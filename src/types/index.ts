@@ -45,3 +45,13 @@ export interface CustomOrder {
   total: number;
   deposit: number;
 }
+
+export interface CashExpense {
+  id: string;
+  amount: number;
+  category: "limpieza" | "retiro_personal" | "insumos_menores" | "proveedor" | "otro";
+  description: string;
+  cashier: string;
+  date: string;
+}
+

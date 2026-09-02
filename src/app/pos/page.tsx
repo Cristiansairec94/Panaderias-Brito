@@ -15,15 +15,15 @@ import {
   Send,
   Sparkles,
   ShoppingBag,
-  Flame,
-  Tag,
-  Star
+  TrendingDown,
+  Wallet
 } from "lucide-react";
-import { Product, CartItem, Sale } from "@/types";
+import { Product, CartItem, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
+import ExpensesModal from "@/components/pos/ExpensesModal";
 
 const FALLBACK_PRODUCTS: Product[] = [
   {
@@ -160,6 +160,25 @@ const FALLBACK_PRODUCTS: Product[] = [
   },
 ];
 
+const INITIAL_EXPENSES: CashExpense[] = [
+  {
+    id: "EXP-001",
+    amount: 145,
+    category: "limpieza",
+    description: "2 escobas y 1 bolsa de jabón Roma para lavado de charolas",
+    cashier: "Don Toño Brito",
+    date: "Hoy, 09:30 AM",
+  },
+  {
+    id: "EXP-002",
+    amount: 300,
+    category: "retiro_personal",
+    description: "Retiro para gastos personales de Don Toño",
+    cashier: "Don Toño Brito",
+    date: "Hoy, 11:15 AM",
+  },
+];
+
 const CATEGORIES = [
   { id: "all", label: "Todo el Pan" },
   { id: "pan_dulce", label: "Pan Dulce Tradicional" },
@@ -182,14 +201,16 @@ export default function POSPage() {
   // Modals & Drawers state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showRecentSales, setShowRecentSales] = useState(false);
+  const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>([]);
+  const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
   
   // Status
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load products & recent sales from Supabase
+  // Load products, recent sales & expenses from Supabase
   useEffect(() => {
     async function loadInitialData() {
       try {
@@ -221,7 +242,7 @@ export default function POSPage() {
           setIsDbConnected(true);
         }
 
-        // 2. Load recent sales of today
+        // 2. Load recent sales
         const { data: salesData, error: salesErr } = await supabase
           .from("sales")
           .select(`
@@ -263,6 +284,27 @@ export default function POSPage() {
             })),
           }));
           setRecentSalesList(mappedSales);
+        }
+
+        // 3. Load cash expenses from Supabase
+        const { data: expData, error: expErr } = await supabase
+          .from("cash_expenses")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (expData && expData.length > 0 && !expErr) {
+          const mappedExp: CashExpense[] = expData.map((e: any) => ({
+            id: e.id,
+            amount: Number(e.amount),
+            category: e.category,
+            description: e.description,
+            cashier: e.cashier || "Don Toño Brito",
+            date: new Date(e.created_at).toLocaleString("es-MX", {
+              dateStyle: "short",
+              timeStyle: "short",
+            }),
+          }));
+          setExpensesList(mappedExp);
         }
       } catch (err) {
         console.log("Using fallback demo mode", err);
@@ -317,12 +359,23 @@ export default function POSPage() {
   const change = paymentMethod === "efectivo" && parsedCashGiven >= total ? parsedCashGiven - total : 0;
   const isPaymentValid = paymentMethod !== "efectivo" || parsedCashGiven >= total;
 
+  // Financial calculations
+  const totalCashSales = recentSalesList
+    .filter((s) => s.paymentMethod === "efectivo")
+    .reduce((sum, s) => sum + s.total, 0);
+  const totalExpenses = expensesList.reduce((sum, e) => sum + e.amount, 0);
+  const netCashInDrawer = Math.max(0, totalCashSales - totalExpenses);
+
   const handleQuickCash = (amount: number) => {
     setCashGiven(amount.toString());
   };
 
   const handleExactCash = () => {
     setCashGiven(total.toString());
+  };
+
+  const handleAddExpense = (newExpense: CashExpense) => {
+    setExpensesList((prev) => [newExpense, ...prev]);
   };
 
   const handleCheckout = async () => {
@@ -424,32 +477,46 @@ export default function POSPage() {
       <div className="flex-1 flex flex-col p-6 overflow-y-auto">
         {/* Top Control Bar */}
         <div className="flex flex-col gap-4 mb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             {/* Search Input */}
-            <div className="relative flex-1 max-w-lg w-full">
+            <div className="relative flex-1 max-w-md w-full">
               <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
               <input
                 type="text"
-                placeholder="Buscar pan dulce, bolillo, pasteles, donas..."
+                placeholder="Buscar concha, bolillo, pastel, dona..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-white rounded-2xl border border-stone-200/90 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm text-sm"
               />
             </div>
 
-            {/* Quick Status and History triggers */}
-            <div className="flex items-center gap-2.5 self-end sm:self-auto">
+            {/* Quick Actions Bar */}
+            <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto">
+              {/* Gastos / Salidas de Caja Button */}
+              <button
+                onClick={() => setShowExpensesModal(true)}
+                className="flex items-center gap-2 text-xs font-black text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-4 py-3 rounded-2xl shadow-sm transition-all active:scale-95"
+              >
+                <TrendingDown className="w-4 h-4 text-rose-600" />
+                <span>Gastos de Turno</span>
+                <span className="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-full">
+                  -{formatCurrency(totalExpenses)}
+                </span>
+              </button>
+
+              {/* Turno / Ventas Recientes */}
               <button
                 onClick={() => setShowRecentSales(true)}
                 className="flex items-center gap-2 text-xs font-bold text-stone-800 bg-white hover:bg-stone-50 border border-stone-200/90 px-4 py-3 rounded-2xl shadow-sm transition-all active:scale-95"
               >
                 <History className="w-4 h-4 text-amber-600" />
-                <span>Turno Activo ({recentSalesList.length})</span>
+                <span>Turno ({recentSalesList.length})</span>
               </button>
 
+              {/* Supabase status */}
               <div className="flex items-center gap-2 text-xs font-semibold text-stone-700 bg-white border border-stone-200/90 px-4 py-3 rounded-2xl shadow-sm">
                 <Database className={`w-4 h-4 ${isDbConnected ? "text-emerald-500" : "text-amber-500"}`} />
-                <span className="hidden md:inline">{isDbConnected ? "Supabase Online" : "Modo Local / Demo"}</span>
+                <span className="hidden xl:inline">{isDbConnected ? "Supabase Online" : "Modo Demo"}</span>
               </div>
             </div>
           </div>
@@ -510,7 +577,6 @@ export default function POSPage() {
                     </div>
                   )}
 
-                  {/* Gradient Overlay for contrast */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 opacity-70 group-hover:opacity-50 transition-opacity" />
 
                   {/* Product Tag Badge */}
@@ -610,7 +676,6 @@ export default function POSPage() {
                 key={item.product.id}
                 className="flex items-center justify-between p-3.5 bg-stone-50 hover:bg-amber-50/60 rounded-2xl border border-stone-200/80 transition-all gap-3"
               >
-                {/* Thumbnail if present */}
                 {item.product.image && (
                   <img
                     src={item.product.image}
@@ -791,6 +856,15 @@ export default function POSPage() {
         onClose={() => setShowRecentSales(false)}
         sales={recentSalesList}
         onSelectSaleForReprint={handleReprintSale}
+      />
+
+      {/* Expenses & Cash Out Modal */}
+      <ExpensesModal
+        isOpen={showExpensesModal}
+        onClose={() => setShowExpensesModal(false)}
+        expenses={expensesList}
+        onAddExpense={handleAddExpense}
+        cashSalesTotal={totalCashSales}
       />
     </div>
   );

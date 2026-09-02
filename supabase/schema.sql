@@ -100,6 +100,16 @@ CREATE TABLE IF NOT EXISTS custom_orders (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 7. Tabla de Gastos y Salidas de Caja en Turno
+CREATE TABLE IF NOT EXISTS cash_expenses (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  amount NUMERIC(10, 2) NOT NULL,
+  category TEXT NOT NULL, -- 'limpieza', 'retiro_personal', 'insumos_menores', 'proveedor', 'otro'
+  description TEXT NOT NULL,
+  cashier TEXT DEFAULT 'Caja Principal - Don Toño' NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Habilitar Políticas de Seguridad (RLS) abiertas para la app
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
@@ -107,6 +117,7 @@ ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sale_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_expenses ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow read/write all for anon users" ON categories FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow read/write all for anon users" ON products FOR ALL USING (true) WITH CHECK (true);
@@ -114,3 +125,5 @@ CREATE POLICY "Allow read/write all for anon users" ON inventory_items FOR ALL U
 CREATE POLICY "Allow read/write all for anon users" ON sales FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow read/write all for anon users" ON sale_items FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow read/write all for anon users" ON custom_orders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow read/write all for anon users" ON cash_expenses FOR ALL USING (true) WITH CHECK (true);
+
