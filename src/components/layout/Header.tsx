@@ -6,14 +6,20 @@ import {
   Clock, 
   ChevronDown, 
   LogOut, 
-  UserCheck
+  UserCheck,
+  Menu,
+  Sparkles,
+  PanelLeftClose,
+  PanelLeftOpen
 } from "lucide-react";
 import NotificationsDropdown from "./NotificationsDropdown";
 import { useAuth, DEMO_USERS } from "@/context/AuthContext";
+import { useSidebar } from "@/context/SidebarContext";
 
 export default function Header() {
   const pathname = usePathname();
   const { user, loginAs, logout } = useAuth();
+  const { isCollapsed, toggleCollapse, toggleMobile } = useSidebar();
   const [time, setTime] = useState<string>("");
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -37,44 +43,81 @@ export default function Header() {
   const getPageTitle = () => {
     switch (pathname) {
       case "/":
-        return { title: "Dashboard / Inicio", subtitle: "Resumen operativo en tiempo real" };
+        return { title: "Dashboard / Inicio", subtitle: "Métricas y actividad operativa en tiempo real" };
       case "/clientes":
         return { title: "Clientes & Mayoristas", subtitle: "Directorio de tienditas, clientes frecuentes y crédito" };
+      case "/productos":
+        return { title: "Catálogo de Productos", subtitle: "Vitrina de panadería tradicional, dulce y repostería fina" };
       case "/inventario":
-        return { title: "Inventario & Insumos", subtitle: "Compras de materia prima, stock y control de mermas" };
+        return { title: "Inventario & Materia Prima", subtitle: "Control de harinas, insumos, compras y mermas" };
       case "/finanzas":
-        return { title: "Finanzas & Balances", subtitle: "Estado de resultados, ingresos, costos y ganancia neta" };
+        return { title: "Resumen Financiero", subtitle: "Estado de resultados, ingresos, costos y márgenes de utilidad" };
       case "/reportes":
         return { title: "Reportes & Estadísticas", subtitle: "Panes estrella, horas pico de mostrador y producción" };
       case "/configuracion":
-        return { title: "Configuración del Sistema", subtitle: "Datos del negocio, tickets, usuarios y base de datos" };
+        return { title: "Configuración del Sistema", subtitle: "Catálogos de sistema, datos de tickets y usuarios" };
       case "/pos":
-        return { title: "Punto de Venta (POS)", subtitle: "Caja rápida y tickets de mostrador" };
+        return { title: "Punto de Venta (POS)", subtitle: "Caja rápida mostrador y tickets de venta" };
       case "/caja":
-        return { title: "Caja & Flujo de Dinero", subtitle: "Arqueo de turno y movimientos de efectivo" };
+        return { title: "Caja & Flujo de Efectivo", subtitle: "Historial de caja, arqueos y registro de movimientos" };
       case "/pedidos":
-        return { title: "Pedidos & Encargos", subtitle: "Pasteles personalizados y fechas de entrega" };
+        return { title: "Pedidos & Encargos", subtitle: "Pasteles para eventos y fechas de entrega programadas" };
       default:
-        return { title: "Panaderías Brito", subtitle: "Sistema Integral ERP" };
+        return { title: "Panaderías Brito", subtitle: "Alta Panadería & Pastelería Fina" };
     }
   };
 
   const current = getPageTitle();
 
   return (
-    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-6 flex items-center justify-between sticky top-0 z-40 shadow-sm">
-      {/* Page Title & Breadcrumbs */}
-      <div>
-        <h2 className="text-lg font-black text-stone-900 tracking-tight">{current.title}</h2>
-        <p className="text-[11px] text-stone-500 font-medium">{current.subtitle}</p>
+    <header className="h-16 bg-[#fdfbf7]/95 backdrop-blur-md border-b border-[#e8ded1] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-[0_2px_12px_-4px_rgba(40,20,10,0.06)]">
+      {/* Left: Hamburger (Mobile) / Collapse Toggle (Desktop) + Page Title */}
+      <div className="flex items-center gap-3">
+        {/* Mobile Hamburger Drawer Toggle */}
+        <button
+          onClick={toggleMobile}
+          className="md:hidden p-2 rounded-xl bg-[#f4ebe1] hover:bg-[#ebdccb] text-[#593922] transition-colors border border-[#d8c7b5]"
+          title="Abrir menú"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Desktop Quick Toggle Button */}
+        <button
+          onClick={toggleCollapse}
+          className="hidden md:flex p-2 rounded-xl bg-[#f5eee4] hover:bg-[#ede1d2] text-[#63442c] transition-colors border border-[#e2d5c5]"
+          title={isCollapsed ? "Desplegar menú lateral" : "Contraer menú lateral"}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="w-4 h-4 text-[#a16207]" />
+          ) : (
+            <PanelLeftClose className="w-4 h-4 text-[#78350f]" />
+          )}
+        </button>
+
+        {/* Breadcrumb / Title */}
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-black text-[#2e1d14] tracking-tight font-serif">
+              {current.title}
+            </h2>
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-[#b45309] bg-[#fef3c7] px-2 py-0.5 rounded-full border border-[#fde68a]">
+              <Sparkles className="w-2.5 h-2.5" />
+              Panadería Fina
+            </span>
+          </div>
+          <p className="text-[10px] sm:text-[11px] text-[#786958] font-medium line-clamp-1">
+            {current.subtitle}
+          </p>
+        </div>
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-3">
-        {/* Live Clock */}
-        <div className="hidden md:flex items-center gap-2 bg-stone-100/80 px-3 py-1.5 rounded-xl border border-stone-200 text-stone-700 text-xs font-bold">
-          <Clock className="w-3.5 h-3.5 text-brito-orange-600" />
-          <span>{time || "Cargando..."}</span>
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Live Clock with Warm Bakery Tone */}
+        <div className="hidden lg:flex items-center gap-2 bg-[#f6eee4] px-3 py-1.5 rounded-xl border border-[#e5d8c8] text-[#573d28] text-xs font-bold shadow-inner">
+          <Clock className="w-3.5 h-3.5 text-[#b45309]" />
+          <span className="tabular-nums">{time || "Cargando..."}</span>
         </div>
 
         {/* Facebook Style Notifications */}
@@ -84,30 +127,30 @@ export default function Header() {
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2.5 p-1 pr-2.5 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/60"
+            className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-[#f3e9dc] transition-all border border-[#decbb7] bg-[#f9f4ed] shadow-sm"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-brito-orange-600 to-brito-crimson-600 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-brito-orange-600/20">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#994714] to-[#c76520] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-[#994714]/20 border border-[#fde047]/40">
               {user?.avatar || "👨‍🍳"}
             </div>
             <div className="text-left hidden sm:block">
-              <p className="text-xs font-black text-stone-900 leading-tight">{user?.name || "Invitado"}</p>
-              <p className="text-[9px] text-brito-orange-700 font-bold uppercase tracking-wider">{user?.roleLabel || "Sin Rol"}</p>
+              <p className="text-xs font-black text-[#29180f] leading-tight">{user?.name || "Invitado"}</p>
+              <p className="text-[9px] text-[#b45309] font-bold uppercase tracking-wider">{user?.roleLabel || "Sin Rol"}</p>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#8c7a68]" />
           </button>
 
           {/* User & Role Switcher Menu */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
-              <div className="p-2.5 border-b border-stone-100">
-                <p className="text-[10px] text-stone-400 font-semibold">Sesión activa:</p>
-                <p className="text-xs font-black text-stone-900">{user?.name}</p>
-                <p className="text-[11px] text-stone-500">{user?.email}</p>
+            <div className="absolute right-0 mt-2 w-72 bg-[#ffffff] rounded-2xl shadow-2xl border border-[#e5d8c8] p-2.5 z-50 animate-in fade-in zoom-in-95">
+              <div className="p-2.5 border-b border-[#f0e7dc] bg-[#faf6f0] rounded-xl mb-1.5">
+                <p className="text-[10px] text-[#8c7a68] font-bold uppercase tracking-wider">Sesión activa:</p>
+                <p className="text-xs font-black text-[#2e1d14]">{user?.name}</p>
+                <p className="text-[11px] text-[#786958]">{user?.email}</p>
               </div>
 
               {/* Fast Role Switcher */}
-              <div className="p-1.5 space-y-0.5">
-                <p className="text-[9px] font-bold text-stone-400 uppercase tracking-wider px-2 py-1">
+              <div className="p-1 space-y-0.5">
+                <p className="text-[9px] font-bold text-[#a89886] uppercase tracking-wider px-2 py-1">
                   Cambiar de Perfil (Demo):
                 </p>
                 {DEMO_USERS.map((demo) => (
@@ -119,26 +162,26 @@ export default function Header() {
                     }}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between font-semibold transition-all ${
                       user?.id === demo.id
-                        ? "bg-amber-100/70 text-brito-orange-900 font-bold"
-                        : "text-stone-600 hover:bg-stone-100"
+                        ? "bg-[#fef3c7] text-[#92400e] font-bold border border-[#fde68a]"
+                        : "text-[#573d28] hover:bg-[#f6eee4]"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <span>{demo.avatar}</span>
                       <span>{demo.name}</span>
                     </div>
-                    {user?.id === demo.id && <UserCheck className="w-3.5 h-3.5 text-brito-orange-600" />}
+                    {user?.id === demo.id && <UserCheck className="w-3.5 h-3.5 text-[#b45309]" />}
                   </button>
                 ))}
               </div>
 
-              <div className="border-t border-stone-100 pt-1.5 mt-1">
+              <div className="border-t border-[#f0e7dc] pt-1.5 mt-1">
                 <button
                   onClick={() => {
                     logout();
                     setShowUserMenu(false);
                   }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                 >
                   <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
                 </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Wallet, 
   ArrowUpRight, 
@@ -51,6 +51,23 @@ export default function CajaPage() {
   const [isCorteModalOpen, setIsCorteModalOpen] = useState(false);
   const [countedCash, setCountedCash] = useState<string>("");
   const [corteSuccess, setCorteSuccess] = useState(false);
+
+  // Read URL query params (?tab=entradas o ?tab=salidas)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "entradas") {
+        setMovementType("entrada");
+        setMovCategory("abono_cliente");
+        setIsMovementModalOpen(true);
+      } else if (tab === "salidas") {
+        setMovementType("salida");
+        setMovCategory("compra_insumos");
+        setIsMovementModalOpen(true);
+      }
+    }
+  }, []);
 
   // Calculations
   const totalEntries = movements.filter((m) => m.type === "entrada").reduce((sum, m) => sum + m.amount, 0);
