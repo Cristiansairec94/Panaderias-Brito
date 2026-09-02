@@ -15,7 +15,9 @@ import {
   Send,
   Sparkles,
   ShoppingBag,
-  AlertCircle
+  Flame,
+  Tag,
+  Star
 } from "lucide-react";
 import { Product, CartItem, Sale } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -24,27 +26,147 @@ import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 
 const FALLBACK_PRODUCTS: Product[] = [
-  { id: "1", name: "Concha de Vainilla", price: 12, category: "pan_dulce", icon: "🥖", stock: 50 },
-  { id: "2", name: "Concha de Chocolate", price: 12, category: "pan_dulce", icon: "🍫", stock: 40 },
-  { id: "3", name: "Cuerno de Mantequilla", price: 15, category: "pan_dulce", icon: "🥐", stock: 30 },
-  { id: "4", name: "Bolillo Tradicional", price: 5, category: "pan_blanco", icon: "🍞", stock: 150 },
-  { id: "5", name: "Telera para Torta", price: 6, category: "pan_blanco", icon: "🥪", stock: 100 },
-  { id: "6", name: "Oreja Hojaldrada", price: 14, category: "pan_dulce", icon: "🥨", stock: 35 },
-  { id: "7", name: "Dona Glaseada", price: 13, category: "pan_dulce", icon: "🍩", stock: 30 },
-  { id: "8", name: "Rebanada Pastel 3 Leches", price: 45, category: "pasteleria", icon: "🍰", stock: 20 },
-  { id: "9", name: "Pay de Queso con Zarzamora", price: 40, category: "pasteleria", icon: "🥧", stock: 15 },
-  { id: "10", name: "Café de Olla Caliente", price: 25, category: "bebidas", icon: "☕", stock: 60 },
-  { id: "11", name: "Pan de Muerto Tradicional", price: 20, category: "temporada", icon: "✨", stock: 50 },
-  { id: "12", name: "Empanada de Calabaza", price: 16, category: "pan_dulce", icon: "🥟", stock: 25 },
+  {
+    id: "1",
+    name: "Concha de Vainilla",
+    price: 12,
+    category: "pan_dulce",
+    icon: "🥖",
+    stock: 50,
+    tag: "Tradicional",
+    description: "Esponjosa y suave con costra crujiente de azúcar y vainilla natural.",
+    image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "2",
+    name: "Concha de Chocolate",
+    price: 12,
+    category: "pan_dulce",
+    icon: "🍫",
+    stock: 40,
+    tag: "Favorito",
+    description: "Masa fina aromatizada con cacao selecto y cubierta crujiente chocolatosa.",
+    image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "3",
+    name: "Cuerno de Mantequilla",
+    price: 15,
+    category: "pan_dulce",
+    icon: "🥐",
+    stock: 30,
+    tag: "Artesanal",
+    description: "Hojaldre 100% mantequilla pura de vaca, dorado y crujiente por capas.",
+    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "4",
+    name: "Bolillo Tradicional",
+    price: 5,
+    category: "pan_blanco",
+    icon: "🍞",
+    stock: 150,
+    tag: "Recién Salido",
+    description: "Corteza dorada crujiente y migajón esponjoso, horneado en piso de piedra.",
+    image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "5",
+    name: "Telera para Torta",
+    price: 6,
+    category: "pan_blanco",
+    icon: "🥪",
+    stock: 100,
+    tag: "De la Casa",
+    description: "Pan suave y dorado en tres secciones, el clásico para tortas mexicanas.",
+    image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "6",
+    name: "Oreja Hojaldrada",
+    price: 14,
+    category: "pan_dulce",
+    icon: "🥨",
+    stock: 35,
+    tag: "Crujiente",
+    description: "Hojaldre finamente caramelizado al horno con mantequilla y azúcar.",
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "7",
+    name: "Dona Glaseada",
+    price: 13,
+    category: "pan_dulce",
+    icon: "🍩",
+    stock: 30,
+    tag: "Más Vendido",
+    description: "Masa esponjada frita a punto exacto con glaseado clásico brillante.",
+    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "8",
+    name: "Rebanada Pastel 3 Leches",
+    price: 45,
+    category: "pasteleria",
+    icon: "🍰",
+    stock: 20,
+    tag: "Gourmet",
+    description: "Bizcocho húmedo bañado en infusión de tres leches y fresa fresca.",
+    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "9",
+    name: "Pay de Queso con Zarzamora",
+    price: 40,
+    category: "pasteleria",
+    icon: "🥧",
+    stock: 15,
+    tag: "Especialidad",
+    description: "Base crujiente de galleta con suave crema de queso y zarzamora silvestre.",
+    image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "10",
+    name: "Café de Olla Caliente",
+    price: 25,
+    category: "bebidas",
+    icon: "☕",
+    stock: 60,
+    tag: "Calientito",
+    description: "Café de grano selecto colado con canela criolla y toque de piloncillo.",
+    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "11",
+    name: "Pan de Muerto Tradicional",
+    price: 20,
+    category: "temporada",
+    icon: "✨",
+    stock: 50,
+    tag: "Temporada",
+    description: "Aromatizado con flor de azahar y naranja, espolvoreado con azúcar fina.",
+    image: "https://images.unsplash.com/photo-1621236378699-8597fee6a1ce?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "12",
+    name: "Empanada de Calabaza",
+    price: 16,
+    category: "pan_dulce",
+    icon: "🥟",
+    stock: 25,
+    tag: "Rellena",
+    description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+  },
 ];
 
 const CATEGORIES = [
-  { id: "all", label: "Todo" },
-  { id: "pan_dulce", label: "Pan Dulce" },
+  { id: "all", label: "Todo el Pan" },
+  { id: "pan_dulce", label: "Pan Dulce Tradicional" },
   { id: "pan_blanco", label: "Bolillo & Telera" },
   { id: "pasteleria", label: "Pasteles & Pays" },
-  { id: "bebidas", label: "Bebidas" },
-  { id: "temporada", label: "Temporada" },
+  { id: "bebidas", label: "Café & Bebidas" },
+  { id: "temporada", label: "Especiales de Temporada" },
 ];
 
 const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500];
@@ -81,14 +203,20 @@ export default function POSPage() {
           .order("name");
 
         if (prodData && prodData.length > 0 && !prodErr) {
-          const mapped: Product[] = prodData.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            price: Number(p.price),
-            category: p.category_id || "pan_dulce",
-            icon: p.icon || "🥖",
-            stock: p.stock || 0,
-          }));
+          const mapped: Product[] = prodData.map((p: any) => {
+            const fallbackMatch = FALLBACK_PRODUCTS.find((fb) => fb.name.toLowerCase() === p.name.toLowerCase());
+            return {
+              id: p.id,
+              name: p.name,
+              price: Number(p.price),
+              category: p.category_id || "pan_dulce",
+              icon: p.icon || "🥖",
+              stock: p.stock || 0,
+              image: p.image || fallbackMatch?.image,
+              description: fallbackMatch?.description,
+              tag: fallbackMatch?.tag || "Artesanal",
+            };
+          });
           setProducts(mapped);
           setIsDbConnected(true);
         }
@@ -145,7 +273,8 @@ export default function POSPage() {
 
   const filteredProducts = products.filter((prod) => {
     const matchesCat = selectedCategory === "all" || prod.category === selectedCategory;
-    const matchesSearch = prod.name.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = prod.name.toLowerCase().includes(search.toLowerCase()) || 
+                          (prod.description && prod.description.toLowerCase().includes(search.toLowerCase()));
     return matchesCat && matchesSearch;
   });
 
@@ -155,7 +284,6 @@ export default function POSPage() {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        // Check stock limit
         if (existing.quantity >= product.stock) return prev;
         return prev.map((item) =>
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
@@ -173,7 +301,7 @@ export default function POSPage() {
           if (item.product.id === id) {
             const newQ = item.quantity + delta;
             if (targetProduct && newQ > targetProduct.stock) {
-              return item; // Cap at max available stock
+              return item;
             }
             return newQ > 0 ? { ...item, quantity: newQ } : null;
           }
@@ -184,7 +312,7 @@ export default function POSPage() {
   };
 
   const total = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPieces = cart.reduce((sum, item) => sum + item.quantity, 0);
   const parsedCashGiven = Number(cashGiven) || 0;
   const change = paymentMethod === "efectivo" && parsedCashGiven >= total ? parsedCashGiven - total : 0;
   const isPaymentValid = paymentMethod !== "efectivo" || parsedCashGiven >= total;
@@ -213,7 +341,6 @@ export default function POSPage() {
     try {
       const supabase = createClient();
       
-      // 1. Insert sale into Supabase
       const { data: saleData, error: saleErr } = await supabase
         .from("sales")
         .insert({
@@ -227,7 +354,6 @@ export default function POSPage() {
       if (saleData && !saleErr) {
         createdSaleId = saleData.id;
 
-        // 2. Insert items
         const saleItemsToInsert = currentItems.map((item) => ({
           sale_id: saleData.id,
           product_id: item.product.id.includes("-") ? item.product.id : null,
@@ -238,7 +364,6 @@ export default function POSPage() {
         }));
         await supabase.from("sale_items").insert(saleItemsToInsert);
 
-        // 3. Discount product stock in Supabase & Local state
         for (const item of currentItems) {
           if (item.product.id.includes("-")) {
             const newStock = Math.max(0, item.product.stock - item.quantity);
@@ -252,7 +377,6 @@ export default function POSPage() {
     } catch (e) {
       console.log("Offline sale or db pending", e);
     } finally {
-      // 4. Update local state stock
       setProducts((prev) =>
         prev.map((prod) => {
           const bought = currentItems.find((ci) => ci.product.id === prod.id);
@@ -263,7 +387,6 @@ export default function POSPage() {
         })
       );
 
-      // 5. Construct completed sale object for Ticket
       const newSaleRecord: Sale = {
         id: createdSaleId,
         date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
@@ -296,51 +419,51 @@ export default function POSPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-stone-100">
-      {/* Product Catalog Grid (Left / Main) */}
+    <div className="flex h-screen overflow-hidden bg-stone-100/70">
+      {/* Product Catalog Area (Main) */}
       <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-        {/* Top bar */}
-        <div className="flex flex-col gap-4 mb-5">
+        {/* Top Control Bar */}
+        <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             {/* Search Input */}
-            <div className="relative flex-1 max-w-md w-full">
-              <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+            <div className="relative flex-1 max-w-lg w-full">
+              <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
               <input
                 type="text"
-                placeholder="Buscar concha, bolillo, pastel, dona..."
+                placeholder="Buscar pan dulce, bolillo, pasteles, donas..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-11 pr-4 py-2.5 bg-white rounded-2xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm text-sm"
+                className="w-full pl-12 pr-4 py-3 bg-white rounded-2xl border border-stone-200/90 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm text-sm"
               />
             </div>
 
             {/* Quick Status and History triggers */}
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex items-center gap-2.5 self-end sm:self-auto">
               <button
                 onClick={() => setShowRecentSales(true)}
-                className="flex items-center gap-1.5 text-xs font-bold text-stone-700 bg-white hover:bg-stone-50 border border-stone-200 px-3.5 py-2.5 rounded-2xl shadow-sm transition-all"
+                className="flex items-center gap-2 text-xs font-bold text-stone-800 bg-white hover:bg-stone-50 border border-stone-200/90 px-4 py-3 rounded-2xl shadow-sm transition-all active:scale-95"
               >
                 <History className="w-4 h-4 text-amber-600" />
-                <span>Turno ({recentSalesList.length})</span>
+                <span>Turno Activo ({recentSalesList.length})</span>
               </button>
 
-              <div className="flex items-center gap-2 text-xs font-semibold text-stone-700 bg-white border border-stone-200 px-3.5 py-2.5 rounded-2xl shadow-sm">
+              <div className="flex items-center gap-2 text-xs font-semibold text-stone-700 bg-white border border-stone-200/90 px-4 py-3 rounded-2xl shadow-sm">
                 <Database className={`w-4 h-4 ${isDbConnected ? "text-emerald-500" : "text-amber-500"}`} />
-                <span className="hidden md:inline">{isDbConnected ? "Supabase Conectado" : "Modo Local / Demo"}</span>
+                <span className="hidden md:inline">{isDbConnected ? "Supabase Online" : "Modo Local / Demo"}</span>
               </div>
             </div>
           </div>
 
-          {/* Category Tabs */}
+          {/* Category Filter Chips */}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all ${
+                className={`px-5 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all ${
                   selectedCategory === cat.id
-                    ? "bg-amber-600 text-white shadow-sm"
-                    : "bg-white text-stone-600 hover:bg-amber-50 border border-stone-200"
+                    ? "bg-amber-900 text-white shadow-md shadow-amber-950/20 scale-[1.02]"
+                    : "bg-white text-stone-700 hover:bg-amber-50/80 border border-stone-200/80"
                 }`}
               >
                 {cat.label}
@@ -349,112 +472,175 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Products Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5 pb-12">
+        {/* High-End Bakery Product Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 pb-14">
           {filteredProducts.map((product) => {
             const isOutOfStock = product.stock <= 0;
             const itemInCart = cart.find((i) => i.product.id === product.id);
+
             return (
-              <button
+              <div
                 key={product.id}
                 onClick={() => addToCart(product)}
-                disabled={isOutOfStock}
-                className={`p-4 rounded-3xl border transition-all text-left flex flex-col justify-between group relative select-none ${
+                className={`group bg-white rounded-3xl border border-stone-200/90 overflow-hidden flex flex-col justify-between transition-all duration-300 relative select-none cursor-pointer ${
                   isOutOfStock
-                    ? "bg-stone-100 border-stone-200 opacity-60 cursor-not-allowed"
-                    : "bg-white border-stone-200 hover:border-amber-500 hover:shadow-lg active:scale-95"
+                    ? "opacity-60 cursor-not-allowed bg-stone-100"
+                    : "hover:shadow-2xl hover:border-amber-400/90 hover:-translate-y-1 active:scale-[0.98]"
                 }`}
               >
-                {/* Active in-cart indicator badge */}
+                {/* Active in-cart indicator */}
                 {itemInCart && (
-                  <span className="absolute -top-2 -right-2 bg-amber-600 text-white font-black text-xs w-6 h-6 rounded-full flex items-center justify-center shadow-md animate-in zoom-in">
-                    {itemInCart.quantity}
+                  <span className="absolute top-3 right-3 z-20 bg-amber-600 text-white font-black text-xs px-2.5 py-1 rounded-full shadow-lg border-2 border-white animate-in zoom-in flex items-center gap-1">
+                    <ShoppingBag className="w-3 h-3" /> {itemInCart.quantity} en charola
                   </span>
                 )}
 
-                <div>
-                  <div className="text-4xl mb-2.5 flex items-center justify-center h-16 bg-amber-50/60 rounded-2xl group-hover:scale-105 transition-transform">
-                    {product.icon || "🥖"}
+                {/* Big Hero Image Container */}
+                <div className="relative h-48 sm:h-52 w-full overflow-hidden bg-stone-100">
+                  {product.image ? (
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500 ease-out"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 text-6xl">
+                      {product.icon || "🥖"}
+                    </div>
+                  )}
+
+                  {/* Gradient Overlay for contrast */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 opacity-70 group-hover:opacity-50 transition-opacity" />
+
+                  {/* Product Tag Badge */}
+                  {product.tag && (
+                    <div className="absolute top-3 left-3 z-10">
+                      <span className="inline-flex items-center gap-1 bg-amber-950/80 backdrop-blur-md text-amber-200 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        {product.tag}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Stock Tag on Image */}
+                  <div className="absolute bottom-3 left-3 z-10">
+                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm ${
+                      isOutOfStock
+                        ? "bg-rose-600/90 text-white font-black"
+                        : "bg-black/60 text-stone-100"
+                    }`}>
+                      {isOutOfStock ? "Agotado en mostrador" : `Disponibles: ${product.stock} pzas`}
+                    </span>
                   </div>
-                  <h4 className="font-bold text-stone-900 text-sm leading-snug line-clamp-1">{product.name}</h4>
-                  <p className={`text-[11px] font-semibold mt-0.5 ${isOutOfStock ? "text-rose-500" : "text-stone-400"}`}>
-                    {isOutOfStock ? "Agotado" : `Stock: ${product.stock} pzas`}
-                  </p>
                 </div>
 
-                <div className="mt-3.5 flex items-center justify-between pt-2 border-t border-stone-100">
-                  <span className="text-base font-black text-amber-700">
-                    {formatCurrency(product.price)}
-                  </span>
-                  <span className={`p-1.5 rounded-xl transition-colors ${
-                    isOutOfStock
-                      ? "bg-stone-200 text-stone-400"
-                      : "bg-amber-100 group-hover:bg-amber-600 group-hover:text-white text-amber-800"
-                  }`}>
-                    <Plus className="w-4 h-4" />
-                  </span>
+                {/* Card Content */}
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
+                  <div>
+                    <h3 className="font-extrabold text-stone-900 text-base leading-snug group-hover:text-amber-800 transition-colors">
+                      {product.name}
+                    </h3>
+                    <p className="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed font-sans">
+                      {product.description || "Panadería artesanal horneada con la receta tradicional de la casa."}
+                    </p>
+                  </div>
+
+                  {/* Price & Action Button */}
+                  <div className="flex items-center justify-between pt-3 border-t border-stone-100">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-stone-400 block leading-none">Precio</span>
+                      <span className="text-xl font-black text-amber-900 tracking-tight">
+                        {formatCurrency(product.price)}
+                      </span>
+                    </div>
+
+                    <button
+                      disabled={isOutOfStock}
+                      className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-black shadow-md transition-all ${
+                        isOutOfStock
+                          ? "bg-stone-200 text-stone-400 cursor-not-allowed"
+                          : "bg-amber-600 group-hover:bg-amber-700 text-white shadow-amber-900/20 active:scale-95"
+                      }`}
+                    >
+                      <Plus className="w-4 h-4 stroke-[3]" />
+                      <span>Agregar</span>
+                    </button>
+                  </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
       </div>
 
       {/* Cart & Cashier Sidebar (Right) */}
-      <div className="w-96 bg-white border-l border-stone-200 flex flex-col h-full shadow-2xl">
+      <div className="w-[400px] bg-white border-l border-stone-200 flex flex-col h-full shadow-2xl">
         {/* Header */}
         <div className="p-4 px-5 border-b border-stone-100 flex items-center justify-between bg-amber-950 text-white">
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-amber-400" />
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-amber-600 rounded-xl">
+              <ShoppingBag className="w-5 h-5 text-white" />
+            </div>
             <div>
               <h3 className="font-bold text-sm leading-tight">Charola de Cobro</h3>
-              <p className="text-[10px] text-amber-300/80">Don Toño Brito</p>
+              <p className="text-[10px] text-amber-300/80">Don Toño Brito • Mostrador</p>
             </div>
           </div>
-          <span className="text-xs bg-amber-800/80 px-2.5 py-1 rounded-full font-bold">
-            {totalItems} {totalItems === 1 ? "pieza" : "piezas"}
+          <span className="text-xs bg-amber-800/90 px-3 py-1.5 rounded-full font-extrabold text-amber-100">
+            {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
           </span>
         </div>
 
         {/* Cart Items List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-stone-400 text-center p-6 space-y-2">
-              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-3xl">
+            <div className="h-full flex flex-col items-center justify-center text-stone-400 text-center p-6 space-y-3">
+              <div className="w-20 h-20 bg-amber-50/80 rounded-full flex items-center justify-center text-4xl shadow-inner">
                 🧺
               </div>
-              <p className="text-sm font-bold text-stone-700">Charola vacía</p>
-              <p className="text-xs text-stone-400 max-w-[200px]">
-                Selecciona los panes en pantalla para agregarlos a la cuenta.
+              <p className="text-base font-bold text-stone-800">Charola vacía</p>
+              <p className="text-xs text-stone-400 max-w-[220px] leading-relaxed">
+                Toca cualquier pan del catálogo para agregarlo a la cuenta del cliente.
               </p>
             </div>
           ) : (
             cart.map((item) => (
               <div
                 key={item.product.id}
-                className="flex items-center justify-between p-3 bg-stone-50 hover:bg-stone-100/80 rounded-2xl border border-stone-200/80 transition-all"
+                className="flex items-center justify-between p-3.5 bg-stone-50 hover:bg-amber-50/60 rounded-2xl border border-stone-200/80 transition-all gap-3"
               >
-                <div className="flex-1 pr-2">
-                  <p className="font-bold text-xs text-stone-900 leading-tight">{item.product.name}</p>
-                  <p className="text-[11px] text-amber-700 font-semibold mt-0.5">
+                {/* Thumbnail if present */}
+                {item.product.image && (
+                  <img
+                    src={item.product.image}
+                    alt={item.product.name}
+                    className="w-12 h-12 object-cover rounded-xl shrink-0 border border-stone-200"
+                  />
+                )}
+
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-xs text-stone-900 leading-tight truncate">{item.product.name}</p>
+                  <p className="text-[11px] text-amber-800 font-semibold mt-0.5">
                     {formatCurrency(item.product.price)} c/u
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5">
+
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => updateQuantity(item.product.id, -1)}
                     className="p-1.5 hover:bg-stone-200 active:scale-90 rounded-xl text-stone-600 transition-all"
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="font-black text-xs w-6 text-center text-stone-800">{item.quantity}</span>
+                  <span className="font-black text-xs w-6 text-center text-stone-900">{item.quantity}</span>
                   <button
                     onClick={() => updateQuantity(item.product.id, 1)}
                     className="p-1.5 hover:bg-stone-200 active:scale-90 rounded-xl text-stone-600 transition-all"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="font-black text-xs text-stone-900 w-14 text-right">
+                  <span className="font-black text-xs text-stone-900 w-16 text-right">
                     {formatCurrency(item.product.price * item.quantity)}
                   </span>
                 </div>
@@ -464,11 +650,11 @@ export default function POSPage() {
         </div>
 
         {/* Payment Configuration & Checkout Area */}
-        <div className="p-4 border-t border-stone-200 bg-stone-50/90 space-y-3">
+        <div className="p-4 border-t border-stone-200 bg-stone-50/95 space-y-3">
           {/* Payment Method Selector */}
           <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Método de Pago:</span>
-            <div className="grid grid-cols-3 gap-1.5">
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Forma de Pago:</span>
+            <div className="grid grid-cols-3 gap-2">
               {[
                 { id: "efectivo", label: "Efectivo", icon: DollarSign },
                 { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
@@ -480,10 +666,10 @@ export default function POSPage() {
                   <button
                     key={m.id}
                     onClick={() => setPaymentMethod(m.id as any)}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all ${
+                    className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-2xl text-xs font-extrabold transition-all ${
                       isSelected
-                        ? "bg-amber-800 text-white shadow-sm"
-                        : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
+                        ? "bg-amber-900 text-white shadow-md"
+                        : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
@@ -495,39 +681,39 @@ export default function POSPage() {
           </div>
 
           {/* Totals Banner */}
-          <div className="bg-white p-3 rounded-2xl border border-stone-200 space-y-1 shadow-sm">
+          <div className="bg-white p-3.5 rounded-2xl border border-stone-200/90 space-y-1 shadow-sm">
             <div className="flex justify-between items-center text-xs font-medium text-stone-500">
-              <span>Subtotal ({totalItems} pzas):</span>
+              <span>Subtotal ({totalPieces} piezas):</span>
               <span>{formatCurrency(total)}</span>
             </div>
-            <div className="flex justify-between items-center text-lg font-black text-stone-900 border-t border-stone-100 pt-1.5">
+            <div className="flex justify-between items-center text-xl font-black text-stone-900 border-t border-stone-100 pt-1.5">
               <span>Total a Cobrar:</span>
-              <span className="text-amber-700">{formatCurrency(total)}</span>
+              <span className="text-amber-800">{formatCurrency(total)}</span>
             </div>
           </div>
 
           {/* Cash Handling with Quick Denominations */}
           {paymentMethod === "efectivo" && (
-            <div className="space-y-2 bg-amber-50/70 p-3 rounded-2xl border border-amber-200/80">
+            <div className="space-y-2 bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200/80">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-stone-700">Paga con ($ Efectivo):</label>
+                <label className="text-xs font-extrabold text-stone-800">Paga con ($ Efectivo):</label>
                 <button
                   onClick={handleExactCash}
                   disabled={cart.length === 0}
-                  className="text-[11px] font-extrabold text-amber-800 hover:underline"
+                  className="text-[11px] font-black text-amber-800 hover:underline active:scale-95 transition-transform"
                 >
-                  Pago Exacto
+                  Cobro Exacto
                 </button>
               </div>
 
               {/* Quick Bill Buttons */}
-              <div className="grid grid-cols-5 gap-1">
+              <div className="grid grid-cols-5 gap-1.5">
                 {QUICK_DENOMINATIONS.map((bill) => (
                   <button
                     key={bill}
                     onClick={() => handleQuickCash(bill)}
                     disabled={cart.length === 0}
-                    className="py-1.5 bg-white hover:bg-amber-600 hover:text-white text-stone-800 font-extrabold text-xs rounded-lg border border-amber-200 shadow-sm transition-all active:scale-95"
+                    className="py-2 bg-white hover:bg-amber-700 hover:text-white text-stone-900 font-black text-xs rounded-xl border border-amber-200 shadow-sm transition-all active:scale-95"
                   >
                     ${bill}
                   </button>
@@ -537,21 +723,21 @@ export default function POSPage() {
               {/* Custom Cash Input */}
               <input
                 type="number"
-                placeholder="O escribe cantidad..."
+                placeholder="O teclea la cantidad recibida..."
                 value={cashGiven}
                 onChange={(e) => setCashGiven(e.target.value)}
-                className="w-full px-3 py-1.5 bg-white rounded-xl border border-amber-300 text-xs font-black text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                className="w-full px-3.5 py-2 bg-white rounded-xl border border-amber-300 text-xs font-black text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
               />
 
               {/* Change Display */}
               {parsedCashGiven > 0 && (
-                <div className={`flex justify-between items-center p-2 rounded-xl text-xs font-bold border ${
+                <div className={`flex justify-between items-center p-2.5 rounded-xl text-xs font-black border ${
                   parsedCashGiven >= total
-                    ? "bg-emerald-100/80 text-emerald-900 border-emerald-300"
-                    : "bg-rose-100 text-rose-800 border-rose-300"
+                    ? "bg-emerald-100/90 text-emerald-950 border-emerald-300"
+                    : "bg-rose-100 text-rose-900 border-rose-300"
                 }`}>
-                  <span>{parsedCashGiven >= total ? "Cambio a Devolver:" : "Falta dinero:"}</span>
-                  <span className="text-sm">
+                  <span>{parsedCashGiven >= total ? "Cambio a Entregar:" : "Falta por cubrir:"}</span>
+                  <span className="text-base">
                     {parsedCashGiven >= total ? formatCurrency(change) : formatCurrency(total - parsedCashGiven)}
                   </span>
                 </div>
@@ -567,17 +753,17 @@ export default function POSPage() {
                 setCashGiven("");
               }}
               disabled={cart.length === 0}
-              className="px-3 py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-40 text-stone-700 font-bold rounded-2xl text-xs flex items-center justify-center gap-1 transition-all"
+              className="px-3 py-3.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-40 text-stone-700 font-bold rounded-2xl text-xs flex items-center justify-center gap-1 transition-all"
             >
               <Trash2 className="w-4 h-4" /> Cancelar
             </button>
             <button
               onClick={handleCheckout}
               disabled={cart.length === 0 || !isPaymentValid || isSubmitting}
-              className="col-span-2 py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-extrabold rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-900/20 transition-all active:scale-95"
+              className="col-span-2 py-3.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-900/20 transition-all active:scale-95"
             >
               <CheckCircle className="w-4 h-4" />
-              <span>{isSubmitting ? "Registrando..." : "Cobrar & Ticket"}</span>
+              <span>{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
             </button>
           </div>
         </div>

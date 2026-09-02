@@ -6,6 +6,8 @@ export interface Product {
   image?: string;
   icon?: string;
   stock: number;
+  description?: string;
+  tag?: string;
 }
 
 export interface CartItem {
