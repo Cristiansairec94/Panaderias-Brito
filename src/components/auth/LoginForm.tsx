@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
-import { Lock, Mail, ArrowRight, ShieldCheck, Sparkles, KeyRound } from "lucide-react";
-import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
+import { Lock, Mail, ArrowRight, Sparkles } from "lucide-react";
+import { useAuth, DEMO_USERS } from "@/context/AuthContext";
+import AnimatedLogo from "@/components/ui/AnimatedLogo";
 
 export default function LoginForm() {
   const { login, loginAs } = useAuth();
@@ -27,17 +27,10 @@ export default function LoginForm() {
       <div className="absolute w-96 h-96 bg-brito-crimson-600/10 rounded-full blur-3xl pointer-events-none -bottom-10" />
 
       <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden border border-stone-100 relative z-10 animate-in fade-in zoom-in-95 duration-300">
-        {/* Header with Logo */}
+        {/* Header with HD Animated Logo */}
         <div className="p-8 text-center bg-gradient-to-b from-amber-50/80 to-white border-b border-stone-100 flex flex-col items-center">
-          <div className="w-28 h-28 relative mb-3 bg-white rounded-3xl p-2 shadow-xl border border-brito-orange-200 flex items-center justify-center">
-            <Image
-              src="/logo.png"
-              alt="Panaderías Brito Logo"
-              width={100}
-              height={100}
-              className="object-contain"
-              priority
-            />
+          <div className="mb-3">
+            <AnimatedLogo size={110} />
           </div>
           <h2 className="text-2xl font-black text-stone-900 tracking-tight">Panaderías Brito</h2>
           <p className="text-xs text-stone-500 font-medium mt-1">

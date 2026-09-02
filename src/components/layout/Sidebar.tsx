@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { 
   ShoppingBag, 
@@ -10,10 +9,10 @@ import {
   BarChart3, 
   Store,
   Users,
-  Wallet,
-  ArrowUpDown
+  Wallet
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import AnimatedLogo from "@/components/ui/AnimatedLogo";
 
 const navigation = [
   { name: "Inicio / Resumen", href: "/", icon: Store, badge: null },
@@ -31,17 +30,10 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 bg-[#18181b] text-stone-100 flex flex-col min-h-screen shrink-0 shadow-2xl border-r border-stone-800 select-none">
-      {/* Brand Header with Official Logo */}
+      {/* Brand Header with Animated HD Logo */}
       <div className="p-5 border-b border-stone-800/80 flex flex-col items-center text-center bg-stone-900/60">
-        <div className="relative w-20 h-20 mb-2 bg-white/95 rounded-2xl p-1.5 shadow-lg border-2 border-brito-orange-500/40 flex items-center justify-center">
-          <Image
-            src="/logo.png"
-            alt="Panadería Bakery Brito"
-            width={75}
-            height={75}
-            className="object-contain"
-            priority
-          />
+        <div className="mb-2">
+          <AnimatedLogo size={85} />
         </div>
         <h1 className="font-black text-sm text-white tracking-wide">Panaderías Brito</h1>
         <p className="text-[10px] font-semibold text-brito-orange-400">Sistema Integral ERP</p>
