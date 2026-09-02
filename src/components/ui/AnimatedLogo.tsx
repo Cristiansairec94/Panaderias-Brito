@@ -18,7 +18,7 @@ export default function AnimatedLogo({
   const [isSpinning, setIsSpinning] = useState(false);
   const [sparkleVisible, setSparkleVisible] = useState(false);
 
-  // Trigger spin automatically every 30 seconds
+  // Trigger 3D spin automatically every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       triggerSpin();
@@ -51,7 +51,7 @@ export default function AnimatedLogo({
 
       {/* Main Logo Container with 3D Flip & Shimmer */}
       <div
-        className={`relative rounded-2xl bg-white/95 p-2 shadow-2xl border-2 border-amber-300/40 backdrop-blur-sm transition-transform duration-700 ease-out flex items-center justify-center overflow-hidden ${
+        className={`relative rounded-2xl bg-white p-2 shadow-2xl border-2 border-amber-300/40 backdrop-blur-sm transition-transform duration-700 ease-out flex items-center justify-center overflow-hidden ${
           isSpinning ? "animate-brito-3d-spin" : "hover:scale-105"
         }`}
         style={{
@@ -63,15 +63,16 @@ export default function AnimatedLogo({
         {/* Shimmer Light Reflection Sweep */}
         <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none z-20" />
 
-        {/* High Resolution Vector Logo */}
+        {/* Exact Original Image without distortion */}
         <div className="relative w-full h-full flex items-center justify-center">
           <Image
-            src="/logo.svg"
+            src="/logo.png"
             alt="Panadería Bakery Brito"
-            width={size}
-            height={size}
-            className="w-full h-full object-contain drop-shadow-md filter saturate-[1.15] contrast-[1.05]"
+            width={size * 2}
+            height={size * 2}
+            className="w-full h-full object-contain select-none pointer-events-none"
             priority
+            unoptimized
           />
         </div>
 
@@ -83,7 +84,7 @@ export default function AnimatedLogo({
         )}
       </div>
 
-      {/* Floating 3D CSS animation keyframes inline */}
+      {/* 3D Coin Spin Animation Keyframes */}
       <style jsx global>{`
         @keyframes brito3dSpin {
           0% {
