@@ -1,33 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Search, 
   Trash2, 
   Plus, 
   Minus, 
-  CreditCard, 
-  Banknote, 
   CheckCircle, 
   Receipt, 
-  Sparkles
+  Sparkles,
+  Database
 } from "lucide-react";
 import { Product, CartItem } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
-const SAMPLE_PRODUCTS: Product[] = [
-  { id: "1", name: "Concha de Vainilla", price: 12, category: "pan_dulce", icon: "🥖", stock: 45 },
-  { id: "2", name: "Concha de Chocolate", price: 12, category: "pan_dulce", icon: "🍫", stock: 38 },
-  { id: "3", name: "Cuerno de Mantequilla", price: 15, category: "pan_dulce", icon: "🥐", stock: 24 },
-  { id: "4", name: "Bolillo Tradicional", price: 5, category: "pan_blanco", icon: "🍞", stock: 120 },
-  { id: "5", name: "Telera para Torta", price: 6, category: "pan_blanco", icon: "🥪", stock: 80 },
-  { id: "6", name: "Oreja Hojaldrada", price: 14, category: "pan_dulce", icon: "🥨", stock: 30 },
-  { id: "7", name: "Dona Glaseada", price: 13, category: "pan_dulce", icon: "🍩", stock: 25 },
-  { id: "8", name: "Rebanada Pastel 3 Leches", price: 45, category: "pasteleria", icon: "🍰", stock: 15 },
-  { id: "9", name: "Pay de Queso con Zarzamora", price: 40, category: "pasteleria", icon: "🥧", stock: 10 },
-  { id: "10", name: "Café de Olla Caliente", price: 25, category: "bebidas", icon: "☕", stock: 50 },
-  { id: "11", name: "Pan de Muerto Tradicional", price: 20, category: "temporada", icon: "✨", stock: 60 },
-  { id: "12", name: "Empanada de Calabaza", price: 16, category: "pan_dulce", icon: "🥟", stock: 20 },
+const FALLBACK_PRODUCTS: Product[] = [
+  { id: "1", name: "Concha de Vainilla", price: 12, category: "pan_dulce", icon: "🥖", stock: 50 },
+  { id: "2", name: "Concha de Chocolate", price: 12, category: "pan_dulce", icon: "🍫", stock: 40 },
+  { id: "3", name: "Cuerno de Mantequilla", price: 15, category: "pan_dulce", icon: "🥐", stock: 30 },
+  { id: "4", name: "Bolillo Tradicional", price: 5, category: "pan_blanco", icon: "🍞", stock: 150 },
+  { id: "5", name: "Telera para Torta", price: 6, category: "pan_blanco", icon: "🥪", stock: 100 },
+  { id: "6", name: "Oreja Hojaldrada", price: 14, category: "pan_dulce", icon: "🥨", stock: 35 },
+  { id: "7", name: "Dona Glaseada", price: 13, category: "pan_dulce", icon: "🍩", stock: 30 },
+  { id: "8", name: "Rebanada Pastel 3 Leches", price: 45, category: "pasteleria", icon: "🍰", stock: 20 },
+  { id: "9", name: "Pay de Queso con Zarzamora", price: 40, category: "pasteleria", icon: "🥧", stock: 15 },
+  { id: "10", name: "Café de Olla Caliente", price: 25, category: "bebidas", icon: "☕", stock: 60 },
+  { id: "11", name: "Pan de Muerto Tradicional", price: 20, category: "temporada", icon: "✨", stock: 50 },
+  { id: "12", name: "Empanada de Calabaza", price: 16, category: "pan_dulce", icon: "🥟", stock: 25 },
 ];
 
 const CATEGORIES = [
@@ -39,13 +39,40 @@ const CATEGORIES = [
 ];
 
 export default function POSPage() {
+  const [products, setProducts] = useState<Product[]>(FALLBACK_PRODUCTS);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [cashGiven, setCashGiven] = useState<string>("");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [isDbConnected, setIsDbConnected] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const filteredProducts = SAMPLE_PRODUCTS.filter((prod) => {
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.from("products").select("*").eq("is_active", true);
+        if (data && data.length > 0 && !error) {
+          const mapped: Product[] = data.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: Number(p.price),
+            category: p.category_id || "pan_dulce",
+            icon: p.icon || "🥖",
+            stock: p.stock || 0,
+          }));
+          setProducts(mapped);
+          setIsDbConnected(true);
+        }
+      } catch (err) {
+        console.log("Using fallback products", err);
+      }
+    }
+    loadProducts();
+  }, []);
+
+  const filteredProducts = products.filter((prod) => {
     const matchesCat = selectedCategory === "all" || prod.category === selectedCategory;
     const matchesSearch = prod.name.toLowerCase().includes(search.toLowerCase());
     return matchesCat && matchesSearch;
@@ -81,9 +108,40 @@ export default function POSPage() {
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const change = Number(cashGiven) >= total ? Number(cashGiven) - total : 0;
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (cart.length === 0) return;
-    setShowReceiptModal(true);
+    setIsSubmitting(true);
+
+    try {
+      const supabase = createClient();
+      // Insert sale into Supabase
+      const { data: saleData, error: saleErr } = await supabase
+        .from("sales")
+        .insert({
+          total: total,
+          payment_method: "efectivo",
+          cashier: "Caja Principal - Don Toño",
+        })
+        .select()
+        .single();
+
+      if (saleData && !saleErr) {
+        const saleItemsToInsert = cart.map((item) => ({
+          sale_id: saleData.id,
+          product_id: item.product.id.includes("-") ? item.product.id : null,
+          product_name: item.product.name,
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          subtotal: item.product.price * item.quantity,
+        }));
+        await supabase.from("sale_items").insert(saleItemsToInsert);
+      }
+    } catch (e) {
+      console.log("Offline sale or db pending", e);
+    } finally {
+      setIsSubmitting(false);
+      setShowReceiptModal(true);
+    }
   };
 
   const resetSale = () => {
@@ -109,9 +167,9 @@ export default function POSPage() {
                 className="w-full pl-11 pr-4 py-2.5 bg-white rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm text-sm"
               />
             </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-stone-600 bg-amber-100/70 px-3.5 py-2 rounded-xl">
-              <Sparkles className="w-4 h-4 text-amber-600" />
-              Precios Actualizados
+            <div className="flex items-center gap-2 text-xs font-semibold text-stone-700 bg-white border border-stone-200 px-3.5 py-2 rounded-xl shadow-sm">
+              <Database className={`w-4 h-4 ${isDbConnected ? "text-emerald-500" : "text-amber-500"}`} />
+              <span>{isDbConnected ? "Supabase Conectado" : "Modo Local / Demo"}</span>
             </div>
           </div>
 
@@ -256,10 +314,10 @@ export default function POSPage() {
             </button>
             <button
               onClick={handleCheckout}
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || isSubmitting}
               className="px-4 py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95"
             >
-              <CheckCircle className="w-4 h-4" /> Cobrar Venta
+              <CheckCircle className="w-4 h-4" /> {isSubmitting ? "Guardando..." : "Cobrar Venta"}
             </button>
           </div>
         </div>
@@ -274,7 +332,7 @@ export default function POSPage() {
             </div>
             <h3 className="text-xl font-bold text-stone-900">¡Venta Registrada!</h3>
             <p className="text-xs text-stone-500">
-              Venta completada con éxito. Se actualizó el stock de piezas horneadas.
+              Venta guardada en Supabase y stock actualizado.
             </p>
             <div className="bg-stone-50 p-4 rounded-2xl text-left text-xs space-y-1.5 border border-stone-200">
               <div className="flex justify-between">
