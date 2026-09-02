@@ -2,10 +2,12 @@ export interface Product {
   id: string;
   name: string;
   price: number;
-  category: "pan_dulce" | "pan_blanco" | "pasteleria" | "bebidas" | "temporada";
+  category: "pan_dulce" | "pan_blanco" | "pasteleria" | "bebidas" | "temporada" | "abarrotes" | "materia_prima";
   image?: string;
   icon?: string;
   stock: number;
+  description?: string;
+  tag?: string;
 }
 
 export interface CartItem {
@@ -20,6 +22,8 @@ export interface Sale {
   total: number;
   paymentMethod: "efectivo" | "tarjeta" | "transferencia";
   cashier: string;
+  cashGiven?: number;
+  change?: number;
 }
 
 export interface InventoryItem {
@@ -102,3 +106,45 @@ export interface CashMovement {
   authorizedBy: string;
   timestamp: string;
 }
+
+export interface CashExpense {
+  id: string;
+  amount: number;
+  category: "limpieza" | "retiro_personal" | "insumos_menores" | "proveedor" | "otro";
+  description: string;
+  cashier: string;
+  date: string;
+}
+
+export type UserRole = "admin" | "cajero" | "panadero" | "supervisor";
+
+export interface RolePermissions {
+  canAccessDashboard: boolean;
+  canAccessPos: boolean;
+  canAccessCaja: boolean;
+  canAccessInventario: boolean;
+  canAccessPedidos: boolean;
+  canAccessClientes: boolean;
+  canAccessFinanzas: boolean;
+  canAccessReportes: boolean;
+  canAccessConfiguracion: boolean;
+  canAccessProductos: boolean;
+  canViewProfitMargins: boolean;
+  canEditPrices: boolean;
+  canManageUsers: boolean;
+}
+
+export interface AppUser {
+  id: string;
+  name: string;
+  username?: string;
+  email: string;
+  password?: string;
+  role: UserRole;
+  roleLabel: string;
+  avatar: string;
+  phone?: string;
+  permissions?: Partial<RolePermissions>;
+}
+
+

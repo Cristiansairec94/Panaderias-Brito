@@ -16,13 +16,25 @@ import {
   Clock,
   Sparkles,
   DollarSign,
-  Plus
+  Plus,
+  X,
+  ShieldAlert,
+  Check
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { DEMO_USERS } from "@/context/AuthContext";
+import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
+import { UserRole } from "@/types";
 
 export default function ConfiguracionPage() {
+  const { usersList, addUser } = useAuth();
   const [activeTab, setActiveTab] = useState<"general" | "usuarios" | "ticket" | "operaciones" | "database">("general");
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<UserRole>("cajero");
+  const [newUserAvatar, setNewUserAvatar] = useState("👤");
+
   const [savedAlert, setSavedAlert] = useState(false);
 
   useEffect(() => {
@@ -194,54 +206,225 @@ export default function ConfiguracionPage() {
 
       {/* Tab 2: Users & Roles */}
       {activeTab === "usuarios" && (
-        <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm space-y-6 max-w-4xl animate-in fade-in">
-          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-            <div>
-              <h3 className="font-black text-base text-stone-900">Personal & Roles con Acceso al ERP</h3>
-              <p className="text-[11px] text-stone-500">Cuentas habilitadas para Don Toño, cajeras y maestros panaderos.</p>
-            </div>
-            <button className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-bold px-3.5 py-2 rounded-xl text-xs transition-all">
-              <Plus className="w-4 h-4 text-brito-orange-400" /> Agregar Empleado
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {DEMO_USERS.map((usr) => (
-              <div
-                key={usr.id}
-                className="flex items-center justify-between p-4 bg-stone-50 rounded-2xl border border-stone-200/80 hover:bg-amber-50/30 transition-colors"
+        <div className="space-y-6 max-w-5xl animate-in fade-in">
+          {/* User List Card */}
+          <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <div>
+                <h3 className="font-black text-base text-stone-900">Personal & Roles con Acceso al ERP</h3>
+                <p className="text-[11px] text-stone-500">Cuentas habilitadas para Don Toño, cajeras y maestros panaderos.</p>
+              </div>
+              <button 
+                onClick={() => setShowAddUserModal(!showAddUserModal)}
+                className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-bold px-3.5 py-2 rounded-xl text-xs transition-all"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-white border border-stone-200 flex items-center justify-center text-2xl shadow-sm">
-                    {usr.avatar}
+                <Plus className="w-4 h-4 text-brito-orange-400" /> {showAddUserModal ? "Cancelar" : "Agregar Empleado"}
+              </button>
+            </div>
+
+            {/* Modal / Form to add employee */}
+            {showAddUserModal && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newUserName || !newUserEmail) return;
+                  const roleLabels: Record<UserRole, string> = {
+                    admin: "Administrador",
+                    cajero: "Cajero Mostrador",
+                    panadero: "Panadero / Horno",
+                    supervisor: "Supervisor de Turno",
+                  };
+                  const newUser: User = {
+                    id: `usr-${Date.now()}`,
+                    name: newUserName,
+                    email: newUserEmail,
+                    password: newUserPassword || "1234",
+                    role: newUserRole,
+                    roleLabel: roleLabels[newUserRole],
+                    avatar: newUserAvatar,
+                  };
+                  addUser(newUser);
+                  setNewUserName("");
+                  setNewUserEmail("");
+                  setNewUserPassword("");
+                  setShowAddUserModal(false);
+                }}
+                className="p-4 bg-amber-50/50 rounded-2xl border border-amber-200/80 space-y-3 animate-in fade-in"
+              >
+                <h4 className="font-black text-xs text-amber-950">Nuevo Empleado / Usuario</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <label className="font-bold text-stone-700">Nombre Completo</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. María Gómez"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 bg-white rounded-xl border border-stone-200"
+                    />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-black text-xs text-stone-900">{usr.name}</h4>
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
-                        usr.role === "admin"
-                          ? "bg-brito-orange-100 text-brito-orange-800 border border-brito-orange-300"
-                          : usr.role === "cajero"
-                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                          : "bg-blue-100 text-blue-800 border border-blue-300"
-                      }`}>
-                        {usr.roleLabel}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500 mt-0.5">{usr.email}</p>
+                    <label className="font-bold text-stone-700">Correo Electrónico</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="maria@panaderiabrito.com"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 bg-white rounded-xl border border-stone-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-stone-700">Contraseña</label>
+                    <input
+                      type="text"
+                      placeholder="••••••"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 bg-white rounded-xl border border-stone-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-stone-700">Rol Operativo</label>
+                    <select
+                      value={newUserRole}
+                      onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                      className="w-full mt-1 px-3 py-2 bg-white rounded-xl border border-stone-200 font-bold"
+                    >
+                      <option value="cajero">Cajero Mostrador</option>
+                      <option value="panadero">Panadero / Horno</option>
+                      <option value="supervisor">Supervisor de Turno</option>
+                      <option value="admin">Administrador General</option>
+                    </select>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-lg">
-                    Activo
-                  </span>
-                  <button className="text-stone-400 hover:text-stone-700 font-bold text-xs p-1.5">
-                    Editar
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddUserModal(false)}
+                    className="px-4 py-2 text-stone-600 font-bold text-xs hover:bg-stone-100 rounded-xl"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 text-white font-extrabold text-xs rounded-xl shadow-md"
+                  >
+                    Guardar Empleado
                   </button>
                 </div>
-              </div>
-            ))}
+              </form>
+            )}
+
+            {/* Users List */}
+            <div className="space-y-3">
+              {usersList.map((usr) => (
+                <div
+                  key={usr.id}
+                  className="flex items-center justify-between p-4 bg-stone-50 rounded-2xl border border-stone-200/80 hover:bg-amber-50/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white border border-stone-200 flex items-center justify-center text-2xl shadow-sm">
+                      {usr.avatar}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-black text-xs text-stone-900">{usr.name}</h4>
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                          usr.role === "admin"
+                            ? "bg-amber-100 text-amber-800 border border-amber-300"
+                            : usr.role === "cajero"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                            : usr.role === "panadero"
+                            ? "bg-orange-100 text-orange-800 border border-orange-300"
+                            : "bg-indigo-100 text-indigo-800 border border-indigo-300"
+                        }`}>
+                          {usr.roleLabel}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500 mt-0.5">{usr.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                      Activo
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* RBAC Permission Matrix Card */}
+          <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm space-y-4">
+            <div className="border-b border-stone-100 pb-3">
+              <h3 className="font-black text-base text-stone-900">Matriz de Permisos por Rol (RBAC)</h3>
+              <p className="text-[11px] text-stone-500">
+                Visualización de accesos autorizados por cada perfil operativo en Panaderías Brito.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-stone-50 text-stone-600 font-black border-b border-stone-200">
+                  <tr>
+                    <th className="p-3">Módulo / Capacidad</th>
+                    <th className="p-3 text-center">Administrador</th>
+                    <th className="p-3 text-center">Supervisor</th>
+                    <th className="p-3 text-center">Cajero Mostrador</th>
+                    <th className="p-3 text-center">Panadero / Horno</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100 font-medium">
+                  {[
+                    { name: "Dashboard / Resumen General", perm: "canAccessDashboard" },
+                    { name: "Punto de Venta (POS)", perm: "canAccessPos" },
+                    { name: "Caja & Flujo de Efectivo", perm: "canAccessCaja" },
+                    { name: "Inventario & Insumos", perm: "canAccessInventario" },
+                    { name: "Pedidos & Encargos", perm: "canAccessPedidos" },
+                    { name: "Clientes & Mayoristas", perm: "canAccessClientes" },
+                    { name: "Finanzas & Balances", perm: "canAccessFinanzas" },
+                    { name: "Reportes & Métricas", perm: "canAccessReportes" },
+                    { name: "Configuración del Sistema", perm: "canAccessConfiguracion" },
+                    { name: "Ver Costos Unitarios & Margen", perm: "canViewProfitMargins" },
+                  ].map((row) => (
+                    <tr key={row.perm} className="hover:bg-amber-50/20">
+                      <td className="p-3 font-bold text-stone-800">{row.name}</td>
+                      <td className="p-3 text-center">
+                        {ROLE_PERMISSIONS.admin[row.perm as keyof typeof ROLE_PERMISSIONS.admin] ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold">✓</span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full">—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {ROLE_PERMISSIONS.supervisor[row.perm as keyof typeof ROLE_PERMISSIONS.supervisor] ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold">✓</span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full">—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {ROLE_PERMISSIONS.cajero[row.perm as keyof typeof ROLE_PERMISSIONS.cajero] ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold">✓</span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full">—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        {ROLE_PERMISSIONS.panadero[row.perm as keyof typeof ROLE_PERMISSIONS.panadero] ? (
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold">✓</span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

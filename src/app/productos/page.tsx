@@ -1,335 +1,882 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useEffect, useMemo, useRef } from "react";
+import Image from "next/image";
 import { 
-  Croissant, 
-  Search, 
   Plus, 
-  ShoppingBag, 
-  Star, 
-  Sparkles, 
+  Search, 
+  Edit3, 
+  Trash2, 
+  Upload, 
+  Link as LinkIcon, 
+  X, 
+  Check, 
+  AlertTriangle, 
+  Croissant, 
+  Package, 
+  DollarSign, 
   Layers, 
-  ArrowRight,
-  Filter,
-  CheckCircle2,
-  Clock
+  Sparkles, 
+  Grid, 
+  List as ListIcon, 
+  Eye, 
+  ArrowUpDown,
+  RefreshCw,
+  Tag as TagIcon,
+  CheckCircle2
 } from "lucide-react";
+import { Product } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-
-interface BakeryProduct {
-  id: string;
-  name: string;
-  category: "pan_dulce" | "pan_blanco" | "pasteleria" | "hojaldre" | "bebidas";
-  price: number;
-  cost: number;
-  stock: number;
-  dailyBake: number; // piezas horneadas hoy
-  badge?: string;
-  icon: string;
-  description: string;
-}
-
-const BAKERY_CATALOG: BakeryProduct[] = [
-  {
-    id: "p1",
-    name: "Concha Tradicional de Vainilla",
-    category: "pan_dulce",
-    price: 14,
-    cost: 4.8,
-    stock: 65,
-    dailyBake: 80,
-    badge: "Estrella",
-    icon: "🥖",
-    description: "Masa madre dulce con costra craquelada de mantequilla y vainilla natural.",
-  },
-  {
-    id: "p2",
-    name: "Concha de Chocolate Gourmet",
-    category: "pan_dulce",
-    price: 14,
-    cost: 5.2,
-    stock: 48,
-    dailyBake: 60,
-    badge: "Favorito",
-    icon: "🍫",
-    description: "Cobertura de cacao amargo con un toque de canela y mantequilla.",
-  },
-  {
-    id: "p3",
-    name: "Cuerno de Mantequilla Francés",
-    category: "hojaldre",
-    price: 18,
-    cost: 6.5,
-    stock: 42,
-    dailyBake: 50,
-    badge: "Hojaldre Fino",
-    icon: "🥐",
-    description: "Auténtico laminado con 100% mantequilla de vaca, crujiente y aireado.",
-  },
-  {
-    id: "p4",
-    name: "Bolillo Artesanal de Leña",
-    category: "pan_blanco",
-    price: 6,
-    cost: 1.8,
-    stock: 180,
-    dailyBake: 250,
-    badge: "Recién Horneado",
-    icon: "🍞",
-    description: "Corteza crocante, migajón tierno con fermentación prolongada.",
-  },
-  {
-    id: "p5",
-    name: "Telera Especial para Tortas",
-    category: "pan_blanco",
-    price: 7,
-    cost: 2.1,
-    stock: 110,
-    dailyBake: 150,
-    icon: "🥪",
-    description: "División tradicional en 3 gajos, suave e ideal para tortas calientes.",
-  },
-  {
-    id: "p6",
-    name: "Pastel Tres Leches Don Toño",
-    category: "pasteleria",
-    price: 360,
-    cost: 135,
-    stock: 8,
-    dailyBake: 12,
-    badge: "Especialidad",
-    icon: "🎂",
-    description: "Bizcocho bañado con infusión de tres leches, canela y crema chantilly.",
-  },
-  {
-    id: "p7",
-    name: "Rebanada Pastel Selva Negra",
-    category: "pasteleria",
-    price: 48,
-    cost: 18,
-    stock: 16,
-    dailyBake: 20,
-    badge: "Fina Repostería",
-    icon: "🍰",
-    description: "Capas de bizcocho de chocolate, cerezas maceradas y virutas de chocolate.",
-  },
-  {
-    id: "p8",
-    name: "Oreja Caramelizada de Hojaldre",
-    category: "hojaldre",
-    price: 16,
-    cost: 5.0,
-    stock: 55,
-    dailyBake: 70,
-    icon: "🥨",
-    description: "Capas infinitas con azúcar caramelizada dorada al horno de bóveda.",
-  },
-  {
-    id: "p9",
-    name: "Pay de Queso con Zarzamoras",
-    category: "pasteleria",
-    price: 240,
-    cost: 85,
-    stock: 6,
-    dailyBake: 8,
-    icon: "🥧",
-    description: "Base crujiente de galleta con crema de queso suave y mermelada de zarzamora.",
-  },
-  {
-    id: "p10",
-    name: "Dona Glaseada Artesanal",
-    category: "pan_dulce",
-    price: 15,
-    cost: 4.2,
-    stock: 35,
-    dailyBake: 45,
-    icon: "🍩",
-    description: "Esponjosa y suave con fino glaseado de vainilla que funde al paladar.",
-  },
-  {
-    id: "p11",
-    name: "Café de Olla Don Benito",
-    category: "bebidas",
-    price: 28,
-    cost: 7.5,
-    stock: 90,
-    dailyBake: 100,
-    badge: "Bebida Caliente",
-    icon: "☕",
-    description: "Preparado en barro con piloncillo natural, canela en rama y clavo de olor.",
-  },
-  {
-    id: "p12",
-    name: "Pan de Muerto Azucarado",
-    category: "pan_dulce",
-    price: 25,
-    cost: 8.0,
-    stock: 50,
-    dailyBake: 60,
-    badge: "Temporada",
-    icon: "✨",
-    description: "Aromas de agua de azahar y ralladura de naranja con mantequilla fresca.",
-  },
-];
-
-const CATEGORIES = [
-  { id: "all", label: "Todo el Catálogo", icon: Sparkles },
-  { id: "pan_dulce", label: "Pan Dulce Tradicional", icon: Croissant },
-  { id: "pan_blanco", label: "Bolillo & Telera Rústica", icon: Layers },
-  { id: "hojaldre", label: "Hojaldres & Masas Finas", icon: Star },
-  { id: "pasteleria", label: "Pastelería & Pays", icon: Star },
-  { id: "bebidas", label: "Cafetería & Bebidas", icon: Clock },
-];
+import { 
+  getStoredProducts, 
+  createProduct, 
+  updateProduct, 
+  deleteProduct, 
+  PRODUCT_CATEGORIES 
+} from "@/lib/products";
 
 export default function ProductosPage() {
-  const [products] = useState<BakeryProduct[]>(BAKERY_CATALOG);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
-  const filteredProducts = products.filter((p) => {
-    const matchesCat = selectedCategory === "all" || p.category === selectedCategory;
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-    return matchesCat && matchesSearch;
+  // Modals state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Delete modal state
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+
+  // Success toast
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Categories visibility & 15-second auto-collapse
+  const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
+  const [countdown, setCountdown] = useState(15);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsCategoriesVisible(false);
+    }, 15000); // 15 seconds auto-hide
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    price: "",
+    category: "pan_dulce" as Product["category"],
+    description: "",
+    image: "",
+    icon: "🥖",
   });
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load products on mount & listen to updates
+  useEffect(() => {
+    const load = () => {
+      setProducts(getStoredProducts());
+    };
+    load();
+
+    const handleUpdate = () => {
+      load();
+    };
+
+    window.addEventListener("brito_products_updated", handleUpdate);
+    return () => window.removeEventListener("brito_products_updated", handleUpdate);
+  }, []);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Filtered products
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchesCat = selectedCategory === "all" || p.category === selectedCategory;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = 
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.tag && p.tag.toLowerCase().includes(q));
+      return matchesCat && matchesSearch;
+    });
+  }, [products, selectedCategory, searchQuery]);
+
+  // KPIs
+  const stats = useMemo(() => {
+    const total = products.length;
+    const lowStock = products.filter((p) => p.stock <= 20).length;
+    const avgPrice = total > 0 ? products.reduce((acc, p) => acc + p.price, 0) / total : 0;
+    return { total, lowStock, avgPrice };
+  }, [products]);
+
+  // Open Create Modal
+  const handleOpenCreate = () => {
+    setModalMode("create");
+    setEditingId(null);
+    setFormData({
+      name: "",
+      price: "",
+      category: "pan_dulce",
+      description: "",
+      image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+      icon: "🥖",
+    });
+    setIsModalOpen(true);
+  };
+
+  // Open Edit Modal
+  const handleOpenEdit = (product: Product) => {
+    setModalMode("edit");
+    setEditingId(product.id);
+    setFormData({
+      name: product.name,
+      price: product.price.toString(),
+      category: product.category,
+      description: product.description || "",
+      image: product.image || "",
+      icon: product.icon || "🥖",
+    });
+    setIsModalOpen(true);
+  };
+
+  // Handle Image File Upload (converts to Base64)
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor selecciona un archivo de imagen válido (PNG, JPG, WebP).");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setFormData((prev) => ({ ...prev, image: event.target!.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Submit Create or Edit
+  const handleSubmitForm = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name.trim()) {
+      alert("Por favor ingresa el nombre del producto.");
+      return;
+    }
+
+    const priceNum = parseFloat(formData.price);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      alert("Por favor ingresa un precio válido mayor a 0.");
+      return;
+    }
+
+    if (modalMode === "create") {
+      const created = createProduct({
+        name: formData.name.trim(),
+        price: priceNum,
+        category: formData.category,
+        stock: 50,
+        description: formData.description.trim() || undefined,
+        image: formData.image.trim() || undefined,
+        icon: formData.icon || "🥖",
+      });
+      setProducts(getStoredProducts());
+      setIsModalOpen(false);
+      showToast(`¡Producto "${created.name}" creado con éxito!`);
+    } else if (modalMode === "edit" && editingId) {
+      const updated = updateProduct(editingId, {
+        name: formData.name.trim(),
+        price: priceNum,
+        category: formData.category,
+        description: formData.description.trim() || undefined,
+        image: formData.image.trim() || undefined,
+        icon: formData.icon || "🥖",
+      });
+      setProducts(getStoredProducts());
+      setIsModalOpen(false);
+      showToast(`¡Producto "${updated?.name || formData.name}" actualizado!`);
+    }
+  };
+
+  // Delete product confirm
+  const handleConfirmDelete = () => {
+    if (!deletingProduct) return;
+    deleteProduct(deletingProduct.id);
+    setProducts(getStoredProducts());
+    showToast(`Producto "${deletingProduct.name}" eliminado del catálogo.`);
+    setDeletingProduct(null);
+  };
+
+  const getCategoryBadge = (cat: Product["category"]) => {
+    switch (cat) {
+      case "pan_dulce":
+        return { label: "Pan Dulce", color: "bg-amber-100 text-amber-900 border-amber-300" };
+      case "pan_blanco":
+        return { label: "Pan Blanco", color: "bg-stone-100 text-stone-900 border-stone-300" };
+      case "pasteleria":
+        return { label: "Pastelería", color: "bg-pink-100 text-pink-900 border-pink-300" };
+      case "bebidas":
+        return { label: "Bebidas", color: "bg-blue-100 text-blue-900 border-blue-300" };
+      case "temporada":
+        return { label: "Temporada", color: "bg-purple-100 text-purple-900 border-purple-300" };
+      case "abarrotes":
+        return { label: "Abarrotes", color: "bg-emerald-100 text-emerald-900 border-emerald-300" };
+      case "materia_prima":
+        return { label: "Materia Prima", color: "bg-orange-100 text-orange-900 border-orange-300" };
+      default:
+        return { label: cat, color: "bg-stone-100 text-stone-800 border-stone-200" };
+    }
+  };
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Header Banner - El Globo Luxury Style */}
-      <div className="bg-gradient-to-r from-[#2a1a11] via-[#3a2518] to-[#1f130b] rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-[#d4af37]/40 relative overflow-hidden">
-        {/* Golden Glow Accent */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-[#d4af37]/20 to-transparent rounded-full blur-3xl pointer-events-none" />
+    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto select-none">
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-amber-500/40 flex items-center gap-3 animate-in slide-in-from-bottom-5">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <p className="text-xs font-bold">{toastMessage}</p>
+        </div>
+      )}
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#d4af37]/20 border border-[#d4af37]/40 text-[#fef08a] text-xs font-bold uppercase tracking-widest">
-              <Sparkles className="w-3.5 h-3.5 text-[#fef08a]" />
-              Vitrina & Catálogo de Panadería Fina
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-serif tracking-tight text-[#fdfbf7]">
-              Productos & Recetas Don Toño
-            </h1>
-            <p className="text-xs sm:text-sm text-[#d4c3b0] max-w-2xl leading-relaxed">
-              Catálogo oficial de pan dulce, hojaldres, bollería y pastelería fina elaborados con ingredientes selectos y recetas tradicionales desde 1985.
-            </p>
+      {/* Header Banner */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="absolute -right-10 -top-10 w-72 h-72 bg-amber-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 w-72 h-72 bg-orange-600/20 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-600 text-stone-950 rounded-full text-[10px] font-black tracking-wider uppercase shadow-md flex items-center gap-1.5">
+              <Croissant className="w-3.5 h-3.5" /> Catálogo Maestro
+            </span>
+            <span className="text-xs text-amber-400 font-semibold flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" /> Sincronizado con POS
+            </span>
           </div>
+          <h1 className="text-3xl font-black tracking-tight text-white">
+            Catálogo de Productos
+          </h1>
+          <p className="text-stone-300 text-xs max-w-xl leading-relaxed">
+            Administra los panes, pasteles y bebidas de <strong className="text-amber-400">Panaderías Brito</strong>. Crea nuevos productos, actualiza precios, gestiona fotografías y mantén al día tu mostrador.
+          </p>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              href="/pos"
-              className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#d4af37] via-[#f59e0b] to-[#d97706] text-[#241710] font-black text-xs hover:brightness-110 shadow-lg shadow-[#d4af37]/30 transition-all"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              <span>Abrir en Caja (POS)</span>
-            </Link>
+        {/* Action Button */}
+        <div className="relative z-10 flex items-center gap-3">
+          <button
+            onClick={handleOpenCreate}
+            className="px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-xl shadow-orange-500/25 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Nuevo Producto</span>
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Total en Catálogo</p>
+            <p className="text-2xl font-black text-stone-900 mt-1">{stats.total} productos</p>
+            <p className="text-[11px] text-emerald-600 font-bold mt-0.5">Disponibles en mostrador</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xl">
+            🥖
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Precio Promedio</p>
+            <p className="text-2xl font-black text-stone-900 mt-1">{formatCurrency(stats.avgPrice)}</p>
+            <p className="text-[11px] text-stone-400 font-medium mt-0.5">Por pieza / porción</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xl">
+            <DollarSign className="w-6 h-6 text-emerald-600" />
           </div>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        {/* Category Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1">
-          {CATEGORIES.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                  isSelected
-                    ? "bg-[#2b1b13] text-[#fef08a] shadow-md border border-[#d4af37]/60"
-                    : "bg-white text-[#5c4938] hover:bg-[#f6eee4] border border-[#e5d8c8]"
-                }`}
+      {/* Filters and Search Bar */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-stone-200 space-y-4">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+          {/* Left Category Toggle & Counter */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCategoriesVisible(!isCategoriesVisible)}
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border shadow-sm ${
+                isCategoriesVisible
+                  ? "bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200"
+                  : "bg-stone-900 text-amber-400 border-amber-500/40 hover:bg-stone-800"
+              }`}
+              title={isCategoriesVisible ? "Ocultar panel de categorías" : "Mostrar panel de categorías"}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>{isCategoriesVisible ? "Ocultar Categorías" : "Ver Categorías"}</span>
+            </button>
+            <span className="hidden md:inline text-xs font-bold text-stone-500">
+              {filteredProducts.length} productos
+            </span>
+          </div>
+
+          {/* Centered Search Bar */}
+          <div className="relative w-full max-w-xl mx-auto">
+            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nombre, descripción o categoría..."
+              className="w-full pl-11 pr-10 py-3 bg-stone-50 hover:bg-stone-100/70 focus:bg-white rounded-2xl border border-stone-200 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-center sm:text-left sm:pl-11"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs p-1"
+                title="Limpiar búsqueda"
               >
-                <span>{cat.label}</span>
+                <X className="w-3.5 h-3.5" />
               </button>
+            )}
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center justify-end gap-2 w-full md:w-44 self-end md:self-auto">
+            <span className="text-xs text-stone-500 font-medium mr-1 md:hidden">
+              {filteredProducts.length} de {products.length}
+            </span>
+            <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  viewMode === "grid" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
+                }`}
+                title="Vista de Cuadrícula"
+              >
+                <Grid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("table")}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  viewMode === "table" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
+                }`}
+                title="Vista de Lista"
+              >
+                <ListIcon className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Main Catalog Layout: Left Categories List, Right Products Content */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* Left Column: Categorías en forma de Lista con Auto-ocultado */}
+        <div className={`transition-all duration-700 ease-in-out shrink-0 overflow-hidden ${
+          isCategoriesVisible
+            ? "w-full lg:w-72 opacity-100 max-h-[900px] mb-4 lg:mb-0"
+            : "w-0 lg:w-0 opacity-0 max-h-0 pointer-events-none p-0 m-0 border-0"
+        }`}>
+          <div className="w-full lg:w-72 bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-4 h-4 text-amber-600" />
+                <span>Categorías</span>
+              </h3>
+              {countdown > 0 ? (
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full" title="Se ocultará en 15s para dar más espacio a los productos">
+                  Oculta en {countdown}s
+                </span>
+              ) : (
+                <button
+                  onClick={() => setIsCategoriesVisible(false)}
+                  className="text-[10px] font-bold text-stone-400 hover:text-stone-700 bg-stone-100 px-2 py-0.5 rounded-full"
+                >
+                  Ocultar
+                </button>
+              )}
+            </div>
+
+            {/* Lista Vertical de Categorías */}
+            <div className="space-y-1.5">
+              {PRODUCT_CATEGORIES.map((cat) => {
+                const isSelected = selectedCategory === cat.id;
+                const count = cat.id === "all" 
+                  ? products.length 
+                  : products.filter((p) => p.category === cat.id).length;
+
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${
+                      isSelected
+                        ? "bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20 font-black scale-[1.01]"
+                        : "text-stone-700 hover:bg-stone-50 hover:text-stone-950 border border-transparent hover:border-stone-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base shrink-0">{cat.icon}</span>
+                      <span className="truncate">{cat.label}</span>
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 transition-colors ${
+                      isSelected 
+                        ? "bg-stone-950/20 text-stone-950" 
+                        : "bg-stone-100 text-stone-500 group-hover:bg-stone-200 group-hover:text-stone-800"
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Products Content Area */}
+        <div className="flex-1 w-full min-w-0">
+          {filteredProducts.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-sm space-y-4">
+              <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 text-4xl flex items-center justify-center mx-auto text-amber-800">
+                🔍
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-stone-900">No se encontraron productos</h3>
+                <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                  No hay productos que coincidan con &ldquo;{searchQuery}&rdquo; en esta categoría. Puedes intentar otra búsqueda o agregar uno nuevo.
+                </p>
+              </div>
+              <button
+                onClick={handleOpenCreate}
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl inline-flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Crear nuevo producto
+              </button>
+            </div>
+          ) : viewMode === "grid" ? (
+            /* Grid View (Expands to 4 cols when categories panel is hidden) */
+            <div className={`grid gap-6 transition-all duration-700 ${
+              isCategoriesVisible
+                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
+                : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+            }`}>
+          {filteredProducts.map((product) => {
+            const catBadge = getCategoryBadge(product.category);
+            return (
+              <div
+                key={product.id}
+                className="bg-white rounded-3xl overflow-hidden border border-stone-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group"
+              >
+                {/* Image Container */}
+                <div className="relative h-48 w-full bg-stone-100 overflow-hidden">
+                  {product.image ? (
+                    <Image
+                      src={product.image}
+                      alt={product.name}
+                      fill
+                      unoptimized
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-5xl bg-stone-50">
+                      {product.icon || "🥖"}
+                    </div>
+                  )}
+
+                  {/* Top Badges */}
+                  <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase shadow-sm ${catBadge.color}`}>
+                      {catBadge.label}
+                    </span>
+                    {product.tag && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-stone-900/80 text-white backdrop-blur-sm border border-white/20 shadow-sm">
+                        {product.tag}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Stock Tag on Top Right */}
+                  <div className="absolute top-3 right-3 z-10">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-sm ${
+                        product.stock <= 20
+                          ? "bg-rose-500 text-white"
+                          : "bg-emerald-500 text-white"
+                      }`}
+                    >
+                      {product.stock} disp.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Body Content */}
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-base font-black text-stone-900 leading-snug">
+                        {product.name}
+                      </h3>
+                      <span className="text-base font-black text-amber-600 shrink-0">
+                        {formatCurrency(product.price)}
+                      </span>
+                    </div>
+                    {product.description && (
+                      <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
+                        {product.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Card Actions */}
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => handleOpenEdit(product)}
+                      className="flex-1 py-2 px-3 bg-stone-100 hover:bg-amber-100 hover:text-amber-900 text-stone-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" /> Editar
+                    </button>
+                    <button
+                      onClick={() => setDeletingProduct(product)}
+                      className="p-2 bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-500 rounded-xl transition-colors"
+                      title="Eliminar producto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             );
           })}
         </div>
-
-        {/* Search Input */}
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-[#8c7a68] absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre de pan..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white border border-[#e2d5c5] text-xs font-medium text-[#2e1d14] placeholder-[#a89886] focus:outline-none focus:ring-2 focus:ring-[#d4af37]/50"
-          />
+      ) : (
+        /* Table View */
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-stone-50 text-stone-600 font-bold uppercase tracking-wider border-b border-stone-200">
+                <tr>
+                  <th className="py-3.5 px-4">Producto</th>
+                  <th className="py-3.5 px-4">Categoría</th>
+                  <th className="py-3.5 px-4 text-right">Precio</th>
+                  <th className="py-3.5 px-4 text-center">Stock</th>
+                  <th className="py-3.5 px-4">Etiqueta</th>
+                  <th className="py-3.5 px-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {filteredProducts.map((product) => {
+                  const catBadge = getCategoryBadge(product.category);
+                  return (
+                    <tr key={product.id} className="hover:bg-stone-50/70 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-11 h-11 rounded-xl bg-stone-100 overflow-hidden shrink-0 border border-stone-200">
+                            {product.image ? (
+                              <Image
+                                src={product.image}
+                                alt={product.name}
+                                fill
+                                unoptimized
+                                className="object-cover"
+                              />
+                            ) : (
+                              <span className="w-full h-full flex items-center justify-center text-xl">
+                                {product.icon || "🥖"}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-black text-stone-900 text-xs">{product.name}</p>
+                            <p className="text-[11px] text-stone-400 truncate max-w-xs">
+                              {product.description || "Sin descripción"}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase ${catBadge.color}`}>
+                          {catBadge.label}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-black text-amber-600 text-sm">
+                        {formatCurrency(product.price)}
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                          product.stock <= 20 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-800"
+                        }`}>
+                          {product.stock} pzas
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-stone-500 font-medium">
+                        {product.tag || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(product)}
+                            className="p-1.5 bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingProduct(product)}
+                            className="p-1.5 bg-stone-100 hover:bg-rose-100 text-stone-500 hover:text-rose-600 rounded-lg transition-colors"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
         </div>
       </div>
 
-      {/* Product Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-        {filteredProducts.map((p) => {
-          const margin = (((p.price - p.cost) / p.price) * 100).toFixed(0);
-
-          return (
-            <div
-              key={p.id}
-              className="bg-white rounded-3xl border border-[#e8dfd3] shadow-sm hover:shadow-xl hover:border-[#d4af37]/60 transition-all duration-300 p-5 flex flex-col justify-between group"
-            >
-              <div>
-                {/* Card Top: Icon & Badge */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="w-12 h-12 rounded-2xl bg-[#faf6f0] border border-[#ecdcc9] flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform">
-                    {p.icon}
-                  </div>
-                  {p.badge && (
-                    <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-[#fef3c7] text-[#92400e] border border-[#fde68a]">
-                      {p.badge}
-                    </span>
-                  )}
+      {/* Modal: Crear / Editar Producto */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-stone-200 relative my-8 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-stone-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center text-xl">
+                  {modalMode === "create" ? "🥖" : "✏️"}
                 </div>
-
-                {/* Name & Description */}
-                <h3 className="font-serif font-black text-sm text-[#2b1b13] group-hover:text-[#b45309] transition-colors leading-tight">
-                  {p.name}
-                </h3>
-                <p className="text-[11px] text-[#786958] mt-1 line-clamp-2 leading-relaxed">
-                  {p.description}
-                </p>
-              </div>
-
-              {/* Stats & Price */}
-              <div className="mt-4 pt-3 border-t border-[#f0e6da] space-y-3">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#8c7a68] flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-[#b45309]" /> Horneado hoy:
-                  </span>
-                  <span className="font-bold text-[#2e1d14]">{p.dailyBake} pzas</span>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#8c7a68]">Margen bruto:</span>
-                  <span className="font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                    +{margin}%
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <div>
-                    <span className="text-[10px] text-[#8c7a68] uppercase font-bold tracking-wider block">Precio Venta</span>
-                    <span className="text-lg font-black text-[#2e1d14] font-serif">
-                      {formatCurrency(p.price)}
-                    </span>
-                  </div>
-
-                  <Link
-                    href="/pos"
-                    className="p-2.5 rounded-xl bg-[#faf4ec] hover:bg-[#2b1b13] text-[#593922] hover:text-[#fef08a] transition-all border border-[#decbb7] hover:border-[#d4af37]"
-                    title="Cobrar este producto en Caja rápida"
-                  >
-                    <ShoppingBag className="w-4 h-4" />
-                  </Link>
+                <div>
+                  <h3 className="text-lg font-black text-stone-900">
+                    {modalMode === "create" ? "Nuevo Producto de Panadería" : "Modificar Producto"}
+                  </h3>
+                  <p className="text-xs text-stone-500 font-medium">
+                    {modalMode === "create" ? "Agrega un pan o producto al catálogo" : "Actualiza precio, stock o fotografía"}
+                  </p>
                 </div>
               </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          );
-        })}
-      </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmitForm} className="space-y-4 pt-4">
+              {/* Product Image Picker & Preview */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-stone-700 flex items-center justify-between">
+                  <span>Fotografía del Producto</span>
+                  <span className="text-[10px] text-amber-600 font-semibold">Subir archivo o pegar link</span>
+                </label>
+
+                <div className="flex items-center gap-4">
+                  {/* Image Preview Box */}
+                  <div className="relative w-24 h-24 rounded-2xl bg-stone-100 border-2 border-dashed border-stone-300 overflow-hidden shrink-0 flex items-center justify-center">
+                    {formData.image ? (
+                      <Image
+                        src={formData.image}
+                        alt="Preview"
+                        fill
+                        unoptimized
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="text-center p-2">
+                        <span className="text-2xl">{formData.icon}</span>
+                        <p className="text-[9px] text-stone-400 mt-1">Sin foto</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions to upload / enter url */}
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageFileUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full py-2 px-3 bg-stone-100 hover:bg-amber-100 text-stone-800 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors border border-stone-200"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Subir foto desde tu equipo</span>
+                    </button>
+
+                    <div className="relative">
+                      <LinkIcon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                      <input
+                        type="url"
+                        value={formData.image}
+                        onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                        placeholder="O pega URL de imagen (https://...)"
+                        className="w-full pl-9 pr-3 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nombre */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-stone-700">Nombre del Producto *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="ej. Concha de Vainilla, Bolillo, Pastel 3 Leches"
+                  className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Categoría & Precio */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-stone-700">Categoría *</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                    className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  >
+                    <option value="pan_dulce">🥖 Pan Dulce Tradicional</option>
+                    <option value="pan_blanco">🍞 Bolillo & Telera</option>
+                    <option value="pasteleria">🍰 Pastelería & Pays</option>
+                    <option value="bebidas">☕ Cafetería & Bebidas</option>
+                    <option value="temporada">✨ Especiales de Temporada</option>
+                    <option value="abarrotes">🥫 Abarrotes</option>
+                    <option value="materia_prima">🌾 Materia Prima</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-stone-700">Precio ($ MXN) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">$</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      required
+                      value={formData.price}
+                      onChange={(e) => {
+                        // Filtro estrictamente numérico: solo dígitos y un punto decimal
+                        let val = e.target.value.replace(/[^0-9.]/g, "");
+                        const parts = val.split(".");
+                        if (parts.length > 2) {
+                          val = parts[0] + "." + parts.slice(1).join("");
+                        }
+                        setFormData({ ...formData, price: val });
+                      }}
+                      onKeyDown={(e) => {
+                        if (["e", "E", "+", "-", ",", " "].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      placeholder="12.00"
+                      className="w-full pl-7 pr-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Descripción */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-stone-700">Descripción del Pan</label>
+                <textarea
+                  rows={2}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Detalles sobre ingredientes, textura o forma de elaboración..."
+                  className="w-full px-3.5 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/25 flex items-center gap-1.5 transition-all active:scale-95"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>{modalMode === "create" ? "Guardar en Catálogo" : "Actualizar Producto"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar Eliminación */}
+      {deletingProduct && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
+            <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-2xl">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-black text-stone-900">
+                ¿Eliminar este producto?
+              </h3>
+              <p className="text-xs text-stone-500">
+                Estás a punto de eliminar <strong className="text-stone-800">&ldquo;{deletingProduct.name}&rdquo;</strong>. Ya no aparecerá en el catálogo ni en el Punto de Venta (POS).
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setDeletingProduct(null)}
+                className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-600/25 transition-all"
+              >
+                Sí, Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

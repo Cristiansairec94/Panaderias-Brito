@@ -12,7 +12,6 @@ import {
   DollarSign,
   Settings,
   ChevronDown,
-  ChevronRight,
   ShoppingBag,
   PlusCircle,
   Receipt,
@@ -22,10 +21,12 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Flame
 } from "lucide-react";
 import AnimatedLogo from "@/components/ui/AnimatedLogo";
 import { useSidebar } from "@/context/SidebarContext";
+import { useAuth } from "@/context/AuthContext";
 
 interface NavItemSingle {
   type: "link";
@@ -128,6 +129,7 @@ const navigationItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user, canAccessRoute } = useAuth();
   const { 
     isCollapsed, 
     toggleCollapse, 
@@ -138,6 +140,26 @@ export default function Sidebar() {
   } = useSidebar();
 
   const isPosActive = pathname === "/pos";
+
+  // Filter navigation items by active user role permissions
+  const filteredNavigation = navigationItems
+    .map((item) => {
+      if (item.type === "link") {
+        const allowed = canAccessRoute ? canAccessRoute(item.href) : true;
+        return allowed ? item : null;
+      }
+      // Accordion: filter children
+      const allowedChildren = item.items.filter((sub) => {
+        const [cleanHref] = sub.href.split("?");
+        return canAccessRoute ? canAccessRoute(cleanHref) : true;
+      });
+      if (allowedChildren.length === 0) return null;
+      return {
+        ...item,
+        items: allowedChildren,
+      };
+    })
+    .filter(Boolean) as NavItem[];
 
   return (
     <>
@@ -206,7 +228,7 @@ export default function Sidebar() {
             </div>
           )}
 
-          {navigationItems.map((item) => {
+          {filteredNavigation.map((item) => {
             // Case 1: Simple Single Link (DashBoard, Clientes, Productos)
             if (item.type === "link") {
               const isActive = pathname === item.href;
@@ -381,34 +403,60 @@ export default function Sidebar() {
 
         {/* Bottom Section: Quick POS Terminal & Bakery Seal */}
         <div className="p-3 border-t border-[#3d271a] bg-[#160d09]/90 space-y-2">
-          {/* Direct Point of Sale Button */}
-          <Link
-            href="/pos"
-            onClick={() => setMobileOpen(false)}
-            className={`w-full flex items-center ${
-              isCollapsed ? "justify-center p-2.5" : "justify-between p-3"
-            } rounded-2xl font-bold text-xs transition-all shadow-xl group active:scale-95 ${
-              isPosActive
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white ring-2 ring-emerald-400/80 shadow-emerald-700/30"
-                : "bg-gradient-to-r from-[#b35718] via-[#c76520] to-[#994714] hover:from-[#c76520] hover:to-[#b35718] text-white shadow-amber-950/40 border border-[#f59e0b]/50"
-            }`}
-            title="Punto de Venta Mostrador (POS)"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-white/20 rounded-xl">
-                <ShoppingBag className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+          {/* Quick Action according to Role */}
+          {canAccessRoute && canAccessRoute("/pos") ? (
+            <Link
+              href="/pos"
+              onClick={() => setMobileOpen(false)}
+              className={`w-full flex items-center ${
+                isCollapsed ? "justify-center p-2.5" : "justify-between p-3"
+              } rounded-2xl font-bold text-xs transition-all shadow-xl group active:scale-95 ${
+                isPosActive
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white ring-2 ring-emerald-400/80 shadow-emerald-700/30"
+                  : "bg-gradient-to-r from-[#b35718] via-[#c76520] to-[#994714] hover:from-[#c76520] hover:to-[#b35718] text-white shadow-amber-950/40 border border-[#f59e0b]/50"
+              }`}
+              title="Punto de Venta Mostrador (POS)"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-white/20 rounded-xl">
+                  <ShoppingBag className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+                </div>
+                {!isCollapsed && (
+                  <div className="text-left">
+                    <p className="leading-tight font-black tracking-tight">Punto de Venta</p>
+                    <p className="text-[9px] font-medium text-amber-100">Caja Mostrador (POS)</p>
+                  </div>
+                )}
               </div>
               {!isCollapsed && (
-                <div className="text-left">
-                  <p className="leading-tight font-black tracking-tight">Punto de Venta</p>
-                  <p className="text-[9px] font-medium text-amber-100">Caja Mostrador (POS)</p>
-                </div>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-[#fef08a]" />
               )}
-            </div>
-            {!isCollapsed && (
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-[#fef08a]" />
-            )}
-          </Link>
+            </Link>
+          ) : user?.role === "panadero" ? (
+            <Link
+              href="/inventario"
+              onClick={() => setMobileOpen(false)}
+              className={`w-full flex items-center ${
+                isCollapsed ? "justify-center p-2.5" : "justify-between p-3"
+              } rounded-2xl font-bold text-xs transition-all shadow-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white active:scale-95`}
+              title="Control de Horno"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-white/20 rounded-xl">
+                  <Flame className="w-4 h-4 text-white" />
+                </div>
+                {!isCollapsed && (
+                  <div className="text-left">
+                    <p className="leading-tight font-black tracking-tight">Control de Horno</p>
+                    <p className="text-[9px] font-medium text-amber-100">Recetas & Harinas</p>
+                  </div>
+                )}
+              </div>
+              {!isCollapsed && (
+                <ArrowRight className="w-4 h-4" />
+              )}
+            </Link>
+          ) : null}
 
           {/* Bakery Heritage Stamp / Sucursal Matriz */}
           {!isCollapsed ? (
@@ -421,7 +469,7 @@ export default function Sidebar() {
                 </div>
               </div>
               <span className="text-[9px] font-extrabold text-[#fef08a] bg-[#140b07] border border-[#d4af37]/40 px-2 py-0.5 rounded-md">
-                ERP Fino
+                v1.5 ERP Fino
               </span>
             </div>
           ) : (

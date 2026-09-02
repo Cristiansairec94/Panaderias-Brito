@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   Clock, 
   ChevronDown, 
@@ -13,12 +13,13 @@ import {
   PanelLeftOpen
 } from "lucide-react";
 import NotificationsDropdown from "./NotificationsDropdown";
-import { useAuth, DEMO_USERS } from "@/context/AuthContext";
+import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
 import { useSidebar } from "@/context/SidebarContext";
 
 export default function Header() {
   const pathname = usePathname();
-  const { user, loginAs, logout } = useAuth();
+  const router = useRouter();
+  const { user, loginAs, logout, getDefaultRouteForUser } = useAuth();
   const { isCollapsed, toggleCollapse, toggleMobile } = useSidebar();
   const [time, setTime] = useState<string>("");
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -47,7 +48,7 @@ export default function Header() {
       case "/clientes":
         return { title: "Clientes & Mayoristas", subtitle: "Directorio de tienditas, clientes frecuentes y crédito" };
       case "/productos":
-        return { title: "Catálogo de Productos", subtitle: "Vitrina de panadería tradicional, dulce y repostería fina" };
+        return { title: "Catálogo de Productos", subtitle: "Gestión de panes, repostería fina, precios y fotografías" };
       case "/inventario":
         return { title: "Inventario & Materia Prima", subtitle: "Control de harinas, insumos, compras y mermas" };
       case "/finanzas":
@@ -65,6 +66,21 @@ export default function Header() {
       default:
         return { title: "Panaderías Brito", subtitle: "Alta Panadería & Pastelería Fina" };
     }
+  };
+
+  const handleRoleSwitch = (demo: User) => {
+    loginAs(demo);
+    setShowUserMenu(false);
+    if (getDefaultRouteForUser) {
+      const targetRoute = getDefaultRouteForUser(demo);
+      router.push(targetRoute);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setShowUserMenu(false);
+    router.push("/");
   };
 
   const current = getPageTitle();
@@ -156,10 +172,7 @@ export default function Header() {
                 {DEMO_USERS.map((demo) => (
                   <button
                     key={demo.id}
-                    onClick={() => {
-                      loginAs(demo);
-                      setShowUserMenu(false);
-                    }}
+                    onClick={() => handleRoleSwitch(demo)}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between font-semibold transition-all ${
                       user?.id === demo.id
                         ? "bg-[#fef3c7] text-[#92400e] font-bold border border-[#fde68a]"
@@ -168,7 +181,10 @@ export default function Header() {
                   >
                     <div className="flex items-center gap-2">
                       <span>{demo.avatar}</span>
-                      <span>{demo.name}</span>
+                      <div>
+                        <span className="font-bold">{demo.name}</span>
+                        <p className="text-[10px] text-[#8c7a68] font-medium">{demo.roleLabel}</p>
+                      </div>
                     </div>
                     {user?.id === demo.id && <UserCheck className="w-3.5 h-3.5 text-[#b45309]" />}
                   </button>
@@ -177,10 +193,7 @@ export default function Header() {
 
               <div className="border-t border-[#f0e7dc] pt-1.5 mt-1">
                 <button
-                  onClick={() => {
-                    logout();
-                    setShowUserMenu(false);
-                  }}
+                  onClick={handleLogout}
                   className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                 >
                   <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
