@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { 
+  ShoppingBag,
   Wallet, 
   ArrowUpRight, 
   ArrowDownRight, 
@@ -118,7 +120,13 @@ export default function CajaPage() {
             Control de turno actual, gastos menores, abonos y arqueo de caja de Don Toño.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/pos"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-500 hover:to-brito-crimson-500 text-white font-extrabold px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
+          >
+            <ShoppingBag className="w-4 h-4" /> Ir a Punto de Venta (POS)
+          </Link>
           <button
             onClick={() => {
               setMovementType("entrada");
@@ -127,7 +135,7 @@ export default function CajaPage() {
             }}
             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
           >
-            <Plus className="w-4 h-4" /> + Entrada de Efectivo
+            <Plus className="w-4 h-4" /> + Entrada
           </button>
           <button
             onClick={() => {

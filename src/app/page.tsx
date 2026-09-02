@@ -56,18 +56,18 @@ export default function Home() {
 
         <div className="flex flex-wrap gap-3 relative z-10">
           <Link
-            href="/caja"
-            className="flex items-center gap-2 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-700 hover:to-brito-crimson-700 text-white font-extrabold px-5 py-3 rounded-2xl shadow-xl shadow-brito-orange-600/30 transition-all active:scale-95 text-xs"
+            href="/pos"
+            className="flex items-center gap-2 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-500 hover:to-brito-crimson-500 text-white font-black px-6 py-3.5 rounded-2xl shadow-xl shadow-brito-orange-600/40 transition-all active:scale-95 text-xs animate-pulse"
           >
-            <Wallet className="w-4 h-4" />
-            Ver Corte de Caja
+            <ShoppingBag className="w-4 h-4 text-amber-300" />
+            Abrir Punto de Venta (POS)
           </Link>
           <Link
-            href="/clientes"
-            className="flex items-center gap-2 bg-stone-800 hover:bg-stone-700 text-stone-100 font-bold px-5 py-3 rounded-2xl border border-stone-700 transition-all text-xs"
+            href="/caja"
+            className="flex items-center gap-2 bg-stone-800 hover:bg-stone-700 text-stone-100 font-bold px-5 py-3.5 rounded-2xl border border-stone-700 transition-all text-xs"
           >
-            <Users className="w-4 h-4 text-brito-orange-400" />
-            Directorio Clientes
+            <Wallet className="w-4 h-4 text-emerald-400" />
+            Corte de Caja
           </Link>
         </div>
       </div>
