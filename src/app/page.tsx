@@ -8,10 +8,12 @@ import {
   ArrowRight,
   Croissant,
   DollarSign,
-  Bell,
-  Sparkles,
+  Wallet,
   Users,
-  ShieldCheck
+  ShieldCheck,
+  Package,
+  TrendingDown,
+  ArrowUpRight
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -22,44 +24,50 @@ export default function Home() {
   const { unreadCount } = useNotifications();
 
   const stats = [
-    { label: "Ventas de Hoy", value: formatCurrency(4850), change: "+12% vs ayer", icon: DollarSign, color: "text-emerald-600 bg-emerald-100" },
-    { label: "Piezas Horneadas", value: "392 pzas", change: "Horno a máxima cap.", icon: Croissant, color: "text-brito-orange-600 bg-amber-100" },
-    { label: "Pedidos por Entregar", value: "5 pasteles", change: "2 para las 4:00 PM", icon: Clock, color: "text-rose-600 bg-rose-100" },
-    { label: "Alertas de Insumos", value: `${unreadCount} pendientes`, change: "Harina Extra & Mantequilla", icon: AlertTriangle, color: "text-brito-crimson-600 bg-rose-100" },
+    { label: "Ventas Totales Hoy", value: formatCurrency(5200), change: "+14% vs ayer", icon: DollarSign, color: "text-emerald-600 bg-emerald-100" },
+    { label: "Efectivo en Caja", value: formatCurrency(5000), change: "Turno Mañana en curso", icon: Wallet, color: "text-brito-orange-600 bg-amber-100" },
+    { label: "Clientes Activos", value: "28 registros", change: "4 tiendas mayoreo", icon: Users, color: "text-blue-600 bg-blue-100" },
+    { label: "Alertas de Insumos", value: `${unreadCount} críticas`, change: "Harina Extra Fina", icon: AlertTriangle, color: "text-brito-crimson-600 bg-rose-100" },
   ];
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       {/* Welcome Banner with Official Brand Colors */}
       <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-8 text-white shadow-2xl border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        {/* Glow circles */}
         <div className="absolute -right-10 -top-10 w-72 h-72 bg-brito-orange-600/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-10 -bottom-10 w-72 h-72 bg-brito-crimson-600/20 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2">
             <span className="px-3 py-1 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 text-white rounded-full text-[10px] font-black tracking-wider uppercase shadow-md">
-              Masterpage ERP
+              Sistema Integral ERP
             </span>
             <span className="text-xs text-stone-400 font-semibold flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Sistema Activo
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Sucursal Matriz
             </span>
           </div>
           <h2 className="text-3xl font-black tracking-tight">
             ¡Hola, {user?.name || "Don Toño"}! 🥖
           </h2>
           <p className="text-stone-300 mt-1.5 text-xs max-w-xl leading-relaxed">
-            Bienvenido al panel central de <strong className="text-brito-orange-400">Panaderías Brito</strong>. Tienes <strong className="text-brito-crimson-400 font-bold">{unreadCount} notificaciones</strong> y alertas operativas listas para revisar en la barra superior.
+            Bienvenido al panel central de <strong className="text-brito-orange-400">Panaderías Brito</strong>. El Punto de Venta está siendo desarrollado en paralelo, y tienes el control de clientes, caja e insumos aquí.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3 relative z-10">
           <Link
-            href="/pos"
-            className="flex items-center gap-2 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-700 hover:to-brito-crimson-700 text-white font-extrabold px-6 py-3.5 rounded-2xl shadow-xl shadow-brito-orange-600/30 transition-all active:scale-95 text-xs"
+            href="/caja"
+            className="flex items-center gap-2 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-700 hover:to-brito-crimson-700 text-white font-extrabold px-5 py-3 rounded-2xl shadow-xl shadow-brito-orange-600/30 transition-all active:scale-95 text-xs"
           >
-            <ShoppingBag className="w-4 h-4" />
-            Abrir Punto de Venta (POS)
+            <Wallet className="w-4 h-4" />
+            Ver Corte de Caja
+          </Link>
+          <Link
+            href="/clientes"
+            className="flex items-center gap-2 bg-stone-800 hover:bg-stone-700 text-stone-100 font-bold px-5 py-3 rounded-2xl border border-stone-700 transition-all text-xs"
+          >
+            <Users className="w-4 h-4 text-brito-orange-400" />
+            Directorio Clientes
           </Link>
         </div>
       </div>
@@ -85,53 +93,53 @@ export default function Home() {
         })}
       </div>
 
-      {/* Quick Access Grid */}
+      {/* ERP Modules Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* POS Card */}
-        <Link href="/pos" className="group bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm hover:border-brito-orange-500 hover:shadow-xl transition-all flex flex-col justify-between">
+        {/* Clientes Card */}
+        <Link href="/clientes" className="group bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm hover:border-brito-orange-500 hover:shadow-xl transition-all flex flex-col justify-between">
           <div>
-            <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-brito-orange-600 mb-4 group-hover:scale-110 transition-transform">
-              <ShoppingBag className="w-6 h-6" />
+            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-700 mb-4 group-hover:scale-110 transition-transform">
+              <Users className="w-6 h-6" />
             </div>
-            <h3 className="font-extrabold text-base text-stone-900">Punto de Venta Rápido</h3>
+            <h3 className="font-extrabold text-base text-stone-900">Clientes & Mayoristas</h3>
             <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
-              Cobro en mostrador, catálogo con precios de panes, tickets y cálculo de cambio.
+              Público general, tienditas de la esquina que compran bolillo al mayoreo, saldo y créditos.
             </p>
           </div>
-          <div className="mt-6 flex items-center gap-2 text-xs font-black text-brito-orange-600 group-hover:translate-x-1 transition-transform">
-            Ir a Caja <ArrowRight className="w-4 h-4" />
+          <div className="mt-6 flex items-center gap-2 text-xs font-black text-blue-600 group-hover:translate-x-1 transition-transform">
+            Ver Directorio <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
 
-        {/* Inventory Card */}
-        <Link href="/inventario" className="group bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm hover:border-amber-500 hover:shadow-xl transition-all flex flex-col justify-between">
+        {/* Caja Card */}
+        <Link href="/caja" className="group bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm hover:border-brito-orange-500 hover:shadow-xl transition-all flex flex-col justify-between">
+          <div>
+            <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-700 mb-4 group-hover:scale-110 transition-transform">
+              <Wallet className="w-6 h-6" />
+            </div>
+            <h3 className="font-extrabold text-base text-stone-900">Caja & Flujo de Dinero</h3>
+            <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
+              Control de turnos, gastos menores (gas, insumos), retiros de Don Toño y arqueo de caja.
+            </p>
+          </div>
+          <div className="mt-6 flex items-center gap-2 text-xs font-black text-emerald-600 group-hover:translate-x-1 transition-transform">
+            Administrar Caja <ArrowRight className="w-4 h-4" />
+          </div>
+        </Link>
+
+        {/* Inventario Card */}
+        <Link href="/inventario" className="group bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm hover:border-brito-crimson-500 hover:shadow-xl transition-all flex flex-col justify-between">
           <div>
             <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-brito-crimson-600 mb-4 group-hover:scale-110 transition-transform">
-              <AlertTriangle className="w-6 h-6" />
+              <Package className="w-6 h-6" />
             </div>
-            <h3 className="font-extrabold text-base text-stone-900">Inventario & Insumos</h3>
+            <h3 className="font-extrabold text-base text-stone-900">Inventario & Materia Prima</h3>
             <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
-              Control de sacos de harina, azúcar, mantequilla, levadura y mermas de pan.
+              Registro de compras a proveedores, sacos de harina, azúcar, mantequilla y control de mermas.
             </p>
           </div>
           <div className="mt-6 flex items-center gap-2 text-xs font-black text-brito-crimson-600 group-hover:translate-x-1 transition-transform">
             Ver Almacén <ArrowRight className="w-4 h-4" />
-          </div>
-        </Link>
-
-        {/* Orders Card */}
-        <Link href="/pedidos" className="group bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm hover:border-rose-500 hover:shadow-xl transition-all flex flex-col justify-between">
-          <div>
-            <div className="w-12 h-12 bg-pink-100 rounded-2xl flex items-center justify-center text-pink-700 mb-4 group-hover:scale-110 transition-transform">
-              <Clock className="w-6 h-6" />
-            </div>
-            <h3 className="font-extrabold text-base text-stone-900">Encargos de Pastelería</h3>
-            <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
-              Agenda de pasteles personalizados, XV años, bodas, anticipos y entregas.
-            </p>
-          </div>
-          <div className="mt-6 flex items-center gap-2 text-xs font-black text-pink-700 group-hover:translate-x-1 transition-transform">
-            Ver Pedidos <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
       </div>

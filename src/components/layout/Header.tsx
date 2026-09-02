@@ -4,12 +4,9 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { 
   Clock, 
-  Store, 
   ChevronDown, 
   LogOut, 
-  UserCheck, 
-  Sparkles,
-  ShieldAlert
+  UserCheck
 } from "lucide-react";
 import NotificationsDropdown from "./NotificationsDropdown";
 import { useAuth, DEMO_USERS } from "@/context/AuthContext";
@@ -40,69 +37,77 @@ export default function Header() {
   const getPageTitle = () => {
     switch (pathname) {
       case "/":
-        return { title: "Panel Principal", subtitle: "Resumen operativo del día" };
+        return { title: "Dashboard / Inicio", subtitle: "Resumen operativo en tiempo real" };
+      case "/clientes":
+        return { title: "Clientes & Mayoristas", subtitle: "Directorio de tienditas, clientes frecuentes y crédito" };
+      case "/inventario":
+        return { title: "Inventario & Insumos", subtitle: "Compras de materia prima, stock y control de mermas" };
+      case "/finanzas":
+        return { title: "Finanzas & Balances", subtitle: "Estado de resultados, ingresos, costos y ganancia neta" };
+      case "/reportes":
+        return { title: "Reportes & Estadísticas", subtitle: "Panes estrella, horas pico de mostrador y producción" };
+      case "/configuracion":
+        return { title: "Configuración del Sistema", subtitle: "Datos del negocio, tickets, usuarios y base de datos" };
       case "/pos":
         return { title: "Punto de Venta (POS)", subtitle: "Caja rápida y tickets de mostrador" };
-      case "/inventario":
-        return { title: "Inventario & Insumos", subtitle: "Control de materias primas y existencias" };
+      case "/caja":
+        return { title: "Caja & Flujo de Dinero", subtitle: "Arqueo de turno y movimientos de efectivo" };
       case "/pedidos":
-        return { title: "Pedidos & Encargos", subtitle: "Pasteles para eventos y fechas de entrega" };
-      case "/reportes":
-        return { title: "Reportes & Corte de Caja", subtitle: "Métricas de ventas y ganancias" };
+        return { title: "Pedidos & Encargos", subtitle: "Pasteles personalizados y fechas de entrega" };
       default:
-        return { title: "Panaderías Brito", subtitle: "Sistema de Gestión" };
+        return { title: "Panaderías Brito", subtitle: "Sistema Integral ERP" };
     }
   };
 
   const current = getPageTitle();
 
   return (
-    <header className="h-20 bg-white/90 backdrop-blur-md border-b border-stone-200/80 px-8 flex items-center justify-between sticky top-0 z-40 shadow-sm">
+    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-6 flex items-center justify-between sticky top-0 z-40 shadow-sm">
       {/* Page Title & Breadcrumbs */}
       <div>
-        <h2 className="text-xl font-black text-stone-900 tracking-tight">{current.title}</h2>
-        <p className="text-xs text-stone-500 font-medium">{current.subtitle}</p>
+        <h2 className="text-lg font-black text-stone-900 tracking-tight">{current.title}</h2>
+        <p className="text-[11px] text-stone-500 font-medium">{current.subtitle}</p>
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         {/* Live Clock */}
-        <div className="hidden md:flex items-center gap-2 bg-stone-100/80 px-3.5 py-2 rounded-2xl border border-stone-200 text-stone-700 text-xs font-bold">
-          <Clock className="w-4 h-4 text-brito-orange-600" />
-          <span>{time || "Cargando hora..."}</span>
+        <div className="hidden md:flex items-center gap-2 bg-stone-100/80 px-3 py-1.5 rounded-xl border border-stone-200 text-stone-700 text-xs font-bold">
+          <Clock className="w-3.5 h-3.5 text-brito-orange-600" />
+          <span>{time || "Cargando..."}</span>
         </div>
 
-        {/* Notifications */}
+        {/* Facebook Style Notifications */}
         <NotificationsDropdown />
 
         {/* User Session Dropdown */}
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-3 p-1.5 pr-3 rounded-2xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/50"
+            className="flex items-center gap-2.5 p-1 pr-2.5 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/60"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brito-orange-600 to-brito-crimson-600 text-white flex items-center justify-center text-lg font-bold shadow-md shadow-brito-orange-600/20">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-brito-orange-600 to-brito-crimson-600 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-brito-orange-600/20">
               {user?.avatar || "👨‍🍳"}
             </div>
             <div className="text-left hidden sm:block">
               <p className="text-xs font-black text-stone-900 leading-tight">{user?.name || "Invitado"}</p>
-              <p className="text-[10px] text-brito-orange-700 font-bold uppercase tracking-wider">{user?.roleLabel || "Sin Rol"}</p>
+              <p className="text-[9px] text-brito-orange-700 font-bold uppercase tracking-wider">{user?.roleLabel || "Sin Rol"}</p>
             </div>
-            <ChevronDown className="w-4 h-4 text-stone-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
           </button>
 
           {/* User & Role Switcher Menu */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-3 w-72 bg-white rounded-3xl shadow-2xl border border-stone-200 p-3 z-50 animate-in fade-in zoom-in-95">
-              <div className="p-3 border-b border-stone-100">
-                <p className="text-xs text-stone-400 font-semibold">Sesión iniciada como:</p>
-                <p className="text-sm font-black text-stone-900 mt-0.5">{user?.name}</p>
-                <p className="text-xs text-stone-500">{user?.email}</p>
+            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
+              <div className="p-2.5 border-b border-stone-100">
+                <p className="text-[10px] text-stone-400 font-semibold">Sesión activa:</p>
+                <p className="text-xs font-black text-stone-900">{user?.name}</p>
+                <p className="text-[11px] text-stone-500">{user?.email}</p>
               </div>
 
               {/* Fast Role Switcher */}
-              <div className="p-2 space-y-1">
-                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider px-2 py-1">
+              <div className="p-1.5 space-y-0.5">
+                <p className="text-[9px] font-bold text-stone-400 uppercase tracking-wider px-2 py-1">
                   Cambiar de Perfil (Demo):
                 </p>
                 {DEMO_USERS.map((demo) => (
@@ -112,7 +117,7 @@ export default function Header() {
                       loginAs(demo);
                       setShowUserMenu(false);
                     }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between font-semibold transition-all ${
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between font-semibold transition-all ${
                       user?.id === demo.id
                         ? "bg-amber-100/70 text-brito-orange-900 font-bold"
                         : "text-stone-600 hover:bg-stone-100"
@@ -127,15 +132,15 @@ export default function Header() {
                 ))}
               </div>
 
-              <div className="border-t border-stone-100 pt-2 mt-1">
+              <div className="border-t border-stone-100 pt-1.5 mt-1">
                 <button
                   onClick={() => {
                     logout();
                     setShowUserMenu(false);
                   }}
-                  className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                 >
-                  <LogOut className="w-4 h-4" /> Cerrar Sesión
+                  <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
                 </button>
               </div>
             </div>
