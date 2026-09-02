@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
+import { AuthProvider } from "@/context/AuthContext";
+import { NotificationProvider } from "@/context/NotificationContext";
+import AppLayout from "@/components/layout/AppLayout";
 
 export const metadata: Metadata = {
-  title: "Panaderías Brito - Sistema de Gestión",
-  description: "Sistema para Don Toño Brito",
+  title: "Panadería Bakery Brito - Sistema ERP & POS",
+  description: "Sistema integral de punto de venta, inventario y gestión para Panadería Brito (Don Toño)",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -14,11 +19,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className="flex min-h-screen bg-amber-50/40 text-stone-900 antialiased">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto max-h-screen">
-          {children}
-        </main>
+      <body className="antialiased font-sans">
+        <AuthProvider>
+          <NotificationProvider>
+            <AppLayout>
+              {children}
+            </AppLayout>
+          </NotificationProvider>
+        </AuthProvider>
       </body>
     </html>
   );
