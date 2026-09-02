@@ -99,24 +99,26 @@ export default function LoginForm() {
                 <div className="absolute -inset-6 bg-gradient-to-r from-amber-500/40 via-orange-500/35 to-amber-600/40 rounded-full blur-3xl animate-pulse group-hover:blur-[40px] transition-all" />
                 <div className="absolute -inset-3 bg-amber-400/30 rounded-full blur-xl" />
 
-                {/* Big Floating Logo Container (224px) */}
-                <div className={`relative w-48 h-48 sm:w-56 sm:h-56 rounded-[38px] bg-gradient-to-b from-stone-900 via-stone-950 to-black p-5 shadow-2xl border-2 border-amber-400/60 flex items-center justify-center transition-all duration-500 group-hover:scale-105 group-hover:border-amber-400 animate-brito-float ${isLogoSpinning ? "animate-brito-spin" : ""}`}>
+                {/* Big Floating Logo Container (Filled with White, seamlessly rounded without sharp corners) */}
+                <div className={`relative w-52 h-52 sm:w-60 sm:h-60 rounded-[40px] bg-white p-3 shadow-2xl shadow-amber-500/25 border-[3px] border-amber-400/90 flex items-center justify-center transition-all duration-500 group-hover:scale-105 group-hover:border-amber-400 animate-brito-float overflow-hidden ${isLogoSpinning ? "animate-brito-spin" : ""}`}>
                   
-                  {/* Subtle sweep shimmer */}
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 rounded-[38px] pointer-events-none" />
+                  {/* Subtle golden shimmer sweep */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-amber-200/20 to-transparent rounded-[40px] pointer-events-none z-10" />
                   
-                  <Image
-                    src="/logo.png"
-                    alt="Panaderías Brito"
-                    width={220}
-                    height={220}
-                    priority
-                    unoptimized
-                    className="w-full h-full object-contain drop-shadow-[0_16px_32px_rgba(245,158,11,0.5)] select-none pointer-events-none transition-transform duration-300 group-hover:scale-110"
-                  />
+                  <div className="relative w-full h-full flex items-center justify-center p-2">
+                    <Image
+                      src="/logo.png"
+                      alt="Panaderías Brito"
+                      width={240}
+                      height={240}
+                      priority
+                      unoptimized
+                      className="w-full h-full object-contain select-none pointer-events-none transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </div>
 
                   {/* Little interactive sparkle tooltip */}
-                  <div className="absolute -bottom-2.5 px-3 py-0.5 bg-amber-500 text-stone-950 text-[10px] font-black rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  <div className="absolute -bottom-2.5 px-3 py-0.5 bg-amber-500 text-stone-950 text-[10px] font-black rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 z-20">
                     <Sparkles className="w-3 h-3" /> ¡Gírame!
                   </div>
                 </div>
