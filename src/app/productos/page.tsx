@@ -52,6 +52,25 @@ export default function ProductosPage() {
   // Success toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Categories visibility & 15-second auto-collapse
+  const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
+  const [countdown, setCountdown] = useState(15);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsCategoriesVisible(false);
+    }, 15000); // 15 seconds auto-hide
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, []);
+
   // Form state
   const [formData, setFormData] = useState({
     name: "",
@@ -300,9 +319,23 @@ export default function ProductosPage() {
       {/* Filters and Search Bar */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-stone-200 space-y-4">
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          {/* Left Count Indicator */}
-          <div className="hidden md:flex items-center gap-1.5 w-44 text-xs font-bold text-stone-500">
-            <span>{filteredProducts.length} productos</span>
+          {/* Left Category Toggle & Counter */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCategoriesVisible(!isCategoriesVisible)}
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border shadow-sm ${
+                isCategoriesVisible
+                  ? "bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200"
+                  : "bg-stone-900 text-amber-400 border-amber-500/40 hover:bg-stone-800"
+              }`}
+              title={isCategoriesVisible ? "Ocultar panel de categorías" : "Mostrar panel de categorías"}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>{isCategoriesVisible ? "Ocultar Categorías" : "Ver Categorías"}</span>
+            </button>
+            <span className="hidden md:inline text-xs font-bold text-stone-500">
+              {filteredProducts.length} productos
+            </span>
           </div>
 
           {/* Centered Search Bar */}
@@ -358,50 +391,65 @@ export default function ProductosPage() {
 
       {/* Main Catalog Layout: Left Categories List, Right Products Content */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {/* Left Column: Categorías en forma de Lista */}
-        <div className="w-full lg:w-72 shrink-0 bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-            <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
-              <Layers className="w-4 h-4 text-amber-600" />
-              <span>Categorías</span>
-            </h3>
-            <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full">
-              {PRODUCT_CATEGORIES.length - 1} tipos
-            </span>
-          </div>
-
-          {/* Lista Vertical de Categorías */}
-          <div className="space-y-1.5">
-            {PRODUCT_CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              const count = cat.id === "all" 
-                ? products.length 
-                : products.filter((p) => p.category === cat.id).length;
-
-              return (
+        {/* Left Column: Categorías en forma de Lista con Auto-ocultado */}
+        <div className={`transition-all duration-700 ease-in-out shrink-0 overflow-hidden ${
+          isCategoriesVisible
+            ? "w-full lg:w-72 opacity-100 max-h-[900px] mb-4 lg:mb-0"
+            : "w-0 lg:w-0 opacity-0 max-h-0 pointer-events-none p-0 m-0 border-0"
+        }`}>
+          <div className="w-full lg:w-72 bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-4 h-4 text-amber-600" />
+                <span>Categorías</span>
+              </h3>
+              {countdown > 0 ? (
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full" title="Se ocultará en 15s para dar más espacio a los productos">
+                  Oculta en {countdown}s
+                </span>
+              ) : (
                 <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${
-                    isSelected
-                      ? "bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20 font-black scale-[1.01]"
-                      : "text-stone-700 hover:bg-stone-50 hover:text-stone-950 border border-transparent hover:border-stone-200"
-                  }`}
+                  onClick={() => setIsCategoriesVisible(false)}
+                  className="text-[10px] font-bold text-stone-400 hover:text-stone-700 bg-stone-100 px-2 py-0.5 rounded-full"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base shrink-0">{cat.icon}</span>
-                    <span className="truncate">{cat.label}</span>
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 transition-colors ${
-                    isSelected 
-                      ? "bg-stone-950/20 text-stone-950" 
-                      : "bg-stone-100 text-stone-500 group-hover:bg-stone-200 group-hover:text-stone-800"
-                  }`}>
-                    {count}
-                  </span>
+                  Ocultar
                 </button>
-              );
-            })}
+              )}
+            </div>
+
+            {/* Lista Vertical de Categorías */}
+            <div className="space-y-1.5">
+              {PRODUCT_CATEGORIES.map((cat) => {
+                const isSelected = selectedCategory === cat.id;
+                const count = cat.id === "all" 
+                  ? products.length 
+                  : products.filter((p) => p.category === cat.id).length;
+
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${
+                      isSelected
+                        ? "bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20 font-black scale-[1.01]"
+                        : "text-stone-700 hover:bg-stone-50 hover:text-stone-950 border border-transparent hover:border-stone-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base shrink-0">{cat.icon}</span>
+                      <span className="truncate">{cat.label}</span>
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 transition-colors ${
+                      isSelected 
+                        ? "bg-stone-950/20 text-stone-950" 
+                        : "bg-stone-100 text-stone-500 group-hover:bg-stone-200 group-hover:text-stone-800"
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -426,8 +474,12 @@ export default function ProductosPage() {
               </button>
             </div>
           ) : viewMode === "grid" ? (
-            /* Grid View */
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            /* Grid View (Expands to 4 cols when categories panel is hidden) */
+            <div className={`grid gap-6 transition-all duration-700 ${
+              isCategoriesVisible
+                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
+                : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+            }`}>
           {filteredProducts.map((product) => {
             const catBadge = getCategoryBadge(product.category);
             return (
@@ -732,12 +784,24 @@ export default function ProductosPage() {
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">$</span>
                     <input
-                      type="number"
-                      step="0.50"
-                      min="1"
+                      type="text"
+                      inputMode="decimal"
                       required
                       value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      onChange={(e) => {
+                        // Filtro estrictamente numérico: solo dígitos y un punto decimal
+                        let val = e.target.value.replace(/[^0-9.]/g, "");
+                        const parts = val.split(".");
+                        if (parts.length > 2) {
+                          val = parts[0] + "." + parts.slice(1).join("");
+                        }
+                        setFormData({ ...formData, price: val });
+                      }}
+                      onKeyDown={(e) => {
+                        if (["e", "E", "+", "-", ",", " "].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
                       placeholder="12.00"
                       className="w-full pl-7 pr-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
