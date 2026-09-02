@@ -57,8 +57,6 @@ export default function ProductosPage() {
     name: "",
     price: "",
     category: "pan_dulce" as Product["category"],
-    stock: "50",
-    tag: "",
     description: "",
     image: "",
     icon: "🥖",
@@ -116,8 +114,6 @@ export default function ProductosPage() {
       name: "",
       price: "",
       category: "pan_dulce",
-      stock: "50",
-      tag: "Recién Horneado",
       description: "",
       image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
       icon: "🥖",
@@ -133,8 +129,6 @@ export default function ProductosPage() {
       name: product.name,
       price: product.price.toString(),
       category: product.category,
-      stock: product.stock.toString(),
-      tag: product.tag || "",
       description: product.description || "",
       image: product.image || "",
       icon: product.icon || "🥖",
@@ -176,15 +170,12 @@ export default function ProductosPage() {
       return;
     }
 
-    const stockNum = parseInt(formData.stock) || 0;
-
     if (modalMode === "create") {
       const created = createProduct({
         name: formData.name.trim(),
         price: priceNum,
         category: formData.category,
-        stock: stockNum,
-        tag: formData.tag.trim() || undefined,
+        stock: 50,
         description: formData.description.trim() || undefined,
         image: formData.image.trim() || undefined,
         icon: formData.icon || "🥖",
@@ -197,8 +188,6 @@ export default function ProductosPage() {
         name: formData.name.trim(),
         price: priceNum,
         category: formData.category,
-        stock: stockNum,
-        tag: formData.tag.trim() || undefined,
         description: formData.description.trim() || undefined,
         image: formData.image.trim() || undefined,
         icon: formData.icon || "🥖",
@@ -365,50 +354,80 @@ export default function ProductosPage() {
           </div>
         </div>
 
-        {/* Category Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {PRODUCT_CATEGORIES.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                  isSelected
-                    ? "bg-amber-500 text-stone-950 shadow-md shadow-amber-500/25 border border-amber-400"
-                    : "bg-stone-50 text-stone-600 hover:bg-stone-100 border border-stone-200"
-                }`}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.label}</span>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
-      {/* Main Content Area */}
-      {filteredProducts.length === 0 ? (
-        <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-sm space-y-4">
-          <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 text-4xl flex items-center justify-center mx-auto text-amber-800">
-            🔍
+      {/* Main Catalog Layout: Left Categories List, Right Products Content */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* Left Column: Categorías en forma de Lista */}
+        <div className="w-full lg:w-72 shrink-0 bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+            <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
+              <Layers className="w-4 h-4 text-amber-600" />
+              <span>Categorías</span>
+            </h3>
+            <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full">
+              {PRODUCT_CATEGORIES.length - 1} tipos
+            </span>
           </div>
-          <div className="space-y-1">
-            <h3 className="text-lg font-bold text-stone-900">No se encontraron productos</h3>
-            <p className="text-xs text-stone-500 max-w-sm mx-auto">
-              No hay productos que coincidan con &ldquo;{searchQuery}&rdquo; en esta categoría. Puedes intentar otra búsqueda o agregar uno nuevo.
-            </p>
+
+          {/* Lista Vertical de Categorías */}
+          <div className="space-y-1.5">
+            {PRODUCT_CATEGORIES.map((cat) => {
+              const isSelected = selectedCategory === cat.id;
+              const count = cat.id === "all" 
+                ? products.length 
+                : products.filter((p) => p.category === cat.id).length;
+
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${
+                    isSelected
+                      ? "bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20 font-black scale-[1.01]"
+                      : "text-stone-700 hover:bg-stone-50 hover:text-stone-950 border border-transparent hover:border-stone-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base shrink-0">{cat.icon}</span>
+                    <span className="truncate">{cat.label}</span>
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 transition-colors ${
+                    isSelected 
+                      ? "bg-stone-950/20 text-stone-950" 
+                      : "bg-stone-100 text-stone-500 group-hover:bg-stone-200 group-hover:text-stone-800"
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <button
-            onClick={handleOpenCreate}
-            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl inline-flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Crear nuevo producto
-          </button>
         </div>
-      ) : viewMode === "grid" ? (
-        /* Grid View */
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+
+        {/* Right Column: Products Content Area */}
+        <div className="flex-1 w-full min-w-0">
+          {filteredProducts.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-sm space-y-4">
+              <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 text-4xl flex items-center justify-center mx-auto text-amber-800">
+                🔍
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-stone-900">No se encontraron productos</h3>
+                <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                  No hay productos que coincidan con &ldquo;{searchQuery}&rdquo; en esta categoría. Puedes intentar otra búsqueda o agregar uno nuevo.
+                </p>
+              </div>
+              <button
+                onClick={handleOpenCreate}
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl inline-flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Crear nuevo producto
+              </button>
+            </div>
+          ) : viewMode === "grid" ? (
+            /* Grid View */
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredProducts.map((product) => {
             const catBadge = getCategoryBadge(product.category);
             return (
@@ -586,6 +605,8 @@ export default function ProductosPage() {
           </div>
         </div>
       )}
+        </div>
+      </div>
 
       {/* Modal: Crear / Editar Producto */}
       {isModalOpen && (
@@ -723,34 +744,6 @@ export default function ProductosPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Stock Inicial & Etiqueta (Se ocultan al Modificar producto) */}
-              {modalMode === "create" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-stone-700">Piezas Disponibles (Stock)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.stock}
-                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                      placeholder="50"
-                      className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-stone-700">Etiqueta Especial</label>
-                    <input
-                      type="text"
-                      value={formData.tag}
-                      onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-                      placeholder="ej. Tradicional, Favorito"
-                      className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-              )}
 
               {/* Descripción */}
               <div className="space-y-1">
