@@ -37,21 +37,25 @@ export default function Header() {
   const getPageTitle = () => {
     switch (pathname) {
       case "/":
-        return { title: "Panel Principal ERP", subtitle: "Resumen operativo en tiempo real" };
+        return { title: "Dashboard / Inicio", subtitle: "Resumen operativo en tiempo real" };
+      case "/clientes":
+        return { title: "Clientes & Mayoristas", subtitle: "Directorio de tienditas, clientes frecuentes y crédito" };
+      case "/inventario":
+        return { title: "Inventario & Insumos", subtitle: "Compras de materia prima, stock y control de mermas" };
+      case "/finanzas":
+        return { title: "Finanzas & Balances", subtitle: "Estado de resultados, ingresos, costos y ganancia neta" };
+      case "/reportes":
+        return { title: "Reportes & Estadísticas", subtitle: "Panes estrella, horas pico de mostrador y producción" };
+      case "/configuracion":
+        return { title: "Configuración del Sistema", subtitle: "Datos del negocio, tickets, usuarios y base de datos" };
       case "/pos":
         return { title: "Punto de Venta (POS)", subtitle: "Caja rápida y tickets de mostrador" };
-      case "/clientes":
-        return { title: "Directorio de Clientes", subtitle: "Público en general, clientes frecuentes y mayoristas" };
-      case "/inventario":
-        return { title: "Inventario & Materia Prima", subtitle: "Compras de insumos, control de stock y mermas" };
       case "/caja":
-        return { title: "Caja & Flujo de Dinero", subtitle: "Apertura de turno, entradas, gastos y corte de caja" };
+        return { title: "Caja & Flujo de Dinero", subtitle: "Arqueo de turno y movimientos de efectivo" };
       case "/pedidos":
-        return { title: "Pedidos & Encargos", subtitle: "Pasteles personalizados, eventos y entregas" };
-      case "/reportes":
-        return { title: "Reportes & Finanzas", subtitle: "Ganancias, productos estrella y balances" };
+        return { title: "Pedidos & Encargos", subtitle: "Pasteles personalizados y fechas de entrega" };
       default:
-        return { title: "Panaderías Brito", subtitle: "Sistema de Gestión ERP" };
+        return { title: "Panaderías Brito", subtitle: "Sistema Integral ERP" };
     }
   };
 
@@ -73,7 +77,7 @@ export default function Header() {
           <span>{time || "Cargando..."}</span>
         </div>
 
-        {/* Notifications */}
+        {/* Facebook Style Notifications */}
         <NotificationsDropdown />
 
         {/* User Session Dropdown */}
