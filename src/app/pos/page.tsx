@@ -16,7 +16,10 @@ import {
   Sparkles,
   ShoppingBag,
   TrendingDown,
-  Wallet
+  Wallet,
+  Coins,
+  UserCheck,
+  Layers
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -24,6 +27,7 @@ import { createClient } from "@/lib/supabase/client";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
+import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
 
 const FALLBACK_PRODUCTS: Product[] = [
   {
@@ -198,10 +202,16 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [cashGiven, setCashGiven] = useState<string>("");
   
+  // Shift & Cashier state
+  const [cashierName, setCashierName] = useState("Don Toño Brito");
+  const [shiftName, setShiftName] = useState("Turno Matutino (06:00 - 14:00)");
+  const [initialCashFund, setInitialCashFund] = useState(500);
+
   // Modals & Drawers state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showRecentSales, setShowRecentSales] = useState(false);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
+  const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>([]);
   const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
@@ -271,7 +281,7 @@ export default function POSPage() {
             }),
             total: Number(s.total),
             paymentMethod: (s.payment_method as any) || "efectivo",
-            cashier: s.cashier || "Caja Principal - Don Toño",
+            cashier: s.cashier || "Don Toño Brito",
             items: (s.sale_items || []).map((si: any) => ({
               product: {
                 id: si.product_id || "temp",
@@ -364,7 +374,8 @@ export default function POSPage() {
     .filter((s) => s.paymentMethod === "efectivo")
     .reduce((sum, s) => sum + s.total, 0);
   const totalExpenses = expensesList.reduce((sum, e) => sum + e.amount, 0);
-  const netCashInDrawer = Math.max(0, totalCashSales - totalExpenses);
+  const netCashInDrawer = initialCashFund + totalCashSales - totalExpenses;
+  const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
 
   const handleQuickCash = (amount: number) => {
     setCashGiven(amount.toString());
@@ -382,7 +393,6 @@ export default function POSPage() {
     if (cart.length === 0 || !isPaymentValid || isSubmitting) return;
     setIsSubmitting(true);
 
-    const cashierName = "Caja Principal - Don Toño";
     const currentItems = [...cart];
     const currentTotal = total;
     const currentPaymentMethod = paymentMethod;
@@ -477,7 +487,7 @@ export default function POSPage() {
       <div className="flex-1 flex flex-col p-6 overflow-y-auto">
         {/* Top Control Bar */}
         <div className="flex flex-col gap-4 mb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
             {/* Search Input */}
             <div className="relative flex-1 max-w-md w-full">
               <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -490,33 +500,47 @@ export default function POSPage() {
               />
             </div>
 
-            {/* Quick Actions Bar */}
-            <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto">
+            {/* Quick Actions & Live Financial Widgets */}
+            <div className="flex items-center gap-2 flex-wrap self-end xl:self-auto">
+              {/* BOTÓN PRINCIPAL: Dinero en Caja / Existencias / Turno */}
+              <button
+                onClick={() => setShowCashDrawerModal(true)}
+                className="flex items-center gap-2.5 text-xs font-black bg-gradient-to-r from-amber-900 to-amber-950 text-white hover:from-black hover:to-black px-4 py-2.5 rounded-2xl shadow-md transition-all active:scale-95 border border-amber-800"
+              >
+                <Coins className="w-4 h-4 text-amber-400" />
+                <div className="text-left">
+                  <span className="text-[10px] text-amber-300 block leading-tight font-medium">
+                    {cashierName} • {shiftName.split(" ")[0]}
+                  </span>
+                  <span className="text-xs font-black text-white">
+                    Caja: {formatCurrency(netCashInDrawer)} | Stock: {formatCurrency(totalStockValue)}
+                  </span>
+                </div>
+              </button>
+
               {/* Gastos / Salidas de Caja Button */}
               <button
                 onClick={() => setShowExpensesModal(true)}
-                className="flex items-center gap-2 text-xs font-black text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-4 py-3 rounded-2xl shadow-sm transition-all active:scale-95"
+                className="flex items-center gap-1.5 text-xs font-black text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3.5 py-3 rounded-2xl shadow-sm transition-all active:scale-95"
               >
                 <TrendingDown className="w-4 h-4 text-rose-600" />
-                <span>Gastos de Turno</span>
-                <span className="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-full">
-                  -{formatCurrency(totalExpenses)}
-                </span>
+                <span>Gastos:</span>
+                <span className="font-extrabold text-rose-800">-{formatCurrency(totalExpenses)}</span>
               </button>
 
               {/* Turno / Ventas Recientes */}
               <button
                 onClick={() => setShowRecentSales(true)}
-                className="flex items-center gap-2 text-xs font-bold text-stone-800 bg-white hover:bg-stone-50 border border-stone-200/90 px-4 py-3 rounded-2xl shadow-sm transition-all active:scale-95"
+                className="flex items-center gap-1.5 text-xs font-bold text-stone-800 bg-white hover:bg-stone-50 border border-stone-200/90 px-3.5 py-3 rounded-2xl shadow-sm transition-all active:scale-95"
               >
                 <History className="w-4 h-4 text-amber-600" />
                 <span>Turno ({recentSalesList.length})</span>
               </button>
 
               {/* Supabase status */}
-              <div className="flex items-center gap-2 text-xs font-semibold text-stone-700 bg-white border border-stone-200/90 px-4 py-3 rounded-2xl shadow-sm">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-700 bg-white border border-stone-200/90 px-3 py-3 rounded-2xl shadow-sm">
                 <Database className={`w-4 h-4 ${isDbConnected ? "text-emerald-500" : "text-amber-500"}`} />
-                <span className="hidden xl:inline">{isDbConnected ? "Supabase Online" : "Modo Demo"}</span>
+                <span className="hidden 2xl:inline">{isDbConnected ? "Supabase Online" : "Modo Demo"}</span>
               </div>
             </div>
           </div>
@@ -650,7 +674,7 @@ export default function POSPage() {
             </div>
             <div>
               <h3 className="font-bold text-sm leading-tight">Charola de Cobro</h3>
-              <p className="text-[10px] text-amber-300/80">Don Toño Brito • Mostrador</p>
+              <p className="text-[10px] text-amber-300/80">{cashierName} • Mostrador</p>
             </div>
           </div>
           <span className="text-xs bg-amber-800/90 px-3 py-1.5 rounded-full font-extrabold text-amber-100">
@@ -865,6 +889,21 @@ export default function POSPage() {
         expenses={expensesList}
         onAddExpense={handleAddExpense}
         cashSalesTotal={totalCashSales}
+      />
+
+      {/* Cash Drawer & Shift Control Modal */}
+      <CashDrawerShiftModal
+        isOpen={showCashDrawerModal}
+        onClose={() => setShowCashDrawerModal(false)}
+        cashierName={cashierName}
+        onChangeCashier={setCashierName}
+        shiftName={shiftName}
+        onChangeShift={setShiftName}
+        initialFund={initialCashFund}
+        onChangeInitialFund={setInitialCashFund}
+        sales={recentSalesList}
+        expenses={expensesList}
+        products={products}
       />
     </div>
   );
