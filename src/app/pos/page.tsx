@@ -24,6 +24,7 @@ import {
 import { Product, CartItem, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { getStoredProducts } from "@/lib/products";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
@@ -195,7 +196,7 @@ const CATEGORIES = [
 const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500];
 
 export default function POSPage() {
-  const [products, setProducts] = useState<Product[]>(FALLBACK_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [search, setSearch] = useState("");
@@ -219,6 +220,18 @@ export default function POSPage() {
   // Status
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load and synchronize products with catalog
+  useEffect(() => {
+    setProducts(getStoredProducts());
+
+    const handleSync = () => {
+      setProducts(getStoredProducts());
+    };
+
+    window.addEventListener("brito_products_updated", handleSync);
+    return () => window.removeEventListener("brito_products_updated", handleSync);
+  }, []);
 
   // Load products, recent sales & expenses from Supabase
   useEffect(() => {

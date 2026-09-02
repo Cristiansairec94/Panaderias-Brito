@@ -128,6 +128,7 @@ export interface RolePermissions {
   canAccessFinanzas: boolean;
   canAccessReportes: boolean;
   canAccessConfiguracion: boolean;
+  canAccessProductos: boolean;
   canViewProfitMargins: boolean;
   canEditPrices: boolean;
   canManageUsers: boolean;

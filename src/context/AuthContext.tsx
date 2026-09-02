@@ -16,6 +16,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canAccessFinanzas: true,
     canAccessReportes: true,
     canAccessConfiguracion: true,
+    canAccessProductos: true,
     canViewProfitMargins: true,
     canEditPrices: true,
     canManageUsers: true,
@@ -30,6 +31,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canAccessFinanzas: false,
     canAccessReportes: true,
     canAccessConfiguracion: false,
+    canAccessProductos: true,
     canViewProfitMargins: false,
     canEditPrices: false,
     canManageUsers: false,
@@ -44,6 +46,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canAccessFinanzas: false,
     canAccessReportes: false,
     canAccessConfiguracion: false,
+    canAccessProductos: false,
     canViewProfitMargins: false,
     canEditPrices: false,
     canManageUsers: false,
@@ -58,6 +61,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canAccessFinanzas: false,
     canAccessReportes: false,
     canAccessConfiguracion: false,
+    canAccessProductos: false,
     canViewProfitMargins: false,
     canEditPrices: false,
     canManageUsers: false,
@@ -74,6 +78,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, keyof RolePermissions> = {
   "/finanzas": "canAccessFinanzas",
   "/reportes": "canAccessReportes",
   "/configuracion": "canAccessConfiguracion",
+  "/productos": "canAccessProductos",
 };
 
 export function getFriendlyName(fullName?: string): string {
@@ -200,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canAccessFinanzas: false,
         canAccessReportes: false,
         canAccessConfiguracion: false,
+        canAccessProductos: false,
         canViewProfitMargins: false,
         canEditPrices: false,
         canManageUsers: false,

@@ -14,13 +14,15 @@ import {
   Wallet,
   Clock,
   ShieldCheck,
-  Flame
+  Flame,
+  Croissant
 } from "lucide-react";
 import AnimatedLogo from "@/components/ui/AnimatedLogo";
 import { useAuth } from "@/context/AuthContext";
 
 const allNavigationItems = [
   { name: "Dashboard / Inicio", href: "/", icon: Store, badge: null },
+  { name: "Productos", href: "/productos", icon: Croissant, badge: "Catálogo" },
   { name: "Caja & Turnos", href: "/caja", icon: Wallet, badge: null },
   { name: "Pedidos & Encargos", href: "/pedidos", icon: Clock, badge: "Horno" },
   { name: "Clientes & Mayoristas", href: "/clientes", icon: Users, badge: null },

@@ -56,6 +56,8 @@ export default function Header() {
         return { title: "Punto de Venta (POS)", subtitle: "Caja rápida y tickets de mostrador" };
       case "/caja":
         return { title: "Caja & Flujo de Dinero", subtitle: "Arqueo de turno y movimientos de efectivo" };
+      case "/productos":
+        return { title: "Catálogo de Productos", subtitle: "Gestión de panes, repostería, precios y fotografías" };
       case "/pedidos":
         return { title: "Pedidos & Encargos", subtitle: "Pasteles personalizados y fechas de entrega" };
       default:

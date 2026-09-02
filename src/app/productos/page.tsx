@@ -1,0 +1,822 @@
+"use client";
+
+import { useState, useEffect, useMemo, useRef } from "react";
+import Image from "next/image";
+import { 
+  Plus, 
+  Search, 
+  Edit3, 
+  Trash2, 
+  Upload, 
+  Link as LinkIcon, 
+  X, 
+  Check, 
+  AlertTriangle, 
+  Croissant, 
+  Package, 
+  DollarSign, 
+  Layers, 
+  Sparkles, 
+  Grid, 
+  List as ListIcon, 
+  Eye, 
+  ArrowUpDown,
+  RefreshCw,
+  Tag as TagIcon,
+  CheckCircle2
+} from "lucide-react";
+import { Product } from "@/types";
+import { formatCurrency } from "@/lib/utils";
+import { 
+  getStoredProducts, 
+  createProduct, 
+  updateProduct, 
+  deleteProduct, 
+  PRODUCT_CATEGORIES 
+} from "@/lib/products";
+
+export default function ProductosPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
+  // Modals state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Delete modal state
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+
+  // Success toast
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    price: "",
+    category: "pan_dulce" as Product["category"],
+    stock: "50",
+    tag: "",
+    description: "",
+    image: "",
+    icon: "🥖",
+  });
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load products on mount & listen to updates
+  useEffect(() => {
+    const load = () => {
+      setProducts(getStoredProducts());
+    };
+    load();
+
+    const handleUpdate = () => {
+      load();
+    };
+
+    window.addEventListener("brito_products_updated", handleUpdate);
+    return () => window.removeEventListener("brito_products_updated", handleUpdate);
+  }, []);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Filtered products
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchesCat = selectedCategory === "all" || p.category === selectedCategory;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = 
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.tag && p.tag.toLowerCase().includes(q));
+      return matchesCat && matchesSearch;
+    });
+  }, [products, selectedCategory, searchQuery]);
+
+  // KPIs
+  const stats = useMemo(() => {
+    const total = products.length;
+    const lowStock = products.filter((p) => p.stock <= 20).length;
+    const avgPrice = total > 0 ? products.reduce((acc, p) => acc + p.price, 0) / total : 0;
+    return { total, lowStock, avgPrice };
+  }, [products]);
+
+  // Open Create Modal
+  const handleOpenCreate = () => {
+    setModalMode("create");
+    setEditingId(null);
+    setFormData({
+      name: "",
+      price: "",
+      category: "pan_dulce",
+      stock: "50",
+      tag: "Recién Horneado",
+      description: "",
+      image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+      icon: "🥖",
+    });
+    setIsModalOpen(true);
+  };
+
+  // Open Edit Modal
+  const handleOpenEdit = (product: Product) => {
+    setModalMode("edit");
+    setEditingId(product.id);
+    setFormData({
+      name: product.name,
+      price: product.price.toString(),
+      category: product.category,
+      stock: product.stock.toString(),
+      tag: product.tag || "",
+      description: product.description || "",
+      image: product.image || "",
+      icon: product.icon || "🥖",
+    });
+    setIsModalOpen(true);
+  };
+
+  // Handle Image File Upload (converts to Base64)
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor selecciona un archivo de imagen válido (PNG, JPG, WebP).");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setFormData((prev) => ({ ...prev, image: event.target!.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Submit Create or Edit
+  const handleSubmitForm = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name.trim()) {
+      alert("Por favor ingresa el nombre del producto.");
+      return;
+    }
+
+    const priceNum = parseFloat(formData.price);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      alert("Por favor ingresa un precio válido mayor a 0.");
+      return;
+    }
+
+    const stockNum = parseInt(formData.stock) || 0;
+
+    if (modalMode === "create") {
+      const created = createProduct({
+        name: formData.name.trim(),
+        price: priceNum,
+        category: formData.category,
+        stock: stockNum,
+        tag: formData.tag.trim() || undefined,
+        description: formData.description.trim() || undefined,
+        image: formData.image.trim() || undefined,
+        icon: formData.icon || "🥖",
+      });
+      setProducts(getStoredProducts());
+      setIsModalOpen(false);
+      showToast(`¡Producto "${created.name}" creado con éxito!`);
+    } else if (modalMode === "edit" && editingId) {
+      const updated = updateProduct(editingId, {
+        name: formData.name.trim(),
+        price: priceNum,
+        category: formData.category,
+        stock: stockNum,
+        tag: formData.tag.trim() || undefined,
+        description: formData.description.trim() || undefined,
+        image: formData.image.trim() || undefined,
+        icon: formData.icon || "🥖",
+      });
+      setProducts(getStoredProducts());
+      setIsModalOpen(false);
+      showToast(`¡Producto "${updated?.name || formData.name}" actualizado!`);
+    }
+  };
+
+  // Delete product confirm
+  const handleConfirmDelete = () => {
+    if (!deletingProduct) return;
+    deleteProduct(deletingProduct.id);
+    setProducts(getStoredProducts());
+    showToast(`Producto "${deletingProduct.name}" eliminado del catálogo.`);
+    setDeletingProduct(null);
+  };
+
+  const getCategoryBadge = (cat: Product["category"]) => {
+    switch (cat) {
+      case "pan_dulce":
+        return { label: "Pan Dulce", color: "bg-amber-100 text-amber-900 border-amber-300" };
+      case "pan_blanco":
+        return { label: "Pan Blanco", color: "bg-stone-100 text-stone-900 border-stone-300" };
+      case "pasteleria":
+        return { label: "Pastelería", color: "bg-pink-100 text-pink-900 border-pink-300" };
+      case "bebidas":
+        return { label: "Bebidas", color: "bg-blue-100 text-blue-900 border-blue-300" };
+      case "temporada":
+        return { label: "Temporada", color: "bg-purple-100 text-purple-900 border-purple-300" };
+      default:
+        return { label: cat, color: "bg-stone-100 text-stone-800 border-stone-200" };
+    }
+  };
+
+  return (
+    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto select-none">
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-amber-500/40 flex items-center gap-3 animate-in slide-in-from-bottom-5">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <p className="text-xs font-bold">{toastMessage}</p>
+        </div>
+      )}
+
+      {/* Header Banner */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="absolute -right-10 -top-10 w-72 h-72 bg-amber-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 w-72 h-72 bg-orange-600/20 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-600 text-stone-950 rounded-full text-[10px] font-black tracking-wider uppercase shadow-md flex items-center gap-1.5">
+              <Croissant className="w-3.5 h-3.5" /> Catálogo Maestro
+            </span>
+            <span className="text-xs text-amber-400 font-semibold flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" /> Sincronizado con POS
+            </span>
+          </div>
+          <h1 className="text-3xl font-black tracking-tight text-white">
+            Catálogo de Productos
+          </h1>
+          <p className="text-stone-300 text-xs max-w-xl leading-relaxed">
+            Administra los panes, pasteles y bebidas de <strong className="text-amber-400">Panaderías Brito</strong>. Crea nuevos productos, actualiza precios, gestiona fotografías y mantén al día tu mostrador.
+          </p>
+        </div>
+
+        {/* Action Button */}
+        <div className="relative z-10 flex items-center gap-3">
+          <button
+            onClick={handleOpenCreate}
+            className="px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-xl shadow-orange-500/25 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Nuevo Producto</span>
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Total en Catálogo</p>
+            <p className="text-2xl font-black text-stone-900 mt-1">{stats.total} productos</p>
+            <p className="text-[11px] text-emerald-600 font-bold mt-0.5">Disponibles en mostrador</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xl">
+            🥖
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Precio Promedio</p>
+            <p className="text-2xl font-black text-stone-900 mt-1">{formatCurrency(stats.avgPrice)}</p>
+            <p className="text-[11px] text-stone-400 font-medium mt-0.5">Por pieza / porción</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xl">
+            <DollarSign className="w-6 h-6 text-emerald-600" />
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Por Hornear / Stock Bajo</p>
+            <p className="text-2xl font-black text-stone-900 mt-1">{stats.lowStock} productos</p>
+            <p className="text-[11px] text-orange-600 font-bold mt-0.5">Menos de 20 piezas</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-800 flex items-center justify-center font-bold text-xl">
+            <AlertTriangle className="w-6 h-6 text-rose-600" />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters and Search Bar */}
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 space-y-4">
+        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+          {/* Search Input */}
+          <div className="relative w-full md:w-80">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nombre, descripción..."
+              className="w-full pl-10 pr-4 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* View Toggle */}
+          <div className="flex items-center gap-2 self-end md:self-auto">
+            <span className="text-xs text-stone-500 font-medium mr-1">
+              Mostrando {filteredProducts.length} de {products.length}
+            </span>
+            <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  viewMode === "grid" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
+                }`}
+                title="Vista de Cuadrícula"
+              >
+                <Grid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("table")}
+                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                  viewMode === "table" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
+                }`}
+                title="Vista de Lista"
+              >
+                <ListIcon className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Category Pills */}
+        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {PRODUCT_CATEGORIES.map((cat) => {
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  isSelected
+                    ? "bg-amber-500 text-stone-950 shadow-md shadow-amber-500/25 border border-amber-400"
+                    : "bg-stone-50 text-stone-600 hover:bg-stone-100 border border-stone-200"
+                }`}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      {filteredProducts.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-sm space-y-4">
+          <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 text-4xl flex items-center justify-center mx-auto text-amber-800">
+            🔍
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-stone-900">No se encontraron productos</h3>
+            <p className="text-xs text-stone-500 max-w-sm mx-auto">
+              No hay productos que coincidan con &ldquo;{searchQuery}&rdquo; en esta categoría. Puedes intentar otra búsqueda o agregar uno nuevo.
+            </p>
+          </div>
+          <button
+            onClick={handleOpenCreate}
+            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl inline-flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Crear nuevo producto
+          </button>
+        </div>
+      ) : viewMode === "grid" ? (
+        /* Grid View */
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {filteredProducts.map((product) => {
+            const catBadge = getCategoryBadge(product.category);
+            return (
+              <div
+                key={product.id}
+                className="bg-white rounded-3xl overflow-hidden border border-stone-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group"
+              >
+                {/* Image Container */}
+                <div className="relative h-48 w-full bg-stone-100 overflow-hidden">
+                  {product.image ? (
+                    <Image
+                      src={product.image}
+                      alt={product.name}
+                      fill
+                      unoptimized
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-5xl bg-stone-50">
+                      {product.icon || "🥖"}
+                    </div>
+                  )}
+
+                  {/* Top Badges */}
+                  <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase shadow-sm ${catBadge.color}`}>
+                      {catBadge.label}
+                    </span>
+                    {product.tag && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-stone-900/80 text-white backdrop-blur-sm border border-white/20 shadow-sm">
+                        {product.tag}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Stock Tag on Top Right */}
+                  <div className="absolute top-3 right-3 z-10">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-sm ${
+                        product.stock <= 20
+                          ? "bg-rose-500 text-white"
+                          : "bg-emerald-500 text-white"
+                      }`}
+                    >
+                      {product.stock} disp.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Body Content */}
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-base font-black text-stone-900 leading-snug">
+                        {product.name}
+                      </h3>
+                      <span className="text-base font-black text-amber-600 shrink-0">
+                        {formatCurrency(product.price)}
+                      </span>
+                    </div>
+                    {product.description && (
+                      <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
+                        {product.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Card Actions */}
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => handleOpenEdit(product)}
+                      className="flex-1 py-2 px-3 bg-stone-100 hover:bg-amber-100 hover:text-amber-900 text-stone-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" /> Editar
+                    </button>
+                    <button
+                      onClick={() => setDeletingProduct(product)}
+                      className="p-2 bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-500 rounded-xl transition-colors"
+                      title="Eliminar producto"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Table View */
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-stone-50 text-stone-600 font-bold uppercase tracking-wider border-b border-stone-200">
+                <tr>
+                  <th className="py-3.5 px-4">Producto</th>
+                  <th className="py-3.5 px-4">Categoría</th>
+                  <th className="py-3.5 px-4 text-right">Precio</th>
+                  <th className="py-3.5 px-4 text-center">Stock</th>
+                  <th className="py-3.5 px-4">Etiqueta</th>
+                  <th className="py-3.5 px-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {filteredProducts.map((product) => {
+                  const catBadge = getCategoryBadge(product.category);
+                  return (
+                    <tr key={product.id} className="hover:bg-stone-50/70 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-11 h-11 rounded-xl bg-stone-100 overflow-hidden shrink-0 border border-stone-200">
+                            {product.image ? (
+                              <Image
+                                src={product.image}
+                                alt={product.name}
+                                fill
+                                unoptimized
+                                className="object-cover"
+                              />
+                            ) : (
+                              <span className="w-full h-full flex items-center justify-center text-xl">
+                                {product.icon || "🥖"}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-black text-stone-900 text-xs">{product.name}</p>
+                            <p className="text-[11px] text-stone-400 truncate max-w-xs">
+                              {product.description || "Sin descripción"}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase ${catBadge.color}`}>
+                          {catBadge.label}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-black text-amber-600 text-sm">
+                        {formatCurrency(product.price)}
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                          product.stock <= 20 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-800"
+                        }`}>
+                          {product.stock} pzas
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-stone-500 font-medium">
+                        {product.tag || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(product)}
+                            className="p-1.5 bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingProduct(product)}
+                            className="p-1.5 bg-stone-100 hover:bg-rose-100 text-stone-500 hover:text-rose-600 rounded-lg transition-colors"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Crear / Editar Producto */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-stone-200 relative my-8 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-stone-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center text-xl">
+                  {modalMode === "create" ? "🥖" : "✏️"}
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-stone-900">
+                    {modalMode === "create" ? "Nuevo Producto de Panadería" : "Modificar Producto"}
+                  </h3>
+                  <p className="text-xs text-stone-500 font-medium">
+                    {modalMode === "create" ? "Agrega un pan o producto al catálogo" : "Actualiza precio, stock o fotografía"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmitForm} className="space-y-4 pt-4">
+              {/* Product Image Picker & Preview */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-stone-700 flex items-center justify-between">
+                  <span>Fotografía del Producto</span>
+                  <span className="text-[10px] text-amber-600 font-semibold">Subir archivo o pegar link</span>
+                </label>
+
+                <div className="flex items-center gap-4">
+                  {/* Image Preview Box */}
+                  <div className="relative w-24 h-24 rounded-2xl bg-stone-100 border-2 border-dashed border-stone-300 overflow-hidden shrink-0 flex items-center justify-center">
+                    {formData.image ? (
+                      <Image
+                        src={formData.image}
+                        alt="Preview"
+                        fill
+                        unoptimized
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="text-center p-2">
+                        <span className="text-2xl">{formData.icon}</span>
+                        <p className="text-[9px] text-stone-400 mt-1">Sin foto</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions to upload / enter url */}
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageFileUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full py-2 px-3 bg-stone-100 hover:bg-amber-100 text-stone-800 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors border border-stone-200"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Subir foto desde tu equipo</span>
+                    </button>
+
+                    <div className="relative">
+                      <LinkIcon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                      <input
+                        type="url"
+                        value={formData.image}
+                        onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                        placeholder="O pega URL de imagen (https://...)"
+                        className="w-full pl-9 pr-3 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nombre */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-stone-700">Nombre del Producto *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="ej. Concha de Vainilla, Bolillo, Pastel 3 Leches"
+                  className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Categoría & Precio */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-stone-700">Categoría *</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                    className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  >
+                    <option value="pan_dulce">🥖 Pan Dulce Tradicional</option>
+                    <option value="pan_blanco">🍞 Bolillo & Telera</option>
+                    <option value="pasteleria">🍰 Pastelería & Pays</option>
+                    <option value="bebidas">☕ Cafetería & Bebidas</option>
+                    <option value="temporada">✨ Especiales de Temporada</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-stone-700">Precio ($ MXN) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">$</span>
+                    <input
+                      type="number"
+                      step="0.50"
+                      min="1"
+                      required
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      placeholder="12.00"
+                      className="w-full pl-7 pr-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock Inicial & Etiqueta */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-stone-700">Piezas Disponibles (Stock)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    placeholder="50"
+                    className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-stone-700">Etiqueta Especial</label>
+                  <input
+                    type="text"
+                    value={formData.tag}
+                    onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
+                    placeholder="ej. Tradicional, Favorito"
+                    className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Descripción */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-stone-700">Descripción del Pan</label>
+                <textarea
+                  rows={2}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Detalles sobre ingredientes, textura o forma de elaboración..."
+                  className="w-full px-3.5 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/25 flex items-center gap-1.5 transition-all active:scale-95"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>{modalMode === "create" ? "Guardar en Catálogo" : "Actualizar Producto"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmar Eliminación */}
+      {deletingProduct && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
+            <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-2xl">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-black text-stone-900">
+                ¿Eliminar este producto?
+              </h3>
+              <p className="text-xs text-stone-500">
+                Estás a punto de eliminar <strong className="text-stone-800">&ldquo;{deletingProduct.name}&rdquo;</strong>. Ya no aparecerá en el catálogo ni en el Punto de Venta (POS).
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setDeletingProduct(null)}
+                className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-600/25 transition-all"
+              >
+                Sí, Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
