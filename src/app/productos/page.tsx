@@ -8,13 +8,11 @@ import {
   Edit3, 
   Trash2, 
   Upload, 
-  Link as LinkIcon, 
   X, 
   Check, 
   AlertTriangle, 
   Croissant, 
   Package, 
-  DollarSign, 
   Layers, 
   Sparkles, 
   Grid, 
@@ -117,14 +115,6 @@ export default function ProductosPage() {
     });
   }, [products, selectedCategory, searchQuery]);
 
-  // KPIs
-  const stats = useMemo(() => {
-    const total = products.length;
-    const lowStock = products.filter((p) => p.stock <= 20).length;
-    const avgPrice = total > 0 ? products.reduce((acc, p) => acc + p.price, 0) / total : 0;
-    return { total, lowStock, avgPrice };
-  }, [products]);
-
   // Open Create Modal
   const handleOpenCreate = () => {
     setModalMode("create");
@@ -134,7 +124,7 @@ export default function ProductosPage() {
       price: "",
       category: "pan_dulce",
       description: "",
-      image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+      image: "",
       icon: "🥖",
     });
     setIsModalOpen(true);
@@ -288,31 +278,6 @@ export default function ProductosPage() {
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>Nuevo Producto</span>
           </button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Total en Catálogo</p>
-            <p className="text-2xl font-black text-stone-900 mt-1">{stats.total} productos</p>
-            <p className="text-[11px] text-emerald-600 font-bold mt-0.5">Disponibles en mostrador</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xl">
-            🥖
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Precio Promedio</p>
-            <p className="text-2xl font-black text-stone-900 mt-1">{formatCurrency(stats.avgPrice)}</p>
-            <p className="text-[11px] text-stone-400 font-medium mt-0.5">Por pieza / porción</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xl">
-            <DollarSign className="w-6 h-6 text-emerald-600" />
-          </div>
         </div>
       </div>
 
@@ -691,31 +656,36 @@ export default function ProductosPage() {
             <form onSubmit={handleSubmitForm} className="space-y-4 pt-4">
               {/* Product Image Picker & Preview */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-stone-700 flex items-center justify-between">
-                  <span>Fotografía del Producto</span>
-                  <span className="text-[10px] text-amber-600 font-semibold">Subir archivo o pegar link</span>
-                </label>
+                <label className="text-xs font-bold text-stone-700">Fotografía del Producto</label>
 
                 <div className="flex items-center gap-4">
-                  {/* Image Preview Box */}
-                  <div className="relative w-24 h-24 rounded-2xl bg-stone-100 border-2 border-dashed border-stone-300 overflow-hidden shrink-0 flex items-center justify-center">
+                  {/* Image Preview Box (Se queda completamente en blanco si se elimina o no hay foto) */}
+                  <div className="relative w-24 h-24 rounded-2xl bg-white border-2 border-dashed border-stone-300 overflow-hidden shrink-0 flex items-center justify-center shadow-sm">
                     {formData.image ? (
-                      <Image
-                        src={formData.image}
-                        alt="Preview"
-                        fill
-                        unoptimized
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="text-center p-2">
-                        <span className="text-2xl">{formData.icon}</span>
-                        <p className="text-[9px] text-stone-400 mt-1">Sin foto</p>
-                      </div>
-                    )}
+                      <>
+                        <Image
+                          src={formData.image}
+                          alt="Preview"
+                          fill
+                          unoptimized
+                          className="object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, image: "" }));
+                            if (fileInputRef.current) fileInputRef.current.value = "";
+                          }}
+                          className="absolute top-1 right-1 z-10 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md transition-colors"
+                          title="Eliminar imagen"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    ) : null}
                   </div>
 
-                  {/* Actions to upload / enter url */}
+                  {/* Actions to upload / delete image */}
                   <div className="flex-1 space-y-2">
                     <input
                       type="file"
@@ -727,22 +697,25 @@ export default function ProductosPage() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-full py-2 px-3 bg-stone-100 hover:bg-amber-100 text-stone-800 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors border border-stone-200"
+                      className="w-full py-2.5 px-3 bg-stone-100 hover:bg-amber-100 text-stone-800 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors border border-stone-200"
                     >
-                      <Upload className="w-3.5 h-3.5 text-amber-600" />
+                      <Upload className="w-4 h-4 text-amber-600" />
                       <span>Subir foto desde tu equipo</span>
                     </button>
 
-                    <div className="relative">
-                      <LinkIcon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                      <input
-                        type="url"
-                        value={formData.image}
-                        onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                        placeholder="O pega URL de imagen (https://...)"
-                        className="w-full pl-9 pr-3 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                      />
-                    </div>
+                    {formData.image && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({ ...prev, image: "" }));
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                        className="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-rose-200"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Eliminar imagen</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
