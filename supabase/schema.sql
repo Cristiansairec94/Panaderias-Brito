@@ -1,8 +1,8 @@
 -- =========================================================
--- PANADERÍA BRITO - SCHEMA DE BASE DE DATOS SUPABASE
+-- PANADERÍA BRITO - SCHEMA COMPLETO DE BASE DE DATOS SUPABASE
 -- =========================================================
 
--- 1. Tabla de Categorías
+-- 1. Categorías
 CREATE TABLE IF NOT EXISTS categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -17,7 +17,7 @@ INSERT INTO categories (id, name) VALUES
   ('temporada', 'Especiales de Temporada')
 ON CONFLICT (id) DO NOTHING;
 
--- 2. Tabla de Productos (Catálogo de Panadería)
+-- 2. Productos
 CREATE TABLE IF NOT EXISTS products (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
@@ -29,22 +29,28 @@ CREATE TABLE IF NOT EXISTS products (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Seed de productos iniciales
-INSERT INTO products (name, price, category_id, icon, stock) VALUES
-  ('Concha de Vainilla', 12.00, 'pan_dulce', '🥖', 50),
-  ('Concha de Chocolate', 12.00, 'pan_dulce', '🍫', 40),
-  ('Cuerno de Mantequilla', 15.00, 'pan_dulce', '🥐', 30),
-  ('Bolillo Tradicional', 5.00, 'pan_blanco', '🍞', 150),
-  ('Telera para Torta', 6.00, 'pan_blanco', '🥪', 100),
-  ('Oreja Hojaldrada', 14.00, 'pan_dulce', '🥨', 35),
-  ('Dona Glaseada', 13.00, 'pan_dulce', '🍩', 30),
-  ('Rebanada Pastel 3 Leches', 45.00, 'pasteleria', '🍰', 20),
-  ('Pay de Queso con Zarzamora', 40.00, 'pasteleria', '🥧', 15),
-  ('Café de Olla Caliente', 25.00, 'bebidas', '☕', 60),
-  ('Pan de Muerto Tradicional', 20.00, 'temporada', '✨', 50),
-  ('Empanada de Calabaza', 16.00, 'pan_dulce', '🥟', 25);
+-- 3. Clientes & Mayoristas
+CREATE TABLE IF NOT EXISTS customers (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  type TEXT DEFAULT 'frecuente' NOT NULL, -- 'general', 'frecuente', 'mayoreo', 'evento'
+  credit_limit NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  current_debt NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  total_purchases NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
--- 3. Tabla de Inventario / Insumos
+INSERT INTO customers (name, phone, type, credit_limit, current_debt, total_purchases, notes) VALUES
+  ('Público en General', 'N/A', 'general', 0, 0, 45800, 'Ventas directas de mostrador al contado.'),
+  ('Abarrotes La Guadalupana (Don Pepe)', '55 4433 2211', 'mayoreo', 3000, 850, 18500, 'Compra 150 bolillos y 80 teleras diario.'),
+  ('Taquería El Pastorcito Dorado', '55 9988 1122', 'mayoreo', 2000, 0, 12400, 'Compra 120 teleras cada 2 días.')
+ON CONFLICT DO NOTHING;
+
+-- 4. Inventario de Insumos
 CREATE TABLE IF NOT EXISTS inventory_items (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
@@ -52,30 +58,67 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   current_stock NUMERIC(10, 2) DEFAULT 0 NOT NULL,
   min_stock NUMERIC(10, 2) DEFAULT 0 NOT NULL,
   cost_per_unit NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  category TEXT DEFAULT 'harinas',
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Seed de inventario inicial
-INSERT INTO inventory_items (name, unit, current_stock, min_stock, cost_per_unit) VALUES
-  ('Harina de Trigo Extra Fina', 'bultos', 8, 10, 520.00),
-  ('Azúcar Estándar', 'bultos', 14, 5, 850.00),
-  ('Mantequilla Pura de Vaca', 'kg', 4, 12, 140.00),
-  ('Levadura Fresca', 'kg', 15, 6, 65.00),
-  ('Huevo Limpio', 'kg', 45, 20, 38.00),
-  ('Manteca Vegetal Inca', 'kg', 25, 10, 55.00),
-  ('Leche Entera', 'litros', 30, 15, 24.00),
-  ('Esencia de Vainilla', 'litros', 5, 2, 90.00);
+-- 5. Movimientos de Inventario (Entradas por compra y Mermas)
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  item_id UUID REFERENCES inventory_items(id),
+  item_name TEXT NOT NULL,
+  type TEXT NOT NULL, -- 'entrada_compra', 'merma_horno', 'merma_mostrador', 'ajuste'
+  quantity NUMERIC(10, 2) NOT NULL,
+  unit TEXT NOT NULL,
+  cost NUMERIC(10, 2),
+  reason TEXT NOT NULL,
+  responsible TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
--- 4. Tabla de Ventas (Tickets de POS)
+-- 6. Turnos de Caja
+CREATE TABLE IF NOT EXISTS cash_shifts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  shift_name TEXT NOT NULL,
+  cashier_name TEXT NOT NULL,
+  opened_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  closed_at TIMESTAMPTZ,
+  initial_cash NUMERIC(10, 2) DEFAULT 1000 NOT NULL,
+  cash_sales NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  card_sales NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  transfer_sales NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  total_cash_in NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  total_cash_out NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  expected_cash NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  actual_cash NUMERIC(10, 2),
+  difference NUMERIC(10, 2),
+  status TEXT DEFAULT 'abierta' NOT NULL, -- 'abierta', 'cerrada'
+  notes TEXT
+);
+
+-- 7. Movimientos de Dinero en Caja (Gastos menores, abonos, retiros)
+CREATE TABLE IF NOT EXISTS cash_movements (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  shift_id UUID REFERENCES cash_shifts(id),
+  type TEXT NOT NULL, -- 'entrada', 'salida'
+  category TEXT NOT NULL, -- 'gasto_gas', 'compra_insumos', 'pago_proveedor', 'retiro_dueno', 'abono_cliente', 'otro'
+  amount NUMERIC(10, 2) NOT NULL,
+  reason TEXT NOT NULL,
+  authorized_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 8. Ventas & Tickets
 CREATE TABLE IF NOT EXISTS sales (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  customer_id UUID REFERENCES customers(id),
   total NUMERIC(10, 2) NOT NULL,
   payment_method TEXT DEFAULT 'efectivo' NOT NULL,
   cashier TEXT DEFAULT 'Caja 1' NOT NULL,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 5. Detalle de Ventas (Productos en cada ticket)
+-- 9. Detalle de Ventas
 CREATE TABLE IF NOT EXISTS sale_items (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   sale_id UUID REFERENCES sales(id) ON DELETE CASCADE,
@@ -86,7 +129,7 @@ CREATE TABLE IF NOT EXISTS sale_items (
   subtotal NUMERIC(10, 2) NOT NULL
 );
 
--- 6. Encargos y Pedidos Especiales
+-- 10. Encargos de Pastelería
 CREATE TABLE IF NOT EXISTS custom_orders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   order_number TEXT UNIQUE NOT NULL,
@@ -94,23 +137,32 @@ CREATE TABLE IF NOT EXISTS custom_orders (
   phone TEXT NOT NULL,
   description TEXT NOT NULL,
   delivery_date TIMESTAMPTZ NOT NULL,
-  status TEXT DEFAULT 'pendiente' NOT NULL, -- 'pendiente', 'en_horno', 'listo', 'entregado'
+  status TEXT DEFAULT 'pendiente' NOT NULL,
   total NUMERIC(10, 2) NOT NULL,
   deposit NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  notes TEXT,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Habilitar Políticas de Seguridad (RLS) abiertas para la app
+-- Habilitar RLS
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_movements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_shifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_movements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sale_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_orders ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow read/write all for anon users" ON categories FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow read/write all for anon users" ON products FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow read/write all for anon users" ON inventory_items FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow read/write all for anon users" ON sales FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow read/write all for anon users" ON sale_items FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow read/write all for anon users" ON custom_orders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_categories" ON categories FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_products" ON products FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_customers" ON customers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_inventory" ON inventory_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_inventory_mov" ON inventory_movements FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_cash_shifts" ON cash_shifts FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_cash_movements" ON cash_movements FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_sales" ON sales FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_sale_items" ON sale_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_orders" ON custom_orders FOR ALL USING (true) WITH CHECK (true);
