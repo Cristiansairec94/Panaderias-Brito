@@ -482,7 +482,7 @@ export default function POSPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-stone-100/70">
+    <div className="flex h-full min-h-[calc(100vh-5rem)] overflow-hidden bg-stone-100/70">
       {/* Product Catalog Area (Main) */}
       <div className="flex-1 flex flex-col p-6 overflow-y-auto">
         {/* Top Control Bar */}
