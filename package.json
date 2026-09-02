@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "setup": "node -e \"const fs=require('fs'); if(!fs.existsSync('.env.local')) fs.copyFileSync('.env.example','.env.local'); console.log('Configuracion lista!')\" && npm install",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
