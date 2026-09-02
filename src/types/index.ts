@@ -116,3 +116,33 @@ export interface CashExpense {
   date: string;
 }
 
+export type UserRole = "admin" | "cajero" | "panadero" | "supervisor";
+
+export interface RolePermissions {
+  canAccessDashboard: boolean;
+  canAccessPos: boolean;
+  canAccessCaja: boolean;
+  canAccessInventario: boolean;
+  canAccessPedidos: boolean;
+  canAccessClientes: boolean;
+  canAccessFinanzas: boolean;
+  canAccessReportes: boolean;
+  canAccessConfiguracion: boolean;
+  canViewProfitMargins: boolean;
+  canEditPrices: boolean;
+  canManageUsers: boolean;
+}
+
+export interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  role: UserRole;
+  roleLabel: string;
+  avatar: string;
+  phone?: string;
+  permissions?: Partial<RolePermissions>;
+}
+
+

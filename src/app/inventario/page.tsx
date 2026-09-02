@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { InventoryItem, InventoryMovement } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 const INITIAL_INVENTORY: InventoryItem[] = [
   { id: "1", name: "Harina de Trigo Extra Fina", unit: "bultos", currentStock: 8, minStock: 10, costPerUnit: 520, category: "harinas" },
@@ -41,6 +42,9 @@ const INITIAL_MOVEMENTS: InventoryMovement[] = [
 ];
 
 export default function InventarioPage() {
+  const { hasPermission } = useAuth();
+  const canViewCosts = hasPermission("canViewProfitMargins");
+
   const [items, setItems] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [movements, setMovements] = useState<InventoryMovement[]>(INITIAL_MOVEMENTS);
   const [activeTab, setActiveTab] = useState<"catalogo" | "entrada" | "merma" | "historial">("catalogo");
@@ -164,8 +168,19 @@ export default function InventarioPage() {
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-stone-900">{formatCurrency(totalInventoryValue)}</p>
-          <p className="text-[11px] text-stone-400 mt-0.5">Costo total de insumos</p>
+          {canViewCosts ? (
+            <>
+              <p className="text-2xl font-black text-stone-900">{formatCurrency(totalInventoryValue)}</p>
+              <p className="text-[11px] text-stone-400 mt-0.5">Costo total de insumos</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg inline-block mt-1">
+                🔒 Confidencial
+              </p>
+              <p className="text-[10px] text-stone-400 mt-1">Visible para Administración</p>
+            </>
+          )}
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-stone-200/80 shadow-sm">
@@ -262,8 +277,8 @@ export default function InventarioPage() {
                   <th className="p-4">Unidad</th>
                   <th className="p-4">Stock en Almacén</th>
                   <th className="p-4">Mínimo</th>
-                  <th className="p-4">Costo Unitario</th>
-                  <th className="p-4">Valor Total</th>
+                  {canViewCosts && <th className="p-4">Costo Unitario</th>}
+                  {canViewCosts && <th className="p-4">Valor Total</th>}
                   <th className="p-4">Semáforo</th>
                 </tr>
               </thead>
@@ -279,10 +294,14 @@ export default function InventarioPage() {
                       <td className="p-4 uppercase text-stone-500 font-semibold">{item.unit}</td>
                       <td className="p-4 font-black text-stone-900 text-sm">{item.currentStock} {item.unit}</td>
                       <td className="p-4 text-stone-500 font-medium">{item.minStock} {item.unit}</td>
-                      <td className="p-4 font-semibold text-stone-700">{formatCurrency(item.costPerUnit)}</td>
-                      <td className="p-4 font-extrabold text-stone-900">
-                        {formatCurrency(item.currentStock * item.costPerUnit)}
-                      </td>
+                      {canViewCosts && (
+                        <td className="p-4 font-semibold text-stone-700">{formatCurrency(item.costPerUnit)}</td>
+                      )}
+                      {canViewCosts && (
+                        <td className="p-4 font-extrabold text-stone-900">
+                          {formatCurrency(item.currentStock * item.costPerUnit)}
+                        </td>
+                      )}
                       <td className="p-4">
                         {isLow ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-700">

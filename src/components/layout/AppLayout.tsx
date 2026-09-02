@@ -1,12 +1,16 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import LoginForm from "@/components/auth/LoginForm";
+import { ShieldAlert, ArrowLeft, Store, ShoppingBag, Package } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user, isLoading, canAccessRoute, getDefaultRouteForUser } = useAuth();
 
   if (isLoading) {
     return (
@@ -21,13 +25,72 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return <LoginForm />;
   }
 
+  const isAllowed = canAccessRoute(pathname);
+
   return (
     <div className="flex min-h-screen bg-stone-50/50 text-stone-900 antialiased selection:bg-brito-orange-500 selection:text-white">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 max-h-screen overflow-hidden">
         <Header />
         <main className="flex-1 overflow-y-auto bg-stone-50/60">
-          {children}
+          {isAllowed ? (
+            children
+          ) : (
+            <div className="p-8 max-w-2xl mx-auto my-12 text-center bg-white rounded-3xl border border-stone-200 shadow-xl p-10 space-y-6 animate-in fade-in zoom-in-95">
+              <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+                <ShieldAlert className="w-10 h-10" />
+              </div>
+
+              <div>
+                <span className="px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-[10px] font-black uppercase tracking-wider">
+                  Acceso Restringido
+                </span>
+                <h3 className="text-2xl font-black text-stone-900 mt-2">
+                  No tienes permisos para este módulo
+                </h3>
+                <p className="text-xs text-stone-500 mt-2 leading-relaxed max-w-md mx-auto">
+                  Tu usuario <strong className="text-stone-900">{user.name}</strong> ({user.roleLabel}) tiene un perfil de seguridad configurado para acceder únicamente a sus áreas operativas asignadas.
+                </p>
+              </div>
+
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 text-left text-xs space-y-2">
+                <p className="font-bold text-stone-700">Módulos habilitados para tu rol:</p>
+                <div className="flex flex-wrap gap-2">
+                  {user.role === "cajero" && (
+                    <>
+                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Punto de Venta (POS)</span>
+                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Caja & Turnos</span>
+                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Pedidos Especiales</span>
+                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Clientes</span>
+                    </>
+                  )}
+                  {user.role === "panadero" && (
+                    <>
+                      <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg font-semibold text-[11px]">Inventario & Insumos</span>
+                      <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg font-semibold text-[11px]">Pedidos & Encargos de Horno</span>
+                    </>
+                  )}
+                  {user.role === "supervisor" && (
+                    <>
+                      <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-lg font-semibold text-[11px]">Dashboard Operativo</span>
+                      <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-lg font-semibold text-[11px]">POS & Caja</span>
+                      <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-lg font-semibold text-[11px]">Inventario & Insumos</span>
+                      <span className="px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-lg font-semibold text-[11px]">Reportes del Día</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-center">
+                <button
+                  onClick={() => router.push(getDefaultRouteForUser(user))}
+                  className="flex items-center gap-2 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-700 hover:to-brito-crimson-700 text-white font-extrabold px-6 py-3 rounded-2xl shadow-lg shadow-brito-orange-600/30 text-xs transition-all active:scale-95"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Regresar a Mi Módulo Principal
+                </button>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>

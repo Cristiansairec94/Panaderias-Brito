@@ -1,19 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   Clock, 
   ChevronDown, 
   LogOut, 
-  UserCheck
+  UserCheck,
+  Shield,
+  ShieldAlert,
+  Sparkles
 } from "lucide-react";
 import NotificationsDropdown from "./NotificationsDropdown";
-import { useAuth, DEMO_USERS } from "@/context/AuthContext";
+import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
 
 export default function Header() {
   const pathname = usePathname();
-  const { user, loginAs, logout } = useAuth();
+  const router = useRouter();
+  const { user, loginAs, logout, getDefaultRouteForUser } = useAuth();
   const [time, setTime] = useState<string>("");
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -59,6 +63,19 @@ export default function Header() {
     }
   };
 
+  const handleRoleSwitch = (demo: User) => {
+    loginAs(demo);
+    setShowUserMenu(false);
+    const targetRoute = getDefaultRouteForUser(demo);
+    router.push(targetRoute);
+  };
+
+  const handleLogout = () => {
+    logout();
+    setShowUserMenu(false);
+    router.push("/");
+  };
+
   const current = getPageTitle();
 
   return (
@@ -77,17 +94,17 @@ export default function Header() {
           <span>{time || "Cargando..."}</span>
         </div>
 
-        {/* Facebook Style Notifications */}
+        {/* Notifications */}
         <NotificationsDropdown />
 
         {/* User Session Dropdown */}
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2.5 p-1 pr-2.5 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/60"
+            className="flex items-center gap-2.5 p-1.5 pr-3 rounded-2xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/80"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-brito-orange-600 to-brito-crimson-600 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-brito-orange-600/20">
-              {user?.avatar || "👨‍🍳"}
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brito-orange-600 to-brito-crimson-600 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-brito-orange-600/20">
+              {user?.avatar || "👤"}
             </div>
             <div className="text-left hidden sm:block">
               <p className="text-xs font-black text-stone-900 leading-tight">{user?.name || "Invitado"}</p>
@@ -98,49 +115,63 @@ export default function Header() {
 
           {/* User & Role Switcher Menu */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
-              <div className="p-2.5 border-b border-stone-100">
-                <p className="text-[10px] text-stone-400 font-semibold">Sesión activa:</p>
-                <p className="text-xs font-black text-stone-900">{user?.name}</p>
-                <p className="text-[11px] text-stone-500">{user?.email}</p>
+            <div className="absolute right-0 mt-2 w-80 bg-white rounded-3xl shadow-2xl border border-stone-200 p-3 z-50 animate-in fade-in zoom-in-95">
+              <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200/70 mb-2">
+                <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Sesión Activa</p>
+                <div className="flex items-center gap-2.5 mt-1.5">
+                  <div className="w-9 h-9 rounded-xl bg-white border border-stone-200 flex items-center justify-center text-lg shadow-sm">
+                    {user?.avatar}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-black text-stone-900 truncate">{user?.name}</p>
+                    <p className="text-[10px] text-stone-500 truncate">{user?.email}</p>
+                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-200">
+                      {user?.roleLabel}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Fast Role Switcher */}
-              <div className="p-1.5 space-y-0.5">
-                <p className="text-[9px] font-bold text-stone-400 uppercase tracking-wider px-2 py-1">
-                  Cambiar de Perfil (Demo):
-                </p>
-                {DEMO_USERS.map((demo) => (
-                  <button
-                    key={demo.id}
-                    onClick={() => {
-                      loginAs(demo);
-                      setShowUserMenu(false);
-                    }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between font-semibold transition-all ${
-                      user?.id === demo.id
-                        ? "bg-amber-100/70 text-brito-orange-900 font-bold"
-                        : "text-stone-600 hover:bg-stone-100"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>{demo.avatar}</span>
-                      <span>{demo.name}</span>
-                    </div>
-                    {user?.id === demo.id && <UserCheck className="w-3.5 h-3.5 text-brito-orange-600" />}
-                  </button>
-                ))}
+              <div className="p-1 space-y-1">
+                <div className="flex items-center justify-between px-2 py-1">
+                  <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-brito-orange-500" /> Cambiar Usuario (Demo)
+                  </span>
+                  <span className="text-[9px] text-stone-400">1-clic</span>
+                </div>
+
+                {DEMO_USERS.map((demo) => {
+                  const isCurrent = user?.id === demo.id;
+                  return (
+                    <button
+                      key={demo.id}
+                      onClick={() => handleRoleSwitch(demo)}
+                      className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between font-semibold transition-all ${
+                        isCurrent
+                          ? "bg-amber-100/80 text-amber-950 font-bold border border-amber-300"
+                          : "text-stone-700 hover:bg-stone-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-base">{demo.avatar}</span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-bold leading-tight">{demo.name}</p>
+                          <p className="text-[10px] text-stone-400 truncate">{demo.roleLabel}</p>
+                        </div>
+                      </div>
+                      {isCurrent && <UserCheck className="w-4 h-4 text-brito-orange-600 shrink-0" />}
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="border-t border-stone-100 pt-1.5 mt-1">
+              <div className="border-t border-stone-100 pt-2 mt-2">
                 <button
-                  onClick={() => {
-                    logout();
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                  onClick={handleLogout}
+                  className="w-full text-left p-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-2 transition-colors border border-rose-100"
                 >
-                  <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
+                  <LogOut className="w-4 h-4" /> Cerrar Sesión
                 </button>
               </div>
             </div>
