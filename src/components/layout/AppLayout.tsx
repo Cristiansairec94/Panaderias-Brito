@@ -15,10 +15,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#1c120c] flex flex-col items-center justify-center text-white space-y-3">
-        <div className="w-10 h-10 border-4 border-[#d4af37] border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-bold text-[#e6ded6] tracking-wider uppercase">
-          Cargando Panaderías Brito...
+      <div className="min-h-screen bg-[#0c0d12] flex flex-col items-center justify-center text-white space-y-3">
+        <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-bold text-stone-400 tracking-wider uppercase">
+          Cargando Panadería Brito...
         </p>
       </div>
     );
@@ -32,15 +32,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen bg-[#faf7f2] text-stone-900 antialiased selection:bg-[#b45309] selection:text-white">
+      <div className="flex min-h-screen bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 max-h-screen overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-y-auto bg-[#faf7f2] p-4 sm:p-6 md:p-8">
+          <main className="flex-1 overflow-y-auto bg-stone-50/60 p-4 sm:p-6 md:p-8">
             {isAllowed ? (
               children
             ) : (
-              <div className="p-8 max-w-2xl mx-auto my-12 text-center bg-white rounded-3xl border border-[#e8dfd3] shadow-xl p-10 space-y-6 animate-in fade-in zoom-in-95">
+              <div className="p-8 max-w-2xl mx-auto my-12 text-center bg-white rounded-3xl border border-stone-200 shadow-xl p-10 space-y-6 animate-in fade-in zoom-in-95">
                 <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
                   <ShieldAlert className="w-10 h-10" />
                 </div>
@@ -49,7 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <span className="px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-[10px] font-black uppercase tracking-wider">
                     Acceso Restringido
                   </span>
-                  <h3 className="text-2xl font-black text-[#2e1d14] font-serif mt-2">
+                  <h3 className="text-2xl font-black text-stone-900 mt-2">
                     No tienes permisos para este módulo
                   </h3>
                   <p className="text-xs text-stone-500 mt-2 leading-relaxed max-w-md mx-auto">
@@ -57,8 +57,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </p>
                 </div>
 
-                <div className="p-4 bg-[#faf6f0] rounded-2xl border border-[#ecdcc9] text-left text-xs space-y-2">
-                  <p className="font-bold text-[#573d28]">Módulos habilitados para tu rol:</p>
+                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 text-left text-xs space-y-2">
+                  <p className="font-bold text-stone-700">Módulos habilitados para tu rol:</p>
                   <div className="flex flex-wrap gap-2">
                     {user.role === "cajero" && (
                       <>
@@ -88,7 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="pt-2 flex justify-center">
                   <button
                     onClick={() => router.push(getDefaultRouteForUser ? getDefaultRouteForUser(user) : "/")}
-                    className="flex items-center gap-2 bg-gradient-to-r from-[#994714] to-[#c76520] hover:brightness-110 text-white font-extrabold px-6 py-3 rounded-2xl shadow-lg shadow-[#994714]/30 text-xs transition-all active:scale-95"
+                    className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-stone-950 font-black px-6 py-3 rounded-2xl shadow-lg shadow-amber-500/20 text-xs transition-all active:scale-95"
                   >
                     <ArrowLeft className="w-4 h-4" /> Regresar a Mi Módulo Principal
                   </button>

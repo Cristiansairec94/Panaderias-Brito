@@ -44,11 +44,11 @@ export default function Header() {
   const getPageTitle = () => {
     switch (pathname) {
       case "/":
-        return { title: "Dashboard / Inicio", subtitle: "Métricas y actividad operativa en tiempo real" };
+        return { title: "Dashboard", subtitle: "Métricas y resumen operativo en tiempo real" };
       case "/clientes":
         return { title: "Clientes & Mayoristas", subtitle: "Directorio de tienditas, clientes frecuentes y crédito" };
       case "/productos":
-        return { title: "Catálogo de Productos", subtitle: "Gestión de panes, repostería fina, precios y fotografías" };
+        return { title: "Catálogo de Productos", subtitle: "Gestión de panes, repostería, precios y fotografías" };
       case "/inventario":
         return { title: "Inventario & Materia Prima", subtitle: "Control de harinas, insumos, compras y mermas" };
       case "/finanzas":
@@ -64,7 +64,7 @@ export default function Header() {
       case "/pedidos":
         return { title: "Pedidos & Encargos", subtitle: "Pasteles para eventos y fechas de entrega programadas" };
       default:
-        return { title: "Panaderías Brito", subtitle: "Alta Panadería & Pastelería Fina" };
+        return { title: "Panadería Brito", subtitle: "Sistema Integral ERP & POS" };
     }
   };
 
@@ -86,13 +86,13 @@ export default function Header() {
   const current = getPageTitle();
 
   return (
-    <header className="h-16 bg-[#fdfbf7]/95 backdrop-blur-md border-b border-[#e8ded1] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-[0_2px_12px_-4px_rgba(40,20,10,0.06)]">
+    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm">
       {/* Left: Hamburger (Mobile) / Collapse Toggle (Desktop) + Page Title */}
       <div className="flex items-center gap-3">
         {/* Mobile Hamburger Drawer Toggle */}
         <button
           onClick={toggleMobile}
-          className="md:hidden p-2 rounded-xl bg-[#f4ebe1] hover:bg-[#ebdccb] text-[#593922] transition-colors border border-[#d8c7b5]"
+          className="md:hidden p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors border border-stone-200"
           title="Abrir menú"
         >
           <Menu className="w-5 h-5" />
@@ -101,28 +101,28 @@ export default function Header() {
         {/* Desktop Quick Toggle Button */}
         <button
           onClick={toggleCollapse}
-          className="hidden md:flex p-2 rounded-xl bg-[#f5eee4] hover:bg-[#ede1d2] text-[#63442c] transition-colors border border-[#e2d5c5]"
+          className="hidden md:flex p-2 rounded-xl bg-stone-100/80 hover:bg-stone-200/80 text-stone-600 hover:text-stone-900 transition-colors border border-stone-200/80"
           title={isCollapsed ? "Desplegar menú lateral" : "Contraer menú lateral"}
         >
           {isCollapsed ? (
-            <PanelLeftOpen className="w-4 h-4 text-[#a16207]" />
+            <PanelLeftOpen className="w-4 h-4 text-amber-600" />
           ) : (
-            <PanelLeftClose className="w-4 h-4 text-[#78350f]" />
+            <PanelLeftClose className="w-4 h-4" />
           )}
         </button>
 
         {/* Breadcrumb / Title */}
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-base sm:text-lg font-black text-[#2e1d14] tracking-tight font-serif">
+            <h2 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
               {current.title}
             </h2>
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-[#b45309] bg-[#fef3c7] px-2 py-0.5 rounded-full border border-[#fde68a]">
-              <Sparkles className="w-2.5 h-2.5" />
-              Panadería Fina
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80">
+              <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+              Panadería Brito
             </span>
           </div>
-          <p className="text-[10px] sm:text-[11px] text-[#786958] font-medium line-clamp-1">
+          <p className="text-[10px] sm:text-[11px] text-stone-500 font-medium line-clamp-1">
             {current.subtitle}
           </p>
         </div>
@@ -130,9 +130,9 @@ export default function Header() {
 
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Live Clock with Warm Bakery Tone */}
-        <div className="hidden lg:flex items-center gap-2 bg-[#f6eee4] px-3 py-1.5 rounded-xl border border-[#e5d8c8] text-[#573d28] text-xs font-bold shadow-inner">
-          <Clock className="w-3.5 h-3.5 text-[#b45309]" />
+        {/* Modern Live Clock */}
+        <div className="hidden lg:flex items-center gap-2 bg-stone-100/80 px-3 py-1.5 rounded-xl border border-stone-200/80 text-stone-700 text-xs font-bold shadow-sm">
+          <Clock className="w-3.5 h-3.5 text-amber-600" />
           <span className="tabular-nums">{time || "Cargando..."}</span>
         </div>
 
@@ -143,30 +143,30 @@ export default function Header() {
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-[#f3e9dc] transition-all border border-[#decbb7] bg-[#f9f4ed] shadow-sm"
+            className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/70 shadow-sm"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#994714] to-[#c76520] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-[#994714]/20 border border-[#fde047]/40">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-amber-500/20">
               {user?.avatar || "👨‍🍳"}
             </div>
             <div className="text-left hidden sm:block">
-              <p className="text-xs font-black text-[#29180f] leading-tight">{user?.name || "Invitado"}</p>
-              <p className="text-[9px] text-[#b45309] font-bold uppercase tracking-wider">{user?.roleLabel || "Sin Rol"}</p>
+              <p className="text-xs font-black text-stone-900 leading-tight">{user?.name || "Invitado"}</p>
+              <p className="text-[9px] text-amber-700 font-bold uppercase tracking-wider">{user?.roleLabel || "Sin Rol"}</p>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-[#8c7a68]" />
+            <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
           </button>
 
           {/* User & Role Switcher Menu */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-72 bg-[#ffffff] rounded-2xl shadow-2xl border border-[#e5d8c8] p-2.5 z-50 animate-in fade-in zoom-in-95">
-              <div className="p-2.5 border-b border-[#f0e7dc] bg-[#faf6f0] rounded-xl mb-1.5">
-                <p className="text-[10px] text-[#8c7a68] font-bold uppercase tracking-wider">Sesión activa:</p>
-                <p className="text-xs font-black text-[#2e1d14]">{user?.name}</p>
-                <p className="text-[11px] text-[#786958]">{user?.email}</p>
+            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
+              <div className="p-2.5 border-b border-stone-100 bg-stone-50/60 rounded-xl mb-1.5">
+                <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Sesión activa:</p>
+                <p className="text-xs font-black text-stone-900">{user?.name}</p>
+                <p className="text-[11px] text-stone-500">{user?.email}</p>
               </div>
 
               {/* Fast Role Switcher */}
               <div className="p-1 space-y-0.5">
-                <p className="text-[9px] font-bold text-[#a89886] uppercase tracking-wider px-2 py-1">
+                <p className="text-[9px] font-bold text-stone-400 uppercase tracking-wider px-2 py-1">
                   Cambiar de Perfil (Demo):
                 </p>
                 {DEMO_USERS.map((demo) => (
@@ -175,26 +175,26 @@ export default function Header() {
                     onClick={() => handleRoleSwitch(demo)}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between font-semibold transition-all ${
                       user?.id === demo.id
-                        ? "bg-[#fef3c7] text-[#92400e] font-bold border border-[#fde68a]"
-                        : "text-[#573d28] hover:bg-[#f6eee4]"
+                        ? "bg-amber-50 text-amber-900 font-bold border border-amber-200"
+                        : "text-stone-700 hover:bg-stone-100"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <span>{demo.avatar}</span>
                       <div>
                         <span className="font-bold">{demo.name}</span>
-                        <p className="text-[10px] text-[#8c7a68] font-medium">{demo.roleLabel}</p>
+                        <p className="text-[10px] text-stone-400 font-medium">{demo.roleLabel}</p>
                       </div>
                     </div>
-                    {user?.id === demo.id && <UserCheck className="w-3.5 h-3.5 text-[#b45309]" />}
+                    {user?.id === demo.id && <UserCheck className="w-3.5 h-3.5 text-amber-600" />}
                   </button>
                 ))}
               </div>
 
-              <div className="border-t border-[#f0e7dc] pt-1.5 mt-1">
+              <div className="border-t border-stone-100 pt-1.5 mt-1">
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
                 >
                   <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
                 </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -52,7 +52,7 @@ interface NavItemAccordion {
 
 type NavItem = NavItemSingle | NavItemAccordion;
 
-// Exact navigation structure requested by user:
+// Exact navigation hierarchy requested:
 // 1. DashBoard
 // 2. Clientes
 // 3. Productos
@@ -139,6 +139,17 @@ export default function Sidebar() {
     toggleSubmenu 
   } = useSidebar();
 
+  const [currentSearch, setCurrentSearch] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCurrentSearch(window.location.search);
+      const handleLocationChange = () => setCurrentSearch(window.location.search);
+      window.addEventListener("popstate", handleLocationChange);
+      return () => window.removeEventListener("popstate", handleLocationChange);
+    }
+  }, [pathname]);
+
   const isPosActive = pathname === "/pos";
 
   // Filter navigation items by active user role permissions
@@ -148,7 +159,6 @@ export default function Sidebar() {
         const allowed = canAccessRoute ? canAccessRoute(item.href) : true;
         return allowed ? item : null;
       }
-      // Accordion: filter children
       const allowedChildren = item.items.filter((sub) => {
         const [cleanHref] = sub.href.split("?");
         return canAccessRoute ? canAccessRoute(cleanHref) : true;
@@ -161,42 +171,51 @@ export default function Sidebar() {
     })
     .filter(Boolean) as NavItem[];
 
+  // Helper to determine exact active child (checking path + query params)
+  const isItemActive = (href: string) => {
+    const [targetPath, targetQuery] = href.split("?");
+    if (pathname !== targetPath) return false;
+    if (targetQuery) {
+      return currentSearch.includes(targetQuery);
+    }
+    // If target has no query (e.g. /caja), active only when no ?tab= is active
+    return !currentSearch.includes("tab=");
+  };
+
   return (
     <>
       {/* Mobile Backdrop Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-stone-950/80 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* Main Sidebar */}
+      {/* Main Sidebar: Modern Luxury Dark Graphite */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl border-r border-[#3d271a] bg-gradient-to-b from-[#1c120c] via-[#160d09] to-[#0f0805] text-[#ede6dd] ${
+        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl border-r border-white/[0.08] bg-[#0c0d12] text-stone-200 ${
           isCollapsed ? "w-20" : "w-64"
         } ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
         {/* Top Header / Brand Logo & Toggle */}
-        <div className="flex flex-col border-b border-[#3d271a]/80 bg-[#241710]/50 relative">
-          {/* Subtle Golden Hairline Accent on top */}
-          <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-[#d4af37] to-transparent" />
-
+        <div className="flex flex-col border-b border-white/[0.06] bg-white/[0.02]">
           <div className={`p-4 flex items-center ${isCollapsed ? "justify-center flex-col gap-2" : "justify-between"}`}>
             <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
-              <AnimatedLogo compact={isCollapsed} size={isCollapsed ? 44 : 58} showGlow={!isCollapsed} />
+              <AnimatedLogo compact={isCollapsed} size={isCollapsed ? 38 : 46} showGlow={!isCollapsed} />
               {!isCollapsed && (
                 <div className="overflow-hidden">
                   <div className="flex items-center gap-1.5">
-                    <h1 className="font-black text-sm tracking-wide text-white uppercase font-serif drop-shadow-sm">
-                      Panaderías Brito
-                    </h1>
+                    <span className="font-semibold text-sm text-stone-300 tracking-tight">Panadería</span>
+                    <span className="font-black text-sm bg-gradient-to-r from-amber-400 via-orange-400 to-amber-200 bg-clip-text text-transparent tracking-tight">
+                      Brito
+                    </span>
                   </div>
-                  <p className="text-[10px] font-semibold text-[#d4af37] tracking-wider uppercase flex items-center gap-1">
-                    <Sparkles className="w-2.5 h-2.5 text-[#fef08a]" />
-                    Alta Panadería Fina
+                  <p className="text-[10px] font-semibold text-stone-400 tracking-wide flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    ERP & Punto de Venta
                   </p>
                 </div>
               )}
@@ -205,26 +224,26 @@ export default function Sidebar() {
             {/* Collapse/Expand Toggle Button on Desktop */}
             <button
               onClick={toggleCollapse}
-              className={`hidden md:flex items-center justify-center p-1.5 rounded-lg border border-[#4a3020] text-[#c7baa8] hover:text-[#fef08a] hover:bg-[#342014] transition-colors ${
+              className={`hidden md:flex items-center justify-center p-1.5 rounded-xl border border-white/[0.08] text-stone-400 hover:text-white hover:bg-white/[0.06] transition-colors ${
                 isCollapsed ? "mt-1" : ""
               }`}
-              title={isCollapsed ? "Desplegar menú completo" : "Contraer menú"}
+              title={isCollapsed ? "Desplegar menú" : "Contraer menú"}
             >
               {isCollapsed ? (
-                <PanelLeftOpen className="w-4 h-4 text-[#d4af37]" />
+                <PanelLeftOpen className="w-4 h-4 text-amber-400" />
               ) : (
-                <PanelLeftClose className="w-4 h-4 text-[#c7baa8]" />
+                <PanelLeftClose className="w-4 h-4" />
               )}
             </button>
           </div>
         </div>
 
         {/* Navigation Modules (Middle Scrollable) */}
-        <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1.5 scrollbar-thin scrollbar-thumb-[#3d271a]">
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 scrollbar-thin scrollbar-thumb-stone-800">
           {!isCollapsed && (
-            <div className="px-3 pb-1 text-[9px] font-extrabold tracking-widest text-[#a89886] uppercase flex items-center justify-between">
-              <span>Menú Principal</span>
-              <span className="text-[#d4af37] text-[10px]">★ Tradición 1985</span>
+            <div className="px-3 pb-1 pt-1 text-[10px] font-bold tracking-wider text-stone-500 uppercase flex items-center justify-between">
+              <span>Navegación</span>
+              <span className="text-[9px] text-amber-400/80 font-mono font-medium">v1.5</span>
             </div>
           )}
 
@@ -238,18 +257,27 @@ export default function Sidebar() {
                 <div key={item.name} className="relative group">
                   <Link
                     href={item.href}
-                    onClick={() => setMobileOpen(false)}
+                    onClick={() => {
+                      setMobileOpen(false);
+                      setCurrentSearch("");
+                    }}
                     className={`flex items-center ${
-                      isCollapsed ? "justify-center px-2 py-3" : "justify-between px-3.5 py-2.5"
+                      isCollapsed ? "justify-center p-2.5" : "justify-between px-3 py-2.5"
                     } rounded-xl font-medium transition-all text-xs group ${
                       isActive
-                        ? "bg-gradient-to-r from-[#994714] via-[#b35718] to-[#c76520] text-white font-bold shadow-lg shadow-[#b35718]/30 border border-[#f59e0b]/40"
-                        : "text-[#dcd1c4] hover:bg-[#291a12] hover:text-white hover:border-[#4d3221] border border-transparent"
+                        ? "bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent text-amber-300 font-bold border-l-2 border-amber-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
+                        : "text-stone-400 hover:text-stone-100 hover:bg-white/[0.05] border-l-2 border-transparent"
                     }`}
                     title={isCollapsed ? item.name : undefined}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`p-1 rounded-lg ${isActive ? "bg-white/20" : "bg-[#2b1b13] text-[#d4af37] group-hover:text-[#fef08a]"}`}>
+                      <div
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                          isActive
+                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                            : "bg-white/[0.03] border border-white/[0.06] text-stone-400 group-hover:text-amber-400 group-hover:border-amber-500/20 group-hover:bg-amber-500/10"
+                        }`}
+                      >
                         <Icon className="w-4 h-4 transition-transform group-hover:scale-110" />
                       </div>
                       {!isCollapsed && <span className="tracking-tight">{item.name}</span>}
@@ -257,10 +285,10 @@ export default function Sidebar() {
 
                     {!isCollapsed && item.badge && (
                       <span
-                        className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                        className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
                           isActive
-                            ? "bg-white/25 text-white"
-                            : "bg-[#2a1b13] text-[#d4af37] border border-[#4a3121]"
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                            : "bg-white/[0.05] text-stone-400 border border-white/[0.06]"
                         }`}
                       >
                         {item.badge}
@@ -270,7 +298,7 @@ export default function Sidebar() {
 
                   {/* Tooltip for collapsed view */}
                   {isCollapsed && (
-                    <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#241710] text-[#fef08a] border border-[#d4af37]/40 text-xs font-bold rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+                    <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#14161f] text-stone-100 border border-white/10 text-xs font-bold rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
                       {item.name}
                     </div>
                   )}
@@ -280,10 +308,7 @@ export default function Sidebar() {
 
             // Case 2: Accordion Menu (Ingresos, Gastos, Finanzas, Configuración)
             const isOpen = Boolean(openMenus[item.id]);
-            const isChildActive = item.items.some((sub) => {
-              const [cleanHref] = sub.href.split("?");
-              return pathname === cleanHref;
-            });
+            const isChildActive = item.items.some((sub) => isItemActive(sub.href));
             const Icon = item.icon;
 
             return (
@@ -292,20 +317,26 @@ export default function Sidebar() {
                   type="button"
                   onClick={() => toggleSubmenu(item.id)}
                   className={`w-full flex items-center ${
-                    isCollapsed ? "justify-center px-2 py-3" : "justify-between px-3.5 py-2.5"
+                    isCollapsed ? "justify-center p-2.5" : "justify-between px-3 py-2.5"
                   } rounded-xl font-medium transition-all text-xs ${
                     isChildActive
-                      ? "bg-[#2e1d14] text-[#fef08a] border border-[#d4af37]/40 shadow-sm"
-                      : "text-[#dcd1c4] hover:bg-[#271911] hover:text-white"
+                      ? "text-stone-100 bg-white/[0.04]"
+                      : "text-stone-400 hover:text-stone-100 hover:bg-white/[0.03]"
                   }`}
                   title={isCollapsed ? item.name : undefined}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`p-1 rounded-lg ${isChildActive ? "bg-[#d4af37]/20 text-[#fef08a]" : "bg-[#251710] text-[#d4af37]"}`}>
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                        isChildActive
+                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                          : "bg-white/[0.03] border border-white/[0.06] text-stone-400 group-hover:text-amber-400"
+                      }`}
+                    >
                       <Icon className="w-4 h-4 transition-transform group-hover:scale-110" />
                     </div>
                     {!isCollapsed && (
-                      <span className={`font-semibold ${isChildActive ? "text-white font-bold" : ""}`}>
+                      <span className={`font-semibold ${isChildActive ? "text-stone-100 font-bold" : ""}`}>
                         {item.name}
                       </span>
                     )}
@@ -314,13 +345,13 @@ export default function Sidebar() {
                   {!isCollapsed && (
                     <div className="flex items-center gap-1.5">
                       {item.badge && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#251710] text-[#d4af37] border border-[#442c1d]">
+                        <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-white/[0.05] text-stone-400 border border-white/[0.06]">
                           {item.badge}
                         </span>
                       )}
                       <ChevronDown
-                        className={`w-3.5 h-3.5 text-[#a89886] transition-transform duration-200 ${
-                          isOpen ? "rotate-180 text-[#d4af37]" : ""
+                        className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
+                          isOpen ? "rotate-180 text-amber-400" : ""
                         }`}
                       />
                     </div>
@@ -329,33 +360,38 @@ export default function Sidebar() {
 
                 {/* Submenu Children (When Expanded) */}
                 {!isCollapsed && isOpen && (
-                  <div className="mt-1 ml-4 pl-3 border-l-2 border-[#523623] space-y-1 animate-in fade-in duration-200">
+                  <div className="mt-1 ml-5 pl-3 border-l border-white/[0.08] space-y-1 animate-in fade-in duration-150">
                     {item.items.map((sub) => {
-                      const [cleanHref] = sub.href.split("?");
-                      const isSubActive = pathname === cleanHref;
+                      const active = isItemActive(sub.href);
                       const SubIcon = sub.icon;
 
                       return (
                         <Link
                           key={sub.name}
                           href={sub.href}
-                          onClick={() => setMobileOpen(false)}
-                          className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                            isSubActive
-                              ? "bg-gradient-to-r from-[#994714] to-[#b35718] text-white font-bold shadow-md shadow-[#994714]/20 border border-[#f59e0b]/40"
-                              : "text-[#c7baa8] hover:text-white hover:bg-[#2b1b13]"
+                          onClick={() => {
+                            setMobileOpen(false);
+                            const [, query] = sub.href.split("?");
+                            setCurrentSearch(query ? `?${query}` : "");
+                          }}
+                          className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all ${
+                            active
+                              ? "bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-transparent text-amber-300 font-bold border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.08)]"
+                              : "text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]"
                           }`}
                         >
                           <div className="flex items-center gap-2">
                             {SubIcon ? (
-                              <SubIcon className={`w-3.5 h-3.5 ${isSubActive ? "text-white" : "text-[#d4af37]"}`} />
+                              <SubIcon className={`w-3.5 h-3.5 ${active ? "text-amber-400" : "text-stone-400"}`} />
                             ) : (
-                              <span className={`w-1.5 h-1.5 rounded-full ${isSubActive ? "bg-white" : "bg-[#d4af37]"}`} />
+                              <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-amber-400 ring-2 ring-amber-400/30" : "bg-stone-500"}`} />
                             )}
                             <span>{sub.name}</span>
                           </div>
                           {sub.badge && (
-                            <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-black/30 text-[#fef08a]">
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${
+                              active ? "bg-amber-500/30 text-amber-200" : "bg-white/[0.05] text-stone-400"
+                            }`}>
                               {sub.badge}
                             </span>
                           )}
@@ -367,27 +403,30 @@ export default function Sidebar() {
 
                 {/* Tooltip / Flyout Menu for Collapsed Sidebar */}
                 {isCollapsed && (
-                  <div className="absolute left-full ml-3 top-0 hidden group-hover:flex flex-col bg-[#1c120c] border border-[#d4af37]/50 rounded-xl p-2 shadow-2xl z-50 min-w-[190px] animate-in fade-in duration-150">
-                    <div className="px-2.5 py-1 text-[11px] font-bold text-[#fef08a] border-b border-[#3d271a] mb-1 flex items-center justify-between">
+                  <div className="absolute left-full ml-3 top-0 hidden group-hover:flex flex-col bg-[#12141c] border border-white/10 rounded-2xl p-2 shadow-2xl z-50 min-w-[200px] animate-in fade-in duration-150">
+                    <div className="px-2.5 py-1.5 text-[11px] font-bold text-amber-300 border-b border-white/[0.06] mb-1 flex items-center justify-between">
                       <span>{item.name}</span>
-                      <Icon className="w-3.5 h-3.5 text-[#d4af37]" />
+                      <Icon className="w-3.5 h-3.5 text-amber-400" />
                     </div>
                     {item.items.map((sub) => {
-                      const [cleanHref] = sub.href.split("?");
-                      const isSubActive = pathname === cleanHref;
+                      const active = isItemActive(sub.href);
                       return (
                         <Link
                           key={sub.name}
                           href={sub.href}
+                          onClick={() => {
+                            const [, query] = sub.href.split("?");
+                            setCurrentSearch(query ? `?${query}` : "");
+                          }}
                           className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-between ${
-                            isSubActive
-                              ? "bg-[#994714] text-white font-bold"
-                              : "text-[#dcd1c4] hover:bg-[#2d1c13] hover:text-white"
+                            active
+                              ? "bg-amber-500/20 text-amber-300 font-bold"
+                              : "text-stone-400 hover:bg-white/[0.05] hover:text-stone-100"
                           }`}
                         >
                           <span>{sub.name}</span>
                           {sub.badge && (
-                            <span className="text-[8px] font-bold text-[#fef08a] bg-[#140b07] px-1 py-0.5 rounded border border-[#3d271a]">
+                            <span className="text-[8px] font-semibold text-stone-400 bg-white/[0.05] px-1 py-0.5 rounded">
                               {sub.badge}
                             </span>
                           )}
@@ -401,44 +440,50 @@ export default function Sidebar() {
           })}
         </div>
 
-        {/* Bottom Section: Quick POS Terminal & Bakery Seal */}
-        <div className="p-3 border-t border-[#3d271a] bg-[#160d09]/90 space-y-2">
+        {/* Bottom Section: Modern POS Quick Action & Branch Pill */}
+        <div className="p-3 border-t border-white/[0.06] bg-white/[0.01] space-y-2">
           {/* Quick Action according to Role */}
           {canAccessRoute && canAccessRoute("/pos") ? (
             <Link
               href="/pos"
-              onClick={() => setMobileOpen(false)}
+              onClick={() => {
+                setMobileOpen(false);
+                setCurrentSearch("");
+              }}
               className={`w-full flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "justify-between p-3"
-              } rounded-2xl font-bold text-xs transition-all shadow-xl group active:scale-95 ${
+              } rounded-2xl font-bold text-xs transition-all shadow-lg group active:scale-95 ${
                 isPosActive
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white ring-2 ring-emerald-400/80 shadow-emerald-700/30"
-                  : "bg-gradient-to-r from-[#b35718] via-[#c76520] to-[#994714] hover:from-[#c76520] hover:to-[#b35718] text-white shadow-amber-950/40 border border-[#f59e0b]/50"
+                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-stone-950 ring-2 ring-emerald-400/50 shadow-emerald-500/20 font-black"
+                  : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black shadow-orange-500/20 hover:shadow-orange-500/30"
               }`}
               title="Punto de Venta Mostrador (POS)"
             >
               <div className="flex items-center gap-2.5">
-                <div className="p-1.5 bg-white/20 rounded-xl">
-                  <ShoppingBag className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+                <div className="p-1.5 bg-black/15 rounded-xl">
+                  <ShoppingBag className="w-4 h-4 text-stone-950 group-hover:scale-110 transition-transform" />
                 </div>
                 {!isCollapsed && (
                   <div className="text-left">
-                    <p className="leading-tight font-black tracking-tight">Punto de Venta</p>
-                    <p className="text-[9px] font-medium text-amber-100">Caja Mostrador (POS)</p>
+                    <p className="leading-tight font-black tracking-tight text-stone-950">Punto de Venta</p>
+                    <p className="text-[9px] font-semibold text-stone-900/80">Caja Mostrador (POS)</p>
                   </div>
                 )}
               </div>
               {!isCollapsed && (
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-[#fef08a]" />
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-stone-950" />
               )}
             </Link>
           ) : user?.role === "panadero" ? (
             <Link
               href="/inventario"
-              onClick={() => setMobileOpen(false)}
+              onClick={() => {
+                setMobileOpen(false);
+                setCurrentSearch("");
+              }}
               className={`w-full flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "justify-between p-3"
-              } rounded-2xl font-bold text-xs transition-all shadow-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white active:scale-95`}
+              } rounded-2xl font-bold text-xs transition-all shadow-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white active:scale-95`}
               title="Control de Horno"
             >
               <div className="flex items-center gap-2.5">
@@ -458,23 +503,26 @@ export default function Sidebar() {
             </Link>
           ) : null}
 
-          {/* Bakery Heritage Stamp / Sucursal Matriz */}
+          {/* Branch Pill */}
           {!isCollapsed ? (
-            <div className="bg-[#241710]/70 border border-[#442c1d] rounded-xl p-2.5 flex items-center justify-between text-xs">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-2.5 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/80" />
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
                 <div>
-                  <p className="font-bold text-stone-100 text-[10px] tracking-wide">Sucursal Matriz</p>
-                  <p className="text-[9px] text-[#d4af37]">Don Toño Brito • Don Benito</p>
+                  <p className="font-bold text-stone-200 text-[10px] tracking-wide">Sucursal Matriz</p>
+                  <p className="text-[9px] text-stone-400">Don Toño Brito</p>
                 </div>
               </div>
-              <span className="text-[9px] font-extrabold text-[#fef08a] bg-[#140b07] border border-[#d4af37]/40 px-2 py-0.5 rounded-md">
-                v1.5 ERP Fino
+              <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                En Línea
               </span>
             </div>
           ) : (
-            <div className="flex justify-center" title="Sucursal Matriz Activa">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-md shadow-emerald-400/80" />
+            <div className="flex justify-center" title="Sucursal Matriz En Línea">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse ring-4 ring-emerald-500/20" />
             </div>
           )}
         </div>
