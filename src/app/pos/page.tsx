@@ -191,6 +191,8 @@ const CATEGORIES = [
   { id: "pasteleria", label: "Pasteles & Pays" },
   { id: "bebidas", label: "Café & Bebidas" },
   { id: "temporada", label: "Especiales de Temporada" },
+  { id: "abarrotes", label: "Abarrotes" },
+  { id: "materia_prima", label: "Materia Prima" },
 ];
 
 const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500];

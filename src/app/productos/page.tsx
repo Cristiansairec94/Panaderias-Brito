@@ -230,6 +230,10 @@ export default function ProductosPage() {
         return { label: "Bebidas", color: "bg-blue-100 text-blue-900 border-blue-300" };
       case "temporada":
         return { label: "Temporada", color: "bg-purple-100 text-purple-900 border-purple-300" };
+      case "abarrotes":
+        return { label: "Abarrotes", color: "bg-emerald-100 text-emerald-900 border-emerald-300" };
+      case "materia_prima":
+        return { label: "Materia Prima", color: "bg-orange-100 text-orange-900 border-orange-300" };
       default:
         return { label: cat, color: "bg-stone-100 text-stone-800 border-stone-200" };
     }
@@ -280,7 +284,7 @@ export default function ProductosPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Total en Catálogo</p>
@@ -302,36 +306,31 @@ export default function ProductosPage() {
             <DollarSign className="w-6 h-6 text-emerald-600" />
           </div>
         </div>
-
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-200 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Por Hornear / Stock Bajo</p>
-            <p className="text-2xl font-black text-stone-900 mt-1">{stats.lowStock} productos</p>
-            <p className="text-[11px] text-orange-600 font-bold mt-0.5">Menos de 20 piezas</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-800 flex items-center justify-center font-bold text-xl">
-            <AlertTriangle className="w-6 h-6 text-rose-600" />
-          </div>
-        </div>
       </div>
 
       {/* Filters and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-stone-200 space-y-4">
-        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-          {/* Search Input */}
-          <div className="relative w-full md:w-80">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-stone-200 space-y-4">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+          {/* Left Count Indicator */}
+          <div className="hidden md:flex items-center gap-1.5 w-44 text-xs font-bold text-stone-500">
+            <span>{filteredProducts.length} productos</span>
+          </div>
+
+          {/* Centered Search Bar */}
+          <div className="relative w-full max-w-xl mx-auto">
+            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nombre, descripción..."
-              className="w-full pl-10 pr-4 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+              placeholder="Buscar por nombre, descripción o categoría..."
+              className="w-full pl-11 pr-10 py-3 bg-stone-50 hover:bg-stone-100/70 focus:bg-white rounded-2xl border border-stone-200 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-center sm:text-left sm:pl-11"
             />
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs p-1"
+                title="Limpiar búsqueda"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -339,9 +338,9 @@ export default function ProductosPage() {
           </div>
 
           {/* View Toggle */}
-          <div className="flex items-center gap-2 self-end md:self-auto">
-            <span className="text-xs text-stone-500 font-medium mr-1">
-              Mostrando {filteredProducts.length} de {products.length}
+          <div className="flex items-center justify-end gap-2 w-full md:w-44 self-end md:self-auto">
+            <span className="text-xs text-stone-500 font-medium mr-1 md:hidden">
+              {filteredProducts.length} de {products.length}
             </span>
             <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200">
               <button
@@ -702,6 +701,8 @@ export default function ProductosPage() {
                     <option value="pasteleria">🍰 Pastelería & Pays</option>
                     <option value="bebidas">☕ Cafetería & Bebidas</option>
                     <option value="temporada">✨ Especiales de Temporada</option>
+                    <option value="abarrotes">🥫 Abarrotes</option>
+                    <option value="materia_prima">🌾 Materia Prima</option>
                   </select>
                 </div>
 
@@ -723,31 +724,33 @@ export default function ProductosPage() {
                 </div>
               </div>
 
-              {/* Stock Inicial & Etiqueta */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-stone-700">Piezas Disponibles (Stock)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    placeholder="50"
-                    className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
+              {/* Stock Inicial & Etiqueta (Se ocultan al Modificar producto) */}
+              {modalMode === "create" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-stone-700">Piezas Disponibles (Stock)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.stock}
+                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                      placeholder="50"
+                      className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-stone-700">Etiqueta Especial</label>
-                  <input
-                    type="text"
-                    value={formData.tag}
-                    onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
-                    placeholder="ej. Tradicional, Favorito"
-                    className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-stone-700">Etiqueta Especial</label>
+                    <input
+                      type="text"
+                      value={formData.tag}
+                      onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
+                      placeholder="ej. Tradicional, Favorito"
+                      className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Descripción */}
               <div className="space-y-1">

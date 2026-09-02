@@ -132,6 +132,28 @@ export const DEFAULT_PRODUCTS: Product[] = [
     tag: "Rellena",
     description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
     image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-13",
+    name: "Leche Entera 1L",
+    price: 28,
+    category: "abarrotes",
+    icon: "🥛",
+    stock: 40,
+    tag: "Abarrote",
+    description: "Leche pasteurizada entera fresca de primera calidad.",
+    image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-14",
+    name: "Harina de Trigo San Antonio 1kg",
+    price: 22,
+    category: "materia_prima",
+    icon: "🌾",
+    stock: 80,
+    tag: "Insumo",
+    description: "Harina de trigo de alta fuerza ideal para panificación tradicional.",
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
   }
 ];
 
@@ -142,6 +164,8 @@ export const PRODUCT_CATEGORIES = [
   { id: "pasteleria", label: "Pastelería & Pays", icon: "🍰" },
   { id: "bebidas", label: "Cafetería & Bebidas", icon: "☕" },
   { id: "temporada", label: "Especiales de Temporada", icon: "✨" },
+  { id: "abarrotes", label: "Abarrotes", icon: "🥫" },
+  { id: "materia_prima", label: "Materia Prima", icon: "🌾" },
 ];
 
 const STORAGE_KEY = "brito_products";
