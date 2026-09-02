@@ -136,6 +136,7 @@ export interface RolePermissions {
 export interface AppUser {
   id: string;
   name: string;
+  username?: string;
   email: string;
   password?: string;
   role: UserRole;

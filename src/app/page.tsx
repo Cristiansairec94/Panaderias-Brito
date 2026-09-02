@@ -16,7 +16,7 @@ import {
   ArrowUpRight
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, getFriendlyName } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
 
 export default function Home() {
@@ -47,7 +47,7 @@ export default function Home() {
             </span>
           </div>
           <h2 className="text-3xl font-black tracking-tight">
-            ¡Hola, {user?.name || "Don Toño"}! 🥖
+            ¡Bienvenido {getFriendlyName(user?.name)}! 🥖
           </h2>
           <p className="text-stone-300 mt-1.5 text-xs max-w-xl leading-relaxed">
             Bienvenido al panel central de <strong className="text-brito-orange-400">Panaderías Brito</strong>. El Punto de Venta está siendo desarrollado en paralelo, y tienes el control de clientes, caja e insumos aquí.

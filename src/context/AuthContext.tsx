@@ -76,10 +76,21 @@ export const ROUTE_PERMISSION_MAP: Record<string, keyof RolePermissions> = {
   "/configuracion": "canAccessConfiguracion",
 };
 
+export function getFriendlyName(fullName?: string): string {
+  if (!fullName) return "Usuario";
+  const lower = fullName.toLowerCase();
+  if (lower.includes("toño") || lower.includes("tono")) return "Toño";
+  if (lower.includes("lupita")) return "Lupita";
+  if (lower.includes("juan")) return "Juan";
+  if (lower.includes("carlos")) return "Carlos";
+  return fullName.split(" ")[0] || fullName;
+}
+
 export const DEMO_USERS: User[] = [
   {
     id: "usr-1",
     name: "Don Toño Brito",
+    username: "toño",
     email: "admin@panaderiabrito.com",
     password: "admin",
     role: "admin",
@@ -90,6 +101,7 @@ export const DEMO_USERS: User[] = [
   {
     id: "usr-2",
     name: "Lupita Brito",
+    username: "lupita",
     email: "caja@panaderiabrito.com",
     password: "caja",
     role: "cajero",
@@ -100,6 +112,7 @@ export const DEMO_USERS: User[] = [
   {
     id: "usr-3",
     name: "Maestro Juan",
+    username: "juan",
     email: "panadero@panaderiabrito.com",
     password: "pan",
     role: "panadero",
@@ -110,6 +123,7 @@ export const DEMO_USERS: User[] = [
   {
     id: "usr-4",
     name: "Carlos Mendoza",
+    username: "carlos",
     email: "supervisor@panaderiabrito.com",
     password: "super",
     role: "supervisor",
@@ -123,7 +137,7 @@ interface AuthContextType {
   user: User | null;
   usersList: User[];
   permissions: RolePermissions;
-  login: (email: string, pass: string, rememberMe?: boolean) => { success: boolean; message?: string };
+  login: (email: string, pass: string, rememberMe?: boolean) => { success: boolean; message?: string; user?: User };
   loginAs: (user: User) => void;
   logout: () => void;
   hasPermission: (permission: keyof RolePermissions) => boolean;
@@ -230,14 +244,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user]
   );
 
-  const login = (email: string, pass: string, rememberMe: boolean = true) => {
-    const cleanEmail = email.trim().toLowerCase();
+  const login = (identifier: string, pass: string, rememberMe: boolean = true) => {
+    const clean = identifier.trim().toLowerCase();
     const cleanPass = pass.trim();
 
-    const found = usersList.find((u) => u.email.toLowerCase() === cleanEmail);
+    const found = usersList.find((u) => {
+      const email = u.email.toLowerCase();
+      const username = u.username?.toLowerCase();
+      const name = u.name.toLowerCase();
+
+      if (email === clean) return true;
+      if (username && username === clean) return true;
+      if (name.includes(clean)) return true;
+
+      // Friendly alias checks
+      if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
+      if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
+      if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
+      if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
+
+      return false;
+    });
 
     if (!found) {
-      return { success: false, message: "El correo electrónico no está registrado en el sistema." };
+      return { success: false, message: "Usuario no encontrado. Ingresa tu usuario o correo." };
     }
 
     if (found.password && found.password !== cleanPass) {
@@ -251,7 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.setItem("brito_user", JSON.stringify(found));
     }
 
-    return { success: true };
+    return { success: true, user: found };
   };
 
   const loginAs = (demoUser: User) => {
