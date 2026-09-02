@@ -1,70 +1,140 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
-export interface Notification {
+export interface FBNotification {
   id: string;
+  senderName: string;
+  senderAvatar: string;
+  badgeIcon: "harina" | "pastel" | "dinero" | "horno" | "cliente" | "alerta";
   title: string;
-  message: string;
-  time: string;
-  type: "warning" | "success" | "info" | "urgent";
+  highlightText: string;
+  description: string;
+  timeAgo: string;
+  group: "recientes" | "anteriores";
   read: boolean;
-  category: "inventario" | "pedidos" | "ventas" | "produccion";
+  actionLabel?: string;
+  actionLink?: string;
+  category: "inventario" | "pedidos" | "caja" | "produccion" | "clientes";
 }
 
-const INITIAL_NOTIFICATIONS: Notification[] = [
+const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
   {
-    id: "notif-1",
-    title: "⚠️ Stock Crítico de Harina",
-    message: "Quedan 8 bultos de Harina Extra Fina (mínimo requerido: 10 bultos).",
-    time: "Hace 10 min",
-    type: "urgent",
+    id: "fb-1",
+    senderName: "Sistema de Almacén",
+    senderAvatar: "📦",
+    badgeIcon: "harina",
+    title: "Alerta de Stock Crítico",
+    highlightText: "Harina de Trigo Extra Fina",
+    description: "Quedan solo 8 bultos en bodega. Se alcanzó el nivel mínimo de reorden.",
+    timeAgo: "Hace 6 min",
+    group: "recientes",
     read: false,
+    actionLabel: "Comprar Insumos",
+    actionLink: "/inventario",
     category: "inventario",
   },
   {
-    id: "notif-2",
-    title: "🎂 Entrega de Pastel Pendiente",
-    message: "Pastel 3 Leches (Sra. María González) debe entregarse a las 4:00 PM.",
-    time: "Hace 35 min",
-    type: "warning",
+    id: "fb-2",
+    senderName: "Pastelería & Encargos",
+    senderAvatar: "🎂",
+    badgeIcon: "pastel",
+    title: "Entrega Próxima (4:00 PM)",
+    highlightText: "Sra. María González",
+    description: "Pastel 3 Leches XV Años (flores lilas) listo para entrega y cobro de restante $450.",
+    timeAgo: "Hace 28 min",
+    group: "recientes",
     read: false,
+    actionLabel: "Ver Pedido",
+    actionLink: "/pedidos",
     category: "pedidos",
   },
   {
-    id: "notif-3",
-    title: "💰 Meta de Venta Alcanzada",
-    message: "La caja de mostrador superó los $4,000 MXN en el turno matutino.",
-    time: "Hace 1 hora",
-    type: "success",
+    id: "fb-3",
+    senderName: "Caja Mostrador (Lupita)",
+    senderAvatar: "👩‍💼",
+    badgeIcon: "dinero",
+    title: "Meta de Turno Superada",
+    highlightText: "$4,150.00 MXN en Efectivo",
+    description: "El turno matutino superó la meta diaria estimada de ventas en mostrador.",
+    timeAgo: "Hace 1 hora",
+    group: "recientes",
     read: false,
-    category: "ventas",
+    actionLabel: "Ver Flujo de Caja",
+    actionLink: "/caja",
+    category: "caja",
   },
   {
-    id: "notif-4",
-    title: "🥖 Horno 1 Disponible",
-    message: "Charolas de Conchas y Cuernos listas para exhibidor de mostrador.",
-    time: "Hace 2 horas",
-    type: "info",
+    id: "fb-4",
+    senderName: "Maestro Panadero Juan",
+    senderAvatar: "👨‍🍳",
+    badgeIcon: "horno",
+    title: "Horno 2 Terminado",
+    highlightText: "Charolas de Conchas y Cuernos",
+    description: "Lote de 80 conchas y 40 cuernos calientes listos para pasar al exhibidor.",
+    timeAgo: "Hace 2 horas",
+    group: "anteriores",
     read: true,
+    actionLabel: "Ver Mostrador",
+    actionLink: "/pos",
     category: "produccion",
+  },
+  {
+    id: "fb-5",
+    senderName: "Abarrotes 'La Guadalupana'",
+    senderAvatar: "🏪",
+    badgeIcon: "cliente",
+    title: "Abono a Cuenta Mayorista",
+    highlightText: "Don Pepe abonó $850.00",
+    description: "Se liquidó la nota de 150 bolillos y 80 teleras de la semana pasada.",
+    timeAgo: "Ayer a las 6:30 PM",
+    group: "anteriores",
+    read: true,
+    actionLabel: "Ver Cliente",
+    actionLink: "/clientes",
+    category: "clientes",
   },
 ];
 
 interface NotificationContextType {
-  notifications: Notification[];
+  notifications: FBNotification[];
   unreadCount: number;
+  soundEnabled: boolean;
+  toggleSound: () => void;
   markAsRead: (id: string) => void;
+  markAsUnread: (id: string) => void;
   markAllAsRead: () => void;
   deleteNotification: (id: string) => void;
+  clearAll: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<FBNotification[]>(INITIAL_FB_NOTIFICATIONS);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const playChime = () => {
+    if (!soundEnabled || typeof window === "undefined") return;
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.35);
+    } catch (e) {
+      console.log(e);
+    }
+  };
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>
@@ -72,7 +142,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     );
   };
 
+  const markAsUnread = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: false } : n))
+    );
+  };
+
   const markAllAsRead = () => {
+    playChime();
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
@@ -80,9 +157,27 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
+  const clearAll = () => {
+    setNotifications([]);
+  };
+
+  const toggleSound = () => {
+    setSoundEnabled(!soundEnabled);
+  };
+
   return (
     <NotificationContext.Provider
-      value={{ notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification }}
+      value={{
+        notifications,
+        unreadCount,
+        soundEnabled,
+        toggleSound,
+        markAsRead,
+        markAsUnread,
+        markAllAsRead,
+        deleteNotification,
+        clearAll,
+      }}
     >
       {children}
     </NotificationContext.Provider>
