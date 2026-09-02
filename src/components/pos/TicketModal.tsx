@@ -1,0 +1,183 @@
+"use client";
+
+import React, { useRef } from "react";
+import { Printer, CheckCircle, X, Receipt } from "lucide-react";
+import { CartItem } from "@/types";
+import { formatCurrency } from "@/lib/utils";
+
+interface TicketModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  saleId?: string;
+  items: CartItem[];
+  total: number;
+  paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  cashGiven?: number;
+  change?: number;
+  cashierName?: string;
+  date?: string;
+}
+
+export default function TicketModal({
+  isOpen,
+  onClose,
+  saleId,
+  items,
+  total,
+  paymentMethod,
+  cashGiven,
+  change,
+  cashierName = "Caja Principal - Don Toño",
+  date,
+}: TicketModalProps) {
+  const ticketRef = useRef<HTMLDivElement>(null);
+
+  if (!isOpen) return null;
+
+  const totalPieces = items.reduce((sum, item) => sum + item.quantity, 0);
+  const formattedDate = date || new Date().toLocaleString("es-MX", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+  const folio = saleId ? saleId.slice(-6).toUpperCase() : `POS-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header bar */}
+        <div className="bg-amber-950 text-amber-100 p-4 px-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Receipt className="w-5 h-5 text-amber-400" />
+            <span className="font-bold text-sm">Comprobante de Venta</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-amber-900 rounded-lg text-amber-300 hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Printable Ticket Area */}
+        <div className="flex-1 overflow-y-auto p-6 bg-stone-100/60">
+          <div
+            ref={ticketRef}
+            id="thermal-receipt"
+            className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm font-mono text-xs text-stone-800 space-y-4 max-w-sm mx-auto"
+          >
+            {/* Business Header */}
+            <div className="text-center space-y-1 border-b border-dashed border-stone-300 pb-4">
+              <div className="inline-flex items-center justify-center p-2 bg-amber-100 rounded-full mb-1">
+                <span className="text-2xl">🥖</span>
+              </div>
+              <h2 className="font-black text-sm tracking-wider uppercase text-stone-900">
+                PANADERÍAS BRITO
+              </h2>
+              <p className="text-[11px] text-stone-600 font-sans">El auténtico sabor tradicional</p>
+              <p className="text-[10px] text-stone-500 font-sans">Don Antonio Brito & Hijos</p>
+              <p className="text-[10px] text-stone-400 font-sans">Sucursal Matriz • Tel: 55 1234 5678</p>
+            </div>
+
+            {/* Ticket Metadata */}
+            <div className="text-[11px] space-y-1 text-stone-600 border-b border-dashed border-stone-300 pb-3">
+              <div className="flex justify-between">
+                <span>FOLIO:</span>
+                <span className="font-bold text-stone-900">#{folio}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>FECHA:</span>
+                <span>{formattedDate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>ATENDIÓ:</span>
+                <span className="font-medium">{cashierName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>MÉTODO:</span>
+                <span className="uppercase font-semibold text-amber-800">{paymentMethod}</span>
+              </div>
+            </div>
+
+            {/* Items Breakdown */}
+            <div className="space-y-2 border-b border-dashed border-stone-300 pb-3">
+              <div className="flex justify-between font-bold text-[10px] text-stone-500 uppercase tracking-wider pb-1">
+                <span>CANT / DESCRIPCIÓN</span>
+                <span>IMPORTE</span>
+              </div>
+
+              {items.map((item, idx) => (
+                <div key={idx} className="flex justify-between text-stone-800 text-[11px] leading-tight">
+                  <span className="flex-1 pr-2">
+                    <span className="font-bold">{item.quantity}x</span> {item.product.name}
+                    <span className="block text-[10px] text-stone-400 font-sans">
+                      @{formatCurrency(item.product.price)} c/u
+                    </span>
+                  </span>
+                  <span className="font-bold whitespace-nowrap">
+                    {formatCurrency(item.product.price * item.quantity)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Totals Breakdown */}
+            <div className="space-y-1.5 pt-1 text-[11px]">
+              <div className="flex justify-between text-stone-600">
+                <span>Total de piezas:</span>
+                <span className="font-bold">{totalPieces} pzas</span>
+              </div>
+              <div className="flex justify-between text-stone-600">
+                <span>Subtotal:</span>
+                <span>{formatCurrency(total)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-black text-stone-900 border-t border-dashed border-stone-300 pt-2">
+                <span>TOTAL:</span>
+                <span className="text-amber-800">{formatCurrency(total)} MXN</span>
+              </div>
+
+              {paymentMethod === "efectivo" && (
+                <>
+                  <div className="flex justify-between text-stone-600 pt-1">
+                    <span>Efectivo recibido:</span>
+                    <span className="font-semibold">{formatCurrency(cashGiven || total)}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-700 font-bold bg-emerald-50/70 p-1.5 rounded-lg">
+                    <span>CAMBIO:</span>
+                    <span>{formatCurrency(change || 0)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer Message */}
+            <div className="text-center pt-3 space-y-1 border-t border-dashed border-stone-300 text-[10px] text-stone-500 font-sans">
+              <p className="font-bold text-stone-800">¡GRACIAS POR SU PREFERENCIA! 🥐</p>
+              <p>Pan horneado calientito todos los días</p>
+              <p className="text-[9px] text-stone-400">Consérvese en un lugar fresco y seco</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-4 bg-white border-t border-stone-200 flex gap-3">
+          <button
+            onClick={handlePrint}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95"
+          >
+            <Printer className="w-4 h-4" /> Imprimir Ticket
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95"
+          >
+            <CheckCircle className="w-4 h-4" /> Siguiente Cliente
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

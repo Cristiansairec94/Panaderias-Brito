@@ -20,6 +20,8 @@ export interface Sale {
   total: number;
   paymentMethod: "efectivo" | "tarjeta" | "transferencia";
   cashier: string;
+  cashGiven?: number;
+  change?: number;
 }
 
 export interface InventoryItem {
