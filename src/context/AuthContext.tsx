@@ -90,7 +90,7 @@ export const DEMO_USERS: User[] = [
   {
     id: "usr-1",
     name: "Don Toño Brito",
-    username: "toño",
+    username: "admin",
     email: "admin@panaderiabrito.com",
     password: "admin",
     role: "admin",
@@ -247,6 +247,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (identifier: string, pass: string, rememberMe: boolean = true) => {
     const clean = identifier.trim().toLowerCase();
     const cleanPass = pass.trim();
+
+    // Fast-path: usuario 'admin' y contraseña 'admin'
+    if (clean === "admin" && cleanPass === "admin") {
+      const adminUser = usersList.find((u) => u.role === "admin") || DEMO_USERS[0];
+      setUser(adminUser);
+      if (rememberMe) {
+        localStorage.setItem("brito_user", JSON.stringify(adminUser));
+      } else {
+        sessionStorage.setItem("brito_user", JSON.stringify(adminUser));
+      }
+      return { success: true, user: adminUser };
+    }
 
     const found = usersList.find((u) => {
       const email = u.email.toLowerCase();

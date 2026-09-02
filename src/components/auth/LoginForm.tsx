@@ -55,14 +55,14 @@ export default function LoginForm() {
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-700/10 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Main Container */}
-      <div className="max-w-[440px] w-full bg-[#16161c]/95 backdrop-blur-2xl rounded-[38px] shadow-2xl shadow-black/80 overflow-hidden border border-amber-500/20 relative z-10 animate-in fade-in zoom-in-95 duration-500">
+      <div className="max-w-[480px] w-full bg-[#16161c]/95 backdrop-blur-2xl rounded-[40px] shadow-2xl shadow-black/80 overflow-hidden border border-amber-500/20 relative z-10 animate-in fade-in zoom-in-95 duration-500">
         
         {welcomeUser ? (
           /* Personalized Welcome Screen Animation */
           <div className="p-12 text-center space-y-6 animate-in zoom-in-90 fade-in duration-300">
             <div className="relative inline-flex items-center justify-center">
               <div className="absolute inset-0 bg-amber-500/40 rounded-full blur-2xl animate-ping" />
-              <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center text-5xl shadow-2xl shadow-orange-500/50 border-4 border-amber-300/60 relative z-10 animate-bounce">
+              <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center text-6xl shadow-2xl shadow-orange-500/50 border-4 border-amber-300/60 relative z-10 animate-bounce">
                 {welcomeUser.avatar || "🥖"}
               </div>
             </div>
@@ -71,7 +71,7 @@ export default function LoginForm() {
               <span className="px-4 py-1.5 bg-amber-500/20 border border-amber-400/40 text-amber-300 rounded-full text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 shadow-sm">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Acceso Autorizado
               </span>
-              <h2 className="text-3xl font-black text-white tracking-tight">
+              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
                 ¡Bienvenido {getFriendlyName(welcomeUser.name)}!
               </h2>
               <p className="text-xs text-stone-300 font-medium">
@@ -91,40 +91,40 @@ export default function LoginForm() {
               
               {/* Extra Large Animated Floating Bakery Logo */}
               <div 
-                className="relative mb-4 cursor-pointer group"
+                className="relative mb-5 cursor-pointer group"
                 onClick={handleLogoClick}
                 title="Haz clic en el logo para hacerlo girar"
               >
                 {/* Glowing Pulsing Aura */}
-                <div className="absolute -inset-4 bg-gradient-to-r from-amber-500/35 via-orange-500/30 to-amber-600/35 rounded-full blur-2xl animate-pulse group-hover:blur-3xl transition-all" />
-                <div className="absolute -inset-2 bg-amber-400/25 rounded-full blur-lg" />
+                <div className="absolute -inset-6 bg-gradient-to-r from-amber-500/40 via-orange-500/35 to-amber-600/40 rounded-full blur-3xl animate-pulse group-hover:blur-[40px] transition-all" />
+                <div className="absolute -inset-3 bg-amber-400/30 rounded-full blur-xl" />
 
-                {/* Big Floating Logo Container */}
-                <div className={`relative w-36 h-36 sm:w-40 sm:h-40 rounded-[32px] bg-gradient-to-b from-stone-900 via-stone-950 to-black p-4 shadow-2xl border-2 border-amber-400/50 flex items-center justify-center transition-all duration-500 group-hover:scale-105 group-hover:border-amber-400 animate-brito-float ${isLogoSpinning ? "animate-brito-spin" : ""}`}>
+                {/* Big Floating Logo Container (224px) */}
+                <div className={`relative w-48 h-48 sm:w-56 sm:h-56 rounded-[38px] bg-gradient-to-b from-stone-900 via-stone-950 to-black p-5 shadow-2xl border-2 border-amber-400/60 flex items-center justify-center transition-all duration-500 group-hover:scale-105 group-hover:border-amber-400 animate-brito-float ${isLogoSpinning ? "animate-brito-spin" : ""}`}>
                   
                   {/* Subtle sweep shimmer */}
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 rounded-[32px] pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 rounded-[38px] pointer-events-none" />
                   
                   <Image
                     src="/logo.png"
                     alt="Panaderías Brito"
-                    width={160}
-                    height={160}
+                    width={220}
+                    height={220}
                     priority
                     unoptimized
-                    className="w-full h-full object-contain drop-shadow-[0_12px_24px_rgba(245,158,11,0.45)] select-none pointer-events-none transition-transform duration-300 group-hover:scale-110"
+                    className="w-full h-full object-contain drop-shadow-[0_16px_32px_rgba(245,158,11,0.5)] select-none pointer-events-none transition-transform duration-300 group-hover:scale-110"
                   />
 
                   {/* Little interactive sparkle tooltip */}
-                  <div className="absolute -bottom-2 px-2.5 py-0.5 bg-amber-500 text-stone-950 text-[9px] font-black rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                    <Sparkles className="w-2.5 h-2.5" /> ¡Gírame!
+                  <div className="absolute -bottom-2.5 px-3 py-0.5 bg-amber-500 text-stone-950 text-[10px] font-black rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> ¡Gírame!
                   </div>
                 </div>
               </div>
 
               {/* Friendly Welcome Title */}
               <div className="space-y-1 mt-1">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-300">
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-xs font-bold text-amber-300">
                   <span>🥖</span> Panadería Tradicional Brito
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight pt-1">
@@ -137,7 +137,7 @@ export default function LoginForm() {
             </div>
 
             {/* Form */}
-            <div className="px-8 pb-9 pt-2 space-y-4">
+            <div className="px-8 pb-10 pt-2 space-y-4">
               {error && (
                 <div className="p-3.5 bg-rose-500/15 border border-rose-500/35 text-rose-200 text-xs rounded-2xl font-semibold flex items-center gap-2.5 animate-in fade-in duration-200">
                   <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
@@ -158,7 +158,7 @@ export default function LoginForm() {
                       required
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder="Tu usuario (ej. toño, lupita, juan)"
+                      placeholder="admin"
                       className="w-full px-4 py-3.5 bg-stone-900/90 rounded-2xl border border-stone-700/80 text-white text-xs font-medium placeholder:text-stone-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-400 focus:bg-stone-900 focus:outline-none transition-all shadow-inner"
                     />
                   </div>
@@ -175,7 +175,7 @@ export default function LoginForm() {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
+                      placeholder="admin"
                       className="w-full pl-4 pr-12 py-3.5 bg-stone-900/90 rounded-2xl border border-stone-700/80 text-white text-xs font-medium placeholder:text-stone-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-400 focus:bg-stone-900 focus:outline-none transition-all shadow-inner"
                     />
                     <button
