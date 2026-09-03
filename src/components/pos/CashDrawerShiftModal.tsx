@@ -525,27 +525,6 @@ export default function CashDrawerShiftModal({
                   </div>
                 )}
               </div>
-
-              {/* Botones de Acción: Cambio de Turno o Cerrar Turno */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("cambio")}
-                  className="p-4 bg-gradient-to-r from-amber-900 to-amber-950 hover:from-amber-950 hover:to-black text-white font-black text-xs rounded-2xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <UserCheck className="w-4 h-4 text-amber-400" />
-                  <span>2. Realizar Cambio de Turno & Relevo</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("cierre")}
-                  className="p-4 bg-stone-900 hover:bg-black text-white font-black text-xs rounded-2xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 border border-stone-700"
-                >
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />
-                  <span>3. Realizar Cierre Final de Turno (Corte Z)</span>
-                </button>
-              </div>
             </div>
           ) : (
             /* PESTAÑAS 2 Y 3: CAMBIO DE TURNO O CIERRE DEFINITIVO */
