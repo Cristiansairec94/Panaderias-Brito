@@ -496,19 +496,6 @@ export default function ProductosPage() {
                       </span>
                     )}
                   </div>
-
-                  {/* Stock Tag on Top Right */}
-                  <div className="absolute top-3 right-3 z-10">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-sm ${
-                        product.stock <= 20
-                          ? "bg-rose-500 text-white"
-                          : "bg-emerald-500 text-white"
-                      }`}
-                    >
-                      {product.stock} disp.
-                    </span>
-                  </div>
                 </div>
 
                 {/* Body Content */}
@@ -575,7 +562,6 @@ export default function ProductosPage() {
                   <th className="py-3.5 px-4">Producto</th>
                   <th className="py-3.5 px-4">Categoría</th>
                   <th className="py-3.5 px-4 text-right">Precio</th>
-                  <th className="py-3.5 px-4 text-center">Stock</th>
                   <th className="py-3.5 px-4">Etiqueta</th>
                   <th className="py-3.5 px-4 text-right">Acciones</th>
                 </tr>
@@ -628,13 +614,6 @@ export default function ProductosPage() {
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-center font-bold">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                          product.stock <= 20 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-800"
-                        }`}>
-                          {product.stock} pzas
-                        </span>
-                      </td>
                       <td className="py-3 px-4 text-stone-500 font-medium">
                         {product.tag || "—"}
                       </td>
@@ -682,7 +661,7 @@ export default function ProductosPage() {
                     {modalMode === "create" ? "Nuevo Producto de Panadería" : "Modificar Producto"}
                   </h3>
                   <p className="text-xs text-stone-500 font-medium">
-                    {modalMode === "create" ? "Agrega un pan o producto al catálogo" : "Actualiza precio, stock o fotografía"}
+                    {modalMode === "create" ? "Agrega un pan o producto al catálogo" : "Actualiza precio, categoría o fotografía"}
                   </p>
                 </div>
               </div>
