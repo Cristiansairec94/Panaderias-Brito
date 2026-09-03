@@ -543,33 +543,33 @@ export default function POSPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* 1. Dinero en Caja y Arqueo */}
+              {/* 1. Dinero en Caja */}
               <button
                 type="button"
                 onClick={() => {
                   setShiftModalTab("cuentas");
                   setShowCashDrawerModal(true);
                 }}
-                className="p-3 bg-[#2d1810] hover:bg-[#3e2723] text-white rounded-2xl border border-amber-900/60 transition-all active:scale-98 shadow-xs flex items-center justify-between text-left"
+                className="p-3.5 bg-[#2d1810] hover:bg-[#3e2723] text-white rounded-2xl border border-amber-900/60 transition-all active:scale-98 shadow-xs flex items-center justify-between text-left"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
+                  <div className="p-2.5 bg-amber-500/20 rounded-xl text-amber-400">
                     <Coins className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] text-amber-300 font-medium block">
-                      {cashierName} • {shiftName.split(" ")[0]}
+                    <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">
+                      Efectivo en Caja
                     </span>
-                    <span className="text-xs font-black text-white block">
-                      Caja: {formatCurrency(netCashInDrawer)}
+                    <span className="text-base font-black text-white block">
+                      {formatCurrency(netCashInDrawer)}
                     </span>
                     <span className="text-[10px] text-stone-300">
-                      Stock: {formatCurrency(totalStockValue)}
+                      Fondo: {formatCurrency(initialCashFund)}
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-800/60">
-                  Arqueo
+                <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-2.5 py-1 rounded-lg border border-amber-800/80">
+                  Ver Cuentas
                 </span>
               </button>
 
@@ -577,42 +577,56 @@ export default function POSPage() {
               <button
                 type="button"
                 onClick={() => setShowExpensesModal(true)}
-                className="p-3 bg-rose-50 hover:bg-rose-100 border border-rose-200/90 rounded-2xl text-left transition-all active:scale-98 flex items-center justify-between"
+                className="p-3.5 bg-rose-50 hover:bg-rose-100/80 border border-rose-200 rounded-2xl text-left transition-all active:scale-98 flex items-center justify-between"
               >
-                <div>
-                  <div className="flex items-center gap-1 text-rose-700 text-[11px] font-bold">
-                    <TrendingDown className="w-3.5 h-3.5" />
-                    <span>Gastos Registrados</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-rose-100 rounded-xl text-rose-700">
+                    <TrendingDown className="w-5 h-5" />
                   </div>
-                  <span className="text-sm font-black text-rose-800 mt-1 block">
-                    -{formatCurrency(totalExpenses)}
-                  </span>
+                  <div>
+                    <span className="text-[10px] text-rose-700 font-bold uppercase tracking-wider block">
+                      Gastos del Turno
+                    </span>
+                    <span className="text-base font-black text-rose-800 block">
+                      -{formatCurrency(totalExpenses)}
+                    </span>
+                    <span className="text-[10px] text-rose-600">
+                      {expensesList.length} salidas registradas
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-1 rounded-lg">
-                  Registrar
+                <span className="text-[10px] font-bold text-rose-800 bg-rose-200/80 px-2.5 py-1 rounded-lg border border-rose-300">
+                  + Registrar
                 </span>
               </button>
 
-              {/* 3. Gestión de Turno (Cuentas del Turno, Cambio & Cierre) */}
+              {/* 3. Botón de Turno & Relevo (Súper Intuitivo y Destacado) */}
               <button
                 type="button"
                 onClick={() => {
                   setShiftModalTab("cambio");
                   setShowCashDrawerModal(true);
                 }}
-                className="p-3 bg-stone-50 hover:bg-amber-50/80 border border-stone-200 hover:border-amber-300 rounded-2xl text-left transition-all active:scale-98 flex items-center justify-between"
+                className="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border-2 border-amber-300 rounded-2xl text-left transition-all active:scale-98 shadow-xs flex items-center justify-between group"
               >
-                <div>
-                  <div className="flex items-center gap-1 text-stone-700 text-[11px] font-bold">
-                    <History className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Turno: {shiftName.split(" ")[0]} ({cashierName})</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 bg-amber-200/90 group-hover:bg-amber-300 rounded-xl text-amber-900 transition-colors">
+                    <UserCheck className="w-5 h-5" />
                   </div>
-                  <span className="text-sm font-black text-stone-900 mt-1 block">
-                    {recentSalesList.length} ventas realizadas
-                  </span>
+                  <div>
+                    <span className="text-[10px] text-amber-900 font-bold uppercase tracking-wider block truncate max-w-[150px]">
+                      {cashierName.split(" - ")[0]} • {shiftName.includes("(") ? shiftName.split("(")[0].trim() : shiftName}
+                    </span>
+                    <span className="text-sm font-black text-stone-900 block">
+                      Cambio de Turno
+                    </span>
+                    <span className="text-[10px] text-stone-500 font-medium">
+                      {recentSalesList.length} ventas realizadas
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[10px] font-bold text-amber-950 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300">
-                  Cuentas & Relevo
+                <span className="text-xs font-black text-white bg-amber-700 group-hover:bg-amber-800 px-3 py-1.5 rounded-xl shadow-xs flex items-center gap-1 transition-all">
+                  <span>🔄 Entregar</span>
                 </span>
               </button>
             </div>
