@@ -533,122 +533,85 @@ export default function POSPage() {
                   {isDbConnected ? "En línea" : "Modo Local"}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowOperationsMenu(false)}
-                className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
-              >
-                Ocultar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowExpensesModal(true)}
+                  className="text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1 rounded-full transition-colors"
+                >
+                  💸 + Registrar Gasto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOperationsMenu(false)}
+                  className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
+                >
+                  Ocultar
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* 1. Dinero en Caja */}
-              <button
-                type="button"
-                onClick={() => {
-                  setShiftModalTab("cuentas");
-                  setShowCashDrawerModal(true);
-                }}
-                className="p-3.5 bg-[#2d1810] hover:bg-[#3e2723] text-white rounded-2xl border border-amber-900/60 transition-all active:scale-98 shadow-xs flex items-center justify-between text-left"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 bg-amber-500/20 rounded-xl text-amber-400">
-                    <Coins className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">
-                      Efectivo en Caja
-                    </span>
-                    <span className="text-base font-black text-white block">
-                      {formatCurrency(netCashInDrawer)}
-                    </span>
-                    <span className="text-[10px] text-stone-300">
-                      Fondo: {formatCurrency(initialCashFund)}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-amber-300 bg-amber-950 px-2.5 py-1 rounded-lg border border-amber-800/80">
-                  Ver Cuentas
-                </span>
-              </button>
+            {/* UN SOLO BOTÓN DE CAMBIO DE TURNO (ENFOCADO, BONITO Y ANIMADO) */}
+            <button
+              type="button"
+              onClick={() => {
+                setShiftModalTab("cambio");
+                setShowCashDrawerModal(true);
+              }}
+              className="w-full p-4 sm:p-5 bg-gradient-to-r from-amber-50 via-orange-50/70 to-amber-100 hover:from-amber-100 hover:via-orange-100 hover:to-amber-200 border-2 border-amber-300 hover:border-amber-400 rounded-2xl sm:rounded-3xl text-left transition-all duration-300 active:scale-[0.99] shadow-sm hover:shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group relative overflow-hidden"
+            >
+              {/* Destello animado de fondo al pasar el cursor */}
+              <div className="absolute -right-12 -top-12 w-44 h-44 bg-gradient-to-br from-amber-400/20 to-orange-400/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700 pointer-events-none" />
 
-              {/* 2. Salidas y Gastos */}
-              <button
-                type="button"
-                onClick={() => setShowExpensesModal(true)}
-                className="p-3.5 bg-rose-50 hover:bg-rose-100/80 border border-rose-200 rounded-2xl text-left transition-all active:scale-98 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2.5 bg-rose-100 rounded-xl text-rose-700">
-                    <TrendingDown className="w-5 h-5" />
+              {/* Lado Izquierdo: Icono animado + Cajero & Turno */}
+              <div className="flex items-center gap-3.5 relative z-10 min-w-0">
+                <div className="relative shrink-0">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-amber-500/30 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                    <UserCheck className="w-6 h-6 sm:w-7 sm:h-7" />
                   </div>
-                  <div>
-                    <span className="text-[10px] text-rose-700 font-bold uppercase tracking-wider block">
-                      Gastos del Turno
-                    </span>
-                    <span className="text-base font-black text-rose-800 block">
-                      -{formatCurrency(totalExpenses)}
-                    </span>
-                    <span className="text-[10px] text-rose-600">
-                      {expensesList.length} salidas registradas
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-rose-800 bg-rose-200/80 px-2.5 py-1 rounded-lg border border-rose-300">
-                  + Registrar
-                </span>
-              </button>
-
-              {/* 3. Botón de Turno & Relevo (Animado, Intuitivo y Dinámico) */}
-              <button
-                type="button"
-                onClick={() => {
-                  setShiftModalTab("cambio");
-                  setShowCashDrawerModal(true);
-                }}
-                className="relative p-3.5 sm:p-4 bg-gradient-to-br from-amber-50 via-orange-50/80 to-amber-100 hover:from-amber-100 hover:via-orange-100 hover:to-amber-200/90 border-2 border-amber-400/90 hover:border-amber-500 rounded-2xl sm:rounded-3xl text-left transition-all duration-300 active:scale-95 shadow-sm hover:shadow-md flex items-center justify-between gap-3 group overflow-hidden"
-              >
-                {/* Destello decorativo suave de fondo al pasar el mouse */}
-                <div className="absolute -right-8 -top-8 w-28 h-28 bg-gradient-to-br from-amber-400/20 to-orange-400/20 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500 pointer-events-none" />
-
-                <div className="flex items-center gap-3 relative z-10 min-w-0">
-                  {/* Icono animado con indicador de estatus activo */}
-                  <div className="relative shrink-0">
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-amber-500/30 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                      <UserCheck className="w-5 h-5 sm:w-6 sm:h-6" />
-                    </div>
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-ping" />
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black text-amber-900 uppercase tracking-wide">
-                      <span className="truncate max-w-[120px] sm:max-w-[140px]">{cashierName.split(" - ")[0]}</span>
-                      <span className="text-amber-500">•</span>
-                      <span className="text-amber-700 truncate max-w-[110px] sm:max-w-[130px]">
-                        {shiftName.includes("(") ? shiftName.split("(")[0].trim() : shiftName}
-                      </span>
-                    </div>
-                    <h4 className="text-sm sm:text-base font-black text-stone-900 group-hover:text-amber-950 transition-colors leading-tight mt-0.5">
-                      Cambio de Turno
-                    </h4>
-                    <p className="text-[10px] sm:text-[11px] text-stone-600 font-semibold flex items-center gap-1 mt-0.5">
-                      <span>{recentSalesList.length} ventas cobradas</span>
-                    </p>
-                  </div>
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full animate-ping" />
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
                 </div>
 
-                {/* Botón de Acción Animado en la Derecha */}
-                <div className="relative z-10 shrink-0">
-                  <div className="flex items-center gap-1.5 py-2 sm:py-2.5 px-3 sm:px-4 bg-gradient-to-r from-amber-600 to-orange-600 group-hover:from-amber-700 group-hover:to-orange-700 text-white rounded-xl sm:rounded-2xl font-black text-xs shadow-md shadow-amber-600/30 group-hover:shadow-lg group-hover:scale-105 transition-all duration-300">
-                    <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-200 group-hover:rotate-180 transition-transform duration-700 ease-in-out shrink-0" />
-                    <span className="whitespace-nowrap">Entregar</span>
-                    <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-200 group-hover:translate-x-1 transition-transform duration-200 shrink-0" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-wide">
+                    <span>{cashierName.split(" - ")[0]}</span>
+                    <span className="text-amber-400">•</span>
+                    <span className="text-amber-700">
+                      {shiftName.includes("(") ? shiftName.split("(")[0].trim() : shiftName}
+                    </span>
                   </div>
+                  <h3 className="text-base sm:text-xl font-black text-stone-900 group-hover:text-amber-950 transition-colors leading-tight mt-0.5">
+                    Realizar Cambio y Entrega de Turno
+                  </h3>
+                  <p className="text-xs text-stone-600 font-semibold flex items-center gap-2 mt-1">
+                    <span>🥖 {recentSalesList.length} ventas</span>
+                    <span>•</span>
+                    <span className="text-rose-700">Gastos: -{formatCurrency(totalExpenses)}</span>
+                    <span>•</span>
+                    <span className="text-amber-800 font-bold">Toca aquí para entregar caja</span>
+                  </p>
                 </div>
-              </button>
-            </div>
+              </div>
+
+              {/* Lado Derecho: Dinero en Caja + Botón Animado */}
+              <div className="flex items-center gap-4 sm:gap-5 relative z-10 shrink-0 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-amber-200/70">
+                <div className="text-left sm:text-right">
+                  <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-stone-500 block">
+                    Dinero en Caja
+                  </span>
+                  <span className="text-xl sm:text-2xl font-black text-stone-900 leading-none">
+                    {formatCurrency(netCashInDrawer)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 py-3 px-5 bg-gradient-to-r from-amber-600 via-amber-700 to-orange-600 group-hover:from-amber-700 group-hover:to-orange-700 text-white rounded-2xl font-black text-xs sm:text-sm shadow-md shadow-amber-600/30 group-hover:shadow-lg group-hover:scale-105 transition-all duration-300">
+                  <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-amber-200 group-hover:rotate-180 transition-transform duration-700 ease-in-out shrink-0" />
+                  <span className="whitespace-nowrap">Entregar Caja</span>
+                  <ArrowRight className="w-4 h-4 text-amber-200 group-hover:translate-x-1.5 transition-transform duration-200 shrink-0" />
+                </div>
+              </div>
+            </button>
           </div>
         )}
 
