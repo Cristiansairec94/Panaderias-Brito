@@ -840,27 +840,27 @@ export default function POSPage() {
         />
       )}
 
-      {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone) */}
-      <div className={`fixed lg:static inset-y-0 right-0 z-50 w-full sm:w-96 lg:w-[380px] shrink-0 bg-white border-l border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out ${
+      {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone - Amplia y Espaciosa) */}
+      <div className={`fixed lg:static inset-y-0 right-0 z-50 w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out ${
         isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       }`}>
         {/* Header con colores de la marca y micro-animación */}
-        <div className="p-4 px-5 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden">
+        <div className="p-3.5 px-5 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden shrink-0">
           <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-2xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40 transition-transform hover:scale-105">
               <ShoppingBag className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
+              <h3 className="font-black text-base sm:text-lg leading-tight tracking-wide text-white flex items-center gap-1.5">
                 Charola de Cobro
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </h3>
-              <p className="text-[11px] text-amber-300 font-bold mt-0.5">{cashierName} • Mostrador</p>
+              <p className="text-xs text-amber-300 font-bold mt-0.5">{cashierName} • Mostrador</p>
             </div>
           </div>
           <div className="flex items-center gap-2 relative z-10">
-            <span className={`text-xs px-3 py-1.5 rounded-full font-black tracking-wide transition-all ${
+            <span className={`text-xs sm:text-sm px-3.5 py-1.5 rounded-full font-black tracking-wide transition-all ${
               totalPieces > 0
                 ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/60 scale-105 animate-pulse"
                 : "bg-amber-900/60 text-amber-200 border border-amber-800"
@@ -878,13 +878,13 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Cart Items List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+        {/* Cart Items List - Mucho más grande, espacioso y claro */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4 animate-in fade-in zoom-in-95 duration-300">
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 animate-in fade-in zoom-in-95 duration-300">
               <div className="relative group">
                 <div className="absolute inset-0 bg-amber-400/20 rounded-full blur-xl animate-pulse" />
-                <div className="relative w-24 h-24 bg-gradient-to-br from-amber-100 via-orange-50 to-amber-50 rounded-3xl flex items-center justify-center text-5xl shadow-lg border-2 border-amber-200 shadow-amber-900/5 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                <div className="relative w-20 h-20 bg-gradient-to-br from-amber-100 via-orange-50 to-amber-50 rounded-3xl flex items-center justify-center text-4xl shadow-lg border-2 border-amber-200 shadow-amber-900/5 transition-transform duration-300 group-hover:scale-110">
                   🧺
                 </div>
               </div>
@@ -892,9 +892,9 @@ export default function POSPage() {
                 <span className="px-3 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider border border-amber-200">
                   Mostrador Listo
                 </span>
-                <p className="text-lg font-black text-stone-900">Charola vacía</p>
-                <p className="text-xs text-stone-500 max-w-[220px] leading-relaxed mx-auto font-medium">
-                  Toca cualquier pan caliente del mostrador para agregarlo al pedido del cliente.
+                <p className="text-base sm:text-lg font-black text-stone-900">Charola vacía</p>
+                <p className="text-xs text-stone-500 max-w-[240px] leading-relaxed mx-auto font-medium">
+                  Toca cualquier pan del mostrador para agregarlo al pedido y ver aquí sus detalles en grande.
                 </p>
               </div>
             </div>
@@ -902,32 +902,41 @@ export default function POSPage() {
             cart.map((item) => (
               <div
                 key={item.product.id}
-                className="p-3 bg-stone-50 hover:bg-amber-50/60 rounded-2xl border border-stone-200/80 transition-all space-y-2 shadow-xs"
+                className="p-3.5 sm:p-4 bg-gradient-to-br from-stone-50 via-white to-amber-50/20 hover:to-amber-50/40 rounded-3xl border-2 border-stone-200 hover:border-amber-300 transition-all space-y-3 shadow-sm hover:shadow-md"
               >
-                <div className="flex items-center justify-between gap-2.5">
-                  {item.product.image && (
+                <div className="flex items-center justify-between gap-3">
+                  {/* Foto Grande y Clara del Pan */}
+                  {item.product.image ? (
                     <img
                       src={item.product.image}
                       alt={item.product.name}
-                      className="w-12 h-12 object-cover rounded-xl shrink-0 border border-stone-200"
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-2xl shrink-0 border-2 border-amber-200 shadow-xs"
                     />
+                  ) : (
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-amber-100 flex items-center justify-center text-3xl shrink-0 border-2 border-amber-200">
+                      🥖
+                    </div>
                   )}
 
+                  {/* Nombre y Precio Grande */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-xs sm:text-sm text-stone-900 leading-tight truncate">{item.product.name}</p>
-                    <p className="text-[11px] text-amber-800 font-bold mt-0.5">
-                      {formatCurrency(item.product.price)} c/u
+                    <p className="font-black text-sm sm:text-base text-stone-900 leading-tight">
+                      {item.product.name}
+                    </p>
+                    <p className="text-xs sm:text-sm text-amber-800 font-extrabold mt-1">
+                      {formatCurrency(item.product.price)} <span className="text-[11px] font-medium text-stone-500">c/pieza</span>
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Controles de Piezas y Total de línea */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={() => updateQuantity(item.product.id, -1)}
-                      className="w-7 h-7 flex items-center justify-center bg-stone-200 hover:bg-stone-300 active:scale-90 rounded-lg text-stone-700 transition-all font-bold"
+                      className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-stone-100 hover:bg-amber-100 active:scale-90 rounded-xl text-stone-800 transition-all font-black border-2 border-stone-200 shadow-xs"
                       title="Restar 1 pieza"
                     >
-                      <Minus className="w-3.5 h-3.5" />
+                      <Minus className="w-4 h-4" />
                     </button>
 
                     {/* Input editable directo para escribir piezas (ej. 100 bolillos) */}
@@ -942,7 +951,7 @@ export default function POSPage() {
                           setExactQuantity(item.product.id, isNaN(val) ? 1 : Math.max(1, val));
                         }}
                         onFocus={(e) => e.target.select()}
-                        className="w-14 h-8 text-center font-black text-sm bg-white border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 rounded-lg focus:outline-none shadow-inner text-stone-900 selection:bg-amber-200 cursor-text"
+                        className="w-16 h-9 sm:w-18 sm:h-10 text-center font-black text-base sm:text-lg bg-white border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 rounded-xl focus:outline-none shadow-inner text-stone-900 selection:bg-amber-200 cursor-text"
                         title="Haz clic para escribir la cantidad de piezas directamente (ej. 100)"
                       />
                     </div>
@@ -950,27 +959,27 @@ export default function POSPage() {
                     <button
                       type="button"
                       onClick={() => updateQuantity(item.product.id, 1)}
-                      className="w-7 h-7 flex items-center justify-center bg-stone-200 hover:bg-stone-300 active:scale-90 rounded-lg text-stone-700 transition-all font-bold"
+                      className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-stone-100 hover:bg-amber-100 active:scale-90 rounded-xl text-stone-800 transition-all font-black border-2 border-stone-200 shadow-xs"
                       title="Sumar 1 pieza"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-4 h-4" />
                     </button>
 
-                    <span className="font-black text-xs sm:text-sm text-stone-900 min-w-[65px] text-right">
+                    <span className="font-black text-base sm:text-lg text-stone-900 min-w-[75px] text-right pl-1">
                       {formatCurrency(item.product.price * item.quantity)}
                     </span>
                   </div>
                 </div>
 
                 {/* Accesos directos de piezas para mayoreo (ej. 10, 20, 50, 100 piezas) */}
-                <div className="flex items-center gap-1.5 pt-1.5 border-t border-stone-200/60 justify-end">
-                  <span className="text-[10px] text-stone-400 font-bold mr-auto">Escribir o elegir:</span>
+                <div className="flex items-center gap-1.5 pt-2 border-t border-stone-200/80 justify-end">
+                  <span className="text-xs text-stone-500 font-extrabold mr-auto">Elegir mayoreo:</span>
                   {[10, 20, 50, 100].map((qty) => (
                     <button
                       key={qty}
                       type="button"
                       onClick={() => setExactQuantity(item.product.id, qty)}
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all active:scale-95 border ${
+                      className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all active:scale-95 border-2 ${
                         item.quantity === qty
                           ? "bg-amber-600 text-white border-amber-600 shadow-xs"
                           : "bg-white hover:bg-amber-100 text-stone-700 border-stone-200 hover:border-amber-300"
@@ -983,10 +992,10 @@ export default function POSPage() {
                   <button
                     type="button"
                     onClick={() => setExactQuantity(item.product.id, 0)}
-                    className="p-1 text-stone-400 hover:text-rose-600 rounded transition-colors ml-1"
+                    className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors ml-1"
                     title="Eliminar de la charola"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -994,14 +1003,14 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* Payment Configuration & Checkout Area */}
-        <div className="p-4 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/30 space-y-3.5 shadow-lg">
+        {/* Payment Configuration & Checkout Area (Compacta y estilizada) */}
+        <div className="p-3.5 sm:p-4 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/30 space-y-2.5 shadow-lg shrink-0">
           {/* Payment Method Selector */}
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-black text-stone-600 uppercase tracking-wider flex items-center gap-1.5">
+          <div className="space-y-1">
+            <span className="text-[10px] sm:text-[11px] font-black text-stone-600 uppercase tracking-wider flex items-center gap-1">
               <span>💳</span> Forma de Pago:
             </span>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               {[
                 { id: "efectivo", label: "Efectivo", icon: DollarSign },
                 { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
@@ -1012,14 +1021,15 @@ export default function POSPage() {
                 return (
                   <button
                     key={m.id}
+                    type="button"
                     onClick={() => setPaymentMethod(m.id as any)}
-                    className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-2xl text-xs font-black transition-all active:scale-95 duration-200 ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-xl text-xs font-black transition-all active:scale-95 duration-200 ${
                       isSelected
-                        ? "bg-gradient-to-r from-[#24130c] to-[#3d1d11] text-amber-100 shadow-md ring-2 ring-amber-500/50 scale-[1.02]"
-                        : "bg-white text-stone-700 hover:bg-amber-50/80 border-2 border-stone-200 hover:border-amber-300 shadow-xs"
+                        ? "bg-gradient-to-r from-[#24130c] to-[#3d1d11] text-amber-100 shadow-sm ring-2 ring-amber-500/50 scale-[1.01]"
+                        : "bg-white text-stone-700 hover:bg-amber-50/80 border-2 border-stone-200 hover:border-amber-300 shadow-2xs"
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${isSelected ? "text-amber-400" : "text-stone-500"}`} />
+                    <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-amber-400" : "text-stone-500"}`} />
                     <span>{m.label}</span>
                   </button>
                 );
@@ -1028,14 +1038,14 @@ export default function POSPage() {
           </div>
 
           {/* Totals Banner Premium */}
-          <div className="bg-gradient-to-br from-white via-amber-50/30 to-orange-50/30 p-4 rounded-3xl border-2 border-amber-300/80 space-y-1.5 shadow-md relative overflow-hidden">
+          <div className="bg-gradient-to-br from-white via-amber-50/30 to-orange-50/20 p-2.5 sm:p-3 rounded-2xl border-2 border-amber-300/80 space-y-1 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 w-20 h-20 bg-amber-400/10 rounded-full blur-lg pointer-events-none" />
             <div className="flex justify-between items-center text-xs font-bold text-stone-500">
               <span className="flex items-center gap-1">🥖 Subtotal ({totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}):</span>
               <span className="font-black text-stone-700">{formatCurrency(total)}</span>
             </div>
-            <div className="flex justify-between items-baseline border-t border-amber-200/80 pt-2">
-              <span className="text-sm font-black text-stone-900 tracking-wide uppercase">Total a Cobrar:</span>
+            <div className="flex justify-between items-baseline border-t border-amber-200/80 pt-1.5">
+              <span className="text-xs sm:text-sm font-black text-stone-900 tracking-wide uppercase">Total a Cobrar:</span>
               <span className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-amber-700 via-amber-800 to-orange-600 bg-clip-text text-transparent">
                 {formatCurrency(total)}
               </span>
@@ -1044,30 +1054,30 @@ export default function POSPage() {
 
           {/* Cash Handling with Quick Denominations */}
           {paymentMethod === "efectivo" && (
-            <div className="space-y-2.5 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 p-4 rounded-3xl border-2 border-amber-300 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="space-y-2 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 p-2.5 sm:p-3 rounded-2xl border-2 border-amber-300 shadow-2xs animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-black text-stone-900 flex items-center gap-1">
+                <label className="text-[11px] font-black text-stone-900 flex items-center gap-1">
                   <span>💵</span> Paga con ($ Efectivo):
                 </label>
                 <button
                   type="button"
                   onClick={handleExactCash}
                   disabled={cart.length === 0}
-                  className="px-2.5 py-1 rounded-xl bg-amber-200/70 hover:bg-amber-300 text-amber-950 text-[11px] font-black transition-all active:scale-95 shadow-xs"
+                  className="px-2 py-0.5 rounded-lg bg-amber-200/80 hover:bg-amber-300 text-amber-950 text-[10px] font-black transition-all active:scale-95 shadow-2xs"
                 >
                   ⚡ Cobro Exacto
                 </button>
               </div>
 
               {/* Quick Bill Buttons */}
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className="grid grid-cols-5 gap-1">
                 {QUICK_DENOMINATIONS.map((bill) => (
                   <button
                     key={bill}
                     type="button"
                     onClick={() => handleQuickCash(bill)}
                     disabled={cart.length === 0}
-                    className="py-2.5 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-xs rounded-xl border-2 border-amber-200 shadow-xs transition-all active:scale-95 hover:scale-105 hover:shadow-md"
+                    className="py-1.5 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-xs rounded-xl border border-amber-200 shadow-2xs transition-all active:scale-95 hover:scale-105"
                   >
                     ${bill}
                   </button>
@@ -1080,20 +1090,20 @@ export default function POSPage() {
                 placeholder="O teclea la cantidad recibida..."
                 value={cashGiven}
                 onChange={(e) => setCashGiven(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-4 focus:ring-amber-400/20 text-sm font-black text-stone-900 focus:outline-none shadow-inner transition-all placeholder:text-stone-400 placeholder:font-normal"
+                className="w-full px-3 py-1.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/20 text-xs sm:text-sm font-black text-stone-900 focus:outline-none shadow-inner transition-all placeholder:text-stone-400"
               />
 
               {/* Change Display */}
               {parsedCashGiven > 0 && (
-                <div className={`flex justify-between items-center p-3 rounded-2xl text-xs font-black border-2 transition-all shadow-md animate-in zoom-in-95 duration-200 ${
+                <div className={`flex justify-between items-center p-2 sm:p-2.5 rounded-xl text-xs font-black border-2 transition-all shadow-xs ${
                   parsedCashGiven >= total
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-400 shadow-emerald-600/20"
-                    : "bg-gradient-to-r from-rose-600 to-red-600 text-white border-rose-400 shadow-rose-600/20"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-400"
+                    : "bg-gradient-to-r from-rose-600 to-red-600 text-white border-rose-400"
                 }`}>
-                  <span className="flex items-center gap-1.5 text-xs tracking-wide">
-                    {parsedCashGiven >= total ? "🟢 Cambio a Entregar:" : "🔴 Falta por cubrir:"}
+                  <span className="flex items-center gap-1 text-[11px] tracking-wide">
+                    {parsedCashGiven >= total ? "🟢 Cambio:" : "🔴 Falta:"}
                   </span>
-                  <span className="text-lg font-black drop-shadow-xs">
+                  <span className="text-base sm:text-lg font-black drop-shadow-xs">
                     {parsedCashGiven >= total ? formatCurrency(change) : formatCurrency(total - parsedCashGiven)}
                   </span>
                 </div>
@@ -1102,27 +1112,29 @@ export default function POSPage() {
           )}
 
           {/* Actions */}
-          <div className="grid grid-cols-3 gap-2.5 pt-1">
+          <div className="grid grid-cols-3 gap-2 pt-0.5">
             <button
+              type="button"
               onClick={() => {
                 setCart([]);
                 setCashGiven("");
               }}
               disabled={cart.length === 0}
-              className="px-3 py-4 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 border-2 border-stone-200 transition-all active:scale-95 shadow-xs"
+              className="px-2 py-3 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-xl text-xs flex items-center justify-center gap-1 border-2 border-stone-200 transition-all active:scale-95 shadow-2xs"
             >
               <Trash2 className="w-4 h-4" /> Cancelar
             </button>
             <button
+              type="button"
               onClick={handleCheckout}
               disabled={cart.length === 0 || !isPaymentValid || isSubmitting}
-              className={`col-span-2 py-4 rounded-2xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 shadow-lg ${
+              className={`col-span-2 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
                 cart.length > 0 && isPaymentValid && !isSubmitting
-                  ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 border-2 border-amber-300/70 ring-2 ring-amber-400/40"
+                  ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border-2 border-amber-300/70 ring-2 ring-amber-400/40"
                   : "bg-stone-200 text-stone-400 border-2 border-stone-300/60 opacity-60 cursor-not-allowed"
               }`}
             >
-              <CheckCircle className={`w-5 h-5 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
+              <CheckCircle className={`w-4 h-4 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
               <span>{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
             </button>
           </div>
