@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🥖 Panaderías Brito - Punto de Venta Web</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React 18 & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel for JSX in browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Google Fonts: Montserrat & Playfair -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          },
+          colors: {
+            brito: {
+              orange: '#f97316',
+              crimson: '#e11d48',
+              dark: '#1c1917',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #f5f5f4;
+      font-family: 'Montserrat', sans-serif;
+    }
+    
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+      #printable-ticket, #printable-ticket * {
+        visibility: visible !important;
+      }
+      #printable-ticket {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 80mm !important;
+        margin: 0 !important;
+        padding: 8px !important;
+        background: white !important;
+        color: black !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-stone-100 text-stone-900 select-none">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    const PRODUCTS_DATA = [
+      {
+        id: "1",
+        name: "Concha de Vainilla",
+        price: 12,
+        category: "pan_dulce",
+        icon: "🥖",
+        stock: 50,
+        tag: "Tradicional",
+        description: "Esponjosa y suave con costra crujiente de azúcar y vainilla natural.",
+        image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "2",
+        name: "Concha de Chocolate",
+        price: 12,
+        category: "pan_dulce",
+        icon: "🍫",
+        stock: 40,
+        tag: "Favorito",
+        description: "Masa fina aromatizada con cacao selecto y cubierta crujiente chocolatosa.",
+        image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "3",
+        name: "Cuerno de Mantequilla",
+        price: 15,
+        category: "pan_dulce",
+        icon: "🥐",
+        stock: 30,
+        tag: "Artesanal",
+        description: "Hojaldre 100% mantequilla pura de vaca, dorado y crujiente por capas.",
+        image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "4",
+        name: "Bolillo Tradicional",
+        price: 5,
+        category: "pan_blanco",
+        icon: "🍞",
+        stock: 150,
+        tag: "Recién Salido",
+        description: "Corteza dorada crujiente y migajón esponjoso, horneado en piso de piedra.",
+        image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "5",
+        name: "Telera para Torta",
+        price: 6,
+        category: "pan_blanco",
+        icon: "🥪",
+        stock: 100,
+        tag: "De la Casa",
+        description: "Pan suave y dorado en tres secciones, el clásico para tortas mexicanas.",
+        image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "6",
+        name: "Oreja Hojaldrada",
+        price: 14,
+        category: "pan_dulce",
+        icon: "🥨",
+        stock: 35,
+        tag: "Crujiente",
+        description: "Hojaldre finamente caramelizado al horno con mantequilla y azúcar.",
+        image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "7",
+        name: "Dona Glaseada",
+        price: 13,
+        category: "pan_dulce",
+        icon: "🍩",
+        stock: 30,
+        tag: "Más Vendido",
+        description: "Masa esponjada frita a punto exacto con glaseado clásico brillante.",
+        image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "8",
+        name: "Rebanada Pastel 3 Leches",
+        price: 45,
+        category: "pasteleria",
+        icon: "🍰",
+        stock: 20,
+        tag: "Gourmet",
+        description: "Bizcocho húmedo bañado en infusión de tres leches y fresa fresca.",
+        image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "9",
+        name: "Pay de Queso con Zarzamora",
+        price: 40,
+        category: "pasteleria",
+        icon: "🥧",
+        stock: 15,
+        tag: "Especialidad",
+        description: "Base crujiente de galleta con suave crema de queso y zarzamora silvestre.",
+        image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "10",
+        name: "Café de Olla Caliente",
+        price: 25,
+        category: "bebidas",
+        icon: "☕",
+        stock: 60,
+        tag: "Calientito",
+        description: "Café de grano selecto colado con canela criolla y toque de piloncillo.",
+        image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "11",
+        name: "Pan de Muerto Tradicional",
+        price: 20,
+        category: "temporada",
+        icon: "✨",
+        stock: 50,
+        tag: "Temporada",
+        description: "Aromatizado con flor de azahar y naranja, espolvoreado con azúcar fina.",
+        image: "https://images.unsplash.com/photo-1621236378699-8597fee6a1ce?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "12",
+        name: "Empanada de Calabaza",
+        price: 16,
+        category: "pan_dulce",
+        icon: "🥟",
+        stock: 25,
+        tag: "Rellena",
+        description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
+        image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+      }
+    ];
+
+    const CATEGORIES = [
+      { id: "all", label: "Todo el Pan" },
+      { id: "pan_dulce", label: "Pan Dulce Tradicional" },
+      { id: "pan_blanco", label: "Bolillo & Telera" },
+      { id: "pasteleria", label: "Pasteles & Pays" },
+      { id: "bebidas", label: "Café & Bebidas" },
+      { id: "temporada", label: "Temporada" },
+    ];
+
+    function formatCurrency(amount) {
+      return new Intl.NumberFormat("es-MX", {
+        style: "currency",
+        currency: "MXN",
+      }).format(amount || 0);
+    }
+
+    function App() {
+      const [products, setProducts] = useState(() => {
+        const saved = localStorage.getItem("brito_products");
+        return saved ? JSON.parse(saved) : PRODUCTS_DATA;
+      });
+
+      const [cart, setCart] = useState([]);
+      const [selectedCategory, setSelectedCategory] = useState("all");
+      const [search, setSearch] = useState("");
+      const [paymentMethod, setPaymentMethod] = useState("efectivo");
+      const [cashGiven, setCashGiven] = useState("");
+      
+      // Shift & Expenses
+      const [cashierName, setCashierName] = useState("Don Toño Brito");
+      const [shiftName, setShiftName] = useState("Turno Matutino");
+      const [initialCashFund, setInitialCashFund] = useState(500);
+      const [expensesList, setExpensesList] = useState(() => {
+        const saved = localStorage.getItem("brito_expenses");
+        return saved ? JSON.parse(saved) : [
+          { id: "EXP-01", amount: 145, category: "limpieza", description: "2 escobas y 1 bolsa de jabón Roma para charolas", cashier: "Don Toño Brito", date: "Hoy, 09:30 AM" },
+          { id: "EXP-02", amount: 300, category: "retiro_personal", description: "Retiro para gastos personales de Don Toño", cashier: "Don Toño Brito", date: "Hoy, 11:15 AM" }
+        ];
+      });
+
+      const [salesList, setSalesList] = useState(() => {
+        const saved = localStorage.getItem("brito_sales");
+        return saved ? JSON.parse(saved) : [];
+      });
+
+      // Modals
+      const [showTicket, setShowTicket] = useState(false);
+      const [showExpenses, setShowExpenses] = useState(false);
+      const [showDrawerModal, setShowDrawerModal] = useState(false);
+      const [completedSale, setCompletedSale] = useState(null);
+
+      // Save state to localStorage
+      useEffect(() => {
+        localStorage.setItem("brito_products", JSON.stringify(products));
+      }, [products]);
+
+      useEffect(() => {
+        localStorage.setItem("brito_expenses", JSON.stringify(expensesList));
+      }, [expensesList]);
+
+      useEffect(() => {
+        localStorage.setItem("brito_sales", JSON.stringify(salesList));
+      }, [salesList]);
+
+      // Filter products
+      const filtered = useMemo(() => {
+        return products.filter((p) => {
+          const matchCat = selectedCategory === "all" || p.category === selectedCategory;
+          const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+                              (p.description && p.description.toLowerCase().includes(search.toLowerCase()));
+          return matchCat && matchSearch;
+        });
+      }, [products, selectedCategory, search]);
+
+      const addToCart = (product) => {
+        if (product.stock <= 0) return;
+        setCart((prev) => {
+          const exist = prev.find((i) => i.product.id === product.id);
+          if (exist) {
+            if (exist.quantity >= product.stock) return prev;
+            return prev.map((i) => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
+          }
+          return [...prev, { product, quantity: 1 }];
+        });
+      };
+
+      const updateQty = (id, delta) => {
+        const prod = products.find((p) => p.id === id);
+        setCart((prev) =>
+          prev.map((i) => {
+            if (i.product.id === id) {
+              const newQ = i.quantity + delta;
+              if (prod && newQ > prod.stock) return i;
+              return newQ > 0 ? { ...i, quantity: newQ } : null;
+            }
+            return i;
+          }).filter(Boolean)
+        );
+      };
+
+      const total = cart.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+      const totalPieces = cart.reduce((sum, i) => sum + i.quantity, 0);
+      const parsedCash = Number(cashGiven) || 0;
+      const change = paymentMethod === "efectivo" && parsedCash >= total ? parsedCash - total : 0;
+      const isValid = paymentMethod !== "efectivo" || parsedCash >= total;
+
+      // Balances
+      const totalCashSales = salesList.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
+      const totalExpenses = expensesList.reduce((sum, e) => sum + e.amount, 0);
+      const cashInDrawer = initialCashFund + totalCashSales - totalExpenses;
+      const totalStockVal = products.reduce((sum, p) => sum + p.stock * p.price, 0);
+      const totalPiecesInStock = products.reduce((sum, p) => sum + p.stock, 0);
+
+      const handleCheckout = () => {
+        if (cart.length === 0 || !isValid) return;
+
+        // Descontar stock
+        setProducts((prev) =>
+          prev.map((prod) => {
+            const bought = cart.find((ci) => ci.product.id === prod.id);
+            return bought ? { ...prod, stock: Math.max(0, prod.stock - bought.quantity) } : prod;
+          })
+        );
+
+        const newSale = {
+          id: `POS-${Math.floor(100000 + Math.random() * 900000)}`,
+          date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+          items: [...cart],
+          total,
+          paymentMethod,
+          cashier: cashierName,
+          cashGiven: paymentMethod === "efectivo" ? parsedCash : undefined,
+          change: paymentMethod === "efectivo" ? change : undefined,
+        };
+
+        setCompletedSale(newSale);
+        setSalesList((prev) => [newSale, ...prev]);
+        setShowTicket(true);
+      };
+
+      const resetSale = () => {
+        setCart([]);
+        setCashGiven("");
+        setShowTicket(false);
+        setCompletedSale(null);
+      };
+
+      return (
+        <div className="flex h-screen overflow-hidden bg-stone-100">
+          {/* Main POS Catalog (Left) */}
+          <div className="flex-1 flex flex-col p-6 overflow-y-auto">
+            {/* Header Controls */}
+            <div className="flex flex-col gap-4 mb-6">
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+                {/* Search */}
+                <div className="relative flex-1 max-w-md w-full">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400">🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Buscar concha, bolillo, pastel, dona..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm text-sm"
+                  />
+                </div>
+
+                {/* Quick Shift Widgets */}
+                <div className="flex items-center gap-2 flex-wrap self-end lg:self-auto">
+                  {/* Dinero en Caja / Existencias */}
+                  <button
+                    onClick={() => setShowDrawerModal(true)}
+                    className="flex items-center gap-2.5 text-xs font-black bg-gradient-to-r from-amber-950 to-stone-900 text-white hover:bg-black px-4 py-2.5 rounded-2xl shadow-md transition-all active:scale-95 border border-amber-800/80"
+                  >
+                    <span className="text-amber-400 text-base">💰</span>
+                    <div className="text-left">
+                      <span className="text-[10px] text-amber-300 block leading-tight">{cashierName} • {shiftName}</span>
+                      <span className="text-xs font-black">Caja: {formatCurrency(cashInDrawer)} | Stock: {formatCurrency(totalStockVal)}</span>
+                    </div>
+                  </button>
+
+                  {/* Gastos de Turno */}
+                  <button
+                    onClick={() => setShowExpenses(true)}
+                    className="flex items-center gap-1.5 text-xs font-black text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3.5 py-3 rounded-2xl shadow-sm transition-all active:scale-95"
+                  >
+                    <span>💸 Gastos:</span>
+                    <span className="font-extrabold text-rose-800">-{formatCurrency(totalExpenses)}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Categories Tabs */}
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`px-5 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all ${
+                      selectedCategory === cat.id
+                        ? "bg-amber-900 text-white shadow-md scale-[1.02]"
+                        : "bg-white text-stone-700 hover:bg-amber-50 border border-stone-200"
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Products Grid (El Globo Style Cards) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 pb-16">
+              {filtered.map((prod) => {
+                const isOutOfStock = prod.stock <= 0;
+                const inCart = cart.find((i) => i.product.id === prod.id);
+
+                return (
+                  <div
+                    key={prod.id}
+                    onClick={() => addToCart(prod)}
+                    className={`group bg-white rounded-3xl border border-stone-200 overflow-hidden flex flex-col justify-between transition-all duration-300 relative select-none cursor-pointer ${
+                      isOutOfStock
+                        ? "opacity-60 cursor-not-allowed bg-stone-100"
+                        : "hover:shadow-2xl hover:border-amber-400 hover:-translate-y-1 active:scale-[0.98]"
+                    }`}
+                  >
+                    {/* In-cart badge */}
+                    {inCart && (
+                      <span className="absolute top-3 right-3 z-20 bg-amber-600 text-white font-black text-xs px-2.5 py-1 rounded-full shadow-lg border-2 border-white flex items-center gap-1">
+                        🧺 {inCart.quantity} en charola
+                      </span>
+                    )}
+
+                    {/* Image Hero Container */}
+                    <div className="relative h-48 w-full overflow-hidden bg-stone-100">
+                      <img
+                        src={prod.image}
+                        alt={prod.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-80" />
+
+                      {/* Tag */}
+                      <span className="absolute top-3 left-3 z-10 bg-amber-950/80 backdrop-blur-md text-amber-200 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                        ✨ {prod.tag}
+                      </span>
+
+                      {/* Stock badge */}
+                      <span className={`absolute bottom-3 left-3 z-10 text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md ${
+                        isOutOfStock ? "bg-rose-600/90 text-white" : "bg-black/60 text-stone-100"
+                      }`}>
+                        {isOutOfStock ? "Agotado" : `Disponibles: ${prod.stock} pzas`}
+                      </span>
+                    </div>
+
+                    {/* Card Content */}
+                    <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
+                      <div>
+                        <h3 className="font-extrabold text-stone-900 text-base leading-snug group-hover:text-amber-800 transition-colors">
+                          {prod.name}
+                        </h3>
+                        <p className="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed">
+                          {prod.description}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-stone-100">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-stone-400 block leading-none">Precio</span>
+                          <span className="text-xl font-black text-amber-900">{formatCurrency(prod.price)}</span>
+                        </div>
+
+                        <button
+                          disabled={isOutOfStock}
+                          className={`flex items-center gap-1 px-4 py-2.5 rounded-2xl text-xs font-black shadow-md transition-all ${
+                            isOutOfStock
+                              ? "bg-stone-200 text-stone-400"
+                              : "bg-amber-600 group-hover:bg-amber-700 text-white active:scale-95"
+                          }`}
+                        >
+                          <span>+ Agregar</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cart & Cashier Sidebar (Right) */}
+          <div className="w-[390px] bg-white border-l border-stone-200 flex flex-col h-full shadow-2xl">
+            {/* Header */}
+            <div className="p-4 px-5 border-b border-stone-100 flex items-center justify-between bg-amber-950 text-white">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-600 rounded-xl text-lg">🥖</div>
+                <div>
+                  <h3 className="font-bold text-sm leading-tight">Charola de Cobro</h3>
+                  <p className="text-[10px] text-amber-300/80">{cashierName} • Mostrador</p>
+                </div>
+              </div>
+              <span className="text-xs bg-amber-800/90 px-3 py-1.5 rounded-full font-extrabold text-amber-100">
+                {totalPieces} piezas
+              </span>
+            </div>
+
+            {/* Cart Items List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+              {cart.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-stone-400 text-center p-6 space-y-3">
+                  <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-3xl">🧺</div>
+                  <p className="text-sm font-bold text-stone-800">Charola vacía</p>
+                  <p className="text-xs text-stone-400 max-w-[200px]">
+                    Toca cualquier pan del catálogo para agregarlo a la cuenta.
+                  </p>
+                </div>
+              ) : (
+                cart.map((item) => (
+                  <div
+                    key={item.product.id}
+                    className="flex items-center justify-between p-3 bg-stone-50 hover:bg-amber-50/60 rounded-2xl border border-stone-200 gap-2.5"
+                  >
+                    <img
+                      src={item.product.image}
+                      alt={item.product.name}
+                      className="w-11 h-11 object-cover rounded-xl shrink-0 border border-stone-200"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-xs text-stone-900 leading-tight truncate">{item.product.name}</p>
+                      <p className="text-[11px] text-amber-800 font-semibold mt-0.5">{formatCurrency(item.product.price)} c/u</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => updateQty(item.product.id, -1)}
+                        className="w-7 h-7 bg-white hover:bg-stone-200 border rounded-lg font-black text-xs text-stone-700"
+                      >
+                        -
+                      </button>
+                      <span className="font-black text-xs w-5 text-center">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQty(item.product.id, 1)}
+                        className="w-7 h-7 bg-white hover:bg-stone-200 border rounded-lg font-black text-xs text-stone-700"
+                      >
+                        +
+                      </button>
+                      <span className="font-black text-xs text-stone-900 w-14 text-right">
+                        {formatCurrency(item.product.price * item.quantity)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Payment Summary Area */}
+            <div className="p-4 border-t border-stone-200 bg-stone-50/95 space-y-3">
+              {/* Method Selector */}
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Forma de Pago:</span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: "efectivo", label: "💵 Efectivo" },
+                    { id: "tarjeta", label: "💳 Tarjeta" },
+                    { id: "transferencia", label: "📱 Transfer." },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setPaymentMethod(m.id)}
+                      className={`py-2 rounded-xl text-xs font-extrabold transition-all ${
+                        paymentMethod === m.id
+                          ? "bg-amber-900 text-white shadow-md"
+                          : "bg-white text-stone-700 border border-stone-200 hover:bg-stone-100"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total Banner */}
+              <div className="bg-white p-3 rounded-2xl border border-stone-200 space-y-1 shadow-sm">
+                <div className="flex justify-between items-center text-xs font-medium text-stone-500">
+                  <span>Subtotal ({totalPieces} pzas):</span>
+                  <span>{formatCurrency(total)}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg font-black text-stone-900 border-t border-stone-100 pt-1">
+                  <span>Total a Cobrar:</span>
+                  <span className="text-amber-800">{formatCurrency(total)}</span>
+                </div>
+              </div>
+
+              {/* Cash Billetes */}
+              {paymentMethod === "efectivo" && (
+                <div className="space-y-2 bg-amber-50/80 p-3 rounded-2xl border border-amber-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold text-stone-800">Paga con ($ Efectivo):</label>
+                    <button
+                      onClick={() => setCashGiven(total.toString())}
+                      disabled={cart.length === 0}
+                      className="text-[11px] font-black text-amber-800 hover:underline"
+                    >
+                      Cobro Exacto
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-5 gap-1">
+                    {[20, 50, 100, 200, 500].map((bill) => (
+                      <button
+                        key={bill}
+                        onClick={() => setCashGiven(bill.toString())}
+                        disabled={cart.length === 0}
+                        className="py-1.5 bg-white hover:bg-amber-700 hover:text-white text-stone-900 font-black text-xs rounded-lg border border-amber-200 shadow-sm"
+                      >
+                        ${bill}
+                      </button>
+                    ))}
+                  </div>
+
+                  <input
+                    type="number"
+                    placeholder="O teclea cantidad..."
+                    value={cashGiven}
+                    onChange={(e) => setCashGiven(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white rounded-xl border border-amber-300 text-xs font-black text-stone-900 focus:outline-none"
+                  />
+
+                  {parsedCash > 0 && (
+                    <div className={`flex justify-between items-center p-2 rounded-xl text-xs font-black border ${
+                      parsedCash >= total ? "bg-emerald-100 text-emerald-950 border-emerald-300" : "bg-rose-100 text-rose-900 border-rose-300"
+                    }`}>
+                      <span>{parsedCash >= total ? "Cambio a Entregar:" : "Falta dinero:"}</span>
+                      <span className="text-sm">{parsedCash >= total ? formatCurrency(change) : formatCurrency(total - parsedCash)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <button
+                  onClick={() => { setCart([]); setCashGiven(""); }}
+                  disabled={cart.length === 0}
+                  className="py-3 bg-stone-200 hover:bg-stone-300 disabled:opacity-40 text-stone-700 font-bold rounded-2xl text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCheckout}
+                  disabled={cart.length === 0 || !isValid}
+                  className="col-span-2 py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-black rounded-2xl text-xs shadow-lg active:scale-95"
+                >
+                  Cobrar & Ticket 🖨️
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* TICKET MODAL */}
+          {showTicket && completedSale && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="bg-amber-950 text-amber-100 p-4 px-6 flex items-center justify-between">
+                  <span className="font-bold text-sm">🧾 Comprobante de Venta</span>
+                  <button onClick={resetSale} className="text-xl font-bold hover:text-white">✕</button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 bg-stone-100">
+                  <div id="printable-ticket" className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm font-mono text-xs text-stone-800 space-y-3 max-w-xs mx-auto">
+                    <div className="text-center border-b border-dashed border-stone-300 pb-3">
+                      <div className="text-2xl mb-1">🥖</div>
+                      <h2 className="font-black text-sm uppercase">PANADERÍAS BRITO</h2>
+                      <p className="text-[10px] text-stone-500 font-sans">Don Antonio Brito & Hijos</p>
+                      <p className="text-[10px] text-stone-400 font-sans">El auténtico sabor tradicional</p>
+                    </div>
+
+                    <div className="text-[11px] space-y-0.5 border-b border-dashed border-stone-300 pb-2">
+                      <div className="flex justify-between"><span>FOLIO:</span><span className="font-bold">#{completedSale.id}</span></div>
+                      <div className="flex justify-between"><span>FECHA:</span><span>{completedSale.date}</span></div>
+                      <div className="flex justify-between"><span>CAJERO:</span><span>{completedSale.cashier}</span></div>
+                      <div className="flex justify-between"><span>MÉTODO:</span><span className="uppercase font-bold">{completedSale.paymentMethod}</span></div>
+                    </div>
+
+                    <div className="space-y-1.5 border-b border-dashed border-stone-300 pb-2">
+                      <div className="flex justify-between text-[10px] font-bold text-stone-400">
+                        <span>CANT / PRODUCTO</span>
+                        <span>IMPORTE</span>
+                      </div>
+                      {completedSale.items.map((i, idx) => (
+                        <div key={idx} className="flex justify-between text-[11px]">
+                          <span>{i.quantity}x {i.product.name}</span>
+                          <span className="font-bold">{formatCurrency(i.product.price * i.quantity)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="space-y-1 pt-1 text-[11px]">
+                      <div className="flex justify-between text-sm font-black text-stone-900 border-t border-dashed border-stone-300 pt-1.5">
+                        <span>TOTAL:</span>
+                        <span className="text-amber-800">{formatCurrency(completedSale.total)}</span>
+                      </div>
+                      {completedSale.paymentMethod === "efectivo" && (
+                        <>
+                          <div className="flex justify-between text-stone-500"><span>Efectivo:</span><span>{formatCurrency(completedSale.cashGiven)}</span></div>
+                          <div className="flex justify-between text-emerald-700 font-bold"><span>CAMBIO:</span><span>{formatCurrency(completedSale.change)}</span></div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="text-center pt-2 text-[9px] text-stone-400 font-sans">
+                      <p className="font-bold text-stone-700">¡GRACIAS POR SU COMPRA!</p>
+                      <p>Pan calientito todos los días</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white border-t border-stone-200 flex gap-3">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex-1 py-3 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs"
+                  >
+                    🖨️ Imprimir Ticket
+                  </button>
+                  <button
+                    onClick={resetSale}
+                    className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs"
+                  >
+                    ✓ Siguiente Cliente
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* GASTOS MODAL */}
+          {showExpenses && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="bg-amber-950 text-white p-4 px-6 flex items-center justify-between">
+                  <span className="font-bold text-sm">💸 Gastos y Salidas de Efectivo</span>
+                  <button onClick={() => setShowExpenses(false)} className="text-xl font-bold hover:text-white">✕</button>
+                </div>
+
+                <div className="p-5 overflow-y-auto space-y-4">
+                  {/* Summary bar */}
+                  <div className="grid grid-cols-3 bg-stone-50 border p-3 rounded-2xl text-center text-xs">
+                    <div>
+                      <span className="text-[10px] text-stone-500 font-bold block">Ventas Efectivo</span>
+                      <span className="font-black text-emerald-700 text-sm">{formatCurrency(totalCashSales)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-rose-700 font-bold block">Gastos / Salidas</span>
+                      <span className="font-black text-rose-700 text-sm">-{formatCurrency(totalExpenses)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-amber-900 font-black block">Efectivo en Caja</span>
+                      <span className="font-black text-stone-900 text-sm">{formatCurrency(cashInDrawer)}</span>
+                    </div>
+                  </div>
+
+                  {/* Form */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const form = e.target;
+                      const amt = Number(form.amount.value);
+                      const desc = form.desc.value;
+                      const cat = form.category.value;
+                      if (!amt || !desc) return;
+
+                      setExpensesList((prev) => [
+                        {
+                          id: `EXP-${Math.floor(1000 + Math.random() * 9000)}`,
+                          amount: amt,
+                          category: cat,
+                          description: desc,
+                          cashier: cashierName,
+                          date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
+                        },
+                        ...prev
+                      ]);
+                      form.reset();
+                    }}
+                    className="p-4 bg-stone-50 rounded-2xl border space-y-3 text-xs"
+                  >
+                    <span className="font-bold text-stone-700 block">Registrar Nueva Salida:</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input name="amount" type="number" required placeholder="Monto ($ MXN)" className="p-2 border rounded-xl font-bold" />
+                      <select name="category" className="p-2 border rounded-xl font-bold">
+                        <option value="limpieza">🧹 Limpieza (Jabón / Escoba)</option>
+                        <option value="retiro_personal">👤 Retiro Don Toño / Personal</option>
+                        <option value="insumos_menores">📦 Insumos / Gas / Hielo</option>
+                        <option value="proveedor">🚚 Pago a Proveedor Menor</option>
+                      </select>
+                    </div>
+                    <input name="desc" type="text" required placeholder="Motivo exacto del gasto..." className="w-full p-2 border rounded-xl font-medium" />
+                    <button type="submit" className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs">
+                      Guardar Salida de Dinero
+                    </button>
+                  </form>
+
+                  {/* List */}
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold text-stone-600 block">Historial de Salidas del Turno:</span>
+                    {expensesList.map((exp) => (
+                      <div key={exp.id} className="p-3 bg-stone-50 rounded-xl border flex justify-between items-center text-xs">
+                        <div>
+                          <p className="font-bold text-stone-800">{exp.description}</p>
+                          <p className="text-[10px] text-stone-400">{exp.category} • {exp.date} • {exp.cashier}</p>
+                        </div>
+                        <span className="font-black text-rose-600 text-sm">-{formatCurrency(exp.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CASH DRAWER & SHIFT MODAL */}
+          {showDrawerModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="bg-amber-950 text-white p-4 px-6 flex items-center justify-between">
+                  <span className="font-bold text-sm">💰 Estado de Caja, Existencias & Turno</span>
+                  <button onClick={() => setShowDrawerModal(false)} className="text-xl font-bold hover:text-white">✕</button>
+                </div>
+
+                <div className="p-6 overflow-y-auto space-y-4">
+                  {/* Operator & Shift */}
+                  <div className="flex gap-3 bg-stone-50 p-3 rounded-2xl border text-xs">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-bold text-stone-500 block">Cajero en Turno:</label>
+                      <select value={cashierName} onChange={(e) => setCashierName(e.target.value)} className="p-1.5 border rounded-xl font-bold w-full bg-white">
+                        <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
+                        <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
+                        <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
+                        <option value="María Brito">María Brito</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] font-bold text-stone-500 block">Turno:</label>
+                      <select value={shiftName} onChange={(e) => setShiftName(e.target.value)} className="p-1.5 border rounded-xl font-bold w-full bg-white">
+                        <option value="Turno Matutino">Turno Matutino (06:00 - 14:00)</option>
+                        <option value="Turno Vespertino">Turno Vespertino (14:00 - 22:00)</option>
+                        <option value="Turno Completo">Turno Completo</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* 3 Metric Cards */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-amber-950 text-white p-4 rounded-2xl space-y-1 shadow-md">
+                      <span className="text-[10px] text-amber-300 font-bold block uppercase">Dinero en Caja</span>
+                      <p className="text-2xl font-black text-white">{formatCurrency(cashInDrawer)}</p>
+                      <p className="text-[9px] text-amber-200">Efectivo físico en cajón</p>
+                    </div>
+
+                    <div className="bg-rose-900 text-white p-4 rounded-2xl space-y-1 shadow-md">
+                      <span className="text-[10px] text-rose-300 font-bold block uppercase">Dinero Gastado</span>
+                      <p className="text-2xl font-black text-white">{formatCurrency(totalExpenses)}</p>
+                      <p className="text-[9px] text-rose-200">{expensesList.length} salidas</p>
+                    </div>
+
+                    <div className="bg-emerald-900 text-white p-4 rounded-2xl space-y-1 shadow-md">
+                      <span className="text-[10px] text-emerald-300 font-bold block uppercase">En Existencia</span>
+                      <p className="text-2xl font-black text-white">{formatCurrency(totalStockVal)}</p>
+                      <p className="text-[9px] text-emerald-200">{totalPiecesInStock} piezas en mostrador</p>
+                    </div>
+                  </div>
+
+                  {/* Detail */}
+                  <div className="p-4 bg-stone-50 rounded-2xl border space-y-2 text-xs">
+                    <span className="font-extrabold text-stone-800 block">Arqueo de Efectivo:</span>
+                    <div className="flex justify-between"><span>🪙 Fondo de Caja Inicial:</span><span className="font-bold">{formatCurrency(initialCashFund)}</span></div>
+                    <div className="flex justify-between text-emerald-800"><span>📈 (+) Ventas en Efectivo:</span><span className="font-bold">+{formatCurrency(totalCashSales)}</span></div>
+                    <div className="flex justify-between text-rose-700"><span>🔻 (-) Salidas y Gastos:</span><span className="font-bold">-{formatCurrency(totalExpenses)}</span></div>
+                    <div className="flex justify-between text-sm font-black border-t pt-2 text-amber-900">
+                      <span>DINERO FÍSICO EN CAJÓN:</span>
+                      <span>{formatCurrency(cashInDrawer)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white border-t flex justify-end">
+                  <button onClick={() => setShowDrawerModal(false)} className="px-6 py-2.5 bg-amber-600 text-white font-bold rounded-xl text-xs">
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
