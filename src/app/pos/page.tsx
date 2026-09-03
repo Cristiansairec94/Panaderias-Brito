@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   Search, 
   Trash2, 
@@ -479,12 +479,30 @@ export default function POSPage() {
     setCompletedSale(null);
   };
 
+  const catalogScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollToTop = () => {
+    catalogScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const scrollToBottom = () => {
+    if (catalogScrollRef.current) {
+      catalogScrollRef.current.scrollTo({
+        top: catalogScrollRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  };
+
   const activeCategory = CATEGORIES.find((c) => c.id === selectedCategory);
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-stone-100/70">
-      {/* Product Catalog Area (Main) */}
-      <div className="flex-1 flex flex-col min-w-0 p-4 lg:p-5 overflow-y-auto">
+      {/* Product Catalog Area (Main) con espacio y scrollbar estilizado */}
+      <div 
+        ref={catalogScrollRef}
+        className="flex-1 flex flex-col min-w-0 p-4 lg:p-5 pr-3 sm:pr-4 overflow-y-auto scroll-smooth relative"
+      >
         {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y tapando las imágenes de atrás) */}
         <div className={`sticky top-0 z-30 -mt-4 -mx-4 px-4 py-3 lg:-mt-5 lg:-mx-5 lg:px-5 lg:py-3.5 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-3 pb-4 mb-4" : "mb-5"}`}>
           <div className="flex items-center justify-between gap-3 w-full">
@@ -817,6 +835,29 @@ export default function POSPage() {
               </div>
             );
           })}
+        </div>
+
+        {/* Widget Flotante Estilizado para Bajar y Subir la Página de Pan */}
+        <div className="sticky bottom-5 self-end mr-1 flex flex-col items-center gap-1.5 z-20 pointer-events-auto bg-[#2d1810]/90 hover:bg-[#2d1810] p-1.5 rounded-2xl shadow-xl border-2 border-amber-500/40 backdrop-blur-md transition-all">
+          <button
+            type="button"
+            onClick={scrollToTop}
+            className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:scale-90 text-stone-950 flex items-center justify-center transition-all shadow-md group"
+            title="Subir al inicio del catálogo de pan"
+          >
+            <ChevronUp className="w-5 h-5 stroke-[2.5] group-hover:-translate-y-0.5 transition-transform" />
+          </button>
+          <span className="text-[9px] font-mono font-black text-amber-200 tracking-wider uppercase select-none px-1">
+            PAN
+          </span>
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:scale-90 text-stone-950 flex items-center justify-center transition-all shadow-md group"
+            title="Bajar al final del catálogo de pan"
+          >
+            <ChevronDown className="w-5 h-5 stroke-[2.5] group-hover:translate-y-0.5 transition-transform" />
+          </button>
         </div>
       </div>
 
