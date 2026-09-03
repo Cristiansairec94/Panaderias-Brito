@@ -427,9 +427,10 @@
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Fila 2: Tarjeta CATEGORÍAS Y PRECIOS */}
-              <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-stone-200 shadow-xs space-y-2.5">
+            {/* Fila 2: Tarjeta CATEGORÍAS Y PRECIOS (En flujo normal, nunca tapa imágenes) */}
+            <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-stone-200 shadow-xs space-y-2.5 mb-5 shrink-0">
                 {/* Cabecera */}
                 <div className="flex items-center justify-between pb-2 border-b border-stone-100">
                   <div className="flex items-center gap-2">
@@ -525,7 +526,6 @@
                   </div>
                 )}
               </div>
-            </div>
 
             {/* Products Grid (Intuitive Price Cards with Images) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12">
