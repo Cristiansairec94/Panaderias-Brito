@@ -229,30 +229,30 @@ export default function CashDrawerShiftModal({
           </button>
         </div>
 
-        {/* Tabs de Navegación */}
-        <div className="flex border-b border-stone-200 bg-stone-100/80 p-1.5 gap-2 px-6">
+        {/* Tabs de Navegación Grandes e Intuitivos */}
+        <div className="grid grid-cols-2 gap-3 p-3 bg-stone-100 border-b border-stone-200">
           <button
             onClick={() => { setActiveTab("cuentas"); setShowCutSuccess(false); }}
-            className={`flex-1 py-3 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 ${
+            className={`py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-xs ${
               activeTab === "cuentas" && !showCutSuccess
-                ? "bg-white text-stone-900 shadow-sm border border-stone-200"
-                : "text-stone-600 hover:text-stone-900"
+                ? "bg-[#2d1810] text-white shadow-md ring-2 ring-amber-500/40"
+                : "bg-white text-stone-700 hover:bg-stone-50 border border-stone-300"
             }`}
           >
-            <Receipt className="w-4 h-4 text-amber-700" />
-            <span>1. 📊 Cuentas del Turno</span>
+            <Receipt className="w-5 h-5 text-amber-400" />
+            <span>1. 📊 Ver Cuentas del Turno</span>
           </button>
 
           <button
             onClick={() => { setActiveTab("cambio"); setShowCutSuccess(false); }}
-            className={`flex-1 py-3 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 ${
+            className={`py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-xs ${
               activeTab === "cambio" && !showCutSuccess
-                ? "bg-gradient-to-r from-amber-900 to-amber-950 text-white shadow-md"
-                : "text-stone-600 hover:text-stone-900"
+                ? "bg-amber-600 text-white shadow-md ring-2 ring-amber-400"
+                : "bg-white text-stone-700 hover:bg-stone-50 border border-stone-300"
             }`}
           >
-            <UserCheck className="w-4 h-4 text-amber-400" />
-            <span>2. 🔄 Cambio de Turno & Relevo</span>
+            <UserCheck className="w-5 h-5 text-amber-600" />
+            <span>2. 🔄 Realizar Cambio de Turno</span>
           </button>
         </div>
 
@@ -421,64 +421,74 @@ export default function CashDrawerShiftModal({
               </div>
 
               {/* Lista Rápida de Ventas del Turno */}
-              <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-stone-200">
-                  <div className="flex items-center gap-1.5 text-xs font-black text-stone-900 uppercase">
+              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-stone-200">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-stone-900 uppercase">
                     <Receipt className="w-4 h-4 text-amber-700" />
                     <span>Tickets Cobrados ({sales.length})</span>
                   </div>
-                  <span className="text-[11px] font-bold text-stone-600">
+                  <span className="text-xs font-bold text-stone-600">
                     Efectivo: <strong className="text-emerald-800">{formatCurrency(cashSales)}</strong> | Tarjeta/Transf: <strong>{formatCurrency(cardSales + transferSales)}</strong>
                   </span>
                 </div>
 
                 {sales.length === 0 ? (
-                  <p className="text-xs text-stone-400 text-center py-6 font-medium">
+                  <p className="text-xs sm:text-sm text-stone-400 text-center py-6 font-medium">
                     Aún no hay ventas cobradas en este turno.
                   </p>
                 ) : (
-                  <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1 divide-y divide-stone-200">
+                  <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1 divide-y divide-stone-200">
                     {sales.map((s, idx) => (
-                      <div key={s.id || idx} className="pt-1.5 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
+                      <div key={s.id || idx} className="pt-2 flex items-center justify-between text-xs sm:text-sm">
+                        <div className="flex items-center gap-2.5">
                           <span className="font-mono font-black text-stone-900">#{s.id.slice(-5)}</span>
-                          <span className="text-stone-400 text-[11px]">{s.date.split(" ")[1] || s.date}</span>
-                          <span className="text-[10px] font-bold uppercase bg-stone-200 px-1.5 py-0.5 rounded">
+                          <span className="text-stone-400 text-xs">{s.date.split(" ")[1] || s.date}</span>
+                          <span className="text-[11px] font-bold uppercase bg-stone-200 px-2 py-0.5 rounded">
                             {s.paymentMethod}
                           </span>
-                          <span className="text-stone-600 truncate max-w-[240px] text-[11px]">
+                          <span className="text-stone-600 truncate max-w-[240px] text-xs">
                             {s.items.map((it) => `${it.quantity}x ${it.product.name}`).join(", ")}
                           </span>
                         </div>
-                        <span className="font-black text-stone-900 text-sm">{formatCurrency(s.total)}</span>
+                        <span className="font-black text-stone-900 text-sm sm:text-base">{formatCurrency(s.total)}</span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
+
+              {/* Botón Grande e Intuitivo para ir a Cambio de Turno */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("cambio")}
+                className="w-full py-4 px-6 bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 hover:from-amber-700 hover:to-amber-900 text-white font-black text-sm sm:text-base rounded-2xl shadow-lg transition-all active:scale-98 flex items-center justify-center gap-3"
+              >
+                <UserCheck className="w-5 h-5 text-amber-200" />
+                <span>¿Vas a entregar turno? Toca aquí para el Cambio de Turno ➔</span>
+              </button>
             </div>
           ) : (
-            /* PESTAÑAS 2 Y 3: CAMBIO DE TURNO O CIERRE (SÚPER RÁPIDO EN 5 SEGUNDOS) */
+            /* PESTAÑA 2: CAMBIO DE TURNO (BOTONES GRANDES Y CLAROS PARA CUALQUIER EDAD) */
             <div className="space-y-4">
               {/* Relevo Rápido: Quién entrega y Quién recibe */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3.5 bg-stone-50 rounded-2xl border border-stone-200 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-stone-50 rounded-2xl border border-stone-200">
                 <div>
-                  <label className="text-[10px] font-bold text-rose-700 uppercase block mb-1">
-                    Cajero Saliente (Entrega):
+                  <label className="text-xs font-black text-rose-700 uppercase block mb-1.5">
+                    👤 Cajero Saliente (Entrega Caja):
                   </label>
-                  <div className="p-2.5 bg-white rounded-xl border font-black text-stone-900 text-xs">
+                  <div className="p-3 bg-white rounded-xl border-2 border-stone-200 font-black text-stone-900 text-sm">
                     {outgoingCashier} ({shiftName.split(" ")[0]})
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-emerald-700 uppercase block mb-1">
-                    Cajero Entrante (Recibe Turno):
+                  <label className="text-xs font-black text-emerald-700 uppercase block mb-1.5">
+                    👤 Cajero Entrante (Recibe Turno):
                   </label>
                   <select
                     value={incomingCashier}
                     onChange={(e) => setIncomingCashier(e.target.value)}
-                    className="w-full p-2.5 bg-white border-2 border-emerald-300 rounded-xl font-black text-stone-900 text-xs focus:outline-none"
+                    className="w-full p-3 bg-white border-2 border-emerald-400 rounded-xl font-black text-stone-900 text-sm focus:outline-none shadow-xs"
                   >
                     <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
                     <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
@@ -489,52 +499,51 @@ export default function CashDrawerShiftModal({
                 </div>
               </div>
 
-              {/* Verificación de Dinero en Caja con Botón Rápido de 1 Toque */}
-              <div className="p-4 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-stone-900 uppercase">
-                    Dinero que debe haber en caja:
+              {/* Verificación de Dinero en Caja con Botón Gigante de 1 Toque */}
+              <div className="p-5 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm font-black text-stone-900 uppercase">
+                    💵 Dinero que debe haber en caja:
                   </span>
-                  <span className="text-lg font-black text-amber-950 bg-amber-200/80 px-3 py-1 rounded-xl">
+                  <span className="text-2xl font-black text-amber-950 bg-amber-200/90 px-4 py-1.5 rounded-xl self-start sm:self-auto">
                     {formatCurrency(expectedCashInDrawer)}
                   </span>
                 </div>
 
-                {/* Botón de 1 Clic para agilizar el cambio de turno */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCountedCash(expectedCashInDrawer.toString());
-                      setHasAcceptedCash(true);
-                    }}
-                    className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5"
-                  >
-                    <span>⚡ El dinero está completo ({formatCurrency(expectedCashInDrawer)})</span>
-                  </button>
-                </div>
+                {/* Botón Gigante de 1 Clic */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCountedCash(expectedCashInDrawer.toString());
+                    setHasAcceptedCash(true);
+                  }}
+                  className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-2xl text-sm sm:text-base shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
+                >
+                  <span className="text-xl">⚡</span>
+                  <span>El dinero está completo ({formatCurrency(expectedCashInDrawer)})</span>
+                </button>
 
                 {/* Input Manual de Conteo */}
-                <div>
-                  <label className="text-[11px] font-bold text-stone-700 block mb-1">
-                    O escribe el monto exacto que contaste en físico ($ MXN):
+                <div className="pt-1">
+                  <label className="text-xs font-bold text-stone-700 block mb-1.5">
+                    O escribe el monto exacto si contaste en físico otra cantidad ($ MXN):
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-base text-stone-500">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
                     <input
                       type="number"
                       step="any"
                       placeholder={expectedCashInDrawer.toString()}
                       value={countedCash}
                       onChange={(e) => setCountedCash(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2.5 bg-white rounded-xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none"
+                      className="w-full pl-9 pr-4 py-3 bg-white rounded-xl border-2 border-stone-300 focus:border-amber-600 font-black text-lg text-stone-900 focus:outline-none"
                     />
                   </div>
                 </div>
 
                 {/* Semáforo Rápido de Diferencia */}
                 {countedCash && (
-                  <div className={`p-2.5 rounded-xl border text-xs font-black flex justify-between items-center ${
+                  <div className={`p-3 rounded-xl border text-sm font-black flex justify-between items-center ${
                     cashDifference === 0
                       ? "bg-emerald-100 text-emerald-950 border-emerald-300"
                       : cashDifference > 0
@@ -548,7 +557,7 @@ export default function CashDrawerShiftModal({
                         ? "🟡 Sobrante en Caja:"
                         : "🔴 Faltante en Caja:"}
                     </span>
-                    <span>
+                    <span className="text-base font-black">
                       {cashDifference === 0
                         ? "$0.00"
                         : cashDifference > 0
@@ -559,37 +568,37 @@ export default function CashDrawerShiftModal({
                 )}
               </div>
 
-              {/* Casilla de Confirmación Directa */}
-              <div className="p-3 bg-amber-50/90 rounded-2xl border border-amber-300">
-                <label className="flex items-center gap-3 cursor-pointer select-none">
+              {/* Casilla de Confirmación Directa y Grande */}
+              <div className="p-4 bg-amber-50/90 rounded-2xl border-2 border-amber-300">
+                <label className="flex items-center gap-3.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={hasAcceptedCash}
                     onChange={(e) => setHasAcceptedCash(e.target.checked)}
-                    className="w-5 h-5 rounded accent-amber-700 cursor-pointer"
+                    className="w-6 h-6 rounded accent-amber-700 cursor-pointer shrink-0"
                   />
-                  <span className="text-xs font-black text-stone-900">
-                    Yo, {incomingCashier}, confirmo que conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y acepto la caja.
+                  <span className="text-xs sm:text-sm font-black text-stone-900 leading-snug">
+                    Yo, <strong>{incomingCashier}</strong>, confirmo que conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y acepto la caja.
                   </span>
                 </label>
               </div>
 
-              {/* Botón de Acción Directo */}
+              {/* Botón de Acción Directo y Gigante */}
               <div>
                 <button
                   type="button"
                   onClick={handleExecuteShiftCut}
                   disabled={!countedCash || !hasAcceptedCash || isFinalizing}
-                  className="w-full py-4 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                  className="w-full py-4 sm:py-5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-base sm:text-lg shadow-xl transition-all active:scale-98 flex items-center justify-center gap-3"
                 >
-                  <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+                  <CheckCircle2 className="w-6 h-6 text-emerald-200 shrink-0" />
                   <span>
-                    {isFinalizing ? "Aceptando Turno..." : `✅ Aceptar Turno y Continuar (${incomingCashier})`}
+                    {isFinalizing ? "Aceptando Turno..." : `✅ ACEPTAR TURNO Y COMENZAR (${incomingCashier})`}
                   </span>
                 </button>
                 {(!countedCash || !hasAcceptedCash) && (
-                  <p className="text-[11px] text-center text-amber-800 font-bold mt-1.5">
-                    👉 Toca "El dinero está completo" o ingresa el conteo para aceptar el turno.
+                  <p className="text-xs text-center text-amber-900 font-black mt-2">
+                    👉 Toca el botón naranja "El dinero está completo" para aceptar el turno al instante.
                   </p>
                 )}
               </div>
@@ -598,13 +607,13 @@ export default function CashDrawerShiftModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-white border-t border-stone-200 flex items-center justify-between">
-          <span className="text-xs font-medium text-stone-500">
+        <div className="p-4 px-6 bg-white border-t border-stone-200 flex items-center justify-between">
+          <span className="text-xs font-bold text-stone-500">
             Panaderías Brito • Sucursal Matriz
           </span>
           <button
             onClick={onClose}
-            className="px-5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors"
+            className="px-6 py-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-xl text-xs sm:text-sm transition-colors"
           >
             Cerrar Ventana
           </button>
