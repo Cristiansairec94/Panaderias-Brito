@@ -536,7 +536,7 @@ export default function POSPage() {
               <div className="flex items-center justify-between pb-3 border-b border-stone-100">
                 <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
                   <Layers className="w-4 h-4 text-amber-600" />
-                  <span>Categorías y Precios</span>
+                  <span>Categorías</span>
                 </h3>
                 <div className="flex items-center gap-2">
                   {selectedCategory !== "all" && (
@@ -545,7 +545,7 @@ export default function POSPage() {
                       onClick={() => setSelectedCategory("all")}
                       className="text-xs font-black text-amber-800 hover:text-amber-950 px-3 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors"
                     >
-                      Mostrar Todos los Precios
+                      Mostrar Todas las Categorías
                     </button>
                   )}
                   <button
