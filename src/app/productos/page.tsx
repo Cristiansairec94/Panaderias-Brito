@@ -10,7 +10,8 @@ import {
   Upload, 
   X, 
   Check, 
-  AlertTriangle, 
+  AlertTriangle,
+  AlertCircle,
   Croissant, 
   Package, 
   Layers, 
@@ -42,13 +43,14 @@ export default function ProductosPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
-  // Modals state
+  // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Delete modal state
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Success toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -210,13 +212,29 @@ export default function ProductosPage() {
     }
   };
 
-  // Delete product confirm
+  // Delete product handlers
+  const handleOpenDelete = (product: Product) => {
+    setDeletingProduct(product);
+    setDeleteConfirmText("");
+  };
+
   const handleConfirmDelete = () => {
     if (!deletingProduct) return;
+    const clean = deleteConfirmText.trim().toLowerCase();
+    if (clean === "no") {
+      setDeletingProduct(null);
+      setDeleteConfirmText("");
+      return;
+    }
+    if (clean !== "si" && clean !== "sí") {
+      alert("Por favor escribe 'si' para confirmar o 'no' para cancelar.");
+      return;
+    }
     deleteProduct(deletingProduct.id);
     setProducts(getStoredProducts());
     showToast(`Producto "${deletingProduct.name}" eliminado del catálogo.`);
     setDeletingProduct(null);
+    setDeleteConfirmText("");
   };
 
   const getCategoryBadge = (cat: Product["category"]) => {
@@ -534,7 +552,7 @@ export default function ProductosPage() {
                       <Edit3 className="w-3.5 h-3.5" /> Editar
                     </button>
                     <button
-                      onClick={() => setDeletingProduct(product)}
+                      onClick={() => handleOpenDelete(product)}
                       className="p-2 bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-500 rounded-xl transition-colors"
                       title="Eliminar producto"
                     >
@@ -630,7 +648,7 @@ export default function ProductosPage() {
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => setDeletingProduct(product)}
+                            onClick={() => handleOpenDelete(product)}
                             className="p-1.5 bg-stone-100 hover:bg-rose-100 text-stone-500 hover:text-rose-600 rounded-lg transition-colors"
                             title="Eliminar"
                           >
@@ -923,35 +941,95 @@ export default function ProductosPage() {
         </div>
       )}
 
-      {/* Modal: Confirmar Eliminación */}
+      {/* Modal: Confirmar Eliminación con "si" o "no" */}
       {deletingProduct && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
-            <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-2xl">
-              <Trash2 className="w-7 h-7" />
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
+            <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-3xl shadow-inner">
+              <Trash2 className="w-8 h-8" />
             </div>
 
-            <div className="space-y-1">
-              <h3 className="text-base font-black text-stone-900">
-                ¿Eliminar este producto?
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-black uppercase tracking-wider">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                Confirmación de Seguridad
+              </div>
+
+              <h3 className="text-lg font-black text-stone-900 leading-snug">
+                ¿Deseas eliminar {deletingProduct.name}?
               </h3>
-              <p className="text-xs text-stone-500">
-                Estás a punto de eliminar <strong className="text-stone-800">&ldquo;{deletingProduct.name}&rdquo;</strong>. Ya no aparecerá en el catálogo ni en el Punto de Venta (POS).
+
+              <p className="text-xs text-stone-500 max-w-xs mx-auto leading-relaxed">
+                Estás a punto de borrar permanentemente este producto {deletingProduct.code ? `[${deletingProduct.code}]` : ""}. No aparecerá en el catálogo ni en el mostrador del POS.
               </p>
             </div>
 
-            <div className="flex items-center gap-2 pt-2">
+            {/* Input de confirmación obligatorio: 'si' o 'no' */}
+            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-2.5 text-left">
+              <label className="text-xs font-bold text-stone-700 block leading-snug">
+                Escribe <span className="text-rose-600 font-black uppercase bg-rose-100 px-1.5 py-0.5 rounded">si</span> para eliminar o <span className="text-stone-700 font-black uppercase bg-stone-200 px-1.5 py-0.5 rounded">no</span> para cancelar:
+              </label>
+
+              <input
+                type="text"
+                autoFocus
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleConfirmDelete();
+                  }
+                }}
+                placeholder="Escribe 'si' o 'no'..."
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-black tracking-widest text-center uppercase transition-all focus:outline-none ${
+                  deleteConfirmText.trim().toLowerCase() === "si" || deleteConfirmText.trim().toLowerCase() === "sí"
+                    ? "bg-rose-50 border-rose-400 text-rose-700 ring-2 ring-rose-500/20"
+                    : deleteConfirmText.trim().toLowerCase() === "no"
+                    ? "bg-stone-100 border-stone-400 text-stone-700"
+                    : "bg-white border-stone-300 text-stone-900 focus:ring-2 focus:ring-amber-500"
+                }`}
+              />
+
+              {deleteConfirmText.trim().toLowerCase() === "si" || deleteConfirmText.trim().toLowerCase() === "sí" ? (
+                <p className="text-[11px] font-bold text-rose-600 text-center">
+                  ✓ Confirmación &ldquo;SI&rdquo; detectada. Puedes presionar Enter o dar clic en Sí, Eliminar.
+                </p>
+              ) : deleteConfirmText.trim().toLowerCase() === "no" ? (
+                <p className="text-[11px] font-bold text-stone-600 text-center">
+                  ✕ Cancelación &ldquo;NO&rdquo; detectada. Presiona Enter o da clic en No, Cancelar.
+                </p>
+              ) : (
+                <p className="text-[10px] text-stone-400 text-center">
+                  Escribe exactamente <strong className="text-stone-600 font-bold">si</strong> para autorizar la eliminación.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-1">
               <button
-                onClick={() => setDeletingProduct(null)}
-                className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors"
+                type="button"
+                onClick={() => {
+                  setDeletingProduct(null);
+                  setDeleteConfirmText("");
+                }}
+                className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors active:scale-95"
               >
-                Cancelar
+                No, Cancelar
               </button>
+
               <button
+                type="button"
                 onClick={handleConfirmDelete}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-600/25 transition-all"
+                disabled={deleteConfirmText.trim().toLowerCase() !== "si" && deleteConfirmText.trim().toLowerCase() !== "sí"}
+                className={`flex-1 py-3 text-xs font-black rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                  deleteConfirmText.trim().toLowerCase() === "si" || deleteConfirmText.trim().toLowerCase() === "sí"
+                    ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30 cursor-pointer animate-pulse"
+                    : "bg-stone-200 text-stone-400 cursor-not-allowed shadow-none"
+                }`}
               >
-                Sí, Eliminar
+                <Trash2 className="w-4 h-4" />
+                <span>Sí, Eliminar</span>
               </button>
             </div>
           </div>
