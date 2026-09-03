@@ -477,24 +477,33 @@ export default function POSPage() {
               </button>
             </div>
 
-            {/* Botón Grande: Caja & Turno */}
+            {/* Botón Gasto Rápido */}
             <div className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => setShowOperationsMenu(!showOperationsMenu)}
-                className={`flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 text-sm sm:text-base font-black transition-all active:scale-95 shadow-sm ${
-                  showOperationsMenu
-                    ? "bg-[#2d1810] text-amber-100 border-amber-800 ring-2 ring-amber-500/40 shadow-md"
-                    : "bg-white hover:bg-amber-50 text-stone-900 border-stone-300 hover:border-amber-400"
-                }`}
-                title="Mostrar u ocultar operaciones de caja y turno"
+                onClick={() => setShowExpensesModal(true)}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 border-rose-200 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/80 text-rose-900 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs"
+                title="Registrar salida o gasto de dinero"
               >
-                <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                  <span className="text-xl">💼</span>
-                  <span className="truncate">Caja & Turno</span>
-                </div>
-                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showOperationsMenu ? "rotate-180 text-amber-400" : "text-stone-400"}`} />
+                <span className="text-lg">💸</span>
+                <span className="hidden sm:inline">Gasto</span>
+              </button>
+            </div>
+
+            {/* Botón Grande: Caja & Turno (Abre directamente el Corte de Caja) */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShiftModalTab("cambio");
+                  setShowCashDrawerModal(true);
+                }}
+                className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 border-amber-900 bg-[#2d1810] hover:bg-[#3d2015] text-amber-100 text-sm sm:text-base font-black transition-all active:scale-95 shadow-md ring-2 ring-amber-500/40"
+                title="Abrir Corte de Caja y Cierre de Turno directamente"
+              >
+                <span className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                <span className="text-xl">💼</span>
+                <span className="truncate">Caja & Turno</span>
               </button>
             </div>
 
@@ -517,103 +526,6 @@ export default function POSPage() {
             </div>
           </div>
         </div>
-
-        {/* Tarjeta OPERACIONES DE TURNO (En flujo normal: empuja hacia abajo y NUNCA tapa las imágenes) */}
-        {showOperationsMenu && (
-          <div className="bg-white rounded-3xl p-4 border border-stone-200 shadow-xs space-y-3 mb-5 shrink-0 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="flex items-center justify-between pb-2.5 border-b border-stone-100">
-              <div className="flex items-center gap-2">
-                <span className="text-base">💼</span>
-                <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider">
-                  Operaciones de Turno y Caja
-                </h3>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  isDbConnected ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                }`}>
-                  {isDbConnected ? "En línea" : "Modo Local"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowExpensesModal(true)}
-                  className="text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1 rounded-full transition-colors"
-                >
-                  💸 + Registrar Gasto
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowOperationsMenu(false)}
-                  className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
-                >
-                  Ocultar
-                </button>
-              </div>
-            </div>
-
-            {/* UN SOLO BOTÓN DE CAMBIO DE TURNO (ENFOCADO, BONITO Y ANIMADO) */}
-            <button
-              type="button"
-              onClick={() => {
-                setShiftModalTab("cambio");
-                setShowCashDrawerModal(true);
-              }}
-              className="w-full p-4 sm:p-5 bg-gradient-to-r from-amber-50 via-orange-50/70 to-amber-100 hover:from-amber-100 hover:via-orange-100 hover:to-amber-200 border-2 border-amber-300 hover:border-amber-400 rounded-2xl sm:rounded-3xl text-left transition-all duration-300 active:scale-[0.99] shadow-sm hover:shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group relative overflow-hidden"
-            >
-              {/* Destello animado de fondo al pasar el cursor */}
-              <div className="absolute -right-12 -top-12 w-44 h-44 bg-gradient-to-br from-amber-400/20 to-orange-400/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700 pointer-events-none" />
-
-              {/* Lado Izquierdo: Icono animado + Cajero & Turno */}
-              <div className="flex items-center gap-3.5 relative z-10 min-w-0">
-                <div className="relative shrink-0">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-amber-500/30 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                    <UserCheck className="w-6 h-6 sm:w-7 sm:h-7" />
-                  </div>
-                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full animate-ping" />
-                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
-                </div>
-
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-xs font-black text-amber-900 uppercase tracking-wide">
-                    <span>{cashierName.split(" - ")[0]}</span>
-                    <span className="text-amber-400">•</span>
-                    <span className="text-amber-700">
-                      {shiftName.includes("(") ? shiftName.split("(")[0].trim() : shiftName}
-                    </span>
-                  </div>
-                  <h3 className="text-base sm:text-xl font-black text-stone-900 group-hover:text-amber-950 transition-colors leading-tight mt-0.5">
-                    Realizar Cambio y Entrega de Turno
-                  </h3>
-                  <p className="text-xs text-stone-600 font-semibold flex items-center gap-2 mt-1">
-                    <span>🥖 {recentSalesList.length} ventas</span>
-                    <span>•</span>
-                    <span className="text-rose-700">Gastos: -{formatCurrency(totalExpenses)}</span>
-                    <span>•</span>
-                    <span className="text-amber-800 font-bold">Toca aquí para entregar caja</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Lado Derecho: Dinero en Caja + Botón Animado */}
-              <div className="flex items-center gap-4 sm:gap-5 relative z-10 shrink-0 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-amber-200/70">
-                <div className="text-left sm:text-right">
-                  <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-stone-500 block">
-                    Dinero en Caja
-                  </span>
-                  <span className="text-xl sm:text-2xl font-black text-stone-900 leading-none">
-                    {formatCurrency(netCashInDrawer)}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 py-3 px-5 bg-gradient-to-r from-amber-600 via-amber-700 to-orange-600 group-hover:from-amber-700 group-hover:to-orange-700 text-white rounded-2xl font-black text-xs sm:text-sm shadow-md shadow-amber-600/30 group-hover:shadow-lg group-hover:scale-105 transition-all duration-300">
-                  <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-amber-200 group-hover:rotate-180 transition-transform duration-700 ease-in-out shrink-0" />
-                  <span className="whitespace-nowrap">Entregar Caja</span>
-                  <ArrowRight className="w-4 h-4 text-amber-200 group-hover:translate-x-1.5 transition-transform duration-200 shrink-0" />
-                </div>
-              </div>
-            </button>
-          </div>
-        )}
 
         {/* Tarjeta CATEGORÍAS Y PRECIOS (Desplegable exactamente en la forma que estaba antes) */}
         {showCategoryPanel && (
