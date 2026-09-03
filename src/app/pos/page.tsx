@@ -60,7 +60,64 @@ const INITIAL_EXPENSES: CashExpense[] = [
   },
 ];
 
-const CATEGORIES = PRODUCT_CATEGORIES;
+const POS_CATEGORIES = [
+  { id: "all", label: "Todo el Pan", priceTag: "", icon: "🧺" },
+  { id: "bolillo_3", label: "Bolillo $3", priceTag: "$3", icon: "🍞" },
+  { id: "telera_350", label: "Telera $3.50", priceTag: "$3.50", icon: "🥪" },
+  { id: "pambazo_4", label: "Pambazo $4", priceTag: "$4", icon: "🥖" },
+  { id: "dulce_10", label: "Pan Dulce $10", priceTag: "$10", icon: "🥐" },
+  { id: "dulce_12", label: "Dulce Especial $12", priceTag: "$12", icon: "🍫" },
+  { id: "rollos_15", label: "Rollos $15", priceTag: "$15", icon: "🥨" },
+  { id: "strudel_18", label: "Strudel $18", priceTag: "$18", icon: "🥧" },
+  { id: "pastes_20", label: "Pastes $20", priceTag: "$20", icon: "🥟" },
+  { id: "pizza_20", label: "Pizza $20", priceTag: "$20", icon: "🍕" },
+  { id: "pay_25", label: "Pay $25", priceTag: "$25", icon: "🍰" },
+  { id: "cuerno_65", label: "Cuerno $65", priceTag: "$65", icon: "🥐" },
+  { id: "abarrotes", label: "Abarrotes", priceTag: "", icon: "🥫" },
+  { id: "materia_prima", label: "Materia Prima", priceTag: "", icon: "🌾" },
+];
+
+function matchesPosCategory(prod: Product, catId: string): boolean {
+  if (catId === "all") return true;
+  if (prod.category === catId) return true;
+
+  const name = prod.name.toLowerCase();
+  const cat = prod.category?.toLowerCase() || "";
+  const price = prod.price;
+
+  switch (catId) {
+    case "bolillo_3":
+      return name.includes("bolillo") || price === 3 || price === 5;
+    case "telera_350":
+      return name.includes("telera") || price === 3.5 || price === 6;
+    case "pambazo_4":
+      return name.includes("pambazo") || price === 4;
+    case "dulce_10":
+      return (cat === "pan_dulce" && price <= 10) || name.includes("concha") || price === 10;
+    case "dulce_12":
+      return (cat === "pan_dulce" && price === 12) || price === 12;
+    case "rollos_15":
+      return name.includes("rollo") || name.includes("cuerno") || name.includes("oreja") || price === 15 || price === 14;
+    case "strudel_18":
+      return name.includes("strudel") || name.includes("empanada") || price === 18;
+    case "pastes_20":
+      return name.includes("paste") || price === 20;
+    case "pizza_20":
+      return name.includes("pizza") || price === 20;
+    case "pay_25":
+      return name.includes("pay") || cat === "pasteleria" || cat === "bebidas" || price === 25 || price === 40 || price === 45 || price === 30;
+    case "cuerno_65":
+      return name.includes("cuerno grande") || price >= 50;
+    case "abarrotes":
+      return cat === "abarrotes" || name.includes("leche");
+    case "materia_prima":
+      return cat === "materia_prima" || name.includes("harina");
+    default:
+      return prod.category === catId;
+  }
+}
+
+const CATEGORIES = POS_CATEGORIES;
 const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500];
 
 export default function POSPage() {
@@ -235,7 +292,7 @@ export default function POSPage() {
   }, []);
 
   const filteredProducts = products.filter((prod) => {
-    const matchesCat = selectedCategory === "all" || prod.category === selectedCategory;
+    const matchesCat = matchesPosCategory(prod, selectedCategory);
     const matchesSearch = 
       (prod.code && prod.code.toLowerCase().includes(search.toLowerCase())) ||
       prod.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -570,7 +627,7 @@ export default function POSPage() {
                 const isSelected = selectedCategory === cat.id;
                 const count = cat.id === "all"
                   ? products.length
-                  : products.filter((p) => p.category === cat.id || p.id === cat.id).length;
+                  : products.filter((p) => matchesPosCategory(p, cat.id)).length;
 
                 return (
                   <button

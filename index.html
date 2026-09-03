@@ -199,19 +199,61 @@
     ];
 
     const CATEGORIES = [
-      { id: "all", label: "Todo", icon: "🧺" },
+      { id: "all", label: "Todo el Pan", icon: "🧺" },
       { id: "bolillo_3", label: "Bolillo $3", icon: "🍞" },
       { id: "telera_350", label: "Telera $3.50", icon: "🥪" },
       { id: "pambazo_4", label: "Pambazo $4", icon: "🥖" },
-      { id: "dulce_10", label: "Dulce $10", icon: "🥐" },
-      { id: "dulce_12", label: "Dulce $12", icon: "🍫" },
+      { id: "dulce_10", label: "Pan Dulce $10", icon: "🥐" },
+      { id: "dulce_12", label: "Dulce Especial $12", icon: "🍫" },
       { id: "rollos_15", label: "Rollos $15", icon: "🥨" },
       { id: "strudel_18", label: "Strudel $18", icon: "🥧" },
       { id: "pastes_20", label: "Pastes $20", icon: "🥟" },
       { id: "pizza_20", label: "Pizza $20", icon: "🍕" },
       { id: "pay_25", label: "Pay $25", icon: "🍰" },
       { id: "cuerno_65", label: "Cuerno $65", icon: "🥐" },
+      { id: "abarrotes", label: "Abarrotes", icon: "🥫" },
+      { id: "materia_prima", label: "Materia Prima", icon: "🌾" },
     ];
+
+    function matchesPosCategory(prod, catId) {
+      if (catId === "all") return true;
+      if (prod.category === catId) return true;
+
+      const name = (prod.name || "").toLowerCase();
+      const cat = (prod.category || "").toLowerCase();
+      const price = prod.price;
+
+      switch (catId) {
+        case "bolillo_3":
+          return name.includes("bolillo") || price === 3 || price === 5;
+        case "telera_350":
+          return name.includes("telera") || price === 3.5 || price === 6;
+        case "pambazo_4":
+          return name.includes("pambazo") || price === 4;
+        case "dulce_10":
+          return (cat === "pan_dulce" && price <= 10) || name.includes("concha") || price === 10;
+        case "dulce_12":
+          return (cat === "pan_dulce" && price === 12) || price === 12;
+        case "rollos_15":
+          return name.includes("rollo") || name.includes("cuerno") || name.includes("oreja") || price === 15 || price === 14;
+        case "strudel_18":
+          return name.includes("strudel") || name.includes("empanada") || price === 18;
+        case "pastes_20":
+          return name.includes("paste") || price === 20;
+        case "pizza_20":
+          return name.includes("pizza") || price === 20;
+        case "pay_25":
+          return name.includes("pay") || cat === "pasteleria" || cat === "bebidas" || price === 25 || price === 40 || price === 45 || price === 30;
+        case "cuerno_65":
+          return name.includes("cuerno grande") || price >= 50;
+        case "abarrotes":
+          return cat === "abarrotes" || name.includes("leche");
+        case "materia_prima":
+          return cat === "materia_prima" || name.includes("harina");
+        default:
+          return prod.category === catId;
+      }
+    }
 
     function formatCurrency(amount) {
       return new Intl.NumberFormat("es-MX", {
@@ -277,7 +319,7 @@
       // Filter products
       const filtered = useMemo(() => {
         return products.filter((p) => {
-          const matchCat = selectedCategory === "all" || p.category === selectedCategory;
+          const matchCat = matchesPosCategory(p, selectedCategory);
           const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
                               (p.description && p.description.toLowerCase().includes(search.toLowerCase()));
           return matchCat && matchSearch;
@@ -505,7 +547,7 @@
                     const isSelected = selectedCategory === cat.id;
                     const count = cat.id === "all"
                       ? products.length
-                      : products.filter((p) => p.category === cat.id || p.id === cat.id).length;
+                      : products.filter((p) => matchesPosCategory(p, cat.id)).length;
 
                     return (
                       <button
