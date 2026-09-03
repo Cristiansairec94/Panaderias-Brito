@@ -518,15 +518,16 @@ export default function POSPage() {
                 <span className="truncate max-w-[160px]">
                   {selectedCategory === "all" ? "Categorías y Precios" : activeCategory?.label}
                 </span>
-                {/* Botón X: Cierra la barrera desplegable sin mandar a todos los productos */}
-                {showCategoryPanel && (
+                {/* Botón X: Cierra la barrera desplegable y manda directo a Todo el Pan */}
+                {(showCategoryPanel || selectedCategory !== "all") && (
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
+                      setSelectedCategory("all");
                       setShowCategoryPanel(false);
                     }}
                     className="w-5 h-5 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center text-xs font-black transition-transform active:scale-90"
-                    title="Cerrar barrera desplegable"
+                    title="Ver todo el pan y cerrar opciones"
                   >
                     ✕
                   </span>
@@ -665,9 +666,10 @@ export default function POSPage() {
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
+                            setSelectedCategory("all");
                             setShowCategoryPanel(false);
                           }}
-                          title="Cerrar barrera desplegable"
+                          title="Ver todo el pan y cerrar opciones"
                           className="w-6 h-6 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-xs ml-0.5 shadow-xs transition-transform active:scale-90"
                         >
                           <X className="w-3.5 h-3.5 stroke-[3]" />
