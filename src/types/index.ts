@@ -147,4 +147,36 @@ export interface AppUser {
   permissions?: Partial<RolePermissions>;
 }
 
+export interface BranchShift {
+  id: string;
+  name: string; // e.g. "Turno Matutino (06:00 - 14:00)"
+  cashier: string;
+  openedAt: string;
+  initialFund: number;
+  cashSales: number;
+  cardSales: number;
+  transferSales: number;
+  totalSales: number;
+  ticketCount: number;
+  status: "abierto" | "cerrado";
+}
+
+export interface Branch {
+  id: string;
+  name: string;
+  shortName: string;
+  code: string;
+  address: string;
+  phone: string;
+  manager: string;
+  status: "abierta" | "cerrada" | "mantenimiento";
+  currentShift: BranchShift;
+  dailyGoal: number;
+  todaySales: number;
+  todayTickets: number;
+  cashInDrawer: number;
+  color: string; // e.g. "orange", "rose", "emerald"
+}
+
+
 

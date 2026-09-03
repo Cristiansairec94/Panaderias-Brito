@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { SidebarProvider } from "@/context/SidebarContext";
+import { BranchProvider } from "@/context/BranchContext";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import LoginForm from "@/components/auth/LoginForm";
@@ -31,8 +32,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAllowed = canAccessRoute ? canAccessRoute(pathname) : true;
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
+    <BranchProvider>
+      <SidebarProvider>
+        <div className="flex min-h-screen bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 max-h-screen overflow-hidden">
           <Header />
@@ -99,5 +101,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     </SidebarProvider>
+    </BranchProvider>
   );
 }
