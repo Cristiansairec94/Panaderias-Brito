@@ -322,30 +322,37 @@ export default function POSPage() {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        const newQ = Math.min(product.stock, existing.quantity + count);
         return prev.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: newQ } : item
+          item.product.id === product.id ? { ...item, quantity: item.quantity + count } : item
         );
       }
-      return [...prev, { product, quantity: Math.min(product.stock, count) }];
+      return [...prev, { product, quantity: count }];
     });
   };
 
   const updateQuantity = (id: string, delta: number) => {
-    const targetProduct = products.find((p) => p.id === id);
     setCart((prev) =>
       prev
         .map((item) => {
           if (item.product.id === id) {
             const newQ = item.quantity + delta;
-            if (targetProduct && newQ > targetProduct.stock) {
-              return item;
-            }
             return newQ > 0 ? { ...item, quantity: newQ } : null;
           }
           return item;
         })
         .filter(Boolean) as CartItem[]
+    );
+  };
+
+  const setExactQuantity = (id: string, qty: number) => {
+    if (qty <= 0) {
+      setCart((prev) => prev.filter((item) => item.product.id !== id));
+      return;
+    }
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product.id === id ? { ...item, quantity: qty } : item
+      )
     );
   };
 
@@ -867,40 +874,92 @@ export default function POSPage() {
             cart.map((item) => (
               <div
                 key={item.product.id}
-                className="flex items-center justify-between p-3.5 bg-stone-50 hover:bg-amber-50/60 rounded-2xl border border-stone-200/80 transition-all gap-3"
+                className="p-3 bg-stone-50 hover:bg-amber-50/60 rounded-2xl border border-stone-200/80 transition-all space-y-2 shadow-xs"
               >
-                {item.product.image && (
-                  <img
-                    src={item.product.image}
-                    alt={item.product.name}
-                    className="w-12 h-12 object-cover rounded-xl shrink-0 border border-stone-200"
-                  />
-                )}
+                <div className="flex items-center justify-between gap-2.5">
+                  {item.product.image && (
+                    <img
+                      src={item.product.image}
+                      alt={item.product.name}
+                      className="w-12 h-12 object-cover rounded-xl shrink-0 border border-stone-200"
+                    />
+                  )}
 
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-xs text-stone-900 leading-tight truncate">{item.product.name}</p>
-                  <p className="text-[11px] text-amber-800 font-semibold mt-0.5">
-                    {formatCurrency(item.product.price)} c/u
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-xs sm:text-sm text-stone-900 leading-tight truncate">{item.product.name}</p>
+                    <p className="text-[11px] text-amber-800 font-bold mt-0.5">
+                      {formatCurrency(item.product.price)} c/u
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => updateQuantity(item.product.id, -1)}
+                      className="w-7 h-7 flex items-center justify-center bg-stone-200 hover:bg-stone-300 active:scale-90 rounded-lg text-stone-700 transition-all font-bold"
+                      title="Restar 1 pieza"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Input editable directo para escribir piezas (ej. 100 bolillos) */}
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max="9999"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          setExactQuantity(item.product.id, isNaN(val) ? 1 : Math.max(1, val));
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        className="w-14 h-8 text-center font-black text-sm bg-white border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 rounded-lg focus:outline-none shadow-inner text-stone-900 selection:bg-amber-200 cursor-text"
+                        title="Haz clic para escribir la cantidad de piezas directamente (ej. 100)"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => updateQuantity(item.product.id, 1)}
+                      className="w-7 h-7 flex items-center justify-center bg-stone-200 hover:bg-stone-300 active:scale-90 rounded-lg text-stone-700 transition-all font-bold"
+                      title="Sumar 1 pieza"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+
+                    <span className="font-black text-xs sm:text-sm text-stone-900 min-w-[65px] text-right">
+                      {formatCurrency(item.product.price * item.quantity)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                {/* Accesos directos de piezas para mayoreo (ej. 10, 20, 50, 100 piezas) */}
+                <div className="flex items-center gap-1.5 pt-1.5 border-t border-stone-200/60 justify-end">
+                  <span className="text-[10px] text-stone-400 font-bold mr-auto">Escribir o elegir:</span>
+                  {[10, 20, 50, 100].map((qty) => (
+                    <button
+                      key={qty}
+                      type="button"
+                      onClick={() => setExactQuantity(item.product.id, qty)}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all active:scale-95 border ${
+                        item.quantity === qty
+                          ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                          : "bg-white hover:bg-amber-100 text-stone-700 border-stone-200 hover:border-amber-300"
+                      }`}
+                      title={`Fijar a ${qty} piezas de ${item.product.name}`}
+                    >
+                      {qty} pzs
+                    </button>
+                  ))}
                   <button
-                    onClick={() => updateQuantity(item.product.id, -1)}
-                    className="p-1.5 hover:bg-stone-200 active:scale-90 rounded-xl text-stone-600 transition-all"
+                    type="button"
+                    onClick={() => setExactQuantity(item.product.id, 0)}
+                    className="p-1 text-stone-400 hover:text-rose-600 rounded transition-colors ml-1"
+                    title="Eliminar de la charola"
                   >
-                    <Minus className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                  <span className="font-black text-xs w-6 text-center text-stone-900">{item.quantity}</span>
-                  <button
-                    onClick={() => updateQuantity(item.product.id, 1)}
-                    className="p-1.5 hover:bg-stone-200 active:scale-90 rounded-xl text-stone-600 transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="font-black text-xs text-stone-900 w-16 text-right">
-                    {formatCurrency(item.product.price * item.quantity)}
-                  </span>
                 </div>
               </div>
             ))
