@@ -1,6 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Satisfy&family=Pacifico&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.font-brito-script {
+  font-family: var(--font-satisfy), 'Satisfy', var(--font-dancing), 'Dancing Script', 'Pacifico', cursive;
+}
 
 :root {
   --background: #fdfbf7;

@@ -205,19 +205,27 @@ export default function Sidebar() {
             <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
               <AnimatedLogo compact={isCollapsed} size={isCollapsed ? 38 : 46} showGlow={!isCollapsed} />
               {!isCollapsed && (
-                <div className="overflow-hidden">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-sm text-white tracking-tight">Panadería</span>
-                    <span className="font-black text-sm bg-gradient-to-r from-orange-400 via-rose-400 to-pink-500 bg-clip-text text-transparent tracking-tight">
+                <div className="overflow-hidden pl-0.5">
+                  <p className="text-[10px] font-extrabold tracking-[0.22em] text-stone-400 uppercase leading-none select-none">
+                    Panadería
+                  </p>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span
+                      className="font-brito-script text-[30px] leading-none text-white tracking-normal select-none inline-block -rotate-2 bg-gradient-to-r from-white via-orange-100 to-rose-100 bg-clip-text text-transparent"
+                      style={{
+                        fontFamily: "var(--font-satisfy), 'Satisfy', var(--font-dancing), 'Dancing Script', 'Pacifico', cursive",
+                        filter: "drop-shadow(0 2px 8px rgba(249, 115, 22, 0.4))",
+                      }}
+                    >
                       Brito
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                    <p className="text-[10px] font-semibold text-stone-400 tracking-wider uppercase">
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-sm shadow-orange-500/80" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/80" />
+                    <span className="text-[9px] font-bold text-stone-400 tracking-wider uppercase">
                       ERP & POS
-                    </p>
+                    </span>
                   </div>
                 </div>
               )}

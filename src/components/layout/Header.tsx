@@ -117,9 +117,10 @@ export default function Header() {
             <h2 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
               {current.title}
             </h2>
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold text-rose-700 bg-gradient-to-r from-orange-50 to-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200/80">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-rose-800 bg-gradient-to-r from-orange-50 to-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200/80">
               <Sparkles className="w-2.5 h-2.5 text-orange-500" />
-              Panadería Brito
+              <span>Panadería</span>
+              <span className="font-brito-script text-base text-rose-600 font-bold -rotate-1">Brito</span>
             </span>
           </div>
           <p className="text-[10px] sm:text-[11px] text-stone-500 font-medium line-clamp-1">
