@@ -850,25 +850,33 @@ export default function POSPage() {
       <div className={`fixed lg:static inset-y-0 right-0 z-50 w-full sm:w-96 lg:w-[380px] shrink-0 bg-white border-l border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out ${
         isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       }`}>
-        {/* Header */}
-        <div className="p-4 px-5 border-b border-stone-100 flex items-center justify-between bg-amber-950 text-white">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-amber-600 rounded-xl">
+        {/* Header con colores de la marca y micro-animación */}
+        <div className="p-4 px-5 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden">
+          <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="p-2.5 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-2xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40 transition-transform hover:scale-105">
               <ShoppingBag className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-sm leading-tight">Charola de Cobro</h3>
-              <p className="text-[10px] text-amber-300/80">{cashierName} • Mostrador</p>
+              <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
+                Charola de Cobro
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              </h3>
+              <p className="text-[11px] text-amber-300 font-bold mt-0.5">{cashierName} • Mostrador</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-amber-800/90 px-3 py-1.5 rounded-full font-extrabold text-amber-100">
+          <div className="flex items-center gap-2 relative z-10">
+            <span className={`text-xs px-3 py-1.5 rounded-full font-black tracking-wide transition-all ${
+              totalPieces > 0
+                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/60 scale-105 animate-pulse"
+                : "bg-amber-900/60 text-amber-200 border border-amber-800"
+            }`}>
               {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
             </span>
             <button
               type="button"
               onClick={() => setIsMobileCartOpen(false)}
-              className="lg:hidden p-1.5 rounded-lg bg-amber-900/80 hover:bg-amber-800 text-amber-200"
+              className="lg:hidden p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-amber-200 transition-colors"
               title="Cerrar charola"
             >
               <X className="w-5 h-5" />
@@ -879,14 +887,22 @@ export default function POSPage() {
         {/* Cart Items List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-stone-400 text-center p-6 space-y-3">
-              <div className="w-20 h-20 bg-amber-50/80 rounded-full flex items-center justify-center text-4xl shadow-inner">
-                🧺
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4 animate-in fade-in zoom-in-95 duration-300">
+              <div className="relative group">
+                <div className="absolute inset-0 bg-amber-400/20 rounded-full blur-xl animate-pulse" />
+                <div className="relative w-24 h-24 bg-gradient-to-br from-amber-100 via-orange-50 to-amber-50 rounded-3xl flex items-center justify-center text-5xl shadow-lg border-2 border-amber-200 shadow-amber-900/5 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+                  🧺
+                </div>
               </div>
-              <p className="text-base font-bold text-stone-800">Charola vacía</p>
-              <p className="text-xs text-stone-400 max-w-[220px] leading-relaxed">
-                Toca cualquier pan del catálogo para agregarlo a la cuenta del cliente.
-              </p>
+              <div className="space-y-1">
+                <span className="px-3 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider border border-amber-200">
+                  Mostrador Listo
+                </span>
+                <p className="text-lg font-black text-stone-900">Charola vacía</p>
+                <p className="text-xs text-stone-500 max-w-[220px] leading-relaxed mx-auto font-medium">
+                  Toca cualquier pan caliente del mostrador para agregarlo al pedido del cliente.
+                </p>
+              </div>
             </div>
           ) : (
             cart.map((item) => (
@@ -985,10 +1001,12 @@ export default function POSPage() {
         </div>
 
         {/* Payment Configuration & Checkout Area */}
-        <div className="p-4 border-t border-stone-200 bg-stone-50/95 space-y-3">
+        <div className="p-4 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/30 space-y-3.5 shadow-lg">
           {/* Payment Method Selector */}
           <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Forma de Pago:</span>
+            <span className="text-[11px] font-black text-stone-600 uppercase tracking-wider flex items-center gap-1.5">
+              <span>💳</span> Forma de Pago:
+            </span>
             <div className="grid grid-cols-3 gap-2">
               {[
                 { id: "efectivo", label: "Efectivo", icon: DollarSign },
@@ -1001,13 +1019,13 @@ export default function POSPage() {
                   <button
                     key={m.id}
                     onClick={() => setPaymentMethod(m.id as any)}
-                    className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-2xl text-xs font-extrabold transition-all ${
+                    className={`flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-2xl text-xs font-black transition-all active:scale-95 duration-200 ${
                       isSelected
-                        ? "bg-amber-900 text-white shadow-md"
-                        : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
+                        ? "bg-gradient-to-r from-[#24130c] to-[#3d1d11] text-amber-100 shadow-md ring-2 ring-amber-500/50 scale-[1.02]"
+                        : "bg-white text-stone-700 hover:bg-amber-50/80 border-2 border-stone-200 hover:border-amber-300 shadow-xs"
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
+                    <Icon className={`w-4 h-4 ${isSelected ? "text-amber-400" : "text-stone-500"}`} />
                     <span>{m.label}</span>
                   </button>
                 );
@@ -1015,29 +1033,35 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Totals Banner */}
-          <div className="bg-white p-3.5 rounded-2xl border border-stone-200/90 space-y-1 shadow-sm">
-            <div className="flex justify-between items-center text-xs font-medium text-stone-500">
-              <span>Subtotal ({totalPieces} piezas):</span>
-              <span>{formatCurrency(total)}</span>
+          {/* Totals Banner Premium */}
+          <div className="bg-gradient-to-br from-white via-amber-50/30 to-orange-50/30 p-4 rounded-3xl border-2 border-amber-300/80 space-y-1.5 shadow-md relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-amber-400/10 rounded-full blur-lg pointer-events-none" />
+            <div className="flex justify-between items-center text-xs font-bold text-stone-500">
+              <span className="flex items-center gap-1">🥖 Subtotal ({totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}):</span>
+              <span className="font-black text-stone-700">{formatCurrency(total)}</span>
             </div>
-            <div className="flex justify-between items-center text-xl font-black text-stone-900 border-t border-stone-100 pt-1.5">
-              <span>Total a Cobrar:</span>
-              <span className="text-amber-800">{formatCurrency(total)}</span>
+            <div className="flex justify-between items-baseline border-t border-amber-200/80 pt-2">
+              <span className="text-sm font-black text-stone-900 tracking-wide uppercase">Total a Cobrar:</span>
+              <span className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-amber-700 via-amber-800 to-orange-600 bg-clip-text text-transparent">
+                {formatCurrency(total)}
+              </span>
             </div>
           </div>
 
           {/* Cash Handling with Quick Denominations */}
           {paymentMethod === "efectivo" && (
-            <div className="space-y-2 bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200/80">
+            <div className="space-y-2.5 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 p-4 rounded-3xl border-2 border-amber-300 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-extrabold text-stone-800">Paga con ($ Efectivo):</label>
+                <label className="text-xs font-black text-stone-900 flex items-center gap-1">
+                  <span>💵</span> Paga con ($ Efectivo):
+                </label>
                 <button
+                  type="button"
                   onClick={handleExactCash}
                   disabled={cart.length === 0}
-                  className="text-[11px] font-black text-amber-800 hover:underline active:scale-95 transition-transform"
+                  className="px-2.5 py-1 rounded-xl bg-amber-200/70 hover:bg-amber-300 text-amber-950 text-[11px] font-black transition-all active:scale-95 shadow-xs"
                 >
-                  Cobro Exacto
+                  ⚡ Cobro Exacto
                 </button>
               </div>
 
@@ -1046,9 +1070,10 @@ export default function POSPage() {
                 {QUICK_DENOMINATIONS.map((bill) => (
                   <button
                     key={bill}
+                    type="button"
                     onClick={() => handleQuickCash(bill)}
                     disabled={cart.length === 0}
-                    className="py-2 bg-white hover:bg-amber-700 hover:text-white text-stone-900 font-black text-xs rounded-xl border border-amber-200 shadow-sm transition-all active:scale-95"
+                    className="py-2.5 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-xs rounded-xl border-2 border-amber-200 shadow-xs transition-all active:scale-95 hover:scale-105 hover:shadow-md"
                   >
                     ${bill}
                   </button>
@@ -1061,18 +1086,20 @@ export default function POSPage() {
                 placeholder="O teclea la cantidad recibida..."
                 value={cashGiven}
                 onChange={(e) => setCashGiven(e.target.value)}
-                className="w-full px-3.5 py-2 bg-white rounded-xl border border-amber-300 text-xs font-black text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-4 focus:ring-amber-400/20 text-sm font-black text-stone-900 focus:outline-none shadow-inner transition-all placeholder:text-stone-400 placeholder:font-normal"
               />
 
               {/* Change Display */}
               {parsedCashGiven > 0 && (
-                <div className={`flex justify-between items-center p-2.5 rounded-xl text-xs font-black border ${
+                <div className={`flex justify-between items-center p-3 rounded-2xl text-xs font-black border-2 transition-all shadow-md animate-in zoom-in-95 duration-200 ${
                   parsedCashGiven >= total
-                    ? "bg-emerald-100/90 text-emerald-950 border-emerald-300"
-                    : "bg-rose-100 text-rose-900 border-rose-300"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-400 shadow-emerald-600/20"
+                    : "bg-gradient-to-r from-rose-600 to-red-600 text-white border-rose-400 shadow-rose-600/20"
                 }`}>
-                  <span>{parsedCashGiven >= total ? "Cambio a Entregar:" : "Falta por cubrir:"}</span>
-                  <span className="text-base">
+                  <span className="flex items-center gap-1.5 text-xs tracking-wide">
+                    {parsedCashGiven >= total ? "🟢 Cambio a Entregar:" : "🔴 Falta por cubrir:"}
+                  </span>
+                  <span className="text-lg font-black drop-shadow-xs">
                     {parsedCashGiven >= total ? formatCurrency(change) : formatCurrency(total - parsedCashGiven)}
                   </span>
                 </div>
@@ -1081,23 +1108,27 @@ export default function POSPage() {
           )}
 
           {/* Actions */}
-          <div className="grid grid-cols-3 gap-2 pt-1">
+          <div className="grid grid-cols-3 gap-2.5 pt-1">
             <button
               onClick={() => {
                 setCart([]);
                 setCashGiven("");
               }}
               disabled={cart.length === 0}
-              className="px-3 py-3.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-40 text-stone-700 font-bold rounded-2xl text-xs flex items-center justify-center gap-1 transition-all"
+              className="px-3 py-4 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 border-2 border-stone-200 transition-all active:scale-95 shadow-xs"
             >
               <Trash2 className="w-4 h-4" /> Cancelar
             </button>
             <button
               onClick={handleCheckout}
               disabled={cart.length === 0 || !isPaymentValid || isSubmitting}
-              className="col-span-2 py-3.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-900/20 transition-all active:scale-95"
+              className={`col-span-2 py-4 rounded-2xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 shadow-lg ${
+                cart.length > 0 && isPaymentValid && !isSubmitting
+                  ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 border-2 border-amber-300/70 ring-2 ring-amber-400/40"
+                  : "bg-stone-200 text-stone-400 border-2 border-stone-300/60 opacity-60 cursor-not-allowed"
+              }`}
             >
-              <CheckCircle className="w-4 h-4" />
+              <CheckCircle className={`w-5 h-5 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
               <span>{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
             </button>
           </div>
