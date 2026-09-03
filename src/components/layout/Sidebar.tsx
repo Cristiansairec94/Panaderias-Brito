@@ -202,28 +202,28 @@ export default function Sidebar() {
         {/* Top Header / Brand Logo & Toggle */}
         <div className="flex flex-col border-b border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent">
           <div className={`p-4 flex items-center ${isCollapsed ? "justify-center flex-col gap-2" : "justify-between"}`}>
-            <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
-              <AnimatedLogo compact={isCollapsed} size={isCollapsed ? 38 : 46} showGlow={!isCollapsed} />
+            <div className={`flex items-center gap-3.5 ${isCollapsed ? "justify-center" : ""}`}>
+              <AnimatedLogo compact={isCollapsed} size={isCollapsed ? 40 : 52} showGlow={!isCollapsed} />
               {!isCollapsed && (
-                <div className="overflow-hidden pl-0.5">
-                  <p className="text-[10px] font-extrabold tracking-[0.22em] text-stone-400 uppercase leading-none select-none">
+                <div className="overflow-hidden pl-1">
+                  <p className="text-[11px] font-extrabold tracking-[0.28em] text-stone-400 uppercase leading-none select-none">
                     Panadería
                   </p>
-                  <div className="flex items-baseline gap-1 mt-0.5">
+                  <div className="flex items-baseline gap-1 my-1">
                     <span
-                      className="font-brito-script text-[30px] leading-none text-white tracking-normal select-none inline-block -rotate-2 bg-gradient-to-r from-white via-orange-100 to-rose-100 bg-clip-text text-transparent"
+                      className="font-brito-script text-[38px] leading-[0.95] text-white tracking-wide select-none inline-block -rotate-2 bg-gradient-to-r from-white via-orange-100 to-rose-200 bg-clip-text text-transparent"
                       style={{
                         fontFamily: "var(--font-satisfy), 'Satisfy', var(--font-dancing), 'Dancing Script', 'Pacifico', cursive",
-                        filter: "drop-shadow(0 2px 8px rgba(249, 115, 22, 0.4))",
+                        filter: "drop-shadow(0 2px 10px rgba(249, 115, 22, 0.45)) drop-shadow(0 4px 14px rgba(225, 29, 72, 0.35))",
                       }}
                     >
                       Brito
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1">
+                  <div className="flex items-center gap-2 pt-0.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-sm shadow-orange-500/80" />
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/80" />
-                    <span className="text-[9px] font-bold text-stone-400 tracking-wider uppercase">
+                    <span className="text-[10px] font-bold text-stone-400 tracking-wider uppercase">
                       ERP & POS
                     </span>
                   </div>
