@@ -23,7 +23,8 @@ import {
   ArrowRight,
   Flame,
   Sparkles,
-  Building2
+  Building2,
+  X
 } from "lucide-react";
 import AnimatedLogo from "@/components/ui/AnimatedLogo";
 import { useSidebar } from "@/context/SidebarContext";
@@ -240,6 +241,15 @@ export default function Sidebar() {
                 </div>
               )}
             </div>
+
+            {/* Mobile Close Button */}
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="md:hidden flex items-center justify-center p-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-stone-400 hover:text-white transition-colors"
+              title="Cerrar menú lateral"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
             {/* Collapse/Expand Toggle Button on Desktop */}
             <button

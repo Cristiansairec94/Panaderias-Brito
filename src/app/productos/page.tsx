@@ -259,7 +259,7 @@ export default function ProductosPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto select-none">
+    <div className="p-3 sm:p-6 md:p-8 space-y-4 sm:space-y-8 max-w-7xl mx-auto select-none">
       {/* Toast notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-amber-500/40 flex items-center gap-3 animate-in slide-in-from-bottom-5">
@@ -269,7 +269,7 @@ export default function ProductosPage() {
       )}
 
       {/* Header Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-2xl border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
         <div className="absolute -right-10 -top-10 w-72 h-72 bg-amber-600/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-10 -bottom-10 w-72 h-72 bg-orange-600/20 rounded-full blur-3xl pointer-events-none" />
 
@@ -282,7 +282,7 @@ export default function ProductosPage() {
               <Sparkles className="w-3.5 h-3.5" /> Sincronizado con POS
             </span>
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             Catálogo de Productos
           </h1>
           <p className="text-stone-300 text-xs max-w-xl leading-relaxed">
@@ -291,10 +291,10 @@ export default function ProductosPage() {
         </div>
 
         {/* Action Button */}
-        <div className="relative z-10 flex items-center gap-3">
+        <div className="relative z-10 flex items-center gap-3 w-full sm:w-auto">
           <button
             onClick={handleOpenCreate}
-            className="px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-xl shadow-orange-500/25 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider"
+            className="w-full sm:w-auto justify-center px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-xl shadow-orange-500/25 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>Nuevo Producto</span>
@@ -412,7 +412,12 @@ export default function ProductosPage() {
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                        setIsCategoriesVisible(false);
+                      }
+                    }}
                     className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2.5 group ${
                       isSelected
                         ? "bg-[#3e2723] text-amber-50 shadow-md shadow-amber-950/25 font-black scale-[1.02] border-2 border-amber-500 ring-2 ring-amber-700/30"
@@ -648,8 +653,8 @@ export default function ProductosPage() {
 
       {/* Modal: Crear / Editar Producto */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-[32px] max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-stone-200 relative my-8 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl sm:rounded-[32px] max-w-lg w-full p-5 sm:p-8 shadow-2xl border border-stone-200 relative my-auto max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-stone-100">
               <div className="flex items-center gap-2.5">
@@ -899,17 +904,17 @@ export default function ProductosPage() {
               </div>
 
               {/* Actions */}
-              <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2.5">
+              <div className="pt-3 border-t border-stone-100 flex flex-col-reverse sm:flex-row items-center justify-end gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/25 flex items-center gap-1.5 transition-all active:scale-95"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/25 flex items-center justify-center gap-1.5 transition-all active:scale-95"
                 >
                   <Check className="w-4 h-4 stroke-[3]" />
                   <span>{modalMode === "create" ? "Guardar en Catálogo" : "Actualizar Producto"}</span>
@@ -922,8 +927,8 @@ export default function ProductosPage() {
 
       {/* Modal: Confirmar Eliminación con "si" o "no" */}
       {deletingProduct && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-7 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
             <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-3xl shadow-inner">
               <Trash2 className="w-8 h-8" />
             </div>

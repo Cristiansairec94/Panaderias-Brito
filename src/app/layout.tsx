@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Satisfy, Dancing_Script } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
@@ -18,6 +18,13 @@ const dancingScript = Dancing_Script({
   variable: "--font-dancing",
   display: "swap",
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#090a0f",
+};
 
 export const metadata: Metadata = {
   title: "Panadería Bakery Brito - Sistema ERP & POS",

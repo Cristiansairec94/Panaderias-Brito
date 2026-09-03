@@ -227,7 +227,7 @@ export default function Header() {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
             <Building2 className="w-3.5 h-3.5 text-orange-600" />
-            <span className="max-w-[110px] sm:max-w-[140px] truncate">
+            <span className="max-w-[80px] sm:max-w-[140px] truncate">
               {isAllBranches ? "Todas las Sucursales" : currentBranch?.shortName}
             </span>
             <ChevronDown className="w-3 h-3 text-stone-400" />
@@ -235,7 +235,7 @@ export default function Header() {
 
           {/* Branch Dropdown Menu */}
           {showBranchMenu && (
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
               <div className="p-2 border-b border-stone-100 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Red de Sucursales</p>
@@ -364,7 +364,7 @@ export default function Header() {
 
           {/* User & Role Switcher Menu */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
               <div className="p-2.5 border-b border-stone-100 bg-stone-50/60 rounded-xl mb-1.5">
                 <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Sesión activa:</p>
                 <p className="text-xs font-black text-stone-900">{user?.name}</p>

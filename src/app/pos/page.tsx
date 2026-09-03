@@ -26,7 +26,8 @@ import {
   Filter,
   X,
   Building2,
-  MapPin
+  MapPin,
+  ArrowRight
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -115,6 +116,7 @@ export default function POSPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCategoryPanel, setShowCategoryPanel] = useState(false);
   const [showOperationsMenu, setShowOperationsMenu] = useState(false);
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   // Load and synchronize products with catalog
   useEffect(() => {
@@ -475,23 +477,42 @@ export default function POSPage() {
             </div>
 
             {/* Botón Discreto de Operaciones (Encuadrado con la misma altura) */}
+            {/* Botón Discreto de Operaciones (Encuadrado con la misma altura) */}
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setShowOperationsMenu(!showOperationsMenu)}
-                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
+                className={`flex items-center gap-2.5 px-3 sm:px-4 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
                   showOperationsMenu
                     ? "bg-[#2d1810] text-amber-50 border-amber-800 ring-2 ring-amber-600/30 font-black"
                     : "bg-white hover:bg-stone-50 text-stone-800 border-stone-300/80"
                 }`}
                 title="Mostrar u ocultar operaciones de caja y turno"
               >
-                <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
                   <span className="text-sm">💼</span>
-                  <span className="font-extrabold text-xs">Caja & Turno</span>
+                  <span className="font-extrabold text-xs hidden sm:inline">Caja & Turno</span>
                 </div>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showOperationsMenu ? "rotate-180 text-amber-400" : "text-stone-400"}`} />
+              </button>
+            </div>
+
+            {/* Botón Móvil para Ver Charola / Carrito */}
+            <div className="relative shrink-0 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setIsMobileCartOpen(true)}
+                className="relative flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-md shadow-amber-600/30 active:scale-95 transition-all"
+                title="Abrir charola de cobro"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span className="hidden sm:inline">Charola</span>
+                {totalPieces > 0 && (
+                  <span className="w-5 h-5 bg-rose-600 text-white rounded-full text-[10px] font-black flex items-center justify-center border-2 border-white">
+                    {totalPieces}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -826,8 +847,18 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* Cart & Cashier Sidebar (Right) */}
-      <div className="w-80 lg:w-[380px] shrink-0 bg-white border-l border-stone-200 flex flex-col h-full shadow-2xl">
+      {/* Mobile Backdrop for Cart */}
+      {isMobileCartOpen && (
+        <div
+          onClick={() => setIsMobileCartOpen(false)}
+          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+        />
+      )}
+
+      {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone) */}
+      <div className={`fixed lg:static inset-y-0 right-0 z-50 w-full sm:w-96 lg:w-[380px] shrink-0 bg-white border-l border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out ${
+        isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+      }`}>
         {/* Header */}
         <div className="p-4 px-5 border-b border-stone-100 flex items-center justify-between bg-amber-950 text-white">
           <div className="flex items-center gap-2.5">
@@ -839,9 +870,19 @@ export default function POSPage() {
               <p className="text-[10px] text-amber-300/80">{cashierName} • Mostrador</p>
             </div>
           </div>
-          <span className="text-xs bg-amber-800/90 px-3 py-1.5 rounded-full font-extrabold text-amber-100">
-            {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs bg-amber-800/90 px-3 py-1.5 rounded-full font-extrabold text-amber-100">
+              {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsMobileCartOpen(false)}
+              className="lg:hidden p-1.5 rounded-lg bg-amber-900/80 hover:bg-amber-800 text-amber-200"
+              title="Cerrar charola"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Cart Items List */}
@@ -1019,6 +1060,33 @@ export default function POSPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Bottom Bar on Mobile when Cart has items */}
+      {cart.length > 0 && !isMobileCartOpen && (
+        <div className="lg:hidden fixed bottom-4 left-3 right-3 z-30 animate-in slide-in-from-bottom-3 duration-200">
+          <button
+            type="button"
+            onClick={() => setIsMobileCartOpen(true)}
+            className="w-full bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white p-3 rounded-2xl shadow-xl shadow-amber-950/40 flex items-center justify-between font-black text-xs sm:text-sm active:scale-98 transition-all border border-white/20"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-base">
+                🧺
+              </div>
+              <div className="text-left">
+                <p className="text-[10px] font-bold text-amber-200 leading-tight">Charola ({totalPieces} {totalPieces === 1 ? "pz" : "pzs"})</p>
+                <p className="text-xs sm:text-sm font-black text-white">Ver orden y cobrar</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm sm:text-base font-black bg-white text-stone-950 px-3 py-1 rounded-xl shadow-sm">
+                {formatCurrency(total)}
+              </span>
+              <ArrowRight className="w-4 h-4" />
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Ticket Modal */}
       {completedSale && (
