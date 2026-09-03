@@ -118,7 +118,7 @@ export interface CashExpense {
   date: string;
 }
 
-export type UserRole = "admin" | "cajero" | "panadero" | "supervisor";
+export type UserRole = "admin" | "auxiliar_admin" | "cajero" | "panadero" | "supervisor";
 
 export interface RolePermissions {
   canAccessDashboard: boolean;
@@ -145,10 +145,13 @@ export interface AppUser {
   role: UserRole;
   roleLabel: string;
   avatar: string;
+  photoUrl?: string;
   phone?: string;
   assignedBranchId?: string;
   assignedBranchName?: string;
   permissions?: Partial<RolePermissions>;
+  status?: "activo" | "inactivo";
+  createdAt?: string;
 }
 
 export interface BranchShift {

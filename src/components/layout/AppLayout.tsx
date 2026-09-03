@@ -68,6 +68,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Caja & Turnos</span>
                         <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Pedidos Especiales</span>
                         <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Clientes</span>
+                        <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Catálogo de Productos</span>
+                      </>
+                    )}
+                    {user.role === "auxiliar_admin" && (
+                      <>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Dashboard General</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Clientes & Mayoristas</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Inventario & Insumos</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Pedidos & Encargos</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Finanzas & Gastos</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Reportes & Métricas</span>
                       </>
                     )}
                     {user.role === "panadero" && (

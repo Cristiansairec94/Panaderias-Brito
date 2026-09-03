@@ -352,8 +352,12 @@ export default function Header() {
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/70 shadow-sm"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-rose-500/20">
-              {user?.avatar || "👨‍🍳"}
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-rose-500/20 overflow-hidden">
+              {user?.photoUrl || (user?.avatar && (user.avatar.startsWith("data:image") || user.avatar.startsWith("http"))) ? (
+                <img src={user.photoUrl || user.avatar} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                user?.avatar || "👨‍🍳"
+              )}
             </div>
             <div className="text-left hidden sm:block">
               <p className="text-xs font-black text-stone-900 leading-tight">{user?.name || "Invitado"}</p>

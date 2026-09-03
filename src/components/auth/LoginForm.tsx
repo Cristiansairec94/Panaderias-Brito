@@ -66,8 +66,12 @@ export default function LoginForm() {
           <div className="p-6 sm:p-12 text-center space-y-5 sm:space-y-6 animate-in zoom-in-95 fade-in duration-400">
             <div className="relative inline-flex items-center justify-center">
               <div className="absolute inset-0 bg-amber-500/40 rounded-full blur-3xl animate-ping" />
-              <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 text-white flex items-center justify-center text-5xl sm:text-6xl shadow-2xl shadow-orange-500/50 border-4 border-amber-300/80 relative z-10 animate-bounce">
-                {welcomeUser.avatar || "👨‍🍳"}
+              <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 text-white flex items-center justify-center text-5xl sm:text-6xl shadow-2xl shadow-orange-500/50 border-4 border-amber-300/80 relative z-10 animate-bounce overflow-hidden">
+                {welcomeUser.photoUrl || (welcomeUser.avatar && (welcomeUser.avatar.startsWith("data:image") || welcomeUser.avatar.startsWith("http"))) ? (
+                  <img src={welcomeUser.photoUrl || welcomeUser.avatar} alt={welcomeUser.name} className="w-full h-full object-cover" />
+                ) : (
+                  welcomeUser.avatar || "👨‍🍳"
+                )}
               </div>
             </div>
 

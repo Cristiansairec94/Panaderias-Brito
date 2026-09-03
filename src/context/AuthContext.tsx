@@ -21,6 +21,21 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canEditPrices: true,
     canManageUsers: true,
   },
+  auxiliar_admin: {
+    canAccessDashboard: true,
+    canAccessPos: false,
+    canAccessCaja: true,
+    canAccessInventario: true,
+    canAccessPedidos: true,
+    canAccessClientes: true,
+    canAccessFinanzas: true,
+    canAccessReportes: true,
+    canAccessConfiguracion: false,
+    canAccessProductos: true,
+    canViewProfitMargins: true,
+    canEditPrices: false,
+    canManageUsers: false,
+  },
   supervisor: {
     canAccessDashboard: true,
     canAccessPos: true,
@@ -46,7 +61,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canAccessFinanzas: false,
     canAccessReportes: false,
     canAccessConfiguracion: false,
-    canAccessProductos: false,
+    canAccessProductos: true,
     canViewProfitMargins: false,
     canEditPrices: false,
     canManageUsers: false,
@@ -102,6 +117,7 @@ export const DEMO_USERS: User[] = [
     roleLabel: "Dueño / Administrador",
     avatar: "👨‍🍳",
     phone: "55 1234 5678",
+    status: "activo",
   },
   {
     id: "usr-2",
@@ -110,12 +126,25 @@ export const DEMO_USERS: User[] = [
     email: "caja@panaderiabrito.com",
     password: "caja",
     role: "cajero",
-    roleLabel: "Cajera Mostrador",
+    roleLabel: "Cajera / Auxiliar de Tienda",
     avatar: "👩‍💼",
     phone: "55 8765 4321",
+    status: "activo",
   },
   {
     id: "usr-3",
+    name: "Lic. Roberto Morales",
+    username: "roberto",
+    email: "auxiliar@panaderiabrito.com",
+    password: "1234",
+    role: "auxiliar_admin",
+    roleLabel: "Auxiliar Administrativo",
+    avatar: "💼",
+    phone: "55 2233 4455",
+    status: "activo",
+  },
+  {
+    id: "usr-4",
     name: "Maestro Juan",
     username: "juan",
     email: "panadero@panaderiabrito.com",
@@ -124,9 +153,10 @@ export const DEMO_USERS: User[] = [
     roleLabel: "Jefe de Horno & Producción",
     avatar: "🥖",
     phone: "55 9988 7766",
+    status: "activo",
   },
   {
-    id: "usr-4",
+    id: "usr-5",
     name: "Carlos Mendoza",
     username: "carlos",
     email: "supervisor@panaderiabrito.com",
@@ -135,6 +165,7 @@ export const DEMO_USERS: User[] = [
     roleLabel: "Supervisor de Turno",
     avatar: "📋",
     phone: "55 3344 5566",
+    status: "activo",
   },
 ];
 
@@ -150,6 +181,9 @@ interface AuthContextType {
   canAccessRoute: (pathname: string) => boolean;
   getDefaultRouteForUser: (targetUser?: User | null) => string;
   addUser: (newUser: User) => void;
+  updateUser: (userId: string, updatedData: Partial<User>) => void;
+  deleteUser: (userId: string) => { success: boolean; message?: string };
+  toggleUserStatus: (userId: string) => void;
   isLoading: boolean;
 }
 
@@ -240,12 +274,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, permissions]
   );
 
-  const getDefaultRouteForUser = useCallback(
+    const getDefaultRouteForUser = useCallback(
     (targetUser?: User | null): string => {
       const u = targetUser || user;
       if (!u) return "/";
       if (u.role === "cajero") return "/pos";
       if (u.role === "panadero") return "/inventario";
+      if (u.role === "auxiliar_admin") return "/";
       return "/";
     },
     [user]
@@ -279,6 +314,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Friendly alias checks
       if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
       if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
+      if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
       if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
       if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
 
@@ -287,6 +323,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!found) {
       return { success: false, message: "Usuario no encontrado. Ingresa tu usuario o correo." };
+    }
+
+    if (found.status === "inactivo") {
+      return { success: false, message: "Esta cuenta se encuentra temporalmente desactivada. Consulta con el Administrador." };
     }
 
     if (found.password && found.password !== cleanPass) {
@@ -325,6 +365,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Friendly alias checks
       if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
       if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
+      if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
       if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
       if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
 
@@ -333,6 +374,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!found) {
       return { success: false, message: "Usuario no encontrado. Ingresa tu usuario o correo." };
+    }
+
+    if (found.status === "inactivo") {
+      return { success: false, message: "Esta cuenta se encuentra temporalmente desactivada. Consulta con el Administrador." };
     }
 
     if (found.password && found.password !== cleanPass) {
@@ -363,6 +408,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateUser = (userId: string, updatedData: Partial<User>) => {
+    const updated = usersList.map((u) => {
+      if (u.id === userId) {
+        return { ...u, ...updatedData };
+      }
+      return u;
+    });
+    setUsersList(updated);
+    try {
+      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Error updating user:", e);
+    }
+
+    if (user && user.id === userId) {
+      const updatedCurrentUser = { ...user, ...updatedData };
+      setUser(updatedCurrentUser);
+      try {
+        localStorage.setItem("brito_user", JSON.stringify(updatedCurrentUser));
+      } catch (e) {
+        console.error("Error updating active session:", e);
+      }
+    }
+  };
+
+  const deleteUser = (userId: string): { success: boolean; message?: string } => {
+    if (user && user.id === userId) {
+      return { success: false, message: "No puedes eliminar tu propia cuenta en sesión activa." };
+    }
+    const target = usersList.find((u) => u.id === userId);
+    if (target && (target.id === "usr-1" || (target.role === "admin" && target.username === "admin"))) {
+      return { success: false, message: "No se permite eliminar la cuenta principal del Administrador Don Toño." };
+    }
+
+    const updated = usersList.filter((u) => u.id !== userId);
+    setUsersList(updated);
+    try {
+      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Error deleting user:", e);
+    }
+    return { success: true };
+  };
+
+  const toggleUserStatus = (userId: string) => {
+    if (user && user.id === userId) {
+      return; // Cannot deactivate own account while logged in
+    }
+    const target = usersList.find((u) => u.id === userId);
+    if (target && (target.id === "usr-1" || (target.role === "admin" && target.username === "admin"))) {
+      return; // Protect primary admin
+    }
+
+    const updated = usersList.map((u) => {
+      if (u.id === userId) {
+        const nextStatus: "activo" | "inactivo" = u.status === "inactivo" ? "activo" : "inactivo";
+        return { ...u, status: nextStatus };
+      }
+      return u;
+    });
+    setUsersList(updated);
+    try {
+      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Error toggling user status:", e);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -377,6 +490,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canAccessRoute,
         getDefaultRouteForUser,
         addUser,
+        updateUser,
+        deleteUser,
+        toggleUserStatus,
         isLoading,
       }}
     >
