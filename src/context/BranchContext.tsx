@@ -23,6 +23,9 @@ const DEFAULT_BRANCHES: Branch[] = [
     address: "Av. Principal #450, Centro Histórico",
     phone: "55 1234 5678",
     manager: "Don Toño Brito",
+    assignedUserId: "usr-1",
+    assignedUserName: "Don Toño Brito",
+    assignedUserEmail: "admin@panaderiabrito.com",
     status: "abierta",
     dailyGoal: 10000,
     todaySales: 5480,
@@ -51,6 +54,9 @@ const DEFAULT_BRANCHES: Branch[] = [
     address: "Calle Hidalgo #120, Col. San Benito",
     phone: "55 8765 4321",
     manager: "Maestro Juan",
+    assignedUserId: "usr-3",
+    assignedUserName: "Maestro Juan",
+    assignedUserEmail: "panadero@panaderiabrito.com",
     status: "abierta",
     dailyGoal: 8000,
     todaySales: 4120,
@@ -79,6 +85,9 @@ const DEFAULT_BRANCHES: Branch[] = [
     address: "Calzada Oriente #88, Plaza Las Flores",
     phone: "55 9988 7766",
     manager: "Elena Brito",
+    assignedUserId: "usr-2",
+    assignedUserName: "Lupita Brito",
+    assignedUserEmail: "caja@panaderiabrito.com",
     status: "abierta",
     dailyGoal: 9500,
     todaySales: 4890,
@@ -119,6 +128,16 @@ interface BranchContextType {
   currentBranch: Branch | null; // null = Todas / Consolidado
   isAllBranches: boolean;
   switchBranch: (branchId: string | "all") => void;
+  addBranch: (newBranch: Branch) => void;
+  updateBranch: (branchId: string, updates: Partial<Branch>) => void;
+  deleteBranch: (branchId: string) => void;
+  registerRealSale: (
+    branchId: string,
+    amount: number,
+    paymentMethod: "efectivo" | "tarjeta" | "transferencia",
+    cashier: string,
+    itemsSummary: string
+  ) => void;
   simulateSale: (targetBranchId?: string, customAmount?: number) => SimulatedSale;
   simulateBulkSales: (targetBranchId?: string, count?: number) => void;
   advanceShift: (branchId: string) => void;
@@ -147,7 +166,20 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     try {
       const savedBranches = localStorage.getItem("brito_branches_data");
       if (savedBranches) {
-        setBranches(JSON.parse(savedBranches));
+        const parsed = JSON.parse(savedBranches);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const merged = parsed.map((b: Branch) => {
+            const def = DEFAULT_BRANCHES.find((d) => d.id === b.id);
+            return {
+              ...def,
+              ...b,
+              assignedUserId: b.assignedUserId || def?.assignedUserId,
+              assignedUserName: b.assignedUserName || def?.assignedUserName,
+              assignedUserEmail: b.assignedUserEmail || def?.assignedUserEmail,
+            };
+          });
+          setBranches(merged);
+        }
       }
       const savedCurrent = localStorage.getItem("brito_current_branch_id");
       if (savedCurrent) {
@@ -180,6 +212,101 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       // Ignore
     }
   };
+
+  const addBranch = useCallback((newBranch: Branch) => {
+    setBranches((prev) => {
+      const updated = [...prev, newBranch];
+      persistBranches(updated);
+      return updated;
+    });
+  }, []);
+
+  const updateBranch = useCallback((branchId: string, updates: Partial<Branch>) => {
+    setBranches((prev) => {
+      const updated = prev.map((b) => (b.id === branchId ? { ...b, ...updates } : b));
+      persistBranches(updated);
+      return updated;
+    });
+  }, []);
+
+  const deleteBranch = useCallback((branchId: string) => {
+    setBranches((prev) => {
+      if (prev.length <= 1) return prev;
+      const updated = prev.filter((b) => b.id !== branchId);
+      persistBranches(updated);
+      return updated;
+    });
+    setCurrentBranchId((current) => {
+      if (current === branchId) {
+        const remaining = branches.filter((b) => b.id !== branchId);
+        const nextId = remaining[0]?.id || "all";
+        try {
+          localStorage.setItem("brito_current_branch_id", nextId);
+        } catch {}
+        return nextId;
+      }
+      return current;
+    });
+  }, [branches]);
+
+  const registerRealSale = useCallback((
+    branchId: string,
+    amount: number,
+    paymentMethod: "efectivo" | "tarjeta" | "transferencia",
+    cashier: string,
+    itemsSummary: string
+  ) => {
+    const isCash = paymentMethod === "efectivo";
+    const isCard = paymentMethod === "tarjeta";
+    const isTransfer = paymentMethod === "transferencia";
+
+    setBranches((prev) => {
+      const updated = prev.map((b) => {
+        if (b.id !== branchId) return b;
+
+        const updatedShift: BranchShift = {
+          ...b.currentShift,
+          totalSales: b.currentShift.totalSales + amount,
+          ticketCount: b.currentShift.ticketCount + 1,
+          cashSales: b.currentShift.cashSales + (isCash ? amount : 0),
+          cardSales: b.currentShift.cardSales + (isCard ? amount : 0),
+          transferSales: b.currentShift.transferSales + (isTransfer ? amount : 0),
+        };
+
+        return {
+          ...b,
+          todaySales: b.todaySales + amount,
+          todayTickets: b.todayTickets + 1,
+          cashInDrawer: b.cashInDrawer + (isCash ? amount : 0),
+          currentShift: updatedShift,
+        };
+      });
+
+      persistBranches(updated);
+      return updated;
+    });
+
+    const timeStr = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const targetBranch = branches.find((b) => b.id === branchId);
+    const saleLog: SimulatedSale = {
+      id: `pos-${Date.now()}`,
+      branchId,
+      branchName: targetBranch ? targetBranch.shortName : "POS",
+      itemsSummary: itemsSummary || "Venta mostrador POS",
+      total: amount,
+      paymentMethod,
+      cashier,
+      timestamp: timeStr,
+    };
+
+    setRecentSimulatedSales((prev) => {
+      const next = [saleLog, ...prev.slice(0, 19)];
+      try {
+        localStorage.setItem("brito_simulated_sales", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, [branches]);
 
   const currentBranch = currentBranchId === "all" 
     ? null 
@@ -365,6 +492,10 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         currentBranch,
         isAllBranches,
         switchBranch,
+        addBranch,
+        updateBranch,
+        deleteBranch,
+        registerRealSale,
         simulateSale,
         simulateBulkSales,
         advanceShift,

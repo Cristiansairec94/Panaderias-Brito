@@ -144,6 +144,8 @@ export interface AppUser {
   roleLabel: string;
   avatar: string;
   phone?: string;
+  assignedBranchId?: string;
+  assignedBranchName?: string;
   permissions?: Partial<RolePermissions>;
 }
 
@@ -169,13 +171,16 @@ export interface Branch {
   address: string;
   phone: string;
   manager: string;
+  assignedUserId?: string;
+  assignedUserName?: string;
+  assignedUserEmail?: string;
   status: "abierta" | "cerrada" | "mantenimiento";
   currentShift: BranchShift;
   dailyGoal: number;
   todaySales: number;
   todayTickets: number;
   cashInDrawer: number;
-  color: string; // e.g. "orange", "rose", "emerald"
+  color: string; // e.g. "orange", "rose", "emerald", "blue", "purple"
 }
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { 
   Building2, 
@@ -23,10 +23,16 @@ import {
   ShieldCheck,
   RefreshCw,
   Coins,
-  CreditCard
+  CreditCard,
+  Croissant,
+  Calendar,
+  Layers,
+  Table as TableIcon,
+  ChevronRight
 } from "lucide-react";
 import { useBranch, SimulatedSale } from "@/context/BranchContext";
 import { formatCurrency } from "@/lib/utils";
+import GoogleBranchChart, { PeriodType } from "@/components/sucursales/GoogleBranchChart";
 
 export default function SucursalesPage() {
   const { 
@@ -44,7 +50,12 @@ export default function SucursalesPage() {
   } = useBranch();
 
   const [lastSimulatedSale, setLastSimulatedSale] = useState<SimulatedSale | null>(null);
-  const [activeTab, setActiveTab] = useState<"todas" | "turnos" | "feed">("todas");
+  const [activeTab, setActiveTab] = useState<"general" | "turnos" | "feed">("general");
+
+  // Filter periods for Google-Style Chart & Table
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>("semana");
+  const [customStartDate, setCustomStartDate] = useState<string>("2026-08-20");
+  const [customEndDate, setCustomEndDate] = useState<string>("2026-09-02");
 
   const handleSimulate = (branchId?: string) => {
     const sale = simulateSale(branchId);
@@ -56,9 +67,88 @@ export default function SucursalesPage() {
     simulateBulkSales(branchId, 12);
   };
 
+  // Compute period multiplier and days count for realistic period calculations
+  const periodMultiplier = useMemo(() => {
+    if (selectedPeriod === "hoy") return 1;
+    if (selectedPeriod === "semana") return 7;
+    if (selectedPeriod === "mes") return 30;
+    if (selectedPeriod === "año") return 365;
+
+    // Custom date range
+    const start = new Date(customStartDate || "2026-08-20");
+    const end = new Date(customEndDate || "2026-09-02");
+    const diff = Math.max(86400000, end.getTime() - start.getTime());
+    return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }, [selectedPeriod, customStartDate, customEndDate]);
+
+  const periodLabel = useMemo(() => {
+    if (selectedPeriod === "hoy") return "Hoy (Día en Curso)";
+    if (selectedPeriod === "semana") return "Esta Semana (Últimos 7 días)";
+    if (selectedPeriod === "mes") return "Este Mes (30 días)";
+    if (selectedPeriod === "año") return "Este Año (12 meses)";
+    return `Rango: ${customStartDate} al ${customEndDate} (${periodMultiplier} días)`;
+  }, [selectedPeriod, customStartDate, customEndDate, periodMultiplier]);
+
+  // General metrics calculated per branch for the selected period
+  const branchesOverview = useMemo(() => {
+    const totalChainPeriodSales = branches.reduce((sum, b) => {
+      // Historical variation weight per branch
+      const weight = b.code.includes("MAT") ? 1.05 : b.code.includes("BEN") ? 0.95 : 1.0;
+      return sum + Math.round(b.todaySales * periodMultiplier * weight);
+    }, 0);
+
+    return branches.map((b) => {
+      const weight = b.code.includes("MAT") ? 1.05 : b.code.includes("BEN") ? 0.95 : 1.0;
+      const periodSales = Math.round(b.todaySales * periodMultiplier * weight);
+      const periodTickets = Math.max(1, Math.round(b.todayTickets * periodMultiplier * weight));
+      // Average price per bread piece ~ $16.5 MXN
+      const periodPieces = Math.round(periodSales / 16.5);
+      const dailyAveragePieces = Math.round(periodPieces / periodMultiplier);
+      const averageTicket = periodSales / periodTickets;
+      const periodGoal = b.dailyGoal * periodMultiplier;
+      const percentGoal = Math.min(100, Math.round((periodSales / (periodGoal || 1)) * 100));
+      const marketShare = totalChainPeriodSales > 0 
+        ? Math.round((periodSales / totalChainPeriodSales) * 100) 
+        : 33;
+
+      return {
+        ...b,
+        periodSales,
+        periodTickets,
+        periodPieces,
+        dailyAveragePieces,
+        averageTicket,
+        periodGoal,
+        percentGoal,
+        marketShare,
+      };
+    });
+  }, [branches, periodMultiplier]);
+
+  // Consolidated table totals for the footer
+  const consolidatedOverview = useMemo(() => {
+    const totalSales = branchesOverview.reduce((sum, b) => sum + b.periodSales, 0);
+    const totalTickets = branchesOverview.reduce((sum, b) => sum + b.periodTickets, 0);
+    const totalPieces = branchesOverview.reduce((sum, b) => sum + b.periodPieces, 0);
+    const totalGoal = branchesOverview.reduce((sum, b) => sum + b.periodGoal, 0);
+    const totalCashInDrawers = branches.reduce((sum, b) => sum + b.cashInDrawer, 0);
+    const averageTicket = totalTickets > 0 ? totalSales / totalTickets : 0;
+    const percentGoal = totalGoal > 0 ? Math.min(100, Math.round((totalSales / totalGoal) * 100)) : 0;
+
+    return {
+      totalSales,
+      totalTickets,
+      totalPieces,
+      totalGoal,
+      totalCashInDrawers,
+      averageTicket,
+      percentGoal,
+    };
+  }, [branchesOverview, branches]);
+
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Header Banner */}
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+      {/* Top Header Banner */}
       <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-stone-800">
         <div className="absolute -right-12 -top-12 w-80 h-80 bg-orange-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-12 -bottom-12 w-80 h-80 bg-rose-500/20 rounded-full blur-3xl pointer-events-none" />
@@ -67,13 +157,13 @@ export default function SucursalesPage() {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-orange-500/20 to-rose-500/20 border border-orange-500/30 text-orange-300 text-xs font-bold uppercase tracking-widest">
               <Building2 className="w-3.5 h-3.5" />
-              Red Multi-Sucursales & Turnos
+              Red Multi-Sucursales & Producción
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Control de Sucursales y Ventas en Vivo
+              Control de Sucursales y Analítica General
             </h1>
             <p className="text-xs sm:text-sm text-stone-300 max-w-2xl leading-relaxed">
-              Monitoreo operativo en tiempo real de las 3 tiendas de <strong>Panaderías Brito</strong>: flujo de caja, turnos activos de cajeros, metas y simulador de clientes.
+              Monitoreo ejecutivo de las 3 tiendas de <strong>Panaderías Brito</strong>: gráfica desplegada de ventas y piezas de pan, tabla general de sucursales, control de turnos y simulador de flujo.
             </p>
           </div>
 
@@ -141,266 +231,359 @@ export default function SucursalesPage() {
         )}
       </div>
 
-      {/* Global Chain Metrics Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Venta Consolidada Hoy</p>
-            <p className="text-2xl font-black text-stone-900 mt-1">{formatCurrency(consolidatedMetrics.totalSales)}</p>
-            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">3 sucursales activas</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center">
-            <TrendingUp className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Total Tickets Emitidos</p>
-            <p className="text-2xl font-black text-stone-900 mt-1">{consolidatedMetrics.totalTickets} clientes</p>
-            <p className="text-[11px] text-stone-500 font-semibold mt-0.5">Ticket promedio: {formatCurrency(consolidatedMetrics.totalSales / (consolidatedMetrics.totalTickets || 1))}</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-            <Receipt className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Efectivo en Cajas</p>
-            <p className="text-2xl font-black text-stone-900 mt-1">{formatCurrency(consolidatedMetrics.totalCashInDrawer)}</p>
-            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Incluye fondos de turno</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-            <Wallet className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Meta Diaria Cadena</p>
-            <p className="text-2xl font-black text-stone-900 mt-1">{consolidatedMetrics.percentGoal}%</p>
-            <div className="w-32 bg-stone-100 rounded-full h-2 mt-2 overflow-hidden">
-              <div 
-                className="bg-gradient-to-r from-orange-500 to-rose-500 h-full rounded-full transition-all duration-500"
-                style={{ width: `${consolidatedMetrics.percentGoal}%` }}
-              />
-            </div>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-            <Sparkles className="w-6 h-6" />
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs / Filter Navigation */}
-      <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-        <div className="flex items-center gap-2">
+      {/* Navigation View Switcher (Tabs) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => setActiveTab("todas")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === "todas"
+            onClick={() => setActiveTab("general")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === "general"
                 ? "bg-stone-900 text-white shadow-md"
                 : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
             }`}
           >
-            🏪 Vista por Sucursal ({branches.length})
+            <TableIcon className="w-4 h-4 text-orange-500" />
+            <span>Resumen General & Gráfica</span>
           </button>
           <button
             onClick={() => setActiveTab("turnos")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === "turnos"
                 ? "bg-stone-900 text-white shadow-md"
                 : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
             }`}
           >
-            ⏰ Estado de Turnos & Arqueo
+            <Clock className="w-4 h-4 text-rose-500" />
+            <span>Estado de Turnos & Arqueo</span>
           </button>
           <button
             onClick={() => setActiveTab("feed")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === "feed"
                 ? "bg-stone-900 text-white shadow-md"
                 : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
             }`}
           >
-            ⚡ Ventas Simuladas en Vivo ({recentSimulatedSales.length})
+            <Zap className="w-4 h-4 text-amber-500" />
+            <span>Ventas Simuladas ({recentSimulatedSales.length})</span>
           </button>
         </div>
 
         <button
           onClick={() => switchBranch("all")}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border self-start sm:self-auto ${
             isAllBranches
               ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
               : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
           }`}
         >
-          {isAllBranches ? "✓ Consolidado Activo" : "Ver Consolidado"}
+          {isAllBranches ? "✓ Consolidado Activo" : "Ver Toda la Cadena"}
         </button>
       </div>
 
-      {/* TAB 1: Branch Cards Grid */}
-      {activeTab === "todas" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {branches.map((b) => {
-            const isSelected = !isAllBranches && currentBranch?.id === b.id;
-            const progress = Math.min(100, Math.round((b.todaySales / b.dailyGoal) * 100));
+      {/* TAB 1: Main Overview (Google-Style Chart + General Table) */}
+      {activeTab === "general" && (
+        <div className="space-y-8 animate-in fade-in">
+          {/* SECTION 1: Google-Style Deployed Interactive Chart */}
+          <GoogleBranchChart
+            branches={branches}
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={setSelectedPeriod}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
+            onCustomDateChange={(start, end) => {
+              setCustomStartDate(start);
+              setCustomEndDate(end);
+              setSelectedPeriod("custom");
+            }}
+            onSimulateSale={handleSimulate}
+          />
 
-            return (
-              <div
-                key={b.id}
-                className={`bg-white rounded-3xl border transition-all duration-300 p-6 flex flex-col justify-between space-y-6 shadow-sm hover:shadow-xl ${
-                  isSelected
-                    ? "border-orange-500 ring-2 ring-orange-500/20 shadow-orange-500/10"
-                    : "border-stone-200/90"
-                }`}
-              >
-                {/* Branch Header */}
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500/10 to-rose-500/10 text-orange-600 border border-orange-200/60 flex items-center justify-center text-xl font-bold">
-                        <Store className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-black text-stone-900 text-base leading-tight">
-                            {b.name}
-                          </h3>
-                        </div>
-                        <span className="text-[10px] font-mono text-stone-400 font-bold uppercase">
-                          {b.code}
-                        </span>
-                      </div>
-                    </div>
-
-                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Abierta
-                    </span>
-                  </div>
-
-                  {/* Address & Manager */}
-                  <div className="mt-4 space-y-1 text-xs text-stone-500 bg-stone-50/70 p-3 rounded-2xl border border-stone-100">
-                    <p className="flex items-center gap-1.5 truncate">
-                      <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                      <span>{b.address}</span>
-                    </p>
-                    <p className="flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                      <span>{b.phone}</span>
-                    </p>
-                    <p className="flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      <span>Responsable: <strong className="text-stone-800">{b.manager}</strong></span>
-                    </p>
-                  </div>
+          {/* SECTION 2: General Overview Table */}
+          <div className="bg-white rounded-3xl border border-stone-200/90 shadow-xl overflow-hidden">
+            {/* Table Header with Details & Period Badge */}
+            <div className="p-6 border-b border-stone-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-stone-50/50">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-stone-900 tracking-tight">
+                    Tabla General de Sucursales
+                  </h3>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-stone-200/70 text-stone-700">
+                    {branches.length} Tiendas Registradas
+                  </span>
                 </div>
-
-                {/* Sales & Daily Goal Progress */}
-                <div className="space-y-3 bg-stone-50/50 p-4 rounded-2xl border border-stone-100">
-                  <div className="flex items-baseline justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Ventas de Hoy</p>
-                      <p className="text-2xl font-black text-stone-900 leading-tight">
-                        {formatCurrency(b.todaySales)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-black text-orange-600 bg-orange-100/70 px-2 py-0.5 rounded-lg">
-                        {progress}% Meta
-                      </span>
-                      <p className="text-[10px] text-stone-400 mt-0.5">Meta: {formatCurrency(b.dailyGoal)}</p>
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="w-full bg-stone-200/80 rounded-full h-2.5 overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-orange-500 to-rose-600 h-full rounded-full transition-all duration-700"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1">
-                    <span>{b.todayTickets} tickets cobrados</span>
-                    <span>Caja: <strong className="text-stone-800">{formatCurrency(b.cashInDrawer)}</strong></span>
-                  </div>
-                </div>
-
-                {/* Active Shift Brief */}
-                <div className="p-3.5 rounded-2xl bg-white border border-stone-200 text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-stone-700 flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-orange-600" />
-                      {b.currentShift.name}
-                    </span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      En Curso
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-stone-500">
-                    <span>Cajera en turno:</span>
-                    <strong className="text-stone-800">{b.currentShift.cashier}</strong>
-                  </div>
-                </div>
-
-                {/* Card Action Buttons */}
-                <div className="space-y-2 pt-2 border-t border-stone-100">
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleSimulate(b.id)}
-                      className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 hover:brightness-110 text-white font-black text-xs shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                    >
-                      <Zap className="w-3.5 h-3.5 fill-current" />
-                      <span>+1 Venta</span>
-                    </button>
-
-                    <button
-                      onClick={() => advanceShift(b.id)}
-                      className="py-2.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
-                      title="Cerrar turno actual y abrir siguiente"
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Cambiar Turno</span>
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => switchBranch(b.id)}
-                    className={`w-full py-2.5 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 ${
-                      isSelected
-                        ? "bg-stone-900 text-white shadow-md"
-                        : "bg-stone-50 hover:bg-stone-100 text-stone-800 border border-stone-200"
-                    }`}
-                  >
-                    {isSelected ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        <span>Sucursal Activa Seleccionada</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Cambiar a esta Sucursal</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </>
-                    )}
-                  </button>
-                </div>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Datos consolidados de piezas de pan, facturación y arqueo para: <strong className="text-stone-800">{periodLabel}</strong>
+                </p>
               </div>
-            );
-          })}
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-stone-500 font-medium">Sucursal activa en el sistema:</span>
+                <span className="text-xs font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-xl border border-orange-200">
+                  {isAllBranches ? "🌐 Toda la Cadena" : currentBranch?.name}
+                </span>
+              </div>
+            </div>
+
+            {/* General Overview Table Content */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-stone-200 bg-stone-100/60 text-stone-600 uppercase tracking-wider font-extrabold text-[10px]">
+                    <th className="py-3.5 px-4">Sucursal</th>
+                    <th className="py-3.5 px-4">Encargado & Contacto</th>
+                    <th className="py-3.5 px-4">Piezas Vendidas</th>
+                    <th className="py-3.5 px-4">Ventas Totales</th>
+                    <th className="py-3.5 px-4">Ticket Prom.</th>
+                    <th className="py-3.5 px-4">Meta & Cumplimiento</th>
+                    <th className="py-3.5 px-4">Caja & Turno Actual</th>
+                    <th className="py-3.5 px-4 text-right">Acciones Rápidas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100 font-medium">
+                  {branchesOverview.map((b) => {
+                    const isSelected = !isAllBranches && currentBranch?.id === b.id;
+
+                    return (
+                      <tr
+                        key={b.id}
+                        className={`transition-colors duration-150 ${
+                          isSelected ? "bg-orange-50/40 font-semibold" : "hover:bg-stone-50/80"
+                        }`}
+                      >
+                        {/* 1. Sucursal & Codigo */}
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-sm ${
+                              b.id === "branch-matriz" ? "bg-gradient-to-br from-orange-500 to-orange-600" :
+                              b.id === "branch-benito" ? "bg-gradient-to-br from-rose-500 to-rose-600" :
+                              "bg-gradient-to-br from-amber-500 to-amber-600"
+                            }`}>
+                              <Store className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-black text-stone-900 text-sm">{b.name}</p>
+                                {isSelected && (
+                                  <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" title="Seleccionada" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="font-mono text-[10px] text-stone-400 font-bold uppercase">
+                                  {b.code}
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  {b.status}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 2. Encargado & Contacto */}
+                        <td className="py-4 px-4 text-stone-600">
+                          <div className="space-y-0.5">
+                            <p className="font-bold text-stone-900 flex items-center gap-1">
+                              <ShieldCheck className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                              {b.manager}
+                            </p>
+                            <p className="text-[11px] text-stone-500 flex items-center gap-1">
+                              <Phone className="w-3 h-3 text-stone-400 shrink-0" />
+                              {b.phone}
+                            </p>
+                            <p className="text-[10px] text-stone-400 truncate max-w-[170px]" title={b.address}>
+                              {b.address}
+                            </p>
+                          </div>
+                        </td>
+
+                        {/* 3. Piezas de Pan */}
+                        <td className="py-4 px-4">
+                          <div className="space-y-0.5">
+                            <p className="font-black text-stone-900 text-sm flex items-center gap-1 text-amber-700">
+                              <Croissant className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              {b.periodPieces.toLocaleString("es-MX")} <span className="text-[10px] text-stone-400 font-normal">pzas</span>
+                            </p>
+                            <p className="text-[10px] text-stone-500">
+                              Prom. ~{b.dailyAveragePieces.toLocaleString("es-MX")} pz/día
+                            </p>
+                          </div>
+                        </td>
+
+                        {/* 4. Ventas Totales */}
+                        <td className="py-4 px-4">
+                          <div className="space-y-0.5">
+                            <p className="font-black text-stone-900 text-sm">
+                              {formatCurrency(b.periodSales)}
+                            </p>
+                            <p className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
+                              {b.marketShare}% de la red
+                            </p>
+                          </div>
+                        </td>
+
+                        {/* 5. Ticket Promedio */}
+                        <td className="py-4 px-4">
+                          <div>
+                            <p className="font-bold text-stone-800">
+                              {formatCurrency(b.averageTicket)}
+                            </p>
+                            <p className="text-[10px] text-stone-400">
+                              {b.periodTickets.toLocaleString("es-MX")} tickets
+                            </p>
+                          </div>
+                        </td>
+
+                        {/* 6. Meta & Cumplimiento */}
+                        <td className="py-4 px-4 min-w-[140px]">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-black text-stone-800">{b.percentGoal}%</span>
+                              <span className="text-[10px] text-stone-400">Meta: {formatCurrency(b.periodGoal)}</span>
+                            </div>
+                            <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-700 ${
+                                  b.percentGoal >= 90 ? "bg-emerald-500" :
+                                  b.percentGoal >= 70 ? "bg-amber-500" :
+                                  "bg-orange-500"
+                                }`}
+                                style={{ width: `${b.percentGoal}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 7. Caja & Turno Actual */}
+                        <td className="py-4 px-4">
+                          <div className="space-y-0.5">
+                            <p className="font-black text-stone-900 flex items-center gap-1 text-xs">
+                              <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              {formatCurrency(b.cashInDrawer)}
+                            </p>
+                            <p className="text-[11px] text-stone-600 font-semibold truncate max-w-[140px]">
+                              {b.currentShift.cashier}
+                            </p>
+                            <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600">
+                              {b.currentShift.name.split("(")[0]}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 8. Acciones Rápidas */}
+                        <td className="py-4 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleSimulate(b.id)}
+                              className="p-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold transition-all active:scale-95 shadow-sm"
+                              title="Simular 1 venta rápida en esta tienda"
+                            >
+                              <Zap className="w-3.5 h-3.5 fill-current" />
+                            </button>
+
+                            <button
+                              onClick={() => advanceShift(b.id)}
+                              className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold transition-colors"
+                              title="Avanzar / Corte de turno"
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => switchBranch(b.id)}
+                              className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all flex items-center gap-1 ${
+                                isSelected
+                                  ? "bg-stone-900 text-white shadow-md"
+                                  : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200"
+                              }`}
+                            >
+                              {isSelected ? (
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>Activa</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>Seleccionar</span>
+                                  <ChevronRight className="w-3 h-3" />
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+
+                {/* Table Footer: Consolidated Total Row */}
+                <tfoot>
+                  <tr className="border-t-2 border-stone-300 bg-stone-900 text-white font-black text-xs">
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-orange-400" />
+                        <div>
+                          <p className="text-sm uppercase tracking-wider text-orange-400">Total Cadena</p>
+                          <p className="text-[10px] text-stone-400 font-normal">Consolidado general</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-stone-300 text-[11px]">
+                      3 Sucursales Activas
+                    </td>
+                    <td className="py-4 px-4 text-amber-300 text-sm">
+                      {consolidatedOverview.totalPieces.toLocaleString("es-MX")}{" "}
+                      <span className="text-[10px] text-stone-400 font-normal">pzas</span>
+                    </td>
+                    <td className="py-4 px-4 text-white text-base">
+                      {formatCurrency(consolidatedOverview.totalSales)}
+                    </td>
+                    <td className="py-4 px-4 text-stone-200">
+                      {formatCurrency(consolidatedOverview.averageTicket)}
+                    </td>
+                    <td className="py-4 px-4">
+                      <div className="space-y-1">
+                        <span className="text-emerald-400 text-xs">
+                          {consolidatedOverview.percentGoal}% Alcanzado
+                        </span>
+                        <div className="w-28 bg-stone-800 rounded-full h-1.5 overflow-hidden">
+                          <div 
+                            className="bg-emerald-400 h-full rounded-full"
+                            style={{ width: `${consolidatedOverview.percentGoal}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-emerald-300 text-sm">
+                      {formatCurrency(consolidatedOverview.totalCashInDrawers)}
+                    </td>
+                    <td className="py-4 px-4 text-right">
+                      <button
+                        onClick={() => switchBranch("all")}
+                        className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition-all active:scale-95 shadow-md"
+                      >
+                        Ver Consolidado
+                      </button>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
       {/* TAB 2: Shift Management & Arqueo Comparison */}
       {activeTab === "turnos" && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in">
           <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
-            <h3 className="text-base font-black text-stone-900 mb-4">
+            <h3 className="text-base font-black text-stone-900 mb-1">
               Comparativa de Turnos Activos por Sucursal
             </h3>
+            <p className="text-xs text-stone-500 mb-4">
+              Estado en tiempo real del fondo inicial, ventas por medio de pago y arqueo de caja
+            </p>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -465,14 +648,14 @@ export default function SucursalesPage() {
 
       {/* TAB 3: Live Sales Simulation Feed */}
       {activeTab === "feed" && (
-        <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
+        <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4 animate-in fade-in">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-black text-stone-900">
                 Historial de Ventas Simuladas en Tiempo Real
               </h3>
               <p className="text-xs text-stone-500">
-                Tickets emitidos recientemente a través del simulador de ventas
+                Tickets emitidos recientemente a través del simulador de ventas multi-sucursal
               </p>
             </div>
 

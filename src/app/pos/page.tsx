@@ -24,12 +24,16 @@ import {
   ChevronUp,
   Check,
   Filter,
-  X
+  X,
+  Building2,
+  MapPin
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
+import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
@@ -58,6 +62,10 @@ const CATEGORIES = PRODUCT_CATEGORIES;
 const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500];
 
 export default function POSPage() {
+  const { user } = useAuth();
+  const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
+  const activeBranch = currentBranch || branches[0];
+
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -66,9 +74,31 @@ export default function POSPage() {
   const [cashGiven, setCashGiven] = useState<string>("");
   
   // Shift & Cashier state
-  const [cashierName, setCashierName] = useState("Don Toño Brito");
-  const [shiftName, setShiftName] = useState("Turno Matutino (06:00 - 14:00)");
-  const [initialCashFund, setInitialCashFund] = useState(500);
+  const [cashierName, setCashierName] = useState(activeBranch ? activeBranch.currentShift.cashier : "Don Toño Brito");
+  const [shiftName, setShiftName] = useState(activeBranch ? activeBranch.currentShift.name : "Turno Matutino (06:00 - 14:00)");
+  const [initialCashFund, setInitialCashFund] = useState(activeBranch ? activeBranch.currentShift.initialFund : 1000);
+
+  // Auto-sync user and branch
+  useEffect(() => {
+    if (user) {
+      const userBranch = branches.find((b) => b.assignedUserId === user.id);
+      if (userBranch && currentBranch?.id !== userBranch.id) {
+        switchBranch(userBranch.id);
+      }
+      setCashierName(user.name);
+    }
+  }, [user, branches]);
+
+  // Sync shift info when branch changes
+  useEffect(() => {
+    if (activeBranch) {
+      setInitialCashFund(activeBranch.currentShift.initialFund);
+      setShiftName(activeBranch.currentShift.name);
+      if (!user) {
+        setCashierName(activeBranch.assignedUserName || activeBranch.currentShift.cashier);
+      }
+    }
+  }, [activeBranch?.id, user]);
 
   // Modals & Drawers state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -353,6 +383,11 @@ export default function POSPage() {
         change: currentChange,
       };
 
+      if (activeBranch) {
+        const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");
+        registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary);
+      }
+
       setCompletedSale(newSaleRecord);
       setRecentSalesList((prev) => [newSaleRecord, ...prev]);
       setIsSubmitting(false);
@@ -426,6 +461,26 @@ export default function POSPage() {
 
             {/* Quick Actions & Live Financial Widgets */}
             <div className="flex items-center gap-2 flex-wrap self-end xl:self-auto">
+              {/* Selector / Indicador de Sucursal Activa */}
+              {activeBranch && (
+                <div className="relative flex items-center">
+                  <Building2 className="w-3.5 h-3.5 text-brito-orange-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <select
+                    value={activeBranch.id}
+                    onChange={(e) => switchBranch(e.target.value)}
+                    className="bg-white hover:bg-stone-50 text-stone-900 font-extrabold text-xs pl-8 pr-7 py-3 rounded-2xl border border-stone-200/90 shadow-sm focus:ring-2 focus:ring-amber-500 focus:outline-none appearance-none cursor-pointer"
+                    title={`Sucursal: ${activeBranch.name} • ${activeBranch.address}`}
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.shortName} ({b.code})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              )}
+
               {/* BOTÓN PRINCIPAL: Dinero en Caja / Existencias / Turno */}
               <button
                 onClick={() => setShowCashDrawerModal(true)}
@@ -883,6 +938,9 @@ export default function POSPage() {
           cashGiven={completedSale.cashGiven}
           change={completedSale.change}
           cashierName={completedSale.cashier}
+          branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
+          branchAddress={activeBranch ? activeBranch.address : undefined}
+          branchPhone={activeBranch ? activeBranch.phone : undefined}
           date={completedSale.date}
         />
       )}

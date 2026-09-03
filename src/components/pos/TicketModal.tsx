@@ -15,6 +15,9 @@ interface TicketModalProps {
   cashGiven?: number;
   change?: number;
   cashierName?: string;
+  branchName?: string;
+  branchAddress?: string;
+  branchPhone?: string;
   date?: string;
 }
 
@@ -28,6 +31,9 @@ export default function TicketModal({
   cashGiven,
   change,
   cashierName = "Caja Principal - Don Toño",
+  branchName = "Sucursal Matriz",
+  branchAddress,
+  branchPhone = "55 1234 5678",
   date,
 }: TicketModalProps) {
   const ticketRef = useRef<HTMLDivElement>(null);
@@ -77,9 +83,13 @@ export default function TicketModal({
               <h2 className="font-black text-sm tracking-wider uppercase text-stone-900">
                 PANADERÍAS BRITO
               </h2>
-              <p className="text-[11px] text-stone-600 font-sans">El auténtico sabor tradicional</p>
-              <p className="text-[10px] text-stone-500 font-sans">Don Antonio Brito & Hijos</p>
-              <p className="text-[10px] text-stone-400 font-sans">Sucursal Matriz • Tel: 55 1234 5678</p>
+              <p className="text-[11px] font-bold text-amber-900 font-sans">{branchName}</p>
+              {branchAddress && (
+                <p className="text-[10px] text-stone-500 font-sans leading-tight px-4">{branchAddress}</p>
+              )}
+              <p className="text-[10px] text-stone-400 font-sans">
+                {branchPhone ? `Tel: ${branchPhone}` : "Don Antonio Brito & Hijos"}
+              </p>
             </div>
 
             {/* Ticket Metadata */}
