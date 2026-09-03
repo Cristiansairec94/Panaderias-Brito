@@ -836,29 +836,6 @@ export default function POSPage() {
             );
           })}
         </div>
-
-        {/* Widget Flotante Estilizado para Bajar y Subir la Página de Pan */}
-        <div className="sticky bottom-5 self-end mr-1 flex flex-col items-center gap-1.5 z-20 pointer-events-auto bg-[#2d1810]/90 hover:bg-[#2d1810] p-1.5 rounded-2xl shadow-xl border-2 border-amber-500/40 backdrop-blur-md transition-all">
-          <button
-            type="button"
-            onClick={scrollToTop}
-            className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:scale-90 text-stone-950 flex items-center justify-center transition-all shadow-md group"
-            title="Subir al inicio del catálogo de pan"
-          >
-            <ChevronUp className="w-5 h-5 stroke-[2.5] group-hover:-translate-y-0.5 transition-transform" />
-          </button>
-          <span className="text-[9px] font-mono font-black text-amber-200 tracking-wider uppercase select-none px-1">
-            PAN
-          </span>
-          <button
-            type="button"
-            onClick={scrollToBottom}
-            className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:scale-90 text-stone-950 flex items-center justify-center transition-all shadow-md group"
-            title="Bajar al final del catálogo de pan"
-          >
-            <ChevronDown className="w-5 h-5 stroke-[2.5] group-hover:translate-y-0.5 transition-transform" />
-          </button>
-        </div>
       </div>
 
       {/* Mobile Backdrop for Cart */}
