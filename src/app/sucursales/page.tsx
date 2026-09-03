@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { 
   Building2, 
@@ -28,7 +28,14 @@ import {
   Calendar,
   Layers,
   Table as TableIcon,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  BarChart3,
+  Flame,
+  Award,
+  Coffee,
+  PieChart
 } from "lucide-react";
 import { useBranch, SimulatedSale } from "@/context/BranchContext";
 import { formatCurrency } from "@/lib/utils";
@@ -56,6 +63,27 @@ export default function SucursalesPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>("semana");
   const [customStartDate, setCustomStartDate] = useState<string>("2026-08-20");
   const [customEndDate, setCustomEndDate] = useState<string>("2026-09-02");
+
+  // Expandable statistics per branch state
+  const [expandedBranchIds, setExpandedBranchIds] = useState<Record<string, boolean>>({
+    "branch-matriz": true, // Default open for demonstration
+  });
+
+  const toggleExpand = (branchId: string) => {
+    setExpandedBranchIds((prev) => ({
+      ...prev,
+      [branchId]: !prev[branchId],
+    }));
+  };
+
+  const toggleAllExpanded = () => {
+    const allOpen = branches.every((b) => expandedBranchIds[b.id]);
+    const nextState: Record<string, boolean> = {};
+    branches.forEach((b) => {
+      nextState[b.id] = !allOpen;
+    });
+    setExpandedBranchIds(nextState);
+  };
 
   const handleSimulate = (branchId?: string) => {
     const sale = simulateSale(branchId);
@@ -92,7 +120,6 @@ export default function SucursalesPage() {
   // General metrics calculated per branch for the selected period
   const branchesOverview = useMemo(() => {
     const totalChainPeriodSales = branches.reduce((sum, b) => {
-      // Historical variation weight per branch
       const weight = b.code.includes("MAT") ? 1.05 : b.code.includes("BEN") ? 0.95 : 1.0;
       return sum + Math.round(b.todaySales * periodMultiplier * weight);
     }, 0);
@@ -111,6 +138,53 @@ export default function SucursalesPage() {
         ? Math.round((periodSales / totalChainPeriodSales) * 100) 
         : 33;
 
+      // Realistic breakdown stats for the expanded drawer
+      const isMatriz = b.code.includes("MAT");
+      const isBenito = b.code.includes("BEN");
+
+      // Bread categories breakdown
+      const dulcePct = isMatriz ? 46 : isBenito ? 42 : 50;
+      const blancoPct = isMatriz ? 36 : isBenito ? 45 : 32;
+      const reposteriaPct = 100 - dulcePct - blancoPct;
+
+      const dulcePieces = Math.round((periodPieces * dulcePct) / 100);
+      const blancoPieces = Math.round((periodPieces * blancoPct) / 100);
+      const reposteriaPieces = periodPieces - dulcePieces - blancoPieces;
+
+      // Payment method breakdown
+      const cashPct = isBenito ? 76 : isMatriz ? 65 : 68;
+      const cardPct = isMatriz ? 25 : isBenito ? 18 : 22;
+      const transferPct = 100 - cashPct - cardPct;
+
+      // Top products for this store
+      const topProducts = isMatriz
+        ? [
+            { name: "Bolillo Tradicional", pieces: Math.round(periodPieces * 0.22), revenue: Math.round(periodSales * 0.16) },
+            { name: "Concha de Vainilla", pieces: Math.round(periodPieces * 0.18), revenue: Math.round(periodSales * 0.18) },
+            { name: "Pastel 3 Leches", pieces: Math.round(periodPieces * 0.08), revenue: Math.round(periodSales * 0.20) },
+            { name: "Cuerno Mantequilla", pieces: Math.round(periodPieces * 0.12), revenue: Math.round(periodSales * 0.14) },
+          ]
+        : isBenito
+        ? [
+            { name: "Bolillo de Sal (Mercado)", pieces: Math.round(periodPieces * 0.32), revenue: Math.round(periodSales * 0.24) },
+            { name: "Telera para Torta", pieces: Math.round(periodPieces * 0.25), revenue: Math.round(periodSales * 0.19) },
+            { name: "Concha de Chocolate", pieces: Math.round(periodPieces * 0.15), revenue: Math.round(periodSales * 0.16) },
+            { name: "Dona Glaseada", pieces: Math.round(periodPieces * 0.12), revenue: Math.round(periodSales * 0.12) },
+          ]
+        : [
+            { name: "Cuerno de Mantequilla", pieces: Math.round(periodPieces * 0.24), revenue: Math.round(periodSales * 0.22) },
+            { name: "Café de Olla & Moka", pieces: Math.round(periodPieces * 0.18), revenue: Math.round(periodSales * 0.20) },
+            { name: "Oreja Caramelizada", pieces: Math.round(periodPieces * 0.17), revenue: Math.round(periodSales * 0.18) },
+            { name: "Rebanada Cheesecake", pieces: Math.round(periodPieces * 0.09), revenue: Math.round(periodSales * 0.19) },
+          ];
+
+      // Rush hours
+      const peakHours = [
+        { hour: "07:00 - 09:30 hrs", label: "Pico Mañanero (Café & Bolillos)", intensity: 95, icon: "☕" },
+        { hour: "13:00 - 14:30 hrs", label: "Comida (Teleras & Baguettes)", intensity: 72, icon: "🥖" },
+        { hour: "17:30 - 20:30 hrs", label: "Pan Caliente (Cena Familiar)", intensity: 100, icon: "🏆" },
+      ];
+
       return {
         ...b,
         periodSales,
@@ -121,6 +195,23 @@ export default function SucursalesPage() {
         periodGoal,
         percentGoal,
         marketShare,
+        details: {
+          categories: [
+            { name: "Pan Dulce Tradicional", pct: dulcePct, pieces: dulcePieces, color: "bg-amber-500", textColor: "text-amber-700" },
+            { name: "Pan Blanco & Teleras", pct: blancoPct, pieces: blancoPieces, color: "bg-orange-500", textColor: "text-orange-700" },
+            { name: "Pastelería & Repostería", pct: reposteriaPct, pieces: reposteriaPieces, color: "bg-rose-500", textColor: "text-rose-700" },
+          ],
+          payment: {
+            cashPct,
+            cashAmount: Math.round((periodSales * cashPct) / 100),
+            cardPct,
+            cardAmount: Math.round((periodSales * cardPct) / 100),
+            transferPct,
+            transferAmount: Math.round((periodSales * transferPct) / 100),
+          },
+          topProducts,
+          peakHours,
+        },
       };
     });
   }, [branches, periodMultiplier]);
@@ -163,7 +254,7 @@ export default function SucursalesPage() {
               Control de Sucursales y Analítica General
             </h1>
             <p className="text-xs sm:text-sm text-stone-300 max-w-2xl leading-relaxed">
-              Monitoreo ejecutivo de las 3 tiendas de <strong>Panaderías Brito</strong>: gráfica desplegada de ventas y piezas de pan, tabla general de sucursales, control de turnos y simulador de flujo.
+              Monitoreo ejecutivo de las 3 tiendas de <strong>Panaderías Brito</strong>: gráfica desplegada de ventas y piezas de pan, tabla general de sucursales con estadísticas desplegables, turnos y simulador de flujo.
             </p>
           </div>
 
@@ -301,7 +392,7 @@ export default function SucursalesPage() {
 
           {/* SECTION 2: General Overview Table */}
           <div className="bg-white rounded-3xl border border-stone-200/90 shadow-xl overflow-hidden">
-            {/* Table Header with Details & Period Badge */}
+            {/* Table Header with Details & Action to toggle all statistics */}
             <div className="p-6 border-b border-stone-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-stone-50/50">
               <div>
                 <div className="flex items-center gap-2">
@@ -317,11 +408,25 @@ export default function SucursalesPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-stone-500 font-medium">Sucursal activa en el sistema:</span>
-                <span className="text-xs font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-xl border border-orange-200">
-                  {isAllBranches ? "🌐 Toda la Cadena" : currentBranch?.name}
-                </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={toggleAllExpanded}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs border border-stone-200 shadow-sm transition-all"
+                >
+                  <BarChart3 className="w-3.5 h-3.5 text-orange-600" />
+                  <span>
+                    {branches.every((b) => expandedBranchIds[b.id])
+                      ? "Colapsar Todas"
+                      : "Desplegar Todas las Estadísticas"}
+                  </span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-stone-500 font-medium">Activa:</span>
+                  <span className="text-xs font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-xl border border-orange-200">
+                    {isAllBranches ? "🌐 Cadena Completa" : currentBranch?.shortName}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -337,182 +442,425 @@ export default function SucursalesPage() {
                     <th className="py-3.5 px-4">Ticket Prom.</th>
                     <th className="py-3.5 px-4">Meta & Cumplimiento</th>
                     <th className="py-3.5 px-4">Caja & Turno Actual</th>
-                    <th className="py-3.5 px-4 text-right">Acciones Rápidas</th>
+                    <th className="py-3.5 px-4 text-right">Estadísticas & Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 font-medium">
                   {branchesOverview.map((b) => {
                     const isSelected = !isAllBranches && currentBranch?.id === b.id;
+                    const isExpanded = !!expandedBranchIds[b.id];
 
                     return (
-                      <tr
-                        key={b.id}
-                        className={`transition-colors duration-150 ${
-                          isSelected ? "bg-orange-50/40 font-semibold" : "hover:bg-stone-50/80"
-                        }`}
-                      >
-                        {/* 1. Sucursal & Codigo */}
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-sm ${
-                              b.id === "branch-matriz" ? "bg-gradient-to-br from-orange-500 to-orange-600" :
-                              b.id === "branch-benito" ? "bg-gradient-to-br from-rose-500 to-rose-600" :
-                              "bg-gradient-to-br from-amber-500 to-amber-600"
-                            }`}>
-                              <Store className="w-5 h-5" />
+                      <React.Fragment key={b.id}>
+                        <tr
+                          className={`transition-colors duration-150 ${
+                            isSelected ? "bg-orange-50/40 font-semibold" : isExpanded ? "bg-stone-50/50" : "hover:bg-stone-50/80"
+                          }`}
+                        >
+                          {/* 1. Sucursal & Codigo */}
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-sm ${
+                                b.id === "branch-matriz" ? "bg-gradient-to-br from-orange-500 to-orange-600" :
+                                b.id === "branch-benito" ? "bg-gradient-to-br from-rose-500 to-rose-600" :
+                                "bg-gradient-to-br from-amber-500 to-amber-600"
+                              }`}>
+                                <Store className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="font-black text-stone-900 text-sm">{b.name}</p>
+                                  {isSelected && (
+                                    <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" title="Seleccionada" />
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="font-mono text-[10px] text-stone-400 font-bold uppercase">
+                                    {b.code}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    {b.status}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
+                          </td>
+
+                          {/* 2. Encargado & Contacto */}
+                          <td className="py-4 px-4 text-stone-600">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-stone-900 flex items-center gap-1">
+                                <ShieldCheck className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                {b.manager}
+                              </p>
+                              <p className="text-[11px] text-stone-500 flex items-center gap-1">
+                                <Phone className="w-3 h-3 text-stone-400 shrink-0" />
+                                {b.phone}
+                              </p>
+                              <p className="text-[10px] text-stone-400 truncate max-w-[170px]" title={b.address}>
+                                {b.address}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* 3. Piezas de Pan */}
+                          <td className="py-4 px-4">
+                            <div className="space-y-0.5">
+                              <p className="font-black text-stone-900 text-sm flex items-center gap-1 text-amber-700">
+                                <Croissant className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                {b.periodPieces.toLocaleString("es-MX")} <span className="text-[10px] text-stone-400 font-normal">pzas</span>
+                              </p>
+                              <p className="text-[10px] text-stone-500">
+                                Prom. ~{b.dailyAveragePieces.toLocaleString("es-MX")} pz/día
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* 4. Ventas Totales */}
+                          <td className="py-4 px-4">
+                            <div className="space-y-0.5">
+                              <p className="font-black text-stone-900 text-sm">
+                                {formatCurrency(b.periodSales)}
+                              </p>
+                              <p className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
+                                {b.marketShare}% de la red
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* 5. Ticket Promedio */}
+                          <td className="py-4 px-4">
                             <div>
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-black text-stone-900 text-sm">{b.name}</p>
-                                {isSelected && (
-                                  <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" title="Seleccionada" />
-                                )}
+                              <p className="font-bold text-stone-800">
+                                {formatCurrency(b.averageTicket)}
+                              </p>
+                              <p className="text-[10px] text-stone-400">
+                                {b.periodTickets.toLocaleString("es-MX")} tickets
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* 6. Meta & Cumplimiento */}
+                          <td className="py-4 px-4 min-w-[140px]">
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-black text-stone-800">{b.percentGoal}%</span>
+                                <span className="text-[10px] text-stone-400">Meta: {formatCurrency(b.periodGoal)}</span>
                               </div>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="font-mono text-[10px] text-stone-400 font-bold uppercase">
-                                  {b.code}
-                                </span>
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  {b.status}
-                                </span>
+                              <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-700 ${
+                                    b.percentGoal >= 90 ? "bg-emerald-500" :
+                                    b.percentGoal >= 70 ? "bg-amber-500" :
+                                    "bg-orange-500"
+                                  }`}
+                                  style={{ width: `${b.percentGoal}%` }}
+                                />
                               </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* 2. Encargado & Contacto */}
-                        <td className="py-4 px-4 text-stone-600">
-                          <div className="space-y-0.5">
-                            <p className="font-bold text-stone-900 flex items-center gap-1">
-                              <ShieldCheck className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                              {b.manager}
-                            </p>
-                            <p className="text-[11px] text-stone-500 flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-stone-400 shrink-0" />
-                              {b.phone}
-                            </p>
-                            <p className="text-[10px] text-stone-400 truncate max-w-[170px]" title={b.address}>
-                              {b.address}
-                            </p>
-                          </div>
-                        </td>
-
-                        {/* 3. Piezas de Pan */}
-                        <td className="py-4 px-4">
-                          <div className="space-y-0.5">
-                            <p className="font-black text-stone-900 text-sm flex items-center gap-1 text-amber-700">
-                              <Croissant className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                              {b.periodPieces.toLocaleString("es-MX")} <span className="text-[10px] text-stone-400 font-normal">pzas</span>
-                            </p>
-                            <p className="text-[10px] text-stone-500">
-                              Prom. ~{b.dailyAveragePieces.toLocaleString("es-MX")} pz/día
-                            </p>
-                          </div>
-                        </td>
-
-                        {/* 4. Ventas Totales */}
-                        <td className="py-4 px-4">
-                          <div className="space-y-0.5">
-                            <p className="font-black text-stone-900 text-sm">
-                              {formatCurrency(b.periodSales)}
-                            </p>
-                            <p className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded inline-block">
-                              {b.marketShare}% de la red
-                            </p>
-                          </div>
-                        </td>
-
-                        {/* 5. Ticket Promedio */}
-                        <td className="py-4 px-4">
-                          <div>
-                            <p className="font-bold text-stone-800">
-                              {formatCurrency(b.averageTicket)}
-                            </p>
-                            <p className="text-[10px] text-stone-400">
-                              {b.periodTickets.toLocaleString("es-MX")} tickets
-                            </p>
-                          </div>
-                        </td>
-
-                        {/* 6. Meta & Cumplimiento */}
-                        <td className="py-4 px-4 min-w-[140px]">
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between text-[11px]">
-                              <span className="font-black text-stone-800">{b.percentGoal}%</span>
-                              <span className="text-[10px] text-stone-400">Meta: {formatCurrency(b.periodGoal)}</span>
+                          {/* 7. Caja & Turno Actual */}
+                          <td className="py-4 px-4">
+                            <div className="space-y-0.5">
+                              <p className="font-black text-stone-900 flex items-center gap-1 text-xs">
+                                <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                {formatCurrency(b.cashInDrawer)}
+                              </p>
+                              <p className="text-[11px] text-stone-600 font-semibold truncate max-w-[140px]">
+                                {b.currentShift.cashier}
+                              </p>
+                              <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600">
+                                {b.currentShift.name.split("(")[0]}
+                              </span>
                             </div>
-                            <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-700 ${
-                                  b.percentGoal >= 90 ? "bg-emerald-500" :
-                                  b.percentGoal >= 70 ? "bg-amber-500" :
-                                  "bg-orange-500"
+                          </td>
+
+                          {/* 8. Botón Ver Estadísticas Desplegable & Acciones */}
+                          <td className="py-4 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                              {/* BOTÓN PRINCIPAL SOLICITADO: Ver Estadísticas Desplegable */}
+                              <button
+                                onClick={() => toggleExpand(b.id)}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all border shadow-sm ${
+                                  isExpanded
+                                    ? "bg-stone-900 text-white border-stone-900 shadow-md"
+                                    : "bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200 active:scale-95"
                                 }`}
-                                style={{ width: `${b.percentGoal}%` }}
-                              />
+                                title="Desplegar panel con estadísticas detalladas de esta sucursal"
+                              >
+                                <BarChart3 className="w-3.5 h-3.5 text-orange-500" />
+                                <span>{isExpanded ? "Ocultar Estadísticas" : "Ver Estadísticas"}</span>
+                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                              </button>
+
+                              <button
+                                onClick={() => handleSimulate(b.id)}
+                                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold transition-all active:scale-95 shadow-sm"
+                                title="Simular 1 venta rápida en esta tienda"
+                              >
+                                <Zap className="w-3.5 h-3.5 fill-current text-amber-600" />
+                              </button>
+
+                              <button
+                                onClick={() => switchBranch(b.id)}
+                                className={`px-2.5 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1 ${
+                                  isSelected
+                                    ? "bg-emerald-600 text-white shadow-sm"
+                                    : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200"
+                                }`}
+                                title={isSelected ? "Sucursal activa seleccionada" : "Seleccionar en POS"}
+                              >
+                                {isSelected ? (
+                                  <>
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                                    <span>Activa</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>Ir a POS</span>
+                                    <ChevronRight className="w-3 h-3 text-stone-400" />
+                                  </>
+                                )}
+                              </button>
                             </div>
-                          </div>
-                        </td>
+                          </td>
+                        </tr>
 
-                        {/* 7. Caja & Turno Actual */}
-                        <td className="py-4 px-4">
-                          <div className="space-y-0.5">
-                            <p className="font-black text-stone-900 flex items-center gap-1 text-xs">
-                              <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              {formatCurrency(b.cashInDrawer)}
-                            </p>
-                            <p className="text-[11px] text-stone-600 font-semibold truncate max-w-[140px]">
-                              {b.currentShift.cashier}
-                            </p>
-                            <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600">
-                              {b.currentShift.name.split("(")[0]}
-                            </span>
-                          </div>
-                        </td>
+                        {/* PANEL DESPLEGABLE: Estadísticas Detalladas de la Sucursal */}
+                        {isExpanded && (
+                          <tr className="bg-orange-50/20 border-b-2 border-orange-200/70">
+                            <td colSpan={8} className="p-4 sm:p-6 animate-in fade-in slide-in-from-top-2 duration-200">
+                              <div className="bg-white rounded-3xl border border-orange-200/90 shadow-xl p-5 sm:p-6 space-y-6">
+                                {/* Header del Panel Desplegable */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-md ${
+                                      b.id === "branch-matriz" ? "bg-gradient-to-br from-orange-500 to-orange-600" :
+                                      b.id === "branch-benito" ? "bg-gradient-to-br from-rose-500 to-rose-600" :
+                                      "bg-gradient-to-br from-amber-500 to-amber-600"
+                                    }`}>
+                                      <BarChart3 className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                      <h4 className="text-base font-black text-stone-900 flex items-center gap-2">
+                                        Estadísticas Operativas: {b.name}
+                                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                                          {b.code}
+                                        </span>
+                                      </h4>
+                                      <p className="text-xs text-stone-500">
+                                        Desglose por tipo de pan, medios de cobro, horas pico y panes estrella para: <strong>{periodLabel}</strong>
+                                      </p>
+                                    </div>
+                                  </div>
 
-                        {/* 8. Acciones Rápidas */}
-                        <td className="py-4 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleSimulate(b.id)}
-                              className="p-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold transition-all active:scale-95 shadow-sm"
-                              title="Simular 1 venta rápida en esta tienda"
-                            >
-                              <Zap className="w-3.5 h-3.5 fill-current" />
-                            </button>
+                                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                                    <button
+                                      onClick={() => handleSimulate(b.id)}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-md shadow-orange-500/20 active:scale-95 transition-all"
+                                    >
+                                      <Zap className="w-3.5 h-3.5 fill-current" />
+                                      <span>+1 Venta en {b.shortName}</span>
+                                    </button>
 
-                            <button
-                              onClick={() => advanceShift(b.id)}
-                              className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold transition-colors"
-                              title="Avanzar / Corte de turno"
-                            >
-                              <Clock className="w-3.5 h-3.5" />
-                            </button>
+                                    <button
+                                      onClick={() => toggleExpand(b.id)}
+                                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs transition-colors"
+                                    >
+                                      <span>Cerrar</span>
+                                      <ChevronUp className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
 
-                            <button
-                              onClick={() => switchBranch(b.id)}
-                              className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all flex items-center gap-1 ${
-                                isSelected
-                                  ? "bg-stone-900 text-white shadow-md"
-                                  : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200"
-                              }`}
-                            >
-                              {isSelected ? (
-                                <>
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                                  <span>Activa</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span>Seleccionar</span>
-                                  <ChevronRight className="w-3 h-3" />
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                                {/* 4 Bloques Analíticos Desplegados */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  {/* Bloque 1: Categorías de Pan Producidas & Vendidas */}
+                                  <div className="bg-stone-50/70 p-4 rounded-2xl border border-stone-200/80 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                                        <Croissant className="w-4 h-4 text-amber-600" />
+                                        Variedad de Pan
+                                      </span>
+                                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                                        {b.periodPieces.toLocaleString("es-MX")} pzas
+                                      </span>
+                                    </div>
+
+                                    <div className="space-y-2 text-xs">
+                                      {b.details.categories.map((cat, idx) => (
+                                        <div key={idx} className="space-y-1">
+                                          <div className="flex justify-between items-center text-[11px]">
+                                            <span className="text-stone-600 font-medium">{cat.name}</span>
+                                            <span className={`font-bold ${cat.textColor}`}>
+                                              {cat.pieces.toLocaleString("es-MX")} pz ({cat.pct}%)
+                                            </span>
+                                          </div>
+                                          <div className="w-full bg-stone-200 rounded-full h-1.5 overflow-hidden">
+                                            <div
+                                              className={`${cat.color} h-full rounded-full`}
+                                              style={{ width: `${cat.pct}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Bloque 2: Distribución de Formas de Pago */}
+                                  <div className="bg-stone-50/70 p-4 rounded-2xl border border-stone-200/80 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                                        <Coins className="w-4 h-4 text-emerald-600" />
+                                        Medios de Pago
+                                      </span>
+                                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                                        {formatCurrency(b.periodSales)}
+                                      </span>
+                                    </div>
+
+                                    <div className="space-y-2 text-xs">
+                                      <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-stone-200/60">
+                                        <span className="text-stone-600 font-medium flex items-center gap-1.5">
+                                          <Wallet className="w-3.5 h-3.5 text-emerald-600" /> Efectivo:
+                                        </span>
+                                        <span className="font-bold text-stone-900">
+                                          {formatCurrency(b.details.payment.cashAmount)}{" "}
+                                          <span className="text-[10px] text-stone-400 font-normal">({b.details.payment.cashPct}%)</span>
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-stone-200/60">
+                                        <span className="text-stone-600 font-medium flex items-center gap-1.5">
+                                          <CreditCard className="w-3.5 h-3.5 text-blue-600" /> Tarjeta:
+                                        </span>
+                                        <span className="font-bold text-stone-900">
+                                          {formatCurrency(b.details.payment.cardAmount)}{" "}
+                                          <span className="text-[10px] text-stone-400 font-normal">({b.details.payment.cardPct}%)</span>
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-stone-200/60">
+                                        <span className="text-stone-600 font-medium flex items-center gap-1.5">
+                                          <Receipt className="w-3.5 h-3.5 text-purple-600" /> Transferencia:
+                                        </span>
+                                        <span className="font-bold text-stone-900">
+                                          {formatCurrency(b.details.payment.transferAmount)}{" "}
+                                          <span className="text-[10px] text-stone-400 font-normal">({b.details.payment.transferPct}%)</span>
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Bloque 3: Horarios Pico en Mostrador */}
+                                  <div className="bg-stone-50/70 p-4 rounded-2xl border border-stone-200/80 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                                        <Clock className="w-4 h-4 text-orange-600" />
+                                        Horas Pico Mostrador
+                                      </span>
+                                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-orange-100 text-orange-800">
+                                        Afluencia
+                                      </span>
+                                    </div>
+
+                                    <div className="space-y-2 text-xs">
+                                      {b.details.peakHours.map((peak, idx) => (
+                                        <div key={idx} className="p-2 rounded-xl bg-white border border-stone-200/60 space-y-1">
+                                          <div className="flex items-center justify-between text-[11px]">
+                                            <span className="font-bold text-stone-800 flex items-center gap-1">
+                                              <span>{peak.icon}</span> {peak.hour}
+                                            </span>
+                                            <span className="font-black text-orange-600 text-[10px]">
+                                              {peak.intensity}% pico
+                                            </span>
+                                          </div>
+                                          <p className="text-[10px] text-stone-500">{peak.label}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Bloque 4: Top Panes Estrella Más Vendidos */}
+                                  <div className="bg-stone-50/70 p-4 rounded-2xl border border-stone-200/80 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                                        <Award className="w-4 h-4 text-amber-500" />
+                                        Panes Estrella
+                                      </span>
+                                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                                        Top 4
+                                      </span>
+                                    </div>
+
+                                    <div className="space-y-1.5 text-xs">
+                                      {b.details.topProducts.map((prod, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition-colors">
+                                          <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-stone-200 text-stone-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                              #{idx + 1}
+                                            </span>
+                                            <span className="font-bold text-stone-800 text-[11px] truncate max-w-[110px]">
+                                              {prod.name}
+                                            </span>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="font-bold text-stone-900 text-[11px]">
+                                              {prod.pieces.toLocaleString("es-MX")} <span className="text-[9px] text-stone-400">pz</span>
+                                            </p>
+                                            <p className="text-[9px] text-emerald-600 font-semibold">
+                                              {formatCurrency(prod.revenue)}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Footer Bar con Balance de Turno y Acción POS */}
+                                <div className="bg-stone-50 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border border-stone-200/80">
+                                  <div className="flex flex-wrap items-center gap-4 text-stone-600">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-stone-400">Turno Activo:</span>
+                                      <strong className="text-stone-900">{b.currentShift.name}</strong>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-stone-400">Cajera / Operador:</span>
+                                      <strong className="text-stone-900">{b.currentShift.cashier}</strong>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-stone-400">Fondo Inicial:</span>
+                                      <strong className="text-stone-900">{formatCurrency(b.currentShift.initialFund)}</strong>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-stone-400">Efectivo en Gaveta:</span>
+                                      <strong className="text-emerald-700 font-black">{formatCurrency(b.cashInDrawer)}</strong>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => advanceShift(b.id)}
+                                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold border border-stone-200 transition-colors"
+                                    >
+                                      Corte de Turno
+                                    </button>
+                                    <button
+                                      onClick={() => switchBranch(b.id)}
+                                      className="px-3.5 py-1.5 rounded-xl bg-stone-900 hover:bg-black text-white font-bold transition-all shadow-sm"
+                                    >
+                                      Usar en POS
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
