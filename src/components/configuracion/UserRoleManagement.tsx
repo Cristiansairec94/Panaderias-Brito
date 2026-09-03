@@ -15,7 +15,6 @@ import {
   BarChart3, 
   Sliders, 
   Phone, 
-  Mail, 
   Lock, 
   Eye, 
   EyeOff, 
@@ -34,12 +33,7 @@ import {
   CalendarDays,
   FileSpreadsheet,
   Upload,
-  Camera,
-  SlidersHorizontal,
-  ChevronRight,
-  Shield,
-  KeyRound,
-  UserCheck
+  Camera
 } from "lucide-react";
 import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
@@ -120,125 +114,109 @@ export const SYSTEM_ROLES: {
   },
 ];
 
-// System permissions grouped in 4 clear categories for manual assignment
-export interface PermissionItem {
+// Available system permissions categorized with friendly explanations
+export const PERMISSION_DEFINITIONS: {
   key: keyof RolePermissions;
   title: string;
+  category: "operacion" | "administracion" | "seguridad";
   description: string;
   icon: React.ComponentType<{ className?: string }>;
-}
-
-export const PERMISSION_GROUPS: {
-  categoryTitle: string;
-  categoryBadge: string;
-  icon: string;
-  items: PermissionItem[];
 }[] = [
+  // Operación & Mostrador
   {
-    categoryTitle: "Ventas, Caja & Atención en Mostrador",
-    categoryBadge: "Operación",
-    icon: "🛍️",
-    items: [
-      {
-        key: "canAccessPos",
-        title: "Punto de Venta (POS)",
-        description: "Cobro en mostrador, emisión de tickets y selección rápida de productos.",
-        icon: ShoppingBag,
-      },
-      {
-        key: "canAccessCaja",
-        title: "Caja & Turnos de Efectivo",
-        description: "Apertura, arqueos, retiros de dinero, entradas y cierre de turno.",
-        icon: Receipt,
-      },
-      {
-        key: "canAccessProductos",
-        title: "Catálogo de Productos",
-        description: "Consulta de lista de panes, precios de venta, piezas y categorías.",
-        icon: Package,
-      },
-      {
-        key: "canAccessPedidos",
-        title: "Pedidos & Encargos Especiales",
-        description: "Recepción y seguimiento de pedidos de pasteles con anticipos.",
-        icon: CalendarDays,
-      },
-      {
-        key: "canAccessClientes",
-        title: "Clientes & Mayoristas",
-        description: "Directorio de clientes frecuentes, tiendas aliadas y cuentas a crédito.",
-        icon: Users,
-      },
-    ],
+    key: "canAccessPos",
+    title: "Punto de Venta (POS)",
+    category: "operacion",
+    description: "Cobro ágil de pan en mostrador, emisión e impresión de tickets térmicos.",
+    icon: ShoppingBag,
   },
   {
-    categoryTitle: "Almacén, Insumos & Resumen Operativo",
-    categoryBadge: "Almacén",
-    icon: "📦",
-    items: [
-      {
-        key: "canAccessInventario",
-        title: "Inventario & Insumos",
-        description: "Control de bultos de harina, azúcar, materias primas y mermas.",
-        icon: Layers,
-      },
-      {
-        key: "canAccessDashboard",
-        title: "Dashboard / Vista General",
-        description: "Métricas del día, metas de venta y accesos rápidos.",
-        icon: Store,
-      },
-    ],
+    key: "canAccessCaja",
+    title: "Caja & Turnos de Efectivo",
+    category: "operacion",
+    description: "Apertura, arqueos, retiros, entradas y cierre de turnos de efectivo.",
+    icon: Receipt,
   },
   {
-    categoryTitle: "Administración, Finanzas & Reportes",
-    categoryBadge: "Gerencia",
-    icon: "💰",
-    items: [
-      {
-        key: "canAccessFinanzas",
-        title: "Finanzas & Balances",
-        description: "Registro de gastos, compras a proveedores y balances contables.",
-        icon: DollarSign,
-      },
-      {
-        key: "canAccessReportes",
-        title: "Reportes & Estadísticas",
-        description: "Reporte de ventas por hora pico, productos estrella y métricas.",
-        icon: BarChart3,
-      },
-      {
-        key: "canAccessConfiguracion",
-        title: "Configuración del Sistema",
-        description: "Ajustes de panadería, tickets térmicos, sucursales y parámetros ERP.",
-        icon: Sliders,
-      },
-    ],
+    key: "canAccessProductos",
+    title: "Catálogo de Productos",
+    category: "operacion",
+    description: "Consulta de catálogo de panes, categorías, códigos y existencia.",
+    icon: Package,
   },
   {
-    categoryTitle: "Permisos Críticos & Seguridad",
-    categoryBadge: "Sensible",
-    icon: "🛡️",
-    items: [
-      {
-        key: "canEditPrices",
-        title: "Modificar Precios de Venta",
-        description: "Autorización para editar los precios al público de panes y productos.",
-        icon: FileSpreadsheet,
-      },
-      {
-        key: "canViewProfitMargins",
-        title: "Ver Costos Unitarios & Márgenes",
-        description: "Visualización de costos reales de materia prima y utilidad neta.",
-        icon: ShieldCheck,
-      },
-      {
-        key: "canManageUsers",
-        title: "Gestionar Empleados & Roles",
-        description: "Crear, editar o remover empleados y asignar accesos del sistema.",
-        icon: Crown,
-      },
-    ],
+    key: "canAccessPedidos",
+    title: "Pedidos & Encargos Especiales",
+    category: "operacion",
+    description: "Registro de pasteles y pedidos para eventos con cobro de anticipos.",
+    icon: CalendarDays,
+  },
+  {
+    key: "canAccessClientes",
+    title: "Clientes & Mayoristas",
+    category: "operacion",
+    description: "Directorio de clientes frecuentes, tiendas aliadas y cuentas a crédito.",
+    icon: Users,
+  },
+
+  // Gestión Administrativa
+  {
+    key: "canAccessInventario",
+    title: "Inventario & Insumos",
+    category: "administracion",
+    description: "Control de sacos de harina, manteca, azúcar, mermas de horno y recetas.",
+    icon: Layers,
+  },
+  {
+    key: "canAccessDashboard",
+    title: "Dashboard / Resumen General",
+    category: "administracion",
+    description: "Estadísticas globales del día, metas de venta y accesos rápidos.",
+    icon: Store,
+  },
+  {
+    key: "canAccessFinanzas",
+    title: "Finanzas & Balances",
+    category: "administracion",
+    description: "Registro de gastos, compras a proveedores, utilidad neta y balances.",
+    icon: DollarSign,
+  },
+  {
+    key: "canAccessReportes",
+    title: "Reportes & Estadísticas",
+    category: "administracion",
+    description: "Reporte de ventas por hora pico, productos estrella y métricas de caja.",
+    icon: BarChart3,
+  },
+  {
+    key: "canAccessConfiguracion",
+    title: "Configuración del Sistema",
+    category: "administracion",
+    description: "Edición de tickets, parámetros de panadería, turnos y bases de datos.",
+    icon: Sliders,
+  },
+
+  // Seguridad & Sensibles
+  {
+    key: "canEditPrices",
+    title: "Modificar Precios de Venta",
+    category: "seguridad",
+    description: "Autorización para editar precios al público de panes y productos.",
+    icon: FileSpreadsheet,
+  },
+  {
+    key: "canViewProfitMargins",
+    title: "Ver Costos Unitarios & Margen",
+    category: "seguridad",
+    description: "Visualizar el margen de utilidad y costos reales de materias primas.",
+    icon: ShieldCheck,
+  },
+  {
+    key: "canManageUsers",
+    title: "Gestionar Empleados & Permisos",
+    category: "seguridad",
+    description: "Crear, editar o remover empleados y asignar accesos del sistema.",
+    icon: Crown,
   },
 ];
 
@@ -250,28 +228,21 @@ export default function UserRoleManagement() {
   const { user: currentUser, usersList, addUser, updateUser, deleteUser, toggleUserStatus } = useAuth();
   const { branches } = useBranch();
 
-  // Navigation sub-view: "directory" (Cards list) | "workspace" (Direct manual assignment panel)
-  const [viewMode, setViewMode] = useState<"directory" | "workspace">("workspace");
-
-  // Selected employee in Workspace mode
-  const [selectedUserId, setSelectedUserId] = useState<string>(usersList[0]?.id || "usr-1");
-
-  // State to toggle visible password on cards
-  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
-
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
 
+  // State to toggle visible password on cards
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+
   // Create / Edit Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
-  // Form fields
+  // Form fields (email field intentionally removed as requested)
   const [formName, setFormName] = useState("");
   const [formUsername, setFormUsername] = useState("");
-  const [formEmail, setFormEmail] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -281,14 +252,10 @@ export default function UserRoleManagement() {
   const [formBranchId, setFormBranchId] = useState<string>("");
   const [formStatus, setFormStatus] = useState<"activo" | "inactivo">("activo");
   const [formPermissions, setFormPermissions] = useState<RolePermissions>({ ...ROLE_PERMISSIONS.cajero });
+  const [isCustomizingPermissions, setIsCustomizingPermissions] = useState(false);
 
   // File input ref for photo
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Workspace unsaved changes state
-  const [workspaceHasChanges, setWorkspaceHasChanges] = useState(false);
-  const [workspacePermissions, setWorkspacePermissions] = useState<RolePermissions>({ ...ROLE_PERMISSIONS.admin });
-  const [workspaceRole, setWorkspaceRole] = useState<UserRole>("admin");
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -296,22 +263,6 @@ export default function UserRoleManagement() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
-
-  // Currently selected user object for workspace
-  const activeUser = useMemo(() => {
-    return usersList.find((u) => u.id === selectedUserId) || usersList[0] || currentUser;
-  }, [usersList, selectedUserId, currentUser]);
-
-  // Sync workspace permissions when active user changes
-  React.useEffect(() => {
-    if (activeUser) {
-      const base = ROLE_PERMISSIONS[activeUser.role] || ROLE_PERMISSIONS.cajero;
-      const effective = { ...base, ...(activeUser.permissions || {}) };
-      setWorkspacePermissions(effective);
-      setWorkspaceRole(activeUser.role);
-      setWorkspaceHasChanges(false);
-    }
-  }, [activeUser?.id, activeUser?.role]);
 
   // Toggle password visibility on card
   const toggleCardPassword = (userId: string) => {
@@ -326,7 +277,6 @@ export default function UserRoleManagement() {
     setEditingUserId(null);
     setFormName("");
     setFormUsername("");
-    setFormEmail("");
     setFormPhone("");
     setFormPassword("1234");
     setShowPassword(false);
@@ -336,6 +286,7 @@ export default function UserRoleManagement() {
     setFormBranchId(branches[0]?.id || "");
     setFormStatus("activo");
     setFormPermissions({ ...ROLE_PERMISSIONS.cajero });
+    setIsCustomizingPermissions(false);
     setIsModalOpen(true);
   };
 
@@ -343,8 +294,7 @@ export default function UserRoleManagement() {
   const handleOpenEditModal = (targetUser: User) => {
     setEditingUserId(targetUser.id);
     setFormName(targetUser.name);
-    setFormUsername(targetUser.username || (targetUser.email ? targetUser.email.split("@")[0] : "") || "");
-    setFormEmail(targetUser.email || "");
+    setFormUsername(targetUser.username || (targetUser.email ? targetUser.email.split("@")[0] : targetUser.name.toLowerCase().replace(/[^a-z0-9]/g, ".")));
     setFormPhone(targetUser.phone || "");
     setFormPassword(targetUser.password || "••••••");
     setShowPassword(false);
@@ -360,6 +310,11 @@ export default function UserRoleManagement() {
     const base = ROLE_PERMISSIONS[targetUser.role] || ROLE_PERMISSIONS.cajero;
     const effective = { ...base, ...(targetUser.permissions || {}) };
     setFormPermissions(effective);
+
+    const hasCustom = Object.keys(effective).some(
+      (k) => effective[k as keyof RolePermissions] !== base[k as keyof RolePermissions]
+    );
+    setIsCustomizingPermissions(hasCustom);
 
     setIsModalOpen(true);
   };
@@ -383,7 +338,7 @@ export default function UserRoleManagement() {
       const result = event.target?.result as string;
       if (result) {
         setFormPhotoUrl(result);
-        showToast("Fotografía cargada. Guarda para confirmar.");
+        showToast("Fotografía cargada correctamente. Guarda para confirmar.");
       }
     };
     reader.readAsDataURL(file);
@@ -396,56 +351,39 @@ export default function UserRoleManagement() {
     }
   };
 
-  // In Workspace: Change active user's role
-  const handleWorkspaceSelectRole = (newRole: UserRole) => {
-    setWorkspaceRole(newRole);
+  // Handle role select in modal
+  const handleSelectRole = (newRole: UserRole) => {
+    setFormRole(newRole);
     const preset = ROLE_PERMISSIONS[newRole] || ROLE_PERMISSIONS.cajero;
-    setWorkspacePermissions({ ...preset });
-    setWorkspaceHasChanges(true);
-    showToast(`Rol cambiado a ${getRoleLabel(newRole)}. Aplica la plantilla correspondiente.`);
+    setFormPermissions({ ...preset });
+    setIsCustomizingPermissions(false);
+
+    if (!formPhotoUrl && (formAvatar === "👩‍💼" || formAvatar === "👨‍🍳" || formAvatar === "💼")) {
+      if (newRole === "admin") setFormAvatar("👨‍🍳");
+      else if (newRole === "auxiliar_admin") setFormAvatar("💼");
+      else setFormAvatar("👩‍💼");
+    }
   };
 
-  // In Workspace: Toggle permission switch
-  const handleWorkspaceTogglePermission = (permKey: keyof RolePermissions) => {
-    setWorkspacePermissions((prev) => ({
+  // Toggle single permission in modal
+  const handleTogglePermission = (permKey: keyof RolePermissions) => {
+    setFormPermissions((prev) => ({
       ...prev,
       [permKey]: !prev[permKey],
     }));
-    setWorkspaceHasChanges(true);
+    setIsCustomizingPermissions(true);
   };
 
-  // In Workspace: Save all changes
-  const handleSaveWorkspaceChanges = () => {
-    if (!activeUser) return;
-
-    const roleLabels: Record<UserRole, string> = {
-      admin: "Dueño / Administrador",
-      auxiliar_admin: "Auxiliar Administrativo",
-      cajero: "Cajero / Auxiliar de Tienda",
-      panadero: "Jefe de Horno & Producción",
-      supervisor: "Supervisor de Turno",
-    };
-
-    updateUser(activeUser.id, {
-      role: workspaceRole,
-      roleLabel: roleLabels[workspaceRole] || "Personal",
-      permissions: { ...workspacePermissions },
-    });
-
-    setWorkspaceHasChanges(false);
-    showToast(`¡Accesos y rol de ${activeUser.name} actualizados exitosamente!`);
+  // Reset to role preset in modal
+  const handleResetToRolePreset = () => {
+    const preset = ROLE_PERMISSIONS[formRole] || ROLE_PERMISSIONS.cajero;
+    setFormPermissions({ ...preset });
+    setIsCustomizingPermissions(false);
+    showToast(`Accesos restablecidos al perfil predeterminado de ${getRoleLabel(formRole)}.`);
   };
 
-  // In Workspace: Reset to preset
-  const handleWorkspaceResetToRole = () => {
-    const preset = ROLE_PERMISSIONS[workspaceRole] || ROLE_PERMISSIONS.cajero;
-    setWorkspacePermissions({ ...preset });
-    setWorkspaceHasChanges(true);
-    showToast("Accesos restablecidos a los valores predeterminados del rol.");
-  };
-
-  // In Workspace: Grant all
-  const handleWorkspaceGrantAll = () => {
+  // Grant all permissions in modal
+  const handleGrantAll = () => {
     const allTrue: RolePermissions = {
       canAccessDashboard: true,
       canAccessPos: true,
@@ -461,12 +399,12 @@ export default function UserRoleManagement() {
       canEditPrices: true,
       canManageUsers: true,
     };
-    setWorkspacePermissions(allTrue);
-    setWorkspaceHasChanges(true);
+    setFormPermissions(allTrue);
+    setIsCustomizingPermissions(true);
   };
 
-  // In Workspace: Revoke all
-  const handleWorkspaceRevokeAll = () => {
+  // Revoke all permissions in modal
+  const handleRevokeAll = () => {
     const allFalse: RolePermissions = {
       canAccessDashboard: false,
       canAccessPos: false,
@@ -482,8 +420,23 @@ export default function UserRoleManagement() {
       canEditPrices: false,
       canManageUsers: false,
     };
-    setWorkspacePermissions(allFalse);
-    setWorkspaceHasChanges(true);
+    setFormPermissions(allFalse);
+    setIsCustomizingPermissions(true);
+  };
+
+  // Auto-generate username from full name
+  const handleNameChange = (nameVal: string) => {
+    setFormName(nameVal);
+    if (!editingUserId && !formUsername) {
+      const generated = nameVal
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, ".")
+        .replace(/\.+/g, ".")
+        .replace(/^\.|\.$/g, "");
+      if (generated) setFormUsername(generated);
+    }
   };
 
   // In Modal: Form save
@@ -508,10 +461,11 @@ export default function UserRoleManagement() {
     const defaultEmail = `${cleanUsername}@panaderiabrito.com`;
 
     if (editingUserId) {
+      const targetUser = usersList.find((u) => u.id === editingUserId);
       updateUser(editingUserId, {
         name: formName.trim(),
         username: cleanUsername,
-        email: formEmail.trim().toLowerCase() || defaultEmail,
+        email: targetUser?.email || defaultEmail,
         phone: formPhone.trim(),
         password: formPassword.trim() || "1234",
         role: formRole,
@@ -544,7 +498,6 @@ export default function UserRoleManagement() {
         createdAt: new Date().toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" }),
       };
       addUser(newUser);
-      setSelectedUserId(newId);
       showToast(`¡Nuevo empleado "${formName}" registrado con éxito!`);
     }
 
@@ -559,10 +512,6 @@ export default function UserRoleManagement() {
         alert(res.message || "No se pudo eliminar el usuario.");
       } else {
         showToast(`Usuario "${target.name}" eliminado del sistema.`);
-        if (selectedUserId === target.id) {
-          const next = usersList.find((u) => u.id !== target.id);
-          if (next) setSelectedUserId(next.id);
-        }
       }
     }
   };
@@ -603,10 +552,10 @@ export default function UserRoleManagement() {
     });
   }, [usersList, searchTerm, roleFilter, branchFilter]);
 
-  // Active permissions count in workspace
-  const workspaceActivePermsCount = useMemo(() => {
-    return Object.values(workspacePermissions).filter(Boolean).length;
-  }, [workspacePermissions]);
+  // Permissions count for modal
+  const formPermissionsCount = useMemo(() => {
+    return Object.values(formPermissions).filter(Boolean).length;
+  }, [formPermissions]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -620,57 +569,29 @@ export default function UserRoleManagement() {
 
       {/* Top Banner & Header */}
       <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent p-5 sm:p-6 rounded-3xl border border-amber-200/80 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-black uppercase tracking-wider">
-              <ShieldCheck className="w-4 h-4 text-amber-600" /> Control de Personal & Asignación de Roles
+              <ShieldCheck className="w-4 h-4 text-amber-600" /> Control de Personal & Roles ERP
             </div>
             <h3 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
               Gestión de Empleados, Roles & Accesos
             </h3>
             <p className="text-xs text-stone-600 max-w-2xl leading-relaxed">
-              Asigna de forma manual e interactiva los roles de trabajo (
+              Administra al personal de Panaderías Brito: consulta contraseñas, asigna fotografías, define roles (
               <strong className="text-stone-900 font-bold">Administrador</strong>, 
               <strong className="text-stone-900 font-bold"> Auxiliar Administrativo</strong> o 
-              <strong className="text-stone-900 font-bold"> Cajeros / Auxiliares de Tienda</strong>) y activa o desactiva con interruptores cada acceso al sistema.
+              <strong className="text-stone-900 font-bold"> Cajeros / Auxiliares de Tienda</strong>) y edita sus permisos del sistema.
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {/* View Mode Switcher */}
-            <div className="bg-white p-1 rounded-2xl border border-stone-200 shadow-xs flex items-center text-xs font-bold">
-              <button
-                onClick={() => setViewMode("workspace")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
-                  viewMode === "workspace"
-                    ? "bg-stone-900 text-white shadow-sm"
-                    : "text-stone-600 hover:text-stone-900"
-                }`}
-              >
-                <SlidersHorizontal className="w-4 h-4 text-amber-400" />
-                <span>Asignación Manual</span>
-              </button>
-              <button
-                onClick={() => setViewMode("directory")}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
-                  viewMode === "directory"
-                    ? "bg-stone-900 text-white shadow-sm"
-                    : "text-stone-600 hover:text-stone-900"
-                }`}
-              >
-                <Users className="w-4 h-4 text-amber-500" />
-                <span>Directorio ({usersList.length})</span>
-              </button>
-            </div>
-
-            <button
-              onClick={handleOpenCreateModal}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-md shadow-orange-500/20 transition-all active:scale-95 cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Nuevo Empleado</span>
-            </button>
-          </div>
+          <button
+            onClick={handleOpenCreateModal}
+            className="self-start sm:self-center flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs sm:text-sm rounded-2xl shadow-md shadow-orange-500/20 transition-all active:scale-95 cursor-pointer shrink-0"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Nuevo Empleado</span>
+          </button>
         </div>
 
         {/* Quick Stats Grid */}
@@ -717,628 +638,386 @@ export default function UserRoleManagement() {
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* VIEW 1: DIRECT WORKSPACE FOR MANUAL ASSIGNMENT OF ROLES & ACCESSES       */}
-      {/* ========================================================================= */}
-      {viewMode === "workspace" && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-200">
-          
-          {/* LEFT COLUMN: Employee Quick Selector (4 cols) */}
-          <div className="lg:col-span-4 bg-white p-4 rounded-3xl border border-stone-200/90 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
-              <div>
-                <h4 className="font-black text-sm text-stone-900">Seleccionar Empleado</h4>
-                <p className="text-[10px] text-stone-500">Haz clic para asignar roles y permisos</p>
-              </div>
-              <span className="text-[10px] font-black bg-stone-100 px-2 py-0.5 rounded-full text-stone-600">
-                {usersList.length} cuentas
-              </span>
-            </div>
+      {/* Filter & Search Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por nombre, usuario o teléfono..."
+            className="w-full pl-9 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none transition-all"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
 
-            {/* Quick search input */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar empleado..."
-                className="w-full pl-8 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:bg-white focus:ring-2 focus:ring-amber-500"
-              />
-            </div>
-
-            {/* List of employees */}
-            <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
-              {filteredUsers.map((u) => {
-                const isSelected = selectedUserId === u.id;
-                const hasPhoto = Boolean(u.photoUrl || (u.avatar && (u.avatar.startsWith("data:image") || u.avatar.startsWith("http"))));
-                const isInactive = u.status === "inactivo";
-
-                return (
-                  <div
-                    key={u.id}
-                    onClick={() => {
-                      if (workspaceHasChanges) {
-                        if (!confirm("Tienes cambios sin guardar en el empleado actual. ¿Deseas cambiar de empleado?")) return;
-                      }
-                      setSelectedUserId(u.id);
-                    }}
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                      isSelected
-                        ? "bg-amber-500/10 border-amber-500 ring-2 ring-amber-400/40 shadow-xs"
-                        : "bg-stone-50/60 hover:bg-stone-100 border-stone-200/70"
-                    } ${isInactive ? "opacity-60" : ""}`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Avatar / Photo */}
-                      <div className="w-11 h-11 rounded-xl bg-white border border-stone-200 flex items-center justify-center text-xl shadow-xs overflow-hidden shrink-0">
-                        {hasPhoto ? (
-                          <img src={u.photoUrl || u.avatar} alt={u.name} className="w-full h-full object-cover" />
-                        ) : (
-                          u.avatar || "👤"
-                        )}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="font-black text-xs text-stone-900 truncate leading-tight">{u.name}</p>
-                          {currentUser?.id === u.id && (
-                            <span className="text-[8px] font-black bg-amber-500 text-stone-950 px-1 py-0.2 rounded">TÚ</span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-stone-500 truncate mt-0.5">
-                          @{u.username || (u.email ? u.email.split("@")[0] : u.name.toLowerCase().replace(/[^a-z0-9]/g, "."))}
-                        </p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${
-                            u.role === "admin"
-                              ? "bg-amber-100 text-amber-900 border border-amber-200"
-                              : u.role === "auxiliar_admin"
-                              ? "bg-blue-100 text-blue-900 border border-blue-200"
-                              : "bg-emerald-100 text-emerald-900 border border-emerald-200"
-                          }`}>
-                            {getRoleLabel(u.role)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? "text-amber-600 translate-x-0.5" : "text-stone-300"}`} />
-                  </div>
-                );
-              })}
-            </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center bg-stone-100 p-1 rounded-xl font-bold text-[11px]">
+            <button
+              onClick={() => setRoleFilter("all")}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                roleFilter === "all" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              Todos ({usersList.length})
+            </button>
+            <button
+              onClick={() => setRoleFilter("admin")}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                roleFilter === "admin" ? "bg-amber-500 text-stone-950 font-black shadow-sm" : "text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              Admin ({stats.admins})
+            </button>
+            <button
+              onClick={() => setRoleFilter("auxiliar_admin")}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                roleFilter === "auxiliar_admin" ? "bg-blue-600 text-white font-bold shadow-sm" : "text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              Auxiliar ({stats.auxAdmins})
+            </button>
+            <button
+              onClick={() => setRoleFilter("cajero")}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                roleFilter === "cajero" ? "bg-emerald-600 text-white font-bold shadow-sm" : "text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              Cajeros ({stats.cajeros})
+            </button>
           </div>
 
-          {/* RIGHT COLUMN: Interactive Role & Manual Access Workspace (8 cols) */}
-          <div className="lg:col-span-8 bg-white p-6 rounded-3xl border border-stone-200/90 shadow-sm space-y-6">
-            
-            {/* Active Employee Profile Header */}
-            {activeUser ? (
-              <div className="p-4 sm:p-5 bg-gradient-to-r from-stone-50 via-amber-50/40 to-stone-50 rounded-2xl border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-white border-2 border-amber-400/80 shadow-md flex items-center justify-center text-3xl overflow-hidden shrink-0">
-                    {activeUser.photoUrl || (activeUser.avatar && (activeUser.avatar.startsWith("data:image") || activeUser.avatar.startsWith("http"))) ? (
-                      <img src={activeUser.photoUrl || activeUser.avatar} alt={activeUser.name} className="w-full h-full object-cover" />
-                    ) : (
-                      activeUser.avatar || "👤"
+          <select
+            value={branchFilter}
+            onChange={(e) => setBranchFilter(e.target.value)}
+            className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-700 text-xs focus:outline-none"
+          >
+            <option value="all">Todas las sucursales</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.shortName}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Employees Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredUsers.map((usr) => {
+          const isCurrentUser = currentUser?.id === usr.id;
+          const assignedBranch = branches.find((b) => b.id === usr.assignedBranchId || b.assignedUserId === usr.id);
+          const isInactive = usr.status === "inactivo";
+          const hasPhoto = Boolean(usr.photoUrl || (usr.avatar && (usr.avatar.startsWith("data:image") || usr.avatar.startsWith("http"))));
+          const isPasswordVisible = Boolean(visiblePasswords[usr.id]);
+
+          const effectivePermissions = {
+            ...(ROLE_PERMISSIONS[usr.role] || {}),
+            ...(usr.permissions || {}),
+          };
+
+          return (
+            <div
+              key={usr.id}
+              className={`bg-white rounded-3xl border p-5 transition-all hover:shadow-md flex flex-col justify-between space-y-4 relative overflow-hidden group ${
+                isInactive 
+                  ? "border-stone-200 opacity-60 bg-stone-50/50" 
+                  : usr.role === "admin"
+                  ? "border-amber-200/80 hover:border-amber-400"
+                  : usr.role === "auxiliar_admin"
+                  ? "border-blue-200/80 hover:border-blue-400"
+                  : "border-emerald-200/80 hover:border-emerald-400"
+              }`}
+            >
+              {/* Header */}
+              <div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-stone-100 to-amber-50 border border-stone-200 flex items-center justify-center text-3xl shadow-sm group-hover:scale-105 transition-transform overflow-hidden shrink-0">
+                      {hasPhoto ? (
+                        <img src={usr.photoUrl || usr.avatar} alt={usr.name} className="w-full h-full object-cover" />
+                      ) : (
+                        usr.avatar || "👤"
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-black text-sm text-stone-900 leading-tight">{usr.name}</h4>
+                        {isCurrentUser && (
+                          <span className="px-1.5 py-0.5 bg-amber-500 text-stone-950 font-black text-[9px] rounded-md">
+                            Tú
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] font-medium text-stone-500 mt-0.5">
+                        @{usr.username || (usr.email ? usr.email.split("@")[0] : usr.name.toLowerCase().replace(/[^a-z0-9]/g, "."))}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border shadow-2xs ${
+                    usr.role === "admin"
+                      ? "bg-amber-100 text-amber-900 border-amber-300"
+                      : usr.role === "auxiliar_admin"
+                      ? "bg-blue-100 text-blue-900 border-blue-300"
+                      : "bg-emerald-100 text-emerald-900 border-emerald-300"
+                  }`}>
+                    {getRoleLabel(usr.role)}
+                  </span>
+                </div>
+
+                {/* Metadata & Password Reveal */}
+                <div className="mt-4 space-y-2 text-xs text-stone-600 bg-stone-50/80 p-3 rounded-2xl border border-stone-100">
+                  {usr.phone && (
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                      <span className="font-medium">{usr.phone}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span className="font-bold text-stone-800">
+                      {assignedBranch ? `Sucursal ${assignedBranch.shortName}` : "Todas las sucursales"}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between text-[11px]">
+                    <div className="flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-stone-400" />
+                      <span className="font-bold text-stone-700">Contraseña:</span>
+                      <span className="font-mono font-bold text-stone-900 tracking-wider">
+                        {isPasswordVisible ? (usr.password || "1234") : "••••••"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleCardPassword(usr.id)}
+                      className="text-stone-500 hover:text-stone-900 font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      {isPasswordVisible ? <EyeOff className="w-3.5 h-3.5 text-amber-600" /> : <Eye className="w-3.5 h-3.5" />}
+                      <span>{isPasswordVisible ? "Ocultar" : "Ver"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Active Permissions Tags */}
+                <div className="mt-3">
+                  <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1.5">
+                    Accesos autorizados:
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {effectivePermissions.canAccessPos && (
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[10px] font-bold">
+                        POS
+                      </span>
+                    )}
+                    {effectivePermissions.canAccessCaja && (
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[10px] font-bold">
+                        Caja
+                      </span>
+                    )}
+                    {effectivePermissions.canAccessInventario && (
+                      <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md text-[10px] font-bold">
+                        Inventario
+                      </span>
+                    )}
+                    {effectivePermissions.canAccessPedidos && (
+                      <span className="px-2 py-0.5 bg-orange-50 text-orange-800 border border-orange-200 rounded-md text-[10px] font-bold">
+                        Pedidos
+                      </span>
+                    )}
+                    {effectivePermissions.canAccessClientes && (
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-md text-[10px] font-bold">
+                        Clientes
+                      </span>
+                    )}
+                    {effectivePermissions.canAccessFinanzas && (
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-md text-[10px] font-bold">
+                        Finanzas
+                      </span>
+                    )}
+                    {effectivePermissions.canAccessReportes && (
+                      <span className="px-2 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded-md text-[10px] font-bold">
+                        Reportes
+                      </span>
+                    )}
+                    {effectivePermissions.canAccessConfiguracion && (
+                      <span className="px-2 py-0.5 bg-stone-100 text-stone-800 border border-stone-300 rounded-md text-[10px] font-bold">
+                        Config
+                      </span>
                     )}
                   </div>
-
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-black text-base text-stone-900 leading-tight">{activeUser.name}</h3>
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-stone-900 text-white">
-                        {getRoleLabel(workspaceRole)}
-                      </span>
-                      {activeUser.status === "inactivo" && (
-                        <span className="text-[9px] font-bold bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded">
-                          Cuenta Inactiva
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-stone-500 mt-0.5">
-                      <span>@{activeUser.username || activeUser.name.toLowerCase().replace(/[^a-z0-9]/g, ".")}</span>
-                      {activeUser.phone ? <span> • Tel: {activeUser.phone}</span> : null}
-                    </p>
-
-                    {/* Quick Password Reveal */}
-                    <div className="flex items-center gap-2 mt-1.5 text-xs">
-                      <div className="flex items-center gap-1 font-mono text-[11px] font-bold text-stone-700 bg-white px-2 py-0.5 rounded-lg border border-stone-200">
-                        <Lock className="w-3 h-3 text-stone-400" />
-                        <span>Clave: {visiblePasswords[activeUser.id] ? (activeUser.password || "1234") : "••••••"}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => toggleCardPassword(activeUser.id)}
-                        className="text-[10px] font-bold text-amber-800 hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        {visiblePasswords[activeUser.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        <span>{visiblePasswords[activeUser.id] ? "Ocultar" : "Mostrar"}</span>
-                      </button>
-                    </div>
-                  </div>
                 </div>
+              </div>
 
-                <div className="flex sm:flex-col items-end justify-between sm:justify-center gap-2">
+              {/* Actions */}
+              <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
+                <button
+                  onClick={() => toggleUserStatus(usr.id)}
+                  disabled={isCurrentUser || usr.id === "usr-1"}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all disabled:opacity-40 cursor-pointer ${
+                    isInactive
+                      ? "bg-rose-100 text-rose-800 hover:bg-rose-200"
+                      : "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                  }`}
+                >
+                  <Power className="w-3 h-3" />
+                  <span>{isInactive ? "Inactivo" : "Activo"}</span>
+                </button>
+
+                <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => handleOpenEditModal(activeUser)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-all cursor-pointer"
-                    title="Editar fotografía, correo, sucursal o contraseña"
+                    onClick={() => handleOpenEditModal(usr)}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-black rounded-xl text-[11px] shadow-sm transition-all cursor-pointer active:scale-95"
+                    title="Editar empleado, rol y permisos"
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-stone-600" />
-                    <span>Editar Perfil & Foto</span>
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Editar Empleado</span>
                   </button>
-                </div>
-              </div>
-            ) : null}
 
-            {/* SECTION 1: Direct Work Role Selection */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-stone-100 pb-2">
-                <div>
-                  <h4 className="font-black text-xs uppercase tracking-wider text-stone-800 flex items-center gap-1.5">
-                    <span>1. Asignar Rol de Trabajo</span>
-                  </h4>
-                  <p className="text-[10px] text-stone-500">Selecciona el rol operativo principal para este empleado</p>
-                </div>
-                <span className="text-[10px] font-bold text-stone-400">Paso 1 de 2</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {SYSTEM_ROLES.map((role) => {
-                  const isSelected = workspaceRole === role.id;
-                  return (
-                    <div
-                      key={role.id}
-                      onClick={() => handleWorkspaceSelectRole(role.id)}
-                      className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between space-y-2 relative select-none ${
-                        isSelected
-                          ? role.colorClass.activeBorder + " " + role.colorClass.activeBg + " shadow-sm"
-                          : "border-stone-200 hover:border-stone-300 bg-white"
-                      }`}
+                  {!isCurrentUser && usr.id !== "usr-1" && (
+                    <button
+                      onClick={() => handleDelete(usr)}
+                      className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                      title="Eliminar empleado"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl">{role.icon}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${role.colorClass.badgeBg}`}>
-                          {role.badge}
-                        </span>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h5 className="font-black text-stone-900 text-xs">{role.name}</h5>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 font-black" />}
-                        </div>
-                        <p className="text-[10px] font-semibold text-stone-500 mt-0.5">{role.subtitle}</p>
-                        <p className="text-[10px] text-stone-600 mt-1 leading-snug">{role.description}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* SECTION 2: Manual Access Toggles (Switches) */}
-            <div className="space-y-4 pt-1">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-2">
-                <div>
-                  <h4 className="font-black text-xs uppercase tracking-wider text-stone-800 flex items-center gap-2">
-                    <span>2. Asignación Manual de Accesos (Permisos)</span>
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 rounded-full font-black text-[10px]">
-                      {workspaceActivePermsCount} de 13 activos
-                    </span>
-                  </h4>
-                  <p className="text-[10px] text-stone-500">
-                    Enciende o apaga con los interruptores cada capacidad del ERP para este trabajador
-                  </p>
-                </div>
-
-                {/* Quick actions */}
-                <div className="flex items-center gap-1.5 text-[10px] font-bold">
-                  <button
-                    type="button"
-                    onClick={handleWorkspaceResetToRole}
-                    className="text-amber-800 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <RefreshCw className="w-3 h-3" /> Restablecer al rol
-                  </button>
-                  <span className="text-stone-300">•</span>
-                  <button
-                    type="button"
-                    onClick={handleWorkspaceGrantAll}
-                    className="text-stone-600 hover:text-stone-900 cursor-pointer"
-                  >
-                    Activar todos
-                  </button>
-                  <span className="text-stone-300">•</span>
-                  <button
-                    type="button"
-                    onClick={handleWorkspaceRevokeAll}
-                    className="text-stone-600 hover:text-stone-900 cursor-pointer"
-                  >
-                    Desactivar todos
-                  </button>
-                </div>
-              </div>
-
-              {/* Categorized Permissions Grid with Modern Toggle Switches */}
-              <div className="space-y-4">
-                {PERMISSION_GROUPS.map((group) => (
-                  <div key={group.categoryTitle} className="bg-stone-50/70 p-4 rounded-2xl border border-stone-200/80 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{group.icon}</span>
-                        <h5 className="font-black text-xs text-stone-900">{group.categoryTitle}</h5>
-                      </div>
-                      <span className="text-[9px] font-bold px-2 py-0.5 bg-white border border-stone-200 text-stone-600 rounded-full">
-                        {group.categoryBadge}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {group.items.map((perm) => {
-                        const isEnabled = Boolean(workspacePermissions[perm.key]);
-                        const IconComponent = perm.icon;
-
-                        return (
-                          <div
-                            key={perm.key}
-                            onClick={() => handleWorkspaceTogglePermission(perm.key)}
-                            className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 select-none ${
-                              isEnabled
-                                ? "bg-white border-emerald-300 shadow-xs ring-1 ring-emerald-400/30"
-                                : "bg-white/60 border-stone-200 hover:border-stone-300 opacity-70"
-                            }`}
-                          >
-                            <div className="flex items-start gap-2.5 min-w-0">
-                              <div className={`p-1.5 rounded-xl shrink-0 mt-0.5 ${isEnabled ? "bg-emerald-100 text-emerald-800" : "bg-stone-100 text-stone-400"}`}>
-                                <IconComponent className="w-3.5 h-3.5" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-bold text-xs text-stone-900 leading-tight">{perm.title}</p>
-                                <p className="text-[10px] text-stone-500 mt-0.5 leading-snug line-clamp-2">{perm.description}</p>
-                              </div>
-                            </div>
-
-                            {/* MODERN SLIDING TOGGLE SWITCH */}
-                            <div className="shrink-0 flex items-center">
-                              <div
-                                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out ${
-                                  isEnabled ? "bg-emerald-500" : "bg-stone-300"
-                                }`}
-                              >
-                                <div
-                                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
-                                    isEnabled ? "translate-x-5" : "translate-x-0"
-                                  }`}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Action Bar for Workspace */}
-              <div className="pt-3 border-t border-stone-100 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  {workspaceHasChanges ? (
-                    <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-spin" />
-                      <span>Tienes cambios pendientes por guardar</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs font-bold text-stone-400 flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5 text-emerald-500" /> Accesos sincronizados
-                    </span>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   )}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleSaveWorkspaceChanges}
-                  disabled={!workspaceHasChanges}
-                  className={`px-6 py-2.5 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-2 cursor-pointer ${
-                    workspaceHasChanges
-                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/30"
-                      : "bg-stone-200 text-stone-400 cursor-not-allowed"
-                  }`}
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Guardar Asignación Manual</span>
-                </button>
               </div>
             </div>
+          );
+        })}
+      </div>
+
+      {/* Empty State */}
+      {filteredUsers.length === 0 && (
+        <div className="bg-white p-12 text-center rounded-3xl border border-stone-200 shadow-sm space-y-3">
+          <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto text-2xl">
+            🔍
           </div>
+          <h4 className="font-black text-stone-900 text-base">No se encontraron empleados</h4>
+          <p className="text-xs text-stone-500 max-w-sm mx-auto">
+            No hay empleados que coincidan con los filtros seleccionados.
+          </p>
+          <button
+            onClick={() => {
+              setSearchTerm("");
+              setRoleFilter("all");
+              setBranchFilter("all");
+            }}
+            className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs"
+          >
+            Limpiar filtros
+          </button>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* VIEW 2: DIRECTORY CARDS GRID                                             */}
-      {/* ========================================================================= */}
-      {viewMode === "directory" && (
-        <div className="space-y-4 animate-in fade-in duration-200">
-          {/* Filter & Search Bar */}
-          <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nombre, usuario o correo..."
-                className="w-full pl-9 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none transition-all"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-              <div className="flex items-center bg-stone-100 p-1 rounded-xl font-bold text-[11px]">
-                <button
-                  onClick={() => setRoleFilter("all")}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    roleFilter === "all" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-800"
-                  }`}
-                >
-                  Todos ({usersList.length})
-                </button>
-                <button
-                  onClick={() => setRoleFilter("admin")}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    roleFilter === "admin" ? "bg-amber-500 text-stone-950 font-black shadow-sm" : "text-stone-500 hover:text-stone-800"
-                  }`}
-                >
-                  Admin ({stats.admins})
-                </button>
-                <button
-                  onClick={() => setRoleFilter("auxiliar_admin")}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    roleFilter === "auxiliar_admin" ? "bg-blue-600 text-white font-bold shadow-sm" : "text-stone-500 hover:text-stone-800"
-                  }`}
-                >
-                  Auxiliar ({stats.auxAdmins})
-                </button>
-                <button
-                  onClick={() => setRoleFilter("cajero")}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    roleFilter === "cajero" ? "bg-emerald-600 text-white font-bold shadow-sm" : "text-stone-500 hover:text-stone-800"
-                  }`}
-                >
-                  Cajeros ({stats.cajeros})
-                </button>
-              </div>
-
-              <select
-                value={branchFilter}
-                onChange={(e) => setBranchFilter(e.target.value)}
-                className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-700 text-xs focus:outline-none"
-              >
-                <option value="all">Todas las sucursales</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.shortName}
-                  </option>
-                ))}
-              </select>
-            </div>
+      {/* RBAC Reference Matrix Table */}
+      <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm space-y-4">
+        <div className="border-b border-stone-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="font-black text-base text-stone-900 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-amber-500" /> Matriz Comparativa de Accesos por Rol
+            </h3>
+            <p className="text-[11px] text-stone-500 mt-0.5">
+              Visualiza los permisos estándar asignados a cada uno de los roles principales del ERP.
+            </p>
           </div>
+        </div>
 
-          {/* Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredUsers.map((usr) => {
-              const isCurrentUser = currentUser?.id === usr.id;
-              const assignedBranch = branches.find((b) => b.id === usr.assignedBranchId || b.assignedUserId === usr.id);
-              const isInactive = usr.status === "inactivo";
-              const hasPhoto = Boolean(usr.photoUrl || (usr.avatar && (usr.avatar.startsWith("data:image") || usr.avatar.startsWith("http"))));
-              const isPasswordVisible = Boolean(visiblePasswords[usr.id]);
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-stone-50 text-stone-700 font-black border-b border-stone-200">
+              <tr>
+                <th className="p-3.5">Módulo / Capacidad del Sistema</th>
+                <th className="p-3.5 text-center bg-amber-500/10 text-amber-950 font-black">
+                  👑 Administrador
+                </th>
+                <th className="p-3.5 text-center bg-blue-500/10 text-blue-950 font-black">
+                  💼 Auxiliar Administrativo
+                </th>
+                <th className="p-3.5 text-center bg-emerald-500/10 text-emerald-950 font-black">
+                  🛒 Cajeros / Tienda
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100 font-medium">
+              {PERMISSION_DEFINITIONS.map((def) => {
+                const adminHas = ROLE_PERMISSIONS.admin[def.key];
+                const auxHas = ROLE_PERMISSIONS.auxiliar_admin[def.key];
+                const cajeroHas = ROLE_PERMISSIONS.cajero[def.key];
+                const IconComponent = def.icon;
 
-              const effectivePermissions = {
-                ...(ROLE_PERMISSIONS[usr.role] || {}),
-                ...(usr.permissions || {}),
-              };
-
-              return (
-                <div
-                  key={usr.id}
-                  className={`bg-white rounded-3xl border p-5 transition-all hover:shadow-md flex flex-col justify-between space-y-4 relative overflow-hidden group ${
-                    isInactive 
-                      ? "border-stone-200 opacity-60 bg-stone-50/50" 
-                      : usr.role === "admin"
-                      ? "border-amber-200/80 hover:border-amber-400"
-                      : usr.role === "auxiliar_admin"
-                      ? "border-blue-200/80 hover:border-blue-400"
-                      : "border-emerald-200/80 hover:border-emerald-400"
-                  }`}
-                >
-                  {/* Header */}
-                  <div>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-stone-100 to-amber-50 border border-stone-200 flex items-center justify-center text-3xl shadow-sm group-hover:scale-105 transition-transform overflow-hidden shrink-0">
-                          {hasPhoto ? (
-                            <img src={usr.photoUrl || usr.avatar} alt={usr.name} className="w-full h-full object-cover" />
-                          ) : (
-                            usr.avatar || "👤"
-                          )}
+                return (
+                  <tr key={def.key} className="hover:bg-amber-50/30 transition-colors">
+                    <td className="p-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 rounded-lg bg-stone-100 text-stone-700">
+                          <IconComponent className="w-4 h-4" />
                         </div>
                         <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="font-black text-sm text-stone-900 leading-tight">{usr.name}</h4>
-                            {isCurrentUser && (
-                              <span className="px-1.5 py-0.5 bg-amber-500 text-stone-950 font-black text-[9px] rounded-md">
-                                Tú
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] font-medium text-stone-500 mt-0.5">
-                            @{usr.username || (usr.email ? usr.email.split("@")[0] : usr.name.toLowerCase().replace(/[^a-z0-9]/g, "."))}
-                          </p>
+                          <p className="font-bold text-stone-900">{def.title}</p>
+                          <p className="text-[10px] text-stone-500">{def.description}</p>
                         </div>
                       </div>
+                    </td>
 
-                      <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border shadow-2xs ${
-                        usr.role === "admin"
-                          ? "bg-amber-100 text-amber-900 border-amber-300"
-                          : usr.role === "auxiliar_admin"
-                          ? "bg-blue-100 text-blue-900 border-blue-300"
-                          : "bg-emerald-100 text-emerald-900 border-emerald-300"
-                      }`}>
-                        {getRoleLabel(usr.role)}
-                      </span>
-                    </div>
-
-                    {/* Metadata & Password Reveal */}
-                    <div className="mt-4 space-y-2 text-xs text-stone-600 bg-stone-50/80 p-3 rounded-2xl border border-stone-100">
-                      {usr.phone && (
-                        <div className="flex items-center gap-2 text-[11px]">
-                          <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                          <span className="font-medium">{usr.phone}</span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 text-[11px]">
-                        <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                        <span className="font-bold text-stone-800">
-                          {assignedBranch ? `Sucursal ${assignedBranch.shortName}` : "Todas las sucursales"}
+                    <td className="p-3.5 text-center bg-amber-500/5">
+                      {adminHas ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold text-xs shadow-xs">
+                          ✓
                         </span>
-                      </div>
-
-                      <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between text-[11px]">
-                        <div className="flex items-center gap-1.5">
-                          <Lock className="w-3.5 h-3.5 text-stone-400" />
-                          <span className="font-bold text-stone-700">Contraseña:</span>
-                          <span className="font-mono font-bold text-stone-900 tracking-wider">
-                            {isPasswordVisible ? (usr.password || "1234") : "••••••"}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleCardPassword(usr.id)}
-                          className="text-stone-500 hover:text-stone-900 font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                        >
-                          {isPasswordVisible ? <EyeOff className="w-3.5 h-3.5 text-amber-600" /> : <Eye className="w-3.5 h-3.5" />}
-                          <span>{isPasswordVisible ? "Ocultar" : "Ver"}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Active Permissions Tags */}
-                    <div className="mt-3">
-                      <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1.5">
-                        Accesos autorizados:
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {effectivePermissions.canAccessPos && (
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[10px] font-bold">
-                            POS
-                          </span>
-                        )}
-                        {effectivePermissions.canAccessCaja && (
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-[10px] font-bold">
-                            Caja
-                          </span>
-                        )}
-                        {effectivePermissions.canAccessInventario && (
-                          <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md text-[10px] font-bold">
-                            Inventario
-                          </span>
-                        )}
-                        {effectivePermissions.canAccessPedidos && (
-                          <span className="px-2 py-0.5 bg-orange-50 text-orange-800 border border-orange-200 rounded-md text-[10px] font-bold">
-                            Pedidos
-                          </span>
-                        )}
-                        {effectivePermissions.canAccessClientes && (
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-md text-[10px] font-bold">
-                            Clientes
-                          </span>
-                        )}
-                        {effectivePermissions.canAccessFinanzas && (
-                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-md text-[10px] font-bold">
-                            Finanzas
-                          </span>
-                        )}
-                        {effectivePermissions.canAccessReportes && (
-                          <span className="px-2 py-0.5 bg-purple-50 text-purple-800 border border-purple-200 rounded-md text-[10px] font-bold">
-                            Reportes
-                          </span>
-                        )}
-                        {effectivePermissions.canAccessConfiguracion && (
-                          <span className="px-2 py-0.5 bg-stone-100 text-stone-800 border border-stone-300 rounded-md text-[10px] font-bold">
-                            Config
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
-                    <button
-                      onClick={() => toggleUserStatus(usr.id)}
-                      disabled={isCurrentUser || usr.id === "usr-1"}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl font-bold text-[11px] transition-all disabled:opacity-40 cursor-pointer ${
-                        isInactive
-                          ? "bg-rose-100 text-rose-800 hover:bg-rose-200"
-                          : "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                      }`}
-                    >
-                      <Power className="w-3 h-3" />
-                      <span>{isInactive ? "Inactivo" : "Activo"}</span>
-                    </button>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => {
-                          setSelectedUserId(usr.id);
-                          setViewMode("workspace");
-                        }}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 font-black rounded-xl text-[11px] shadow-sm transition-all cursor-pointer"
-                        title="Asignar roles y accesos manualmente"
-                      >
-                        <SlidersHorizontal className="w-3 h-3" />
-                        <span>Asignar Roles</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleOpenEditModal(usr)}
-                        className="p-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-all cursor-pointer"
-                        title="Editar datos personales y foto"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-
-                      {!isCurrentUser && usr.id !== "usr-1" && (
-                        <button
-                          onClick={() => handleDelete(usr)}
-                          className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
-                          title="Eliminar empleado"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      ) : (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full text-xs">
+                          —
+                        </span>
                       )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    </td>
+
+                    <td className="p-3.5 text-center bg-blue-500/5">
+                      {auxHas ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold text-xs shadow-xs">
+                          ✓
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full text-xs">
+                          —
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="p-3.5 text-center bg-emerald-500/5">
+                      {cajeroHas ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold text-xs shadow-xs">
+                          ✓
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full text-xs">
+                          —
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
       {/* ========================================================================= */}
-      {/* MODAL: CREATE / EDIT EMPLOYEE WITH PHOTO & PASSWORD                       */}
+      {/* MODAL: CREATE / EDIT EMPLOYEE WITH PHOTO, ROLES & PERMISSIONS             */}
       {/* ========================================================================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
@@ -1358,7 +1037,7 @@ export default function UserRoleManagement() {
                     {editingUserId ? `Editar Empleado: ${formName || "Personal"}` : "Registrar Nuevo Empleado"}
                   </h3>
                   <p className="text-xs text-stone-500">
-                    Define los datos personales, fotografía y credenciales del trabajador.
+                    Define la fotografía, datos personales, contraseña, rol operativo y accesos al sistema.
                   </p>
                 </div>
               </div>
@@ -1373,236 +1052,355 @@ export default function UserRoleManagement() {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleSaveModalUser} className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+            <form onSubmit={handleSaveModalUser} className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs">
               
-              {/* Photo Upload Section */}
-              <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-stone-800 flex items-center gap-1.5">
-                    <Camera className="w-4 h-4 text-amber-600" /> Fotografía del Empleado
-                  </label>
-                  {formPhotoUrl && (
-                    <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px] flex items-center gap-1">
-                      <Check className="w-3 h-3 text-emerald-600" /> Foto Seleccionada
-                    </span>
-                  )}
+              {/* SECTION 1: Photo & Personal Data */}
+              <div className="space-y-4">
+                <div className="border-b border-stone-100 pb-2">
+                  <h4 className="font-black text-xs uppercase tracking-wider text-stone-800">
+                    1. Fotografía & Datos del Empleado
+                  </h4>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <div className="relative group">
-                    <div className="w-20 h-20 rounded-2xl bg-white border-2 border-amber-300 overflow-hidden flex items-center justify-center text-4xl shadow-md">
-                      {formPhotoUrl ? (
-                        <img src={formPhotoUrl} alt="Foto empleado" className="w-full h-full object-cover" />
-                      ) : (
-                        formAvatar
-                      )}
-                    </div>
+                {/* Photo Upload Section */}
+                <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-stone-800 flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-amber-600" /> Fotografía del Empleado
+                    </label>
                     {formPhotoUrl && (
-                      <button
-                        type="button"
-                        onClick={handleRemovePhoto}
-                        className="absolute -top-2 -right-2 p-1 bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-md transition-all cursor-pointer"
-                        title="Eliminar foto"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                      <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px] flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-600" /> Foto Cargada
+                      </span>
                     )}
                   </div>
 
-                  <div className="space-y-2 flex-1 w-full text-center sm:text-left">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept="image/*"
-                      onChange={handlePhotoUpload}
-                      className="hidden"
-                    />
-                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-4 py-2 bg-stone-900 hover:bg-black text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
-                      >
-                        <Upload className="w-3.5 h-3.5 text-amber-400" />
-                        <span>{formPhotoUrl ? "Cambiar Fotografía" : "Subir Foto desde el Equipo"}</span>
-                      </button>
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="relative group">
+                      <div className="w-20 h-20 rounded-2xl bg-white border-2 border-amber-300 overflow-hidden flex items-center justify-center text-4xl shadow-md">
+                        {formPhotoUrl ? (
+                          <img src={formPhotoUrl} alt="Foto empleado" className="w-full h-full object-cover" />
+                        ) : (
+                          formAvatar
+                        )}
+                      </div>
                       {formPhotoUrl && (
                         <button
                           type="button"
                           onClick={handleRemovePhoto}
-                          className="px-3 py-2 text-rose-700 hover:bg-rose-50 rounded-xl font-bold text-xs transition-all cursor-pointer"
+                          className="absolute -top-2 -right-2 p-1 bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-md transition-all cursor-pointer"
+                          title="Eliminar foto"
                         >
-                          Quitar Foto
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
-                    <p className="text-[10px] text-stone-400 font-medium">
-                      Formatos compatibles: JPG, PNG o WebP desde tu computadora o teléfono.
+
+                    <div className="space-y-2 flex-1 w-full text-center sm:text-left">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-4 py-2 bg-stone-900 hover:bg-black text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{formPhotoUrl ? "Cambiar Fotografía" : "Subir Foto desde el Equipo"}</span>
+                        </button>
+                        {formPhotoUrl && (
+                          <button
+                            type="button"
+                            onClick={handleRemovePhoto}
+                            className="px-3 py-2 text-rose-700 hover:bg-rose-50 rounded-xl font-bold text-xs transition-all cursor-pointer"
+                          >
+                            Quitar Foto
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-stone-400 font-medium">
+                        Formatos compatibles: JPG, PNG o WebP desde tu computadora o teléfono.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-amber-200/60">
+                    <p className="text-[10px] font-bold text-stone-600 mb-1.5">
+                      O elige un avatar / ícono representativo:
                     </p>
+                    <div className="flex items-center gap-2 overflow-x-auto py-1">
+                      {AVATAR_OPTIONS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => {
+                            setFormAvatar(emoji);
+                            setFormPhotoUrl("");
+                          }}
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all shrink-0 cursor-pointer ${
+                            !formPhotoUrl && formAvatar === emoji
+                              ? "bg-amber-400 scale-110 shadow-md ring-2 ring-amber-300"
+                              : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200"
+                          }`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-amber-200/60">
-                  <p className="text-[10px] font-bold text-stone-600 mb-1.5">
-                    O elige un avatar / ícono representativo:
-                  </p>
-                  <div className="flex items-center gap-2 overflow-x-auto py-1">
-                    {AVATAR_OPTIONS.map((emoji) => (
+                {/* Form fields grid (sin correo electrónico) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div className="space-y-1">
+                    <label className="font-bold text-stone-700">Nombre Completo *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Brenda Morales Brito"
+                      value={formName}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-semibold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-stone-700">Usuario para Iniciar Sesión *</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        placeholder="brenda.m"
+                        value={formUsername}
+                        onChange={(e) => setFormUsername(e.target.value)}
+                        className="w-full pl-7 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-mono text-xs font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold">@</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-stone-700">Teléfono / WhatsApp</label>
+                    <input
+                      type="tel"
+                      placeholder="55 1234 5678"
+                      value={formPhone}
+                      onChange={(e) => setFormPhone(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-medium text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-stone-700">Sucursal Asignada</label>
+                    <select
+                      value={formBranchId}
+                      onChange={(e) => setFormBranchId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    >
+                      <option value="">Todas las Sucursales (Sin Restricción)</option>
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} ({b.shortName})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="font-bold text-stone-700">Estado del Empleado</label>
+                    <select
+                      value={formStatus}
+                      onChange={(e) => setFormStatus(e.target.value as "activo" | "inactivo")}
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    >
+                      <option value="activo">Activo (Permite el acceso al sistema)</option>
+                      <option value="inactivo">Inactivo (Acceso suspendido)</option>
+                    </select>
+                  </div>
+
+                  {/* Password field with Show/Hide toggle */}
+                  <div className="space-y-1 sm:col-span-2 bg-stone-50 p-3.5 rounded-2xl border border-stone-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-1">
+                      <label className="font-bold text-stone-700 flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-600" /> Contraseña / PIN de Entrada *
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="text-[11px] font-bold text-stone-700 hover:text-stone-950 flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-stone-100 border border-stone-200 rounded-lg transition-all cursor-pointer shadow-xs"
+                        >
+                          {showPassword ? (
+                            <>
+                              <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Ocultar Contraseña</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5 text-stone-500" />
+                              <span>Visualizar Contraseña</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const randPin = Math.floor(1000 + Math.random() * 9000).toString();
+                            setFormPassword(randPin);
+                            setShowPassword(true);
+                          }}
+                          className="text-[11px] font-bold text-amber-800 hover:underline px-1.5 py-1"
+                        >
+                          Generar PIN
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••"
+                        value={formPassword}
+                        onChange={(e) => setFormPassword(e.target.value)}
+                        className="w-full pl-3.5 pr-12 py-2.5 bg-white border border-stone-200 rounded-xl font-mono text-sm font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none tracking-wider"
+                      />
                       <button
-                        key={emoji}
                         type="button"
-                        onClick={() => {
-                          setFormAvatar(emoji);
-                          setFormPhotoUrl("");
-                        }}
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all shrink-0 cursor-pointer ${
-                          !formPhotoUrl && formAvatar === emoji
-                            ? "bg-amber-400 scale-110 shadow-md ring-2 ring-amber-300"
-                            : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200"
-                        }`}
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
+                        tabIndex={-1}
                       >
-                        {emoji}
+                        {showPassword ? <EyeOff className="w-4 h-4 text-amber-600" /> : <Eye className="w-4 h-4" />}
                       </button>
-                    ))}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Personal Data Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Nombre Completo *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Brenda Morales Brito"
-                    value={formName}
-                    onChange={(e) => {
-                      setFormName(e.target.value);
-                      if (!editingUserId && !formUsername) {
-                        const clean = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ".");
-                        setFormUsername(clean);
-                      }
-                    }}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-semibold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
+              {/* SECTION 2: Role Selection */}
+              <div className="space-y-3 pt-2">
+                <div className="border-b border-stone-100 pb-2">
+                  <h4 className="font-black text-xs uppercase tracking-wider text-stone-800">
+                    2. Selección de Rol Operativo
+                  </h4>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Usuario para Iniciar Sesión *</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      placeholder="brenda.m"
-                      value={formUsername}
-                      onChange={(e) => setFormUsername(e.target.value)}
-                      className="w-full pl-7 pr-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-mono text-xs font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                    />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold">@</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Teléfono / WhatsApp</label>
-                  <input
-                    type="tel"
-                    placeholder="55 1234 5678"
-                    value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-medium text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Sucursal Asignada</label>
-                  <select
-                    value={formBranchId}
-                    onChange={(e) => setFormBranchId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  >
-                    <option value="">Todas las Sucursales (Sin Restricción)</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.shortName})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Rol Inicial</label>
-                  <select
-                    value={formRole}
-                    onChange={(e) => {
-                      const r = e.target.value as UserRole;
-                      setFormRole(r);
-                      setFormPermissions({ ...(ROLE_PERMISSIONS[r] || ROLE_PERMISSIONS.cajero) });
-                    }}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  >
-                    <option value="admin">Administrador (Acceso Total)</option>
-                    <option value="auxiliar_admin">Auxiliar Administrativo</option>
-                    <option value="cajero">Cajero o Auxiliar de Tienda</option>
-                  </select>
-                </div>
-
-                {/* Password field with Show/Hide toggle */}
-                <div className="space-y-1 sm:col-span-2 bg-stone-50 p-3.5 rounded-2xl border border-stone-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-1">
-                    <label className="font-bold text-stone-700 flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-amber-600" /> Contraseña / PIN de Entrada *
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="text-[11px] font-bold text-stone-700 hover:text-stone-950 flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-stone-100 border border-stone-200 rounded-lg transition-all cursor-pointer shadow-xs"
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {SYSTEM_ROLES.map((role) => {
+                    const isSelected = formRole === role.id;
+                    return (
+                      <div
+                        key={role.id}
+                        onClick={() => handleSelectRole(role.id)}
+                        className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between space-y-2.5 relative ${
+                          isSelected
+                            ? role.colorClass.activeBorder + " " + role.colorClass.activeBg + " shadow-md"
+                            : "border-stone-200 hover:border-stone-300 bg-white"
+                        }`}
                       >
-                        {showPassword ? (
-                          <>
-                            <EyeOff className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Ocultar Contraseña</span>
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="w-3.5 h-3.5 text-stone-500" />
-                            <span>Visualizar Contraseña</span>
-                          </>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const randPin = Math.floor(1000 + Math.random() * 9000).toString();
-                          setFormPassword(randPin);
-                          setShowPassword(true);
-                        }}
-                        className="text-[11px] font-bold text-amber-800 hover:underline px-1.5 py-1"
-                      >
-                        Generar PIN
-                      </button>
-                    </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl">{role.icon}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${role.colorClass.badgeBg}`}>
+                            {role.badge}
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <h5 className="font-black text-stone-900 text-xs">{role.name}</h5>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 font-black" />}
+                          </div>
+                          <p className="text-[10px] font-semibold text-stone-500 mt-0.5">{role.subtitle}</p>
+                          <p className="text-[10px] text-stone-600 mt-1.5 leading-snug">{role.description}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SECTION 3: System Accesses */}
+              <div className="space-y-3 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-black text-xs uppercase tracking-wider text-stone-800">
+                      3. Accesos y Permisos del Sistema
+                    </h4>
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded-full font-black text-[10px]">
+                      {formPermissionsCount} de {PERMISSION_DEFINITIONS.length} activos
+                    </span>
                   </div>
 
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      placeholder="••••••"
-                      value={formPassword}
-                      onChange={(e) => setFormPassword(e.target.value)}
-                      className="w-full pl-3.5 pr-12 py-2.5 bg-white border border-stone-200 rounded-xl font-mono text-sm font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none tracking-wider"
-                    />
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold">
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
-                      tabIndex={-1}
+                      onClick={handleResetToRolePreset}
+                      className="text-amber-800 hover:underline flex items-center gap-1 cursor-pointer"
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4 text-amber-600" /> : <Eye className="w-4 h-4" />}
+                      <RefreshCw className="w-3 h-3" /> Restablecer al rol
+                    </button>
+                    <span className="text-stone-300">•</span>
+                    <button
+                      type="button"
+                      onClick={handleGrantAll}
+                      className="text-stone-600 hover:text-stone-900 cursor-pointer"
+                    >
+                      Todos
+                    </button>
+                    <span className="text-stone-300">•</span>
+                    <button
+                      type="button"
+                      onClick={handleRevokeAll}
+                      className="text-stone-600 hover:text-stone-900 cursor-pointer"
+                    >
+                      Ninguno
                     </button>
                   </div>
+                </div>
+
+                {isCustomizingPermissions && (
+                  <div className="p-2.5 bg-blue-50/70 rounded-xl border border-blue-200/80 text-[11px] text-blue-900 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>Permisos personalizados activos para este empleado. Puedes marcar o desmarcar cada acceso libremente.</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {PERMISSION_DEFINITIONS.map((def) => {
+                    const isChecked = Boolean(formPermissions[def.key]);
+                    const IconComp = def.icon;
+
+                    return (
+                      <label
+                        key={def.key}
+                        className={`flex items-start gap-3 p-3 rounded-2xl border transition-all cursor-pointer select-none ${
+                          isChecked
+                            ? "bg-amber-50/60 border-amber-300 shadow-2xs"
+                            : "bg-stone-50/50 border-stone-200 opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleTogglePermission(def.key)}
+                          className="w-4 h-4 mt-0.5 rounded text-amber-600 focus:ring-amber-500 border-stone-300 cursor-pointer"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <IconComp className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                            <span className="font-bold text-stone-900 text-xs">{def.title}</span>
+                          </div>
+                          <p className="text-[10px] text-stone-500 mt-0.5 leading-snug">{def.description}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1621,7 +1419,7 @@ export default function UserRoleManagement() {
                   className="px-6 py-2.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-2"
                 >
                   <Check className="w-4 h-4" />
-                  <span>{editingUserId ? "Guardar Cambios" : "Registrar Empleado"}</span>
+                  <span>{editingUserId ? "Guardar Cambios del Empleado" : "Registrar Empleado"}</span>
                 </button>
               </div>
             </form>
