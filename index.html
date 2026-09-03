@@ -499,8 +499,8 @@
                   </div>
                 </div>
 
-                {/* Cuadrícula de 12 Botones tal como estaba antes */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                {/* Cuadrícula de Botones Grandes y Claros (Sin recortes de texto) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5">
                   {CATEGORIES.map((cat) => {
                     const isSelected = selectedCategory === cat.id;
                     const count = cat.id === "all"
@@ -518,24 +518,26 @@
                             setSelectedCategory(cat.id);
                           }
                         }}
-                        className={`relative px-3 py-2 rounded-2xl text-xs font-bold transition-all duration-150 flex items-center justify-between border active:scale-95 ${
+                        className={`relative px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl text-left transition-all duration-200 flex items-center justify-between gap-3 border-2 active:scale-98 shadow-xs ${
                           isSelected
-                            ? "bg-[#2d1810] text-amber-50 shadow-md shadow-amber-950/20 font-black border-2 border-amber-500 ring-2 ring-amber-700/30"
-                            : "bg-stone-50/80 hover:bg-amber-50/90 hover:border-amber-300 text-stone-800 border-stone-200/90"
+                            ? "bg-[#2d1810] text-amber-50 shadow-md shadow-amber-950/20 font-black border-amber-500 ring-2 ring-amber-500/30"
+                            : "bg-white hover:bg-amber-50/90 hover:border-amber-300 text-stone-900 border-stone-200/90 hover:shadow-sm"
                         }`}
                       >
-                        {/* Icono + Nombre y Precio */}
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-base shrink-0">{cat.icon}</span>
-                          <span className="truncate font-bold">{cat.label}</span>
+                        {/* Icono Grande + Nombre Completo */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-2xl sm:text-3xl shrink-0 drop-shadow-xs">{cat.icon}</span>
+                          <span className="font-black text-sm sm:text-base leading-tight">
+                            {cat.label}
+                          </span>
                         </div>
 
                         {/* Badge de Conteo y botón X si está seleccionado */}
-                        <div className="flex items-center gap-1 shrink-0 ml-1">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`text-xs sm:text-sm px-2.5 py-1 rounded-xl font-black ${
                             isSelected
                               ? "bg-amber-500 text-stone-950"
-                              : "bg-stone-200/90 text-stone-600"
+                              : "bg-stone-100 text-stone-700 border border-stone-200"
                           }`}>
                             {count}
                           </span>
@@ -547,7 +549,7 @@
                                 setSelectedCategory("all");
                               }}
                               title="Quitar filtro"
-                              className="w-4 h-4 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-[10px] ml-0.5"
+                              className="w-6 h-6 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-xs ml-0.5 shadow-xs transition-transform active:scale-90"
                             >
                               ✕
                             </span>
