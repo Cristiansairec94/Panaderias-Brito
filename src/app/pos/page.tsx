@@ -518,14 +518,15 @@ export default function POSPage() {
                 <span className="truncate max-w-[160px]">
                   {selectedCategory === "all" ? "Categorías y Precios" : activeCategory?.label}
                 </span>
+                {/* Botón X: Cierra la barrera desplegable sin mandar a todos los productos */}
                 {selectedCategory !== "all" && (
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedCategory("all");
+                      setShowCategoryPanel(false);
                     }}
-                    className="w-5 h-5 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center text-xs font-black"
-                    title="Quitar filtro"
+                    className="w-5 h-5 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center text-xs font-black transition-transform active:scale-90"
+                    title="Cerrar barrera desplegable"
                   >
                     ✕
                   </span>
@@ -634,11 +635,8 @@ export default function POSPage() {
                     key={cat.id}
                     type="button"
                     onClick={() => {
-                      if (isSelected && cat.id !== "all") {
-                        setSelectedCategory("all");
-                      } else {
-                        setSelectedCategory(cat.id);
-                      }
+                      setSelectedCategory(cat.id);
+                      setShowCategoryPanel(false);
                     }}
                     className={`relative px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl text-left transition-all duration-200 flex items-center justify-between gap-3 border-2 active:scale-98 shadow-xs ${
                       isSelected
@@ -668,9 +666,9 @@ export default function POSPage() {
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedCategory("all");
+                            setShowCategoryPanel(false);
                           }}
-                          title="Quitar filtro"
+                          title="Cerrar barrera desplegable"
                           className="w-6 h-6 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-xs ml-0.5 shadow-xs transition-transform active:scale-90"
                         >
                           <X className="w-3.5 h-3.5 stroke-[3]" />
