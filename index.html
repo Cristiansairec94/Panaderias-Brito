@@ -254,6 +254,7 @@
       const [showExpenses, setShowExpenses] = useState(false);
       const [showDrawerModal, setShowDrawerModal] = useState(false);
       const [showCategoryPanel, setShowCategoryPanel] = useState(true);
+      const [showOperationsMenu, setShowOperationsMenu] = useState(false);
       const [completedSale, setCompletedSale] = useState(null);
 
       useEffect(() => {
@@ -393,38 +394,112 @@
                   )}
                 </div>
 
-                {/* Fila de Herramientas Operativas */}
-                <div className="flex items-center gap-2 flex-wrap xl:flex-nowrap justify-start xl:justify-end">
-                  {/* Dinero en Caja / Existencias */}
+                {/* Botón Discreto de Operaciones */}
+                <div className="relative shrink-0">
                   <button
                     type="button"
-                    onClick={() => setShowDrawerModal(true)}
-                    className="flex items-center gap-2.5 text-xs font-black bg-[#2d1810] hover:bg-[#3e2723] text-white px-3.5 py-2 rounded-2xl shadow-xs transition-all active:scale-95 border border-amber-900/60 shrink-0"
+                    onClick={() => setShowOperationsMenu(!showOperationsMenu)}
+                    className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
+                      showOperationsMenu
+                        ? "bg-[#2d1810] text-amber-50 border-amber-800 ring-2 ring-amber-600/30 font-black"
+                        : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
+                    }`}
+                    title="Administración de caja, gastos y turno"
                   >
-                    <span className="text-amber-400 text-sm">💰</span>
-                    <div className="text-left leading-tight">
-                      <span className="text-[10px] text-amber-300 font-medium block">{cashierName} • {shiftName}</span>
-                      <span className="text-xs font-black text-white">
-                        Caja: {formatCurrency(cashInDrawer)} <span className="text-stone-400 font-normal">|</span> Stock: {formatCurrency(totalStockVal)}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                      <span className="text-sm">💼</span>
+                      <span className="font-extrabold text-xs">Caja & Turno</span>
                     </div>
+                    <span className="text-xs text-stone-400">▾</span>
                   </button>
 
-                  {/* Gastos de Turno */}
-                  <button
-                    type="button"
-                    onClick={() => setShowExpenses(true)}
-                    className="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/90 px-3.5 py-2.5 rounded-2xl shadow-xs transition-all active:scale-95 shrink-0"
-                  >
-                    <span>💸 Gastos:</span>
-                    <span className="font-black text-rose-800">-{formatCurrency(totalExpenses)}</span>
-                  </button>
+                  {/* Menú Desplegable Flotante */}
+                  {showOperationsMenu && (
+                    <>
+                      {/* Backdrop para cerrar al hacer clic afuera */}
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowOperationsMenu(false)}
+                      />
 
-                  {/* Estado Web */}
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700 bg-white border border-stone-200 px-3 py-2.5 rounded-2xl shadow-xs shrink-0">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                    <span>En línea</span>
-                  </div>
+                      {/* Panel Flotante */}
+                      <div className="absolute right-0 top-full mt-2.5 z-50 w-80 sm:w-96 bg-white/98 backdrop-blur-xl rounded-3xl p-4 border border-stone-200 shadow-2xl space-y-3 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">💼</span>
+                            <span className="text-xs font-black text-stone-900 uppercase tracking-wider">
+                              Operaciones de Turno
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowOperationsMenu(false)}
+                            className="text-stone-400 hover:text-stone-700 text-xs font-bold p-1 rounded-lg hover:bg-stone-100"
+                          >
+                            ✕ Cerrar
+                          </button>
+                        </div>
+
+                        {/* Botón Principal: Arqueo y Dinero en Caja */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowOperationsMenu(false);
+                            setShowDrawerModal(true);
+                          }}
+                          className="w-full flex items-center justify-between p-3 rounded-2xl bg-[#2d1810] hover:bg-[#3e2723] text-white transition-all active:scale-98 shadow-sm border border-amber-900/60 text-left"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-2 bg-amber-500/20 rounded-xl text-amber-400 text-base">
+                              💰
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-amber-300 font-medium block">
+                                {cashierName} • {shiftName}
+                              </span>
+                              <span className="text-sm font-black text-white block">
+                                Caja: {formatCurrency(cashInDrawer)}
+                              </span>
+                              <span className="text-[11px] text-stone-300">
+                                Stock estimado: {formatCurrency(totalStockVal)}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-bold text-amber-400 bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-800/60">
+                            Arqueo
+                          </span>
+                        </button>
+
+                        {/* Acciones Secundarias: Gastos */}
+                        <div className="grid grid-cols-1 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowOperationsMenu(false);
+                              setShowExpenses(true);
+                            }}
+                            className="flex items-center justify-between p-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200/90 text-left transition-all active:scale-95"
+                          >
+                            <div className="flex items-center gap-1.5 text-rose-700 text-xs font-bold">
+                              <span>💸 Salidas y Gastos</span>
+                            </div>
+                            <span className="text-xs font-black text-rose-800">
+                              -{formatCurrency(totalExpenses)}
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Estado */}
+                        <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Sistema Web en Línea</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

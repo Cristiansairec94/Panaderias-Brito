@@ -113,6 +113,7 @@ export default function POSPage() {
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCategoryPanel, setShowCategoryPanel] = useState(true);
+  const [showOperationsMenu, setShowOperationsMenu] = useState(false);
 
   // Load and synchronize products with catalog
   useEffect(() => {
@@ -439,79 +440,160 @@ export default function POSPage() {
                   </button>
                 )}
               </div>
-
-              {/* Selector de Sucursal */}
-              {activeBranch && (
-                <div className="relative flex items-center shrink-0">
-                  <Building2 className="w-3.5 h-3.5 text-amber-700 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <select
-                    value={activeBranch.id}
-                    onChange={(e) => switchBranch(e.target.value)}
-                    className="bg-white hover:bg-stone-50 text-stone-900 font-bold text-xs pl-8 pr-7 py-2.5 rounded-2xl border border-stone-200 shadow-xs focus:ring-2 focus:ring-amber-500 focus:outline-none appearance-none cursor-pointer"
-                    title={`Sucursal: ${activeBranch.name}`}
-                  >
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.shortName} ({b.code})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              )}
             </div>
 
-            {/* Fila de Herramientas Operativas */}
-            <div className="flex items-center gap-2 flex-wrap xl:flex-nowrap justify-start xl:justify-end">
-              {/* Botón Principal: Turno y Caja */}
+            {/* Botón Discreto de Operaciones */}
+            <div className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => setShowCashDrawerModal(true)}
-                className="flex items-center gap-2.5 text-xs font-black bg-[#2d1810] hover:bg-[#3e2723] text-white px-3.5 py-2 rounded-2xl shadow-xs transition-all active:scale-95 border border-amber-900/60 shrink-0"
-                title="Arqueo y corte de caja"
+                onClick={() => setShowOperationsMenu(!showOperationsMenu)}
+                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
+                  showOperationsMenu
+                    ? "bg-[#2d1810] text-amber-50 border-amber-800 ring-2 ring-amber-600/30 font-black"
+                    : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
+                }`}
+                title="Administración de caja, gastos, turno y sucursal"
               >
-                <Coins className="w-4 h-4 text-amber-400 shrink-0" />
-                <div className="text-left leading-tight">
-                  <span className="text-[10px] text-amber-300 font-medium block">
-                    {cashierName} • {shiftName.split(" ")[0]}
-                  </span>
-                  <span className="text-xs font-black text-white">
-                    Caja: {formatCurrency(netCashInDrawer)} <span className="text-stone-400 font-normal">|</span> Stock: {formatCurrency(totalStockValue)}
-                  </span>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                  <span className="text-sm">💼</span>
+                  <span className="font-extrabold text-xs">Caja & Turno</span>
                 </div>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showOperationsMenu ? "rotate-180 text-amber-400" : "text-stone-400"}`} />
               </button>
 
-              {/* Botón Gastos */}
-              <button
-                type="button"
-                onClick={() => setShowExpensesModal(true)}
-                className="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/90 px-3.5 py-2.5 rounded-2xl shadow-xs transition-all active:scale-95 shrink-0"
-                title="Salidas de efectivo"
-              >
-                <TrendingDown className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                <span>Gastos:</span>
-                <span className="font-black text-rose-800">-{formatCurrency(totalExpenses)}</span>
-              </button>
+              {/* Menú Desplegable Flotante (Solo a demanda) */}
+              {showOperationsMenu && (
+                <>
+                  {/* Backdrop para cerrar al hacer clic afuera */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowOperationsMenu(false)}
+                  />
 
-              {/* Botón Turno */}
-              <button
-                type="button"
-                onClick={() => setShowRecentSales(true)}
-                className="flex items-center gap-1.5 text-xs font-bold text-stone-700 bg-white hover:bg-stone-50 border border-stone-200 px-3.5 py-2.5 rounded-2xl shadow-xs transition-all active:scale-95 shrink-0"
-                title="Ventas del turno actual"
-              >
-                <History className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span>Turno ({recentSalesList.length})</span>
-              </button>
+                  {/* Panel Flotante */}
+                  <div className="absolute right-0 top-full mt-2.5 z-50 w-80 sm:w-96 bg-white/98 backdrop-blur-xl rounded-3xl p-4 border border-stone-200 shadow-2xl space-y-3 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">💼</span>
+                        <span className="text-xs font-black text-stone-900 uppercase tracking-wider">
+                          Operaciones de Turno
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowOperationsMenu(false)}
+                        className="text-stone-400 hover:text-stone-700 text-xs font-bold p-1 rounded-lg hover:bg-stone-100"
+                      >
+                        ✕ Cerrar
+                      </button>
+                    </div>
 
-              {/* Estado: Modo Demo / En Línea */}
-              <div 
-                className="flex items-center gap-1.5 text-xs font-bold text-stone-700 bg-white border border-stone-200 px-3 py-2.5 rounded-2xl shadow-xs shrink-0"
-                title={isDbConnected ? "Conectado a base de datos en tiempo real" : "Operando en modo local"}
-              >
-                <Database className={`w-3.5 h-3.5 shrink-0 ${isDbConnected ? "text-emerald-500" : "text-amber-500"}`} />
-                <span className="text-xs font-bold">{isDbConnected ? "En línea" : "Modo Demo"}</span>
-              </div>
+                    {/* Selector de Sucursal */}
+                    {activeBranch && (
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+                          Sucursal Activa
+                        </label>
+                        <div className="relative">
+                          <Building2 className="w-4 h-4 text-amber-700 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <select
+                            value={activeBranch.id}
+                            onChange={(e) => {
+                              switchBranch(e.target.value);
+                              setShowOperationsMenu(false);
+                            }}
+                            className="w-full bg-stone-50 hover:bg-stone-100 text-stone-900 font-bold text-xs pl-9 pr-8 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none cursor-pointer"
+                          >
+                            {branches.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name} ({b.code})
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Botón Principal: Arqueo y Dinero en Caja */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowOperationsMenu(false);
+                        setShowCashDrawerModal(true);
+                      }}
+                      className="w-full flex items-center justify-between p-3 rounded-2xl bg-[#2d1810] hover:bg-[#3e2723] text-white transition-all active:scale-98 shadow-sm border border-amber-900/60 text-left"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
+                          <Coins className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-amber-300 font-medium block">
+                            {cashierName} • {shiftName.split(" ")[0]}
+                          </span>
+                          <span className="text-sm font-black text-white block">
+                            Caja: {formatCurrency(netCashInDrawer)}
+                          </span>
+                          <span className="text-[11px] text-stone-300">
+                            Stock estimado: {formatCurrency(totalStockValue)}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-bold text-amber-400 bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-800/60">
+                        Arqueo
+                      </span>
+                    </button>
+
+                    {/* Acciones Secundarias: Gastos e Historial */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowOperationsMenu(false);
+                          setShowExpensesModal(true);
+                        }}
+                        className="flex flex-col items-start p-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200/90 text-left transition-all active:scale-95"
+                      >
+                        <div className="flex items-center gap-1.5 text-rose-700 text-xs font-bold">
+                          <TrendingDown className="w-3.5 h-3.5" />
+                          <span>Gastos</span>
+                        </div>
+                        <span className="text-xs font-black text-rose-800 mt-1">
+                          -{formatCurrency(totalExpenses)}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowOperationsMenu(false);
+                          setShowRecentSales(true);
+                        }}
+                        className="flex flex-col items-start p-2.5 rounded-xl bg-stone-50 hover:bg-stone-100 border border-stone-200 text-left transition-all active:scale-95"
+                      >
+                        <div className="flex items-center gap-1.5 text-stone-700 text-xs font-bold">
+                          <History className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Turno</span>
+                        </div>
+                        <span className="text-xs font-black text-stone-800 mt-1">
+                          {recentSalesList.length} ventas
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Estado de Conexión */}
+                    <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
+                      <div className="flex items-center gap-1.5">
+                        <Database className={`w-3 h-3 ${isDbConnected ? "text-emerald-500" : "text-amber-500"}`} />
+                        <span>{isDbConnected ? "Base de datos en línea (Supabase)" : "Modo Local / Demo"}</span>
+                      </div>
+                      <span className={`w-2 h-2 rounded-full ${isDbConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
