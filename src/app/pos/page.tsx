@@ -415,42 +415,39 @@ export default function POSPage() {
     <div className="flex h-full w-full overflow-hidden bg-stone-100/70">
       {/* Product Catalog Area (Main) */}
       <div className="flex-1 flex flex-col min-w-0 p-4 lg:p-5 overflow-y-auto">
-        {/* Top Control Bar & Categorías */}
-        <div className="flex flex-col gap-3 mb-4 sticky top-0 z-20 bg-stone-100/95 backdrop-blur-md pt-1 pb-2">
-          {/* Fila 1: Buscador y Operaciones Principales */}
-          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5">
-            {/* Buscador de Productos + Sucursal */}
-            <div className="flex items-center gap-2 flex-1 min-w-[280px] max-w-xl">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-9 py-2.5 bg-white rounded-2xl border border-stone-200/90 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs text-xs font-semibold text-stone-800 placeholder:text-stone-400"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+        {/* Top Fixed Header Toolbar (Perfectamente encuadrada y anclada a los bordes) */}
+        <div className="sticky top-0 z-30 -mt-4 -mx-4 px-4 py-3 lg:-mt-5 lg:-mx-5 lg:px-5 lg:py-3.5 bg-stone-100 border-b border-stone-200/90 shadow-xs mb-5">
+          <div className="flex items-center justify-between gap-3 w-full">
+            {/* Buscador de Productos (Alineado y expandido con proporción limpia) */}
+            <div className="relative flex-1 max-w-2xl">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <input
+                type="text"
+                placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-9 py-2.5 bg-white rounded-xl border border-stone-300/80 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs text-xs font-semibold text-stone-800 placeholder:text-stone-400"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Botón Discreto de Operaciones */}
+            {/* Botón Discreto de Operaciones (Encuadrado con la misma altura) */}
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setShowOperationsMenu(!showOperationsMenu)}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
                   showOperationsMenu
                     ? "bg-[#2d1810] text-amber-50 border-amber-800 ring-2 ring-amber-600/30 font-black"
-                    : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
+                    : "bg-white hover:bg-stone-50 text-stone-800 border-stone-300/80"
                 }`}
                 title="Administración de caja, gastos, turno y sucursal"
               >
