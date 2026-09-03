@@ -28,7 +28,13 @@ import {
   X,
   Building2,
   MapPin,
-  ArrowRight
+  ArrowRight,
+  Lock,
+  Unlock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ShieldCheck
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -175,6 +181,48 @@ export default function POSPage() {
   const [showCategoryPanel, setShowCategoryPanel] = useState(false);
   const [showOperationsMenu, setShowOperationsMenu] = useState(false);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+
+  // Shift Lock State (Candado de Seguridad por Cierre de Turno)
+  const [isShiftLocked, setIsShiftLocked] = useState(false);
+  const [lockUser, setLockUser] = useState("");
+  const [lockPassword, setLockPassword] = useState("");
+  const [lockError, setLockError] = useState("");
+  const [showLockPassword, setShowLockPassword] = useState(false);
+
+  useEffect(() => {
+    try {
+      const locked = localStorage.getItem("brito_pos_shift_locked");
+      if (locked === "true") {
+        setIsShiftLocked(true);
+      }
+    } catch (e) {}
+  }, []);
+
+  const handleUnlockShift = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (lockUser.trim().toLowerCase() === "admin" && lockPassword.trim() === "admin") {
+      setIsShiftLocked(false);
+      setLockUser("");
+      setLockPassword("");
+      setLockError("");
+      setShowLockPassword(false);
+      try {
+        localStorage.removeItem("brito_pos_shift_locked");
+      } catch (e) {}
+    } else {
+      setLockError("Usuario o contraseña de encargada incorrectos.");
+    }
+  };
+
+  const handleCompleteShiftCut = () => {
+    setRecentSalesList([]);
+    setExpensesList([]);
+    setShowCashDrawerModal(false);
+    setIsShiftLocked(true);
+    try {
+      localStorage.setItem("brito_pos_shift_locked", "true");
+    } catch (e) {}
+  };
 
   // Load and synchronize products with catalog
   useEffect(() => {
@@ -1219,11 +1267,112 @@ export default function POSPage() {
           expenses={expensesList}
           products={products}
           initialTab={shiftModalTab}
-          onCompleteShiftCut={() => {
-            setRecentSalesList([]);
-            setExpensesList([]);
-          }}
+          onCompleteShiftCut={handleCompleteShiftCut}
         />
+      )}
+
+      {/* PANTALLA DE BLOQUEO CON CANDADO DE SEGURIDAD (Cierre de Turno de Cajera) */}
+      {isShiftLocked && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/95 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+          <div className="absolute w-96 h-96 bg-amber-600/10 rounded-full blur-3xl pointer-events-none -top-20 -left-20 animate-pulse" />
+          <div className="absolute w-96 h-96 bg-orange-600/10 rounded-full blur-3xl pointer-events-none -bottom-20 -right-20 animate-pulse" />
+
+          <div className="relative bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-2 border-amber-900/30 text-stone-900 animate-in zoom-in-95 duration-200">
+            {/* Cabecera Café Tostado Oficial Panadería Brito */}
+            <div className="bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] p-6 text-white text-center relative overflow-hidden">
+              <div className="relative z-10 space-y-2">
+                {/* Candado Animado Dorado */}
+                <div className="w-20 h-20 mx-auto bg-gradient-to-tr from-amber-500 to-orange-500 rounded-3xl flex items-center justify-center shadow-xl shadow-amber-500/30 ring-4 ring-amber-400/40 text-white animate-bounce">
+                  <Lock className="w-10 h-10 stroke-[2.5]" />
+                </div>
+                <h2 className="text-2xl font-black text-white tracking-wide">
+                  Turno Cerrado
+                </h2>
+                <p className="text-xs text-amber-200 font-bold max-w-xs mx-auto">
+                  Terminal de cobro bloqueada con candado de seguridad
+                </p>
+              </div>
+            </div>
+
+            {/* Cuerpo del Bloqueo */}
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-2xl text-xs space-y-1 text-stone-700">
+                <p className="font-bold flex items-center gap-1.5 text-stone-900">
+                  <ShieldCheck className="w-4 h-4 text-amber-700" /> Acceso para Encargada de Turno
+                </p>
+                <p className="text-[11px] text-stone-600 leading-relaxed">
+                  El turno de la cajera ha sido cerrado. Por seguridad, la encargada debe ingresar sus credenciales para habilitar la terminal y aperturar el siguiente turno.
+                </p>
+              </div>
+
+              {lockError && (
+                <div className="p-3 bg-rose-50 border-2 border-rose-300 text-rose-900 text-xs font-black rounded-2xl flex items-center gap-2 animate-in shake">
+                  <span>⚠️</span> {lockError}
+                </div>
+              )}
+
+              <form onSubmit={handleUnlockShift} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-black text-stone-800 uppercase tracking-wider block mb-1">
+                    Usuario de Encargada:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="admin"
+                    value={lockUser}
+                    onChange={(e) => {
+                      setLockUser(e.target.value);
+                      setLockError("");
+                    }}
+                    className="w-full px-4 py-3 bg-stone-50 border-2 border-stone-200 focus:border-amber-600 focus:bg-white rounded-xl text-sm font-bold text-stone-900 focus:outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-black text-stone-800 uppercase tracking-wider block mb-1">
+                    Contraseña:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showLockPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••"
+                      value={lockPassword}
+                      onChange={(e) => {
+                        setLockPassword(e.target.value);
+                        setLockError("");
+                      }}
+                      className="w-full pl-4 pr-11 py-3 bg-stone-50 border-2 border-stone-200 focus:border-amber-600 focus:bg-white rounded-xl text-sm font-bold text-stone-900 focus:outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLockPassword(!showLockPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 font-bold text-xs"
+                    >
+                      {showLockPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-2xl text-sm shadow-lg shadow-amber-600/30 transition-all active:scale-95 flex items-center justify-center gap-2 mt-2"
+                >
+                  <Unlock className="w-4 h-4" />
+                  <span>Desbloquear Terminal & Iniciar Turno</span>
+                </button>
+              </form>
+
+              <div className="text-center pt-1 border-t border-stone-100">
+                <span className="text-[11px] text-stone-400 font-bold">
+                  Panaderías Brito • Don Antonio Brito
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

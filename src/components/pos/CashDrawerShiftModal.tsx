@@ -23,7 +23,8 @@ import {
   BellRing,
   Send,
   UserPlus,
-  Calendar
+  Calendar,
+  Lock
 } from "lucide-react";
 import { Product, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -319,10 +320,14 @@ export default function CashDrawerShiftModal({
                   <span>Imprimir Ticket de Corte</span>
                 </button>
                 <button
-                  onClick={onClose}
-                  className="flex-1 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs"
+                  onClick={() => {
+                    onClose();
+                    if (onCompleteShiftCut) onCompleteShiftCut();
+                  }}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95"
                 >
-                  Cerrar
+                  <Lock className="w-4 h-4" />
+                  <span>Finalizar y Bloquear Caja</span>
                 </button>
               </div>
             </div>
