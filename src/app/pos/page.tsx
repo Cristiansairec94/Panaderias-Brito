@@ -501,10 +501,10 @@ export default function POSPage() {
       {/* Product Catalog Area (Main) con espacio y scrollbar estilizado */}
       <div 
         ref={catalogScrollRef}
-        className="flex-1 flex flex-col min-w-0 p-4 lg:p-5 pr-3 sm:pr-4 overflow-y-auto scroll-smooth relative"
+        className="flex-1 flex flex-col min-w-0 px-4 lg:px-5 pb-6 pt-0 pr-3 sm:pr-4 overflow-y-auto scroll-smooth relative"
       >
-        {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y tapando las imágenes de atrás) */}
-        <div className={`sticky top-0 z-30 -mt-4 -mx-4 px-4 py-3 lg:-mt-5 lg:-mx-5 lg:px-5 lg:py-3.5 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-3 pb-4 mb-4" : "mb-5"}`}>
+        {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
+        <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-3.5 lg:px-5 lg:py-3.5 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-3 pb-4 mb-4" : "mb-5"}`}>
           <div className="flex items-center justify-between gap-3 w-full">
             {/* Buscador de Productos (Grande, Claro y Cómodo) */}
             <div className="relative flex-1 max-w-xl">
