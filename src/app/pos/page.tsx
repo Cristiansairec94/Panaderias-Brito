@@ -423,41 +423,41 @@ export default function POSPage() {
         {/* Top Fixed Header Toolbar (Perfectamente encuadrada y anclada a los bordes) */}
         <div className="sticky top-0 z-30 -mt-4 -mx-4 px-4 py-3 lg:-mt-5 lg:-mx-5 lg:px-5 lg:py-3.5 bg-stone-100 border-b border-stone-200/90 shadow-xs mb-5">
           <div className="flex items-center justify-between gap-3 w-full">
-            {/* Buscador de Productos (Alineado y expandido con proporción limpia) */}
+            {/* Buscador de Productos (Grande, Claro y Cómodo) */}
             <div className="relative flex-1 max-w-xl">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+              <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
               <input
                 type="text"
                 placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 bg-white rounded-xl border border-stone-300/80 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs text-xs font-semibold text-stone-800 placeholder:text-stone-400"
+                className="w-full pl-12 pr-10 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
               />
               {search && (
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            {/* Botón para Desplegar/Ocultar Categorías y Precios (Como estaba antes) */}
+            {/* Botón Grande: Categorías y Precios */}
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setShowCategoryPanel(!showCategoryPanel)}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
+                className={`flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 text-sm sm:text-base font-black transition-all active:scale-95 shadow-sm ${
                   showCategoryPanel || selectedCategory !== "all"
-                    ? "bg-[#2d1810] text-amber-50 border-amber-800 ring-2 ring-amber-600/30 font-black"
-                    : "bg-white hover:bg-stone-50 text-stone-800 border-stone-300/80"
+                    ? "bg-[#2d1810] text-amber-100 border-amber-800 ring-2 ring-amber-500/40 shadow-md"
+                    : "bg-white hover:bg-amber-50 text-stone-900 border-amber-300 hover:border-amber-400"
                 }`}
                 title="Mostrar u ocultar panel de categorías y precios"
               >
-                <span className="text-sm">{activeCategory?.icon || "🥞"}</span>
-                <span className="font-extrabold truncate max-w-[140px]">
+                <span className="text-xl">{activeCategory?.icon || "🥞"}</span>
+                <span className="truncate max-w-[160px]">
                   {selectedCategory === "all" ? "Categorías y Precios" : activeCategory?.label}
                 </span>
                 {selectedCategory !== "all" && (
@@ -466,35 +466,34 @@ export default function POSPage() {
                       e.stopPropagation();
                       setSelectedCategory("all");
                     }}
-                    className="w-4 h-4 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center text-[10px] font-black"
+                    className="w-5 h-5 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center text-xs font-black"
                     title="Quitar filtro"
                   >
                     ✕
                   </span>
                 )}
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showCategoryPanel ? "rotate-180 text-amber-400" : "text-stone-400"}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showCategoryPanel ? "rotate-180 text-amber-400" : "text-stone-400"}`} />
               </button>
             </div>
 
-            {/* Botón Discreto de Operaciones (Encuadrado con la misma altura) */}
-            {/* Botón Discreto de Operaciones (Encuadrado con la misma altura) */}
+            {/* Botón Grande: Caja & Turno */}
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setShowOperationsMenu(!showOperationsMenu)}
-                className={`flex items-center gap-2.5 px-3 sm:px-4 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
+                className={`flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 text-sm sm:text-base font-black transition-all active:scale-95 shadow-sm ${
                   showOperationsMenu
-                    ? "bg-[#2d1810] text-amber-50 border-amber-800 ring-2 ring-amber-600/30 font-black"
-                    : "bg-white hover:bg-stone-50 text-stone-800 border-stone-300/80"
+                    ? "bg-[#2d1810] text-amber-100 border-amber-800 ring-2 ring-amber-500/40 shadow-md"
+                    : "bg-white hover:bg-amber-50 text-stone-900 border-stone-300 hover:border-amber-400"
                 }`}
                 title="Mostrar u ocultar operaciones de caja y turno"
               >
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                  <span className="text-sm">💼</span>
-                  <span className="font-extrabold text-xs hidden sm:inline">Caja & Turno</span>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                  <span className="text-xl">💼</span>
+                  <span className="truncate">Caja & Turno</span>
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showOperationsMenu ? "rotate-180 text-amber-400" : "text-stone-400"}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showOperationsMenu ? "rotate-180 text-amber-400" : "text-stone-400"}`} />
               </button>
             </div>
 
