@@ -257,7 +257,7 @@ export default function CashDrawerShiftModal({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
           {showCutSuccess && lastCutData ? (
             /* Vista de Éxito y Ticket de Corte */
             <div className="space-y-6 animate-in zoom-in-95">
@@ -468,27 +468,27 @@ export default function CashDrawerShiftModal({
               </button>
             </div>
           ) : (
-            /* PESTAÑA 2: CAMBIO DE TURNO (BOTONES GRANDES Y CLAROS PARA CUALQUIER EDAD) */
-            <div className="space-y-4">
-              {/* Relevo Rápido: Quién entrega y Quién recibe */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-stone-50 rounded-2xl border border-stone-200">
-                <div>
-                  <label className="text-xs font-black text-rose-700 uppercase block mb-1.5">
-                    👤 Cajero Saliente (Entrega Caja):
-                  </label>
-                  <div className="p-3 bg-white rounded-xl border-2 border-stone-200 font-black text-stone-900 text-sm">
+            /* PESTAÑA 2: CAMBIO DE TURNO (RESUMIDO EN UNA SOLA HOJA SIN SCROLL) */
+            <div className="space-y-3">
+              {/* 1. Relevo Directo: Quién Entrega y Quién Recibe */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 bg-stone-50 rounded-2xl border border-stone-200 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-black text-rose-700 uppercase shrink-0">
+                    👤 Entrega:
+                  </span>
+                  <div className="p-2 bg-white rounded-xl border font-black text-stone-900 text-xs truncate flex-1 text-right">
                     {outgoingCashier} ({shiftName.split(" ")[0]})
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-black text-emerald-700 uppercase block mb-1.5">
-                    👤 Cajero Entrante (Recibe Turno):
-                  </label>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-black text-emerald-700 uppercase shrink-0">
+                    👤 Recibe:
+                  </span>
                   <select
                     value={incomingCashier}
                     onChange={(e) => setIncomingCashier(e.target.value)}
-                    className="w-full p-3 bg-white border-2 border-emerald-400 rounded-xl font-black text-stone-900 text-sm focus:outline-none shadow-xs"
+                    className="p-2 bg-white border-2 border-emerald-400 rounded-xl font-black text-stone-900 text-xs focus:outline-none flex-1 shadow-xs"
                   >
                     <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
                     <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
@@ -499,51 +499,58 @@ export default function CashDrawerShiftModal({
                 </div>
               </div>
 
-              {/* Verificación de Dinero en Caja con Botón Gigante de 1 Toque */}
-              <div className="p-5 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm font-black text-stone-900 uppercase">
-                    💵 Dinero que debe haber en caja:
-                  </span>
-                  <span className="text-2xl font-black text-amber-950 bg-amber-200/90 px-4 py-1.5 rounded-xl self-start sm:self-auto">
+              {/* 2. Verificación de Dinero en Caja (Resumido y Claro) */}
+              <div className="p-3.5 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-black text-stone-900 uppercase block">
+                      💵 Dinero que debe haber en caja:
+                    </span>
+                    <span className="text-[11px] text-stone-600 font-bold">
+                      Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)} • Gastos: -{formatCurrency(totalExpenses)}
+                    </span>
+                  </div>
+                  <span className="text-2xl font-black text-amber-950 bg-amber-200/90 px-3.5 py-1 rounded-xl">
                     {formatCurrency(expectedCashInDrawer)}
                   </span>
                 </div>
 
-                {/* Botón Gigante de 1 Clic */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCountedCash(expectedCashInDrawer.toString());
-                    setHasAcceptedCash(true);
-                  }}
-                  className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-2xl text-sm sm:text-base shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
-                >
-                  <span className="text-xl">⚡</span>
-                  <span>El dinero está completo ({formatCurrency(expectedCashInDrawer)})</span>
-                </button>
+                {/* Conteo Rápido: Botón 1 Toque o Input Manual en 1 fila */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCountedCash(expectedCashInDrawer.toString());
+                      setHasAcceptedCash(true);
+                    }}
+                    className={`py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95 ${
+                      countedCash === expectedCashInDrawer.toString() && hasAcceptedCash
+                        ? "bg-amber-700 text-white ring-2 ring-amber-400"
+                        : "bg-amber-600 hover:bg-amber-700 text-white"
+                    }`}
+                  >
+                    <span>⚡ El dinero está completo ({formatCurrency(expectedCashInDrawer)})</span>
+                  </button>
 
-                {/* Input Manual de Conteo */}
-                <div className="pt-1">
-                  <label className="text-xs font-bold text-stone-700 block mb-1.5">
-                    O escribe el monto exacto si contaste en físico otra cantidad ($ MXN):
-                  </label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-sm text-stone-500">$</span>
                     <input
                       type="number"
                       step="any"
-                      placeholder={expectedCashInDrawer.toString()}
+                      placeholder={`O escribe otro monto`}
                       value={countedCash}
-                      onChange={(e) => setCountedCash(e.target.value)}
-                      className="w-full pl-9 pr-4 py-3 bg-white rounded-xl border-2 border-stone-300 focus:border-amber-600 font-black text-lg text-stone-900 focus:outline-none"
+                      onChange={(e) => {
+                        setCountedCash(e.target.value);
+                        setHasAcceptedCash(true);
+                      }}
+                      className="w-full pl-7 pr-3 py-2 bg-white rounded-xl border-2 border-stone-300 focus:border-amber-600 font-black text-sm text-stone-900 focus:outline-none"
                     />
                   </div>
                 </div>
 
                 {/* Semáforo Rápido de Diferencia */}
                 {countedCash && (
-                  <div className={`p-3 rounded-xl border text-sm font-black flex justify-between items-center ${
+                  <div className={`p-2 rounded-xl border text-xs font-black flex justify-between items-center ${
                     cashDifference === 0
                       ? "bg-emerald-100 text-emerald-950 border-emerald-300"
                       : cashDifference > 0
@@ -557,7 +564,7 @@ export default function CashDrawerShiftModal({
                         ? "🟡 Sobrante en Caja:"
                         : "🔴 Faltante en Caja:"}
                     </span>
-                    <span className="text-base font-black">
+                    <span className="font-black">
                       {cashDifference === 0
                         ? "$0.00"
                         : cashDifference > 0
@@ -568,39 +575,31 @@ export default function CashDrawerShiftModal({
                 )}
               </div>
 
-              {/* Casilla de Confirmación Directa y Grande */}
-              <div className="p-4 bg-amber-50/90 rounded-2xl border-2 border-amber-300">
-                <label className="flex items-center gap-3.5 cursor-pointer select-none">
+              {/* 3. Casilla de Confirmación y Botón Final */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-2.5 px-3 py-2 bg-amber-50/80 rounded-xl border border-amber-300 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={hasAcceptedCash}
                     onChange={(e) => setHasAcceptedCash(e.target.checked)}
-                    className="w-6 h-6 rounded accent-amber-700 cursor-pointer shrink-0"
+                    className="w-4 h-4 rounded accent-amber-700 cursor-pointer shrink-0"
                   />
-                  <span className="text-xs sm:text-sm font-black text-stone-900 leading-snug">
+                  <span className="text-xs font-bold text-stone-900 leading-snug">
                     Yo, <strong>{incomingCashier}</strong>, confirmo que conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y acepto la caja.
                   </span>
                 </label>
-              </div>
 
-              {/* Botón de Acción Directo y Gigante */}
-              <div>
                 <button
                   type="button"
                   onClick={handleExecuteShiftCut}
                   disabled={!countedCash || !hasAcceptedCash || isFinalizing}
-                  className="w-full py-4 sm:py-5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-base sm:text-lg shadow-xl transition-all active:scale-98 flex items-center justify-center gap-3"
+                  className="w-full py-3.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm sm:text-base shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2"
                 >
-                  <CheckCircle2 className="w-6 h-6 text-emerald-200 shrink-0" />
+                  <CheckCircle2 className="w-5 h-5 text-emerald-200 shrink-0" />
                   <span>
                     {isFinalizing ? "Aceptando Turno..." : `✅ ACEPTAR TURNO Y COMENZAR (${incomingCashier})`}
                   </span>
                 </button>
-                {(!countedCash || !hasAcceptedCash) && (
-                  <p className="text-xs text-center text-amber-900 font-black mt-2">
-                    👉 Toca el botón naranja "El dinero está completo" para aceptar el turno al instante.
-                  </p>
-                )}
               </div>
             </div>
           )}
