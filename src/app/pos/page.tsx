@@ -519,7 +519,7 @@ export default function POSPage() {
                   {selectedCategory === "all" ? "Categorías y Precios" : activeCategory?.label}
                 </span>
                 {/* Botón X: Cierra la barrera desplegable sin mandar a todos los productos */}
-                {selectedCategory !== "all" && (
+                {showCategoryPanel && (
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
@@ -636,7 +636,6 @@ export default function POSPage() {
                     type="button"
                     onClick={() => {
                       setSelectedCategory(cat.id);
-                      setShowCategoryPanel(false);
                     }}
                     className={`relative px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl text-left transition-all duration-200 flex items-center justify-between gap-3 border-2 active:scale-98 shadow-xs ${
                       isSelected
