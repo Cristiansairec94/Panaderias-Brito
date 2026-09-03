@@ -224,15 +224,15 @@ export default function ExpensesModal({
                 </div>
               </div>
 
-              {/* 2. Motivo en Texto Libre */}
+              {/* 2. Motivo */}
               <div className="space-y-1.5">
                 <label className="text-xs font-black text-stone-900 block">
-                  2. ¿Para qué se usó el dinero? (Texto libre)
+                  2. ¿Para qué se usó el dinero?
                 </label>
                 <textarea
                   required
                   rows={3}
-                  placeholder="Escribe el motivo aquí... ej. 2 escobas y jabón Roma, Don Toño tomó $300 para el gas, Pago de garrafón de agua, cambio de monedas, etc."
+                  placeholder=""
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full p-3.5 bg-stone-50 rounded-2xl border-2 border-stone-200 focus:border-rose-500 focus:bg-white focus:outline-none text-xs font-medium text-stone-900 transition-all leading-relaxed"
