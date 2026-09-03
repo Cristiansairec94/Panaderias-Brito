@@ -19,7 +19,10 @@ import {
   Wallet,
   Coins,
   UserCheck,
-  Layers
+  Layers,
+  ChevronDown,
+  Check,
+  Filter
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -77,6 +80,7 @@ export default function POSPage() {
   // Status
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   // Load and synchronize products with catalog
   useEffect(() => {
@@ -367,6 +371,8 @@ export default function POSPage() {
     setCompletedSale(null);
   };
 
+  const activeCategory = CATEGORIES.find((c) => c.id === selectedCategory);
+
   return (
     <div className="flex h-full min-h-[calc(100vh-5rem)] overflow-hidden bg-stone-100/70">
       {/* Product Catalog Area (Main) */}
@@ -374,16 +380,89 @@ export default function POSPage() {
         {/* Top Control Bar */}
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-md w-full">
-              <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-              <input
-                type="text"
-                placeholder="Buscar concha, bolillo, pastel, dona..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-white rounded-2xl border border-stone-200/90 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm text-sm"
-              />
+            {/* Search Input + Desplegable de Precios */}
+            <div className="flex items-center gap-2 flex-1 max-w-xl w-full">
+              <div className="relative flex-1">
+                <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar pan dulce, bolillo, telera, pizza..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-white rounded-2xl border border-stone-200/90 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm text-sm font-medium"
+                />
+              </div>
+
+              {/* Selector Desplegable de Precios (Discreto y Compacto) */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                  className={`flex items-center gap-2 px-4 py-3 rounded-2xl border font-black text-xs transition-all shadow-sm active:scale-95 ${
+                    selectedCategory !== "all"
+                      ? "bg-amber-950 text-white border-amber-900 ring-2 ring-amber-500/30"
+                      : "bg-white text-stone-700 hover:bg-stone-50 border-stone-200/90"
+                  }`}
+                >
+                  <span className="text-base">{activeCategory?.icon || "🏷️"}</span>
+                  <span className="whitespace-nowrap">
+                    {selectedCategory === "all" ? "Todos los Precios" : activeCategory?.label}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-stone-400 transition-transform duration-200 ${showCategoryDropdown ? "rotate-180 text-amber-500" : ""}`} />
+                </button>
+
+                {/* Menú Desplegable Flotante */}
+                {showCategoryDropdown && (
+                  <>
+                    {/* Backdrop transparente para cerrar con clic afuera */}
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowCategoryDropdown(false)} 
+                    />
+                    
+                    <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-stone-200 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="px-3 py-1.5 border-b border-stone-100 flex items-center justify-between text-[11px] font-bold text-stone-400 uppercase tracking-wider">
+                        <span>Filtrar por Precio:</span>
+                        {selectedCategory !== "all" && (
+                          <button
+                            onClick={() => { setSelectedCategory("all"); setShowCategoryDropdown(false); }}
+                            className="text-amber-800 hover:underline font-black normal-case"
+                          >
+                            Ver Todo
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="max-h-80 overflow-y-auto space-y-1 py-1">
+                        {CATEGORIES.map((cat) => {
+                          const isSelected = selectedCategory === cat.id;
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCategory(cat.id);
+                                setShowCategoryDropdown(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all text-left ${
+                                isSelected
+                                  ? "bg-amber-950 text-white font-black shadow-xs"
+                                  : "text-stone-700 hover:bg-amber-50/80 hover:text-stone-900"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-base">{cat.icon}</span>
+                                <span>{cat.label}</span>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-amber-400" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Quick Actions & Live Financial Widgets */}
@@ -429,27 +508,6 @@ export default function POSPage() {
                 <span className="hidden 2xl:inline">{isDbConnected ? "Supabase Online" : "Modo Demo"}</span>
               </div>
             </div>
-          </div>
-
-          {/* Discreet, Compact Category Filter Chips (All Visible, Zero Scrollbar) */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            {CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-black transition-all active:scale-95 flex items-center gap-1 ${
-                    isSelected
-                      ? "bg-amber-950 text-white shadow-xs ring-1 ring-amber-800"
-                      : "bg-white text-stone-700 hover:bg-stone-100 hover:text-stone-900 border border-stone-200 shadow-2xs"
-                  }`}
-                >
-                  <span className="text-[11px]">{cat.icon}</span>
-                  <span>{cat.label}</span>
-                </button>
-              );
-            })}
           </div>
         </div>
 
