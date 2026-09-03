@@ -394,26 +394,28 @@ export default function POSPage() {
                 />
               </div>
 
-              {/* Botón Selector Desplegable (Abre Panel Integrado) */}
-              <div className="shrink-0">
+              {/* Botón Selector Desplegable Estilo Oficial */}
+              <div className="shrink-0 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  className={`flex items-center gap-2 px-4 py-3 rounded-2xl border font-black text-xs transition-all shadow-sm active:scale-95 ${
-                    selectedCategory !== "all" || showCategoryDropdown
+                  className={`px-4 py-3 rounded-2xl text-xs font-black flex items-center gap-2 transition-all border shadow-sm active:scale-95 ${
+                    showCategoryDropdown
+                      ? "bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 ring-2 ring-amber-400/30"
+                      : selectedCategory !== "all"
                       ? "bg-amber-950 text-white border-amber-900 ring-2 ring-amber-500/30"
-                      : "bg-white text-stone-700 hover:bg-stone-50 border-stone-200/90"
+                      : "bg-amber-50 hover:bg-amber-100/80 text-amber-900 border-amber-200"
                   }`}
+                  title={showCategoryDropdown ? "Ocultar panel de categorías" : "Mostrar panel de categorías"}
                 >
-                  <span className="text-base">{activeCategory?.icon || "🏷️"}</span>
+                  <Layers className={`w-4 h-4 text-amber-800 transition-transform duration-500 ${showCategoryDropdown ? "rotate-180" : ""}`} />
                   <span className="whitespace-nowrap">
-                    {selectedCategory === "all" ? "Todos los Precios" : activeCategory?.label}
+                    {showCategoryDropdown
+                      ? "Ocultar Categorías"
+                      : selectedCategory === "all"
+                      ? "Ver Categorías (11)"
+                      : activeCategory?.label}
                   </span>
-                  {showCategoryDropdown ? (
-                    <ChevronUp className="w-4 h-4 text-amber-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-stone-400" />
-                  )}
                 </button>
               </div>
             </div>
@@ -463,81 +465,76 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* INLINE COLLAPSIBLE PRICE FILTER PANEL (Ultra-Soft Luxurious Accordion Expansion) */}
+          {/* INLINE COLLAPSIBLE PRICE FILTER PANEL (Exact Style & Animation from Productos Page) */}
           <div
-            className={`grid transition-all duration-700 ease-[cubic-bezier(0.19,1,0.22,1)] ${
+            className={`transition-all duration-700 ease-in-out overflow-hidden ${
               showCategoryDropdown
-                ? "grid-rows-[1fr] opacity-100 mt-3.5 pointer-events-auto"
-                : "grid-rows-[0fr] opacity-0 mt-0 pointer-events-none"
+                ? "opacity-100 max-h-[800px] mt-3.5 mb-2 pointer-events-auto"
+                : "opacity-0 max-h-0 pointer-events-none p-0 m-0 border-0"
             }`}
           >
-            <div className="overflow-hidden min-h-0">
-              <div 
-                className={`bg-white rounded-3xl border border-stone-200/90 p-5 shadow-sm space-y-3.5 transition-all duration-700 ease-[cubic-bezier(0.19,1,0.22,1)] ${
-                  showCategoryDropdown ? "translate-y-0 scale-100" : "-translate-y-3 scale-[0.99]"
-                }`}
-              >
-                <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-lg">🏷️</span>
-                    <div>
-                      <span className="text-xs font-black text-stone-900 uppercase tracking-wider block">
-                        Filtrar por Grupo de Precio
-                      </span>
-                      <span className="text-[10px] text-stone-400 font-bold">
-                        12 categorías configuradas para cobro ágil
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {selectedCategory !== "all" && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCategory("all")}
-                        className="text-xs font-black text-amber-800 hover:text-amber-950 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors"
-                      >
-                        Mostrar Todo el Pan
-                      </button>
-                    )}
+            <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3.5">
+              <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-amber-600" />
+                  <span>Categorías y Precios</span>
+                </h3>
+                <div className="flex items-center gap-2">
+                  {selectedCategory !== "all" && (
                     <button
                       type="button"
-                      onClick={() => setShowCategoryDropdown(false)}
-                      className="p-1.5 px-3 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition-colors text-xs font-bold flex items-center gap-1.5"
+                      onClick={() => setSelectedCategory("all")}
+                      className="text-xs font-black text-amber-800 hover:text-amber-950 px-3 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors"
                     >
-                      <ChevronUp className="w-4 h-4 text-stone-400" />
-                      <span>Ocultar</span>
+                      Mostrar Todos los Precios
                     </button>
-                  </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryDropdown(false)}
+                    className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
+                  >
+                    Ocultar
+                  </button>
                 </div>
+              </div>
 
-                {/* Grid completo de las 12 opciones */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-                  {CATEGORIES.map((cat) => {
-                    const isSelected = selectedCategory === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCategory(cat.id);
-                          setShowCategoryDropdown(false);
-                        }}
-                        className={`p-3 rounded-2xl text-xs font-bold transition-all duration-300 ease-out flex items-center justify-between active:scale-95 border ${
-                          isSelected
-                            ? "bg-amber-950 text-white font-black border-amber-900 shadow-md ring-2 ring-amber-500/30 scale-[1.02]"
-                            : "bg-stone-50 hover:bg-amber-50/80 hover:border-amber-300 text-stone-700 border-stone-200 hover:scale-[1.02]"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-base shrink-0">{cat.icon}</span>
-                          <span className="truncate">{cat.label}</span>
-                        </div>
-                        {isSelected && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Grid completo de las 12 opciones */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                {CATEGORIES.map((cat) => {
+                  const isSelected = selectedCategory === cat.id;
+                  const count = cat.id === "all"
+                    ? products.length
+                    : products.filter((p) => p.category === cat.id || p.id === cat.id).length;
+
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategory(cat.id);
+                        setShowCategoryDropdown(false);
+                      }}
+                      className={`p-3 rounded-2xl text-xs font-bold transition-all duration-300 flex items-center justify-between active:scale-95 border ${
+                        isSelected
+                          ? "bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20 font-black scale-[1.02] border-amber-400"
+                          : "bg-stone-50 hover:bg-amber-50/80 hover:border-amber-300 text-stone-700 border-stone-200 hover:scale-[1.02]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base shrink-0">{cat.icon}</span>
+                        <span className="truncate">{cat.label}</span>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 transition-colors ${
+                        isSelected
+                          ? "bg-stone-950/20 text-stone-950"
+                          : "bg-stone-200 text-stone-600"
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
