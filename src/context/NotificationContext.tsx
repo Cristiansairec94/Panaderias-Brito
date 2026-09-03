@@ -106,6 +106,7 @@ interface NotificationContextType {
   markAllAsRead: () => void;
   deleteNotification: (id: string) => void;
   clearAll: () => void;
+  addNotification: (notif: Omit<FBNotification, "id" | "read" | "timeAgo" | "group"> & Partial<FBNotification>) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -134,6 +135,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     } catch (e) {
       console.log(e);
     }
+  };
+
+  const addNotification = (notif: Omit<FBNotification, "id" | "read" | "timeAgo" | "group"> & Partial<FBNotification>) => {
+    const newId = `notif-${Date.now()}`;
+    const fullNotif: FBNotification = {
+      id: newId,
+      timeAgo: "Hace un momento",
+      group: "recientes",
+      read: false,
+      ...notif,
+    };
+    setNotifications((prev) => [fullNotif, ...prev]);
+    playChime();
   };
 
   const markAsRead = (id: string) => {
@@ -177,6 +191,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         markAllAsRead,
         deleteNotification,
         clearAll,
+        addNotification,
       }}
     >
       {children}

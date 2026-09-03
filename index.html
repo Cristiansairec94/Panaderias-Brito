@@ -757,12 +757,15 @@
             </div>
           )}
 
-          {/* GASTOS MODAL */}
+          {/* GASTOS MODAL (Simple 2-Field Free-Text) */}
           {showExpenses && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="bg-amber-950 text-white p-4 px-6 flex items-center justify-between">
-                  <span className="font-bold text-sm">💸 Gastos y Salidas de Efectivo</span>
+                  <div>
+                    <span className="font-bold text-sm block">💸 Salida de Efectivo / Gastos</span>
+                    <span className="text-[10px] text-amber-300">Registro rápido sin opciones complicadas</span>
+                  </div>
                   <button onClick={() => setShowExpenses(false)} className="text-xl font-bold hover:text-white">✕</button>
                 </div>
 
@@ -774,7 +777,7 @@
                       <span className="font-black text-emerald-700 text-sm">{formatCurrency(totalCashSales)}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-rose-700 font-bold block">Gastos / Salidas</span>
+                      <span className="text-[10px] text-rose-700 font-bold block">Total Salidas</span>
                       <span className="font-black text-rose-700 text-sm">-{formatCurrency(totalExpenses)}</span>
                     </div>
                     <div>
@@ -783,22 +786,21 @@
                     </div>
                   </div>
 
-                  {/* Form */}
+                  {/* Super Simple Form */}
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       const form = e.target;
                       const amt = Number(form.amount.value);
                       const desc = form.desc.value;
-                      const cat = form.category.value;
                       if (!amt || !desc) return;
 
                       setExpensesList((prev) => [
                         {
                           id: `EXP-${Math.floor(1000 + Math.random() * 9000)}`,
                           amount: amt,
-                          category: cat,
-                          description: desc,
+                          category: "otro",
+                          description: desc.trim(),
                           cashier: cashierName,
                           date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
                         },
@@ -806,36 +808,39 @@
                       ]);
                       form.reset();
                     }}
-                    className="p-4 bg-stone-50 rounded-2xl border space-y-3 text-xs"
+                    className="p-4 bg-stone-50 rounded-2xl border space-y-3.5 text-xs"
                   >
-                    <span className="font-bold text-stone-700 block">Registrar Nueva Salida:</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input name="amount" type="number" required placeholder="Monto ($ MXN)" className="p-2 border rounded-xl font-bold" />
-                      <select name="category" className="p-2 border rounded-xl font-bold">
-                        <option value="limpieza">🧹 Limpieza (Jabón / Escoba)</option>
-                        <option value="retiro_personal">👤 Retiro Don Toño / Personal</option>
-                        <option value="insumos_menores">📦 Insumos / Gas / Hielo</option>
-                        <option value="proveedor">🚚 Pago a Proveedor Menor</option>
-                      </select>
+                    <div>
+                      <label className="font-black text-stone-900 block mb-1">1. ¿Cuánto dinero se sacó de caja?</label>
+                      <input name="amount" type="number" step="any" required placeholder="$ Monto en pesos (ej. 150, 300, 500)" className="w-full p-3 text-base font-black text-stone-900 bg-white border-2 border-stone-200 rounded-xl focus:border-rose-500 focus:outline-none" />
                     </div>
-                    <input name="desc" type="text" required placeholder="Motivo exacto del gasto..." className="w-full p-2 border rounded-xl font-medium" />
-                    <button type="submit" className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs">
-                      Guardar Salida de Dinero
+
+                    <div>
+                      <label className="font-black text-stone-900 block mb-1">2. ¿Para qué se usó el dinero? (Texto libre)</label>
+                      <textarea name="desc" rows="3" required placeholder="Escribe el motivo aquí... ej. Compré 2 escobas y jabón Roma, Don Toño tomó $300 para el gas, Pago de garrafón, etc." className="w-full p-3 text-xs bg-white border-2 border-stone-200 rounded-xl focus:border-rose-500 focus:outline-none font-medium leading-relaxed" />
+                    </div>
+
+                    <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-black rounded-xl text-xs shadow-lg shadow-rose-600/30 active:scale-95">
+                      💸 Registrar Salida de Dinero
                     </button>
                   </form>
 
                   {/* List */}
-                  <div className="space-y-2">
-                    <span className="text-xs font-bold text-stone-600 block">Historial de Salidas del Turno:</span>
-                    {expensesList.map((exp) => (
-                      <div key={exp.id} className="p-3 bg-stone-50 rounded-xl border flex justify-between items-center text-xs">
-                        <div>
-                          <p className="font-bold text-stone-800">{exp.description}</p>
-                          <p className="text-[10px] text-stone-400">{exp.category} • {exp.date} • {exp.cashier}</p>
+                  <div className="space-y-2 pt-2">
+                    <span className="text-xs font-bold text-stone-600 block">Historial de Salidas del Turno ({expensesList.length}):</span>
+                    {expensesList.length === 0 ? (
+                      <p className="text-stone-400 text-center py-4">No hay salidas en este turno.</p>
+                    ) : (
+                      expensesList.map((exp) => (
+                        <div key={exp.id} className="p-3 bg-stone-50 rounded-xl border flex justify-between items-center text-xs">
+                          <div>
+                            <p className="font-bold text-stone-800">{exp.description}</p>
+                            <p className="text-[10px] text-stone-400">{exp.date} • {exp.cashier}</p>
+                          </div>
+                          <span className="font-black text-rose-600 text-sm">-{formatCurrency(exp.amount)}</span>
                         </div>
-                        <span className="font-black text-rose-600 text-sm">-{formatCurrency(exp.amount)}</span>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
