@@ -140,7 +140,7 @@ export interface AppUser {
   id: string;
   name: string;
   username?: string;
-  email: string;
+  email?: string;
   password?: string;
   role: UserRole;
   roleLabel: string;

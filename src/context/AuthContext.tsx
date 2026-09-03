@@ -303,7 +303,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const found = usersList.find((u) => {
-      const email = u.email.toLowerCase();
+      const email = u.email ? u.email.toLowerCase() : "";
       const username = u.username?.toLowerCase();
       const name = u.name.toLowerCase();
 
@@ -354,7 +354,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const found = usersList.find((u) => {
-      const email = u.email.toLowerCase();
+      const email = u.email ? u.email.toLowerCase() : "";
       const username = u.username?.toLowerCase();
       const name = u.name.toLowerCase();
 

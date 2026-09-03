@@ -343,8 +343,8 @@ export default function UserRoleManagement() {
   const handleOpenEditModal = (targetUser: User) => {
     setEditingUserId(targetUser.id);
     setFormName(targetUser.name);
-    setFormUsername(targetUser.username || targetUser.email.split("@")[0] || "");
-    setFormEmail(targetUser.email);
+    setFormUsername(targetUser.username || (targetUser.email ? targetUser.email.split("@")[0] : "") || "");
+    setFormEmail(targetUser.email || "");
     setFormPhone(targetUser.phone || "");
     setFormPassword(targetUser.password || "••••••");
     setShowPassword(false);
@@ -490,8 +490,8 @@ export default function UserRoleManagement() {
   const handleSaveModalUser = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formName.trim() || !formEmail.trim()) {
-      alert("Por favor completa los campos requeridos.");
+    if (!formName.trim()) {
+      alert("Por favor introduce el nombre completo del empleado.");
       return;
     }
 
@@ -504,11 +504,14 @@ export default function UserRoleManagement() {
       supervisor: "Supervisor de Turno",
     };
 
+    const cleanUsername = formUsername.trim().toLowerCase() || formName.trim().toLowerCase().replace(/[^a-z0-9]/g, ".");
+    const defaultEmail = `${cleanUsername}@panaderiabrito.com`;
+
     if (editingUserId) {
       updateUser(editingUserId, {
         name: formName.trim(),
-        username: formUsername.trim().toLowerCase() || formEmail.split("@")[0],
-        email: formEmail.trim().toLowerCase(),
+        username: cleanUsername,
+        email: formEmail.trim().toLowerCase() || defaultEmail,
         phone: formPhone.trim(),
         password: formPassword.trim() || "1234",
         role: formRole,
@@ -526,8 +529,8 @@ export default function UserRoleManagement() {
       const newUser: User = {
         id: newId,
         name: formName.trim(),
-        username: formUsername.trim().toLowerCase() || formEmail.split("@")[0],
-        email: formEmail.trim().toLowerCase(),
+        username: cleanUsername,
+        email: defaultEmail,
         phone: formPhone.trim(),
         password: formPassword.trim() || "1234",
         role: formRole,
@@ -591,7 +594,7 @@ export default function UserRoleManagement() {
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
         const matchName = u.name.toLowerCase().includes(term);
-        const matchEmail = u.email.toLowerCase().includes(term);
+        const matchEmail = u.email ? u.email.toLowerCase().includes(term) : false;
         const matchUser = u.username?.toLowerCase().includes(term);
         const matchPhone = u.phone?.toLowerCase().includes(term);
         if (!matchName && !matchEmail && !matchUser && !matchPhone) return false;
@@ -783,7 +786,9 @@ export default function UserRoleManagement() {
                             <span className="text-[8px] font-black bg-amber-500 text-stone-950 px-1 py-0.2 rounded">TÚ</span>
                           )}
                         </div>
-                        <p className="text-[10px] text-stone-500 truncate mt-0.5">@{u.username || u.email.split("@")[0]}</p>
+                        <p className="text-[10px] text-stone-500 truncate mt-0.5">
+                          @{u.username || (u.email ? u.email.split("@")[0] : u.name.toLowerCase().replace(/[^a-z0-9]/g, "."))}
+                        </p>
                         <div className="flex items-center gap-1 mt-1">
                           <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${
                             u.role === "admin"
@@ -833,7 +838,8 @@ export default function UserRoleManagement() {
                       )}
                     </div>
                     <p className="text-xs text-stone-500 mt-0.5">
-                      <span>@{activeUser.username || activeUser.email.split("@")[0]}</span> • <span>{activeUser.email}</span>
+                      <span>@{activeUser.username || activeUser.name.toLowerCase().replace(/[^a-z0-9]/g, ".")}</span>
+                      {activeUser.phone ? <span> • Tel: {activeUser.phone}</span> : null}
                     </p>
 
                     {/* Quick Password Reveal */}
@@ -1176,7 +1182,7 @@ export default function UserRoleManagement() {
                             )}
                           </div>
                           <p className="text-[11px] font-medium text-stone-500 mt-0.5">
-                            @{usr.username || usr.email.split("@")[0]}
+                            @{usr.username || (usr.email ? usr.email.split("@")[0] : usr.name.toLowerCase().replace(/[^a-z0-9]/g, "."))}
                           </p>
                         </div>
                       </div>
@@ -1194,11 +1200,6 @@ export default function UserRoleManagement() {
 
                     {/* Metadata & Password Reveal */}
                     <div className="mt-4 space-y-2 text-xs text-stone-600 bg-stone-50/80 p-3 rounded-2xl border border-stone-100">
-                      <div className="flex items-center gap-2 text-[11px]">
-                        <Mail className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                        <span className="truncate font-medium">{usr.email}</span>
-                      </div>
-
                       {usr.phone && (
                         <div className="flex items-center gap-2 text-[11px]">
                           <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
@@ -1500,18 +1501,6 @@ export default function UserRoleManagement() {
                     />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold">@</span>
                   </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Correo Electrónico *</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="brenda@panaderiabrito.com"
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-medium text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
                 </div>
 
                 <div className="space-y-1">
