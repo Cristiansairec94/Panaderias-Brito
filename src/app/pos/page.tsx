@@ -431,21 +431,25 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* Category Filter Chips */}
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-5 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all ${
-                  selectedCategory === cat.id
-                    ? "bg-amber-900 text-white shadow-md shadow-amber-950/20 scale-[1.02]"
-                    : "bg-white text-stone-700 hover:bg-amber-50/80 border border-stone-200/80"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
+          {/* Discreet, Compact Category Filter Chips (All Visible, Zero Scrollbar) */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            {CATEGORIES.map((cat) => {
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-black transition-all active:scale-95 flex items-center gap-1 ${
+                    isSelected
+                      ? "bg-amber-950 text-white shadow-xs ring-1 ring-amber-800"
+                      : "bg-white text-stone-700 hover:bg-stone-100 hover:text-stone-900 border border-stone-200 shadow-2xs"
+                  }`}
+                >
+                  <span className="text-[11px]">{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

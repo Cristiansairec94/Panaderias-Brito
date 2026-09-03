@@ -125,7 +125,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
 ];
 
 export const PRODUCT_CATEGORIES = [
-  { id: "all", label: "Todo el Pan", priceTag: "", icon: "🧺" },
+  { id: "all", label: "Todo", priceTag: "", icon: "🧺" },
   { id: "bolillo_3", label: "Bolillo $3", priceTag: "$3", icon: "🍞" },
   { id: "telera_350", label: "Telera $3.50", priceTag: "$3.50", icon: "🥪" },
   { id: "pambazo_4", label: "Pambazo $4", priceTag: "$4", icon: "🥖" },
@@ -134,9 +134,9 @@ export const PRODUCT_CATEGORIES = [
   { id: "rollos_15", label: "Rollos $15", priceTag: "$15", icon: "🥨" },
   { id: "strudel_18", label: "Strudel $18", priceTag: "$18", icon: "🥧" },
   { id: "pastes_20", label: "Pastes $20", priceTag: "$20", icon: "🥟" },
-  { id: "pizza_20", label: "Rebanada Pizza $20", priceTag: "$20", icon: "🍕" },
-  { id: "pay_25", label: "Rebanada Pay $25", priceTag: "$25", icon: "🍰" },
-  { id: "cuerno_65", label: "Cuerno Grande $65", priceTag: "$65", icon: "🥐" },
+  { id: "pizza_20", label: "Pizza $20", priceTag: "$20", icon: "🍕" },
+  { id: "pay_25", label: "Pay $25", priceTag: "$25", icon: "🍰" },
+  { id: "cuerno_65", label: "Cuerno $65", priceTag: "$65", icon: "🥐" },
 ];
 
 const STORAGE_KEY = "brito_products_v2";
