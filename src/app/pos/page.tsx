@@ -589,30 +589,20 @@ export default function POSPage() {
                         <span className="truncate">{cat.label}</span>
                       </div>
 
-                      {/* Right Area: Count + Cancel X Icon when active */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
-                          isSelected
-                            ? "bg-amber-500 text-stone-950 font-black"
-                            : "bg-stone-200 text-stone-600"
-                        }`}>
-                          {count}
+                      {/* Right Area: Cancel X Icon when active */}
+                      {isSelected && (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCategory("all");
+                            setShowCategoryDropdown(false);
+                          }}
+                          title="Cancelar opción, ver todos los productos y ocultar catálogo"
+                          className="w-5 h-5 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black shadow-md transition-all active:scale-90 hover:scale-110 ml-0.5 cursor-pointer shrink-0"
+                        >
+                          <X className="w-3 h-3 stroke-[3]" />
                         </span>
-
-                        {isSelected && (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedCategory("all");
-                              setShowCategoryDropdown(false);
-                            }}
-                            title="Cancelar opción, ver todos los productos y ocultar catálogo"
-                            className="w-5 h-5 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black shadow-md transition-all active:scale-90 hover:scale-110 ml-0.5 cursor-pointer"
-                          >
-                            <X className="w-3 h-3 stroke-[3]" />
-                          </span>
-                        )}
-                      </div>
+                      )}
                     </button>
                   );
                 })}

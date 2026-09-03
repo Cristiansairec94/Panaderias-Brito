@@ -8,7 +8,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "dulce_10",
     icon: "🥐",
     stock: 150,
-    tag: "Pan Dulce $10",
+    tag: "Pan Dulce",
     description: "Conchas chicas, donas, orejas, polvorones, banderillas, moños y pan dulce tradicional.",
     image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80"
   },
@@ -19,7 +19,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "bolillo_3",
     icon: "🍞",
     stock: 300,
-    tag: "Bolillo $3",
+    tag: "Recién Horneado",
     description: "Bolillo tradicional crujiente de horno caliente con migajón esponjoso.",
     image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
   },
@@ -30,7 +30,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "telera_350",
     icon: "🥪",
     stock: 200,
-    tag: "Telera $3.50",
+    tag: "Para Tortas",
     description: "Telera suave y dorada en tres secciones, clásica para tortas mexicanas.",
     image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
   },
@@ -41,7 +41,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "dulce_12",
     icon: "🍫",
     stock: 120,
-    tag: "Pan Dulce $12",
+    tag: "Especial",
     description: "Conchas grandes especiales, cuernitos de mantequilla, rehiletes, trenzas y chocolatines.",
     image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
   },
@@ -52,7 +52,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "rollos_15",
     icon: "🥨",
     stock: 75,
-    tag: "Rollos $15",
+    tag: "Glaseado",
     description: "Rollos de canela glaseados, rollos de crema pastelera, mermelada de fresa y nuez.",
     image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
   },
@@ -63,7 +63,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "strudel_18",
     icon: "🥧",
     stock: 50,
-    tag: "Strudel $18",
+    tag: "Hojaldrado",
     description: "Strudel fino hojaldrado relleno de manzana horneada con canela, nuez o piña.",
     image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
   },
@@ -74,7 +74,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "pambazo_4",
     icon: "🥖",
     stock: 180,
-    tag: "Pambazo $4",
+    tag: "Tradicional",
     description: "Pan de pambazo suave tradicional para enchilar y rellenar de papa y chorizo.",
     image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
   },
@@ -85,7 +85,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "pastes_20",
     icon: "🥟",
     stock: 60,
-    tag: "Pastes $20",
+    tag: "Artesanal",
     description: "Paste tradicional horneado de papa con carne molida, frijol con queso o tinga.",
     image: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80"
   },
@@ -96,7 +96,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "pizza_20",
     icon: "🍕",
     stock: 45,
-    tag: "Pizza $20",
+    tag: "Al Horno",
     description: "Rebanada de pizza panadera crujiente con salsa de tomate, queso y pepperoni.",
     image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80"
   },
@@ -107,7 +107,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "pay_25",
     icon: "🍰",
     stock: 40,
-    tag: "Pay $25",
+    tag: "Repostería",
     description: "Rebanada de pay de queso con zarzamora, limón, piña o nuez sobre costra de galleta.",
     image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80"
   },
@@ -118,7 +118,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "cuerno_65",
     icon: "🥐",
     stock: 25,
-    tag: "Cuerno Grande $65",
+    tag: "Familiar",
     description: "Cuerno gigante hojaldrado 100% mantequilla pura de vaca (tamaño familiar).",
     image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
   }
@@ -126,20 +126,22 @@ export const DEFAULT_PRODUCTS: Product[] = [
 
 export const PRODUCT_CATEGORIES = [
   { id: "all", label: "Todo", priceTag: "", icon: "🧺" },
-  { id: "bolillo_3", label: "Bolillo $3", priceTag: "$3", icon: "🍞" },
-  { id: "telera_350", label: "Telera $3.50", priceTag: "$3.50", icon: "🥪" },
-  { id: "pambazo_4", label: "Pambazo $4", priceTag: "$4", icon: "🥖" },
-  { id: "dulce_10", label: "Dulce $10", priceTag: "$10", icon: "🥐" },
-  { id: "dulce_12", label: "Dulce $12", priceTag: "$12", icon: "🍫" },
-  { id: "rollos_15", label: "Rollos $15", priceTag: "$15", icon: "🥨" },
-  { id: "strudel_18", label: "Strudel $18", priceTag: "$18", icon: "🥧" },
-  { id: "pastes_20", label: "Pastes $20", priceTag: "$20", icon: "🥟" },
-  { id: "pizza_20", label: "Pizza $20", priceTag: "$20", icon: "🍕" },
-  { id: "pay_25", label: "Pay $25", priceTag: "$25", icon: "🍰" },
-  { id: "cuerno_65", label: "Cuerno $65", priceTag: "$65", icon: "🥐" },
+  { id: "bolillo_3", label: "Bolillo", priceTag: "", icon: "🍞" },
+  { id: "telera_350", label: "Telera", priceTag: "", icon: "🥪" },
+  { id: "pambazo_4", label: "Pambazo", priceTag: "", icon: "🥖" },
+  { id: "dulce_10", label: "Pan Dulce", priceTag: "", icon: "🥐" },
+  { id: "dulce_12", label: "Dulce Especial", priceTag: "", icon: "🍫" },
+  { id: "rollos_15", label: "Rollos", priceTag: "", icon: "🥨" },
+  { id: "strudel_18", label: "Strudel", priceTag: "", icon: "🥧" },
+  { id: "pastes_20", label: "Pastes", priceTag: "", icon: "🥟" },
+  { id: "pizza_20", label: "Pizza", priceTag: "", icon: "🍕" },
+  { id: "pay_25", label: "Pay", priceTag: "", icon: "🍰" },
+  { id: "cuerno_65", label: "Cuerno", priceTag: "", icon: "🥐" },
+  { id: "abarrotes", label: "Abarrotes", priceTag: "", icon: "🥫" },
+  { id: "materia_prima", label: "Materia Prima", priceTag: "", icon: "🌾" },
 ];
 
-const STORAGE_KEY = "brito_products_v2";
+const STORAGE_KEY = "brito_products_v3";
 
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") {
