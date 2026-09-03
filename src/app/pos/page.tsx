@@ -527,54 +527,47 @@ export default function POSPage() {
               )}
             </div>
 
-            {/* Botón Grande: Categorías y Precios */}
+            {/* Botón Grande: Categorías y Precios (Fijo con colores oficiales, texto y tamaño estables) */}
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setShowCategoryPanel(!showCategoryPanel)}
-                className={`flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 text-sm sm:text-base font-black transition-all active:scale-95 shadow-sm ${
-                  showCategoryPanel || selectedCategory !== "all"
-                    ? "bg-[#2d1810] text-amber-100 border-amber-800 ring-2 ring-amber-500/40 shadow-md"
-                    : "bg-white hover:bg-amber-50 text-stone-900 border-amber-300 hover:border-amber-400"
-                }`}
+                className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 border-amber-400 bg-white hover:bg-amber-50 text-stone-900 text-sm sm:text-base font-black transition-all active:scale-95 shadow-sm whitespace-nowrap"
                 title="Mostrar u ocultar panel de categorías y precios"
               >
-                <span className="text-xl">{activeCategory?.icon || "🥞"}</span>
-                <span className="truncate max-w-[160px]">
-                  {selectedCategory === "all" ? "Categorías y Precios" : activeCategory?.label}
-                </span>
-                {/* Botón X: Cierra la barrera desplegable y manda directo a Todo el Pan */}
-                {(showCategoryPanel || selectedCategory !== "all") && (
+                <span className="text-xl">🧺</span>
+                <span>Categorías y Precios</span>
+                {selectedCategory !== "all" && (
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedCategory("all");
                       setShowCategoryPanel(false);
                     }}
-                    className="w-5 h-5 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center text-xs font-black transition-transform active:scale-90"
-                    title="Ver todo el pan y cerrar opciones"
+                    className="w-5 h-5 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center text-xs font-black transition-transform active:scale-90 ml-0.5"
+                    title="Ver todo el pan y quitar filtro"
                   >
                     ✕
                   </span>
                 )}
-                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showCategoryPanel ? "rotate-180 text-amber-400" : "text-stone-400"}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
               </button>
             </div>
 
-            {/* Botón Gasto Rápido */}
+            {/* Botón Gasto Rápido (Colores, texto y tamaño estables) */}
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setShowExpensesModal(true)}
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 border-rose-200 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/80 text-rose-900 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 border-rose-200 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/80 text-rose-900 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap"
                 title="Registrar salida o gasto de dinero"
               >
                 <span className="text-lg">💸</span>
-                <span className="hidden sm:inline">Gasto</span>
+                <span>Gasto</span>
               </button>
             </div>
 
-            {/* Botón Grande: Caja & Turno (Abre directamente el Corte de Caja) */}
+            {/* Botón Grande: Caja & Turno (Colores oficiales, texto y tamaño estables) */}
             <div className="relative shrink-0">
               <button
                 type="button"
@@ -582,12 +575,12 @@ export default function POSPage() {
                   setShiftModalTab("cambio");
                   setShowCashDrawerModal(true);
                 }}
-                className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 border-amber-900 bg-[#2d1810] hover:bg-[#3d2015] text-amber-100 text-sm sm:text-base font-black transition-all active:scale-95 shadow-md ring-2 ring-amber-500/40"
+                className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 border-amber-900 bg-[#2d1810] hover:bg-[#3d2015] text-amber-100 text-sm sm:text-base font-black transition-all active:scale-95 shadow-md ring-2 ring-amber-500/40 whitespace-nowrap"
                 title="Abrir Corte de Caja y Cierre de Turno directamente"
               >
-                <span className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-xs ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
                 <span className="text-xl">💼</span>
-                <span className="truncate">Caja & Turno</span>
+                <span>Caja & Turno</span>
               </button>
             </div>
 
