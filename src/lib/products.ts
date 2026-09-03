@@ -140,6 +140,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "abarrotes",
     icon: "🥛",
     stock: 40,
+    unit: "pieza",
     tag: "Abarrote",
     description: "Leche pasteurizada entera fresca de primera calidad.",
     image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&auto=format&fit=crop&q=80"
@@ -151,6 +152,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
     category: "materia_prima",
     icon: "🌾",
     stock: 80,
+    unit: "kg",
     tag: "Insumo",
     description: "Harina de trigo de alta fuerza ideal para panificación tradicional.",
     image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
@@ -168,7 +170,7 @@ export const PRODUCT_CATEGORIES = [
   { id: "materia_prima", label: "Materia Prima", priceTag: "", icon: "🌾" },
 ];
 
-const STORAGE_KEY = "brito_products_v4";
+const STORAGE_KEY = "brito_products_v5";
 
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") {

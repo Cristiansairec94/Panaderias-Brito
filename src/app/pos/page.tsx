@@ -663,8 +663,13 @@ export default function POSPage() {
 
                   {/* PROMINENT PRICE BADGE (Top Right) */}
                   <div className="absolute top-3 right-3 z-10">
-                    <span className="inline-flex items-center bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black text-sm px-3 py-1 rounded-2xl shadow-xl border-2 border-white">
-                      {formatCurrency(product.price)}
+                    <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black text-sm px-3 py-1 rounded-2xl shadow-xl border-2 border-white">
+                      <span>{formatCurrency(product.price)}</span>
+                      {product.unit && (
+                        <span className="text-[10px] font-bold text-amber-100">
+                          /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
+                        </span>
+                      )}
                     </span>
                   </div>
 
@@ -687,9 +692,16 @@ export default function POSPage() {
                       <h3 className="font-black text-stone-900 text-lg leading-snug group-hover:text-amber-800 transition-colors">
                         {product.name}
                       </h3>
-                      <span className="font-black text-amber-900 text-base shrink-0">
-                        {formatCurrency(product.price)}
-                      </span>
+                      <div className="text-right shrink-0">
+                        <span className="font-black text-amber-900 text-base">
+                          {formatCurrency(product.price)}
+                        </span>
+                        {product.unit && (
+                          <span className="text-[11px] font-bold text-amber-700 ml-1">
+                            /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="text-xs text-stone-600 mt-1 line-clamp-2 leading-relaxed font-sans">
                       {product.description || "Panadería artesanal horneada con la receta tradicional de la casa."}
