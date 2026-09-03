@@ -24,146 +24,11 @@ import {
 import { Product, CartItem, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredProducts } from "@/lib/products";
+import { getStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
 import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
-
-const FALLBACK_PRODUCTS: Product[] = [
-  {
-    id: "1",
-    name: "Concha de Vainilla",
-    price: 12,
-    category: "pan_dulce",
-    icon: "🥖",
-    stock: 50,
-    tag: "Tradicional",
-    description: "Esponjosa y suave con costra crujiente de azúcar y vainilla natural.",
-    image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "2",
-    name: "Concha de Chocolate",
-    price: 12,
-    category: "pan_dulce",
-    icon: "🍫",
-    stock: 40,
-    tag: "Favorito",
-    description: "Masa fina aromatizada con cacao selecto y cubierta crujiente chocolatosa.",
-    image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "3",
-    name: "Cuerno de Mantequilla",
-    price: 15,
-    category: "pan_dulce",
-    icon: "🥐",
-    stock: 30,
-    tag: "Artesanal",
-    description: "Hojaldre 100% mantequilla pura de vaca, dorado y crujiente por capas.",
-    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "4",
-    name: "Bolillo Tradicional",
-    price: 5,
-    category: "pan_blanco",
-    icon: "🍞",
-    stock: 150,
-    tag: "Recién Salido",
-    description: "Corteza dorada crujiente y migajón esponjoso, horneado en piso de piedra.",
-    image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "5",
-    name: "Telera para Torta",
-    price: 6,
-    category: "pan_blanco",
-    icon: "🥪",
-    stock: 100,
-    tag: "De la Casa",
-    description: "Pan suave y dorado en tres secciones, el clásico para tortas mexicanas.",
-    image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "6",
-    name: "Oreja Hojaldrada",
-    price: 14,
-    category: "pan_dulce",
-    icon: "🥨",
-    stock: 35,
-    tag: "Crujiente",
-    description: "Hojaldre finamente caramelizado al horno con mantequilla y azúcar.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "7",
-    name: "Dona Glaseada",
-    price: 13,
-    category: "pan_dulce",
-    icon: "🍩",
-    stock: 30,
-    tag: "Más Vendido",
-    description: "Masa esponjada frita a punto exacto con glaseado clásico brillante.",
-    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "8",
-    name: "Rebanada Pastel 3 Leches",
-    price: 45,
-    category: "pasteleria",
-    icon: "🍰",
-    stock: 20,
-    tag: "Gourmet",
-    description: "Bizcocho húmedo bañado en infusión de tres leches y fresa fresca.",
-    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "9",
-    name: "Pay de Queso con Zarzamora",
-    price: 40,
-    category: "pasteleria",
-    icon: "🥧",
-    stock: 15,
-    tag: "Especialidad",
-    description: "Base crujiente de galleta con suave crema de queso y zarzamora silvestre.",
-    image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "10",
-    name: "Café de Olla Caliente",
-    price: 25,
-    category: "bebidas",
-    icon: "☕",
-    stock: 60,
-    tag: "Calientito",
-    description: "Café de grano selecto colado con canela criolla y toque de piloncillo.",
-    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "11",
-    name: "Pan de Muerto Tradicional",
-    price: 20,
-    category: "temporada",
-    icon: "✨",
-    stock: 50,
-    tag: "Temporada",
-    description: "Aromatizado con flor de azahar y naranja, espolvoreado con azúcar fina.",
-    image: "https://images.unsplash.com/photo-1621236378699-8597fee6a1ce?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "12",
-    name: "Empanada de Calabaza",
-    price: 16,
-    category: "pan_dulce",
-    icon: "🥟",
-    stock: 25,
-    tag: "Rellena",
-    description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
-  },
-];
 
 const INITIAL_EXPENSES: CashExpense[] = [
   {
@@ -184,17 +49,7 @@ const INITIAL_EXPENSES: CashExpense[] = [
   },
 ];
 
-const CATEGORIES = [
-  { id: "all", label: "Todo el Pan" },
-  { id: "pan_dulce", label: "Pan Dulce Tradicional" },
-  { id: "pan_blanco", label: "Bolillo & Telera" },
-  { id: "pasteleria", label: "Pasteles & Pays" },
-  { id: "bebidas", label: "Café & Bebidas" },
-  { id: "temporada", label: "Especiales de Temporada" },
-  { id: "abarrotes", label: "Abarrotes" },
-  { id: "materia_prima", label: "Materia Prima" },
-];
-
+const CATEGORIES = PRODUCT_CATEGORIES;
 const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500];
 
 export default function POSPage() {
@@ -250,17 +105,17 @@ export default function POSPage() {
 
         if (prodData && prodData.length > 0 && !prodErr) {
           const mapped: Product[] = prodData.map((p: any) => {
-            const fallbackMatch = FALLBACK_PRODUCTS.find((fb) => fb.name.toLowerCase() === p.name.toLowerCase());
+            const fallbackMatch = DEFAULT_PRODUCTS.find((fb) => fb.name.toLowerCase() === p.name.toLowerCase());
             return {
               id: p.id,
               name: p.name,
               price: Number(p.price),
-              category: p.category_id || "pan_dulce",
-              icon: p.icon || "🥖",
+              category: p.category_id || "dulce_10",
+              icon: p.icon || "🥐",
               stock: p.stock || 0,
               image: p.image || fallbackMatch?.image,
               description: fallbackMatch?.description,
-              tag: fallbackMatch?.tag || "Artesanal",
+              tag: fallbackMatch?.tag || `Pan $${p.price}`,
             };
           });
           setProducts(mapped);
@@ -357,6 +212,22 @@ export default function POSPage() {
         );
       }
       return [...prev, { product, quantity: 1 }];
+    });
+  };
+
+  const addMultipleToCart = (product: Product, count: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (product.stock <= 0) return;
+
+    setCart((prev) => {
+      const existing = prev.find((item) => item.product.id === product.id);
+      if (existing) {
+        const newQ = Math.min(product.stock, existing.quantity + count);
+        return prev.map((item) =>
+          item.product.id === product.id ? { ...item, quantity: newQ } : item
+        );
+      }
+      return [...prev, { product, quantity: Math.min(product.stock, count) }];
     });
   };
 
@@ -612,28 +483,35 @@ export default function POSPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 text-6xl">
-                      {product.icon || "🥖"}
+                      {product.icon || "🥐"}
                     </div>
                   )}
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 opacity-70 group-hover:opacity-50 transition-opacity" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/15 opacity-70 group-hover:opacity-40 transition-opacity" />
 
                   {/* Product Tag Badge */}
                   {product.tag && (
                     <div className="absolute top-3 left-3 z-10">
-                      <span className="inline-flex items-center gap-1 bg-amber-950/80 backdrop-blur-md text-amber-200 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                      <span className="inline-flex items-center gap-1 bg-amber-950/85 backdrop-blur-md text-amber-200 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md border border-amber-800/50">
                         <Sparkles className="w-3 h-3 text-amber-400" />
                         {product.tag}
                       </span>
                     </div>
                   )}
 
+                  {/* PROMINENT PRICE BADGE (Top Right) */}
+                  <div className="absolute top-3 right-3 z-10">
+                    <span className="inline-flex items-center bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black text-sm px-3 py-1 rounded-2xl shadow-xl border-2 border-white">
+                      {formatCurrency(product.price)}
+                    </span>
+                  </div>
+
                   {/* Stock Tag on Image */}
                   <div className="absolute bottom-3 left-3 z-10">
                     <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm ${
                       isOutOfStock
                         ? "bg-rose-600/90 text-white font-black"
-                        : "bg-black/60 text-stone-100"
+                        : "bg-black/70 text-stone-100"
                     }`}>
                       {isOutOfStock ? "Agotado en mostrador" : `Disponibles: ${product.stock} pzas`}
                     </span>
@@ -643,34 +521,37 @@ export default function POSPage() {
                 {/* Card Content */}
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
                   <div>
-                    <h3 className="font-extrabold text-stone-900 text-base leading-snug group-hover:text-amber-800 transition-colors">
-                      {product.name}
-                    </h3>
-                    <p className="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed font-sans">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-black text-stone-900 text-lg leading-snug group-hover:text-amber-800 transition-colors">
+                        {product.name}
+                      </h3>
+                      <span className="font-black text-amber-900 text-base shrink-0">
+                        {formatCurrency(product.price)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 mt-1 line-clamp-2 leading-relaxed font-sans">
                       {product.description || "Panadería artesanal horneada con la receta tradicional de la casa."}
                     </p>
                   </div>
 
-                  {/* Price & Action Button */}
-                  <div className="flex items-center justify-between pt-3 border-t border-stone-100">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-stone-400 block leading-none">Precio</span>
-                      <span className="text-xl font-black text-amber-900 tracking-tight">
-                        {formatCurrency(product.price)}
-                      </span>
+                  {/* Quick Quantity Shortcuts (+1, +5, +10) */}
+                  <div className="space-y-2 pt-1 border-t border-stone-100">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                      <span>Agregar piezas:</span>
                     </div>
-
-                    <button
-                      disabled={isOutOfStock}
-                      className={`flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-black shadow-md transition-all ${
-                        isOutOfStock
-                          ? "bg-stone-200 text-stone-400 cursor-not-allowed"
-                          : "bg-amber-600 group-hover:bg-amber-700 text-white shadow-amber-900/20 active:scale-95"
-                      }`}
-                    >
-                      <Plus className="w-4 h-4 stroke-[3]" />
-                      <span>Agregar</span>
-                    </button>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[1, 5, 10].map((qty) => (
+                        <button
+                          key={qty}
+                          type="button"
+                          onClick={(e) => addMultipleToCart(product, qty, e)}
+                          disabled={isOutOfStock}
+                          className="py-1.5 px-2 bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-950 border border-amber-200/80 rounded-xl text-xs font-black transition-all active:scale-95 shadow-xs disabled:opacity-30 disabled:cursor-not-allowed text-center"
+                        >
+                          +{qty} pza{qty > 1 ? "s" : ""}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -2,173 +2,144 @@ import { Product } from "@/types";
 
 export const DEFAULT_PRODUCTS: Product[] = [
   {
-    id: "prod-1",
-    name: "Concha de Vainilla",
-    price: 12,
-    category: "pan_dulce",
-    icon: "🥖",
-    stock: 50,
-    tag: "Tradicional",
-    description: "Esponjosa y suave con costra crujiente de azúcar y vainilla natural.",
+    id: "prod-dulce-10",
+    name: "Dulce",
+    price: 10,
+    category: "dulce_10",
+    icon: "🥐",
+    stock: 150,
+    tag: "Pan Dulce $10",
+    description: "Conchas chicas, donas, orejas, polvorones, banderillas, moños y pan dulce tradicional.",
     image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-2",
-    name: "Concha de Chocolate",
-    price: 12,
-    category: "pan_dulce",
-    icon: "🍫",
-    stock: 40,
-    tag: "Favorito",
-    description: "Masa fina aromatizada con cacao selecto y cubierta crujiente chocolatosa.",
-    image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-3",
-    name: "Cuerno de Mantequilla",
-    price: 15,
-    category: "pan_dulce",
-    icon: "🥐",
-    stock: 30,
-    tag: "Artesanal",
-    description: "Hojaldre 100% mantequilla pura de vaca, dorado y crujiente por capas.",
-    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-4",
-    name: "Bolillo Tradicional",
-    price: 5,
-    category: "pan_blanco",
+    id: "prod-bolillo-3",
+    name: "Bolillo",
+    price: 3,
+    category: "bolillo_3",
     icon: "🍞",
-    stock: 150,
-    tag: "Recién Salido",
-    description: "Corteza dorada crujiente y migajón esponjoso, horneado en piso de piedra.",
+    stock: 300,
+    tag: "Bolillo $3",
+    description: "Bolillo tradicional crujiente de horno caliente con migajón esponjoso.",
     image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-5",
-    name: "Telera para Torta",
-    price: 6,
-    category: "pan_blanco",
+    id: "prod-telera-350",
+    name: "Telera",
+    price: 3.50,
+    category: "telera_350",
     icon: "🥪",
-    stock: 100,
-    tag: "De la Casa",
-    description: "Pan suave y dorado en tres secciones, el clásico para tortas mexicanas.",
+    stock: 200,
+    tag: "Telera $3.50",
+    description: "Telera suave y dorada en tres secciones, clásica para tortas mexicanas.",
     image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-6",
-    name: "Oreja Hojaldrada",
-    price: 14,
-    category: "pan_dulce",
+    id: "prod-dulce-12",
+    name: "Dulce",
+    price: 12,
+    category: "dulce_12",
+    icon: "🍫",
+    stock: 120,
+    tag: "Pan Dulce $12",
+    description: "Conchas grandes especiales, cuernitos de mantequilla, rehiletes, trenzas y chocolatines.",
+    image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-rollos-15",
+    name: "Rollos",
+    price: 15,
+    category: "rollos_15",
     icon: "🥨",
-    stock: 35,
-    tag: "Crujiente",
-    description: "Hojaldre finamente caramelizado al horno con mantequilla y azúcar.",
+    stock: 75,
+    tag: "Rollos $15",
+    description: "Rollos de canela glaseados, rollos de crema pastelera, mermelada de fresa y nuez.",
     image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-7",
-    name: "Dona Glaseada",
-    price: 13,
-    category: "pan_dulce",
-    icon: "🍩",
-    stock: 30,
-    tag: "Más Vendido",
-    description: "Masa esponjada frita a punto exacto con glaseado clásico brillante.",
-    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-8",
-    name: "Rebanada Pastel 3 Leches",
-    price: 45,
-    category: "pasteleria",
-    icon: "🍰",
-    stock: 20,
-    tag: "Gourmet",
-    description: "Bizcocho húmedo bañado en infusión de tres leches y fresa fresca.",
-    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-9",
-    name: "Pay de Queso con Zarzamora",
-    price: 40,
-    category: "pasteleria",
+    id: "prod-strudel-18",
+    name: "Strudel",
+    price: 18,
+    category: "strudel_18",
     icon: "🥧",
-    stock: 15,
-    tag: "Especialidad",
-    description: "Base crujiente de galleta con suave crema de queso y zarzamora silvestre.",
+    stock: 50,
+    tag: "Strudel $18",
+    description: "Strudel fino hojaldrado relleno de manzana horneada con canela, nuez o piña.",
+    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-pambazo-4",
+    name: "Pambazo",
+    price: 4,
+    category: "pambazo_4",
+    icon: "🥖",
+    stock: 180,
+    tag: "Pambazo $4",
+    description: "Pan de pambazo suave tradicional para enchilar y rellenar de papa y chorizo.",
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-pastes-20",
+    name: "Pastes",
+    price: 20,
+    category: "pastes_20",
+    icon: "🥟",
+    stock: 60,
+    tag: "Pastes $20",
+    description: "Paste tradicional horneado de papa con carne molida, frijol con queso o tinga.",
+    image: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-pizza-20",
+    name: "Rebanada de pizza",
+    price: 20,
+    category: "pizza_20",
+    icon: "🍕",
+    stock: 45,
+    tag: "Pizza $20",
+    description: "Rebanada de pizza panadera crujiente con salsa de tomate, queso y pepperoni.",
+    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-pay-25",
+    name: "Rebanada de pay",
+    price: 25,
+    category: "pay_25",
+    icon: "🍰",
+    stock: 40,
+    tag: "Pay $25",
+    description: "Rebanada de pay de queso con zarzamora, limón, piña o nuez sobre costra de galleta.",
     image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-10",
-    name: "Café de Olla Caliente",
-    price: 25,
-    category: "bebidas",
-    icon: "☕",
-    stock: 60,
-    tag: "Calientito",
-    description: "Café de grano selecto colado con canela criolla y toque de piloncillo.",
-    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-11",
-    name: "Chocolate Caliente con Leche",
-    price: 30,
-    category: "bebidas",
-    icon: "🍫",
-    stock: 40,
-    tag: "Tradición",
-    description: "Tablelilla artesanal espumada en jarra con leche entera caliente.",
-    image: "https://images.unsplash.com/photo-1542990253-0d0f5be5f0ed?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-12",
-    name: "Empanada de Calabaza",
-    price: 18,
-    category: "temporada",
-    icon: "🥟",
+    id: "prod-cuerno-65",
+    name: "Cuerno grande",
+    price: 65,
+    category: "cuerno_65",
+    icon: "🥐",
     stock: 25,
-    tag: "Rellena",
-    description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-13",
-    name: "Leche Entera 1L",
-    price: 28,
-    category: "abarrotes",
-    icon: "🥛",
-    stock: 40,
-    tag: "Abarrote",
-    description: "Leche pasteurizada entera fresca de primera calidad.",
-    image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-14",
-    name: "Harina de Trigo San Antonio 1kg",
-    price: 22,
-    category: "materia_prima",
-    icon: "🌾",
-    stock: 80,
-    tag: "Insumo",
-    description: "Harina de trigo de alta fuerza ideal para panificación tradicional.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+    tag: "Cuerno Grande $65",
+    description: "Cuerno gigante hojaldrado 100% mantequilla pura de vaca (tamaño familiar).",
+    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
   }
 ];
 
 export const PRODUCT_CATEGORIES = [
-  { id: "all", label: "Todas las Categorías", icon: "🧺" },
-  { id: "pan_dulce", label: "Pan Dulce Tradicional", icon: "🥖" },
-  { id: "pan_blanco", label: "Bolillo & Telera", icon: "🍞" },
-  { id: "pasteleria", label: "Pastelería & Pays", icon: "🍰" },
-  { id: "bebidas", label: "Cafetería & Bebidas", icon: "☕" },
-  { id: "temporada", label: "Especiales de Temporada", icon: "✨" },
-  { id: "abarrotes", label: "Abarrotes", icon: "🥫" },
-  { id: "materia_prima", label: "Materia Prima", icon: "🌾" },
+  { id: "all", label: "Todo el Pan", priceTag: "", icon: "🧺" },
+  { id: "bolillo_3", label: "Bolillo $3", priceTag: "$3", icon: "🍞" },
+  { id: "telera_350", label: "Telera $3.50", priceTag: "$3.50", icon: "🥪" },
+  { id: "pambazo_4", label: "Pambazo $4", priceTag: "$4", icon: "🥖" },
+  { id: "dulce_10", label: "Dulce $10", priceTag: "$10", icon: "🥐" },
+  { id: "dulce_12", label: "Dulce $12", priceTag: "$12", icon: "🍫" },
+  { id: "rollos_15", label: "Rollos $15", priceTag: "$15", icon: "🥨" },
+  { id: "strudel_18", label: "Strudel $18", priceTag: "$18", icon: "🥧" },
+  { id: "pastes_20", label: "Pastes $20", priceTag: "$20", icon: "🥟" },
+  { id: "pizza_20", label: "Rebanada Pizza $20", priceTag: "$20", icon: "🍕" },
+  { id: "pay_25", label: "Rebanada Pay $25", priceTag: "$25", icon: "🍰" },
+  { id: "cuerno_65", label: "Cuerno Grande $65", priceTag: "$65", icon: "🥐" },
 ];
 
-const STORAGE_KEY = "brito_products";
+const STORAGE_KEY = "brito_products_v2";
 
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") {
@@ -182,12 +153,12 @@ export function getStoredProducts(): Product[] {
       return DEFAULT_PRODUCTS;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+    if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.some(p => p.id === "prod-dulce-10")) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
+      return DEFAULT_PRODUCTS;
     }
-    return DEFAULT_PRODUCTS;
-  } catch (err) {
-    console.error("Error reading products from localStorage:", err);
+    return parsed;
+  } catch {
     return DEFAULT_PRODUCTS;
   }
 }
@@ -196,53 +167,54 @@ export function saveStoredProducts(products: Product[]): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    // Dispatch event to notify other components/tabs
-    window.dispatchEvent(new CustomEvent("brito_products_updated", { detail: products }));
+    window.dispatchEvent(new Event("brito_products_updated"));
   } catch (err) {
-    console.error("Error saving products to localStorage:", err);
+    console.error("Error saving products:", err);
   }
 }
 
-export function createProduct(newProductData: Omit<Product, "id">): Product {
+export function updateProductStock(id: string, newStock: number): void {
   const current = getStoredProducts();
-  const id = `prod-${Date.now()}`;
-  const newProduct: Product = {
-    ...newProductData,
-    id,
-    stock: Number(newProductData.stock) || 0,
-    price: Number(newProductData.price) || 0,
-  };
-  const updated = [newProduct, ...current];
+  const updated = current.map((p) => (p.id === id ? { ...p, stock: Math.max(0, newStock) } : p));
   saveStoredProducts(updated);
+}
+
+export function updateProductPrice(id: string, newPrice: number): void {
+  const current = getStoredProducts();
+  const updated = current.map((p) => (p.id === id ? { ...p, price: Math.max(0, newPrice) } : p));
+  saveStoredProducts(updated);
+}
+
+export function addProduct(product: Omit<Product, "id">): Product {
+  const current = getStoredProducts();
+  const newProduct: Product = {
+    ...product,
+    id: `prod-${Date.now()}`,
+  };
+  saveStoredProducts([...current, newProduct]);
   return newProduct;
+}
+
+export function createProduct(product: Omit<Product, "id">): Product {
+  return addProduct(product);
 }
 
 export function updateProduct(id: string, updates: Partial<Product>): Product | null {
   const current = getStoredProducts();
-  const index = current.findIndex((p) => p.id === id);
-  if (index === -1) return null;
-
-  const updatedProduct: Product = {
-    ...current[index],
-    ...updates,
-    stock: updates.stock !== undefined ? Number(updates.stock) : current[index].stock,
-    price: updates.price !== undefined ? Number(updates.price) : current[index].price,
-  };
-
-  current[index] = updatedProduct;
-  saveStoredProducts([...current]);
-  return updatedProduct;
+  let updatedItem: Product | null = null;
+  const updated = current.map((p) => {
+    if (p.id === id) {
+      updatedItem = { ...p, ...updates };
+      return updatedItem;
+    }
+    return p;
+  });
+  saveStoredProducts(updated);
+  return updatedItem;
 }
 
-export function deleteProduct(id: string): boolean {
+export function deleteProduct(id: string): void {
   const current = getStoredProducts();
-  const filtered = current.filter((p) => p.id !== id);
-  if (filtered.length === current.length) return false;
-  saveStoredProducts(filtered);
-  return true;
+  saveStoredProducts(current.filter((p) => p.id !== id));
 }
 
-export function resetProductsToDefault(): Product[] {
-  saveStoredProducts(DEFAULT_PRODUCTS);
-  return DEFAULT_PRODUCTS;
-}

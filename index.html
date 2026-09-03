@@ -15,9 +15,6 @@
   <!-- Babel for JSX in browser -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-
   <!-- Google Fonts: Montserrat & Playfair -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -79,146 +76,141 @@
 
     const PRODUCTS_DATA = [
       {
-        id: "1",
-        name: "Concha de Vainilla",
-        price: 12,
-        category: "pan_dulce",
-        icon: "🥖",
-        stock: 50,
-        tag: "Tradicional",
-        description: "Esponjosa y suave con costra crujiente de azúcar y vainilla natural.",
+        id: "prod-dulce-10",
+        name: "Dulce",
+        price: 10,
+        category: "dulce_10",
+        icon: "🥐",
+        stock: 150,
+        tag: "Pan Dulce $10",
+        description: "Conchas chicas, donas, orejas, polvorones, banderillas, moños y pan dulce estándar.",
         image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80"
       },
       {
-        id: "2",
-        name: "Concha de Chocolate",
-        price: 12,
-        category: "pan_dulce",
-        icon: "🍫",
-        stock: 40,
-        tag: "Favorito",
-        description: "Masa fina aromatizada con cacao selecto y cubierta crujiente chocolatosa.",
-        image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
-      },
-      {
-        id: "3",
-        name: "Cuerno de Mantequilla",
-        price: 15,
-        category: "pan_dulce",
-        icon: "🥐",
-        stock: 30,
-        tag: "Artesanal",
-        description: "Hojaldre 100% mantequilla pura de vaca, dorado y crujiente por capas.",
-        image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
-      },
-      {
-        id: "4",
-        name: "Bolillo Tradicional",
-        price: 5,
-        category: "pan_blanco",
+        id: "prod-bolillo-3",
+        name: "Bolillo",
+        price: 3,
+        category: "bolillo_3",
         icon: "🍞",
-        stock: 150,
-        tag: "Recién Salido",
-        description: "Corteza dorada crujiente y migajón esponjoso, horneado en piso de piedra.",
+        stock: 300,
+        tag: "Bolillo $3",
+        description: "Bolillo tradicional crujiente de horno caliente con migajón esponjoso.",
         image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
       },
       {
-        id: "5",
-        name: "Telera para Torta",
-        price: 6,
-        category: "pan_blanco",
+        id: "prod-telera-350",
+        name: "Telera",
+        price: 3.50,
+        category: "telera_350",
         icon: "🥪",
-        stock: 100,
-        tag: "De la Casa",
-        description: "Pan suave y dorado en tres secciones, el clásico para tortas mexicanas.",
+        stock: 200,
+        tag: "Telera $3.50",
+        description: "Telera suave y dorada en tres secciones, clásica para tortas mexicanas.",
         image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
       },
       {
-        id: "6",
-        name: "Oreja Hojaldrada",
-        price: 14,
-        category: "pan_dulce",
+        id: "prod-dulce-12",
+        name: "Dulce",
+        price: 12,
+        category: "dulce_12",
+        icon: "🍫",
+        stock: 120,
+        tag: "Pan Dulce $12",
+        description: "Conchas grandes especiales, cuernitos de mantequilla, rehiletes, trenzas y chocolatines.",
+        image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "prod-rollos-15",
+        name: "Rollos",
+        price: 15,
+        category: "rollos_15",
         icon: "🥨",
-        stock: 35,
-        tag: "Crujiente",
-        description: "Hojaldre finamente caramelizado al horno con mantequilla y azúcar.",
+        stock: 75,
+        tag: "Rollos $15",
+        description: "Rollos de canela glaseados, rollos de crema pastelera, mermelada de fresa y nuez.",
         image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
       },
       {
-        id: "7",
-        name: "Dona Glaseada",
-        price: 13,
-        category: "pan_dulce",
-        icon: "🍩",
-        stock: 30,
-        tag: "Más Vendido",
-        description: "Masa esponjada frita a punto exacto con glaseado clásico brillante.",
-        image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80"
-      },
-      {
-        id: "8",
-        name: "Rebanada Pastel 3 Leches",
-        price: 45,
-        category: "pasteleria",
-        icon: "🍰",
-        stock: 20,
-        tag: "Gourmet",
-        description: "Bizcocho húmedo bañado en infusión de tres leches y fresa fresca.",
-        image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80"
-      },
-      {
-        id: "9",
-        name: "Pay de Queso con Zarzamora",
-        price: 40,
-        category: "pasteleria",
+        id: "prod-strudel-18",
+        name: "Strudel",
+        price: 18,
+        category: "strudel_18",
         icon: "🥧",
-        stock: 15,
-        tag: "Especialidad",
-        description: "Base crujiente de galleta con suave crema de queso y zarzamora silvestre.",
+        stock: 50,
+        tag: "Strudel $18",
+        description: "Strudel fino hojaldrado relleno de manzana horneada con canela, nuez o piña.",
+        image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "prod-pambazo-4",
+        name: "Pambazo",
+        price: 4,
+        category: "pambazo_4",
+        icon: "🥖",
+        stock: 180,
+        tag: "Pambazo $4",
+        description: "Pan de pambazo suave tradicional para enchilar y rellenar de papa y chorizo.",
+        image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "prod-pastes-20",
+        name: "Pastes",
+        price: 20,
+        category: "pastes_20",
+        icon: "🥟",
+        stock: 60,
+        tag: "Pastes $20",
+        description: "Paste tradicional horneado de papa con carne molida, frijol con queso o tinga.",
+        image: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "prod-pizza-20",
+        name: "Rebanada de pizza",
+        price: 20,
+        category: "pizza_20",
+        icon: "🍕",
+        stock: 45,
+        tag: "Pizza $20",
+        description: "Rebanada de pizza panadera crujiente con salsa de tomate, queso y pepperoni.",
+        image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80"
+      },
+      {
+        id: "prod-pay-25",
+        name: "Rebanada de pay",
+        price: 25,
+        category: "pay_25",
+        icon: "🍰",
+        stock: 40,
+        tag: "Pay $25",
+        description: "Rebanada de pay de queso con zarzamora, limón, piña o nuez sobre costra de galleta.",
         image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80"
       },
       {
-        id: "10",
-        name: "Café de Olla Caliente",
-        price: 25,
-        category: "bebidas",
-        icon: "☕",
-        stock: 60,
-        tag: "Calientito",
-        description: "Café de grano selecto colado con canela criolla y toque de piloncillo.",
-        image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80"
-      },
-      {
-        id: "11",
-        name: "Pan de Muerto Tradicional",
-        price: 20,
-        category: "temporada",
-        icon: "✨",
-        stock: 50,
-        tag: "Temporada",
-        description: "Aromatizado con flor de azahar y naranja, espolvoreado con azúcar fina.",
-        image: "https://images.unsplash.com/photo-1621236378699-8597fee6a1ce?w=800&auto=format&fit=crop&q=80"
-      },
-      {
-        id: "12",
-        name: "Empanada de Calabaza",
-        price: 16,
-        category: "pan_dulce",
-        icon: "🥟",
+        id: "prod-cuerno-65",
+        name: "Cuerno grande",
+        price: 65,
+        category: "cuerno_65",
+        icon: "🥐",
         stock: 25,
-        tag: "Rellena",
-        description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
-        image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+        tag: "Cuerno Grande $65",
+        description: "Cuerno gigante hojaldrado 100% mantequilla pura de vaca (tamaño familiar).",
+        image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
       }
     ];
 
     const CATEGORIES = [
-      { id: "all", label: "Todo el Pan" },
-      { id: "pan_dulce", label: "Pan Dulce Tradicional" },
-      { id: "pan_blanco", label: "Bolillo & Telera" },
-      { id: "pasteleria", label: "Pasteles & Pays" },
-      { id: "bebidas", label: "Café & Bebidas" },
-      { id: "temporada", label: "Temporada" },
+      { id: "all", label: "🥖 Todo el Pan" },
+      { id: "bolillo_3", label: "Bolillo $3" },
+      { id: "telera_350", label: "Telera $3.50" },
+      { id: "pambazo_4", label: "Pambazo $4" },
+      { id: "dulce_10", label: "Dulce $10" },
+      { id: "dulce_12", label: "Dulce $12" },
+      { id: "rollos_15", label: "Rollos $15" },
+      { id: "strudel_18", label: "Strudel $18" },
+      { id: "pastes_20", label: "Pastes $20" },
+      { id: "pizza_20", label: "Rebanada Pizza $20" },
+      { id: "pay_25", label: "Rebanada Pay $25" },
+      { id: "cuerno_65", label: "Cuerno Grande $65" },
     ];
 
     function formatCurrency(amount) {
@@ -230,7 +222,7 @@
 
     function App() {
       const [products, setProducts] = useState(() => {
-        const saved = localStorage.getItem("brito_products");
+        const saved = localStorage.getItem("brito_products_v2");
         return saved ? JSON.parse(saved) : PRODUCTS_DATA;
       });
 
@@ -263,9 +255,8 @@
       const [showDrawerModal, setShowDrawerModal] = useState(false);
       const [completedSale, setCompletedSale] = useState(null);
 
-      // Save state to localStorage
       useEffect(() => {
-        localStorage.setItem("brito_products", JSON.stringify(products));
+        localStorage.setItem("brito_products_v2", JSON.stringify(products));
       }, [products]);
 
       useEffect(() => {
@@ -295,6 +286,19 @@
             return prev.map((i) => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
           }
           return [...prev, { product, quantity: 1 }];
+        });
+      };
+
+      const addMultipleToCart = (product, count, e) => {
+        if (e) e.stopPropagation();
+        if (product.stock <= 0) return;
+        setCart((prev) => {
+          const exist = prev.find((i) => i.product.id === product.id);
+          if (exist) {
+            const newQ = Math.min(product.stock, exist.quantity + count);
+            return prev.map((i) => i.product.id === product.id ? { ...i, quantity: newQ } : i);
+          }
+          return [...prev, { product, quantity: Math.min(product.stock, count) }];
         });
       };
 
@@ -371,10 +375,10 @@
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400">🔍</span>
                   <input
                     type="text"
-                    placeholder="Buscar concha, bolillo, pastel, dona..."
+                    placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm text-sm"
+                    className="w-full pl-11 pr-4 py-3 bg-white rounded-2xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm text-sm font-semibold"
                   />
                 </div>
 
@@ -403,16 +407,16 @@
                 </div>
               </div>
 
-              {/* Categories Tabs */}
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              {/* Categories Tabs (Price-Based Classification) */}
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
                 {CATEGORIES.map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-5 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all ${
+                    className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all ${
                       selectedCategory === cat.id
-                        ? "bg-amber-900 text-white shadow-md scale-[1.02]"
-                        : "bg-white text-stone-700 hover:bg-amber-50 border border-stone-200"
+                        ? "bg-amber-900 text-white shadow-md scale-[1.02] border-2 border-amber-800"
+                        : "bg-white text-stone-700 hover:bg-amber-50 border border-stone-200 shadow-xs"
                     }`}
                   >
                     {cat.label}
@@ -421,7 +425,7 @@
               </div>
             </div>
 
-            {/* Products Grid (El Globo Style Cards) */}
+            {/* Products Grid (Intuitive Price Cards with Images) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 pb-16">
               {filtered.map((prod) => {
                 const isOutOfStock = prod.stock <= 0;
@@ -439,7 +443,7 @@
                   >
                     {/* In-cart badge */}
                     {inCart && (
-                      <span className="absolute top-3 right-3 z-20 bg-amber-600 text-white font-black text-xs px-2.5 py-1 rounded-full shadow-lg border-2 border-white flex items-center gap-1">
+                      <span className="absolute top-3 left-3 z-20 bg-amber-600 text-white font-black text-xs px-2.5 py-1 rounded-full shadow-lg border-2 border-white flex items-center gap-1">
                         🧺 {inCart.quantity} en charola
                       </span>
                     )}
@@ -451,48 +455,56 @@
                         alt={prod.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-80" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10 opacity-70 group-hover:opacity-40 transition-opacity" />
 
                       {/* Tag */}
-                      <span className="absolute top-3 left-3 z-10 bg-amber-950/80 backdrop-blur-md text-amber-200 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      <span className="absolute bottom-3 left-3 z-10 bg-amber-950/85 backdrop-blur-md text-amber-200 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider border border-amber-800/40">
                         ✨ {prod.tag}
                       </span>
 
-                      {/* Stock badge */}
-                      <span className={`absolute bottom-3 left-3 z-10 text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md ${
-                        isOutOfStock ? "bg-rose-600/90 text-white" : "bg-black/60 text-stone-100"
-                      }`}>
-                        {isOutOfStock ? "Agotado" : `Disponibles: ${prod.stock} pzas`}
-                      </span>
+                      {/* PROMINENT PRICE BADGE (Top Right) */}
+                      <div className="absolute top-3 right-3 z-10">
+                        <span className="inline-flex items-center bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black text-sm px-3 py-1.5 rounded-2xl shadow-xl border-2 border-white">
+                          {formatCurrency(prod.price)}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Card Content */}
                     <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
                       <div>
-                        <h3 className="font-extrabold text-stone-900 text-base leading-snug group-hover:text-amber-800 transition-colors">
-                          {prod.name}
-                        </h3>
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-black text-stone-900 text-lg leading-snug group-hover:text-amber-800 transition-colors">
+                            {prod.name}
+                          </h3>
+                          <span className="font-black text-amber-900 text-base shrink-0">
+                            {formatCurrency(prod.price)}
+                          </span>
+                        </div>
                         <p className="text-xs text-stone-500 mt-1 line-clamp-2 leading-relaxed">
                           {prod.description}
                         </p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3 border-t border-stone-100">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-stone-400 block leading-none">Precio</span>
-                          <span className="text-xl font-black text-amber-900">{formatCurrency(prod.price)}</span>
+                      {/* Quick Quantity Shortcuts (+1, +5, +10) */}
+                      <div className="space-y-1.5 pt-2 border-t border-stone-100">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                          <span>Agregar piezas:</span>
+                          <span className="text-stone-500 font-semibold">{prod.stock} disponibles</span>
                         </div>
-
-                        <button
-                          disabled={isOutOfStock}
-                          className={`flex items-center gap-1 px-4 py-2.5 rounded-2xl text-xs font-black shadow-md transition-all ${
-                            isOutOfStock
-                              ? "bg-stone-200 text-stone-400"
-                              : "bg-amber-600 group-hover:bg-amber-700 text-white active:scale-95"
-                          }`}
-                        >
-                          <span>+ Agregar</span>
-                        </button>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[1, 5, 10].map((qty) => (
+                            <button
+                              key={qty}
+                              type="button"
+                              onClick={(e) => addMultipleToCart(prod, qty, e)}
+                              disabled={isOutOfStock}
+                              className="py-1.5 px-2 bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-950 border border-amber-200/80 rounded-xl text-xs font-black transition-all active:scale-95 shadow-xs disabled:opacity-30 disabled:cursor-not-allowed text-center"
+                            >
+                              +{qty} pza{qty > 1 ? "s" : ""}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -524,7 +536,7 @@
                   <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-3xl">🧺</div>
                   <p className="text-sm font-bold text-stone-800">Charola vacía</p>
                   <p className="text-xs text-stone-400 max-w-[200px]">
-                    Toca cualquier pan del catálogo para agregarlo a la cuenta.
+                    Toca cualquier pan del catálogo o los botones +1, +5, +10 para cobrar.
                   </p>
                 </div>
               ) : (

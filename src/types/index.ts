@@ -2,7 +2,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
-  category: "pan_dulce" | "pan_blanco" | "pasteleria" | "bebidas" | "temporada" | "abarrotes" | "materia_prima";
+  category: string;
   image?: string;
   icon?: string;
   stock: number;
