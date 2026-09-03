@@ -8,6 +8,7 @@ export interface Product {
   stock: number;
   description?: string;
   tag?: string;
+  unit?: "pieza" | "kg" | "g" | string;
 }
 
 export interface CartItem {

@@ -21,7 +21,8 @@ import {
   ArrowUpDown,
   RefreshCw,
   Tag as TagIcon,
-  CheckCircle2
+  CheckCircle2,
+  Scale
 } from "lucide-react";
 import { Product } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -58,6 +59,7 @@ export default function ProductosPage() {
     name: "",
     price: "",
     category: "pan_dulce" as Product["category"],
+    unit: "pieza" as "pieza" | "kg" | "g",
     description: "",
     image: "",
     icon: "🥖",
@@ -103,13 +105,15 @@ export default function ProductosPage() {
   const handleOpenCreate = () => {
     setModalMode("create");
     setEditingId(null);
+    const initialCat = (selectedCategory !== "all" ? selectedCategory : "pan_dulce") as Product["category"];
     setFormData({
       name: "",
       price: "",
-      category: "pan_dulce",
+      category: initialCat,
+      unit: initialCat === "materia_prima" ? "kg" : "pieza",
       description: "",
       image: "",
-      icon: "🥖",
+      icon: initialCat === "abarrotes" ? "🥫" : initialCat === "materia_prima" ? "🌾" : "🥖",
     });
     setIsModalOpen(true);
   };
@@ -122,6 +126,7 @@ export default function ProductosPage() {
       name: product.name,
       price: product.price.toString(),
       category: product.category,
+      unit: (product.unit as "pieza" | "kg" | "g") || (product.category === "materia_prima" ? "kg" : "pieza"),
       description: product.description || "",
       image: product.image || "",
       icon: product.icon || "🥖",
@@ -163,15 +168,19 @@ export default function ProductosPage() {
       return;
     }
 
+    const isUnitApplicable = formData.category === "abarrotes" || formData.category === "materia_prima";
+    const selectedUnit = isUnitApplicable ? (formData.unit || "pieza") : undefined;
+
     if (modalMode === "create") {
       const created = createProduct({
         name: formData.name.trim(),
         price: priceNum,
         category: formData.category,
+        unit: selectedUnit,
         stock: 50,
         description: formData.description.trim() || undefined,
         image: formData.image.trim() || undefined,
-        icon: formData.icon || "🥖",
+        icon: formData.icon || (formData.category === "abarrotes" ? "🥫" : formData.category === "materia_prima" ? "🌾" : "🥖"),
       });
       setProducts(getStoredProducts());
       setIsModalOpen(false);
@@ -181,6 +190,7 @@ export default function ProductosPage() {
         name: formData.name.trim(),
         price: priceNum,
         category: formData.category,
+        unit: selectedUnit,
         description: formData.description.trim() || undefined,
         image: formData.image.trim() || undefined,
         icon: formData.icon || "🥖",
@@ -376,23 +386,14 @@ export default function ProductosPage() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${
+                    className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2.5 group ${
                       isSelected
                         ? "bg-[#3e2723] text-amber-50 shadow-md shadow-amber-950/25 font-black scale-[1.02] border-2 border-amber-500 ring-2 ring-amber-700/30"
                         : "text-stone-700 hover:bg-stone-50 hover:text-stone-950 border border-transparent hover:border-stone-200"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-base shrink-0">{cat.icon}</span>
-                      <span className="truncate">{cat.label}</span>
-                    </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 transition-colors ${
-                      isSelected 
-                        ? "bg-amber-500 text-stone-950 font-black" 
-                        : "bg-stone-100 text-stone-500 group-hover:bg-stone-200 group-hover:text-stone-800"
-                    }`}>
-                      {count}
-                    </span>
+                    <span className="text-base shrink-0">{cat.icon}</span>
+                    <span className="truncate">{cat.label}</span>
                   </button>
                 );
               })}
@@ -483,9 +484,16 @@ export default function ProductosPage() {
                       <h3 className="text-base font-black text-stone-900 leading-snug">
                         {product.name}
                       </h3>
-                      <span className="text-base font-black text-amber-600 shrink-0">
-                        {formatCurrency(product.price)}
-                      </span>
+                      <div className="text-right shrink-0">
+                        <span className="text-base font-black text-amber-600">
+                          {formatCurrency(product.price)}
+                        </span>
+                        {product.unit && (
+                          <span className="text-[11px] font-bold text-stone-500 ml-1">
+                            /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {product.description && (
                       <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
@@ -565,8 +573,13 @@ export default function ProductosPage() {
                           {catBadge.label}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-black text-amber-600 text-sm">
+                      <td className="py-3 px-4 text-right font-black text-amber-600 text-sm whitespace-nowrap">
                         {formatCurrency(product.price)}
+                        {product.unit && (
+                          <span className="text-[10px] font-bold text-stone-400 ml-1">
+                            /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-center font-bold">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] ${
@@ -721,7 +734,14 @@ export default function ProductosPage() {
                   <label className="text-xs font-bold text-stone-700">Categoría *</label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                    onChange={(e) => {
+                      const newCat = e.target.value as any;
+                      setFormData({ 
+                        ...formData, 
+                        category: newCat,
+                        unit: newCat === "materia_prima" ? "kg" : (formData.unit || "pieza")
+                      });
+                    }}
                     className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   >
                     <option value="pan_dulce">🥖 Pan Dulce Tradicional</option>
@@ -763,6 +783,53 @@ export default function ProductosPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Apartado de Unidad (solo para Abarrotes y Materia Prima) */}
+              {(formData.category === "abarrotes" || formData.category === "materia_prima") && (
+                <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/90 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                      <Scale className="w-4 h-4 text-amber-600" />
+                      <span>Unidad de Venta / Medida *</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      {formData.category === "abarrotes" ? "Abarrotes" : "Materia Prima"}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-amber-900/80">
+                    Selecciona si este producto se vende o pesa por pieza, kilogramo o gramos:
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "pieza", label: "Por Pieza", short: "pz", icon: "📦" },
+                      { id: "kg", label: "Kilogramo", short: "kg", icon: "⚖️" },
+                      { id: "g", label: "Gramos", short: "g", icon: "🥄" },
+                    ].map((u) => {
+                      const isSelected = formData.unit === u.id;
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, unit: u.id as "pieza" | "kg" | "g" })}
+                          className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center gap-0.5 ${
+                            isSelected
+                              ? "bg-[#3e2723] text-amber-50 border-amber-500 ring-2 ring-amber-700/30 shadow-md scale-[1.02]"
+                              : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
+                          }`}
+                        >
+                          <span className="text-base">{u.icon}</span>
+                          <span className="text-xs font-black">{u.label}</span>
+                          <span className={`text-[10px] font-mono ${isSelected ? "text-amber-300" : "text-stone-400"}`}>
+                            ({u.short})
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Descripción */}
               <div className="space-y-1">

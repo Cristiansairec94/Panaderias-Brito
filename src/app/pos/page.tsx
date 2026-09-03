@@ -746,14 +746,17 @@ export default function POSPage() {
                     </div>
                   )}
 
-                  {/* PROMINENT PRICE BADGE (Top Right if not in cart) */}
-                  {!itemInCart && (
-                    <div className="absolute top-2.5 right-2.5 z-10">
-                      <span className="inline-flex items-center bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black text-xs px-2.5 py-0.5 rounded-xl shadow-md border border-white/80">
-                        {formatCurrency(product.price)}
-                      </span>
-                    </div>
-                  )}
+                  {/* PROMINENT PRICE BADGE (Top Right) */}
+                  <div className="absolute top-2.5 right-2.5 z-10">
+                    <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black text-xs px-2.5 py-0.5 rounded-xl shadow-md border border-white/80">
+                      <span>{formatCurrency(product.price)}</span>
+                      {product.unit && (
+                        <span className="text-[10px] font-bold text-amber-100">
+                          /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
+                        </span>
+                      )}
+                    </span>
+                  </div>
 
                   {/* Stock Tag on Image */}
                   <div className="absolute bottom-2.5 left-2.5 z-10">
@@ -774,9 +777,16 @@ export default function POSPage() {
                       <h3 className="font-extrabold text-stone-900 text-sm sm:text-base leading-snug group-hover:text-amber-800 transition-colors truncate">
                         {product.name}
                       </h3>
-                      <span className="font-black text-amber-900 text-sm shrink-0">
-                        {formatCurrency(product.price)}
-                      </span>
+                      <div className="text-right shrink-0">
+                        <span className="font-black text-amber-900 text-base">
+                          {formatCurrency(product.price)}
+                        </span>
+                        {product.unit && (
+                          <span className="text-[11px] font-bold text-amber-700 ml-1">
+                            /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p className="text-xs text-stone-500 mt-0.5 line-clamp-1 font-sans">
                       {product.description || "Panadería artesanal horneada diariamente."}
