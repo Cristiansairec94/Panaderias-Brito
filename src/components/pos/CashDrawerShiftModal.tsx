@@ -42,7 +42,7 @@ interface CashDrawerShiftModalProps {
   expenses: CashExpense[];
   products: Product[];
   onCompleteShiftCut?: () => void;
-  initialTab?: "cuentas" | "cambio" | "cierre";
+  initialTab?: "cuentas" | "cambio";
 }
 
 export default function CashDrawerShiftModal({
@@ -61,7 +61,7 @@ export default function CashDrawerShiftModal({
   initialTab = "cuentas",
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
-  const [activeTab, setActiveTab] = useState<"cuentas" | "cambio" | "cierre">(initialTab);
+  const [activeTab, setActiveTab] = useState<"cuentas" | "cambio">(initialTab);
   
   // Shift Times
   const [shiftStartTime, setShiftStartTime] = useState("06:00 AM");
@@ -253,18 +253,6 @@ export default function CashDrawerShiftModal({
           >
             <UserCheck className="w-4 h-4 text-amber-400" />
             <span>2. 🔄 Cambio de Turno & Relevo</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveTab("cierre"); setShowCutSuccess(false); }}
-            className={`flex-1 py-3 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 ${
-              activeTab === "cierre" || showCutSuccess
-                ? "bg-stone-900 text-amber-200 shadow-md"
-                : "text-stone-600 hover:text-stone-900"
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4 text-amber-400" />
-            <span>3. 🔒 Cerrar Turno (Corte Final)</span>
           </button>
         </div>
 
@@ -483,33 +471,22 @@ export default function CashDrawerShiftModal({
                   </div>
                 </div>
 
-                {activeTab === "cambio" ? (
-                  <div>
-                    <label className="text-[10px] font-bold text-emerald-700 uppercase block mb-1">
-                      Cajero Entrante (Recibe Turno):
-                    </label>
-                    <select
-                      value={incomingCashier}
-                      onChange={(e) => setIncomingCashier(e.target.value)}
-                      className="w-full p-2.5 bg-white border-2 border-emerald-300 rounded-xl font-black text-stone-900 text-xs focus:outline-none"
-                    >
-                      <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
-                      <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
-                      <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
-                      <option value="María Brito">María Brito</option>
-                      <option value="Lupita Brito">Lupita Brito</option>
-                    </select>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">
-                      Turno a Cerrar:
-                    </label>
-                    <div className="p-2.5 bg-white rounded-xl border font-black text-stone-900 text-xs">
-                      {shiftName}
-                    </div>
-                  </div>
-                )}
+                <div>
+                  <label className="text-[10px] font-bold text-emerald-700 uppercase block mb-1">
+                    Cajero Entrante (Recibe Turno):
+                  </label>
+                  <select
+                    value={incomingCashier}
+                    onChange={(e) => setIncomingCashier(e.target.value)}
+                    className="w-full p-2.5 bg-white border-2 border-emerald-300 rounded-xl font-black text-stone-900 text-xs focus:outline-none"
+                  >
+                    <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
+                    <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
+                    <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
+                    <option value="María Brito">María Brito</option>
+                    <option value="Lupita Brito">Lupita Brito</option>
+                  </select>
+                </div>
               </div>
 
               {/* Verificación de Dinero en Caja con Botón Rápido de 1 Toque */}
@@ -583,55 +560,37 @@ export default function CashDrawerShiftModal({
               </div>
 
               {/* Casilla de Confirmación Directa */}
-              {activeTab === "cambio" && (
-                <div className="p-3 bg-amber-50/90 rounded-2xl border border-amber-300">
-                  <label className="flex items-center gap-3 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={hasAcceptedCash}
-                      onChange={(e) => setHasAcceptedCash(e.target.checked)}
-                      className="w-5 h-5 rounded accent-amber-700 cursor-pointer"
-                    />
-                    <span className="text-xs font-black text-stone-900">
-                      Yo, {incomingCashier}, confirmo que conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y acepto la caja.
-                    </span>
-                  </label>
-                </div>
-              )}
+              <div className="p-3 bg-amber-50/90 rounded-2xl border border-amber-300">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={hasAcceptedCash}
+                    onChange={(e) => setHasAcceptedCash(e.target.checked)}
+                    className="w-5 h-5 rounded accent-amber-700 cursor-pointer"
+                  />
+                  <span className="text-xs font-black text-stone-900">
+                    Yo, {incomingCashier}, confirmo que conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y acepto la caja.
+                  </span>
+                </label>
+              </div>
 
               {/* Botón de Acción Directo */}
               <div>
-                {activeTab === "cambio" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleExecuteShiftCut}
-                      disabled={!countedCash || !hasAcceptedCash || isFinalizing}
-                      className="w-full py-4 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <CheckCircle2 className="w-5 h-5 text-emerald-300" />
-                      <span>
-                        {isFinalizing ? "Aceptando Turno..." : `✅ Aceptar Turno y Continuar (${incomingCashier})`}
-                      </span>
-                    </button>
-                    {(!countedCash || !hasAcceptedCash) && (
-                      <p className="text-[11px] text-center text-amber-800 font-bold mt-1.5">
-                        👉 Toca "El dinero está completo" o ingresa el conteo para aceptar el turno.
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleExecuteShiftCut}
-                    disabled={!countedCash || isFinalizing}
-                    className="w-full py-4 bg-stone-900 hover:bg-black disabled:opacity-50 text-white font-black rounded-2xl text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <ShieldCheck className="w-5 h-5 text-amber-400" />
-                    <span>
-                      {isFinalizing ? "Cerrando Turno..." : "🔒 Realizar Corte Final y Cerrar Turno (Corte Z)"}
-                    </span>
-                  </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteShiftCut}
+                  disabled={!countedCash || !hasAcceptedCash || isFinalizing}
+                  className="w-full py-4 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+                  <span>
+                    {isFinalizing ? "Aceptando Turno..." : `✅ Aceptar Turno y Continuar (${incomingCashier})`}
+                  </span>
+                </button>
+                {(!countedCash || !hasAcceptedCash) && (
+                  <p className="text-[11px] text-center text-amber-800 font-bold mt-1.5">
+                    👉 Toca "El dinero está completo" o ingresa el conteo para aceptar el turno.
+                  </p>
                 )}
               </div>
             </div>

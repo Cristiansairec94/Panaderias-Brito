@@ -1122,18 +1122,6 @@
                   >
                     <span>2. 🔄 Cambio de Turno & Relevo</span>
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShiftModalTab("cierre")}
-                    className={`flex-1 py-2.5 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 ${
-                      shiftModalTab === "cierre"
-                        ? "bg-stone-900 text-amber-200 shadow-md"
-                        : "text-stone-600 hover:text-stone-900"
-                    }`}
-                  >
-                    <span>3. 🔒 Cerrar Turno (Corte Final)</span>
-                  </button>
                 </div>
 
                 {/* Modal Body */}
@@ -1230,7 +1218,7 @@
                     </div>
                   )}
 
-                  {(shiftModalTab === "cambio" || shiftModalTab === "cierre") && (
+                  {shiftModalTab === "cambio" && (
                     <div className="space-y-4 text-xs">
                       {/* Relevo Rápido */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
@@ -1243,33 +1231,22 @@
                           </div>
                         </div>
 
-                        {shiftModalTab === "cambio" ? (
-                          <div>
-                            <label className="text-[10px] font-bold text-emerald-700 uppercase block mb-1">
-                              Cajero Entrante (Recibe Turno):
-                            </label>
-                            <select
-                              value={nextCashier}
-                              onChange={(e) => setNextCashier(e.target.value)}
-                              className="w-full p-2.5 bg-white border-2 border-emerald-300 rounded-xl font-black text-stone-900 focus:outline-none"
-                            >
-                              <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
-                              <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
-                              <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
-                              <option value="María Brito">María Brito</option>
-                              <option value="Lupita Brito">Lupita Brito</option>
-                            </select>
-                          </div>
-                        ) : (
-                          <div>
-                            <label className="text-[10px] font-bold text-stone-500 uppercase block mb-1">
-                              Turno a Cerrar:
-                            </label>
-                            <div className="p-2.5 bg-white rounded-xl border font-black text-stone-900">
-                              {shiftName}
-                            </div>
-                          </div>
-                        )}
+                        <div>
+                          <label className="text-[10px] font-bold text-emerald-700 uppercase block mb-1">
+                            Cajero Entrante (Recibe Turno):
+                          </label>
+                          <select
+                            value={nextCashier}
+                            onChange={(e) => setNextCashier(e.target.value)}
+                            className="w-full p-2.5 bg-white border-2 border-emerald-300 rounded-xl font-black text-stone-900 focus:outline-none"
+                          >
+                            <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
+                            <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
+                            <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
+                            <option value="María Brito">María Brito</option>
+                            <option value="Lupita Brito">Lupita Brito</option>
+                          </select>
+                        </div>
                       </div>
 
                       {/* Verificación Rápida de Dinero con 1 Toque */}
@@ -1341,65 +1318,44 @@
                       </div>
 
                       {/* Casilla de Confirmación Directa */}
-                      {shiftModalTab === "cambio" && (
-                        <div className="p-3 bg-amber-50/90 rounded-2xl border border-amber-300">
-                          <label className="flex items-center gap-3 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={hasAcceptedShift}
-                              onChange={(e) => setHasAcceptedShift(e.target.checked)}
-                              className="w-5 h-5 rounded accent-amber-700 cursor-pointer"
-                            />
-                            <span className="text-xs font-black text-stone-900">
-                              Yo, {nextCashier}, confirmo que conté el dinero ({countedCashInput ? formatCurrency(Number(countedCashInput)) : "$0.00"}) y acepto la caja.
-                            </span>
-                          </label>
-                        </div>
-                      )}
+                      <div className="p-3 bg-amber-50/90 rounded-2xl border border-amber-300">
+                        <label className="flex items-center gap-3 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={hasAcceptedShift}
+                            onChange={(e) => setHasAcceptedShift(e.target.checked)}
+                            className="w-5 h-5 rounded accent-amber-700 cursor-pointer"
+                          />
+                          <span className="text-xs font-black text-stone-900">
+                            Yo, {nextCashier}, confirmo que conté el dinero ({countedCashInput ? formatCurrency(Number(countedCashInput)) : "$0.00"}) y acepto la caja.
+                          </span>
+                        </label>
+                      </div>
 
                       {/* Botón de Acción Directo */}
                       <div>
-                        {shiftModalTab === "cambio" ? (
-                          <>
-                            <button
-                              type="button"
-                              disabled={!countedCashInput || !hasAcceptedShift}
-                              onClick={() => {
-                                const prevCashier = cashierName;
-                                setCashierName(nextCashier);
-                                setShiftName(nextShift);
-                                setExpensesList([]);
-                                setSalesList([]);
-                                setShowDrawerModal(false);
-                                setCountedCashInput("");
-                                setHasAcceptedShift(false);
-                                alert(`✅ ¡Turno Aceptado con Éxito!\n\nEntregó: ${prevCashier}\nRecibió y Aceptó: ${nextCashier}\nTurno: ${nextShift}\nDinero Contado y Verificado: ${formatCurrency(Number(countedCashInput))}\n\nLa caja quedó lista para el nuevo turno.`);
-                              }}
-                              className="w-full py-4 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
-                            >
-                              <span>✅ Aceptar Turno y Continuar ({nextCashier})</span>
-                            </button>
-                            {(!countedCashInput || !hasAcceptedShift) && (
-                              <p className="text-[11px] text-center text-amber-800 font-bold mt-1.5">
-                                👉 Toca "El dinero está completo" o ingresa el conteo para aceptar el turno.
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={!countedCashInput}
-                            onClick={() => {
-                              setExpensesList([]);
-                              setSalesList([]);
-                              setShowDrawerModal(false);
-                              setCountedCashInput("");
-                              alert(`🔒 ¡Corte Final de Turno Realizado!\n\nCajero: ${cashierName}\nTurno: ${shiftName}\nDinero en Caja: ${formatCurrency(Number(countedCashInput))}\n\nEl turno ha quedado formalmente cerrado.`);
-                            }}
-                            className="w-full py-4 bg-stone-900 hover:bg-black disabled:opacity-50 text-white font-black rounded-2xl text-sm shadow-lg transition-all active:scale-95"
-                          >
-                            <span>🔒 Realizar Corte Final y Cerrar Turno (Corte Z)</span>
-                          </button>
+                        <button
+                          type="button"
+                          disabled={!countedCashInput || !hasAcceptedShift}
+                          onClick={() => {
+                            const prevCashier = cashierName;
+                            setCashierName(nextCashier);
+                            setShiftName(nextShift);
+                            setExpensesList([]);
+                            setSalesList([]);
+                            setShowDrawerModal(false);
+                            setCountedCashInput("");
+                            setHasAcceptedShift(false);
+                            alert(`✅ ¡Turno Aceptado con Éxito!\n\nEntregó: ${prevCashier}\nRecibió y Aceptó: ${nextCashier}\nTurno: ${nextShift}\nDinero Contado y Verificado: ${formatCurrency(Number(countedCashInput))}\n\nLa caja quedó lista para el nuevo turno.`);
+                          }}
+                          className="w-full py-4 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <span>✅ Aceptar Turno y Continuar ({nextCashier})</span>
+                        </button>
+                        {(!countedCashInput || !hasAcceptedShift) && (
+                          <p className="text-[11px] text-center text-amber-800 font-bold mt-1.5">
+                            👉 Toca "El dinero está completo" o ingresa el conteo para aceptar el turno.
+                          </p>
                         )}
                       </div>
                     </div>

@@ -109,7 +109,7 @@ export default function POSPage() {
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>([]);
   const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
-  const [shiftModalTab, setShiftModalTab] = useState<"cuentas" | "cambio" | "cierre">("cuentas");
+  const [shiftModalTab, setShiftModalTab] = useState<"cuentas" | "cambio">("cuentas");
   
   // Status
   const [isDbConnected, setIsDbConnected] = useState(false);
