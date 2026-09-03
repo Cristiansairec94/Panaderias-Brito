@@ -81,7 +81,7 @@ export default function POSPage() {
   // Status
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(true);
 
   // Load and synchronize products with catalog
   useEffect(() => {
@@ -379,7 +379,7 @@ export default function POSPage() {
       {/* Product Catalog Area (Main) */}
       <div className="flex-1 flex flex-col p-6 overflow-y-auto">
         {/* Top Control Bar */}
-        <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col gap-3 mb-5 sticky top-0 z-20 bg-stone-100/95 backdrop-blur-md pt-1 pb-2">
           <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
             {/* Search Input + Desplegable de Precios */}
             <div className="flex items-center gap-2 flex-1 max-w-xl w-full">
@@ -399,23 +399,26 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  className={`px-4 py-3 rounded-2xl text-xs font-black flex items-center gap-2 transition-all border shadow-sm active:scale-95 ${
-                    showCategoryDropdown
-                      ? "bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 ring-2 ring-amber-400/30"
-                      : selectedCategory !== "all"
-                      ? "bg-amber-950 text-white border-amber-900 ring-2 ring-amber-500/30"
-                      : "bg-amber-50 hover:bg-amber-100/80 text-amber-900 border-amber-200"
+                  className={`px-4 py-3 rounded-2xl text-xs font-black flex items-center gap-2.5 transition-all border shadow-md active:scale-95 ${
+                    selectedCategory !== "all" || showCategoryDropdown
+                      ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 ring-2 ring-amber-700/40 shadow-amber-950/25"
+                      : "bg-[#3e2723] text-amber-100 border-2 border-amber-800 hover:border-amber-600 hover:bg-[#4a2f2a]"
                   }`}
                   title={showCategoryDropdown ? "Ocultar panel de categorías" : "Mostrar panel de categorías"}
                 >
-                  <Layers className={`w-4 h-4 text-amber-800 transition-transform duration-500 ${showCategoryDropdown ? "rotate-180" : ""}`} />
-                  <span className="whitespace-nowrap">
-                    {showCategoryDropdown
-                      ? "Ocultar Categorías"
-                      : selectedCategory === "all"
-                      ? "Ver Categorías (11)"
+                  <span className="text-base shrink-0">
+                    {activeCategory?.icon || "🥞"}
+                  </span>
+                  <span className="whitespace-nowrap font-black">
+                    {selectedCategory === "all"
+                      ? "Todas las Categorías"
                       : activeCategory?.label}
                   </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-amber-400 transition-transform duration-300 shrink-0 ${
+                      showCategoryDropdown ? "rotate-180 text-amber-300" : ""
+                    }`}
+                  />
                 </button>
               </div>
             </div>
@@ -511,14 +514,11 @@ export default function POSPage() {
                     <button
                       key={cat.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedCategory(cat.id);
-                        setShowCategoryDropdown(false);
-                      }}
-                      className={`p-3 rounded-2xl text-xs font-bold transition-all duration-300 flex items-center justify-between active:scale-95 border ${
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`p-3 rounded-2xl text-xs font-bold transition-all duration-200 flex items-center justify-between active:scale-95 border ${
                         isSelected
-                          ? "bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20 font-black scale-[1.02] border-amber-400"
-                          : "bg-stone-50 hover:bg-amber-50/80 hover:border-amber-300 text-stone-700 border-stone-200 hover:scale-[1.02]"
+                          ? "bg-[#3e2723] text-amber-50 shadow-lg shadow-amber-950/25 font-black scale-[1.03] border-2 border-amber-500 ring-2 ring-amber-700/30"
+                          : "bg-stone-50 hover:bg-amber-50/80 hover:border-amber-300 text-stone-800 border-stone-200 hover:scale-[1.01]"
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
@@ -527,7 +527,7 @@ export default function POSPage() {
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 transition-colors ${
                         isSelected
-                          ? "bg-stone-950/20 text-stone-950"
+                          ? "bg-amber-500 text-stone-950 font-black"
                           : "bg-stone-200 text-stone-600"
                       }`}>
                         {count}

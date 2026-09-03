@@ -50,24 +50,8 @@ export default function ProductosPage() {
   // Success toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Categories visibility & 15-second auto-collapse
+  // Categories visibility (permanent while in use)
   const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
-  const [countdown, setCountdown] = useState(15);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsCategoriesVisible(false);
-    }, 15000); // 15 seconds auto-hide
-
-    const interval = setInterval(() => {
-      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
-  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -288,15 +272,19 @@ export default function ProductosPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsCategoriesVisible(!isCategoriesVisible)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border shadow-sm ${
-                isCategoriesVisible
-                  ? "bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200"
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border shadow-sm ${
+                isCategoriesVisible || selectedCategory !== "all"
+                  ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 ring-2 ring-amber-700/30"
                   : "bg-stone-900 text-amber-400 border-amber-500/40 hover:bg-stone-800"
               }`}
               title={isCategoriesVisible ? "Ocultar panel de categorías" : "Mostrar panel de categorías"}
             >
-              <Layers className="w-3.5 h-3.5" />
-              <span>{isCategoriesVisible ? "Ocultar Categorías" : "Ver Categorías"}</span>
+              <Layers className="w-3.5 h-3.5 text-amber-400" />
+              <span>
+                {selectedCategory === "all"
+                  ? "Categorías"
+                  : PRODUCT_CATEGORIES.find((c) => c.id === selectedCategory)?.label || "Categorías"}
+              </span>
             </button>
             <span className="hidden md:inline text-xs font-bold text-stone-500">
               {filteredProducts.length} productos
@@ -368,18 +356,12 @@ export default function ProductosPage() {
                 <Layers className="w-4 h-4 text-amber-600" />
                 <span>Categorías</span>
               </h3>
-              {countdown > 0 ? (
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full" title="Se ocultará en 15s para dar más espacio a los productos">
-                  Oculta en {countdown}s
-                </span>
-              ) : (
-                <button
-                  onClick={() => setIsCategoriesVisible(false)}
-                  className="text-[10px] font-bold text-stone-400 hover:text-stone-700 bg-stone-100 px-2 py-0.5 rounded-full"
-                >
-                  Ocultar
-                </button>
-              )}
+              <button
+                onClick={() => setIsCategoriesVisible(false)}
+                className="text-[10px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
+              >
+                Ocultar
+              </button>
             </div>
 
             {/* Lista Vertical de Categorías */}
@@ -396,7 +378,7 @@ export default function ProductosPage() {
                     onClick={() => setSelectedCategory(cat.id)}
                     className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${
                       isSelected
-                        ? "bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20 font-black scale-[1.01]"
+                        ? "bg-[#3e2723] text-amber-50 shadow-md shadow-amber-950/25 font-black scale-[1.02] border-2 border-amber-500 ring-2 ring-amber-700/30"
                         : "text-stone-700 hover:bg-stone-50 hover:text-stone-950 border border-transparent hover:border-stone-200"
                     }`}
                   >
@@ -406,7 +388,7 @@ export default function ProductosPage() {
                     </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 transition-colors ${
                       isSelected 
-                        ? "bg-stone-950/20 text-stone-950" 
+                        ? "bg-amber-500 text-stone-950 font-black" 
                         : "bg-stone-100 text-stone-500 group-hover:bg-stone-200 group-hover:text-stone-800"
                     }`}>
                       {count}
