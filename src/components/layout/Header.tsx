@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { 
@@ -23,6 +24,12 @@ export default function Header() {
   const { isCollapsed, toggleCollapse, toggleMobile } = useSidebar();
   const [time, setTime] = useState<string>("");
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isLogoSpinning, setIsLogoSpinning] = useState(false);
+
+  const handleLogoClick = () => {
+    setIsLogoSpinning(true);
+    setTimeout(() => setIsLogoSpinning(false), 1200);
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -87,8 +94,8 @@ export default function Header() {
 
   return (
     <header className="h-16 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-      {/* Left: Hamburger (Mobile) / Collapse Toggle (Desktop) + Page Title */}
-      <div className="flex items-center gap-3">
+      {/* Left: Hamburger (Mobile) / Collapse Toggle (Desktop) + Animated Official Brand Logo + Page Title */}
+      <div className="flex items-center gap-3.5">
         {/* Mobile Hamburger Drawer Toggle */}
         <button
           onClick={toggleMobile}
@@ -111,21 +118,48 @@ export default function Header() {
           )}
         </button>
 
-        {/* Breadcrumb / Title */}
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
-              {current.title}
-            </h2>
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-rose-800 bg-gradient-to-r from-orange-50 to-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200/80">
-              <Sparkles className="w-2.5 h-2.5 text-orange-500" />
-              <span>Panadería</span>
-              <span className="font-brito-script text-base text-rose-600 font-bold -rotate-1">Brito</span>
-            </span>
+        {/* Breadcrumb / Title with Official Animated Brand Logo */}
+        <div className="flex items-center gap-3">
+          {/* Animated Mini Brand Logo */}
+          <div 
+            onClick={handleLogoClick}
+            className="relative cursor-pointer group select-none shrink-0" 
+            title="Panadería Brito • Clic para animar"
+          >
+            <div className={`relative w-10 h-10 rounded-2xl p-[1.5px] bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] shadow-md shadow-orange-500/20 group-hover:scale-110 group-hover:shadow-rose-500/30 transition-all duration-300 ${
+              isLogoSpinning ? "rotate-[360deg] scale-110" : ""
+            }`}>
+              <div className="w-full h-full bg-white rounded-[14px] p-1 flex items-center justify-center overflow-hidden">
+                <Image
+                  src="/logo.png"
+                  alt="Panadería Brito Logo"
+                  width={36}
+                  height={36}
+                  className="w-full h-full object-contain group-hover:rotate-6 transition-transform duration-300"
+                  priority
+                />
+              </div>
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse" />
           </div>
-          <p className="text-[10px] sm:text-[11px] text-stone-500 font-medium line-clamp-1">
-            {current.subtitle}
-          </p>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-black text-stone-900 tracking-tight leading-tight">
+                {current.title}
+              </h2>
+              <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold text-stone-800 bg-gradient-to-r from-orange-50 via-rose-50 to-orange-50 px-3 py-0.5 rounded-full border border-rose-200/80 shadow-xs group cursor-default">
+                <Sparkles className="w-3 h-3 text-orange-500 group-hover:rotate-180 transition-transform duration-500" />
+                <span className="font-extrabold text-stone-700">Panadería</span>
+                <span className="text-xs font-black bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
+                  Brito
+                </span>
+              </div>
+            </div>
+            <p className="text-[10px] sm:text-[11px] text-stone-500 font-medium line-clamp-1 mt-0.5">
+              {current.subtitle}
+            </p>
+          </div>
         </div>
       </div>
 
