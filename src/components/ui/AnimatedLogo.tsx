@@ -12,7 +12,7 @@ interface AnimatedLogoProps {
 }
 
 export default function AnimatedLogo({
-  size = 52,
+  size = 54,
   className = "",
   showGlow = true,
   compact = false,
@@ -20,11 +20,11 @@ export default function AnimatedLogo({
   const [isSpinning, setIsSpinning] = useState(false);
   const [sparkleVisible, setSparkleVisible] = useState(false);
 
-  // Trigger 3D spin automatically every 30 seconds
+  // Auto 3D spin every 25 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       triggerSpin();
-    }, 30000);
+    }, 25000);
 
     return () => clearInterval(interval);
   }, []);
@@ -46,22 +46,32 @@ export default function AnimatedLogo({
       title="Panadería Brito • Clic para girar"
       style={{ perspective: "1000px" }}
     >
-      {/* Modern Ambient Glow */}
+      {/* 1. Brand Dual Glow (Orange on top, Crimson Rose on bottom, matching logo) */}
       {showGlow && (
-        <div
-          className="absolute rounded-full pointer-events-none transition-all duration-700 blur-xl opacity-40 group-hover:opacity-75"
-          style={{
-            width: currentSize * 1.6,
-            height: currentSize * 1.6,
-            background: "radial-gradient(circle, rgba(245, 158, 11, 0.45) 0%, rgba(234, 88, 12, 0.25) 50%, transparent 75%)",
-          }}
-        />
+        <>
+          <div
+            className="absolute rounded-full pointer-events-none transition-all duration-700 blur-xl opacity-60 group-hover:opacity-90 -top-1"
+            style={{
+              width: currentSize * 1.5,
+              height: currentSize * 0.9,
+              background: "radial-gradient(ellipse, rgba(249, 115, 22, 0.45) 0%, transparent 70%)",
+            }}
+          />
+          <div
+            className="absolute rounded-full pointer-events-none transition-all duration-700 blur-xl opacity-60 group-hover:opacity-90 -bottom-1"
+            style={{
+              width: currentSize * 1.5,
+              height: currentSize * 0.9,
+              background: "radial-gradient(ellipse, rgba(225, 29, 72, 0.45) 0%, transparent 70%)",
+            }}
+          />
+        </>
       )}
 
-      {/* Modern Gradient Rim / Squircle Wrapper */}
+      {/* 2. Modern Dual-Gradient Border Squircle */}
       <div
-        className={`relative p-[1.5px] rounded-2xl bg-gradient-to-tr from-amber-400 via-orange-400 to-amber-200 shadow-xl transition-all duration-500 ease-out ${
-          isSpinning ? "animate-brito-3d-spin" : "group-hover:scale-105 group-hover:shadow-amber-500/25"
+        className={`relative p-[2px] rounded-2xl bg-gradient-to-b from-[#f97316] via-[#fb7185] to-[#e11d48] shadow-lg shadow-rose-950/40 transition-all duration-500 ease-out ${
+          isSpinning ? "animate-brito-3d-spin" : "group-hover:scale-105 group-hover:shadow-orange-500/25"
         }`}
         style={{
           width: currentSize,
@@ -69,12 +79,13 @@ export default function AnimatedLogo({
           transformStyle: "preserve-3d",
         }}
       >
-        {/* Inner Clean Container */}
-        <div className="relative w-full h-full rounded-[14px] bg-white p-1.5 flex items-center justify-center overflow-hidden shadow-inner">
-          {/* Subtle Light Reflection Sweep */}
-          <div className="absolute inset-0 -translate-x-[150%] group-hover:translate-x-[150%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none z-20" />
+        {/* 3. Pure White High-Contrast Badge Base */}
+        <div className="relative w-full h-full rounded-[14px] bg-white p-1 flex items-center justify-center overflow-hidden shadow-inner">
+          {/* Periodic Glass Sweep Sheen */}
+          <div className="absolute inset-0 -translate-x-[160%] group-hover:translate-x-[160%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none z-20" />
+          <div className="absolute inset-0 animate-periodic-sheen pointer-events-none z-10" />
 
-          {/* Logo Image */}
+          {/* Clean Original HD Logo Image */}
           <div className="relative w-full h-full flex items-center justify-center z-10">
             <Image
               src="/logo.png"
@@ -87,16 +98,21 @@ export default function AnimatedLogo({
             />
           </div>
 
-          {/* Clean Modern Sparkle */}
+          {/* Dual Sparkle Burst */}
           {sparkleVisible && (
-            <div className="absolute top-1 right-1 text-amber-500 animate-ping z-30 pointer-events-none">
-              <Sparkles className="w-3 h-3" />
-            </div>
+            <>
+              <div className="absolute top-1 right-1 text-orange-500 animate-ping z-30 pointer-events-none">
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+              <div className="absolute bottom-1 left-1 text-rose-500 animate-pulse z-30 pointer-events-none">
+                <Sparkles className="w-2.5 h-2.5" />
+              </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* 3D Spin Animation */}
+      {/* 3D Spin & Sheen Keyframes */}
       <style jsx global>{`
         @keyframes britoModernSpin {
           0% {
@@ -114,6 +130,29 @@ export default function AnimatedLogo({
         }
         .animate-brito-3d-spin {
           animation: britoModernSpin 1.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes periodicSheen {
+          0%, 82% {
+            opacity: 0;
+            transform: translateX(-160%) skewX(-20deg);
+          }
+          90% {
+            opacity: 0.7;
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(180%) skewX(-20deg);
+          }
+        }
+        .animate-periodic-sheen {
+          background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.9) 50%,
+            transparent 100%
+          );
+          animation: periodicSheen 6s ease-in-out infinite;
         }
       `}</style>
     </div>

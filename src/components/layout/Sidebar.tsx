@@ -20,9 +20,9 @@ import {
   UserCheck,
   PanelLeftClose,
   PanelLeftOpen,
-  Sparkles,
   ArrowRight,
-  Flame
+  Flame,
+  Sparkles
 } from "lucide-react";
 import AnimatedLogo from "@/components/ui/AnimatedLogo";
 import { useSidebar } from "@/context/SidebarContext";
@@ -171,14 +171,13 @@ export default function Sidebar() {
     })
     .filter(Boolean) as NavItem[];
 
-  // Helper to determine exact active child (checking path + query params)
+  // Determine exact active child item
   const isItemActive = (href: string) => {
     const [targetPath, targetQuery] = href.split("?");
     if (pathname !== targetPath) return false;
     if (targetQuery) {
       return currentSearch.includes(targetQuery);
     }
-    // If target has no query (e.g. /caja), active only when no ?tab= is active
     return !currentSearch.includes("tab=");
   };
 
@@ -192,31 +191,34 @@ export default function Sidebar() {
         />
       )}
 
-      {/* Main Sidebar: Modern Luxury Dark Graphite */}
+      {/* Main Modern Sidebar: Deep Onyx with Brito Brand Orange & Crimson accents */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl border-r border-white/[0.08] bg-[#0c0d12] text-stone-200 ${
+        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl border-r border-white/[0.08] bg-[#090a0f] text-stone-200 ${
           isCollapsed ? "w-20" : "w-64"
         } ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
         {/* Top Header / Brand Logo & Toggle */}
-        <div className="flex flex-col border-b border-white/[0.06] bg-white/[0.02]">
+        <div className="flex flex-col border-b border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent">
           <div className={`p-4 flex items-center ${isCollapsed ? "justify-center flex-col gap-2" : "justify-between"}`}>
             <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
               <AnimatedLogo compact={isCollapsed} size={isCollapsed ? 38 : 46} showGlow={!isCollapsed} />
               {!isCollapsed && (
                 <div className="overflow-hidden">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-sm text-stone-300 tracking-tight">Panadería</span>
-                    <span className="font-black text-sm bg-gradient-to-r from-amber-400 via-orange-400 to-amber-200 bg-clip-text text-transparent tracking-tight">
+                    <span className="font-bold text-sm text-white tracking-tight">Panadería</span>
+                    <span className="font-black text-sm bg-gradient-to-r from-orange-400 via-rose-400 to-pink-500 bg-clip-text text-transparent tracking-tight">
                       Brito
                     </span>
                   </div>
-                  <p className="text-[10px] font-semibold text-stone-400 tracking-wide flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    ERP & Punto de Venta
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                    <p className="text-[10px] font-semibold text-stone-400 tracking-wider uppercase">
+                      ERP & POS
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -230,7 +232,7 @@ export default function Sidebar() {
               title={isCollapsed ? "Desplegar menú" : "Contraer menú"}
             >
               {isCollapsed ? (
-                <PanelLeftOpen className="w-4 h-4 text-amber-400" />
+                <PanelLeftOpen className="w-4 h-4 text-orange-400" />
               ) : (
                 <PanelLeftClose className="w-4 h-4" />
               )}
@@ -242,8 +244,10 @@ export default function Sidebar() {
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 scrollbar-thin scrollbar-thumb-stone-800">
           {!isCollapsed && (
             <div className="px-3 pb-1 pt-1 text-[10px] font-bold tracking-wider text-stone-500 uppercase flex items-center justify-between">
-              <span>Navegación</span>
-              <span className="text-[9px] text-amber-400/80 font-mono font-medium">v1.5</span>
+              <span>Módulos del Sistema</span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/[0.05] text-orange-400 border border-white/[0.06]">
+                Oficial
+              </span>
             </div>
           )}
 
@@ -265,8 +269,8 @@ export default function Sidebar() {
                       isCollapsed ? "justify-center p-2.5" : "justify-between px-3 py-2.5"
                     } rounded-xl font-medium transition-all text-xs group ${
                       isActive
-                        ? "bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent text-amber-300 font-bold border-l-2 border-amber-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
-                        : "text-stone-400 hover:text-stone-100 hover:bg-white/[0.05] border-l-2 border-transparent"
+                        ? "bg-gradient-to-r from-orange-500/15 via-rose-500/10 to-transparent text-white font-bold border-l-2 border-orange-500 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]"
+                        : "text-stone-400 hover:text-white hover:bg-white/[0.05] border-l-2 border-transparent"
                     }`}
                     title={isCollapsed ? item.name : undefined}
                   >
@@ -274,8 +278,8 @@ export default function Sidebar() {
                       <div
                         className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                           isActive
-                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                            : "bg-white/[0.03] border border-white/[0.06] text-stone-400 group-hover:text-amber-400 group-hover:border-amber-500/20 group-hover:bg-amber-500/10"
+                            ? "bg-gradient-to-br from-orange-500 to-rose-600 text-white shadow-md shadow-orange-500/25"
+                            : "bg-white/[0.03] border border-white/[0.06] text-stone-400 group-hover:text-orange-400 group-hover:border-orange-500/30 group-hover:bg-orange-500/10"
                         }`}
                       >
                         <Icon className="w-4 h-4 transition-transform group-hover:scale-110" />
@@ -287,7 +291,7 @@ export default function Sidebar() {
                       <span
                         className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
                           isActive
-                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
                             : "bg-white/[0.05] text-stone-400 border border-white/[0.06]"
                         }`}
                       >
@@ -298,7 +302,7 @@ export default function Sidebar() {
 
                   {/* Tooltip for collapsed view */}
                   {isCollapsed && (
-                    <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#14161f] text-stone-100 border border-white/10 text-xs font-bold rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+                    <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#12141c] text-white border border-white/10 text-xs font-bold rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
                       {item.name}
                     </div>
                   )}
@@ -320,8 +324,8 @@ export default function Sidebar() {
                     isCollapsed ? "justify-center p-2.5" : "justify-between px-3 py-2.5"
                   } rounded-xl font-medium transition-all text-xs ${
                     isChildActive
-                      ? "text-stone-100 bg-white/[0.04]"
-                      : "text-stone-400 hover:text-stone-100 hover:bg-white/[0.03]"
+                      ? "text-white bg-white/[0.04]"
+                      : "text-stone-400 hover:text-white hover:bg-white/[0.03]"
                   }`}
                   title={isCollapsed ? item.name : undefined}
                 >
@@ -329,14 +333,14 @@ export default function Sidebar() {
                     <div
                       className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                         isChildActive
-                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                          : "bg-white/[0.03] border border-white/[0.06] text-stone-400 group-hover:text-amber-400"
+                          ? "bg-gradient-to-br from-orange-500/30 to-rose-600/30 text-orange-400 border border-orange-500/30 shadow-sm"
+                          : "bg-white/[0.03] border border-white/[0.06] text-stone-400 group-hover:text-orange-400"
                       }`}
                     >
                       <Icon className="w-4 h-4 transition-transform group-hover:scale-110" />
                     </div>
                     {!isCollapsed && (
-                      <span className={`font-semibold ${isChildActive ? "text-stone-100 font-bold" : ""}`}>
+                      <span className={`font-semibold ${isChildActive ? "text-white font-bold" : ""}`}>
                         {item.name}
                       </span>
                     )}
@@ -345,13 +349,19 @@ export default function Sidebar() {
                   {!isCollapsed && (
                     <div className="flex items-center gap-1.5">
                       {item.badge && (
-                        <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-white/[0.05] text-stone-400 border border-white/[0.06]">
+                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${
+                          item.id === "ingresos"
+                            ? "bg-orange-500/15 text-orange-300 border-orange-500/25"
+                            : item.id === "gastos"
+                            ? "bg-rose-500/15 text-rose-300 border-rose-500/25"
+                            : "bg-white/[0.05] text-stone-400 border-white/[0.06]"
+                        }`}>
                           {item.badge}
                         </span>
                       )}
                       <ChevronDown
                         className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
-                          isOpen ? "rotate-180 text-amber-400" : ""
+                          isOpen ? "rotate-180 text-orange-400" : ""
                         }`}
                       />
                     </div>
@@ -376,21 +386,21 @@ export default function Sidebar() {
                           }}
                           className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all ${
                             active
-                              ? "bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-transparent text-amber-300 font-bold border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.08)]"
-                              : "text-stone-400 hover:text-stone-100 hover:bg-white/[0.04]"
+                              ? "bg-gradient-to-r from-orange-500/20 via-rose-500/15 to-transparent text-white font-bold border border-orange-500/35 shadow-[0_0_15px_rgba(249,115,22,0.1)]"
+                              : "text-stone-400 hover:text-white hover:bg-white/[0.04]"
                           }`}
                         >
                           <div className="flex items-center gap-2">
                             {SubIcon ? (
-                              <SubIcon className={`w-3.5 h-3.5 ${active ? "text-amber-400" : "text-stone-400"}`} />
+                              <SubIcon className={`w-3.5 h-3.5 ${active ? "text-orange-400" : "text-stone-400"}`} />
                             ) : (
-                              <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-amber-400 ring-2 ring-amber-400/30" : "bg-stone-500"}`} />
+                              <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-gradient-to-r from-orange-400 to-rose-500 ring-2 ring-orange-400/30" : "bg-stone-500"}`} />
                             )}
                             <span>{sub.name}</span>
                           </div>
                           {sub.badge && (
                             <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${
-                              active ? "bg-amber-500/30 text-amber-200" : "bg-white/[0.05] text-stone-400"
+                              active ? "bg-rose-500/30 text-rose-200" : "bg-white/[0.05] text-stone-400"
                             }`}>
                               {sub.badge}
                             </span>
@@ -403,10 +413,10 @@ export default function Sidebar() {
 
                 {/* Tooltip / Flyout Menu for Collapsed Sidebar */}
                 {isCollapsed && (
-                  <div className="absolute left-full ml-3 top-0 hidden group-hover:flex flex-col bg-[#12141c] border border-white/10 rounded-2xl p-2 shadow-2xl z-50 min-w-[200px] animate-in fade-in duration-150">
-                    <div className="px-2.5 py-1.5 text-[11px] font-bold text-amber-300 border-b border-white/[0.06] mb-1 flex items-center justify-between">
+                  <div className="absolute left-full ml-3 top-0 hidden group-hover:flex flex-col bg-[#11131c] border border-white/10 rounded-2xl p-2 shadow-2xl z-50 min-w-[200px] animate-in fade-in duration-150">
+                    <div className="px-2.5 py-1.5 text-[11px] font-bold text-orange-300 border-b border-white/[0.06] mb-1 flex items-center justify-between">
                       <span>{item.name}</span>
-                      <Icon className="w-3.5 h-3.5 text-amber-400" />
+                      <Icon className="w-3.5 h-3.5 text-rose-400" />
                     </div>
                     {item.items.map((sub) => {
                       const active = isItemActive(sub.href);
@@ -420,8 +430,8 @@ export default function Sidebar() {
                           }}
                           className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-between ${
                             active
-                              ? "bg-amber-500/20 text-amber-300 font-bold"
-                              : "text-stone-400 hover:bg-white/[0.05] hover:text-stone-100"
+                              ? "bg-gradient-to-r from-orange-500/20 to-rose-500/20 text-white font-bold"
+                              : "text-stone-400 hover:bg-white/[0.05] hover:text-white"
                           }`}
                         >
                           <span>{sub.name}</span>
@@ -440,7 +450,7 @@ export default function Sidebar() {
           })}
         </div>
 
-        {/* Bottom Section: Modern POS Quick Action & Branch Pill */}
+        {/* Bottom Section: Hero POS Action in Brito Brand Dual Gradient */}
         <div className="p-3 border-t border-white/[0.06] bg-white/[0.01] space-y-2">
           {/* Quick Action according to Role */}
           {canAccessRoute && canAccessRoute("/pos") ? (
@@ -451,27 +461,27 @@ export default function Sidebar() {
                 setCurrentSearch("");
               }}
               className={`w-full flex items-center ${
-                isCollapsed ? "justify-center p-2.5" : "justify-between p-3"
-              } rounded-2xl font-bold text-xs transition-all shadow-lg group active:scale-95 ${
+                isCollapsed ? "justify-center p-2.5" : "justify-between p-3.5"
+              } rounded-2xl font-bold text-xs transition-all shadow-xl group active:scale-95 ${
                 isPosActive
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-stone-950 ring-2 ring-emerald-400/50 shadow-emerald-500/20 font-black"
-                  : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black shadow-orange-500/20 hover:shadow-orange-500/30"
+                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white ring-2 ring-emerald-400/50 shadow-emerald-500/25 font-black"
+                  : "bg-gradient-to-r from-[#f97316] via-[#e11d48] to-[#be123c] hover:brightness-110 text-white font-black shadow-rose-950/40 border border-white/20"
               }`}
               title="Punto de Venta Mostrador (POS)"
             >
               <div className="flex items-center gap-2.5">
-                <div className="p-1.5 bg-black/15 rounded-xl">
-                  <ShoppingBag className="w-4 h-4 text-stone-950 group-hover:scale-110 transition-transform" />
+                <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-xl">
+                  <ShoppingBag className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
                 </div>
                 {!isCollapsed && (
                   <div className="text-left">
-                    <p className="leading-tight font-black tracking-tight text-stone-950">Punto de Venta</p>
-                    <p className="text-[9px] font-semibold text-stone-900/80">Caja Mostrador (POS)</p>
+                    <p className="leading-tight font-black tracking-tight text-white">Punto de Venta</p>
+                    <p className="text-[9px] font-medium text-orange-100">Caja Mostrador (POS)</p>
                   </div>
                 )}
               </div>
               {!isCollapsed && (
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-stone-950" />
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-white" />
               )}
             </Link>
           ) : user?.role === "panadero" ? (
@@ -483,7 +493,7 @@ export default function Sidebar() {
               }}
               className={`w-full flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "justify-between p-3"
-              } rounded-2xl font-bold text-xs transition-all shadow-lg bg-gradient-to-r from-amber-600 to-orange-600 text-white active:scale-95`}
+              } rounded-2xl font-bold text-xs transition-all shadow-lg bg-gradient-to-r from-orange-600 to-rose-600 text-white active:scale-95`}
               title="Control de Horno"
             >
               <div className="flex items-center gap-2.5">
@@ -493,7 +503,7 @@ export default function Sidebar() {
                 {!isCollapsed && (
                   <div className="text-left">
                     <p className="leading-tight font-black tracking-tight">Control de Horno</p>
-                    <p className="text-[9px] font-medium text-amber-100">Recetas & Harinas</p>
+                    <p className="text-[9px] font-medium text-orange-100">Recetas & Harinas</p>
                   </div>
                 )}
               </div>
@@ -516,7 +526,7 @@ export default function Sidebar() {
                   <p className="text-[9px] text-stone-400">Don Toño Brito</p>
                 </div>
               </div>
-              <span className="text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+              <span className="text-[9px] font-bold text-orange-300 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full">
                 En Línea
               </span>
             </div>

@@ -117,8 +117,8 @@ export default function Header() {
             <h2 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
               {current.title}
             </h2>
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80">
-              <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold text-rose-700 bg-gradient-to-r from-orange-50 to-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200/80">
+              <Sparkles className="w-2.5 h-2.5 text-orange-500" />
               Panadería Brito
             </span>
           </div>
@@ -132,7 +132,7 @@ export default function Header() {
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Modern Live Clock */}
         <div className="hidden lg:flex items-center gap-2 bg-stone-100/80 px-3 py-1.5 rounded-xl border border-stone-200/80 text-stone-700 text-xs font-bold shadow-sm">
-          <Clock className="w-3.5 h-3.5 text-amber-600" />
+          <Clock className="w-3.5 h-3.5 text-orange-600" />
           <span className="tabular-nums">{time || "Cargando..."}</span>
         </div>
 
@@ -145,12 +145,12 @@ export default function Header() {
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/70 shadow-sm"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-amber-500/20">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-rose-500/20">
               {user?.avatar || "👨‍🍳"}
             </div>
             <div className="text-left hidden sm:block">
               <p className="text-xs font-black text-stone-900 leading-tight">{user?.name || "Invitado"}</p>
-              <p className="text-[9px] text-amber-700 font-bold uppercase tracking-wider">{user?.roleLabel || "Sin Rol"}</p>
+              <p className="text-[9px] text-rose-700 font-bold uppercase tracking-wider">{user?.roleLabel || "Sin Rol"}</p>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
           </button>
