@@ -112,6 +112,7 @@ export default function POSPage() {
   // Status
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCategoryPanel, setShowCategoryPanel] = useState(true);
 
   // Load and synchronize products with catalog
   useEffect(() => {
@@ -413,125 +414,203 @@ export default function POSPage() {
     <div className="flex h-full w-full overflow-hidden bg-stone-100/70">
       {/* Product Catalog Area (Main) */}
       <div className="flex-1 flex flex-col min-w-0 p-4 lg:p-5 overflow-y-auto">
-        {/* Top Control Bar */}
-        <div className="flex flex-col gap-2.5 mb-4 sticky top-0 z-20 bg-stone-100/95 backdrop-blur-md pt-1 pb-2 border-b border-stone-200/60">
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            {/* Search Input */}
-            <div className="relative flex-1 min-w-[240px] max-w-md">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
-              <input
-                type="text"
-                placeholder="Buscar pan dulce, bolillo, telera, pizza..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-9 py-2 bg-white rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs text-xs font-medium"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+        {/* Top Control Bar & Categorías */}
+        <div className="flex flex-col gap-3 mb-4 sticky top-0 z-20 bg-stone-100/95 backdrop-blur-md pt-1 pb-2">
+          {/* Fila 1: Buscador y Operaciones Principales */}
+          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5">
+            {/* Buscador de Productos + Sucursal */}
+            <div className="flex items-center gap-2 flex-1 min-w-[280px] max-w-xl">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-9 py-2.5 bg-white rounded-2xl border border-stone-200/90 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs text-xs font-semibold text-stone-800 placeholder:text-stone-400"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
 
-            {/* Quick Actions & Live Financial Widgets */}
-            <div className="flex items-center gap-2 flex-wrap">
               {/* Selector de Sucursal */}
               {activeBranch && (
-                <div className="relative flex items-center">
-                  <Building2 className="w-3.5 h-3.5 text-amber-600 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <div className="relative flex items-center shrink-0">
+                  <Building2 className="w-3.5 h-3.5 text-amber-700 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <select
                     value={activeBranch.id}
                     onChange={(e) => switchBranch(e.target.value)}
-                    className="bg-white hover:bg-stone-50 text-stone-900 font-bold text-xs pl-7 pr-6 py-2 rounded-xl border border-stone-200 shadow-xs focus:ring-2 focus:ring-amber-500 focus:outline-none appearance-none cursor-pointer"
-                    title={`Sucursal: ${activeBranch.name} • ${activeBranch.address}`}
+                    className="bg-white hover:bg-stone-50 text-stone-900 font-bold text-xs pl-8 pr-7 py-2.5 rounded-2xl border border-stone-200 shadow-xs focus:ring-2 focus:ring-amber-500 focus:outline-none appearance-none cursor-pointer"
+                    title={`Sucursal: ${activeBranch.name}`}
                   >
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.shortName}
+                        {b.shortName} ({b.code})
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-3 h-3 text-stone-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               )}
+            </div>
 
-              {/* BOTÓN: Dinero en Caja / Existencias */}
+            {/* Fila de Herramientas Operativas */}
+            <div className="flex items-center gap-2 flex-wrap xl:flex-nowrap justify-start xl:justify-end">
+              {/* Botón Principal: Turno y Caja */}
               <button
+                type="button"
                 onClick={() => setShowCashDrawerModal(true)}
-                className="flex items-center gap-2 text-xs font-bold bg-[#3e2723] hover:bg-[#4a2f2a] text-white px-3 py-2 rounded-xl shadow-xs transition-all active:scale-95 border border-amber-900/60"
-                title="Caja y arqueo de turno"
+                className="flex items-center gap-2.5 text-xs font-black bg-[#2d1810] hover:bg-[#3e2723] text-white px-3.5 py-2 rounded-2xl shadow-xs transition-all active:scale-95 border border-amber-900/60 shrink-0"
+                title="Arqueo y corte de caja"
               >
-                <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="text-amber-200 text-[11px] font-semibold hidden xl:inline">{cashierName} •</span>
-                <span className="font-extrabold text-white text-xs">Caja: {formatCurrency(netCashInDrawer)}</span>
-                <span className="text-amber-400/80 text-[11px] hidden sm:inline">| Stock: {formatCurrency(totalStockValue)}</span>
+                <Coins className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="text-left leading-tight">
+                  <span className="text-[10px] text-amber-300 font-medium block">
+                    {cashierName} • {shiftName.split(" ")[0]}
+                  </span>
+                  <span className="text-xs font-black text-white">
+                    Caja: {formatCurrency(netCashInDrawer)} <span className="text-stone-400 font-normal">|</span> Stock: {formatCurrency(totalStockValue)}
+                  </span>
+                </div>
               </button>
 
-              {/* Gastos de Caja */}
+              {/* Botón Gastos */}
               <button
+                type="button"
                 onClick={() => setShowExpensesModal(true)}
-                className="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-xl shadow-xs transition-all active:scale-95"
-                title="Gastos y salidas de efectivo"
+                className="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/90 px-3.5 py-2.5 rounded-2xl shadow-xs transition-all active:scale-95 shrink-0"
+                title="Salidas de efectivo"
               >
                 <TrendingDown className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                 <span>Gastos:</span>
                 <span className="font-black text-rose-800">-{formatCurrency(totalExpenses)}</span>
               </button>
 
-              {/* Turno / Ventas Recientes */}
+              {/* Botón Turno */}
               <button
+                type="button"
                 onClick={() => setShowRecentSales(true)}
-                className="flex items-center gap-1.5 text-xs font-bold text-stone-700 bg-white hover:bg-stone-50 border border-stone-200 px-3 py-2 rounded-xl shadow-xs transition-all active:scale-95"
-                title="Historial de ventas del turno"
+                className="flex items-center gap-1.5 text-xs font-bold text-stone-700 bg-white hover:bg-stone-50 border border-stone-200 px-3.5 py-2.5 rounded-2xl shadow-xs transition-all active:scale-95 shrink-0"
+                title="Ventas del turno actual"
               >
                 <History className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 <span>Turno ({recentSalesList.length})</span>
               </button>
 
-              {/* Estado de Conexión */}
+              {/* Estado: Modo Demo / En Línea */}
               <div 
-                className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-600 bg-white border border-stone-200 px-2.5 py-2 rounded-xl shadow-xs"
+                className="flex items-center gap-1.5 text-xs font-bold text-stone-700 bg-white border border-stone-200 px-3 py-2.5 rounded-2xl shadow-xs shrink-0"
                 title={isDbConnected ? "Conectado a base de datos en tiempo real" : "Operando en modo local"}
               >
-                <span className={`w-2 h-2 rounded-full shrink-0 ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                <span className="hidden sm:inline">{isDbConnected ? "En línea" : "Demo"}</span>
+                <Database className={`w-3.5 h-3.5 shrink-0 ${isDbConnected ? "text-emerald-500" : "text-amber-500"}`} />
+                <span className="text-xs font-bold">{isDbConnected ? "En línea" : "Modo Demo"}</span>
               </div>
             </div>
           </div>
 
-          {/* Row 2: Category Filter Carousel (Modern POS Pills) */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-scrollbar pt-0.5">
-            {CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              const count = cat.id === "all"
-                ? products.length
-                : products.filter((p) => p.category === cat.id || p.id === cat.id).length;
-
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border active:scale-95 ${
-                    isSelected
-                      ? "bg-[#3e2723] text-amber-50 border-amber-600 shadow-sm ring-1 ring-amber-600/40 font-black"
-                      : "bg-white text-stone-700 border-stone-200 hover:bg-amber-50 hover:border-amber-300"
-                  }`}
-                >
-                  <span className="text-sm shrink-0">{cat.icon}</span>
-                  <span className="whitespace-nowrap">{cat.label}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    isSelected ? "bg-amber-500 text-stone-950 font-black" : "bg-stone-100 text-stone-500"
-                  }`}>
-                    {count}
+          {/* Fila 2: Tarjeta CATEGORÍAS Y PRECIOS */}
+          <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-stone-200 shadow-xs space-y-2.5">
+            {/* Cabecera */}
+            <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-amber-600" />
+                <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider">
+                  Categorías y Precios
+                </h3>
+                {selectedCategory !== "all" && (
+                  <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                    Filtro activo: {activeCategory?.label}
                   </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {selectedCategory !== "all" && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("all")}
+                    className="text-xs font-black text-amber-900 hover:text-amber-950 px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors"
+                  >
+                    Mostrar Todos los Precios
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryPanel(!showCategoryPanel)}
+                  className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
+                >
+                  {showCategoryPanel ? "Ocultar" : "Mostrar"}
                 </button>
-              );
-            })}
+              </div>
+            </div>
+
+            {/* Cuadrícula de 12 Botones */}
+            {showCategoryPanel && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                {CATEGORIES.map((cat) => {
+                  const isSelected = selectedCategory === cat.id;
+                  const count = cat.id === "all"
+                    ? products.length
+                    : products.filter((p) => p.category === cat.id || p.id === cat.id).length;
+
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected && cat.id !== "all") {
+                          setSelectedCategory("all");
+                        } else {
+                          setSelectedCategory(cat.id);
+                        }
+                      }}
+                      className={`relative px-3 py-2 rounded-2xl text-xs font-bold transition-all duration-150 flex items-center justify-between border active:scale-95 ${
+                        isSelected
+                          ? "bg-[#2d1810] text-amber-50 shadow-md shadow-amber-950/20 font-black border-2 border-amber-500 ring-2 ring-amber-700/30"
+                          : "bg-stone-50/80 hover:bg-amber-50/90 hover:border-amber-300 text-stone-800 border-stone-200/90"
+                      }`}
+                    >
+                      {/* Icono + Nombre y Precio */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base shrink-0">{cat.icon}</span>
+                        <span className="truncate font-bold">{cat.label}</span>
+                      </div>
+
+                      {/* Badge de Conteo y botón X si está seleccionado */}
+                      <div className="flex items-center gap-1 shrink-0 ml-1">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                          isSelected
+                            ? "bg-amber-500 text-stone-950"
+                            : "bg-stone-200/90 text-stone-600"
+                        }`}>
+                          {count}
+                        </span>
+
+                        {isSelected && cat.id !== "all" && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCategory("all");
+                            }}
+                            title="Quitar filtro"
+                            className="w-4 h-4 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-[10px] ml-0.5"
+                          >
+                            <X className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
