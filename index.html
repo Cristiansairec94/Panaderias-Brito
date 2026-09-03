@@ -493,7 +493,7 @@
             className="flex-1 flex flex-col min-w-0 px-4 lg:px-5 pb-6 pt-0 pr-3 sm:pr-4 overflow-y-auto scroll-smooth relative"
           >
             {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
-            <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-3.5 lg:px-5 lg:py-3.5 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-3 pb-4 mb-4" : "mb-5"}`}>
+            <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
               <div className="flex items-center justify-between gap-3 w-full">
                 {/* Buscador de Productos (Grande y Cómodo) */}
                 <div className="relative flex-1 max-w-2xl">
@@ -574,45 +574,45 @@
                 </div>
               </div>
 
-              {/* Tarjeta CATEGORÍAS Y PRECIOS (Unida firmemente al marco superior para tapar las imágenes de atrás) */}
+              {/* Tarjeta CATEGORÍAS Y PRECIOS COMPACTA (Permite ver el pan y productos simultáneamente) */}
               {showCategoryPanel && (
-                <div className="bg-white rounded-3xl p-3.5 sm:p-4 border-2 border-stone-200/90 shadow-lg space-y-2.5 shrink-0 animate-in fade-in duration-200">
-                  {/* Cabecera */}
-                  <div className="flex items-center justify-between pb-2 border-b border-stone-100">
-                    <div className="flex items-center gap-2">
-                      <span className="text-amber-600 text-sm">🥞</span>
-                      <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider">
+                <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-2.5 sm:p-3 border-2 border-amber-200/90 shadow-md space-y-2 shrink-0 animate-in fade-in duration-200">
+                  {/* Cabecera Compacta */}
+                  <div className="flex items-center justify-between pb-1.5 border-b border-stone-100 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-amber-600 text-sm shrink-0">🥞</span>
+                      <h3 className="text-[11px] font-black text-stone-800 uppercase tracking-wider truncate">
                         Categorías y Precios
                       </h3>
                       {selectedCategory !== "all" && (
-                        <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-                          Filtro activo: {CATEGORIES.find((c) => c.id === selectedCategory)?.label}
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 shrink-0">
+                          Filtro: {CATEGORIES.find((c) => c.id === selectedCategory)?.label}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       {selectedCategory !== "all" && (
                         <button
                           type="button"
                           onClick={() => setSelectedCategory("all")}
-                          className="text-xs font-black text-amber-900 hover:text-amber-950 px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors"
+                          className="text-[11px] font-black text-amber-900 hover:text-amber-950 px-2 py-0.5 rounded-lg bg-amber-100/70 hover:bg-amber-200 transition-colors"
                         >
-                          Mostrar Todos los Precios
+                          Mostrar Todo
                         </button>
                       )}
                       <button
                         type="button"
                         onClick={() => setShowCategoryPanel(false)}
-                        className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
+                        className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-2.5 py-0.5 rounded-lg transition-colors"
                       >
-                        Ocultar
+                        Ocultar ✕
                       </button>
                     </div>
                   </div>
 
-                  {/* Cuadrícula de Botones Grandes y Claros (Sin recortes de texto) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5 max-h-[60vh] overflow-y-auto pr-1">
+                  {/* Cuadrícula Compacta: 7 columnas en escritorio (2 filas exactas) para dejar todo el pan visible abajo */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-1.5 sm:gap-2 max-h-[160px] overflow-y-auto pr-0.5">
                     {CATEGORIES.map((cat) => {
                       const isSelected = selectedCategory === cat.id;
                       const count = cat.id === "all"
@@ -626,26 +626,27 @@
                           onClick={() => {
                             setSelectedCategory(cat.id);
                           }}
-                          className={`relative px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl text-left transition-all duration-200 flex items-center justify-between gap-3 border-2 active:scale-98 shadow-xs ${
+                          className={`relative px-2.5 py-2 rounded-xl text-left transition-all duration-150 flex items-center justify-between gap-1.5 border active:scale-95 shadow-2xs ${
                             isSelected
-                              ? "bg-[#2d1810] text-amber-50 shadow-md shadow-amber-950/20 font-black border-amber-500 ring-2 ring-amber-500/30"
-                              : "bg-white hover:bg-amber-50/90 hover:border-amber-300 text-stone-900 border-stone-200/90 hover:shadow-sm"
+                              ? "bg-[#2d1810] text-amber-50 shadow-xs font-black border-amber-500 ring-1 ring-amber-400"
+                              : "bg-stone-50/80 hover:bg-amber-50/90 hover:border-amber-300 text-stone-800 border-stone-200/90"
                           }`}
+                          title={`${cat.label} (${count} productos)`}
                         >
-                          {/* Icono Grande + Nombre Completo */}
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-2xl sm:text-3xl shrink-0 drop-shadow-xs">{cat.icon}</span>
-                            <span className="font-black text-sm sm:text-base leading-tight">
+                          {/* Icono + Nombre Compacto */}
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-base shrink-0">{cat.icon}</span>
+                            <span className="font-black text-xs leading-tight truncate">
                               {cat.label}
                             </span>
                           </div>
 
                           {/* Badge de Conteo y botón X si está seleccionado */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className={`text-xs sm:text-sm px-2.5 py-1 rounded-xl font-black ${
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-black ${
                               isSelected
                                 ? "bg-amber-500 text-stone-950"
-                                : "bg-stone-100 text-stone-700 border border-stone-200"
+                                : "bg-stone-200/80 text-stone-600"
                             }`}>
                               {count}
                             </span>
@@ -657,8 +658,8 @@
                                   setSelectedCategory("all");
                                   setShowCategoryPanel(false);
                                 }}
-                                title="Ver todo el pan y cerrar opciones"
-                                className="w-6 h-6 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-xs ml-0.5 shadow-xs transition-transform active:scale-90"
+                                title="Ver todo el pan"
+                                className="w-4 h-4 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-[9px] transition-transform active:scale-90"
                               >
                                 ✕
                               </span>
