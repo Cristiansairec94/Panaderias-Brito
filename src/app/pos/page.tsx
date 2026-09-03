@@ -232,8 +232,10 @@ export default function POSPage() {
 
   const filteredProducts = products.filter((prod) => {
     const matchesCat = selectedCategory === "all" || prod.category === selectedCategory;
-    const matchesSearch = prod.name.toLowerCase().includes(search.toLowerCase()) || 
-                          (prod.description && prod.description.toLowerCase().includes(search.toLowerCase()));
+    const matchesSearch = 
+      (prod.code && prod.code.toLowerCase().includes(search.toLowerCase())) ||
+      prod.name.toLowerCase().includes(search.toLowerCase()) || 
+      (prod.description && prod.description.toLowerCase().includes(search.toLowerCase()));
     return matchesCat && matchesSearch;
   });
 
@@ -734,14 +736,19 @@ export default function POSPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10 opacity-60 group-hover:opacity-30 transition-opacity" />
 
                   {/* Product Tag Badge */}
-                  {product.tag && (
-                    <div className="absolute top-2.5 left-2.5 z-10">
+                  <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1 items-start">
+                    {product.code && (
+                      <span className="inline-flex items-center gap-0.5 bg-stone-950/90 backdrop-blur-md text-amber-300 font-mono text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-sm border border-amber-500/40">
+                        #{product.code}
+                      </span>
+                    )}
+                    {product.tag && (
                       <span className="inline-flex items-center gap-1 bg-amber-950/85 backdrop-blur-md text-amber-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider shadow-sm border border-amber-800/50">
                         <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                         {product.tag}
                       </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* PROMINENT PRICE BADGE (Top Right) */}
                   <div className="absolute top-2.5 right-2.5 z-10">
@@ -771,9 +778,16 @@ export default function POSPage() {
                 <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2">
                   <div>
                     <div className="flex items-start justify-between gap-1.5">
-                      <h3 className="font-extrabold text-stone-900 text-sm sm:text-base leading-snug group-hover:text-amber-800 transition-colors truncate">
-                        {product.name}
-                      </h3>
+                      <div className="min-w-0">
+                        {product.code && (
+                          <span className="text-[9px] font-mono font-black text-stone-500 block leading-none mb-0.5">
+                            {product.code}
+                          </span>
+                        )}
+                        <h3 className="font-extrabold text-stone-900 text-sm sm:text-base leading-snug group-hover:text-amber-800 transition-colors truncate">
+                          {product.name}
+                        </h3>
+                      </div>
                       <div className="text-right shrink-0">
                         <span className="font-black text-amber-900 text-base">
                           {formatCurrency(product.price)}

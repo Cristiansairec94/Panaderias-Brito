@@ -3,6 +3,7 @@ import { Product } from "@/types";
 export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-1",
+    code: "PAN-001",
     name: "Concha de Vainilla",
     price: 12,
     category: "pan_dulce",
@@ -14,6 +15,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-2",
+    code: "PAN-002",
     name: "Concha de Chocolate",
     price: 12,
     category: "pan_dulce",
@@ -25,6 +27,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-3",
+    code: "PAN-003",
     name: "Cuerno de Mantequilla",
     price: 15,
     category: "pan_dulce",
@@ -36,6 +39,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-4",
+    code: "BLA-001",
     name: "Bolillo Tradicional",
     price: 5,
     category: "pan_blanco",
@@ -47,6 +51,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-5",
+    code: "BLA-002",
     name: "Telera para Torta",
     price: 6,
     category: "pan_blanco",
@@ -58,6 +63,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-6",
+    code: "PAN-004",
     name: "Oreja Hojaldrada",
     price: 14,
     category: "pan_dulce",
@@ -69,6 +75,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-7",
+    code: "PAN-005",
     name: "Dona Glaseada",
     price: 13,
     category: "pan_dulce",
@@ -80,6 +87,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-8",
+    code: "PAS-001",
     name: "Rebanada Pastel 3 Leches",
     price: 45,
     category: "pasteleria",
@@ -91,6 +99,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-9",
+    code: "PAS-002",
     name: "Pay de Queso con Zarzamora",
     price: 40,
     category: "pasteleria",
@@ -102,6 +111,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-10",
+    code: "BEB-001",
     name: "Café de Olla Caliente",
     price: 25,
     category: "bebidas",
@@ -113,6 +123,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-11",
+    code: "BEB-002",
     name: "Chocolate Caliente con Leche",
     price: 30,
     category: "bebidas",
@@ -124,6 +135,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-12",
+    code: "TEM-001",
     name: "Empanada de Calabaza",
     price: 18,
     category: "temporada",
@@ -135,6 +147,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-13",
+    code: "AB-001",
     name: "Leche Entera 1L",
     price: 28,
     category: "abarrotes",
@@ -147,6 +160,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   },
   {
     id: "prod-14",
+    code: "MP-001",
     name: "Harina de Trigo San Antonio 1kg",
     price: 22,
     category: "materia_prima",
@@ -170,7 +184,30 @@ export const PRODUCT_CATEGORIES = [
   { id: "materia_prima", label: "Materia Prima", priceTag: "", icon: "🌾" },
 ];
 
-const STORAGE_KEY = "brito_products_v5";
+const STORAGE_KEY = "brito_products_v6";
+
+export function generateProductCode(category?: string): string {
+  const current = getStoredProducts();
+  const prefixMap: Record<string, string> = {
+    pan_dulce: "PAN",
+    pan_blanco: "BLA",
+    pasteleria: "PAS",
+    bebidas: "BEB",
+    temporada: "TEM",
+    abarrotes: "AB",
+    materia_prima: "MP",
+  };
+  const prefix = (category && prefixMap[category]) || "PRD";
+  const existingInCat = current.filter((p) => p.code?.startsWith(prefix) || p.category === category);
+  const nextNum = existingInCat.length + 1;
+  let codeCandidate = `${prefix}-${String(nextNum).padStart(3, "0")}`;
+  let attempt = 1;
+  while (current.some((p) => p.code?.toUpperCase() === codeCandidate.toUpperCase())) {
+    codeCandidate = `${prefix}-${String(nextNum + attempt).padStart(3, "0")}`;
+    attempt++;
+  }
+  return codeCandidate;
+}
 
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") {
@@ -188,7 +225,10 @@ export function getStoredProducts(): Product[] {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
       return DEFAULT_PRODUCTS;
     }
-    return parsed;
+    return parsed.map((p: Product, idx: number) => ({
+      ...p,
+      code: p.code || `PRD-${String(idx + 1).padStart(3, "0")}`,
+    }));
   } catch {
     return DEFAULT_PRODUCTS;
   }
@@ -218,8 +258,10 @@ export function updateProductPrice(id: string, newPrice: number): void {
 
 export function addProduct(product: Omit<Product, "id">): Product {
   const current = getStoredProducts();
+  const assignedCode = product.code?.trim() || generateProductCode(product.category);
   const newProduct: Product = {
     ...product,
+    code: assignedCode.toUpperCase(),
     id: `prod-${Date.now()}`,
   };
   saveStoredProducts([...current, newProduct]);
