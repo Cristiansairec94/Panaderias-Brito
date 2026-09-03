@@ -12,7 +12,8 @@ import {
   Building2,
   Zap,
   Store,
-  Clock
+  Clock,
+  ShoppingBag
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
