@@ -64,10 +64,11 @@ export default function SucursalesPage() {
   const [customStartDate, setCustomStartDate] = useState<string>("2026-08-20");
   const [customEndDate, setCustomEndDate] = useState<string>("2026-09-02");
 
-  // Expandable statistics per branch state
-  const [expandedBranchIds, setExpandedBranchIds] = useState<Record<string, boolean>>({
-    "branch-matriz": true, // Default open for demonstration
-  });
+  // Collapsible Google-Style Chart state (hidden by default as requested)
+  const [showStatisticsChart, setShowStatisticsChart] = useState<boolean>(false);
+
+  // Expandable statistics per branch state (hidden by default)
+  const [expandedBranchIds, setExpandedBranchIds] = useState<Record<string, boolean>>({});
 
   const toggleExpand = (branchId: string) => {
     setExpandedBranchIds((prev) => ({
@@ -374,21 +375,67 @@ export default function SucursalesPage() {
 
       {/* TAB 1: Main Overview (Google-Style Chart + General Table) */}
       {activeTab === "general" && (
-        <div className="space-y-8 animate-in fade-in">
-          {/* SECTION 1: Google-Style Deployed Interactive Chart */}
-          <GoogleBranchChart
-            branches={branches}
-            selectedPeriod={selectedPeriod}
-            onPeriodChange={setSelectedPeriod}
-            customStartDate={customStartDate}
-            customEndDate={customEndDate}
-            onCustomDateChange={(start, end) => {
-              setCustomStartDate(start);
-              setCustomEndDate(end);
-              setSelectedPeriod("custom");
-            }}
-            onSimulateSale={handleSimulate}
-          />
+        <div className="space-y-6 animate-in fade-in">
+          {/* SECCIÓN DESPLEGABLE: Gráfica de Análisis & Estadísticas Estilo Google (Oculta al inicio) */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 bg-white rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-md transition-all">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-orange-500/10 to-rose-500/10 border border-orange-200/80 text-orange-600 flex items-center justify-center shrink-0">
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-stone-900 tracking-tight">
+                      Análisis de Ventas & Producción
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                      Estilo Google
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500">
+                    Gráfica desplegable de facturación ($ MXN), piezas de pan y comparativa multi-tienda ({periodLabel})
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowStatisticsChart((prev) => !prev)}
+                className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs transition-all shadow-md active:scale-95 ${
+                  showStatisticsChart
+                    ? "bg-stone-900 text-white hover:bg-black"
+                    : "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-orange-500/20 hover:brightness-110"
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>{showStatisticsChart ? "Ocultar Estadísticas" : "Ver Estadísticas"}</span>
+                <ChevronDown
+                  className={`w-4 h-4 transition-transform duration-300 ${
+                    showStatisticsChart ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Gráfica desplegada únicamente cuando showStatisticsChart es true */}
+            {showStatisticsChart && (
+              <div className="animate-in fade-in zoom-in-95 duration-300">
+                <GoogleBranchChart
+                  branches={branches}
+                  selectedPeriod={selectedPeriod}
+                  onPeriodChange={setSelectedPeriod}
+                  customStartDate={customStartDate}
+                  customEndDate={customEndDate}
+                  onCustomDateChange={(start, end) => {
+                    setCustomStartDate(start);
+                    setCustomEndDate(end);
+                    setSelectedPeriod("custom");
+                  }}
+                  onSimulateSale={handleSimulate}
+                  onClose={() => setShowStatisticsChart(false)}
+                />
+              </div>
+            )}
+          </div>
 
           {/* SECTION 2: General Overview Table */}
           <div className="bg-white rounded-3xl border border-stone-200/90 shadow-xl overflow-hidden">

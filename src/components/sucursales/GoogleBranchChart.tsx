@@ -15,7 +15,8 @@ import {
   Filter,
   BarChart2,
   CalendarRange,
-  RotateCcw
+  RotateCcw,
+  ChevronUp
 } from "lucide-react";
 import { Branch } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -32,6 +33,7 @@ interface GoogleBranchChartProps {
   customEndDate: string;
   onCustomDateChange: (start: string, end: string) => void;
   onSimulateSale?: (branchId?: string) => void;
+  onClose?: () => void;
 }
 
 interface DataPoint {
@@ -60,6 +62,7 @@ export default function GoogleBranchChart({
   customEndDate,
   onCustomDateChange,
   onSimulateSale,
+  onClose,
 }: GoogleBranchChartProps) {
   const [activeMetric, setActiveMetric] = useState<MetricType>("dinero");
   const [viewMode, setViewMode] = useState<ChartViewMode>("consolidado");
@@ -544,6 +547,17 @@ export default function GoogleBranchChart({
               <span>Entre Fechas</span>
             </button>
           </div>
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs border border-stone-200 shadow-sm transition-all"
+              title="Ocultar gráfica desplegable"
+            >
+              <ChevronUp className="w-3.5 h-3.5 text-stone-500" />
+              <span>Ocultar</span>
+            </button>
+          )}
         </div>
       </div>
 
