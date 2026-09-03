@@ -1190,8 +1190,8 @@
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-amber-600 rounded-xl text-lg">💼</div>
                     <div>
-                      <span className="font-black text-sm block">Control y Gestión de Turno</span>
-                      <span className="text-[10px] text-amber-300">Cuentas completas, cambio de turno con conteo obligatorio y corte de caja</span>
+                      <span className="font-black text-sm block">Cierre de Turno & Entrega de Caja</span>
+                      <span className="text-[10px] text-amber-300">Confirmación de arqueo sin detalles en caja y entrega conforme al relevo</span>
                     </div>
                   </div>
                   <button onClick={() => setShowDrawerModal(false)} className="text-xl font-bold hover:text-white">✕</button>
@@ -1297,34 +1297,50 @@
                           </div>
                         </div>
 
-                        {/* Semáforo Rápido de Diferencia */}
+                        {/* Dictamen y Confirmación del Cierre de Turno */}
                         {countedCashInput && (
-                          <div className={`p-2 rounded-xl border text-xs font-black flex justify-between items-center ${
+                          <div className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 text-xs ${
                             Number(countedCashInput) === cashInDrawer
-                              ? "bg-emerald-100 text-emerald-950 border-emerald-300"
+                              ? "bg-emerald-50 text-emerald-950 border-emerald-400 shadow-xs"
                               : Number(countedCashInput) > cashInDrawer
-                              ? "bg-blue-100 text-blue-950 border-blue-300"
-                              : "bg-rose-100 text-rose-950 border-rose-300"
+                              ? "bg-blue-50 text-blue-950 border-blue-400"
+                              : "bg-rose-50 text-rose-950 border-rose-400"
                           }`}>
-                            <span>
-                              {Number(countedCashInput) === cashInDrawer
-                                ? "🟢 ¡Caja Cuadrada Exacta!"
-                                : Number(countedCashInput) > cashInDrawer
-                                ? "🟡 Sobrante en Caja:"
-                                : "🔴 Faltante en Caja:"}
-                            </span>
-                            <span className="font-black">
-                              {Number(countedCashInput) === cashInDrawer
-                                ? "$0.00"
-                                : formatCurrency(Number(countedCashInput) - cashInDrawer)}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-xs ${
+                                Number(countedCashInput) === cashInDrawer ? "bg-emerald-600 text-white" : Number(countedCashInput) > cashInDrawer ? "bg-blue-600 text-white" : "bg-rose-600 text-white"
+                              }`}>
+                                {Number(countedCashInput) === cashInDrawer ? "✓" : "!"}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-black block text-xs sm:text-sm">
+                                  {Number(countedCashInput) === cashInDrawer
+                                    ? "🟢 Cierre de Turno Conforme: Todo está bien y no hay detalles en caja"
+                                    : Number(countedCashInput) > cashInDrawer
+                                    ? "🟡 Detalle en Cierre: Sobrante detectado en caja"
+                                    : "🔴 Detalle en Cierre: Faltante detectado en caja"}
+                                </span>
+                                <span className={`text-[11px] font-semibold block ${
+                                  Number(countedCashInput) === cashInDrawer ? "text-emerald-800" : Number(countedCashInput) > cashInDrawer ? "text-blue-800" : "text-rose-800"
+                                }`}>
+                                  {Number(countedCashInput) === cashInDrawer
+                                    ? "Cuentas cuadradas al 100%. El dinero en caja coincide exactamente con el sistema ($0.00)."
+                                    : `Diferencia de ${formatCurrency(Number(countedCashInput) - cashInDrawer)}. Se registrará el detalle en el comprobante del turno.`}
+                                </span>
+                              </div>
+                            </div>
+                            <span className={`shrink-0 px-2.5 py-1 rounded-lg font-black text-[11px] uppercase tracking-wide ${
+                              Number(countedCashInput) === cashInDrawer ? "bg-emerald-200 text-emerald-900" : Number(countedCashInput) > cashInDrawer ? "bg-blue-200 text-blue-900" : "bg-rose-200 text-rose-900"
+                            }`}>
+                              {Number(countedCashInput) === cashInDrawer ? "Sin Detalles ✓" : formatCurrency(Number(countedCashInput) - cashInDrawer)}
                             </span>
                           </div>
                         )}
                       </div>
 
-                      {/* 3. Casilla de Confirmación y Botón Final */}
+                      {/* 3. Casilla de Confirmación y Botón Final de Cierre de Turno */}
                       <div className="space-y-2">
-                        <label className="flex items-center gap-2.5 px-3 py-2 bg-amber-50/80 rounded-xl border border-amber-300 cursor-pointer select-none">
+                        <label className="flex items-center gap-2.5 px-3.5 py-2.5 bg-amber-50/90 rounded-2xl border-2 border-amber-300 cursor-pointer select-none">
                           <input
                             type="checkbox"
                             checked={hasAcceptedShift}
@@ -1332,7 +1348,7 @@
                             className="w-4 h-4 rounded accent-amber-700 cursor-pointer shrink-0"
                           />
                           <span className="text-xs font-bold text-stone-900 leading-snug">
-                            Yo, <strong>{nextCashier}</strong>, confirmo que conté el dinero ({countedCashInput ? formatCurrency(Number(countedCashInput)) : "$0.00"}) y acepto la caja.
+                            Confirmo el <strong>Cierre de Turno</strong>: todo está bien, conté el dinero ({countedCashInput ? formatCurrency(Number(countedCashInput)) : "$0.00"}) y no hay detalles pendientes en caja.
                           </span>
                         </label>
 
@@ -1348,12 +1364,12 @@
                             setShowDrawerModal(false);
                             setCountedCashInput("");
                             setHasAcceptedShift(false);
-                            alert(`✅ ¡Turno Aceptado con Éxito!\n\nEntregó: ${prevCashier}\nRecibió y Aceptó: ${nextCashier}\nTurno: ${nextShift}\nDinero Contado y Verificado: ${formatCurrency(Number(countedCashInput))}\n\nLa caja quedó lista para el nuevo turno.`);
+                            alert(`✅ ¡Cierre de Turno Conforme y Exitoso!\n\nEl turno cerró correctamente sin detalles en caja.\n\nEntregó: ${prevCashier}\nRecibió y Aceptó: ${nextCashier}\nTurno: ${nextShift}\nEfectivo Entregado: ${formatCurrency(Number(countedCashInput))}\n\nLa caja quedó lista para el nuevo turno.`);
                           }}
-                          className="w-full py-3.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm sm:text-base shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2"
+                          className="w-full py-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm sm:text-base shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2.5"
                         >
-                          <span className="text-lg">✅</span>
-                          <span>ACEPTAR TURNO Y COMENZAR ({nextCashier})</span>
+                          <span className="text-lg">🔒</span>
+                          <span>CERRAR TURNO Y ENTREGAR CAJA ({nextCashier}) ➔</span>
                         </button>
                       </div>
                     </div>

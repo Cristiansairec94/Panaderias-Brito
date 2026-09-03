@@ -215,9 +215,9 @@ export default function CashDrawerShiftModal({
               <Coins className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="font-black text-lg leading-tight">Corte de Caja & Cambio de Turno</h2>
+              <h2 className="font-black text-lg leading-tight">Cierre de Turno & Entrega de Caja</h2>
               <p className="text-xs text-amber-300 font-medium">
-                Arqueo financiero, entrega de cuentas y notificación directa al administrador
+                Confirmación de arqueo sin detalles en caja y entrega conforme al relevo
               </p>
             </div>
           </div>
@@ -238,9 +238,9 @@ export default function CashDrawerShiftModal({
                 <div className="w-14 h-14 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-lg">
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
-                <h3 className="text-xl font-black text-emerald-950">¡Corte y Cambio de Turno Completado!</h3>
+                <h3 className="text-xl font-black text-emerald-950">¡Cierre de Turno Conforme y Exitoso!</h3>
                 <p className="text-xs text-emerald-800 max-w-md mx-auto">
-                  Se ha registrado el corte correctamente, se envió la notificación directa al administrador y la caja quedó lista para <strong>{lastCutData.incomingCashier}</strong>.
+                  El turno cerró correctamente sin detalles en caja. Cuentas cuadradas al 100%, comprobante emitido y caja entregada a <strong>{lastCutData.incomingCashier}</strong>.
                 </p>
               </div>
 
@@ -424,36 +424,50 @@ export default function CashDrawerShiftModal({
                   </div>
                 </div>
 
-                {/* Semáforo Rápido de Diferencia */}
+                {/* Dictamen y Confirmación del Cierre de Turno */}
                 {countedCash && (
-                  <div className={`p-2 rounded-xl border text-xs font-black flex justify-between items-center ${
+                  <div className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 text-xs ${
                     cashDifference === 0
-                      ? "bg-emerald-100 text-emerald-950 border-emerald-300"
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-400 shadow-xs"
                       : cashDifference > 0
-                      ? "bg-blue-100 text-blue-950 border-blue-300"
-                      : "bg-rose-100 text-rose-950 border-rose-300"
+                      ? "bg-blue-50 text-blue-950 border-blue-400"
+                      : "bg-rose-50 text-rose-950 border-rose-400"
                   }`}>
-                    <span>
-                      {cashDifference === 0
-                        ? "🟢 ¡Caja Cuadrada Exacta!"
-                        : cashDifference > 0
-                        ? "🟡 Sobrante en Caja:"
-                        : "🔴 Faltante en Caja:"}
-                    </span>
-                    <span className="font-black">
-                      {cashDifference === 0
-                        ? "$0.00"
-                        : cashDifference > 0
-                        ? `+${formatCurrency(cashDifference)}`
-                        : formatCurrency(cashDifference)}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-xs ${
+                        cashDifference === 0 ? "bg-emerald-600 text-white" : cashDifference > 0 ? "bg-blue-600 text-white" : "bg-rose-600 text-white"
+                      }`}>
+                        {cashDifference === 0 ? "✓" : "!"}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-black block text-xs sm:text-sm">
+                          {cashDifference === 0
+                            ? "🟢 Cierre de Turno Conforme: Todo está bien y no hay detalles en caja"
+                            : cashDifference > 0
+                            ? "🟡 Detalle en Cierre: Sobrante detectado en caja"
+                            : "🔴 Detalle en Cierre: Faltante detectado en caja"}
+                        </span>
+                        <span className={`text-[11px] font-semibold block ${
+                          cashDifference === 0 ? "text-emerald-800" : cashDifference > 0 ? "text-blue-800" : "text-rose-800"
+                        }`}>
+                          {cashDifference === 0
+                            ? "Cuentas cuadradas al 100%. El dinero en caja coincide exactamente con el sistema ($0.00)."
+                            : `Diferencia de ${formatCurrency(cashDifference)}. Se registrará el detalle en el comprobante del turno.`}
+                        </span>
+                      </div>
+                    </div>
+                    <span className={`shrink-0 px-2.5 py-1 rounded-lg font-black text-[11px] uppercase tracking-wide ${
+                      cashDifference === 0 ? "bg-emerald-200 text-emerald-900" : cashDifference > 0 ? "bg-blue-200 text-blue-900" : "bg-rose-200 text-rose-900"
+                    }`}>
+                      {cashDifference === 0 ? "Sin Detalles ✓" : formatCurrency(cashDifference)}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* 3. Casilla de Confirmación y Botón Final */}
+              {/* 3. Casilla de Confirmación y Botón Final de Cierre de Turno */}
               <div className="space-y-2">
-                <label className="flex items-center gap-2.5 px-3 py-2 bg-amber-50/80 rounded-xl border border-amber-300 cursor-pointer select-none">
+                <label className="flex items-center gap-2.5 px-3.5 py-2.5 bg-amber-50/90 rounded-2xl border-2 border-amber-300 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={hasAcceptedCash}
@@ -461,7 +475,7 @@ export default function CashDrawerShiftModal({
                     className="w-4 h-4 rounded accent-amber-700 cursor-pointer shrink-0"
                   />
                   <span className="text-xs font-bold text-stone-900 leading-snug">
-                    Yo, <strong>{incomingCashier}</strong>, confirmo que conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y acepto la caja.
+                    Confirmo el <strong>Cierre de Turno</strong>: todo está bien, conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y no hay detalles pendientes en caja.
                   </span>
                 </label>
 
@@ -469,11 +483,11 @@ export default function CashDrawerShiftModal({
                   type="button"
                   onClick={handleExecuteShiftCut}
                   disabled={!countedCash || !hasAcceptedCash || isFinalizing}
-                  className="w-full py-3.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm sm:text-base shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm sm:text-base shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2.5"
                 >
                   <CheckCircle2 className="w-5 h-5 text-emerald-200 shrink-0" />
                   <span>
-                    {isFinalizing ? "Aceptando Turno..." : `✅ ACEPTAR TURNO Y COMENZAR (${incomingCashier})`}
+                    {isFinalizing ? "Cerrando Turno..." : `🔒 CERRAR TURNO Y ENTREGAR CAJA (${incomingCashier}) ➔`}
                   </span>
                 </button>
               </div>
