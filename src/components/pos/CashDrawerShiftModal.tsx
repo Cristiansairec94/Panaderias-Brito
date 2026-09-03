@@ -229,35 +229,8 @@ export default function CashDrawerShiftModal({
           </button>
         </div>
 
-        {/* Tabs de Navegación Grandes e Intuitivos */}
-        <div className="grid grid-cols-2 gap-3 p-3 bg-stone-100 border-b border-stone-200">
-          <button
-            onClick={() => { setActiveTab("cuentas"); setShowCutSuccess(false); }}
-            className={`py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-xs ${
-              activeTab === "cuentas" && !showCutSuccess
-                ? "bg-[#2d1810] text-white shadow-md ring-2 ring-amber-500/40"
-                : "bg-white text-stone-700 hover:bg-stone-50 border border-stone-300"
-            }`}
-          >
-            <Receipt className="w-5 h-5 text-amber-400" />
-            <span>1. 📊 Ver Cuentas del Turno</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveTab("cambio"); setShowCutSuccess(false); }}
-            className={`py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-xs ${
-              activeTab === "cambio" && !showCutSuccess
-                ? "bg-amber-600 text-white shadow-md ring-2 ring-amber-400"
-                : "bg-white text-stone-700 hover:bg-stone-50 border border-stone-300"
-            }`}
-          >
-            <UserCheck className="w-5 h-5 text-amber-600" />
-            <span>2. 🔄 Realizar Cambio de Turno</span>
-          </button>
-        </div>
-
-        {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        {/* Modal Scrollable Body: UN SOLO APARTADO SIMPLE Y DIRECTO */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
           {showCutSuccess && lastCutData ? (
             /* Vista de Éxito y Ticket de Corte */
             <div className="space-y-6 animate-in zoom-in-95">
@@ -298,54 +271,43 @@ export default function CashDrawerShiftModal({
                   </div>
                   <div className="flex justify-between"><span>(+) Fondo Inicial de Turno:</span><span>{formatCurrency(lastCutData.initialFund)}</span></div>
                   <div className="flex justify-between text-emerald-700"><span>(+) Ventas en Efectivo:</span><span className="font-bold">+{formatCurrency(lastCutData.cashSales)}</span></div>
-                  <div className="flex justify-between text-rose-700"><span>(-) Gastos y Salidas:</span><span className="font-bold">-{formatCurrency(lastCutData.totalExpenses)}</span></div>
-                  <div className="flex justify-between font-black text-stone-900 border-t border-dashed border-stone-300 pt-1">
-                    <span>(=) EFECTIVO ESPERADO:</span>
+                  <div className="flex justify-between text-rose-700"><span>(-) Gastos de Turno:</span><span>-{formatCurrency(lastCutData.totalExpenses)}</span></div>
+                  <div className="flex justify-between font-black text-stone-900 border-t border-dashed border-stone-300 pt-1.5 text-xs">
+                    <span>(=) Total Esperado en Caja:</span>
                     <span>{formatCurrency(lastCutData.expectedCash)}</span>
                   </div>
-                  <div className="flex justify-between font-black text-amber-900">
-                    <span>($) EFECTIVO CONTADO FÍSICO:</span>
+                  <div className="flex justify-between font-black text-amber-950 pt-0.5 text-xs">
+                    <span>(=) Efectivo Físico Entregado:</span>
                     <span>{formatCurrency(lastCutData.countedCash)}</span>
                   </div>
-                  <div className={`flex justify-between font-black p-1 rounded ${
+                  <div className={`flex justify-between font-black p-1.5 rounded-lg mt-1 text-xs ${
                     lastCutData.difference === 0
-                      ? "bg-emerald-100 text-emerald-900"
+                      ? "bg-emerald-100 text-emerald-950"
                       : lastCutData.difference > 0
-                      ? "bg-blue-100 text-blue-900"
-                      : "bg-rose-100 text-rose-900"
+                      ? "bg-blue-100 text-blue-950"
+                      : "bg-rose-100 text-rose-950"
                   }`}>
-                    <span>DIFERENCIA / RESULTADO:</span>
-                    <span>{lastCutData.difference === 0 ? "CUADRADO $0.00" : (lastCutData.difference > 0 ? `SOBRANTE +${formatCurrency(lastCutData.difference)}` : `FALTANTE ${formatCurrency(lastCutData.difference)}`)}</span>
+                    <span>DIFERENCIA:</span>
+                    <span>{lastCutData.difference === 0 ? "$0.00 (Cuadrada)" : formatCurrency(lastCutData.difference)}</span>
                   </div>
                 </div>
 
-                {/* Otros Métodos */}
-                <div className="space-y-1 border-b border-dashed border-stone-300 pb-2 text-[10px] text-stone-600">
-                  <div className="flex justify-between"><span>Cobros con Tarjeta:</span><span>{formatCurrency(lastCutData.cardSales)}</span></div>
-                  <div className="flex justify-between"><span>Cobros con Transferencia:</span><span>{formatCurrency(lastCutData.transferSales)}</span></div>
-                  <div className="flex justify-between font-bold text-stone-900"><span>TOTAL VENTAS DEL TURNO:</span><span>{formatCurrency(lastCutData.totalSales)}</span></div>
-                  <div className="flex justify-between text-stone-500"><span>Fondo dejado para siguiente turno:</span><span className="font-bold">{formatCurrency(lastCutData.nextFund)}</span></div>
+                {/* Additional payment stats */}
+                <div className="space-y-1 text-[10px] text-stone-500 pt-1 border-b border-dashed border-stone-300 pb-2">
+                  <div className="flex justify-between"><span>Ventas con Tarjeta:</span><span>{formatCurrency(lastCutData.cardSales)}</span></div>
+                  <div className="flex justify-between"><span>Ventas con Transferencia:</span><span>{formatCurrency(lastCutData.transferSales)}</span></div>
+                  <div className="flex justify-between font-bold text-stone-800"><span>Gran Total Vendido:</span><span>{formatCurrency(lastCutData.totalSalesAll)}</span></div>
                 </div>
 
-                {/* Observaciones */}
-                <div className="text-[10px] text-stone-600 border-b border-dashed border-stone-300 pb-2">
-                  <span className="font-bold block text-stone-800">OBSERVACIONES:</span>
-                  <p className="italic font-sans">{lastCutData.notes}</p>
-                </div>
-
-                {/* Firmas */}
-                <div className="pt-6 grid grid-cols-2 gap-4 text-center text-[9px] font-sans">
-                  <div className="border-t border-stone-400 pt-1">
-                    <p className="font-bold">{lastCutData.outgoingCashier}</p>
-                    <p className="text-stone-400">Entregó Conforme</p>
-                  </div>
-                  <div className="border-t border-stone-400 pt-1">
-                    <p className="font-bold">{lastCutData.incomingCashier}</p>
-                    <p className="text-stone-400">Recibió Conforme</p>
-                  </div>
+                <div className="text-center pt-2 space-y-1 text-[10px] text-stone-400 font-sans">
+                  <p className="font-bold text-stone-700">ENTREGA DE TURNO CONFORME</p>
+                  <p>Firma Saliente: _____________________</p>
+                  <p>Firma Entrante: _____________________</p>
+                  <p className="pt-1 text-[9px]">Panaderías Brito • Sucursal Matriz</p>
                 </div>
               </div>
 
+              {/* Botones de acción post-corte */}
               <div className="flex gap-3 max-w-md mx-auto">
                 <button
                   onClick={handlePrintZCut}
@@ -362,114 +324,28 @@ export default function CashDrawerShiftModal({
                 </button>
               </div>
             </div>
-          ) : activeTab === "cuentas" ? (
-            /* PESTAÑA 1: CUENTAS DEL TURNO (SIMPLE, RÁPIDA, SIN DUPLICADOS) */
-            <div className="space-y-4">
-              {/* 4 Métricas Clave en 1 Sola Fila */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {/* 1. Dinero en Caja */}
-                <div className="p-3.5 bg-[#2d1810] text-white rounded-2xl border border-amber-950 shadow-xs flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                    Dinero en Caja
-                  </span>
-                  <span className="text-2xl font-black text-white mt-1">
-                    {formatCurrency(expectedCashInDrawer)}
-                  </span>
-                  <span className="text-[10px] text-stone-300 mt-1">
-                    Fondo: {formatCurrency(initialFund)}
-                  </span>
-                </div>
-
-                {/* 2. Ventas del Turno */}
-                <div className="p-3.5 bg-emerald-50 text-emerald-950 rounded-2xl border border-emerald-200 flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
-                    Ventas del Turno
-                  </span>
-                  <span className="text-2xl font-black text-emerald-900 mt-1">
-                    {formatCurrency(totalSalesAll)}
-                  </span>
-                  <span className="text-[10px] text-emerald-700 mt-1">
-                    {sales.length} tickets cobrados
-                  </span>
-                </div>
-
-                {/* 3. Gastos del Turno */}
-                <div className="p-3.5 bg-rose-50 text-rose-950 rounded-2xl border border-rose-200 flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">
-                    Gastos Registrados
-                  </span>
-                  <span className="text-2xl font-black text-rose-900 mt-1">
-                    -{formatCurrency(totalExpenses)}
-                  </span>
-                  <span className="text-[10px] text-rose-700 mt-1">
-                    {expenses.length} salidas de dinero
-                  </span>
-                </div>
-
-                {/* 4. Cajero y Turno */}
-                <div className="p-3.5 bg-stone-50 text-stone-900 rounded-2xl border border-stone-200 flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
-                    Cajero Activo
-                  </span>
-                  <span className="text-sm font-black text-stone-900 truncate mt-1">
-                    {cashierName}
-                  </span>
-                  <span className="text-[10px] text-stone-500 mt-1 truncate">
-                    {shiftName.split(" ")[0]} • {currentTime || "En vivo"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Lista Rápida de Ventas del Turno */}
-              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-2.5">
-                <div className="flex items-center justify-between pb-2 border-b border-stone-200">
-                  <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-stone-900 uppercase">
-                    <Receipt className="w-4 h-4 text-amber-700" />
-                    <span>Tickets Cobrados ({sales.length})</span>
-                  </div>
-                  <span className="text-xs font-bold text-stone-600">
-                    Efectivo: <strong className="text-emerald-800">{formatCurrency(cashSales)}</strong> | Tarjeta/Transf: <strong>{formatCurrency(cardSales + transferSales)}</strong>
-                  </span>
-                </div>
-
-                {sales.length === 0 ? (
-                  <p className="text-xs sm:text-sm text-stone-400 text-center py-6 font-medium">
-                    Aún no hay ventas cobradas en este turno.
-                  </p>
-                ) : (
-                  <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1 divide-y divide-stone-200">
-                    {sales.map((s, idx) => (
-                      <div key={s.id || idx} className="pt-2 flex items-center justify-between text-xs sm:text-sm">
-                        <div className="flex items-center gap-2.5">
-                          <span className="font-mono font-black text-stone-900">#{s.id.slice(-5)}</span>
-                          <span className="text-stone-400 text-xs">{s.date.split(" ")[1] || s.date}</span>
-                          <span className="text-[11px] font-bold uppercase bg-stone-200 px-2 py-0.5 rounded">
-                            {s.paymentMethod}
-                          </span>
-                          <span className="text-stone-600 truncate max-w-[240px] text-xs">
-                            {s.items.map((it) => `${it.quantity}x ${it.product.name}`).join(", ")}
-                          </span>
-                        </div>
-                        <span className="font-black text-stone-900 text-sm sm:text-base">{formatCurrency(s.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Botón Grande e Intuitivo para ir a Cambio de Turno */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("cambio")}
-                className="w-full py-4 px-6 bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 hover:from-amber-700 hover:to-amber-900 text-white font-black text-sm sm:text-base rounded-2xl shadow-lg transition-all active:scale-98 flex items-center justify-center gap-3"
-              >
-                <UserCheck className="w-5 h-5 text-amber-200" />
-                <span>¿Vas a entregar turno? Toca aquí para el Cambio de Turno ➔</span>
-              </button>
-            </div>
           ) : (
-            /* PESTAÑA 2: CAMBIO DE TURNO (RESUMIDO EN UNA SOLA HOJA SIN SCROLL) */
+            /* UN SOLO APARTADO SIMPLE Y DIRECTO (SIN PESTAÑAS) */
             <div className="space-y-3">
+              {/* 1. Resumen Financiero del Turno en 1 Sola Franja */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-stone-50 rounded-2xl border border-stone-200 text-xs">
+                <div>
+                  <span className="text-[10px] text-stone-500 font-bold block uppercase">Fondo Inicial</span>
+                  <span className="text-sm font-black text-stone-900">{formatCurrency(initialFund)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-emerald-700 font-bold block uppercase">(+) Ventas</span>
+                  <span className="text-sm font-black text-emerald-700">+{formatCurrency(cashSales)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-rose-700 font-bold block uppercase">(-) Gastos</span>
+                  <span className="text-sm font-black text-rose-700">-{formatCurrency(totalExpenses)}</span>
+                </div>
+                <div className="bg-amber-100/80 px-2 py-1 rounded-xl border border-amber-300">
+                  <span className="text-[10px] text-amber-950 font-black block uppercase">En Caja</span>
+                  <span className="text-sm font-black text-amber-950">{formatCurrency(expectedCashInDrawer)}</span>
+                </div>
+              </div>
               {/* 1. Relevo Directo: Quién Entrega y Quién Recibe */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 bg-stone-50 rounded-2xl border border-stone-200 text-xs">
                 <div className="flex items-center justify-between gap-2">

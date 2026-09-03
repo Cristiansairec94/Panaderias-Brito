@@ -173,48 +173,39 @@ export default function TicketModal({
               )}
             </div>
 
-            {/* GANCHO DE RECOMPRA: Cupón de Fidelización */}
-            <div className="border-2 border-dashed border-amber-400 bg-gradient-to-br from-amber-50 to-orange-50/80 p-3 rounded-2xl text-center space-y-1 font-sans">
-              <div className="flex items-center justify-center gap-1 text-[10px] font-black text-amber-900 uppercase tracking-wide">
-                <span>🎁</span>
-                <span>¡PREMIO EN TU PRÓXIMA COMPRA!</span>
+
+            {/* Horarios de Pan Calientito (Llamativo y Letras Grandes) */}
+            <div className="p-3.5 bg-gradient-to-br from-amber-100/90 to-orange-100/90 rounded-2xl text-center border-2 border-amber-400/90 space-y-1 font-sans shadow-xs">
+              <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wide">
+                <span className="text-base">🔥</span>
+                <span>¡PAN CALIENTITO RECIÉN HORNEADO!</span>
               </div>
-              <p className="text-[11px] font-extrabold text-stone-900 leading-tight">
-                Presenta este ticket y llévate:
-              </p>
-              <div className="py-1 px-2.5 bg-amber-600 text-white font-black text-xs rounded-xl shadow-xs inline-block my-0.5">
-                ⭐ 1 PIEZA DE PAN DULCE GRATIS ⭐
-              </div>
-              <p className="text-[9px] text-amber-900 font-bold leading-tight">
-                En tu siguiente compra de $50 o más • Válido por 7 días
+              <p className="text-xs sm:text-sm font-extrabold text-stone-800">
+                🥐 Mañanas: <span className="text-amber-900 font-black underline decoration-amber-500">6:30 AM</span> &nbsp;•&nbsp; Tardes: <span className="text-amber-900 font-black underline decoration-amber-500">5:30 PM</span>
               </p>
             </div>
 
-            {/* Horarios de Pan Calientito (Impulso de Visita) */}
-            <div className="p-2.5 bg-stone-50 rounded-xl text-center border border-stone-200/90 space-y-0.5 font-sans">
-              <p className="text-[10px] font-black text-stone-900 flex items-center justify-center gap-1">
-                <span>🔥</span>
-                <span>¡Ven por tu pan calientito recién horneado!</span>
-              </p>
-              <p className="text-[9px] text-stone-600 font-semibold">
-                Mañanas: <strong className="text-amber-800 font-black">6:30 AM</strong> • Tardes: <strong className="text-amber-800 font-black">5:30 PM</strong>
-              </p>
-            </div>
+            {/* Pedidos Especiales y Agradecimiento (Grande, Claro y Muy Visible) */}
+            <div className="text-center pt-2 space-y-2 font-sans border-t-2 border-dashed border-stone-300">
+              <div className="space-y-0.5">
+                <p className="text-xs sm:text-sm font-black text-stone-900 flex items-center justify-center gap-1">
+                  <span>🎂</span>
+                  <span>¿Tienes fiesta o evento? Pedidos Especiales:</span>
+                </p>
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-100 text-emerald-900 font-black text-xs sm:text-sm rounded-xl border border-emerald-300 shadow-xs mt-1">
+                  <span>📲 WhatsApp:</span>
+                  <span className="tracking-wider">{branchPhone || "55 1234 5678"}</span>
+                </div>
+              </div>
 
-            {/* Pedidos Especiales y Agradecimiento */}
-            <div className="text-center pt-2 space-y-1 text-[10px] text-stone-500 font-sans border-t border-dashed border-stone-300">
-              <p className="text-[10px] font-bold text-stone-800">
-                🎂 ¿Tienes fiesta o evento? Hacemos pedidos especiales.
-              </p>
-              <p className="text-[9px] font-extrabold text-amber-800">
-                WhatsApp: {branchPhone || "55 1234 5678"}
-              </p>
-              <p className="font-black text-stone-900 text-xs pt-1">
-                ¡GRACIAS POR SU PREFERENCIA! 🥐
-              </p>
-              <p className="text-[9px] text-stone-400">
-                Consérvese en un lugar fresco y seco • Panaderías Brito
-              </p>
+              <div className="pt-1 space-y-0.5">
+                <p className="font-black text-stone-950 text-sm sm:text-base tracking-wide">
+                  ¡GRACIAS POR SU PREFERENCIA! 🥐
+                </p>
+                <p className="text-[11px] font-bold text-stone-500">
+                  Consérvese en un lugar fresco y seco • Panaderías Brito
+                </p>
+              </div>
             </div>
           </div>
         </div>
