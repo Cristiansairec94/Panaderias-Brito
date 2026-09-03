@@ -108,6 +108,7 @@ export default function POSPage() {
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>([]);
   const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
+  const [shiftModalTab, setShiftModalTab] = useState<"cuentas" | "cambio" | "cierre">("cuentas");
   
   // Status
   const [isDbConnected, setIsDbConnected] = useState(false);
@@ -520,35 +521,14 @@ export default function POSPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {/* Selector de Sucursal */}
-              {activeBranch && (
-                <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200/80 flex flex-col justify-between">
-                  <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
-                    Sucursal Activa
-                  </span>
-                  <div className="relative">
-                    <Building2 className="w-4 h-4 text-amber-700 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <select
-                      value={activeBranch.id}
-                      onChange={(e) => switchBranch(e.target.value)}
-                      className="w-full bg-white text-stone-900 font-bold text-xs pl-8 pr-7 py-2 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-none cursor-pointer"
-                    >
-                      {branches.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name} ({b.code})
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-stone-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                </div>
-              )}
-
-              {/* Dinero en Caja y Arqueo */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* 1. Dinero en Caja y Arqueo */}
               <button
                 type="button"
-                onClick={() => setShowCashDrawerModal(true)}
+                onClick={() => {
+                  setShiftModalTab("cuentas");
+                  setShowCashDrawerModal(true);
+                }}
                 className="p-3 bg-[#2d1810] hover:bg-[#3e2723] text-white rounded-2xl border border-amber-900/60 transition-all active:scale-98 shadow-xs flex items-center justify-between text-left"
               >
                 <div className="flex items-center gap-2.5">
@@ -567,12 +547,12 @@ export default function POSPage() {
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-950/80 px-2 py-1 rounded-lg border border-amber-800/60">
+                <span className="text-[10px] font-bold text-amber-400 bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-800/60">
                   Arqueo
                 </span>
               </button>
 
-              {/* Salidas y Gastos */}
+              {/* 2. Salidas y Gastos */}
               <button
                 type="button"
                 onClick={() => setShowExpensesModal(true)}
@@ -592,23 +572,26 @@ export default function POSPage() {
                 </span>
               </button>
 
-              {/* Ventas del Turno */}
+              {/* 3. Gestión de Turno (Cuentas del Turno, Cambio & Cierre) */}
               <button
                 type="button"
-                onClick={() => setShowRecentSales(true)}
-                className="p-3 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-2xl text-left transition-all active:scale-98 flex items-center justify-between"
+                onClick={() => {
+                  setShiftModalTab("cambio");
+                  setShowCashDrawerModal(true);
+                }}
+                className="p-3 bg-stone-50 hover:bg-amber-50/80 border border-stone-200 hover:border-amber-300 rounded-2xl text-left transition-all active:scale-98 flex items-center justify-between"
               >
                 <div>
                   <div className="flex items-center gap-1 text-stone-700 text-[11px] font-bold">
                     <History className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Ventas del Turno</span>
+                    <span>Turno: {shiftName.split(" ")[0]} ({cashierName})</span>
                   </div>
-                  <span className="text-sm font-black text-stone-800 mt-1 block">
-                    {recentSalesList.length} ventas
+                  <span className="text-sm font-black text-stone-900 mt-1 block">
+                    {recentSalesList.length} ventas realizadas
                   </span>
                 </div>
-                <span className="text-[10px] font-bold text-stone-600 bg-stone-200/70 px-2 py-1 rounded-lg">
-                  Ver
+                <span className="text-[10px] font-bold text-amber-950 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300">
+                  Cuentas & Relevo
                 </span>
               </button>
             </div>
@@ -1086,6 +1069,7 @@ export default function POSPage() {
         sales={recentSalesList}
         expenses={expensesList}
         products={products}
+        initialTab={shiftModalTab}
         onCompleteShiftCut={() => {
           setRecentSalesList([]);
           setExpensesList([]);
