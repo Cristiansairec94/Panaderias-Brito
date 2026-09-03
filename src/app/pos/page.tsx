@@ -463,70 +463,78 @@ export default function POSPage() {
             </div>
           </div>
 
-          {/* INLINE COLLAPSIBLE PRICE FILTER PANEL (Pushes Content Down, Never Covers Any Images) */}
-          {showCategoryDropdown && (
-            <div className="bg-white rounded-3xl border border-stone-200 p-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
-              <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">🏷️</span>
-                  <span className="text-xs font-black text-stone-900 uppercase tracking-wider">
-                    Filtrar por Grupo de Precio:
-                  </span>
-                  <span className="text-[10px] text-stone-400 font-bold">
-                    (12 grupos configurados)
-                  </span>
-                </div>
+          {/* INLINE COLLAPSIBLE PRICE FILTER PANEL (Ultra-Smooth Accordion Expansion) */}
+          <div
+            className={`grid transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+              showCategoryDropdown
+                ? "grid-rows-[1fr] opacity-100 mt-2"
+                : "grid-rows-[0fr] opacity-0 mt-0 pointer-events-none"
+            }`}
+          >
+            <div className="overflow-hidden min-h-0">
+              <div className="bg-white rounded-3xl border border-stone-200 p-4 shadow-sm space-y-3 transition-transform duration-300">
+                <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🏷️</span>
+                    <span className="text-xs font-black text-stone-900 uppercase tracking-wider">
+                      Filtrar por Grupo de Precio:
+                    </span>
+                    <span className="text-[10px] text-stone-400 font-bold">
+                      (12 grupos configurados)
+                    </span>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  {selectedCategory !== "all" && (
+                  <div className="flex items-center gap-2">
+                    {selectedCategory !== "all" && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCategory("all")}
+                        className="text-xs font-black text-amber-800 hover:text-amber-950 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 transition-colors"
+                      >
+                        Mostrar Todos los Precios
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => setSelectedCategory("all")}
-                      className="text-xs font-black text-amber-800 hover:text-amber-950 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 transition-colors"
+                      onClick={() => setShowCategoryDropdown(false)}
+                      className="p-1 px-2.5 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition-colors text-xs font-bold flex items-center gap-1"
                     >
-                      Mostrar Todos los Precios
+                      <ChevronUp className="w-4 h-4" />
+                      <span>Ocultar</span>
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowCategoryDropdown(false)}
-                    className="p-1 px-2.5 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition-colors text-xs font-bold flex items-center gap-1"
-                  >
-                    <ChevronUp className="w-4 h-4" />
-                    <span>Ocultar</span>
-                  </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Grid completo de las 12 opciones */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                {CATEGORIES.map((cat) => {
-                  const isSelected = selectedCategory === cat.id;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedCategory(cat.id);
-                        setShowCategoryDropdown(false);
-                      }}
-                      className={`p-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between active:scale-95 border ${
-                        isSelected
-                          ? "bg-amber-950 text-white font-black border-amber-900 shadow-md ring-2 ring-amber-500/30"
-                          : "bg-stone-50 hover:bg-amber-50/80 hover:border-amber-300 text-stone-700 border-stone-200"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-base shrink-0">{cat.icon}</span>
-                        <span className="truncate">{cat.label}</span>
-                      </div>
-                      {isSelected && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
-                    </button>
-                  );
-                })}
+                {/* Grid completo de las 12 opciones */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                  {CATEGORIES.map((cat) => {
+                    const isSelected = selectedCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCategory(cat.id);
+                          setShowCategoryDropdown(false);
+                        }}
+                        className={`p-2.5 rounded-2xl text-xs font-bold transition-all duration-200 flex items-center justify-between active:scale-95 border ${
+                          isSelected
+                            ? "bg-amber-950 text-white font-black border-amber-900 shadow-md ring-2 ring-amber-500/30 scale-[1.02]"
+                            : "bg-stone-50 hover:bg-amber-50/80 hover:border-amber-300 text-stone-700 border-stone-200 hover:scale-[1.02]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-base shrink-0">{cat.icon}</span>
+                          <span className="truncate">{cat.label}</span>
+                        </div>
+                        {isSelected && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* High-End Bakery Product Cards Grid */}
