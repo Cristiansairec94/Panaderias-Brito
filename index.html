@@ -906,29 +906,27 @@
           {/* CASH DRAWER & SHIFT MODAL */}
           {showDrawerModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[92vh]">
                 <div className="bg-amber-950 text-white p-4 px-6 flex items-center justify-between">
-                  <span className="font-bold text-sm">💰 Estado de Caja, Existencias & Turno</span>
+                  <div>
+                    <span className="font-bold text-sm block">💰 Corte de Caja & Cambio de Turno</span>
+                    <span className="text-[10px] text-amber-300">Arqueo financiero y entrega de cuentas</span>
+                  </div>
                   <button onClick={() => setShowDrawerModal(false)} className="text-xl font-bold hover:text-white">✕</button>
                 </div>
 
                 <div className="p-6 overflow-y-auto space-y-4">
                   {/* Operator & Shift */}
-                  <div className="flex gap-3 bg-stone-50 p-3 rounded-2xl border text-xs">
-                    <div className="flex-1">
-                      <label className="text-[10px] font-bold text-stone-500 block">Cajero en Turno:</label>
-                      <select value={cashierName} onChange={(e) => setCashierName(e.target.value)} className="p-1.5 border rounded-xl font-bold w-full bg-white">
-                        <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
-                        <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
-                        <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
-                        <option value="María Brito">María Brito</option>
-                      </select>
+                  <div className="grid grid-cols-2 gap-3 bg-stone-50 p-3 rounded-2xl border text-xs">
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 block">Cajero en Turno (Saliente):</label>
+                      <input value={cashierName} onChange={(e) => setCashierName(e.target.value)} className="p-2 border rounded-xl font-bold w-full bg-white text-xs" />
                     </div>
-                    <div className="flex-1">
-                      <label className="text-[10px] font-bold text-stone-500 block">Turno:</label>
-                      <select value={shiftName} onChange={(e) => setShiftName(e.target.value)} className="p-1.5 border rounded-xl font-bold w-full bg-white">
-                        <option value="Turno Matutino">Turno Matutino (06:00 - 14:00)</option>
-                        <option value="Turno Vespertino">Turno Vespertino (14:00 - 22:00)</option>
+                    <div>
+                      <label className="text-[10px] font-bold text-stone-500 block">Turno Activo:</label>
+                      <select value={shiftName} onChange={(e) => setShiftName(e.target.value)} className="p-2 border rounded-xl font-bold w-full bg-white text-xs">
+                        <option value="Turno Matutino (06:00 - 14:00)">Turno Matutino (06:00 - 14:00)</option>
+                        <option value="Turno Vespertino (14:00 - 22:00)">Turno Vespertino (14:00 - 22:00)</option>
                         <option value="Turno Completo">Turno Completo</option>
                       </select>
                     </div>
@@ -939,11 +937,11 @@
                     <div className="bg-amber-950 text-white p-4 rounded-2xl space-y-1 shadow-md">
                       <span className="text-[10px] text-amber-300 font-bold block uppercase">Dinero en Caja</span>
                       <p className="text-2xl font-black text-white">{formatCurrency(cashInDrawer)}</p>
-                      <p className="text-[9px] text-amber-200">Efectivo físico en cajón</p>
+                      <p className="text-[9px] text-amber-200">Efectivo en cajón</p>
                     </div>
 
                     <div className="bg-rose-900 text-white p-4 rounded-2xl space-y-1 shadow-md">
-                      <span className="text-[10px] text-rose-300 font-bold block uppercase">Dinero Gastado</span>
+                      <span className="text-[10px] text-rose-300 font-bold block uppercase">Gastos Turno</span>
                       <p className="text-2xl font-black text-white">{formatCurrency(totalExpenses)}</p>
                       <p className="text-[9px] text-rose-200">{expensesList.length} salidas</p>
                     </div>
@@ -951,27 +949,65 @@
                     <div className="bg-emerald-900 text-white p-4 rounded-2xl space-y-1 shadow-md">
                       <span className="text-[10px] text-emerald-300 font-bold block uppercase">En Existencia</span>
                       <p className="text-2xl font-black text-white">{formatCurrency(totalStockVal)}</p>
-                      <p className="text-[9px] text-emerald-200">{totalPiecesInStock} piezas en mostrador</p>
+                      <p className="text-[9px] text-emerald-200">{totalPiecesInStock} pzas en vitrina</p>
                     </div>
                   </div>
 
-                  {/* Detail */}
-                  <div className="p-4 bg-stone-50 rounded-2xl border space-y-2 text-xs">
-                    <span className="font-extrabold text-stone-800 block">Arqueo de Efectivo:</span>
+                  {/* Arqueo de Efectivo */}
+                  <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-2 text-xs">
+                    <span className="font-extrabold text-stone-800 block">Arqueo Financiero del Turno:</span>
                     <div className="flex justify-between"><span>🪙 Fondo de Caja Inicial:</span><span className="font-bold">{formatCurrency(initialCashFund)}</span></div>
                     <div className="flex justify-between text-emerald-800"><span>📈 (+) Ventas en Efectivo:</span><span className="font-bold">+{formatCurrency(totalCashSales)}</span></div>
                     <div className="flex justify-between text-rose-700"><span>🔻 (-) Salidas y Gastos:</span><span className="font-bold">-{formatCurrency(totalExpenses)}</span></div>
-                    <div className="flex justify-between text-sm font-black border-t pt-2 text-amber-900">
-                      <span>DINERO FÍSICO EN CAJÓN:</span>
+                    <div className="flex justify-between text-sm font-black border-t border-amber-200 pt-2 text-amber-900">
+                      <span>DINERO ESPERADO EN CAJÓN:</span>
                       <span>{formatCurrency(cashInDrawer)}</span>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-4 bg-white border-t flex justify-end">
-                  <button onClick={() => setShowDrawerModal(false)} className="px-6 py-2.5 bg-amber-600 text-white font-bold rounded-xl text-xs">
-                    Cerrar
-                  </button>
+                  {/* Relevo de Turno */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const form = e.target;
+                      const nextCashier = form.nextCashier.value;
+                      const nextShift = form.nextShift.value;
+                      const notes = form.notes.value;
+
+                      setCashierName(nextCashier);
+                      setShiftName(nextShift);
+                      setExpensesList([]);
+                      setSalesList([]);
+                      setShowDrawerModal(false);
+                      alert(`🏁 ¡Corte de Caja Exitoso!\n\nEntregó: ${cashierName}\nRecibió: ${nextCashier}\nTurno: ${nextShift}\nEfectivo en Caja: ${formatCurrency(cashInDrawer)}\n\nSe ha notificado al administrador.`);
+                    }}
+                    className="p-4 bg-stone-50 rounded-2xl border space-y-3 text-xs"
+                  >
+                    <span className="font-bold text-stone-800 block">🏁 Realizar Relevo & Entrega de Turno:</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-stone-500 block">Cajero Entrante (Recibe):</label>
+                        <select name="nextCashier" className="w-full p-2 border rounded-xl font-bold bg-white">
+                          <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
+                          <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
+                          <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
+                          <option value="María Brito">María Brito</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-stone-500 block">Turno Siguiente:</label>
+                        <select name="nextShift" className="w-full p-2 border rounded-xl font-bold bg-white">
+                          <option value="Turno Vespertino (14:00 - 22:00)">Turno Vespertino</option>
+                          <option value="Turno Matutino (06:00 - 14:00)">Turno Matutino</option>
+                        </select>
+                      </div>
+                    </div>
+                    <input name="notes" placeholder="Notas de entrega (ej. vitrina llena, todo en orden)..." className="w-full p-2 border rounded-xl" />
+                    
+                    <button type="submit" className="w-full py-3 bg-amber-950 hover:bg-black text-white font-black rounded-xl text-xs shadow-md">
+                      🏁 Finalizar Corte y Entregar Turno
+                    </button>
+                  </form>
                 </div>
               </div>
             </div>

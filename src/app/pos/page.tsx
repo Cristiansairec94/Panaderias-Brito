@@ -862,6 +862,10 @@ export default function POSPage() {
         sales={recentSalesList}
         expenses={expensesList}
         products={products}
+        onCompleteShiftCut={() => {
+          setRecentSalesList([]);
+          setExpensesList([]);
+        }}
       />
     </div>
   );
