@@ -16,10 +16,18 @@ import {
   ArrowUpRight
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
 
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/pos");
+  }, [router]);
+
   const { user } = useAuth();
   const { unreadCount } = useNotifications();
 
