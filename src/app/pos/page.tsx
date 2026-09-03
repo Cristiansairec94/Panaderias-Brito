@@ -112,7 +112,7 @@ export default function POSPage() {
   // Status
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showCategoryPanel, setShowCategoryPanel] = useState(true);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showOperationsMenu, setShowOperationsMenu] = useState(false);
 
   // Load and synchronize products with catalog
@@ -421,7 +421,7 @@ export default function POSPage() {
         <div className="sticky top-0 z-30 -mt-4 -mx-4 px-4 py-3 lg:-mt-5 lg:-mx-5 lg:px-5 lg:py-3.5 bg-stone-100 border-b border-stone-200/90 shadow-xs mb-5">
           <div className="flex items-center justify-between gap-3 w-full">
             {/* Buscador de Productos (Alineado y expandido con proporción limpia) */}
-            <div className="relative flex-1 max-w-2xl">
+            <div className="relative flex-1 max-w-xl">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
               <input
                 type="text"
@@ -438,6 +438,99 @@ export default function POSPage() {
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
+              )}
+            </div>
+
+            {/* Selector de Categorías y Precios (En un solo botón discreto) */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all active:scale-95 shadow-xs ${
+                  selectedCategory !== "all"
+                    ? "bg-[#2d1810] text-amber-50 border-amber-800 ring-2 ring-amber-600/30 font-black"
+                    : "bg-white hover:bg-stone-50 text-stone-800 border-stone-300/80"
+                }`}
+                title="Filtrar por categoría o precio"
+              >
+                <span className="text-sm">{activeCategory?.icon || "🧺"}</span>
+                <span className="font-extrabold truncate max-w-[140px]">
+                  {selectedCategory === "all" ? "Categorías y Precios" : activeCategory?.label}
+                </span>
+                {selectedCategory !== "all" && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCategory("all");
+                    }}
+                    className="w-4 h-4 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center text-[10px] font-black"
+                    title="Quitar filtro"
+                  >
+                    ✕
+                  </span>
+                )}
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showCategoryDropdown ? "rotate-180 text-amber-400" : "text-stone-400"}`} />
+              </button>
+
+              {/* Menú Desplegable Flotante de Categorías y Precios */}
+              {showCategoryDropdown && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowCategoryDropdown(false)}
+                  />
+                  <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-2.5 z-50 w-72 sm:w-80 bg-white/98 backdrop-blur-xl rounded-2xl p-3 border border-stone-200 shadow-2xl space-y-1.5 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between px-2 pb-2 border-b border-stone-100 text-stone-500 text-[11px] font-bold uppercase tracking-wider">
+                      <div className="flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Categorías y Precios</span>
+                      </div>
+                      <button
+                        onClick={() => setShowCategoryDropdown(false)}
+                        className="hover:text-stone-800 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+                      {CATEGORIES.map((cat) => {
+                        const isSelected = selectedCategory === cat.id;
+                        const count = cat.id === "all"
+                          ? products.length
+                          : products.filter((p) => p.category === cat.id || p.id === cat.id).length;
+
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategory(cat.id);
+                              setShowCategoryDropdown(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all text-left ${
+                              isSelected
+                                ? "bg-[#2d1810] text-amber-50 font-black shadow-xs"
+                                : "hover:bg-amber-50/80 text-stone-700"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="text-base shrink-0">{cat.icon}</span>
+                              <span className="truncate">{cat.label}</span>
+                            </div>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ml-2 ${
+                              isSelected
+                                ? "bg-amber-500 text-stone-950 font-black"
+                                : "bg-stone-100 text-stone-500"
+                            }`}>
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
@@ -597,103 +690,7 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Fila 2: Tarjeta CATEGORÍAS Y PRECIOS (En flujo normal, empuja hacia abajo y NUNCA tapa las imágenes) */}
-        <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-stone-200 shadow-xs space-y-2.5 mb-5 shrink-0">
-            {/* Cabecera */}
-            <div className="flex items-center justify-between pb-2 border-b border-stone-100">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-amber-600" />
-                <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider">
-                  Categorías y Precios
-                </h3>
-                {selectedCategory !== "all" && (
-                  <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-                    Filtro activo: {activeCategory?.label}
-                  </span>
-                )}
-              </div>
 
-              <div className="flex items-center gap-2">
-                {selectedCategory !== "all" && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCategory("all")}
-                    className="text-xs font-black text-amber-900 hover:text-amber-950 px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors"
-                  >
-                    Mostrar Todos los Precios
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowCategoryPanel(!showCategoryPanel)}
-                  className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
-                >
-                  {showCategoryPanel ? "Ocultar" : "Mostrar"}
-                </button>
-              </div>
-            </div>
-
-            {/* Cuadrícula de 12 Botones */}
-            {showCategoryPanel && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                {CATEGORIES.map((cat) => {
-                  const isSelected = selectedCategory === cat.id;
-                  const count = cat.id === "all"
-                    ? products.length
-                    : products.filter((p) => p.category === cat.id || p.id === cat.id).length;
-
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        if (isSelected && cat.id !== "all") {
-                          setSelectedCategory("all");
-                        } else {
-                          setSelectedCategory(cat.id);
-                        }
-                      }}
-                      className={`relative px-3 py-2 rounded-2xl text-xs font-bold transition-all duration-150 flex items-center justify-between border active:scale-95 ${
-                        isSelected
-                          ? "bg-[#2d1810] text-amber-50 shadow-md shadow-amber-950/20 font-black border-2 border-amber-500 ring-2 ring-amber-700/30"
-                          : "bg-stone-50/80 hover:bg-amber-50/90 hover:border-amber-300 text-stone-800 border-stone-200/90"
-                      }`}
-                    >
-                      {/* Icono + Nombre y Precio */}
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-base shrink-0">{cat.icon}</span>
-                        <span className="truncate font-bold">{cat.label}</span>
-                      </div>
-
-                      {/* Badge de Conteo y botón X si está seleccionado */}
-                      <div className="flex items-center gap-1 shrink-0 ml-1">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                          isSelected
-                            ? "bg-amber-500 text-stone-950"
-                            : "bg-stone-200/90 text-stone-600"
-                        }`}>
-                          {count}
-                        </span>
-
-                        {isSelected && cat.id !== "all" && (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedCategory("all");
-                            }}
-                            title="Quitar filtro"
-                            className="w-4 h-4 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-[10px] ml-0.5"
-                          >
-                            <X className="w-2.5 h-2.5 stroke-[3]" />
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
 
         {/* Bakery Product Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12">
