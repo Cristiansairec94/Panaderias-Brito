@@ -92,7 +92,7 @@ export default function Home() {
             </span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-            ¡Bienvenido {getFriendlyName(user?.name)}! 🥖
+            ¡Bienvenido a la Panadería de Toño! 🥖
           </h2>
           <p className="text-stone-300 mt-1.5 text-xs max-w-xl leading-relaxed">
             Panel central de <strong className="text-orange-400">Panaderías Brito</strong>. Administra ventas en mostrador, flujo de turnos por sucursal, clientes e inventario en tiempo real.

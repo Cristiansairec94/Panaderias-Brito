@@ -6,7 +6,7 @@ import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles,
 import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
 
 export default function LoginForm() {
-  const { login } = useAuth();
+  const { login, verifyCredentials } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -38,9 +38,13 @@ export default function LoginForm() {
     setIsLoading(true);
 
     setTimeout(() => {
-      const res = login(identifier, password, rememberMe);
+      const res = verifyCredentials(identifier, password);
       if (res.success && res.user) {
         setWelcomeUser(res.user);
+        // Mostrar el mensaje de bienvenida 2 segundos antes de ingresar a la app
+        setTimeout(() => {
+          login(identifier, password, rememberMe);
+        }, 2000);
       } else {
         setError(res.message || "Usuario o contraseña incorrectos. Intenta de nuevo.");
         setIsLoading(false);
@@ -58,29 +62,34 @@ export default function LoginForm() {
       <div className="max-w-[480px] w-full bg-[#16161c]/95 backdrop-blur-2xl rounded-[40px] shadow-2xl shadow-black/80 overflow-hidden border border-amber-500/20 relative z-10 animate-in fade-in zoom-in-95 duration-500">
         
         {welcomeUser ? (
-          /* Personalized Welcome Screen Animation */
-          <div className="p-12 text-center space-y-6 animate-in zoom-in-90 fade-in duration-300">
+          /* Personalized Welcome Screen Animation: Bienvenido a la Panaderia de Tono */
+          <div className="p-10 sm:p-12 text-center space-y-6 animate-in zoom-in-95 fade-in duration-400">
             <div className="relative inline-flex items-center justify-center">
-              <div className="absolute inset-0 bg-amber-500/40 rounded-full blur-2xl animate-ping" />
-              <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center text-6xl shadow-2xl shadow-orange-500/50 border-4 border-amber-300/60 relative z-10 animate-bounce">
-                {welcomeUser.avatar || "🥖"}
+              <div className="absolute inset-0 bg-amber-500/40 rounded-full blur-3xl animate-ping" />
+              <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 text-white flex items-center justify-center text-6xl shadow-2xl shadow-orange-500/50 border-4 border-amber-300/80 relative z-10 animate-bounce">
+                {welcomeUser.avatar || "👨‍🍳"}
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <span className="px-4 py-1.5 bg-amber-500/20 border border-amber-400/40 text-amber-300 rounded-full text-xs font-black uppercase tracking-wider inline-flex items-center gap-1.5 shadow-sm">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Acceso Autorizado
               </span>
-              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                ¡Bienvenido {getFriendlyName(welcomeUser.name)}!
+              
+              <h2 className="text-3xl sm:text-4xl font-black text-amber-400 tracking-tight leading-tight">
+                ¡Bienvenido a la Panadería de Toño! 🥖
               </h2>
-              <p className="text-xs text-stone-300 font-medium">
-                Abriendo tu área de trabajo en <strong className="text-amber-400">Panaderías Brito</strong>...
+              
+              <p className="text-sm text-stone-200 font-medium max-w-sm mx-auto">
+                Hola, <strong className="text-white font-bold">{welcomeUser.name}</strong>. Accediendo al sistema en tiempo real...
               </p>
             </div>
 
-            <div className="flex justify-center pt-3">
-              <div className="w-9 h-9 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
+            <div className="flex flex-col items-center gap-2.5 pt-2">
+              <div className="w-10 h-10 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-[11px] font-bold text-amber-400/90 tracking-wider uppercase animate-pulse">
+                Iniciando sesión...
+              </span>
             </div>
           </div>
         ) : (

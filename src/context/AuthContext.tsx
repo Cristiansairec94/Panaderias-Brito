@@ -143,6 +143,7 @@ interface AuthContextType {
   usersList: User[];
   permissions: RolePermissions;
   login: (email: string, pass: string, rememberMe?: boolean) => { success: boolean; message?: string; user?: User };
+  verifyCredentials: (email: string, pass: string) => { success: boolean; message?: string; user?: User };
   loginAs: (user: User) => void;
   logout: () => void;
   hasPermission: (permission: keyof RolePermissions) => boolean;
@@ -302,6 +303,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true, user: found };
   };
 
+  const verifyCredentials = (identifier: string, pass: string) => {
+    const clean = identifier.trim().toLowerCase();
+    const cleanPass = pass.trim();
+
+    // Fast-path: usuario 'admin' y contraseña 'admin'
+    if (clean === "admin" && cleanPass === "admin") {
+      const adminUser = usersList.find((u) => u.role === "admin") || DEMO_USERS[0];
+      return { success: true, user: adminUser };
+    }
+
+    const found = usersList.find((u) => {
+      const email = u.email.toLowerCase();
+      const username = u.username?.toLowerCase();
+      const name = u.name.toLowerCase();
+
+      if (email === clean) return true;
+      if (username && username === clean) return true;
+      if (name.includes(clean)) return true;
+
+      // Friendly alias checks
+      if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
+      if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
+      if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
+      if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
+
+      return false;
+    });
+
+    if (!found) {
+      return { success: false, message: "Usuario no encontrado. Ingresa tu usuario o correo." };
+    }
+
+    if (found.password && found.password !== cleanPass) {
+      return { success: false, message: "Contraseña incorrecta. Por favor verifica tus datos." };
+    }
+
+    return { success: true, user: found };
+  };
+
   const loginAs = (demoUser: User) => {
     setUser(demoUser);
     localStorage.setItem("brito_user", JSON.stringify(demoUser));
@@ -316,7 +356,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const addUser = (newUser: User) => {
     const updated = [...usersList, newUser];
     setUsersList(updated);
-    localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+    try {
+      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+    } catch (e) {
+      console.error("Error saving custom user:", e);
+    }
   };
 
   return (
@@ -326,6 +370,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         usersList,
         permissions,
         login,
+        verifyCredentials,
         loginAs,
         logout,
         hasPermission,
