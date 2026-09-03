@@ -2,146 +2,173 @@ import { Product } from "@/types";
 
 export const DEFAULT_PRODUCTS: Product[] = [
   {
-    id: "prod-dulce-10",
-    name: "Dulce",
-    price: 10,
-    category: "dulce_10",
-    icon: "🥐",
-    stock: 150,
-    tag: "Pan Dulce",
-    description: "Conchas chicas, donas, orejas, polvorones, banderillas, moños y pan dulce tradicional.",
+    id: "prod-1",
+    name: "Concha de Vainilla",
+    price: 12,
+    category: "pan_dulce",
+    icon: "🥖",
+    stock: 50,
+    tag: "Tradicional",
+    description: "Esponjosa y suave con costra crujiente de azúcar y vainilla natural.",
     image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-bolillo-3",
-    name: "Bolillo",
-    price: 3,
-    category: "bolillo_3",
-    icon: "🍞",
-    stock: 300,
-    tag: "Recién Horneado",
-    description: "Bolillo tradicional crujiente de horno caliente con migajón esponjoso.",
-    image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-telera-350",
-    name: "Telera",
-    price: 3.50,
-    category: "telera_350",
-    icon: "🥪",
-    stock: 200,
-    tag: "Para Tortas",
-    description: "Telera suave y dorada en tres secciones, clásica para tortas mexicanas.",
-    image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-dulce-12",
-    name: "Dulce",
+    id: "prod-2",
+    name: "Concha de Chocolate",
     price: 12,
-    category: "dulce_12",
+    category: "pan_dulce",
     icon: "🍫",
-    stock: 120,
-    tag: "Especial",
-    description: "Conchas grandes especiales, cuernitos de mantequilla, rehiletes, trenzas y chocolatines.",
+    stock: 40,
+    tag: "Favorito",
+    description: "Masa fina aromatizada con cacao selecto y cubierta crujiente chocolatosa.",
     image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-rollos-15",
-    name: "Rollos",
+    id: "prod-3",
+    name: "Cuerno de Mantequilla",
     price: 15,
-    category: "rollos_15",
-    icon: "🥨",
-    stock: 75,
-    tag: "Glaseado",
-    description: "Rollos de canela glaseados, rollos de crema pastelera, mermelada de fresa y nuez.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-strudel-18",
-    name: "Strudel",
-    price: 18,
-    category: "strudel_18",
-    icon: "🥧",
-    stock: 50,
-    tag: "Hojaldrado",
-    description: "Strudel fino hojaldrado relleno de manzana horneada con canela, nuez o piña.",
+    category: "pan_dulce",
+    icon: "🥐",
+    stock: 30,
+    tag: "Artesanal",
+    description: "Hojaldre 100% mantequilla pura de vaca, dorado y crujiente por capas.",
     image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-pambazo-4",
-    name: "Pambazo",
-    price: 4,
-    category: "pambazo_4",
-    icon: "🥖",
-    stock: 180,
-    tag: "Tradicional",
-    description: "Pan de pambazo suave tradicional para enchilar y rellenar de papa y chorizo.",
+    id: "prod-4",
+    name: "Bolillo Tradicional",
+    price: 5,
+    category: "pan_blanco",
+    icon: "🍞",
+    stock: 150,
+    tag: "Recién Salido",
+    description: "Corteza dorada crujiente y migajón esponjoso, horneado en piso de piedra.",
+    image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-5",
+    name: "Telera para Torta",
+    price: 6,
+    category: "pan_blanco",
+    icon: "🥪",
+    stock: 100,
+    tag: "De la Casa",
+    description: "Pan suave y dorado en tres secciones, el clásico para tortas mexicanas.",
+    image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-6",
+    name: "Oreja Hojaldrada",
+    price: 14,
+    category: "pan_dulce",
+    icon: "🥨",
+    stock: 35,
+    tag: "Crujiente",
+    description: "Hojaldre finamente caramelizado al horno con mantequilla y azúcar.",
     image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-pastes-20",
-    name: "Pastes",
-    price: 20,
-    category: "pastes_20",
-    icon: "🥟",
-    stock: 60,
-    tag: "Artesanal",
-    description: "Paste tradicional horneado de papa con carne molida, frijol con queso o tinga.",
-    image: "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800&auto=format&fit=crop&q=80"
+    id: "prod-7",
+    name: "Dona Glaseada",
+    price: 13,
+    category: "pan_dulce",
+    icon: "🍩",
+    stock: 30,
+    tag: "Más Vendido",
+    description: "Masa esponjada frita a punto exacto con glaseado clásico brillante.",
+    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-pizza-20",
-    name: "Rebanada de pizza",
-    price: 20,
-    category: "pizza_20",
-    icon: "🍕",
-    stock: 45,
-    tag: "Al Horno",
-    description: "Rebanada de pizza panadera crujiente con salsa de tomate, queso y pepperoni.",
-    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "prod-pay-25",
-    name: "Rebanada de pay",
-    price: 25,
-    category: "pay_25",
+    id: "prod-8",
+    name: "Rebanada Pastel 3 Leches",
+    price: 45,
+    category: "pasteleria",
     icon: "🍰",
-    stock: 40,
-    tag: "Repostería",
-    description: "Rebanada de pay de queso con zarzamora, limón, piña o nuez sobre costra de galleta.",
+    stock: 20,
+    tag: "Gourmet",
+    description: "Bizcocho húmedo bañado en infusión de tres leches y fresa fresca.",
+    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-9",
+    name: "Pay de Queso con Zarzamora",
+    price: 40,
+    category: "pasteleria",
+    icon: "🥧",
+    stock: 15,
+    tag: "Especialidad",
+    description: "Base crujiente de galleta con suave crema de queso y zarzamora silvestre.",
     image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80"
   },
   {
-    id: "prod-cuerno-65",
-    name: "Cuerno grande",
-    price: 65,
-    category: "cuerno_65",
-    icon: "🥐",
+    id: "prod-10",
+    name: "Café de Olla Caliente",
+    price: 25,
+    category: "bebidas",
+    icon: "☕",
+    stock: 60,
+    tag: "Calientito",
+    description: "Café de grano selecto colado con canela criolla y toque de piloncillo.",
+    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-11",
+    name: "Chocolate Caliente con Leche",
+    price: 30,
+    category: "bebidas",
+    icon: "🍫",
+    stock: 40,
+    tag: "Tradición",
+    description: "Tablelilla artesanal espumada en jarra con leche entera caliente.",
+    image: "https://images.unsplash.com/photo-1542990253-0d0f5be5f0ed?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-12",
+    name: "Empanada de Calabaza",
+    price: 18,
+    category: "temporada",
+    icon: "🥟",
     stock: 25,
-    tag: "Familiar",
-    description: "Cuerno gigante hojaldrado 100% mantequilla pura de vaca (tamaño familiar).",
-    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
+    tag: "Rellena",
+    description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-13",
+    name: "Leche Entera 1L",
+    price: 28,
+    category: "abarrotes",
+    icon: "🥛",
+    stock: 40,
+    tag: "Abarrote",
+    description: "Leche pasteurizada entera fresca de primera calidad.",
+    image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "prod-14",
+    name: "Harina de Trigo San Antonio 1kg",
+    price: 22,
+    category: "materia_prima",
+    icon: "🌾",
+    stock: 80,
+    tag: "Insumo",
+    description: "Harina de trigo de alta fuerza ideal para panificación tradicional.",
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
   }
 ];
 
 export const PRODUCT_CATEGORIES = [
-  { id: "all", label: "Todo", priceTag: "", icon: "🧺" },
-  { id: "bolillo_3", label: "Bolillo", priceTag: "", icon: "🍞" },
-  { id: "telera_350", label: "Telera", priceTag: "", icon: "🥪" },
-  { id: "pambazo_4", label: "Pambazo", priceTag: "", icon: "🥖" },
-  { id: "dulce_10", label: "Pan Dulce", priceTag: "", icon: "🥐" },
-  { id: "dulce_12", label: "Dulce Especial", priceTag: "", icon: "🍫" },
-  { id: "rollos_15", label: "Rollos", priceTag: "", icon: "🥨" },
-  { id: "strudel_18", label: "Strudel", priceTag: "", icon: "🥧" },
-  { id: "pastes_20", label: "Pastes", priceTag: "", icon: "🥟" },
-  { id: "pizza_20", label: "Pizza", priceTag: "", icon: "🍕" },
-  { id: "pay_25", label: "Pay", priceTag: "", icon: "🍰" },
-  { id: "cuerno_65", label: "Cuerno", priceTag: "", icon: "🥐" },
+  { id: "all", label: "Todas las Categorías", priceTag: "", icon: "🧺" },
+  { id: "pan_dulce", label: "Pan Dulce Tradicional", priceTag: "", icon: "🥖" },
+  { id: "pan_blanco", label: "Bolillo & Telera", priceTag: "", icon: "🍞" },
+  { id: "pasteleria", label: "Pastelería & Pays", priceTag: "", icon: "🍰" },
+  { id: "bebidas", label: "Cafetería & Bebidas", priceTag: "", icon: "☕" },
+  { id: "temporada", label: "Especiales de Temporada", priceTag: "", icon: "✨" },
   { id: "abarrotes", label: "Abarrotes", priceTag: "", icon: "🥫" },
   { id: "materia_prima", label: "Materia Prima", priceTag: "", icon: "🌾" },
 ];
 
-const STORAGE_KEY = "brito_products_v3";
+const STORAGE_KEY = "brito_products_v4";
 
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") {
@@ -155,7 +182,7 @@ export function getStoredProducts(): Product[] {
       return DEFAULT_PRODUCTS;
     }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.some(p => p.id === "prod-dulce-10")) {
+    if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.some(p => p.id === "prod-1")) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
       return DEFAULT_PRODUCTS;
     }

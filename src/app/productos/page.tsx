@@ -202,28 +202,6 @@ export default function ProductosPage() {
 
   const getCategoryBadge = (cat: Product["category"]) => {
     switch (cat) {
-      case "bolillo_3":
-        return { label: "Bolillo", color: "bg-amber-100 text-amber-900 border-amber-300" };
-      case "telera_350":
-        return { label: "Telera", color: "bg-orange-100 text-orange-900 border-orange-300" };
-      case "pambazo_4":
-        return { label: "Pambazo", color: "bg-stone-100 text-stone-900 border-stone-300" };
-      case "dulce_10":
-        return { label: "Pan Dulce", color: "bg-yellow-100 text-yellow-900 border-yellow-300" };
-      case "dulce_12":
-        return { label: "Dulce Especial", color: "bg-amber-100 text-amber-900 border-amber-300" };
-      case "rollos_15":
-        return { label: "Rollos", color: "bg-orange-100 text-orange-900 border-orange-300" };
-      case "strudel_18":
-        return { label: "Strudel", color: "bg-rose-100 text-rose-900 border-rose-300" };
-      case "pastes_20":
-        return { label: "Pastes", color: "bg-emerald-100 text-emerald-900 border-emerald-300" };
-      case "pizza_20":
-        return { label: "Pizza", color: "bg-red-100 text-red-900 border-red-300" };
-      case "pay_25":
-        return { label: "Pay", color: "bg-pink-100 text-pink-900 border-pink-300" };
-      case "cuerno_65":
-        return { label: "Cuerno", color: "bg-amber-100 text-amber-900 border-amber-300" };
       case "pan_dulce":
         return { label: "Pan Dulce", color: "bg-amber-100 text-amber-900 border-amber-300" };
       case "pan_blanco":
@@ -737,17 +715,6 @@ export default function ProductosPage() {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
                     className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   >
-                    <option value="bolillo_3">🍞 Bolillo</option>
-                    <option value="telera_350">🥪 Telera</option>
-                    <option value="pambazo_4">🥖 Pambazo</option>
-                    <option value="dulce_10">🥐 Pan Dulce</option>
-                    <option value="dulce_12">🍫 Dulce Especial</option>
-                    <option value="rollos_15">🥨 Rollos</option>
-                    <option value="strudel_18">🥧 Strudel</option>
-                    <option value="pastes_20">🥟 Pastes</option>
-                    <option value="pizza_20">🍕 Pizza</option>
-                    <option value="pay_25">🍰 Pay</option>
-                    <option value="cuerno_65">🥐 Cuerno</option>
                     <option value="pan_dulce">🥖 Pan Dulce Tradicional</option>
                     <option value="pan_blanco">🍞 Bolillo & Telera</option>
                     <option value="pasteleria">🍰 Pastelería & Pays</option>
