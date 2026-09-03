@@ -209,23 +209,23 @@ export default function CashDrawerShiftModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200">
         {/* Header Modal */}
-        <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-5 px-6 flex items-center justify-between border-b border-amber-900/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-amber-600/90 rounded-2xl shadow-inner">
-              <Coins className="w-6 h-6 text-white" />
+        <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-5 sm:p-6 px-6 sm:px-8 flex items-center justify-between border-b border-amber-900/50 shadow-md">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-amber-500/30">
+              <Coins className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h2 className="font-black text-lg leading-tight">Cierre de Turno & Entrega de Caja</h2>
-              <p className="text-xs text-amber-300 font-medium">
+              <h2 className="font-black text-xl sm:text-2xl leading-tight text-white tracking-wide">Cierre de Turno & Entrega de Caja</h2>
+              <p className="text-xs sm:text-sm text-amber-300 font-bold mt-0.5">
                 Confirmación de arqueo sin detalles en caja y entrega conforme al relevo
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2.5 rounded-2xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
@@ -328,43 +328,44 @@ export default function CashDrawerShiftModal({
             /* UN SOLO APARTADO SIMPLE Y DIRECTO (SIN PESTAÑAS) */
             <div className="space-y-3">
               {/* 1. Resumen Financiero del Turno en 1 Sola Franja */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-stone-50 rounded-2xl border border-stone-200 text-xs">
-                <div>
-                  <span className="text-[10px] text-stone-500 font-bold block uppercase">Fondo Inicial</span>
-                  <span className="text-sm font-black text-stone-900">{formatCurrency(initialFund)}</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs">
+                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                  <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
+                  <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(initialFund)}</span>
                 </div>
-                <div>
-                  <span className="text-[10px] text-emerald-700 font-bold block uppercase">(+) Ventas</span>
-                  <span className="text-sm font-black text-emerald-700">+{formatCurrency(cashSales)}</span>
+                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                  <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
+                  <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(cashSales)}</span>
                 </div>
-                <div>
-                  <span className="text-[10px] text-rose-700 font-bold block uppercase">(-) Gastos</span>
-                  <span className="text-sm font-black text-rose-700">-{formatCurrency(totalExpenses)}</span>
+                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                  <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos</span>
+                  <span className="text-xl sm:text-2xl font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
                 </div>
-                <div className="bg-amber-100/80 px-2 py-1 rounded-xl border border-amber-300">
-                  <span className="text-[10px] text-amber-950 font-black block uppercase">En Caja</span>
-                  <span className="text-sm font-black text-amber-950">{formatCurrency(expectedCashInDrawer)}</span>
+                <div className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20">
+                  <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">En Caja</span>
+                  <span className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(expectedCashInDrawer)}</span>
                 </div>
               </div>
+
               {/* 1. Relevo Directo: Quién Entrega y Quién Recibe */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 bg-stone-50 rounded-2xl border border-stone-200 text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-black text-rose-700 uppercase shrink-0">
-                    👤 Entrega:
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-stone-50 rounded-3xl border-2 border-stone-200">
+                <div className="flex items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-stone-200/90 shadow-xs">
+                  <span className="font-black text-rose-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
+                    <span className="text-base">👤</span> Entrega:
                   </span>
-                  <div className="p-2 bg-white rounded-xl border font-black text-stone-900 text-xs truncate flex-1 text-right">
+                  <div className="font-black text-stone-900 text-sm sm:text-base truncate flex-1 text-right">
                     {outgoingCashier} ({shiftName.split(" ")[0]})
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-black text-emerald-700 uppercase shrink-0">
-                    👤 Recibe:
+                <div className="flex items-center justify-between gap-3 bg-white p-2 sm:p-2.5 rounded-2xl border-2 border-emerald-400 shadow-xs">
+                  <span className="font-black text-emerald-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5 pl-2">
+                    <span className="text-base">👤</span> Recibe:
                   </span>
                   <select
                     value={incomingCashier}
                     onChange={(e) => setIncomingCashier(e.target.value)}
-                    className="p-2 bg-white border-2 border-emerald-400 rounded-xl font-black text-stone-900 text-xs focus:outline-none flex-1 shadow-xs"
+                    className="p-2 bg-transparent font-black text-stone-900 text-sm sm:text-base focus:outline-none flex-1 text-right cursor-pointer"
                   >
                     <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
                     <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
@@ -376,40 +377,41 @@ export default function CashDrawerShiftModal({
               </div>
 
               {/* 2. Verificación de Dinero en Caja (Resumido y Claro) */}
-              <div className="p-3.5 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-2.5">
-                <div className="flex items-center justify-between">
+              <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-50 via-orange-50/50 to-amber-100/60 rounded-3xl border-2 border-amber-300 shadow-sm space-y-3.5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                   <div>
-                    <span className="text-xs font-black text-stone-900 uppercase block">
-                      💵 Dinero que debe haber en caja:
+                    <span className="text-sm sm:text-base font-black text-stone-900 uppercase flex items-center gap-2">
+                      <span className="text-xl">💵</span> Dinero que debe haber en caja:
                     </span>
-                    <span className="text-[11px] text-stone-600 font-bold">
+                    <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
                       Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)} • Gastos: -{formatCurrency(totalExpenses)}
                     </span>
                   </div>
-                  <span className="text-2xl font-black text-amber-950 bg-amber-200/90 px-3.5 py-1 rounded-xl">
+                  <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">
                     {formatCurrency(expectedCashInDrawer)}
                   </span>
                 </div>
 
-                {/* Conteo Rápido: Botón 1 Toque o Input Manual en 1 fila */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                {/* Conteo Rápido: Botón 1 Toque o Input Manual */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <button
                     type="button"
                     onClick={() => {
                       setCountedCash(expectedCashInDrawer.toString());
                       setHasAcceptedCash(true);
                     }}
-                    className={`py-2.5 px-3 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95 ${
+                    className={`py-4 px-5 rounded-2xl font-black text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2.5 shadow-md active:scale-95 group relative overflow-hidden ${
                       countedCash === expectedCashInDrawer.toString() && hasAcceptedCash
-                        ? "bg-amber-700 text-white ring-2 ring-amber-400"
-                        : "bg-amber-600 hover:bg-amber-700 text-white"
+                        ? "bg-gradient-to-r from-amber-700 to-orange-700 text-white ring-4 ring-amber-400/40 shadow-lg scale-[1.01]"
+                        : "bg-gradient-to-r from-amber-600 via-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white hover:scale-[1.02] hover:shadow-lg"
                     }`}
                   >
-                    <span>⚡ El dinero está completo ({formatCurrency(expectedCashInDrawer)})</span>
+                    <span className="text-xl group-hover:scale-125 group-hover:rotate-12 transition-transform duration-300">⚡</span>
+                    <span className="tracking-wide">El dinero está completo ({formatCurrency(expectedCashInDrawer)})</span>
                   </button>
 
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-sm text-stone-500">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
                     <input
                       type="number"
                       step="any"
@@ -419,35 +421,35 @@ export default function CashDrawerShiftModal({
                         setCountedCash(e.target.value);
                         setHasAcceptedCash(true);
                       }}
-                      className="w-full pl-7 pr-3 py-2 bg-white rounded-xl border-2 border-stone-300 focus:border-amber-600 font-black text-sm text-stone-900 focus:outline-none"
+                      className="w-full pl-9 pr-4 py-4 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base sm:text-lg text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
                     />
                   </div>
                 </div>
 
                 {/* Dictamen y Confirmación del Cierre de Turno */}
                 {countedCash && (
-                  <div className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 text-xs ${
+                  <div className={`p-4 rounded-2xl border-2 transition-all duration-300 flex items-center justify-between gap-3 shadow-sm animate-in fade-in zoom-in-95 ${
                     cashDifference === 0
-                      ? "bg-emerald-50 text-emerald-950 border-emerald-400 shadow-xs"
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-400"
                       : cashDifference > 0
                       ? "bg-blue-50 text-blue-950 border-blue-400"
                       : "bg-rose-50 text-rose-950 border-rose-400"
                   }`}>
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-xs ${
-                        cashDifference === 0 ? "bg-emerald-600 text-white" : cashDifference > 0 ? "bg-blue-600 text-white" : "bg-rose-600 text-white"
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-base shrink-0 shadow-md ${
+                        cashDifference === 0 ? "bg-emerald-600 text-white animate-bounce" : cashDifference > 0 ? "bg-blue-600 text-white" : "bg-rose-600 text-white"
                       }`}>
                         {cashDifference === 0 ? "✓" : "!"}
                       </div>
                       <div className="min-w-0">
-                        <span className="font-black block text-xs sm:text-sm">
+                        <span className="font-black block text-sm sm:text-base leading-tight">
                           {cashDifference === 0
                             ? "🟢 Cierre de Turno Conforme: Todo está bien y no hay detalles en caja"
                             : cashDifference > 0
                             ? "🟡 Detalle en Cierre: Sobrante detectado en caja"
                             : "🔴 Detalle en Cierre: Faltante detectado en caja"}
                         </span>
-                        <span className={`text-[11px] font-semibold block ${
+                        <span className={`text-xs sm:text-sm font-bold block mt-0.5 ${
                           cashDifference === 0 ? "text-emerald-800" : cashDifference > 0 ? "text-blue-800" : "text-rose-800"
                         }`}>
                           {cashDifference === 0
@@ -456,8 +458,8 @@ export default function CashDrawerShiftModal({
                         </span>
                       </div>
                     </div>
-                    <span className={`shrink-0 px-2.5 py-1 rounded-lg font-black text-[11px] uppercase tracking-wide ${
-                      cashDifference === 0 ? "bg-emerald-200 text-emerald-900" : cashDifference > 0 ? "bg-blue-200 text-blue-900" : "bg-rose-200 text-rose-900"
+                    <span className={`shrink-0 px-3.5 py-1.5 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wide shadow-xs ${
+                      cashDifference === 0 ? "bg-emerald-200 text-emerald-950 border border-emerald-300" : cashDifference > 0 ? "bg-blue-200 text-blue-900" : "bg-rose-200 text-rose-900"
                     }`}>
                       {cashDifference === 0 ? "Sin Detalles ✓" : formatCurrency(cashDifference)}
                     </span>
@@ -466,16 +468,20 @@ export default function CashDrawerShiftModal({
               </div>
 
               {/* 3. Casilla de Confirmación y Botón Final de Cierre de Turno */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2.5 px-3.5 py-2.5 bg-amber-50/90 rounded-2xl border-2 border-amber-300 cursor-pointer select-none">
+              <div className="space-y-3 pt-1">
+                <label className={`flex items-center gap-3.5 p-4 sm:p-4.5 rounded-2xl sm:rounded-3xl border-2 cursor-pointer select-none transition-all duration-300 ${
+                  hasAcceptedCash
+                    ? "bg-emerald-50/90 border-emerald-400 shadow-md ring-2 ring-emerald-500/20"
+                    : "bg-amber-50/90 border-amber-300 hover:border-amber-400"
+                }`}>
                   <input
                     type="checkbox"
                     checked={hasAcceptedCash}
                     onChange={(e) => setHasAcceptedCash(e.target.checked)}
-                    className="w-4 h-4 rounded accent-amber-700 cursor-pointer shrink-0"
+                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg accent-emerald-600 cursor-pointer shrink-0 transition-transform active:scale-90"
                   />
-                  <span className="text-xs font-bold text-stone-900 leading-snug">
-                    Confirmo el <strong>Cierre de Turno</strong>: todo está bien, conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y no hay detalles pendientes en caja.
+                  <span className="text-sm sm:text-base font-black text-stone-900 leading-snug">
+                    Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: todo está bien, conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y no hay detalles pendientes en caja.
                   </span>
                 </label>
 
@@ -483,9 +489,13 @@ export default function CashDrawerShiftModal({
                   type="button"
                   onClick={handleExecuteShiftCut}
                   disabled={!countedCash || !hasAcceptedCash || isFinalizing}
-                  className="w-full py-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black rounded-2xl text-sm sm:text-base shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2.5"
+                  className={`w-full py-5 px-6 rounded-2xl sm:rounded-3xl font-black text-base sm:text-lg tracking-wide shadow-xl transition-all duration-300 flex items-center justify-center gap-3 group active:scale-98 ${
+                    !countedCash || !hasAcceptedCash || isFinalizing
+                      ? "bg-stone-300 text-stone-500 cursor-not-allowed opacity-60"
+                      : "bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-emerald-700/30 hover:shadow-2xl hover:scale-[1.01] animate-pulse"
+                  }`}
                 >
-                  <CheckCircle2 className="w-5 h-5 text-emerald-200 shrink-0" />
+                  <CheckCircle2 className="w-6 h-6 text-emerald-200 shrink-0 group-hover:scale-125 transition-transform duration-300" />
                   <span>
                     {isFinalizing ? "Cerrando Turno..." : `🔒 CERRAR TURNO Y ENTREGAR CAJA (${incomingCashier}) ➔`}
                   </span>
