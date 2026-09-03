@@ -205,9 +205,11 @@ export default function CashDrawerShiftModal({
     window.print();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[92vh] border-2 border-amber-900/30">
         {/* Header Modal */}
         <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-5 sm:p-6 px-6 sm:px-8 flex items-center justify-between border-b border-amber-900/50 shadow-md">
           <div className="flex items-center gap-3.5">

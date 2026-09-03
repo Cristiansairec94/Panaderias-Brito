@@ -485,8 +485,8 @@ export default function POSPage() {
     <div className="flex h-full w-full overflow-hidden bg-stone-100/70">
       {/* Product Catalog Area (Main) */}
       <div className="flex-1 flex flex-col min-w-0 p-4 lg:p-5 overflow-y-auto">
-        {/* Top Fixed Header Toolbar (Perfectamente encuadrada y anclada a los bordes) */}
-        <div className="sticky top-0 z-30 -mt-4 -mx-4 px-4 py-3 lg:-mt-5 lg:-mx-5 lg:px-5 lg:py-3.5 bg-stone-100 border-b border-stone-200/90 shadow-xs mb-5">
+        {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y tapando las imágenes de atrás) */}
+        <div className={`sticky top-0 z-30 -mt-4 -mx-4 px-4 py-3 lg:-mt-5 lg:-mx-5 lg:px-5 lg:py-3.5 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-3 pb-4 mb-4" : "mb-5"}`}>
           <div className="flex items-center justify-between gap-3 w-full">
             {/* Buscador de Productos (Grande, Claro y Cómodo) */}
             <div className="relative flex-1 max-w-xl">
@@ -591,104 +591,104 @@ export default function POSPage() {
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Tarjeta CATEGORÍAS Y PRECIOS (Desplegable exactamente en la forma que estaba antes) */}
-        {showCategoryPanel && (
-          <div className="bg-white rounded-3xl p-3.5 sm:p-4 border border-stone-200 shadow-xs space-y-2.5 mb-5 shrink-0 animate-in fade-in slide-in-from-top-2 duration-200">
-            {/* Cabecera */}
-            <div className="flex items-center justify-between pb-2 border-b border-stone-100">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-amber-600" />
-                <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider">
-                  Categorías y Precios
-                </h3>
-                {selectedCategory !== "all" && (
-                  <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-                    Filtro activo: {activeCategory?.label}
-                  </span>
-                )}
-              </div>
+          {/* Tarjeta CATEGORÍAS Y PRECIOS (Unida firmemente al marco superior para tapar las imágenes de atrás) */}
+          {showCategoryPanel && (
+            <div className="bg-white rounded-3xl p-3.5 sm:p-4 border-2 border-stone-200/90 shadow-lg space-y-2.5 shrink-0 animate-in fade-in duration-200">
+              {/* Cabecera */}
+              <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-amber-600" />
+                  <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider">
+                    Categorías y Precios
+                  </h3>
+                  {selectedCategory !== "all" && (
+                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                      Filtro activo: {activeCategory?.label}
+                    </span>
+                  )}
+                </div>
 
-              <div className="flex items-center gap-2">
-                {selectedCategory !== "all" && (
+                <div className="flex items-center gap-2">
+                  {selectedCategory !== "all" && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory("all")}
+                      className="text-xs font-black text-amber-900 hover:text-amber-950 px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors"
+                    >
+                      Mostrar Todos los Precios
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setSelectedCategory("all")}
-                    className="text-xs font-black text-amber-900 hover:text-amber-950 px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 transition-colors"
+                    onClick={() => setShowCategoryPanel(false)}
+                    className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
                   >
-                    Mostrar Todos los Precios
+                    Ocultar
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowCategoryPanel(false)}
-                  className="text-[11px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
-                >
-                  Ocultar
-                </button>
+                </div>
               </div>
-            </div>
 
-            {/* Cuadrícula de Botones Grandes y Claros (Sin recortes de texto) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5">
-              {CATEGORIES.map((cat) => {
-                const isSelected = selectedCategory === cat.id;
-                const count = cat.id === "all"
-                  ? products.length
-                  : products.filter((p) => matchesPosCategory(p, cat.id)).length;
+              {/* Cuadrícula de Botones Grandes y Claros (Sin recortes de texto) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5 max-h-[60vh] overflow-y-auto pr-1">
+                {CATEGORIES.map((cat) => {
+                  const isSelected = selectedCategory === cat.id;
+                  const count = cat.id === "all"
+                    ? products.length
+                    : products.filter((p) => matchesPosCategory(p, cat.id)).length;
 
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategory(cat.id);
-                    }}
-                    className={`relative px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl text-left transition-all duration-200 flex items-center justify-between gap-3 border-2 active:scale-98 shadow-xs ${
-                      isSelected
-                        ? "bg-[#2d1810] text-amber-50 shadow-md shadow-amber-950/20 font-black border-amber-500 ring-2 ring-amber-500/30"
-                        : "bg-white hover:bg-amber-50/90 hover:border-amber-300 text-stone-900 border-stone-200/90 hover:shadow-sm"
-                    }`}
-                  >
-                    {/* Icono Grande + Nombre Completo */}
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-2xl sm:text-3xl shrink-0 drop-shadow-xs">{cat.icon}</span>
-                      <span className="font-black text-sm sm:text-base leading-tight">
-                        {cat.label}
-                      </span>
-                    </div>
-
-                    {/* Badge de Conteo y botón X si está seleccionado */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className={`text-xs sm:text-sm px-2.5 py-1 rounded-xl font-black ${
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategory(cat.id);
+                      }}
+                      className={`relative px-4 sm:px-5 py-3.5 sm:py-4 rounded-2xl sm:rounded-3xl text-left transition-all duration-200 flex items-center justify-between gap-3 border-2 active:scale-98 shadow-xs ${
                         isSelected
-                          ? "bg-amber-500 text-stone-950"
-                          : "bg-stone-100 text-stone-700 border border-stone-200"
-                      }`}>
-                        {count}
-                      </span>
-
-                      {isSelected && cat.id !== "all" && (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedCategory("all");
-                            setShowCategoryPanel(false);
-                          }}
-                          title="Ver todo el pan y cerrar opciones"
-                          className="w-6 h-6 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-xs ml-0.5 shadow-xs transition-transform active:scale-90"
-                        >
-                          <X className="w-3.5 h-3.5 stroke-[3]" />
+                          ? "bg-[#2d1810] text-amber-50 shadow-md shadow-amber-950/20 font-black border-amber-500 ring-2 ring-amber-500/30"
+                          : "bg-white hover:bg-amber-50/90 hover:border-amber-300 text-stone-900 border-stone-200/90 hover:shadow-sm"
+                      }`}
+                    >
+                      {/* Icono Grande + Nombre Completo */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-2xl sm:text-3xl shrink-0 drop-shadow-xs">{cat.icon}</span>
+                        <span className="font-black text-sm sm:text-base leading-tight">
+                          {cat.label}
                         </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+                      </div>
+
+                      {/* Badge de Conteo y botón X si está seleccionado */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`text-xs sm:text-sm px-2.5 py-1 rounded-xl font-black ${
+                          isSelected
+                            ? "bg-amber-500 text-stone-950"
+                            : "bg-stone-100 text-stone-700 border border-stone-200"
+                        }`}>
+                          {count}
+                        </span>
+
+                        {isSelected && cat.id !== "all" && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCategory("all");
+                              setShowCategoryPanel(false);
+                            }}
+                            title="Ver todo el pan y cerrar opciones"
+                            className="w-6 h-6 rounded-full bg-amber-400 hover:bg-amber-300 text-stone-950 flex items-center justify-center font-black text-xs ml-0.5 shadow-xs transition-transform active:scale-90"
+                          >
+                            <X className="w-3.5 h-3.5 stroke-[3]" />
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12">
           {filteredProducts.map((product) => {
             const isOutOfStock = product.stock <= 0;
@@ -1150,24 +1150,26 @@ export default function POSPage() {
       />
 
       {/* Cash Drawer & Shift Control Modal */}
-      <CashDrawerShiftModal
-        isOpen={showCashDrawerModal}
-        onClose={() => setShowCashDrawerModal(false)}
-        cashierName={cashierName}
-        onChangeCashier={setCashierName}
-        shiftName={shiftName}
-        onChangeShift={setShiftName}
-        initialFund={initialCashFund}
-        onChangeInitialFund={setInitialCashFund}
-        sales={recentSalesList}
-        expenses={expensesList}
-        products={products}
-        initialTab={shiftModalTab}
-        onCompleteShiftCut={() => {
-          setRecentSalesList([]);
-          setExpensesList([]);
-        }}
-      />
+      {showCashDrawerModal && (
+        <CashDrawerShiftModal
+          isOpen={showCashDrawerModal}
+          onClose={() => setShowCashDrawerModal(false)}
+          cashierName={cashierName}
+          onChangeCashier={setCashierName}
+          shiftName={shiftName}
+          onChangeShift={setShiftName}
+          initialFund={initialCashFund}
+          onChangeInitialFund={setInitialCashFund}
+          sales={recentSalesList}
+          expenses={expensesList}
+          products={products}
+          initialTab={shiftModalTab}
+          onCompleteShiftCut={() => {
+            setRecentSalesList([]);
+            setExpensesList([]);
+          }}
+        />
+      )}
     </div>
   );
 }
