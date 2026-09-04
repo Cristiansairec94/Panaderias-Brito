@@ -1190,21 +1190,6 @@ export default function POSPage() {
                 )}
               </div>
 
-              {/* Botón Lista Clientes */}
-              <button
-                type="button"
-                onClick={() => setIsCustomerPickerOpen(!isCustomerPickerOpen)}
-                className={`px-2.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all border shrink-0 active:scale-95 ${
-                  isCustomerPickerOpen
-                    ? "bg-stone-900 text-amber-300 border-stone-900 shadow-md"
-                    : "bg-white hover:bg-stone-100 text-stone-700 border-stone-200 shadow-2xs"
-                }`}
-                title="Ver lista de clientes"
-              >
-                <Users className="w-3.5 h-3.5 text-amber-600" />
-                <span className="hidden sm:inline">Clientes</span>
-                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isCustomerPickerOpen ? "rotate-180" : ""}`} />
-              </button>
 
               {/* Botón Registrar Nuevo Cliente */}
               <button
