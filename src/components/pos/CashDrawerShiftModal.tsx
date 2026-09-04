@@ -29,8 +29,6 @@ import {
   Search,
   Eye,
   ArrowLeft,
-  Copy,
-  Check,
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense } from "@/types";
@@ -173,7 +171,6 @@ export default function CashDrawerShiftModal({
   const [selectedHistoryTicket, setSelectedHistoryTicket] = useState<ShiftCutRecord | null>(null);
   const [historySearchQuery, setHistorySearchQuery] = useState("");
   const [historyFilterType, setHistoryFilterType] = useState<"all" | "cajera1" | "cajera2" | "cuadrado" | "diferencia">("all");
-  const [copiedFolio, setCopiedFolio] = useState<string | null>(null);
 
   // Load history from localStorage
   const loadCutsHistory = () => {
@@ -340,30 +337,6 @@ export default function CashDrawerShiftModal({
     onClose();
   };
 
-  const copyTicketData = (cut: ShiftCutRecord) => {
-    const text = `🥖 PANADERÍAS BRITO - COMPROBANTE DE CORTE DE CAJA
-FOLIO: ${cut.id}
-FECHA: ${cut.date}
-HORARIO: ${cut.shiftRange}
-ENTREGÓ: ${cut.outgoingCashier}
-RECIBIÓ: ${cut.incomingCashier}
-----------------------------------------
-(+) Fondo Inicial: ${formatCurrency(cut.initialFund)}
-(+) Ventas Efectivo: ${formatCurrency(cut.cashSales)}
-(-) Gastos: ${formatCurrency(cut.totalExpenses)}
-(=) Esperado en Caja: ${formatCurrency(cut.expectedCash)}
-(=) Efectivo Entregado: ${formatCurrency(cut.countedCash)}
-DIFERENCIA: ${cut.difference === 0 ? "$0.00 (Cuadrada)" : formatCurrency(cut.difference)}
-----------------------------------------
-Gran Total Vendido: ${formatCurrency(cut.totalSalesAll || cut.totalSales || (cut.cashSales + cut.cardSales + cut.transferSales))}
-ARQUEO DIGITAL VERIFICADO Y REGISTRADO`;
-
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      setCopiedFolio(cut.id);
-      setTimeout(() => setCopiedFolio(null), 2500);
-    }
-  };
 
   // Filtrado para el historial de cortes
   const filteredHistory = useMemo(() => {
@@ -542,40 +515,6 @@ ARQUEO DIGITAL VERIFICADO Y REGISTRADO`;
           </div>
         </div>
 
-        {/* Barra de Acciones del Ticket */}
-        <div className="max-w-md mx-auto flex flex-col sm:flex-row gap-2">
-          <button
-            type="button"
-            onClick={() => copyTicketData(cut)}
-            className="flex-1 py-3 px-4 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 border border-stone-300 transition-all active:scale-95"
-          >
-            {copiedFolio === cut.id ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-600" />
-                <span className="text-emerald-700 font-black">¡Copiado al Portapapeles!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 text-stone-600" />
-                <span>Copiar Datos del Ticket</span>
-              </>
-            )}
-          </button>
-
-          {!isHistoryView && (
-            <button
-              type="button"
-              onClick={() => {
-                setModalView("history");
-                setSelectedHistoryTicket(cut);
-              }}
-              className="flex-1 py-3 px-4 bg-amber-100 hover:bg-amber-200 text-amber-950 font-black rounded-2xl text-xs flex items-center justify-center gap-2 border border-amber-300 transition-all active:scale-95"
-            >
-              <History className="w-4 h-4 text-amber-800" />
-              <span>Ver en Historial</span>
-            </button>
-          )}
-        </div>
       </div>
     );
   };
