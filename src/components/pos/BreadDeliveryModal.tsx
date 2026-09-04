@@ -748,15 +748,16 @@ export default function BreadDeliveryModal({
                           </div>
                         </div>
 
-                        {/* Botones de incremento rápido */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <div className="hidden sm:flex items-center gap-1 mr-1">
+                        {/* Espacio para ingresar piezas directamente + botones rápidos */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Botones de incremento rápido (+10, +25, +50) */}
+                          <div className="hidden sm:flex items-center gap-1">
                             {[10, 25, 50].map((step) => (
                               <button
                                 key={step}
                                 type="button"
                                 onClick={() => handleAddQuantity(prod.id, step)}
-                                className="px-2 py-1 rounded-lg text-xs font-black bg-stone-100 hover:bg-emerald-100 hover:text-emerald-900 text-stone-700 transition-colors border border-stone-200 cursor-pointer active:scale-95"
+                                className="px-2 py-1 rounded-xl text-xs font-black bg-stone-100 hover:bg-emerald-100 hover:text-emerald-900 text-stone-700 transition-colors border border-stone-200 cursor-pointer active:scale-95"
                                 title={`Sumar +${step} piezas`}
                               >
                                 +{step}
@@ -764,20 +765,58 @@ export default function BreadDeliveryModal({
                             ))}
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handleAddQuantity(prod.id, 1)}
-                            className="w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-xs transition-transform active:scale-95 font-black text-sm cursor-pointer"
-                            title="Sumar 1 pieza"
+                          {/* Control con recuadro donde poner las piezas */}
+                          <div
+                            className={`flex items-center gap-1 p-1 rounded-2xl border transition-all ${
+                              isSelected
+                                ? "bg-emerald-100/70 border-emerald-300 ring-2 ring-emerald-400/30"
+                                : "bg-stone-100/90 border-stone-200"
+                            }`}
                           >
-                            <Plus className="w-4 h-4" />
-                          </button>
+                            {/* Botón menos */}
+                            {isSelected && (
+                              <button
+                                type="button"
+                                onClick={() => handleAddQuantity(prod.id, -1)}
+                                className="w-7 h-7 rounded-xl bg-white hover:bg-rose-50 text-stone-700 hover:text-rose-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95"
+                                title="Restar 1 pieza"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                            )}
 
-                          {isSelected && (
-                            <span className="min-w-[32px] text-center font-black text-xs text-emerald-800 bg-emerald-100 px-1.5 py-1 rounded-lg border border-emerald-300">
-                              +{selectedQty}
-                            </span>
-                          )}
+                            {/* Espacio donde poner las piezas */}
+                            <div className="relative flex items-center">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                placeholder="0"
+                                value={selectedQty > 0 ? selectedQty : ""}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, "");
+                                  handleSetQuantity(prod.id, val);
+                                }}
+                                onFocus={(e) => e.target.select()}
+                                className={`w-14 sm:w-16 h-8 text-center text-xs sm:text-sm font-black rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                  isSelected
+                                    ? "bg-emerald-700 text-white border-emerald-700 shadow-2xs"
+                                    : "bg-white text-stone-900 border-stone-300 placeholder:text-stone-400 hover:border-emerald-400"
+                                }`}
+                                title="Escribe aquí el número de piezas recibidas"
+                              />
+                            </div>
+
+                            {/* Botón más */}
+                            <button
+                              type="button"
+                              onClick={() => handleAddQuantity(prod.id, 1)}
+                              className="w-7 h-7 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95 font-black text-sm"
+                              title="Sumar 1 pieza"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
