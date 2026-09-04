@@ -130,24 +130,6 @@ export default function RealTimeSalesMonitor({
           )}
 
           <button
-            onClick={() => onSimulateSale()}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-orange-500/20 active:scale-95 transition-all"
-            title="Generar 1 ticket inmediato en la red"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current animate-pulse" />
-            <span>+1 Venta Rápida</span>
-          </button>
-
-          <button
-            onClick={() => onSimulateBulk(undefined, 5)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-stone-200 font-bold text-xs border border-white/10 active:scale-95 transition-all"
-            title="Simular 5 ventas consecutivas"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-orange-400" />
-            <span>Ráfaga (5 Ventas)</span>
-          </button>
-
-          <button
             onClick={onToggleLive}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all border ${
               isLiveSimulating
@@ -444,7 +426,7 @@ export default function RealTimeSalesMonitor({
               <Receipt className="w-12 h-12 mx-auto opacity-30 text-stone-400" />
               <p className="font-bold text-sm text-stone-600">No hay ventas registradas con este filtro</p>
               <p className="text-xs text-stone-400">
-                Presiona <strong>&quot;+1 Venta Rápida&quot;</strong> para generar movimientos en vivo.
+                Las transacciones registradas desde mostrador aparecerán aquí en tiempo real.
               </p>
             </div>
           ) : (
