@@ -353,10 +353,10 @@ export default function ClientesPage() {
                     </div>
                   </th>
                   <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">Descripción del Cliente</th>
-                  <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">
+                  <th className="py-3.5 px-4 sm:px-5 min-w-[160px] whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 text-amber-600" />
-                      <span>Lo que más compra (Moda)</span>
+                      <span>Historial</span>
                     </div>
                   </th>
                   <th className="py-3.5 px-4 sm:px-5 text-center w-28 whitespace-nowrap">Acciones</th>
@@ -434,22 +434,20 @@ export default function ClientesPage() {
                           )}
                         </td>
 
-                        {/* 4. Lo que más compra (Moda Desplegable - a la derecha antes de Acciones) */}
-                        <td className="py-3.5 px-4 sm:px-5">
+                        {/* 4. Historial Desplegable */}
+                        <td className="py-3.5 px-4 sm:px-5 whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => setExpandedClientId(expandedClientId === c.id ? null : c.id)}
-                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl text-xs sm:text-sm font-bold border transition-all cursor-pointer shadow-2xs ${
+                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl text-xs sm:text-sm font-bold border transition-all cursor-pointer shadow-2xs ${
                               expandedClientId === c.id
                                 ? "bg-amber-600 text-white border-amber-700 shadow-md ring-2 ring-amber-400/40"
                                 : "bg-gradient-to-r from-amber-50 to-orange-50/80 hover:bg-amber-100/90 border-amber-200/90 text-amber-950"
                             }`}
-                            title="Haz clic para ver qué compra e historial de tickets"
+                            title="Haz clic para ver el historial y moda de compra"
                           >
                             <span className="text-base shrink-0">🍞</span>
-                            <span className="font-black leading-snug">
-                              {c.favoriteProduct || "Ver Historial"}
-                            </span>
+                            <span className="font-black leading-snug">Historial</span>
                             <ChevronDown
                               className={`w-4 h-4 transition-transform duration-200 shrink-0 ${
                                 expandedClientId === c.id ? "rotate-180 text-white" : "text-amber-700"
