@@ -1852,6 +1852,7 @@ export default function POSPage() {
         expenses={expensesList}
         onAddExpense={handleAddExpense}
         cashSalesTotal={totalCashSales}
+        cashierName={cashierName}
       />
 
       {/* Cash Drawer & Shift Control Modal */}

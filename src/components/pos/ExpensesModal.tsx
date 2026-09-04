@@ -28,6 +28,7 @@ interface ExpensesModalProps {
   onAddExpense: (expense: CashExpense) => void;
   onDeleteExpense?: (id: string) => void;
   cashSalesTotal: number;
+  cashierName?: string;
 }
 
 const QUICK_AMOUNTS = [50, 100, 150, 200, 300, 500];
@@ -39,6 +40,7 @@ export default function ExpensesModal({
   onAddExpense,
   onDeleteExpense,
   cashSalesTotal,
+  cashierName = "Don Toño Brito",
 }: ExpensesModalProps) {
   const { addNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState<"register" | "list">("register");
@@ -46,7 +48,6 @@ export default function ExpensesModal({
   // Simple form fields
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
-  const [authorizedBy, setAuthorizedBy] = useState("Cajera 1 - Turno Matutino");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
@@ -66,7 +67,7 @@ export default function ExpensesModal({
       amount: parsedAmount,
       category: "otro",
       description: description.trim(),
-      cashier: authorizedBy.trim() || "Don Toño Brito",
+      cashier: cashierName,
       date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
     };
 
@@ -237,39 +238,6 @@ export default function ExpensesModal({
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full p-3.5 bg-stone-50 rounded-2xl border-2 border-stone-200 focus:border-rose-500 focus:bg-white focus:outline-none text-xs font-medium text-stone-900 transition-all leading-relaxed"
                 />
-              </div>
-
-              {/* 3. Responsable / Quién lo tomó (Solo Cajera 1 y Cajera 2) */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-stone-500 block">
-                  3. ¿Quién tomó o autorizó el dinero?
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAuthorizedBy("Cajera 1 - Turno Matutino")}
-                    className={`p-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 border ${
-                      authorizedBy.includes("Cajera 1")
-                        ? "bg-gradient-to-r from-amber-950 to-stone-900 text-white border-amber-800 shadow-md ring-2 ring-amber-500/30 font-black scale-[1.02]"
-                        : "bg-stone-50 text-stone-700 hover:bg-amber-50/60 border-stone-200"
-                    }`}
-                  >
-                    <span className="text-base">👩‍🍳</span>
-                    <span>Cajera 1 (Mañana)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuthorizedBy("Cajera 2 - Turno Vespertino")}
-                    className={`p-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 border ${
-                      authorizedBy.includes("Cajera 2")
-                        ? "bg-gradient-to-r from-amber-950 to-stone-900 text-white border-amber-800 shadow-md ring-2 ring-amber-500/30 font-black scale-[1.02]"
-                        : "bg-stone-50 text-stone-700 hover:bg-amber-50/60 border-stone-200"
-                    }`}
-                  >
-                    <span className="text-base">👩‍🍳</span>
-                    <span>Cajera 2 (Tarde)</span>
-                  </button>
-                </div>
               </div>
 
               {/* Submit Button */}
