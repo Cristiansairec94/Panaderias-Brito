@@ -410,7 +410,7 @@ export default function BreadDeliveryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-stone-950/75 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-stone-950/75 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-5xl xl:max-w-6xl max-h-[92vh] rounded-3xl shadow-2xl border-2 border-emerald-500/20 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Header con colores artesanales y acento esmeralda de frescura */}
@@ -1307,7 +1307,7 @@ export default function BreadDeliveryModal({
 
       {/* MODAL SECUNDARIO: GESTIÓN DE CHOFERES (EDITAR Y GUARDAR) */}
       {isManageDriversOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-stone-950/75 backdrop-blur-xs animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[210] flex items-center justify-center p-3 sm:p-4 bg-stone-950/75 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border-2 border-emerald-500/20 overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-150">
             {/* Header */}
             <div className="bg-gradient-to-r from-emerald-950 to-stone-900 text-white p-4 sm:p-5 flex items-center justify-between shrink-0">

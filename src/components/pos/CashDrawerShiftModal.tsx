@@ -562,7 +562,7 @@ export default function CashDrawerShiftModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/90 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/90 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[94vh] border-2 border-amber-900/30">
         
         {/* Cabecera Principal con Pestañas de Navegación */}
