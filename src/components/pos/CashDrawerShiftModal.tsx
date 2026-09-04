@@ -647,53 +647,25 @@ export default function CashDrawerShiftModal({
                     </div>
                   </div>
 
-                  {/* 2. Relevo Directo: Quién Entrega y Quién Recibe (Solo Cajera 1 y Cajera 2) */}
+                  {/* 2. Relevo Directo Estático: Quién Entrega y Quién Recibe (Sin opciones de selección) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-stone-50 rounded-3xl border-2 border-stone-200">
                     <div className="flex items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-stone-200/90 shadow-xs">
                       <span className="font-black text-rose-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
                         <span className="text-base">👤</span> Entrega:
                       </span>
-                      <div className="font-black text-stone-900 text-sm sm:text-base truncate flex-1 text-right">
-                        {outgoingCashier} ({shiftName.split(" ")[0]})
+                      <div className="font-black text-stone-900 text-xs sm:text-sm truncate flex-1 text-right flex items-center justify-end gap-1.5">
+                        <span className="text-base">👩‍🍳</span>
+                        <span className="truncate">{outgoingCashier}</span>
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-white p-2.5 rounded-2xl border-2 border-emerald-400 shadow-xs">
-                      <span className="font-black text-emerald-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5 pl-1">
+                    <div className="flex items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-emerald-200 shadow-xs">
+                      <span className="font-black text-emerald-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
                         <span className="text-base">👤</span> Recibe:
                       </span>
-                      <div className="grid grid-cols-2 gap-1.5 flex-1 w-full sm:w-auto">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIncomingCashier("Cajera 1 - Turno Matutino");
-                            setNextShiftName("Turno Matutino (06:00 - 14:00)");
-                          }}
-                          className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all duration-200 active:scale-95 border ${
-                            incomingCashier.includes("Cajera 1")
-                              ? "bg-gradient-to-r from-emerald-800 to-emerald-950 text-white border-emerald-950 shadow-md ring-2 ring-emerald-400/50 font-black scale-[1.02]"
-                              : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200"
-                          }`}
-                        >
-                          <span>👩‍🍳</span>
-                          <span>Cajera 1</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIncomingCashier("Cajera 2 - Turno Vespertino");
-                            setNextShiftName("Turno Vespertino (14:00 - 22:00)");
-                          }}
-                          className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all duration-200 active:scale-95 border ${
-                            incomingCashier.includes("Cajera 2")
-                              ? "bg-gradient-to-r from-emerald-800 to-emerald-950 text-white border-emerald-950 shadow-md ring-2 ring-emerald-400/50 font-black scale-[1.02]"
-                              : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200"
-                          }`}
-                        >
-                          <span>👩‍🍳</span>
-                          <span>Cajera 2</span>
-                        </button>
+                      <div className="font-black text-emerald-950 text-xs sm:text-sm truncate flex-1 text-right flex items-center justify-end gap-1.5">
+                        <span className="text-base">👩‍🍳</span>
+                        <span className="truncate">{incomingCashier}</span>
                       </div>
                     </div>
                   </div>
