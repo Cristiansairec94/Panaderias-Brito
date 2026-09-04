@@ -955,7 +955,7 @@ export default function ClientesPage() {
                   </span>
                   <span className="text-sm sm:text-base font-black text-amber-800 flex items-center gap-1.5 mt-0.5">
                     <span>🍞</span>
-                    <span className="truncate">{c.favoriteProduct || "Por definir"}</span>
+                    <span className="break-words leading-tight">{c.favoriteProduct || "Por definir"}</span>
                   </span>
                 </div>
 
@@ -987,19 +987,19 @@ export default function ClientesPage() {
                 </div>
               </div>
 
-              {/* Grid de 2 Columnas: Moda/Desglose vs Historial */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Columna 1: Desglose de qué es lo que más compra (5 cols) */}
-                <div className="lg:col-span-5 bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
-                  <div className="flex items-center justify-between">
+              {/* Información Hacia Abajo (Flujo Vertical Completo) */}
+              <div className="flex flex-col gap-6">
+                {/* Bloque 1 (Arriba): ¿Qué es lo que más compra? (Moda y Frecuencia de Piezas) */}
+                <div className="w-full bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <BarChart3 className="w-5 h-5 text-amber-600" />
                       <h5 className="font-black text-stone-900 text-sm sm:text-base">
-                        ¿Qué es lo que más compra?
+                        ¿Qué es lo que más compra? (Moda y Frecuencia de Piezas)
                       </h5>
                     </div>
                     <span className="text-xs font-bold text-stone-500">
-                      Frecuencia de piezas
+                      Total: {totalPieces} piezas acumuladas
                     </span>
                   </div>
 
@@ -1016,24 +1016,24 @@ export default function ClientesPage() {
                         return (
                           <div
                             key={prodName}
-                            className={`p-3 rounded-xl border transition-all ${
+                            className={`p-3.5 rounded-xl border transition-all ${
                               isTop
                                 ? "bg-amber-50/90 border-amber-300 shadow-2xs"
                                 : "bg-white border-stone-200"
                             }`}
                           >
-                            <div className="flex items-center justify-between text-xs sm:text-sm font-black text-stone-900 mb-1.5">
-                              <div className="flex items-center gap-1.5 truncate mr-2">
-                                <span>{isTop ? "⭐" : "🥖"}</span>
-                                <span className="truncate">{prodName}</span>
+                            <div className="flex items-center justify-between text-xs sm:text-sm font-black text-stone-900 mb-1.5 flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">{isTop ? "⭐" : "🥖"}</span>
+                                <span className="font-black text-stone-900 text-sm sm:text-base">{prodName}</span>
                                 {isTop && (
-                                  <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded-md text-[10px] uppercase font-black shrink-0">
-                                    Moda #1
+                                  <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] uppercase font-black tracking-wider">
+                                    Moda #1 Más Comprado
                                   </span>
                                 )}
                               </div>
-                              <span className="tabular-nums font-mono shrink-0 text-stone-700">
-                                {count} pz ({percent}%)
+                              <span className="tabular-nums font-mono text-xs sm:text-sm font-black text-stone-700 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200">
+                                {count} piezas ({percent}%)
                               </span>
                             </div>
                             {/* Barra de progreso */}
@@ -1052,9 +1052,9 @@ export default function ClientesPage() {
                   )}
                 </div>
 
-                {/* Columna 2: Historial de Compras (Tickets) (7 cols) */}
-                <div className="lg:col-span-7 bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
-                  <div className="flex items-center justify-between">
+                {/* Bloque 2 (Abajo): Historial de Compras (Tickets) */}
+                <div className="w-full bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Receipt className="w-5 h-5 text-amber-600" />
                       <h5 className="font-black text-stone-900 text-sm sm:text-base">
@@ -1062,7 +1062,7 @@ export default function ClientesPage() {
                       </h5>
                     </div>
                     <span className="text-xs font-bold text-stone-500">
-                      {(c.purchaseHistory || []).length} registros
+                      {(c.purchaseHistory || []).length} tickets registrados
                     </span>
                   </div>
 
@@ -1077,24 +1077,26 @@ export default function ClientesPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                    <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                       {c.purchaseHistory.map((purchase) => (
                         <div
                           key={purchase.id}
-                          className="p-3.5 bg-white rounded-2xl border border-stone-200 hover:border-amber-300 shadow-2xs space-y-2.5 transition-all"
+                          className="p-4 bg-white rounded-2xl border border-stone-200 hover:border-amber-300 shadow-2xs space-y-3 transition-all"
                         >
-                          <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2 flex-wrap">
-                            <div className="flex items-center gap-2 text-xs font-bold text-stone-600">
-                              <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                              <span>{purchase.date}</span>
+                          <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2.5 flex-wrap">
+                            <div className="flex items-center gap-2 text-xs font-bold text-stone-600 flex-wrap">
+                              <span className="flex items-center gap-1.5 text-stone-800 font-black">
+                                <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                {purchase.date}
+                              </span>
                               {purchase.branchName && (
-                                <span className="bg-stone-100 text-stone-700 px-2 py-0.5 rounded-lg text-[11px] font-bold">
+                                <span className="bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-lg text-[11px] font-bold border border-amber-200">
                                   {purchase.branchName}
                                 </span>
                               )}
                               {purchase.cashier && (
                                 <span className="text-stone-400 text-[11px]">
-                                  • Cajero: {purchase.cashier}
+                                  • Cajero: <strong className="text-stone-700">{purchase.cashier}</strong>
                                 </span>
                               )}
                             </div>
@@ -1104,7 +1106,7 @@ export default function ClientesPage() {
                                   {purchase.paymentMethod}
                                 </span>
                               )}
-                              <span className="font-black text-base text-stone-900">
+                              <span className="font-black text-base sm:text-lg text-stone-900">
                                 {formatCurrency(purchase.total)}
                               </span>
                             </div>
@@ -1115,7 +1117,7 @@ export default function ClientesPage() {
                             {purchase.items.map((it, itIdx) => (
                               <div
                                 key={itIdx}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold text-stone-800"
+                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold text-stone-800"
                               >
                                 <span className="text-amber-700 font-mono font-black">{it.quantity}x</span>
                                 <span>{it.name}</span>
