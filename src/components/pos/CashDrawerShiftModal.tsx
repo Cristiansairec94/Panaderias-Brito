@@ -815,62 +815,18 @@ export default function CashDrawerShiftModal({
                       </div>
                     </div>
 
-                    {/* Botones de Selección Rápida de Fondo */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {[500, 1000, 1500].map((preset) => (
-                          <button
-                            key={preset}
-                            type="button"
-                            onClick={() => setNextInitialFund(preset.toString())}
-                            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all duration-150 border active:scale-95 ${
-                              nextInitialFund === preset.toString()
-                                ? "bg-[#2d1810] text-amber-100 border-amber-500 shadow-sm ring-2 ring-amber-400/40"
-                                : "bg-white hover:bg-amber-100/70 text-stone-800 border-stone-300"
-                            }`}
-                          >
-                            {formatCurrency(preset)}
-                          </button>
-                        ))}
-
-                        <button
-                          type="button"
-                          onClick={() => setNextInitialFund(parsedCountedCash.toString())}
-                          className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all duration-150 border active:scale-95 ${
-                            nextInitialFund === parsedCountedCash.toString() && parsedCountedCash > 0
-                              ? "bg-[#2d1810] text-amber-100 border-amber-500 shadow-sm ring-2 ring-amber-400/40"
-                              : "bg-white hover:bg-amber-100/70 text-stone-800 border-stone-300"
-                          }`}
-                        >
-                          Todo el efectivo ({formatCurrency(parsedCountedCash)})
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setNextInitialFund("0")}
-                          className={`px-3 py-2 rounded-xl text-xs font-black transition-all duration-150 border active:scale-95 ${
-                            nextInitialFund === "0"
-                              ? "bg-[#2d1810] text-amber-100 border-amber-500 shadow-sm ring-2 ring-amber-400/40"
-                              : "bg-white hover:bg-stone-100 text-stone-600 border-stone-300"
-                          }`}
-                        >
-                          $0.00 (Sin Fondo)
-                        </button>
-                      </div>
-
-                      {/* Input Manual de Fondo Siguiente */}
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          placeholder="O escribe otro monto que se quedará en caja para el nuevo turno"
-                          value={nextInitialFund}
-                          onChange={(e) => setNextInitialFund(e.target.value)}
-                          className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
-                        />
-                      </div>
+                    {/* Input Manual de Fondo Siguiente */}
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        placeholder="Monto de dinero que se quedará en caja para el nuevo turno"
+                        value={nextInitialFund}
+                        onChange={(e) => setNextInitialFund(e.target.value)}
+                        className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
+                      />
                     </div>
 
                     {/* Resumen de Entrega: Total Contado, Fondo que Queda, Efectivo a Entregar */}
