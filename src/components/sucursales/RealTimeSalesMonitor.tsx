@@ -201,7 +201,6 @@ export default function RealTimeSalesMonitor({
         {branches.map((b) => {
           const isSelected = !isAllBranches && currentBranch?.id === b.id;
           const pieces = Math.round(b.todaySales / 16.5);
-          const percentGoal = Math.min(100, Math.round((b.todaySales / (b.dailyGoal || 1)) * 100));
           const avgTicket = b.todayTickets > 0 ? Math.round(b.todaySales / b.todayTickets) : 0;
           const salesRate = Math.round(b.todaySales / 7.5);
 
@@ -258,26 +257,6 @@ export default function RealTimeSalesMonitor({
                   <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
                     {formatCurrency(b.todaySales)}
                   </p>
-                </div>
-
-                {/* Goal Progress Bar */}
-                <div className="space-y-1.5 mb-4 bg-stone-50 p-3 rounded-2xl border border-stone-100">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-stone-500 font-semibold">Meta Diaria</span>
-                    <span className="font-black text-stone-900">
-                      {percentGoal}% <span className="text-stone-400 font-normal">({formatCurrency(b.dailyGoal)})</span>
-                    </span>
-                  </div>
-                  <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ${
-                        percentGoal >= 90 ? "bg-emerald-500" :
-                        percentGoal >= 70 ? "bg-amber-500" :
-                        "bg-orange-500"
-                      }`}
-                      style={{ width: `${percentGoal}%` }}
-                    />
-                  </div>
                 </div>
 
                 {/* Secondary Counters (Pieces, Tickets, Cash in Drawer) */}
