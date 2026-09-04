@@ -186,6 +186,7 @@ interface AuthContextType {
   toggleUserStatus: (userId: string) => void;
   rolePermissionsMap: Record<UserRole, RolePermissions>;
   updateRolePermissions: (role: UserRole, newPermissions: RolePermissions, roleLabel?: string) => void;
+  removeRolePermissions: (role: UserRole) => void;
   isLoading: boolean;
 }
 
@@ -547,6 +548,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Remove permissions for a deleted role
+  const removeRolePermissions = useCallback((role: UserRole) => {
+    setRolePermissionsMap((prev) => {
+      const copy = { ...prev };
+      delete copy[role];
+      try {
+        localStorage.setItem("brito_role_permissions", JSON.stringify(copy));
+      } catch (e) {
+        console.error("Error saving updated role permissions after deletion:", e);
+      }
+      return copy;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -566,6 +581,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toggleUserStatus,
         rolePermissionsMap,
         updateRolePermissions,
+        removeRolePermissions,
         isLoading,
       }}
     >

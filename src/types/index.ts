@@ -121,7 +121,7 @@ export interface CashExpense {
   date: string;
 }
 
-export type UserRole = "admin" | "auxiliar_admin" | "cajero" | "panadero" | "supervisor";
+export type UserRole = "admin" | "auxiliar_admin" | "cajero" | "panadero" | "supervisor" | (string & {});
 
 export interface RolePermissions {
   canAccessDashboard: boolean;
