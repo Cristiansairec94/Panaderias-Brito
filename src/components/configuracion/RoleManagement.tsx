@@ -202,6 +202,9 @@ interface PermissionGroup {
   categoryTitle: string;
   categoryBadge: string;
   icon: string;
+  badgeClass: string;
+  borderClass: string;
+  headerBg: string;
   items: {
     key: keyof RolePermissions;
     label: string;
@@ -216,6 +219,9 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     categoryTitle: "Punto de Venta y Cobro en Mostrador",
     categoryBadge: "Operación Caja",
     icon: "🛒",
+    badgeClass: "bg-emerald-100 text-emerald-900 border-emerald-300",
+    borderClass: "border-emerald-200/90",
+    headerBg: "bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent",
     items: [
       {
         key: "canAccessPos",
@@ -247,6 +253,9 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     categoryTitle: "Almacén, Compras y Materia Prima",
     categoryBadge: "Inventarios",
     icon: "📦",
+    badgeClass: "bg-amber-100 text-amber-900 border-amber-300",
+    borderClass: "border-amber-200/90",
+    headerBg: "bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent",
     items: [
       {
         key: "canAccessInventario",
@@ -273,6 +282,9 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     categoryTitle: "Finanzas, Rentabilidad y Gerencia",
     categoryBadge: "Finanzas",
     icon: "💼",
+    badgeClass: "bg-blue-100 text-blue-900 border-blue-300",
+    borderClass: "border-blue-200/90",
+    headerBg: "bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent",
     items: [
       {
         key: "canAccessDashboard",
@@ -306,6 +318,9 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     categoryTitle: "Seguridad y Control Crítico del Sistema",
     categoryBadge: "Seguridad",
     icon: "🔒",
+    badgeClass: "bg-purple-100 text-purple-900 border-purple-300",
+    borderClass: "border-purple-200/90",
+    headerBg: "bg-gradient-to-r from-purple-500/10 via-rose-500/5 to-transparent",
     items: [
       {
         key: "canAccessConfiguracion",
@@ -475,6 +490,23 @@ export default function RoleManagement() {
     setHasChanges(true);
   };
 
+  // Toggle all items in a single category
+  const handleToggleCategory = (group: PermissionGroup, enable: boolean) => {
+    setCurrentPermissions((prev) => {
+      const next = { ...prev };
+      group.items.forEach((item) => {
+        next[item.key] = enable;
+      });
+      return next;
+    });
+    setHasChanges(true);
+    showToast(
+      enable
+        ? `Accesos de "${group.categoryTitle}" habilitados.`
+        : `Accesos de "${group.categoryTitle}" desactivados.`
+    );
+  };
+
   // Save changes
   const handleSaveRole = () => {
     const newTitle = customRoleTitle.trim() || activeRoleConfig.defaultTitle || activeRoleConfig.name;
@@ -637,388 +669,453 @@ export default function RoleManagement() {
       </div>
 
       {/* ========================================================================= */}
-      {/* STEP 1: SELECT ROLE IN SYSTEM (GRID OF ROLES)                              */}
+      {/* MASTER-DETAIL LAYOUT: ROLES LIST (LEFT) & 13 PERMISSIONS MATRIX (RIGHT)   */}
       {/* ========================================================================= */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h4 className="font-black text-xs uppercase tracking-wider text-stone-700 flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-amber-600" />
-            <span>Selecciona un Rol para Modificar su Configuración y Permisos:</span>
-          </h4>
-          <span className="text-[11px] font-bold text-stone-400">
-            Haz clic en cualquiera para activarlo
-          </span>
-        </div>
-
-        <div className="flex flex-col gap-2.5">
-          {rolesList.map((role) => {
-            const isSelected = selectedRole === role.id;
-            const countUsers = usersList.filter((u) => u.role === role.id).length;
-            const effectivePerms = rolePermissionsMap?.[role.id] || ROLE_PERMISSIONS[role.id] || ROLE_PERMISSIONS.cajero;
-            const activeCount = Object.values(effectivePerms || {}).filter(Boolean).length;
-            const themeColors = role.colorClass || COLOR_THEMES.amber.colors;
-
-            return (
-              <div
-                key={role.id}
-                onClick={() => {
-                  if (hasChanges) {
-                    if (!confirm("Tienes cambios sin guardar en el rol actual. ¿Deseas cambiar de rol?")) return;
-                  }
-                  setSelectedRole(role.id);
-                }}
-                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3.5 group ${
-                  isSelected
-                    ? "border-amber-500 bg-gradient-to-r from-amber-500/15 via-orange-500/5 to-white shadow-md shadow-amber-500/10 ring-2 ring-amber-400/20 scale-[1.005]"
-                    : "bg-white border-stone-200/90 hover:border-stone-300 hover:bg-stone-50/50 hover:shadow-xs"
-                }`}
-              >
-                {/* Left: Icon, Name, and Description */}
-                <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-2xl shrink-0 transition-transform group-hover:scale-105 border ${
-                    isSelected ? "bg-white border-amber-300 shadow-xs" : "bg-stone-100/80 border-stone-200"
-                  }`}>
-                    {role.icon}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h5 className="font-black text-sm text-stone-900 leading-tight">
-                        {role.name}
-                      </h5>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border shrink-0 ${themeColors.badgeBg}`}>
-                        {role.badge}
-                      </span>
-                      {!role.isSystemRole && (
-                        <span className="px-1.5 py-0.2 bg-purple-100 text-purple-800 rounded text-[9px] font-bold shrink-0">
-                          Nuevo
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-stone-500 line-clamp-1 mt-0.5">
-                      {role.description}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right: Metrics, Delete & Status */}
-                <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2.5 md:pt-0 border-t md:border-t-0 border-stone-100 text-xs">
-                  {/* Users assigned badge */}
-                  <div className="flex items-center gap-1.5 font-bold text-[11px] text-stone-600 bg-stone-50 px-2.5 py-1.5 rounded-xl border border-stone-200/70">
-                    <Users className="w-3.5 h-3.5 text-stone-400" />
-                    <span>{countUsers} {countUsers === 1 ? "usuario" : "usuarios"}</span>
-                  </div>
-
-                  {/* Active permissions count */}
-                  <span className="text-[11px] font-black bg-white px-2.5 py-1.5 rounded-xl border border-stone-200 text-stone-800 shrink-0">
-                    {activeCount} de 13 permisos
-                  </span>
-
-                  {/* Delete button (for non-admin roles) */}
-                  {role.id !== "admin" && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteRoleClick(role);
-                      }}
-                      className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
-                      title={`Eliminar rol ${role.name}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-
-                  {/* Selection Status Button/Badge */}
-                  <div className="shrink-0 pl-1">
-                    {isSelected ? (
-                      <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-stone-900 text-amber-400 rounded-xl font-black text-[10px] uppercase tracking-wider shadow-xs">
-                        <Check className="w-3 h-3 stroke-[3]" /> Activo
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-stone-100 group-hover:bg-stone-200 text-stone-600 rounded-xl font-bold text-[10px] transition-colors">
-                        Seleccionar
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* STEP 2: ACTIVE ROLE DETAILS & PERMISSIONS MODIFIER                         */}
-      {/* ========================================================================= */}
-      <div className="bg-white rounded-3xl border border-stone-200/90 shadow-sm overflow-hidden divide-y divide-stone-100">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* Role Editor Header */}
-        <div className="p-5 sm:p-6 bg-gradient-to-r from-stone-50 via-amber-50/30 to-stone-50 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white border-2 border-amber-400 shadow-md flex items-center justify-center text-3xl shrink-0">
-              {activeRoleConfig.icon}
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="font-black text-lg text-stone-900 tracking-tight">
-                  Modificando: {activeRoleConfig.name}
+        {/* ======================================================================= */}
+        {/* LEFT COLUMN: SELECT ROLE LIST (lg:col-span-4 xl:col-span-4)              */}
+        {/* ======================================================================= */}
+        <div className="lg:col-span-4 xl:col-span-4 space-y-3 lg:sticky lg:top-4">
+          <div className="bg-white rounded-3xl border border-stone-200/90 p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between px-1 pb-2 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+                <h4 className="font-black text-xs uppercase tracking-wider text-stone-800">
+                  Seleccionar Rol
                 </h4>
-                <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase border ${activeRoleConfig.colorClass.badgeBg}`}>
-                  {activeRoleConfig.badge}
-                </span>
-                {activeRoleConfig.isSystemRole ? (
-                  <span className="px-2 py-0.5 bg-stone-100 text-stone-600 rounded-md font-bold text-[9px] uppercase border border-stone-200">
-                    Rol del Sistema
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md font-bold text-[9px] uppercase border border-purple-200">
-                    Rol Creado por Usuario
-                  </span>
-                )}
-                {hasChanges && (
-                  <span className="px-2 py-0.5 bg-amber-500 text-stone-950 font-black text-[9px] rounded-md animate-pulse uppercase">
-                    Cambios sin guardar
-                  </span>
-                )}
               </div>
-
-              <p className="text-xs text-stone-500 mt-1">
-                {activeRoleConfig.description}
-              </p>
-
-              {/* Users assigned pill list */}
-              <div className="flex items-center gap-2 mt-2 flex-wrap text-xs">
-                <span className="text-[11px] font-bold text-stone-500">Personal con este rol:</span>
-                {assignedUsers.length > 0 ? (
-                  assignedUsers.map((u) => (
-                    <span
-                      key={u.id}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-stone-100 border border-stone-200 rounded-lg text-[11px] font-bold text-stone-800"
-                    >
-                      <span>{u.avatar || "👤"}</span>
-                      <span>{u.name}</span>
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-[11px] text-stone-400 italic">Ningún usuario asignado aún</span>
-                )}
-              </div>
+              <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full">
+                {rolesList.length} roles
+              </span>
             </div>
-          </div>
 
-          {/* Action Buttons: Delete + Save */}
-          <div className="flex items-center gap-2.5 shrink-0 self-start lg:self-center flex-wrap">
-            {/* BOTON: ELIMINAR ROL */}
-            {activeRoleConfig.id !== "admin" ? (
-              <button
-                type="button"
-                onClick={() => handleDeleteRoleClick(activeRoleConfig)}
-                className="flex items-center gap-1.5 px-4 py-3 bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-2xl font-black text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
-                title={`Eliminar el rol ${activeRoleConfig.name}`}
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Eliminar Rol</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5 px-3 py-2 bg-stone-100 text-stone-500 rounded-xl text-xs font-bold border border-stone-200">
-                <Lock className="w-3.5 h-3.5 text-stone-400" />
-                <span>Rol Maestro Protegido</span>
-              </div>
-            )}
+            {/* List of roles */}
+            <div className="space-y-2">
+              {rolesList.map((role) => {
+                const isSelected = selectedRole === role.id;
+                const countUsers = usersList.filter((u) => u.role === role.id).length;
+                const effectivePerms = rolePermissionsMap?.[role.id] || ROLE_PERMISSIONS[role.id] || ROLE_PERMISSIONS.cajero;
+                const activeCount = Object.values(effectivePerms || {}).filter(Boolean).length;
+                const themeColors = role.colorClass || COLOR_THEMES.amber.colors;
 
-            {/* BOTON: GUARDAR CAMBIOS */}
-            <button
-              onClick={handleSaveRole}
-              className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer ${
-                hasChanges
-                  ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/25 ring-2 ring-amber-400"
-                  : "bg-stone-900 hover:bg-black text-white"
-              }`}
-            >
-              <Save className="w-4 h-4" />
-              <span>Guardar Permisos de {activeRoleConfig.name}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Role Title & Customization input */}
-        <div className="p-5 sm:p-6 bg-stone-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex-1 max-w-md space-y-1">
-            <label className="font-bold text-xs text-stone-700 flex items-center gap-1.5">
-              <span>Título Descriptivo del Rol</span>
-              <span className="text-stone-400 font-normal">(Nombre visible en el sistema)</span>
-            </label>
-            <input
-              type="text"
-              value={customRoleTitle}
-              onChange={(e) => {
-                setCustomRoleTitle(e.target.value);
-                setHasChanges(true);
-              }}
-              placeholder={activeRoleConfig.defaultTitle || activeRoleConfig.name}
-              className="w-full px-3.5 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-            />
-          </div>
-
-          {/* Quick Permission Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={handleResetToDefault}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-stone-100 border border-stone-200 rounded-xl text-xs font-bold text-stone-700 transition-all cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-stone-500" />
-              <span>Predeterminados</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleGrantAll}
-              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Activar Todos</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleRevokeAll}
-              className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5 text-rose-600" />
-              <span>Desactivar Todos</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Permissions Groups (4 Categories with Switches) */}
-        <div className="p-5 sm:p-6 space-y-6">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-            <div>
-              <h5 className="font-black text-sm text-stone-900">
-                Matriz de 13 Accesos y Permisos Granulares
-              </h5>
-              <p className="text-xs text-stone-500">
-                Alterna cada interruptor para encender o apagar el acceso a las funciones del ERP.
-              </p>
-            </div>
-            <span className="px-3 py-1 bg-stone-900 text-amber-400 rounded-xl font-mono font-bold text-xs">
-              {activePermsCount} de 13 Habilitados
-            </span>
-          </div>
-
-          <div className="space-y-6">
-            {PERMISSION_GROUPS.map((group) => (
-              <div key={group.categoryTitle} className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{group.icon}</span>
-                  <h6 className="font-black text-xs uppercase tracking-wider text-stone-800">
-                    {group.categoryTitle}
-                  </h6>
-                  <span className="text-[10px] font-bold text-stone-400 bg-stone-100 px-2 py-0.5 rounded-full">
-                    {group.categoryBadge}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {group.items.map((item) => {
-                    const isEnabled = Boolean(currentPermissions[item.key]);
-                    const IconComponent = item.icon;
-
-                    return (
-                      <div
-                        key={item.key}
-                        onClick={() => handleTogglePermission(item.key)}
-                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-4 select-none ${
-                          isEnabled
-                            ? "bg-emerald-50/40 border-emerald-300 shadow-xs"
-                            : "bg-stone-50/70 border-stone-200 hover:border-stone-300"
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm shrink-0 transition-colors ${
-                              isEnabled
-                                ? "bg-emerald-600 text-white shadow-xs"
-                                : "bg-stone-200 text-stone-500"
-                            }`}
-                          >
-                            <IconComponent className="w-4 h-4" />
-                          </div>
-
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="font-black text-xs text-stone-900 leading-tight">
-                                {item.label}
-                              </p>
-                              {item.critical && (
-                                <span className="px-1.5 py-0.2 bg-rose-100 text-rose-800 font-bold text-[9px] rounded uppercase">
-                                  Crítico
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-stone-500 leading-snug">
-                              {item.description}
-                            </p>
-                          </div>
+                return (
+                  <div
+                    key={role.id}
+                    onClick={() => {
+                      if (hasChanges) {
+                        if (!confirm("Tienes cambios sin guardar en el rol actual. ¿Deseas cambiar de rol?")) return;
+                      }
+                      setSelectedRole(role.id);
+                    }}
+                    className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden flex flex-col gap-2 group ${
+                      isSelected
+                        ? "border-amber-500 bg-gradient-to-br from-amber-500/15 via-orange-500/5 to-white shadow-md shadow-amber-500/10 ring-2 ring-amber-400/20 scale-[1.01]"
+                        : "bg-stone-50/70 border-stone-200/80 hover:border-stone-300 hover:bg-white hover:shadow-xs"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xl shrink-0 transition-transform group-hover:scale-105 border ${
+                          isSelected ? "bg-white border-amber-300 shadow-xs" : "bg-white border-stone-200"
+                        }`}>
+                          {role.icon}
                         </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h5 className="font-black text-xs text-stone-900 leading-tight truncate">
+                              {role.name}
+                            </h5>
+                            {!role.isSystemRole && (
+                              <span className="px-1.5 py-0.2 bg-purple-100 text-purple-800 rounded text-[9px] font-bold shrink-0">
+                                Nuevo
+                              </span>
+                            )}
+                          </div>
+                          <span className={`inline-block px-2 py-0.2 rounded-full text-[9px] font-black uppercase border mt-1 ${themeColors.badgeBg}`}>
+                            {role.badge}
+                          </span>
+                        </div>
+                      </div>
 
-                        {/* Tactile Sliding Switch Button */}
-                        <div className="shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
+                        {role.id !== "admin" && (
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleTogglePermission(item.key);
+                              handleDeleteRoleClick(role);
                             }}
-                            className={`w-12 h-6.5 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none cursor-pointer ${
-                              isEnabled ? "bg-emerald-600" : "bg-stone-300"
-                            }`}
+                            className="p-1 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                            title={`Eliminar rol ${role.name}`}
                           >
-                            <div
-                              className={`bg-white w-4.5 h-4.5 rounded-full shadow-md transform transition-transform duration-300 flex items-center justify-center text-[9px] font-black ${
-                                isEnabled ? "translate-x-5.5 text-emerald-600" : "translate-x-0 text-stone-400"
-                              }`}
-                            >
-                              {isEnabled ? "✓" : "✕"}
-                            </div>
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        </div>
+                        )}
+                        {isSelected && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+                    </div>
+
+                    <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1 text-stone-500 font-medium">
+                        <Users className="w-3 h-3 text-stone-400" />
+                        <span>{countUsers} {countUsers === 1 ? "usuario" : "usuarios"}</span>
+                      </div>
+
+                      <span className={`px-2 py-0.5 rounded-md font-mono font-bold text-[10px] ${
+                        isSelected ? "bg-stone-900 text-amber-400" : "bg-white border border-stone-200 text-stone-700"
+                      }`}>
+                        {activeCount} / 13 accesos
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Button to Add New Role */}
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="w-full py-2.5 px-4 bg-stone-50 hover:bg-amber-50/60 border-2 border-dashed border-stone-300 hover:border-amber-400 text-stone-700 hover:text-amber-900 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-amber-600" />
+              <span>Crear Nuevo Rol</span>
+            </button>
           </div>
         </div>
 
-        {/* Footer with Persistent Save Reminder */}
-        <div className="p-5 sm:p-6 bg-stone-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center text-xl shrink-0">
-              💡
+        {/* ======================================================================= */}
+        {/* RIGHT COLUMN: ACTIVE ROLE PERMISSIONS MODIFIER (lg:col-span-8)          */}
+        {/* ======================================================================= */}
+        <div className="lg:col-span-8 xl:col-span-8 space-y-6">
+          <div className="bg-white rounded-3xl border border-stone-200/90 shadow-sm overflow-hidden divide-y divide-stone-100">
+            
+            {/* Header: Active Role Details */}
+            <div className="p-5 sm:p-6 bg-gradient-to-r from-stone-50 via-amber-50/30 to-stone-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white border-2 border-amber-400 shadow-sm flex items-center justify-center text-3xl shrink-0">
+                  {activeRoleConfig.icon}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-black text-lg text-stone-900 tracking-tight">
+                      {activeRoleConfig.name}
+                    </h4>
+                    <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase border ${activeRoleConfig.colorClass.badgeBg}`}>
+                      {activeRoleConfig.badge}
+                    </span>
+                    {activeRoleConfig.isSystemRole ? (
+                      <span className="px-2 py-0.5 bg-stone-100 text-stone-600 rounded-md font-bold text-[9px] uppercase border border-stone-200">
+                        Rol del Sistema
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md font-bold text-[9px] uppercase border border-purple-200">
+                        Rol Personalizado
+                      </span>
+                    )}
+                    {hasChanges && (
+                      <span className="px-2 py-0.5 bg-amber-500 text-stone-950 font-black text-[9px] rounded-md animate-pulse uppercase">
+                        Cambios sin guardar
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-stone-500 mt-1">
+                    {activeRoleConfig.description}
+                  </p>
+
+                  <div className="flex items-center gap-2 mt-2 flex-wrap text-xs">
+                    <span className="text-[11px] font-bold text-stone-500">Personal con este rol:</span>
+                    {assignedUsers.length > 0 ? (
+                      assignedUsers.map((u) => (
+                        <span
+                          key={u.id}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-stone-100 border border-stone-200 rounded-lg text-[11px] font-bold text-stone-800"
+                        >
+                          <span>{u.avatar || "👤"}</span>
+                          <span>{u.name}</span>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-stone-400 italic">Ningún usuario asignado aún</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons: Delete + Save */}
+              <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center flex-wrap">
+                {activeRoleConfig.id !== "admin" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteRoleClick(activeRoleConfig)}
+                    className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                    title={`Eliminar el rol ${activeRoleConfig.name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Eliminar</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 px-3 py-2 bg-stone-100 text-stone-500 rounded-xl text-xs font-bold border border-stone-200">
+                    <Lock className="w-3.5 h-3.5 text-stone-400" />
+                    <span>Protegido</span>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSaveRole}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer ${
+                    hasChanges
+                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/25 ring-2 ring-amber-400"
+                      : "bg-stone-900 hover:bg-black text-white"
+                  }`}
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Guardar Permisos</span>
+                </button>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-stone-900">
-                Los cambios se aplican automáticamente a los colaboradores con este rol
-              </p>
-              <p className="text-[11px] text-stone-500">
-                Al guardar, cualquier usuario que tenga asignado &quot;{activeRoleConfig.name}&quot; adoptará esta matriz de permisos de forma instantánea.
-              </p>
+
+            {/* Role Title & Quick Toggles */}
+            <div className="p-4 sm:p-5 bg-stone-50/50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex-1 max-w-md space-y-1">
+                <label className="font-bold text-xs text-stone-700 flex items-center gap-1.5">
+                  <span>Título Descriptivo del Rol</span>
+                  <span className="text-stone-400 font-normal">(Nombre visible)</span>
+                </label>
+                <input
+                  type="text"
+                  value={customRoleTitle}
+                  onChange={(e) => {
+                    setCustomRoleTitle(e.target.value);
+                    setHasChanges(true);
+                  }}
+                  placeholder={activeRoleConfig.defaultTitle || activeRoleConfig.name}
+                  className="w-full px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleResetToDefault}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-stone-100 border border-stone-200 rounded-xl text-xs font-bold text-stone-700 transition-all cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-stone-500" />
+                  <span>Predeterminados</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGrantAll}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Activar Todos</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRevokeAll}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Desactivar Todos</span>
+                </button>
+              </div>
+            </div>
+
+            {/* MATRIZ DE 13 ACCESOS (ELEGANTE, INTUITIVA Y AGRUPADA) */}
+            <div className="p-5 sm:p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-100">
+                <div className="space-y-0.5">
+                  <h5 className="font-black text-sm text-stone-900 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Matriz de 13 Accesos & Permisos Granulares</span>
+                  </h5>
+                  <p className="text-xs text-stone-500">
+                    Controla y audita qué acciones exactas puede realizar este rol en cada área de la panadería.
+                  </p>
+                </div>
+                
+                {/* Visual Progress Bar */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="w-32 bg-stone-200 rounded-full h-2.5 overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-emerald-500 to-teal-500 h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${(activePermsCount / 13) * 100}%` }}
+                    />
+                  </div>
+                  <span className="px-3 py-1 bg-stone-900 text-amber-400 rounded-xl font-mono font-bold text-xs shadow-xs">
+                    {activePermsCount} de 13 Activos
+                  </span>
+                </div>
+              </div>
+
+              {/* 4 Category Panels */}
+              <div className="space-y-4">
+                {PERMISSION_GROUPS.map((group) => {
+                  const categoryTotal = group.items.length;
+                  const categoryEnabled = group.items.filter((item) => Boolean(currentPermissions[item.key])).length;
+                  const isAllEnabled = categoryEnabled === categoryTotal;
+
+                  return (
+                    <div
+                      key={group.categoryTitle}
+                      className={`rounded-2xl border-2 ${group.borderClass} overflow-hidden shadow-xs transition-all`}
+                    >
+                      {/* Category Header */}
+                      <div className={`p-3.5 ${group.headerBg} border-b ${group.borderClass} flex flex-col sm:flex-row sm:items-center justify-between gap-2.5`}>
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xl p-1.5 rounded-xl bg-white shadow-2xs border border-stone-200/60">
+                            {group.icon}
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h6 className="font-black text-xs text-stone-900 uppercase tracking-wide">
+                                {group.categoryTitle}
+                              </h6>
+                              <span className={`px-2 py-0.2 rounded-full text-[9px] font-black uppercase border ${group.badgeClass}`}>
+                                {group.categoryBadge}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-stone-500 font-medium">
+                              {categoryEnabled} de {categoryTotal} accesos concedidos
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Quick Category Action Toggles */}
+                        <div className="flex items-center gap-1.5 self-end sm:self-center">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCategory(group, true)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                              isAllEnabled
+                                ? "bg-emerald-600 text-white shadow-xs"
+                                : "bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200"
+                            }`}
+                          >
+                            Activar Todos ({categoryTotal})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCategory(group, false)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                              categoryEnabled === 0
+                                ? "bg-stone-300 text-stone-700"
+                                : "bg-white hover:bg-rose-50 text-stone-600 hover:text-rose-700 border border-stone-200"
+                            }`}
+                          >
+                            Desactivar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Switches Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 p-3.5 bg-white">
+                        {group.items.map((item) => {
+                          const isEnabled = Boolean(currentPermissions[item.key]);
+                          const IconComponent = item.icon;
+
+                          return (
+                            <div
+                              key={item.key}
+                              onClick={() => handleTogglePermission(item.key)}
+                              className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 select-none group/item ${
+                                isEnabled
+                                  ? "bg-emerald-50/40 border-emerald-300/80 shadow-2xs hover:border-emerald-400"
+                                  : "bg-stone-50/50 border-stone-200 hover:border-stone-300 hover:bg-white"
+                              }`}
+                            >
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <div
+                                  className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs shrink-0 transition-all ${
+                                    isEnabled
+                                      ? "bg-emerald-600 text-white shadow-xs scale-105"
+                                      : "bg-stone-200 text-stone-500 group-hover/item:bg-stone-300"
+                                  }`}
+                                >
+                                  <IconComponent className="w-3.5 h-3.5" />
+                                </div>
+
+                                <div className="space-y-0.5 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="font-black text-xs text-stone-900 leading-tight">
+                                      {item.label}
+                                    </p>
+                                    {item.critical && (
+                                      <span className="px-1.5 py-0.2 bg-rose-100 text-rose-800 font-bold text-[8px] rounded uppercase border border-rose-200">
+                                        Crítico
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-stone-500 leading-snug line-clamp-2">
+                                    {item.description}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Tactile Switch */}
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTogglePermission(item.key);
+                                  }}
+                                  className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer ${
+                                    isEnabled ? "bg-emerald-600 shadow-xs" : "bg-stone-300"
+                                  }`}
+                                >
+                                  <div
+                                    className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 flex items-center justify-center text-[8px] font-black ${
+                                      isEnabled ? "translate-x-5 text-emerald-600" : "translate-x-0 text-stone-400"
+                                    }`}
+                                  >
+                                    {isEnabled ? "✓" : "✕"}
+                                  </div>
+                                </button>
+                                <span className={`text-[8px] font-black uppercase tracking-wider ${
+                                  isEnabled ? "text-emerald-700" : "text-stone-400"
+                                }`}>
+                                  {isEnabled ? "Permitido" : "Bloqueado"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer with Save Button */}
+            <div className="p-4 sm:p-5 bg-stone-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">💡</span>
+                <p className="text-xs font-bold text-stone-700">
+                  Los cambios de permisos se guardan y aplican al instante para todos los colaboradores con el rol {activeRoleConfig.name}.
+                </p>
+              </div>
+
+              <button
+                onClick={handleSaveRole}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer shrink-0 ${
+                  hasChanges
+                    ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/25 ring-2 ring-amber-400"
+                    : "bg-stone-900 hover:bg-black text-white"
+                }`}
+              >
+                <Save className="w-4 h-4" />
+                <span>Guardar Permisos de {activeRoleConfig.name}</span>
+              </button>
             </div>
           </div>
-
-          <button
-            onClick={handleSaveRole}
-            className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs sm:text-sm shadow-md transition-all active:scale-95 cursor-pointer shrink-0 ${
-              hasChanges
-                ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/25 ring-2 ring-amber-400"
-                : "bg-stone-900 hover:bg-black text-white"
-            }`}
-          >
-            <Save className="w-4 h-4" />
-            <span>Guardar Permisos de {activeRoleConfig.name}</span>
-          </button>
         </div>
       </div>
 
