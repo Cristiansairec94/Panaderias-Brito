@@ -311,8 +311,8 @@ export default function SucursalesPage() {
         )}
 
         {/* Live KPI Pulse Ribbon */}
-        <div className="mt-6 pt-5 border-t border-stone-800/80 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="bg-white/[0.04] p-3 rounded-2xl border border-white/5">
+        <div className="mt-6 pt-5 border-t border-stone-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="bg-white/[0.04] p-3.5 rounded-2xl border border-white/5">
             <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
               Ventas Hoy (En Vivo)
             </span>
@@ -321,7 +321,7 @@ export default function SucursalesPage() {
             </span>
           </div>
 
-          <div className="bg-white/[0.04] p-3 rounded-2xl border border-white/5">
+          <div className="bg-white/[0.04] p-3.5 rounded-2xl border border-white/5">
             <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
               Efectivo en Gavetas
             </span>
@@ -330,25 +330,13 @@ export default function SucursalesPage() {
             </span>
           </div>
 
-          <div className="bg-white/[0.04] p-3 rounded-2xl border border-white/5">
+          <div className="bg-white/[0.04] p-3.5 rounded-2xl border border-white/5">
             <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
               Tickets Emitidos
             </span>
             <span className="text-lg sm:text-xl font-black text-amber-300">
               {consolidatedMetrics.totalTickets} tickets
             </span>
-          </div>
-
-          <div className="bg-white/[0.04] p-3 rounded-2xl border border-white/5">
-            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
-              Cumplimiento de Meta
-            </span>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-lg sm:text-xl font-black text-orange-400">
-                {consolidatedMetrics.percentGoal}%
-              </span>
-              <span className="text-[10px] text-stone-400">({formatCurrency(consolidatedMetrics.totalDailyGoal)})</span>
-            </div>
           </div>
         </div>
       </div>
