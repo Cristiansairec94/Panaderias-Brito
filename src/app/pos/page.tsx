@@ -944,27 +944,9 @@ export default function POSPage() {
             <div className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => {
-                  if (isShiftLocked) {
-                    addNotification({
-                      senderName: "🔒 Terminal Bloqueada",
-                      senderAvatar: "⚠️",
-                      badgeIcon: "alerta",
-                      title: "Terminal Bloqueada",
-                      highlightText: "Turno cerrado por seguridad",
-                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar entrada de pan.",
-                      category: "caja",
-                    });
-                    return;
-                  }
-                  setShowBreadDeliveryModal(true);
-                }}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
-                  isShiftLocked
-                    ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                    : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black shadow-sm"
-                }`}
-                title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
+                onClick={() => setShowBreadDeliveryModal(true)}
+                className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black shadow-sm transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+                title="Registrar pan recibido de las camionetas o taller"
               >
                 <span className="text-lg">🚐</span>
                 <span>Entrada de Pan</span>
@@ -2004,14 +1986,16 @@ export default function POSPage() {
       )}
 
       {/* Bread Delivery Modal (Recepción de Pan de Camionetas) */}
-      <BreadDeliveryModal
-        isOpen={showBreadDeliveryModal}
-        onClose={() => setShowBreadDeliveryModal(false)}
-        products={products}
-        onConfirmDelivery={handleReceiveBreadDelivery}
-        cashierName={cashierName}
-        deliveriesHistory={breadDeliveriesList}
-      />
+      {showBreadDeliveryModal && (
+        <BreadDeliveryModal
+          isOpen={showBreadDeliveryModal}
+          onClose={() => setShowBreadDeliveryModal(false)}
+          products={products}
+          onConfirmDelivery={handleReceiveBreadDelivery}
+          cashierName={cashierName}
+          deliveriesHistory={breadDeliveriesList}
+        />
+      )}
     </div>
   );
 }

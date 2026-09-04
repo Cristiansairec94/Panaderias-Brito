@@ -11,14 +11,7 @@ import {
   PackageCheck, 
   Clock, 
   CheckCircle2, 
-  AlertCircle, 
-  Layers, 
-  Receipt, 
-  Sparkles,
-  ShoppingBag,
-  Store,
-  ChevronRight,
-  Printer
+  Layers
 } from "lucide-react";
 import { Product, BreadDeliveryRecord, BreadDeliveryItem } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -42,7 +35,7 @@ const CAMIONETA_PRESETS = [
 export default function BreadDeliveryModal({
   isOpen,
   onClose,
-  products,
+  products = [],
   onConfirmDelivery,
   cashierName = "Cajera en turno",
   deliveriesHistory = [],
@@ -62,28 +55,56 @@ export default function BreadDeliveryModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
-  if (!isOpen) return null;
-
-  // Filter products for left selection list
-  const filteredProducts = products.filter((prod) => {
-    const matchesCat = selectedCategory === "all" || prod.category === selectedCategory;
-    const q = search.toLowerCase().trim();
-    const matchesSearch = 
-      !q || 
-      (prod.name && prod.name.toLowerCase().includes(q)) ||
-      (prod.code && prod.code.toLowerCase().includes(q)) ||
-      prod.price.toString().includes(q);
-    return matchesCat && matchesSearch;
-  });
-
-  // Unique categories in products
+  // Unique categories in products (Called unconditionally at top level)
   const categories = useMemo(() => {
     const set = new Set<string>();
-    products.forEach((p) => {
-      if (p.category) set.add(p.category);
+    (products || []).forEach((p) => {
+      if (p && p.category) set.add(p.category);
     });
     return Array.from(set);
   }, [products]);
+
+  // Filter products for selection list (Called unconditionally at top level)
+  const filteredProducts = useMemo(() => {
+    return (products || []).filter((prod) => {
+      if (!prod) return false;
+      const matchesCat = selectedCategory === "all" || prod.category === selectedCategory;
+      const q = search.toLowerCase().trim();
+      if (!q) return matchesCat;
+      const nameStr = (prod.name || "").toLowerCase();
+      const codeStr = (prod.code || "").toLowerCase();
+      const priceStr = prod.price != null ? String(prod.price) : "";
+      const matchesSearch = nameStr.includes(q) || codeStr.includes(q) || priceStr.includes(q);
+      return matchesCat && matchesSearch;
+    });
+  }, [products, selectedCategory, search]);
+
+  // Compute selected items list
+  const selectedProductList = useMemo(() => {
+    return Object.entries(deliveryItems)
+      .map(([id, qty]) => {
+        const product = (products || []).find((p) => p && p.id === id);
+        return {
+          product,
+          quantity: qty,
+        };
+      })
+      .filter((entry): entry is { product: Product; quantity: number } => entry.product !== undefined);
+  }, [deliveryItems, products]);
+
+  const totalPieces = useMemo(() => {
+    return selectedProductList.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+  }, [selectedProductList]);
+
+  const totalEstimatedValue = useMemo(() => {
+    return selectedProductList.reduce(
+      (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.product.price) || 0), 
+      0
+    );
+  }, [selectedProductList]);
+
+  // If not open, return null only after ALL hooks have executed
+  if (!isOpen) return null;
 
   // Handle adding pieces to a product
   const handleAddQuantity = (productId: string, amount: number) => {
@@ -123,21 +144,6 @@ export default function BreadDeliveryModal({
     setDeliveryItems({});
   };
 
-  // Compute summary metrics
-  const selectedProductList = Object.entries(deliveryItems).map(([id, qty]) => {
-    const product = products.find((p) => p.id === id);
-    return {
-      product,
-      quantity: qty,
-    };
-  }).filter((entry): entry is { product: Product; quantity: number } => entry.product !== undefined);
-
-  const totalPieces = selectedProductList.reduce((sum, item) => sum + item.quantity, 0);
-  const totalEstimatedValue = selectedProductList.reduce(
-    (sum, item) => sum + item.quantity * item.product.price, 
-    0
-  );
-
   const finalSource = source === "otro" ? customSource.trim() || "Camioneta Externa" : source;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -154,9 +160,9 @@ export default function BreadDeliveryModal({
       productId: item.product.id,
       productName: item.product.name,
       quantity: item.quantity,
-      unitPrice: item.product.price,
-      previousStock: item.product.stock,
-      newStock: item.product.stock + item.quantity,
+      unitPrice: Number(item.product.price) || 0,
+      previousStock: Number(item.product.stock) || 0,
+      newStock: (Number(item.product.stock) || 0) + item.quantity,
     }));
 
     const newDelivery: BreadDeliveryRecord = {
@@ -174,7 +180,7 @@ export default function BreadDeliveryModal({
 
     onConfirmDelivery(newDelivery);
 
-    setSuccessNotice(`¡Se ingresaron exitosamente ${totalPieces} piezas al mostrador!`);
+    setSuccessNotice(`¡Se ingresaron exitosamente +${totalPieces} piezas de pan al mostrador!`);
     setIsSubmitting(false);
 
     // Reset items
@@ -182,9 +188,11 @@ export default function BreadDeliveryModal({
     setNotes("");
     setDriverName("");
 
+    // Auto cerrar tras mostrar confirmación
     setTimeout(() => {
       setSuccessNotice(null);
-    }, 3500);
+      onClose();
+    }, 1200);
   };
 
   return (
@@ -216,7 +224,7 @@ export default function BreadDeliveryModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-all active:scale-95"
+              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer"
               title="Cerrar ventana"
             >
               <X className="w-5 h-5" />
@@ -238,7 +246,7 @@ export default function BreadDeliveryModal({
             <button
               type="button"
               onClick={() => setActiveTab("receive")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === "receive"
                   ? "bg-white text-emerald-950 shadow-sm border border-stone-200"
                   : "text-stone-600 hover:text-stone-900 hover:bg-white/60"
@@ -256,7 +264,7 @@ export default function BreadDeliveryModal({
             <button
               type="button"
               onClick={() => setActiveTab("history")}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === "history"
                   ? "bg-white text-stone-900 shadow-sm border border-stone-200"
                   : "text-stone-600 hover:text-stone-900 hover:bg-white/60"
@@ -299,7 +307,7 @@ export default function BreadDeliveryModal({
                         setSource(preset.label);
                         setCustomSource("");
                       }}
-                      className={`px-2.5 py-2 rounded-xl text-xs font-bold text-left transition-all border flex items-center gap-1.5 ${
+                      className={`px-2.5 py-2 rounded-xl text-xs font-bold text-left transition-all border flex items-center gap-1.5 cursor-pointer ${
                         source === preset.label
                           ? "bg-emerald-50 border-emerald-500 text-emerald-950 ring-1 ring-emerald-400 font-black shadow-2xs"
                           : "bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-700"
@@ -344,7 +352,7 @@ export default function BreadDeliveryModal({
                     <button
                       type="button"
                       onClick={() => setSearch("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 p-1 text-xs font-bold"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 p-1 text-xs font-bold cursor-pointer"
                     >
                       ✕
                     </button>
@@ -356,7 +364,7 @@ export default function BreadDeliveryModal({
                   <button
                     type="button"
                     onClick={() => setSelectedCategory("all")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                       selectedCategory === "all"
                         ? "bg-stone-900 text-white shadow-2xs font-black"
                         : "bg-white text-stone-600 hover:bg-stone-200 border border-stone-200"
@@ -369,7 +377,7 @@ export default function BreadDeliveryModal({
                       key={cat}
                       type="button"
                       onClick={() => setSelectedCategory(cat)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap capitalize transition-all ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap capitalize transition-all cursor-pointer ${
                         selectedCategory === cat
                           ? "bg-emerald-700 text-white shadow-2xs font-black"
                           : "bg-white text-stone-600 hover:bg-stone-200 border border-stone-200"
@@ -421,11 +429,11 @@ export default function BreadDeliveryModal({
                             </h4>
                             <div className="flex items-center gap-2 text-[11px] text-stone-500 font-medium">
                               <span className="font-bold text-amber-800">
-                                {formatCurrency(prod.price)}
+                                {formatCurrency(Number(prod.price) || 0)}
                               </span>
                               <span>•</span>
-                              <span className={prod.stock <= 5 ? "text-rose-600 font-bold" : "text-stone-600"}>
-                                Stock actual: {prod.stock} pz
+                              <span className={(prod.stock || 0) <= 5 ? "text-rose-600 font-bold" : "text-stone-600"}>
+                                Stock actual: {prod.stock || 0} pz
                               </span>
                             </div>
                           </div>
@@ -439,7 +447,7 @@ export default function BreadDeliveryModal({
                                 key={step}
                                 type="button"
                                 onClick={() => handleAddQuantity(prod.id, step)}
-                                className="px-2 py-1 rounded-lg text-xs font-black bg-stone-100 hover:bg-emerald-100 hover:text-emerald-900 text-stone-700 transition-colors border border-stone-200"
+                                className="px-2 py-1 rounded-lg text-xs font-black bg-stone-100 hover:bg-emerald-100 hover:text-emerald-900 text-stone-700 transition-colors border border-stone-200 cursor-pointer active:scale-95"
                                 title={`Sumar +${step} piezas`}
                               >
                                 +{step}
@@ -450,7 +458,7 @@ export default function BreadDeliveryModal({
                           <button
                             type="button"
                             onClick={() => handleAddQuantity(prod.id, 1)}
-                            className="w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-xs transition-transform active:scale-95 font-black text-sm"
+                            className="w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-xs transition-transform active:scale-95 font-black text-sm cursor-pointer"
                             title="Sumar 1 pieza"
                           >
                             <Plus className="w-4 h-4" />
@@ -488,7 +496,7 @@ export default function BreadDeliveryModal({
                   <button
                     type="button"
                     onClick={handleClearAll}
-                    className="text-[11px] font-bold text-rose-600 hover:text-rose-800 hover:underline"
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
                   >
                     Vaciar lista
                   </button>
@@ -511,7 +519,8 @@ export default function BreadDeliveryModal({
                   </div>
                 ) : (
                   selectedProductList.map(({ product, quantity }) => {
-                    const finalStock = product.stock + quantity;
+                    const currentStk = Number(product.stock) || 0;
+                    const finalStock = currentStk + quantity;
 
                     return (
                       <div
@@ -524,10 +533,10 @@ export default function BreadDeliveryModal({
                               {product.name}
                             </h4>
                             <div className="flex items-center gap-2 text-[11px] text-stone-500 font-medium mt-0.5">
-                              <span>Precio: {formatCurrency(product.price)}</span>
+                              <span>Precio: {formatCurrency(Number(product.price) || 0)}</span>
                               <span>•</span>
                               <span className="text-stone-700">
-                                Stock: {product.stock} ➔ <strong className="text-emerald-700">{finalStock} pz</strong>
+                                Stock: {currentStk} ➔ <strong className="text-emerald-700">{finalStock} pz</strong>
                               </span>
                             </div>
                           </div>
@@ -535,7 +544,7 @@ export default function BreadDeliveryModal({
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(product.id)}
-                            className="text-stone-400 hover:text-rose-600 p-1 transition-colors"
+                            className="text-stone-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
                             title="Quitar de la lista"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -548,7 +557,7 @@ export default function BreadDeliveryModal({
                             <button
                               type="button"
                               onClick={() => handleAddQuantity(product.id, -1)}
-                              className="w-7 h-7 rounded-lg bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 flex items-center justify-center font-black active:scale-95 transition-transform"
+                              className="w-7 h-7 rounded-lg bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 flex items-center justify-center font-black active:scale-95 transition-transform cursor-pointer"
                             >
                               <Minus className="w-3.5 h-3.5" />
                             </button>
@@ -558,13 +567,13 @@ export default function BreadDeliveryModal({
                               min="1"
                               value={quantity}
                               onChange={(e) => handleSetQuantity(product.id, e.target.value)}
-                              className="w-16 text-center py-1 text-xs sm:text-sm font-black rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-16 text-center py-1 text-xs sm:text-sm font-black rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
 
                             <button
                               type="button"
                               onClick={() => handleAddQuantity(product.id, 1)}
-                              className="w-7 h-7 rounded-lg bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 flex items-center justify-center font-black active:scale-95 transition-transform"
+                              className="w-7 h-7 rounded-lg bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 flex items-center justify-center font-black active:scale-95 transition-transform cursor-pointer"
                             >
                               <Plus className="w-3.5 h-3.5" />
                             </button>
@@ -577,7 +586,7 @@ export default function BreadDeliveryModal({
                                 key={addStep}
                                 type="button"
                                 onClick={() => handleAddQuantity(product.id, addStep)}
-                                className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-emerald-100/80 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 transition-colors"
+                                className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-emerald-100/80 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 transition-colors cursor-pointer"
                               >
                                 +{addStep}
                               </button>
@@ -617,23 +626,33 @@ export default function BreadDeliveryModal({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={totalPieces <= 0 || isSubmitting}
-                  className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 ${
-                    totalPieces > 0 && !isSubmitting
-                      ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-900/20"
-                      : "bg-stone-200 text-stone-400 cursor-not-allowed shadow-none"
-                  }`}
-                >
-                  <PackageCheck className="w-5 h-5" />
-                  <span>
-                    {isSubmitting
-                      ? "Ingresando pan..."
-                      : `Ingresar ${totalPieces} Piezas al Mostrador`}
-                  </span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm text-stone-600 hover:text-stone-900 hover:bg-stone-200 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={totalPieces <= 0 || isSubmitting}
+                    className={`flex-1 py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer ${
+                      totalPieces > 0 && !isSubmitting
+                        ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-900/20"
+                        : "bg-stone-200 text-stone-400 cursor-not-allowed shadow-none"
+                    }`}
+                  >
+                    <PackageCheck className="w-5 h-5" />
+                    <span>
+                      {isSubmitting
+                        ? "Ingresando pan..."
+                        : `Ingresar ${totalPieces} Piezas al Mostrador`}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -712,7 +731,7 @@ export default function BreadDeliveryModal({
                       </span>
                       <div className="flex items-center gap-3">
                         <span className="text-stone-500">
-                          Valor: <strong className="text-stone-800">{formatCurrency(rec.totalEstimatedValue)}</strong>
+                          Valor: <strong className="text-stone-800">{formatCurrency(Number(rec.totalEstimatedValue) || 0)}</strong>
                         </span>
                         <span className="font-black text-sm text-emerald-800 bg-emerald-100 px-3 py-1 rounded-xl">
                           +{rec.totalPieces} piezas totales
