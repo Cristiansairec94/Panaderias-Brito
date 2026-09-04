@@ -123,7 +123,7 @@ export default function Header() {
   const current = getPageTitle();
 
   return (
-    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-[70] shadow-sm">
+    <header className="h-16 shrink-0 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-[70] shadow-sm">
       {/* Left: Hamburger / Collapse Toggle + Page Title */}
       <div className="flex items-center gap-3">
         {/* Mobile Hamburger Drawer Toggle */}

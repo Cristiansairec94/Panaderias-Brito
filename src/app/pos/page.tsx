@@ -63,7 +63,6 @@ import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
 import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
 import BreadDeliveryModal from "@/components/pos/BreadDeliveryModal";
-import NotificationsDropdown from "@/components/layout/NotificationsDropdown";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
 
@@ -1060,11 +1059,6 @@ export default function POSPage() {
               </button>
             </div>
 
-            {/* Campana de Notificaciones Frontal */}
-            <div className="relative shrink-0">
-              <NotificationsDropdown />
-            </div>
-
             {/* Botón Móvil para Ver Charola / Carrito */}
             <div className="relative shrink-0 lg:hidden">
               <button
@@ -1271,12 +1265,12 @@ export default function POSPage() {
       {isMobileCartOpen && (
         <div
           onClick={() => setIsMobileCartOpen(false)}
-          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          className="lg:hidden fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
         />
       )}
 
       {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone - Amplia y Espaciosa) */}
-      <div className={`fixed lg:static inset-y-0 right-0 z-40 w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out relative overflow-hidden ${
+      <div className={`fixed lg:static inset-y-0 right-0 z-[80] w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out relative overflow-hidden ${
         isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       }`}>
         {/* Header con colores de la marca y micro-animación */}
