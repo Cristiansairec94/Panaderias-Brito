@@ -67,6 +67,16 @@ export interface CustomOrder {
   notes?: string;
 }
 
+export interface CustomerPurchase {
+  id: string;
+  date: string;
+  total: number;
+  items: { name: string; quantity: number; unitPrice?: number; subtotal?: number }[];
+  branchName?: string;
+  cashier?: string;
+  paymentMethod?: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -81,6 +91,7 @@ export interface Customer {
   registeredAt: string;
   favoriteProduct?: string; // Pan o producto que más compra (Moda de compra)
   purchaseCounts?: Record<string, number>; // Conteo de compras acumuladas por producto
+  purchaseHistory?: CustomerPurchase[]; // Historial detallado de compras
 }
 
 export interface CashShift {
