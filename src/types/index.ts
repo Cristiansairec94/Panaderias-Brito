@@ -79,6 +79,8 @@ export interface Customer {
   totalPurchases: number;
   notes?: string;
   registeredAt: string;
+  favoriteProduct?: string; // Pan o producto que más compra (Moda de compra)
+  purchaseCounts?: Record<string, number>; // Conteo de compras acumuladas por producto
 }
 
 export interface CashShift {

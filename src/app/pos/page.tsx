@@ -52,7 +52,8 @@ import {
   DEFAULT_GENERAL_CUSTOMER, 
   getStoredCustomers, 
   saveStoredCustomers, 
-  addQuickCustomer 
+  addQuickCustomer,
+  recordCustomerSale
 } from "@/lib/customers";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
@@ -244,6 +245,7 @@ export default function POSPage() {
   // New Customer Form State
   const [newCustName, setNewCustName] = useState("");
   const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustFavoriteProduct, setNewCustFavoriteProduct] = useState("");
   const [newCustType, setNewCustType] = useState<Customer["type"]>("frecuente");
   const [newCustCreditLimit, setNewCustCreditLimit] = useState("0");
   const [newCustNotes, setNewCustNotes] = useState("");
@@ -344,6 +346,7 @@ export default function POSPage() {
       phone: newCustPhone.trim() || "Sin teléfono",
       type: "frecuente",
       creditLimit: 0,
+      favoriteProduct: newCustFavoriteProduct.trim() || undefined,
       notes: newCustNotes.trim(),
     });
 
@@ -354,6 +357,7 @@ export default function POSPage() {
     // Reset form
     setNewCustName("");
     setNewCustPhone("");
+    setNewCustFavoriteProduct("");
     setNewCustType("frecuente");
     setNewCustCreditLimit("0");
     setNewCustNotes("");
@@ -672,6 +676,15 @@ export default function POSPage() {
       if (activeBranch) {
         const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");
         registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary);
+      }
+
+      // Registrar la compra en el cliente para calcular automáticamente su MODA de compra
+      if (selectedCustomer.id && selectedCustomer.id !== "cli-0") {
+        recordCustomerSale(
+          selectedCustomer.id,
+          currentItems.map((ci) => ({ name: ci.product.name, quantity: ci.quantity })),
+          currentTotal
+        );
       }
 
       setCompletedSale(newSaleRecord);
@@ -1497,6 +1510,11 @@ export default function POSPage() {
                               {c.phone && c.phone !== "N/A" && c.phone !== "Sin teléfono" && (
                                 <span className="font-bold text-stone-700">📞 {c.phone}</span>
                               )}
+                              {c.favoriteProduct && (
+                                <span className="text-amber-950 font-black bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md truncate max-w-[200px]">
+                                  🍞 Moda: {c.favoriteProduct}
+                                </span>
+                              )}
                               {c.notes && (
                                 <span className="text-amber-900 bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded truncate max-w-[200px]">
                                   📝 {c.notes}
@@ -1915,7 +1933,33 @@ export default function POSPage() {
                 />
               </div>
 
-              {/* 3. Característica Opcional */}
+              {/* 3. Pan o Producto Habitual (Moda) */}
+              <div>
+                <label className="block text-stone-700 font-extrabold mb-1">
+                  🍞 Pan Habitual / Moda <span className="text-stone-400 font-normal">(Lo que más compra)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="ej. Bolillo y Telera, o Conchas"
+                  value={newCustFavoriteProduct}
+                  onChange={(e) => setNewCustFavoriteProduct(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border-2 border-stone-200 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all text-sm"
+                />
+                <div className="flex flex-wrap gap-1 pt-1.5">
+                  {["🍞 Bolillo", "🥪 Telera", "🥐 Pan Dulce", "🥖 Pambazo", "🍰 Pastel"].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setNewCustFavoriteProduct(chip)}
+                      className="px-2 py-0.5 bg-stone-100 hover:bg-amber-100 text-stone-700 text-[10px] font-bold rounded-lg border border-stone-200 cursor-pointer"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Característica Opcional */}
               <div>
                 <label className="block text-stone-700 font-extrabold mb-1">
                   ✨ Característica o Detalle <span className="text-stone-400 font-normal">(Opcional)</span>

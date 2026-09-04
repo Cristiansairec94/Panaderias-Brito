@@ -12,7 +12,8 @@ import {
   Trash2, 
   CheckCircle2, 
   User,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles
 } from "lucide-react";
 import { Customer } from "@/types";
 import { onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
@@ -54,11 +55,13 @@ export default function ClientesPage() {
   // Form State: Nuevo Cliente
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [favoriteProduct, setFavoriteProduct] = useState("");
   const [notes, setNotes] = useState("");
 
   // Form State: Editar Cliente
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editFavoriteProduct, setEditFavoriteProduct] = useState("");
   const [editNotes, setEditNotes] = useState("");
 
   useEffect(() => {
@@ -95,7 +98,8 @@ export default function ClientesPage() {
             c.name.toLowerCase().includes(q) ||
             (c.phone && c.phone.toLowerCase().includes(q)) ||
             (qClean.length > 0 && cClean.includes(qClean)) ||
-            (c.notes && c.notes.toLowerCase().includes(q))
+            (c.notes && c.notes.toLowerCase().includes(q)) ||
+            (c.favoriteProduct && c.favoriteProduct.toLowerCase().includes(q))
           );
         });
 
@@ -108,6 +112,7 @@ export default function ClientesPage() {
   const handleOpenCreate = () => {
     setName("");
     setPhone("");
+    setFavoriteProduct("");
     setNotes("");
     setIsModalOpen(true);
   };
@@ -125,6 +130,7 @@ export default function ClientesPage() {
       creditLimit: 0,
       currentDebt: 0,
       totalPurchases: 0,
+      favoriteProduct: favoriteProduct.trim() || undefined,
       notes: notes.trim() || undefined,
       registeredAt: new Date().toISOString().split("T")[0],
     };
@@ -141,6 +147,7 @@ export default function ClientesPage() {
     setEditingCustomer(c);
     setEditName(c.name);
     setEditPhone(c.phone === "N/A" ? "" : c.phone?.replace(/\D/g, "") || "");
+    setEditFavoriteProduct(c.favoriteProduct || "");
     setEditNotes(c.notes || "");
   };
 
@@ -155,6 +162,7 @@ export default function ClientesPage() {
           ...c,
           name: editName.trim(),
           phone: editPhone.trim() ? formatPhoneNumber(editPhone.trim()) : "N/A",
+          favoriteProduct: editFavoriteProduct.trim() || undefined,
           notes: editNotes.trim() || undefined,
         };
       }
@@ -180,7 +188,7 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6 animate-in fade-in duration-200">
+    <div className="px-2 sm:px-4 lg:px-6 py-4 sm:py-6 w-full max-w-[1650px] mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-200">
       {/* Notificación Flotante */}
       {successNotice && (
         <div className="fixed top-6 right-6 z-50 bg-stone-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-amber-500 animate-in slide-in-from-top-4">
@@ -190,7 +198,7 @@ export default function ClientesPage() {
       )}
 
       {/* ENCABEZADO SIMPLE Y DIRECTO */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border-2 border-stone-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 sm:p-7 rounded-3xl border-2 border-stone-200 shadow-sm">
         <div>
           <div className="flex items-center gap-3">
             <div className="p-3 bg-amber-100 text-amber-900 rounded-2xl">
@@ -201,7 +209,7 @@ export default function ClientesPage() {
                 Directorio de Clientes
               </h1>
               <p className="text-sm sm:text-base text-stone-600 font-bold mt-0.5">
-                Ingreso rápido de clientes: teléfono, nombre y descripción
+                Directorio organizado con historial y moda de compra habitual
               </p>
             </div>
           </div>
@@ -210,7 +218,7 @@ export default function ClientesPage() {
         <button
           type="button"
           onClick={handleOpenCreate}
-          className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-7 py-4 rounded-2xl shadow-lg shadow-amber-600/25 text-base sm:text-lg transition-all active:scale-95 cursor-pointer"
+          className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-6 py-3.5 rounded-2xl shadow-lg shadow-amber-600/25 text-base sm:text-lg transition-all active:scale-95 cursor-pointer"
         >
           <Plus className="w-6 h-6" />
           <span>Registrar Nuevo Cliente</span>
@@ -223,7 +231,7 @@ export default function ClientesPage() {
           <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
           <input
             type="text"
-            placeholder="Buscar por nombre, número de teléfono o descripción..."
+            placeholder="Buscar por nombre, número de teléfono, pan habitual o descripción..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-12 pr-10 py-3.5 bg-stone-50 hover:bg-white focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 text-sm sm:text-base font-bold text-stone-900 focus:outline-none transition-all placeholder:text-stone-400 shadow-2xs"
@@ -264,7 +272,7 @@ export default function ClientesPage() {
                 {search ? "No se encontraron clientes con esa búsqueda" : "Aún no hay clientes registrados"}
               </p>
               <p className="text-sm text-stone-500 font-medium">
-                {search ? "Intenta con otro nombre o número." : "Haz clic en 'Registrar Nuevo Cliente' para agregar el primero."}
+                {search ? "Intenta con otro nombre, número o tipo de pan." : "Haz clic en 'Registrar Nuevo Cliente' para agregar el primero."}
               </p>
             </div>
             {search ? (
@@ -290,16 +298,22 @@ export default function ClientesPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-stone-100 border-b-2 border-stone-200 text-xs sm:text-sm font-black text-stone-700 uppercase tracking-wider">
-                  <th className="py-4 px-4 sm:px-5 w-20 text-center whitespace-nowrap"># Lista</th>
-                  <th className="py-4 px-5 sm:px-6 min-w-[240px]">Cliente / Nombre</th>
-                  <th className="py-4 px-5 sm:px-6 min-w-[320px] whitespace-nowrap">
-                    <div className="flex items-center gap-2">
+                  <th className="py-3.5 px-3 sm:px-4 w-16 text-center whitespace-nowrap"># Lista</th>
+                  <th className="py-3.5 px-4 sm:px-5 min-w-[200px]">Cliente / Nombre</th>
+                  <th className="py-3.5 px-4 sm:px-5 min-w-[210px] whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
                       <Phone className="w-4 h-4 text-stone-500" />
                       <span>Teléfono / WhatsApp</span>
                     </div>
                   </th>
-                  <th className="py-4 px-5 sm:px-6 min-w-[260px]">Descripción del Cliente</th>
-                  <th className="py-4 px-5 sm:px-6 text-center w-36 whitespace-nowrap">Acciones</th>
+                  <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-600" />
+                      <span>Lo que más compra (Moda)</span>
+                    </div>
+                  </th>
+                  <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">Descripción del Cliente</th>
+                  <th className="py-3.5 px-4 sm:px-5 text-center w-28 whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
@@ -312,20 +326,20 @@ export default function ClientesPage() {
                       className="hover:bg-amber-50/50 transition-colors"
                     >
                       {/* Número de Orden de Lista */}
-                      <td className="py-4 px-4 sm:px-5 text-center whitespace-nowrap">
+                      <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
                         <span className="inline-flex items-center justify-center min-w-8 h-8 px-2 rounded-xl bg-stone-100 border border-stone-300 font-mono text-xs sm:text-sm font-black text-stone-700 shadow-2xs">
                           {idx + 1}
                         </span>
                       </td>
 
                       {/* 1. Nombre */}
-                      <td className="py-4 px-5 sm:px-6">
+                      <td className="py-3.5 px-4 sm:px-5">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 font-black text-base sm:text-lg shadow-xs bg-amber-100 text-amber-900 border border-amber-300">
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 font-black text-sm sm:text-base shadow-xs bg-amber-100 text-amber-900 border border-amber-300">
                             {c.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <span className="text-base sm:text-lg font-black text-stone-900 block leading-snug">
+                            <span className="text-sm sm:text-base font-black text-stone-900 block leading-snug">
                               {c.name}
                             </span>
                           </div>
@@ -333,11 +347,11 @@ export default function ClientesPage() {
                       </td>
 
                       {/* 2. Número / Teléfono y WhatsApp */}
-                      <td className="py-4 px-5 sm:px-6 whitespace-nowrap">
+                      <td className="py-3.5 px-4 sm:px-5 whitespace-nowrap">
                         {c.phone && c.phone !== "N/A" ? (
-                          <div className="inline-flex items-center gap-2.5 whitespace-nowrap">
-                            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-stone-100/90 border border-stone-300/80 rounded-xl font-mono text-sm sm:text-base font-black text-stone-900 tracking-wide select-all shadow-2xs">
-                              <Phone className="w-4 h-4 text-amber-700 shrink-0" />
+                          <div className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-100/90 border border-stone-300/80 rounded-xl font-mono text-xs sm:text-sm font-black text-stone-900 tracking-wide select-all shadow-2xs">
+                              <Phone className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                               <span className="tabular-nums tracking-wider">{formatPhoneNumber(c.phone)}</span>
                             </div>
                             {cleanPhone.length >= 8 && (
@@ -345,11 +359,10 @@ export default function ClientesPage() {
                                 href={`https://wa.me/52${cleanPhone}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black px-3 py-1.5 rounded-xl text-xs sm:text-sm transition-all shadow-xs hover:shadow-md cursor-pointer shrink-0"
+                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-90 text-white flex items-center justify-center transition-all shadow-2xs hover:shadow-md cursor-pointer shrink-0"
                                 title={`Abrir WhatsApp (${formatPhoneNumber(c.phone)})`}
                               >
-                                <WhatsAppIcon className="w-4 h-4 fill-white shrink-0" />
-                                <span>WhatsApp</span>
+                                <WhatsAppIcon className="w-4 h-4 fill-white" />
                               </a>
                             )}
                           </div>
@@ -360,10 +373,24 @@ export default function ClientesPage() {
                         )}
                       </td>
 
-                      {/* 3. Cuadro de Descripción */}
-                      <td className="py-4 px-5 sm:px-6">
+                      {/* 3. Lo que más compra (Moda) */}
+                      <td className="py-3.5 px-4 sm:px-5">
+                        {c.favoriteProduct ? (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-50 to-orange-50/70 border border-amber-200/90 rounded-2xl text-xs sm:text-sm font-bold text-amber-950 shadow-2xs">
+                            <span className="text-base shrink-0">🍞</span>
+                            <span className="font-black text-stone-900 leading-snug">{c.favoriteProduct}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-stone-400 font-medium italic">
+                            Sin compras registradas
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 4. Cuadro de Descripción */}
+                      <td className="py-3.5 px-4 sm:px-5">
                         {c.notes ? (
-                          <div className="p-3 bg-stone-50 border border-stone-200 rounded-2xl text-xs sm:text-sm font-semibold text-stone-800 leading-relaxed max-w-md">
+                          <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-800 leading-relaxed max-w-sm">
                             {c.notes}
                           </div>
                         ) : (
@@ -373,25 +400,25 @@ export default function ClientesPage() {
                         )}
                       </td>
 
-                      {/* 4. Acciones */}
-                      <td className="py-4 px-5 sm:px-6 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                      {/* 5. Acciones */}
+                      <td className="py-3.5 px-4 sm:px-5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(c)}
-                            className="p-2.5 sm:p-3 rounded-2xl bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
+                            className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
                             title="Editar cliente"
                           >
-                            <Edit3 className="w-4 h-4 sm:w-5 sm:h-5" />
+                            <Edit3 className="w-4 h-4" />
                           </button>
 
                           <button
                             type="button"
                             onClick={() => setDeleteConfirm({ id: c.id, name: c.name })}
-                            className="p-2.5 sm:p-3 rounded-2xl bg-stone-100 hover:bg-rose-100 text-stone-400 hover:text-rose-700 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
+                            className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-rose-100 text-stone-400 hover:text-rose-700 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
                             title="Eliminar cliente"
                           >
-                            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -475,7 +502,43 @@ export default function ClientesPage() {
                 )}
               </div>
 
-              {/* 3. Cuadro con Descripción del Cliente */}
+              {/* 3. Pan o Producto Habitual (Moda de compra) */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  <span>Pan o Producto Habitual (Moda de Compra)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. Bolillo y Telera (150 pz), o Conchas"
+                  value={favoriteProduct}
+                  onChange={(e) => setFavoriteProduct(e.target.value)}
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all placeholder:text-stone-400 placeholder:font-normal"
+                />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-xs text-stone-500 font-bold self-center mr-1">Común:</span>
+                  {[
+                    "🍞 Bolillo",
+                    "🥪 Telera",
+                    "🥐 Pan Dulce (Conchas)",
+                    "🥖 Pambazo",
+                    "🥧 Pastelería / Pastel",
+                    "🍕 Pizza / Pastes",
+                    "🥨 Repostería Fina",
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setFavoriteProduct(chip)}
+                      className="px-2.5 py-1 bg-stone-100 hover:bg-amber-100 hover:text-amber-900 text-stone-700 text-xs font-bold rounded-lg border border-stone-200 transition-colors cursor-pointer"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Cuadro con Descripción del Cliente */}
               <div className="space-y-1.5">
                 <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
                   <FileText className="w-4 h-4 text-amber-600" />
@@ -581,7 +644,43 @@ export default function ClientesPage() {
                 )}
               </div>
 
-              {/* 3. Cuadro con Descripción del Cliente */}
+              {/* 3. Pan o Producto Habitual (Moda de compra) */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  <span>Pan o Producto Habitual (Moda de Compra)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. Bolillo y Telera (150 pz), o Conchas"
+                  value={editFavoriteProduct}
+                  onChange={(e) => setEditFavoriteProduct(e.target.value)}
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all"
+                />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-xs text-stone-500 font-bold self-center mr-1">Común:</span>
+                  {[
+                    "🍞 Bolillo",
+                    "🥪 Telera",
+                    "🥐 Pan Dulce (Conchas)",
+                    "🥖 Pambazo",
+                    "🥧 Pastelería / Pastel",
+                    "🍕 Pizza / Pastes",
+                    "🥨 Repostería Fina",
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setEditFavoriteProduct(chip)}
+                      className="px-2.5 py-1 bg-stone-100 hover:bg-amber-100 hover:text-amber-900 text-stone-700 text-xs font-bold rounded-lg border border-stone-200 transition-colors cursor-pointer"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Cuadro con Descripción del Cliente */}
               <div className="space-y-1.5">
                 <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
                   <FileText className="w-4 h-4 text-amber-600" />

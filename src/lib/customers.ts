@@ -25,6 +25,8 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     creditLimit: 3000,
     currentDebt: 850,
     totalPurchases: 18500,
+    favoriteProduct: "Bolillo y Telera (150 pz)",
+    purchaseCounts: { "Bolillo Caliente": 150, "Telera Tradicional": 80 },
     notes: "Compra 150 bolillos y 80 teleras diario. Pago semanal los viernes.",
     registeredAt: "2026-03-15",
   },
@@ -37,6 +39,8 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     creditLimit: 2000,
     currentDebt: 0,
     totalPurchases: 12400,
+    favoriteProduct: "Telera para Tortas (120 pz)",
+    purchaseCounts: { "Telera Tradicional": 120 },
     notes: "Compra 120 teleras para tortas cada 2 días.",
     registeredAt: "2026-04-10",
   },
@@ -50,6 +54,8 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     creditLimit: 0,
     currentDebt: 450,
     totalPurchases: 3200,
+    favoriteProduct: "Pastelería y Eventos",
+    purchaseCounts: { "Pastel Tres Leches": 2, "Pay de Queso": 5 },
     notes: "Pastel XV años pedido PED-101 (Flores lilas). Anticipo pagado.",
     registeredAt: "2026-08-20",
   },
@@ -61,6 +67,8 @@ export const INITIAL_CUSTOMERS: Customer[] = [
     creditLimit: 500,
     currentDebt: 0,
     totalPurchases: 4800,
+    favoriteProduct: "Pan Dulce (Conchas y Donas)",
+    purchaseCounts: { "Concha de Vainilla": 24, "Concha de Chocolate": 18, "Dona de Azúcar": 15 },
     notes: "Cliente fiel, compra pan dulce todas las noches.",
     registeredAt: "2026-02-01",
   },
@@ -81,7 +89,28 @@ export function getStoredCustomers(): Customer[] {
     }
     // Depurar y eliminar cualquier cliente virtual de mostrador (cli-0 / general) del listado guardado
     const cleaned = parsed.filter((c: Customer) => c.id !== "cli-0" && c.type !== "general");
-    if (cleaned.length !== parsed.length) {
+
+    // Retrocompatibilidad: Asignar producto habitual (moda) a los clientes por defecto si les falta
+    let updatedNeeded = false;
+    cleaned.forEach((c: Customer) => {
+      if (!c.favoriteProduct) {
+        if (c.id === "cli-1") {
+          c.favoriteProduct = "Bolillo y Telera (150 pz)";
+          updatedNeeded = true;
+        } else if (c.id === "cli-2") {
+          c.favoriteProduct = "Telera para Tortas (120 pz)";
+          updatedNeeded = true;
+        } else if (c.id === "cli-3") {
+          c.favoriteProduct = "Pastelería y Eventos";
+          updatedNeeded = true;
+        } else if (c.id === "cli-4") {
+          c.favoriteProduct = "Pan Dulce (Conchas y Donas)";
+          updatedNeeded = true;
+        }
+      }
+    });
+
+    if (cleaned.length !== parsed.length || updatedNeeded) {
       localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(cleaned));
     }
     return cleaned;
@@ -108,6 +137,7 @@ export function addQuickCustomer(customerData: {
   notes?: string;
   address?: string;
   email?: string;
+  favoriteProduct?: string;
 }): Customer {
   const current = getStoredCustomers();
   const newCustomer: Customer = {
@@ -118,6 +148,7 @@ export function addQuickCustomer(customerData: {
     creditLimit: customerData.creditLimit || 0,
     currentDebt: 0,
     totalPurchases: 0,
+    favoriteProduct: customerData.favoriteProduct?.trim() || undefined,
     notes: customerData.notes?.trim(),
     address: customerData.address?.trim(),
     email: customerData.email?.trim(),
@@ -127,4 +158,52 @@ export function addQuickCustomer(customerData: {
   const updated = [...current, newCustomer];
   saveStoredCustomers(updated);
   return newCustomer;
+}
+
+/**
+ * Registra los productos de una venta para un cliente y calcula automáticamente la MODA estadística
+ * (el producto que compra con mayor frecuencia / más piezas)
+ */
+export function recordCustomerSale(
+  customerId: string,
+  items: { name: string; quantity: number }[],
+  saleAmount: number
+): void {
+  if (typeof window === "undefined" || !customerId || customerId === "cli-0") return;
+  try {
+    const customers = getStoredCustomers();
+    const idx = customers.findIndex((c) => c.id === customerId);
+    if (idx === -1) return;
+
+    const customer = { ...customers[idx] };
+    customer.totalPurchases = (customer.totalPurchases || 0) + saleAmount;
+
+    // Actualizar conteos acumulados de compra por producto
+    const counts: Record<string, number> = { ...(customer.purchaseCounts || {}) };
+    for (const it of items) {
+      if (it.name) {
+        counts[it.name] = (counts[it.name] || 0) + (it.quantity || 1);
+      }
+    }
+    customer.purchaseCounts = counts;
+
+    // Calcular la moda (producto con mayor frecuencia acumulada)
+    let maxCount = 0;
+    let modeItem = customer.favoriteProduct || "";
+    for (const [prodName, count] of Object.entries(counts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        modeItem = prodName;
+      }
+    }
+
+    if (modeItem) {
+      customer.favoriteProduct = modeItem;
+    }
+
+    customers[idx] = customer;
+    saveStoredCustomers(customers);
+  } catch (e) {
+    console.error("Error recording customer purchase mode", e);
+  }
 }
