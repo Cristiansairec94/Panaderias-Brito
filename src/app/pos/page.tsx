@@ -44,7 +44,7 @@ import {
   Menu,
   Pencil
 } from "lucide-react";
-import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord } from "@/types";
+import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
@@ -161,6 +161,37 @@ function matchesPosCategory(prod: Product, catId: string): boolean {
 const CATEGORIES = POS_CATEGORIES;
 const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500];
 
+// Cuentas predefinidas para depósito / transferencia bancaria con nombres de a quién depositar
+const DEFAULT_TRANSFER_ACCOUNTS: TransferAccount[] = [
+  {
+    id: "cta-1",
+    name: "Don Antonio Brito (Don Toño)",
+    bank: "BBVA Bancomer",
+    clabe: "012 180 01598423012 5",
+    accountNumber: "159 842 3012",
+  },
+  {
+    id: "cta-2",
+    name: "Lupita Brito",
+    bank: "Banorte",
+    clabe: "072 180 00847291104 8",
+    accountNumber: "084 729 1104",
+  },
+  {
+    id: "cta-3",
+    name: "Panaderías Brito (Cuenta Fiscal)",
+    bank: "Santander México",
+    clabe: "014 180 06550914321 3",
+    accountNumber: "655 091 4321",
+  },
+  {
+    id: "cta-4",
+    name: "Cobro Rápido Panadería Brito (STP / Terminal)",
+    bank: "Mercado Pago / STP",
+    clabe: "646 180 12345678901 2",
+  },
+];
+
 export default function POSPage() {
   const { user } = useAuth();
   const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
@@ -174,6 +205,25 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [cashGiven, setCashGiven] = useState<string>("");
+
+  // Cuentas bancarias para cobro por transferencia
+  const [transferAccounts] = useState<TransferAccount[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("brito_transfer_accounts");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_TRANSFER_ACCOUNTS;
+  });
+  const [selectedTransferAccountId, setSelectedTransferAccountId] = useState<string>(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+
+  const selectedTransferAccount = useMemo(() => {
+    return transferAccounts.find((acc) => acc.id === selectedTransferAccountId) || transferAccounts[0];
+  }, [transferAccounts, selectedTransferAccountId]);
   
   // Shift & Cashier state
   const [cashierName, setCashierName] = useState(activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino");
@@ -662,6 +712,9 @@ export default function POSPage() {
         items: currentItems,
         total: currentTotal,
         paymentMethod: currentPaymentMethod,
+        transferAccount: currentPaymentMethod === "transferencia" && selectedTransferAccount
+          ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})`
+          : undefined,
         cashier: cashierName,
         cashGiven: currentCashGiven,
         change: currentChange,
@@ -1689,7 +1742,7 @@ export default function POSPage() {
         {/* Payment Configuration & Checkout Area (Más grande, números destacados y micro-animaciones) */}
         <div className="p-3 sm:p-4 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/40 space-y-2.5 shadow-xl shrink-0">
           {/* Fila Principal: Total a Cobrar + Selector de Forma de Pago */}
-          <div className="bg-gradient-to-br from-[#24130c] via-[#2d1810] to-[#1f100a] text-white p-3 sm:p-3.5 px-4 rounded-2xl shadow-lg border-2 border-amber-900/70 flex items-center justify-between gap-3">
+          <div className="bg-gradient-to-br from-[#24130c] via-[#2d1810] to-[#1f100a] text-white p-3 sm:p-3.5 px-4 rounded-2xl shadow-lg border-2 border-amber-900/70 flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-black uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5">
                 <span>Total a Cobrar</span>
@@ -1700,12 +1753,12 @@ export default function POSPage() {
               </div>
             </div>
 
-            {/* Selector de Método de Pago integrado y animado */}
-            <div className="flex items-center bg-black/40 p-1.5 rounded-xl border border-white/10 gap-1.5 shrink-0">
+            {/* Selector de Método de Pago integrado con texto visible siempre */}
+            <div className="flex items-center bg-black/50 p-1.5 rounded-2xl border border-white/10 gap-1.5 flex-wrap">
               {[
                 { id: "efectivo", label: "Efectivo", icon: DollarSign },
                 { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
-                { id: "transferencia", label: "Transfer.", icon: Send },
+                { id: "transferencia", label: "Transferencia", icon: Send },
               ].map((m) => {
                 const Icon = m.icon;
                 const isSelected = paymentMethod === m.id;
@@ -1714,14 +1767,14 @@ export default function POSPage() {
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMethod(m.id as any)}
-                    className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs sm:text-sm font-black transition-all duration-200 active:scale-95 ${
+                    className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs sm:text-sm font-black transition-all duration-200 active:scale-95 cursor-pointer ${
                       isSelected
                         ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md scale-105 ring-2 ring-amber-300/40"
                         : "text-amber-200/80 hover:text-white hover:bg-white/10"
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span className="hidden xs:inline">{m.label}</span>
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="font-black whitespace-nowrap">{m.label}</span>
                   </button>
                 );
               })}
@@ -1785,6 +1838,97 @@ export default function POSPage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Manejo de Tarjeta */}
+          {paymentMethod === "tarjeta" && (
+            <div className="p-3 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-300/90 flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h5 className="text-xs sm:text-sm font-black text-stone-900">Cobro con Tarjeta</h5>
+                  <p className="text-[11px] text-stone-600 font-bold">Cobrar en terminal bancaria</p>
+                </div>
+              </div>
+              <span className="font-black text-sm sm:text-base text-amber-950 bg-amber-200/80 px-3 py-1 rounded-xl border border-amber-300 shadow-2xs">
+                {formatCurrency(total)}
+              </span>
+            </div>
+          )}
+
+          {/* Manejo de Transferencia con Selector Desplegable de Cuentas */}
+          {paymentMethod === "transferencia" && (
+            <div className="p-3.5 bg-gradient-to-br from-amber-50/95 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-400/90 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
+              <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs sm:text-sm font-black text-stone-900 leading-tight">
+                      Pago por Transferencia
+                    </h5>
+                    <p className="text-[11px] text-stone-600 font-bold">
+                      Selecciona la cuenta de depósito
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs sm:text-sm font-black text-amber-950 bg-amber-200/80 border border-amber-300 px-3 py-1 rounded-xl shadow-2xs">
+                  {formatCurrency(total)}
+                </span>
+              </div>
+
+              {/* Opción Desplegable de Cuentas con Nombres de a Quién Depositar */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">
+                  ¿A quién va a depositar? (Cuenta / Beneficiario):
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedTransferAccountId}
+                    onChange={(e) => setSelectedTransferAccountId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white text-stone-900 rounded-xl border-2 border-amber-400 focus:border-amber-600 font-black text-xs sm:text-sm focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
+                  >
+                    {transferAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} — {acc.bank}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-stone-600 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Ficha Visual con Datos de la Cuenta Seleccionada */}
+              {selectedTransferAccount && (
+                <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-2xs space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-stone-500 font-bold">Depositar a:</span>
+                    <span className="font-black text-stone-900">{selectedTransferAccount.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-stone-500 font-bold">Banco:</span>
+                    <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                      {selectedTransferAccount.bank}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-stone-100">
+                    <span className="text-stone-600 font-bold">CLABE:</span>
+                    <span className="font-mono font-black text-stone-900 bg-stone-100 px-2.5 py-0.5 rounded-lg border border-stone-200 select-all tracking-wider">
+                      {selectedTransferAccount.clabe}
+                    </span>
+                  </div>
+                  {selectedTransferAccount.accountNumber && (
+                    <div className="flex items-center justify-between text-[11px] text-stone-500">
+                      <span>No. Cuenta:</span>
+                      <span className="font-mono font-bold text-stone-800">{selectedTransferAccount.accountNumber}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -1859,6 +2003,7 @@ export default function POSPage() {
           items={completedSale.items}
           total={completedSale.total}
           paymentMethod={completedSale.paymentMethod}
+          transferAccount={completedSale.transferAccount}
           cashGiven={completedSale.cashGiven}
           change={completedSale.change}
           cashierName={completedSale.cashier}

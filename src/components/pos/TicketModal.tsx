@@ -12,6 +12,7 @@ interface TicketModalProps {
   items: CartItem[];
   total: number;
   paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  transferAccount?: string;
   cashGiven?: number;
   change?: number;
   cashierName?: string;
@@ -30,6 +31,7 @@ export default function TicketModal({
   items,
   total,
   paymentMethod,
+  transferAccount,
   cashGiven,
   change,
   cashierName = "Caja Principal - Don Toño",
@@ -135,6 +137,12 @@ export default function TicketModal({
                   {paymentMethod}
                 </span>
               </div>
+              {paymentMethod === "transferencia" && transferAccount && (
+                <div className="flex justify-between text-[10px] text-stone-600 border-t border-stone-100 pt-1">
+                  <span>CUENTA:</span>
+                  <span className="font-bold text-stone-900 text-right max-w-[190px] truncate">{transferAccount}</span>
+                </div>
+              )}
             </div>
 
             {/* Items Breakdown */}

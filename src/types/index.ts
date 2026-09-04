@@ -17,12 +17,21 @@ export interface CartItem {
   quantity: number;
 }
 
+export interface TransferAccount {
+  id: string;
+  name: string;
+  bank: string;
+  clabe: string;
+  accountNumber?: string;
+}
+
 export interface Sale {
   id: string;
   date: string;
   items: CartItem[];
   total: number;
   paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  transferAccount?: string;
   cashier: string;
   cashGiven?: number;
   change?: number;
@@ -75,6 +84,7 @@ export interface CustomerPurchase {
   branchName?: string;
   cashier?: string;
   paymentMethod?: string;
+  transferAccount?: string;
 }
 
 export interface Customer {
