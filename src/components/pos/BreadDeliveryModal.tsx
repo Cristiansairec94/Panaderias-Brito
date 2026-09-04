@@ -460,7 +460,7 @@ export default function BreadDeliveryModal({
                         setIsDriverDropdownOpen(true);
                       }}
                       onFocus={() => setIsDriverDropdownOpen(true)}
-                      className="w-full pl-9 pr-14 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-50/80 font-bold text-stone-900 shadow-2xs"
+                      className="w-full pl-9 pr-14 py-2.5 text-sm sm:text-base rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-50/90 font-bold text-stone-900 shadow-2xs"
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                       {driverName && (
@@ -604,7 +604,7 @@ export default function BreadDeliveryModal({
                     placeholder="Buscar pan por nombre o precio (ej. Bolillo, Concha, 10)..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shadow-2xs font-medium"
+                    className="w-full pl-10 pr-9 py-2.5 text-sm sm:text-base rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shadow-2xs font-semibold text-stone-900"
                   />
                   {search && (
                     <button
@@ -669,7 +669,7 @@ export default function BreadDeliveryModal({
                       >
                         {/* Info del Pan */}
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="w-11 h-11 rounded-xl bg-stone-100 overflow-hidden shrink-0 flex items-center justify-center border border-stone-200">
+                          <div className="w-12 h-12 rounded-xl bg-stone-100 overflow-hidden shrink-0 flex items-center justify-center border border-stone-200 shadow-2xs">
                             {prod.image ? (
                               <img
                                 src={prod.image}
@@ -677,21 +677,21 @@ export default function BreadDeliveryModal({
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span className="text-xl">{prod.icon || "🥖"}</span>
+                              <span className="text-2xl">{prod.icon || "🥖"}</span>
                             )}
                           </div>
 
                           <div className="min-w-0">
-                            <h4 className="text-xs sm:text-sm font-black text-stone-900 truncate">
+                            <h4 className="text-sm sm:text-base font-black text-stone-900 truncate">
                               {prod.name}
                             </h4>
-                            <div className="flex items-center gap-2 text-[11px] text-stone-500 font-medium">
-                              <span className="font-bold text-amber-800">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-stone-600 font-semibold mt-0.5">
+                              <span className="font-bold text-amber-900">
                                 {formatCurrency(Number(prod.price) || 0)}
                               </span>
                               <span>•</span>
-                              <span className={(prod.stock || 0) <= 5 ? "text-rose-600 font-bold" : "text-stone-600"}>
-                                Stock actual: {prod.stock || 0} pz
+                              <span className={(prod.stock || 0) <= 5 ? "text-rose-600 font-bold" : "text-stone-700"}>
+                                Stock: {prod.stock || 0} pz
                               </span>
                             </div>
                           </div>
@@ -713,10 +713,10 @@ export default function BreadDeliveryModal({
                               <button
                                 type="button"
                                 onClick={() => handleAddQuantity(prod.id, -1)}
-                                className="w-7 h-7 rounded-xl bg-white hover:bg-rose-50 text-stone-700 hover:text-rose-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95"
+                                className="w-8 sm:w-9 h-8 sm:h-9 rounded-xl bg-white hover:bg-rose-50 text-stone-700 hover:text-rose-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95"
                                 title="Restar 1 pieza"
                               >
-                                <Minus className="w-3.5 h-3.5" />
+                                <Minus className="w-4 h-4" />
                               </button>
                             )}
 
@@ -733,7 +733,7 @@ export default function BreadDeliveryModal({
                                   handleSetQuantity(prod.id, val);
                                 }}
                                 onFocus={(e) => e.target.select()}
-                                className={`w-14 sm:w-16 h-8 text-center text-xs sm:text-sm font-black rounded-xl border transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                className={`w-16 sm:w-20 h-9 sm:h-10 text-center text-sm sm:text-base font-black rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                                   isSelected
                                     ? "bg-emerald-700 text-white border-emerald-700 shadow-2xs"
                                     : "bg-white text-stone-900 border-stone-300 placeholder:text-stone-400 hover:border-emerald-400"
@@ -746,10 +746,10 @@ export default function BreadDeliveryModal({
                             <button
                               type="button"
                               onClick={() => handleAddQuantity(prod.id, 1)}
-                              className="w-7 h-7 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95 font-black text-sm"
+                              className="w-8 sm:w-9 h-8 sm:h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95 font-black text-base"
                               title="Sumar 1 pieza"
                             >
-                              <Plus className="w-3.5 h-3.5" />
+                              <Plus className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
@@ -766,11 +766,11 @@ export default function BreadDeliveryModal({
               {/* Header de la Remisión */}
               <div className="p-3.5 sm:p-4 border-b border-stone-200 bg-stone-50/80 flex items-center justify-between shrink-0">
                 <div>
-                  <h3 className="text-xs sm:text-sm font-black text-stone-900 flex items-center gap-1.5">
-                    <PackageCheck className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+                    <PackageCheck className="w-5 h-5 text-emerald-600" />
                     <span>Pan por Ingresar a Mostrador</span>
                   </h3>
-                  <p className="text-[11px] text-stone-500 font-medium">
+                  <p className="text-xs sm:text-sm text-stone-600 font-semibold mt-0.5">
                     {selectedProductList.length} variedad(es) seleccionada(s)
                   </p>
                 </div>
@@ -779,7 +779,7 @@ export default function BreadDeliveryModal({
                   <button
                     type="button"
                     onClick={handleClearAll}
-                    className="text-[11px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                    className="text-xs sm:text-sm font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
                   >
                     Vaciar lista
                   </button>
@@ -790,12 +790,14 @@ export default function BreadDeliveryModal({
               <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5">
                 {selectedProductList.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center p-6 text-stone-400 space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-stone-100 flex items-center justify-center text-3xl text-stone-300">
+                    <div className="w-16 h-16 rounded-2xl bg-stone-100 flex items-center justify-center text-4xl text-stone-400 shadow-2xs">
                       🥖
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-stone-600">No has agregado pan a la entrega</p>
-                      <p className="text-xs text-stone-400 mt-1 max-w-xs">
+                    <div className="space-y-1">
+                      <p className="text-base sm:text-lg font-black text-stone-800">
+                        No has agregado pan a la entrega
+                      </p>
+                      <p className="text-xs sm:text-sm text-stone-500 font-medium max-w-sm">
                         Selecciona panes a la izquierda e ingresa las piezas recibidas para cargar lo que dejó la camioneta.
                       </p>
                     </div>
@@ -808,18 +810,20 @@ export default function BreadDeliveryModal({
                     return (
                       <div
                         key={product.id}
-                        className="p-3 rounded-2xl border-2 border-emerald-100 bg-emerald-50/30 space-y-2 transition-all"
+                        className="p-3.5 sm:p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 space-y-2.5 transition-all shadow-2xs"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <h4 className="font-extrabold text-xs sm:text-sm text-stone-900 truncate">
+                            <h4 className="font-black text-sm sm:text-base text-stone-900 truncate">
                               {product.name}
                             </h4>
-                            <div className="flex items-center gap-2 text-[11px] text-stone-500 font-medium mt-0.5">
-                              <span>Precio: {formatCurrency(Number(product.price) || 0)}</span>
+                            <div className="flex items-center gap-2.5 text-xs sm:text-sm text-stone-600 font-semibold mt-1">
+                              <span className="text-amber-900 font-bold">
+                                {formatCurrency(Number(product.price) || 0)}
+                              </span>
                               <span>•</span>
                               <span className="text-stone-700">
-                                Stock: {currentStk} ➔ <strong className="text-emerald-700">{finalStock} pz</strong>
+                                Stock: {currentStk} ➔ <strong className="text-emerald-700 font-black">{finalStock} pz</strong>
                               </span>
                             </div>
                           </div>
@@ -827,22 +831,23 @@ export default function BreadDeliveryModal({
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(product.id)}
-                            className="text-stone-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
+                            className="text-stone-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                             title="Quitar de la lista"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5" />
                           </button>
                         </div>
 
                         {/* Stepper de cantidad */}
-                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-emerald-200/50">
-                          <div className="flex items-center gap-1">
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-emerald-200/60">
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => handleAddQuantity(product.id, -1)}
-                              className="w-7 h-7 rounded-lg bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 flex items-center justify-center font-black active:scale-95 transition-transform cursor-pointer"
+                              className="w-9 h-9 rounded-xl bg-white border border-stone-200 hover:bg-rose-50 text-stone-700 hover:text-rose-600 flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-2xs"
+                              title="Restar 1 pieza"
                             >
-                              <Minus className="w-3.5 h-3.5" />
+                              <Minus className="w-4 h-4" />
                             </button>
 
                             <input
@@ -850,31 +855,22 @@ export default function BreadDeliveryModal({
                               min="1"
                               value={quantity}
                               onChange={(e) => handleSetQuantity(product.id, e.target.value)}
-                              className="w-16 text-center py-1 text-xs sm:text-sm font-black rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-20 text-center py-1.5 text-sm sm:text-base font-black rounded-xl border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-stone-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none shadow-2xs"
                             />
 
                             <button
                               type="button"
                               onClick={() => handleAddQuantity(product.id, 1)}
-                              className="w-7 h-7 rounded-lg bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 flex items-center justify-center font-black active:scale-95 transition-transform cursor-pointer"
+                              className="w-9 h-9 rounded-xl bg-white border border-stone-200 hover:bg-emerald-50 text-stone-700 hover:text-emerald-700 flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-2xs"
+                              title="Sumar 1 pieza"
                             >
-                              <Plus className="w-3.5 h-3.5" />
+                              <Plus className="w-4 h-4" />
                             </button>
                           </div>
 
-                          {/* Chips de adición rápida directa */}
-                          <div className="flex items-center gap-1">
-                            {[10, 25, 50].map((addStep) => (
-                              <button
-                                key={addStep}
-                                type="button"
-                                onClick={() => handleAddQuantity(product.id, addStep)}
-                                className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-emerald-100/80 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 transition-colors cursor-pointer"
-                              >
-                                +{addStep}
-                              </button>
-                            ))}
-                          </div>
+                          <span className="text-xs sm:text-sm font-black text-emerald-900 bg-emerald-100 px-3 py-1 rounded-xl">
+                            {formatCurrency((Number(product.price) || 0) * quantity)}
+                          </span>
                         </div>
                       </div>
                     );
@@ -883,34 +879,36 @@ export default function BreadDeliveryModal({
               </div>
 
               {/* Resumen Final y Botón de Ingreso al Mostrador */}
-              <div className="p-4 border-t border-stone-200 bg-stone-50 space-y-3 shrink-0">
-                <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs space-y-1.5">
-                  <div className="flex items-center justify-between text-xs text-stone-600 font-medium">
+              <div className="p-4 sm:p-5 border-t border-stone-200 bg-stone-50 space-y-3 shrink-0">
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-stone-200/90 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-xs sm:text-sm text-stone-600 font-bold">
                     <span>Chofer / Repartidor:</span>
-                    <strong className="text-stone-900 font-bold flex items-center gap-1">
-                      <span>🚚</span>
+                    <strong className="text-stone-950 font-black text-sm sm:text-base flex items-center gap-1.5">
+                      <span className="text-base sm:text-lg">🚚</span>
                       <span>{driverName.trim() || (savedDrivers[0] || "Manuel Sánchez")}</span>
                     </strong>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-stone-600 font-medium">
+                  <div className="flex items-center justify-between text-xs sm:text-sm text-stone-600 font-bold">
                     <span>Valor estimado de venta:</span>
-                    <strong className="text-amber-800">{formatCurrency(totalEstimatedValue)}</strong>
+                    <strong className="text-amber-900 font-black text-sm sm:text-base">
+                      {formatCurrency(totalEstimatedValue)}
+                    </strong>
                   </div>
-                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
-                    <span className="text-xs font-black text-stone-800 uppercase tracking-wider">
+                  <div className="pt-2.5 border-t-2 border-stone-100 flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-black text-stone-900 uppercase tracking-wider">
                       Total a Sumar:
                     </span>
-                    <span className="text-xl sm:text-2xl font-black text-emerald-700">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-700">
                       +{totalPieces} piezas
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm text-stone-600 hover:text-stone-900 hover:bg-stone-200 transition-colors cursor-pointer"
+                    className="py-4 px-5 rounded-2xl font-black text-xs sm:text-sm text-stone-600 hover:text-stone-900 hover:bg-stone-200 transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
@@ -919,13 +917,13 @@ export default function BreadDeliveryModal({
                     type="button"
                     onClick={handleSubmit}
                     disabled={totalPieces <= 0 || isSubmitting}
-                    className={`flex-1 py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer ${
+                    className={`flex-1 py-4 px-6 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2.5 transition-all shadow-md active:scale-95 cursor-pointer ${
                       totalPieces > 0 && !isSubmitting
                         ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-900/20"
                         : "bg-stone-200 text-stone-400 cursor-not-allowed shadow-none"
                     }`}
                   >
-                    <PackageCheck className="w-5 h-5" />
+                    <PackageCheck className="w-5 h-5 sm:w-6 sm:h-6" />
                     <span>
                       {isSubmitting
                         ? "Ingresando pan..."
