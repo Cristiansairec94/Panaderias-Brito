@@ -233,8 +233,8 @@
       const [cashGiven, setCashGiven] = useState("");
       
       // Shift & Expenses
-      const [cashierName, setCashierName] = useState("Don Toño Brito");
-      const [shiftName, setShiftName] = useState("Turno Matutino");
+      const [cashierName, setCashierName] = useState("Cajera 1 - Turno Matutino");
+      const [shiftName, setShiftName] = useState("Turno Matutino (06:00 - 14:00)");
       const [initialCashFund, setInitialCashFund] = useState(500);
       const [expensesList, setExpensesList] = useState(() => {
         const saved = localStorage.getItem("brito_expenses");
@@ -1017,49 +1017,61 @@
                     </div>
                   </div>
 
-                  {/* Relevo de Turno */}
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const form = e.target;
-                      const nextCashier = form.nextCashier.value;
-                      const nextShift = form.nextShift.value;
-                      const notes = form.notes.value;
+                  {/* Relevo de Turno (Solo Cajera 1 y Cajera 2) */}
+                  <div className="p-4 bg-stone-50 rounded-2xl border space-y-3 text-xs">
+                    <span className="font-extrabold text-stone-900 block flex items-center gap-1.5">
+                      <span>🏁 Realizar Relevo & Entrega de Turno:</span>
+                    </span>
 
-                      setCashierName(nextCashier);
-                      setShiftName(nextShift);
-                      setExpensesList([]);
-                      setSalesList([]);
-                      setShowDrawerModal(false);
-                      alert(`🏁 ¡Corte de Caja Exitoso!\n\nEntregó: ${cashierName}\nRecibió: ${nextCashier}\nTurno: ${nextShift}\nEfectivo en Caja: ${formatCurrency(cashInDrawer)}\n\nSe ha notificado al administrador.`);
-                    }}
-                    className="p-4 bg-stone-50 rounded-2xl border space-y-3 text-xs"
-                  >
-                    <span className="font-bold text-stone-800 block">🏁 Realizar Relevo & Entrega de Turno:</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] font-bold text-stone-500 block">Cajero Entrante (Recibe):</label>
-                        <select name="nextCashier" className="w-full p-2 border rounded-xl font-bold bg-white">
-                          <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
-                          <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
-                          <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
-                          <option value="María Brito">María Brito</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-stone-500 block">Turno Siguiente:</label>
-                        <select name="nextShift" className="w-full p-2 border rounded-xl font-bold bg-white">
-                          <option value="Turno Vespertino (14:00 - 22:00)">Turno Vespertino</option>
-                          <option value="Turno Matutino (06:00 - 14:00)">Turno Matutino</option>
-                        </select>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-emerald-800 uppercase block">
+                        Cajera que Recibe la Caja (Entrante):
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCashierName("Cajera 1 - Turno Matutino");
+                            setShiftName("Turno Matutino (06:00 - 14:00)");
+                            setExpensesList([]);
+                            setSalesList([]);
+                            setShowDrawerModal(false);
+                            alert(`🏁 ¡Corte de Caja Exitoso!\n\nRecibió: Cajera 1 - Turno Matutino\nTurno: Turno Matutino (06:00 - 14:00)\nEfectivo en Caja: ${formatCurrency(cashInDrawer)}\n\nSe ha notificado al administrador.`);
+                          }}
+                          className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all active:scale-95 border ${
+                            cashierName.includes("Cajera 1")
+                              ? "bg-emerald-800 text-white border-emerald-950 shadow-md font-black ring-2 ring-emerald-400"
+                              : "bg-white text-stone-700 hover:bg-emerald-50 border-stone-200"
+                          }`}
+                        >
+                          <span className="text-xl">👩‍🍳</span>
+                          <span className="font-extrabold text-[11px]">Cajera 1</span>
+                          <span className="text-[9px] opacity-75">Turno Matutino</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCashierName("Cajera 2 - Turno Vespertino");
+                            setShiftName("Turno Vespertino (14:00 - 22:00)");
+                            setExpensesList([]);
+                            setSalesList([]);
+                            setShowDrawerModal(false);
+                            alert(`🏁 ¡Corte de Caja Exitoso!\n\nRecibió: Cajera 2 - Turno Vespertino\nTurno: Turno Vespertino (14:00 - 22:00)\nEfectivo en Caja: ${formatCurrency(cashInDrawer)}\n\nSe ha notificado al administrador.`);
+                          }}
+                          className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all active:scale-95 border ${
+                            cashierName.includes("Cajera 2")
+                              ? "bg-emerald-800 text-white border-emerald-950 shadow-md font-black ring-2 ring-emerald-400"
+                              : "bg-white text-stone-700 hover:bg-emerald-50 border-stone-200"
+                          }`}
+                        >
+                          <span className="text-xl">👩‍🍳</span>
+                          <span className="font-extrabold text-[11px]">Cajera 2</span>
+                          <span className="text-[9px] opacity-75">Turno Vespertino</span>
+                        </button>
                       </div>
                     </div>
-                    <input name="notes" placeholder="Notas de entrega (ej. vitrina llena, todo en orden)..." className="w-full p-2 border rounded-xl" />
-                    
-                    <button type="submit" className="w-full py-3 bg-amber-950 hover:bg-black text-white font-black rounded-xl text-xs shadow-md">
-                      🏁 Finalizar Corte y Entregar Turno
-                    </button>
-                  </form>
+                  </div>
                 </div>
               </div>
             </div>

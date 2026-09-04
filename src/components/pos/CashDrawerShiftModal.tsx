@@ -448,71 +448,142 @@ export default function CashDrawerShiftModal({
           ) : (
             /* PESTAÑA 2: FORMULARIO DE CORTE DE CAJA Y CAMBIO DE TURNO */
             <div className="space-y-5">
-              {/* Sección 1: Horario & Relevo de Cajeros */}
-              <div className="p-4 bg-stone-50 rounded-3xl border border-stone-200/90 space-y-3">
-                <div className="flex items-center gap-2 border-b border-stone-200 pb-2">
-                  <Calendar className="w-4 h-4 text-amber-700" />
-                  <h3 className="font-extrabold text-sm text-stone-900">1. Horario del Turno & Relevo de Cajeros</h3>
+              {/* Sección 1: Horario & Relevo de Cajeras (Solo Cajera 1 y Cajera 2) */}
+              <div className="p-5 bg-stone-50 rounded-3xl border border-stone-200/90 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-stone-200 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-amber-100 text-amber-800 rounded-lg">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-extrabold text-sm text-stone-900">1. Horario del Turno & Relevo de Cajeras</h3>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-200">
+                    Puesto Fijo: 2 Turnos
+                  </span>
                 </div>
 
+                {/* Horario y Turno */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   {/* Hora Inicio y Fin */}
-                  <div className="p-3 bg-white rounded-2xl border space-y-1">
-                    <label className="text-[10px] font-bold text-stone-500 block uppercase">Horario del Turno:</label>
+                  <div className="p-3 bg-white rounded-2xl border border-stone-200/80 space-y-1.5 shadow-xs">
+                    <label className="text-[10px] font-black text-stone-500 block uppercase tracking-wider">
+                      ⏰ Horario del Turno Actual:
+                    </label>
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
                         value={shiftStartTime}
                         onChange={(e) => setShiftStartTime(e.target.value)}
-                        className="w-24 p-1.5 border rounded-lg font-black text-xs text-center"
+                        className="w-24 p-2 border-2 border-stone-200 rounded-xl font-black text-xs text-center text-stone-900 focus:border-amber-500 focus:outline-none"
                         placeholder="06:00 AM"
                       />
                       <span className="font-bold text-stone-400">hasta</span>
-                      <span className="p-1.5 bg-amber-100 text-amber-900 font-black rounded-lg text-xs">
+                      <span className="p-2 bg-amber-100 text-amber-950 font-black rounded-xl text-xs shadow-xs">
                         {currentTime || "Ahora"} (Corte)
                       </span>
                     </div>
                   </div>
 
-                  {/* Turno Siguiente */}
-                  <div className="p-3 bg-white rounded-2xl border space-y-1">
-                    <label className="text-[10px] font-bold text-stone-500 block uppercase">Próximo Turno:</label>
-                    <select
-                      value={nextShiftName}
-                      onChange={(e) => setNextShiftName(e.target.value)}
-                      className="w-full p-1.5 border rounded-lg font-black text-xs bg-white text-stone-800"
-                    >
-                      <option value="Turno Vespertino (14:00 - 22:00)">Turno Vespertino (14:00 - 22:00)</option>
-                      <option value="Turno Matutino (06:00 - 14:00)">Turno Matutino (06:00 - 14:00)</option>
-                      <option value="Turno Nocturno">Turno Nocturno</option>
-                    </select>
+                  {/* Próximo Turno */}
+                  <div className="p-3 bg-white rounded-2xl border border-stone-200/80 space-y-1.5 shadow-xs">
+                    <label className="text-[10px] font-black text-stone-500 block uppercase tracking-wider">
+                      📋 Turno que se Iniciará:
+                    </label>
+                    <div className="p-2 bg-stone-100 rounded-xl font-black text-xs text-stone-800 flex items-center justify-between">
+                      <span>{nextShiftName}</span>
+                      <span className="text-[10px] text-stone-400">Automático</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selector Visual Animado: Cajera Saliente vs Cajera Entrante */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                  {/* Cajera Saliente (Entrega Cuentas) */}
+                  <div className="p-3.5 bg-white rounded-2xl border border-rose-200 shadow-xs space-y-2">
+                    <label className="text-[10px] font-black text-rose-800 uppercase tracking-wide flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
+                      <span>Cajera que Entrega Cuentas (Saliente):</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOutgoingCashier("Cajera 1 - Turno Matutino");
+                          setIncomingCashier("Cajera 2 - Turno Vespertino");
+                          setNextShiftName("Turno Vespertino (14:00 - 22:00)");
+                        }}
+                        className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all duration-300 active:scale-95 border ${
+                          outgoingCashier.includes("Cajera 1")
+                            ? "bg-gradient-to-br from-rose-900 to-rose-950 text-white border-rose-950 shadow-md ring-2 ring-rose-500/40 font-black scale-[1.02]"
+                            : "bg-stone-50 text-stone-700 hover:bg-rose-50/60 border-stone-200 hover:scale-[1.01]"
+                        }`}
+                      >
+                        <span className="text-xl">👩‍🍳</span>
+                        <span className="font-extrabold text-[11px]">Cajera 1</span>
+                        <span className="text-[9px] opacity-75">Turno Matutino</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOutgoingCashier("Cajera 2 - Turno Vespertino");
+                          setIncomingCashier("Cajera 1 - Turno Matutino");
+                          setNextShiftName("Turno Matutino (06:00 - 14:00)");
+                        }}
+                        className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all duration-300 active:scale-95 border ${
+                          outgoingCashier.includes("Cajera 2")
+                            ? "bg-gradient-to-br from-rose-900 to-rose-950 text-white border-rose-950 shadow-md ring-2 ring-rose-500/40 font-black scale-[1.02]"
+                            : "bg-stone-50 text-stone-700 hover:bg-rose-50/60 border-stone-200 hover:scale-[1.01]"
+                        }`}
+                      >
+                        <span className="text-xl">👩‍🍳</span>
+                        <span className="font-extrabold text-[11px]">Cajera 2</span>
+                        <span className="text-[9px] opacity-75">Turno Vespertino</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Cajero Saliente */}
-                  <div className="p-3 bg-white rounded-2xl border space-y-1">
-                    <label className="text-[10px] font-bold text-rose-700 block uppercase">Cajero que Entrega Cuentas (Saliente):</label>
-                    <input
-                      type="text"
-                      value={outgoingCashier}
-                      onChange={(e) => setOutgoingCashier(e.target.value)}
-                      className="w-full p-2 border rounded-xl font-black text-xs text-stone-900 bg-rose-50/50"
-                    />
-                  </div>
+                  {/* Cajera Entrante (Recibe la Caja) */}
+                  <div className="p-3.5 bg-white rounded-2xl border-2 border-emerald-400 shadow-md shadow-emerald-900/5 space-y-2">
+                    <label className="text-[10px] font-black text-emerald-900 uppercase tracking-wide flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
+                      <span>Cajera que Recibe la Caja (Entrante):</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIncomingCashier("Cajera 1 - Turno Matutino");
+                          setNextShiftName("Turno Matutino (06:00 - 14:00)");
+                        }}
+                        className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all duration-300 active:scale-95 border ${
+                          incomingCashier.includes("Cajera 1")
+                            ? "bg-gradient-to-br from-emerald-800 to-emerald-950 text-white border-emerald-950 shadow-lg ring-2 ring-emerald-400/50 font-black scale-[1.02]"
+                            : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200 hover:scale-[1.01]"
+                        }`}
+                      >
+                        <span className="text-xl">👩‍🍳</span>
+                        <span className="font-extrabold text-[11px]">Cajera 1</span>
+                        <span className="text-[9px] opacity-75">Turno Matutino</span>
+                      </button>
 
-                  {/* Cajero Entrante */}
-                  <div className="p-3 bg-white rounded-2xl border space-y-1">
-                    <label className="text-[10px] font-bold text-emerald-700 block uppercase">Cajero que Recibe la Caja (Entrante):</label>
-                    <select
-                      value={incomingCashier}
-                      onChange={(e) => setIncomingCashier(e.target.value)}
-                      className="w-full p-2 border rounded-xl font-black text-xs text-stone-900 bg-emerald-50/50"
-                    >
-                      <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
-                      <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
-                      <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
-                      <option value="María Brito">María Brito</option>
-                      <option value="Lupita Brito">Lupita Brito</option>
-                    </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIncomingCashier("Cajera 2 - Turno Vespertino");
+                          setNextShiftName("Turno Vespertino (14:00 - 22:00)");
+                        }}
+                        className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all duration-300 active:scale-95 border ${
+                          incomingCashier.includes("Cajera 2")
+                            ? "bg-gradient-to-br from-emerald-800 to-emerald-950 text-white border-emerald-950 shadow-lg ring-2 ring-emerald-400/50 font-black scale-[1.02]"
+                            : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200 hover:scale-[1.01]"
+                        }`}
+                      >
+                        <span className="text-xl">👩‍🍳</span>
+                        <span className="font-extrabold text-[11px]">Cajera 2</span>
+                        <span className="text-[9px] opacity-75">Turno Vespertino</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

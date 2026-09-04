@@ -46,7 +46,7 @@ export default function ExpensesModal({
   // Simple form fields
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
-  const [authorizedBy, setAuthorizedBy] = useState("Don Toño Brito");
+  const [authorizedBy, setAuthorizedBy] = useState("Cajera 1 - Turno Matutino");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
@@ -239,23 +239,36 @@ export default function ExpensesModal({
                 />
               </div>
 
-              {/* 3. Responsable / Quién lo tomó */}
-              <div className="space-y-1">
+              {/* 3. Responsable / Quién lo tomó (Solo Cajera 1 y Cajera 2) */}
+              <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-stone-500 block">
                   3. ¿Quién tomó o autorizó el dinero?
                 </label>
-                <div className="flex gap-2">
-                  <select
-                    value={authorizedBy}
-                    onChange={(e) => setAuthorizedBy(e.target.value)}
-                    className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-xs text-stone-800 focus:outline-none focus:border-amber-600"
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAuthorizedBy("Cajera 1 - Turno Matutino")}
+                    className={`p-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 border ${
+                      authorizedBy.includes("Cajera 1")
+                        ? "bg-gradient-to-r from-amber-950 to-stone-900 text-white border-amber-800 shadow-md ring-2 ring-amber-500/30 font-black scale-[1.02]"
+                        : "bg-stone-50 text-stone-700 hover:bg-amber-50/60 border-stone-200"
+                    }`}
                   >
-                    <option value="Don Toño Brito">Don Antonio Brito (Propietario)</option>
-                    <option value="Cajero 1 - Turno Mañana">Cajero 1 - Turno Mañana</option>
-                    <option value="Cajero 2 - Turno Tarde">Cajero 2 - Turno Tarde</option>
-                    <option value="María Brito">María Brito</option>
-                    <option value="Lupita Brito">Lupita Brito</option>
-                  </select>
+                    <span className="text-base">👩‍🍳</span>
+                    <span>Cajera 1 (Mañana)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthorizedBy("Cajera 2 - Turno Vespertino")}
+                    className={`p-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 border ${
+                      authorizedBy.includes("Cajera 2")
+                        ? "bg-gradient-to-r from-amber-950 to-stone-900 text-white border-amber-800 shadow-md ring-2 ring-amber-500/30 font-black scale-[1.02]"
+                        : "bg-stone-50 text-stone-700 hover:bg-amber-50/60 border-stone-200"
+                    }`}
+                  >
+                    <span className="text-base">👩‍🍳</span>
+                    <span>Cajera 2 (Tarde)</span>
+                  </button>
                 </div>
               </div>
 

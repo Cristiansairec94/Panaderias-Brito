@@ -66,7 +66,7 @@ export default function POSPage() {
   const [cashGiven, setCashGiven] = useState<string>("");
   
   // Shift & Cashier state
-  const [cashierName, setCashierName] = useState("Don Toño Brito");
+  const [cashierName, setCashierName] = useState("Cajera 1 - Turno Matutino");
   const [shiftName, setShiftName] = useState("Turno Matutino (06:00 - 14:00)");
   const [initialCashFund, setInitialCashFund] = useState(500);
 
