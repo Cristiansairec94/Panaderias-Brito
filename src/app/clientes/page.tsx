@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Users, 
   Plus, 
@@ -19,75 +19,22 @@ import {
 } from "lucide-react";
 import { Customer } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-
-const INITIAL_CUSTOMERS: Customer[] = [
-  {
-    id: "cli-0",
-    name: "Público en General",
-    phone: "N/A",
-    type: "general",
-    creditLimit: 0,
-    currentDebt: 0,
-    totalPurchases: 45800,
-    notes: "Cliente predeterminado para ventas de mostrador al contado.",
-    registeredAt: "2026-01-01",
-  },
-  {
-    id: "cli-1",
-    name: "Abarrotes 'La Guadalupana' (Don Pepe)",
-    phone: "55 4433 2211",
-    email: "laguadalupana@gmail.com",
-    address: "Av. Hidalgo #124, Col. Centro",
-    type: "mayoreo",
-    creditLimit: 3000,
-    currentDebt: 850,
-    totalPurchases: 18500,
-    notes: "Compra 150 bolillos y 80 teleras diario. Pago semanal los viernes.",
-    registeredAt: "2026-03-15",
-  },
-  {
-    id: "cli-2",
-    name: "Taquería 'El Pastorcito Dorado'",
-    phone: "55 9988 1122",
-    address: "Calle Juárez #45",
-    type: "mayoreo",
-    creditLimit: 2000,
-    currentDebt: 0,
-    totalPurchases: 12400,
-    notes: "Compra 120 teleras para tortas cada 2 días.",
-    registeredAt: "2026-04-10",
-  },
-  {
-    id: "cli-3",
-    name: "Sra. María González",
-    phone: "55 1234 5678",
-    email: "maria.gonzalez@hotmail.com",
-    address: "Privada de los Pinos #12",
-    type: "evento",
-    creditLimit: 0,
-    currentDebt: 450,
-    totalPurchases: 3200,
-    notes: "Pastel XV años pedido PED-101 (Flores lilas). Anticipo pagado.",
-    registeredAt: "2026-08-20",
-  },
-  {
-    id: "cli-4",
-    name: "Familia Ramírez (Vecinos)",
-    phone: "55 7766 5544",
-    type: "frecuente",
-    creditLimit: 500,
-    currentDebt: 0,
-    totalPurchases: 4800,
-    notes: "Cliente fiel, compra pan dulce todas las noches.",
-    registeredAt: "2026-02-01",
-  },
-];
+import { getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
 
 export default function ClientesPage() {
-  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | Customer["type"]>("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    setCustomers(getStoredCustomers());
+    const handleSync = () => {
+      setCustomers(getStoredCustomers());
+    };
+    window.addEventListener("brito_customers_updated", handleSync);
+    return () => window.removeEventListener("brito_customers_updated", handleSync);
+  }, []);
 
   // Form State
   const [name, setName] = useState("");
@@ -117,19 +64,21 @@ export default function ClientesPage() {
 
     const newCustomer: Customer = {
       id: `cli-${Date.now()}`,
-      name,
-      phone: phone || "Sin teléfono",
-      email,
-      address,
+      name: name.trim(),
+      phone: phone.trim() || "N/A",
+      email: email.trim() || undefined,
+      address: address.trim() || undefined,
       type,
       creditLimit: Number(creditLimit) || 0,
       currentDebt: 0,
       totalPurchases: 0,
-      notes,
+      notes: notes.trim() || undefined,
       registeredAt: new Date().toISOString().split("T")[0],
     };
 
-    setCustomers((prev) => [...prev, newCustomer]);
+    const updated = [...customers, newCustomer];
+    setCustomers(updated);
+    saveStoredCustomers(updated);
     setIsModalOpen(false);
     // Reset form
     setName("");

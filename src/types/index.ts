@@ -26,6 +26,9 @@ export interface Sale {
   cashier: string;
   cashGiven?: number;
   change?: number;
+  customerId?: string;
+  customerName?: string;
+  customerType?: "general" | "frecuente" | "mayoreo" | "evento";
 }
 
 export interface InventoryItem {

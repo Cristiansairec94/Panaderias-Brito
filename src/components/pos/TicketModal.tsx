@@ -15,6 +15,8 @@ interface TicketModalProps {
   cashGiven?: number;
   change?: number;
   cashierName?: string;
+  customerName?: string;
+  customerType?: string;
   branchName?: string;
   branchAddress?: string;
   branchPhone?: string;
@@ -31,6 +33,8 @@ export default function TicketModal({
   cashGiven,
   change,
   cashierName = "Caja Principal - Don Toño",
+  customerName = "Público General",
+  customerType,
   branchName = "Sucursal Matriz",
   branchAddress,
   branchPhone = "55 1234 5678",
@@ -109,6 +113,17 @@ export default function TicketModal({
               <div className="flex justify-between">
                 <span>FECHA:</span>
                 <span>{formattedDate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>CLIENTE:</span>
+                <span className="font-bold text-stone-900 text-right max-w-[200px] truncate">
+                  {customerName || "Público General"}
+                  {customerType && customerType !== "general" && (
+                    <span className="ml-1 text-[9px] font-black uppercase text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">
+                      {customerType}
+                    </span>
+                  )}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>ATENDIÓ:</span>

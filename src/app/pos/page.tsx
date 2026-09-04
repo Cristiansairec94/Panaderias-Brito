@@ -19,6 +19,12 @@ import {
   Wallet,
   Coins,
   UserCheck,
+  Users,
+  UserPlus,
+  Star,
+  Store,
+  Cake,
+  Phone,
   RefreshCw,
   Layers,
   ChevronDown,
@@ -36,10 +42,16 @@ import {
   EyeOff,
   ShieldCheck
 } from "lucide-react";
-import { Product, CartItem, Sale, CashExpense } from "@/types";
+import { Product, CartItem, Sale, CashExpense, Customer } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
+import { 
+  DEFAULT_GENERAL_CUSTOMER, 
+  getStoredCustomers, 
+  saveStoredCustomers, 
+  addQuickCustomer 
+} from "@/lib/customers";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import TicketModal from "@/components/pos/TicketModal";
@@ -175,6 +187,22 @@ export default function POSPage() {
   const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
   const [shiftModalTab, setShiftModalTab] = useState<"cuentas" | "cambio" | "corte" | "historial">("cambio");
   
+  // Customer State (Público General + Clientes Frecuentes, Mayoreo y Eventos)
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer>(DEFAULT_GENERAL_CUSTOMER);
+  const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<"all" | Customer["type"]>("all");
+  const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+  const customerPickerRef = useRef<HTMLDivElement>(null);
+
+  // New Customer Form State
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustType, setNewCustType] = useState<Customer["type"]>("frecuente");
+  const [newCustCreditLimit, setNewCustCreditLimit] = useState("0");
+  const [newCustNotes, setNewCustNotes] = useState("");
+
   // Status
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -197,6 +225,53 @@ export default function POSPage() {
       }
     } catch (e) {}
   }, []);
+
+  // Load and synchronize customers
+  useEffect(() => {
+    setCustomers(getStoredCustomers());
+    const handleCustomerSync = () => {
+      setCustomers(getStoredCustomers());
+    };
+    window.addEventListener("brito_customers_updated", handleCustomerSync);
+    return () => window.removeEventListener("brito_customers_updated", handleCustomerSync);
+  }, []);
+
+  // Close customer picker on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (customerPickerRef.current && !customerPickerRef.current.contains(event.target as Node)) {
+        setIsCustomerPickerOpen(false);
+      }
+    }
+    if (isCustomerPickerOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isCustomerPickerOpen]);
+
+  const handleCreateQuickCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustName.trim()) return;
+
+    const created = addQuickCustomer({
+      name: newCustName,
+      phone: newCustPhone,
+      type: newCustType,
+      creditLimit: Number(newCustCreditLimit) || 0,
+      notes: newCustNotes,
+    });
+
+    setSelectedCustomer(created);
+    setIsCustomerPickerOpen(false);
+    setIsNewCustomerModalOpen(false);
+    
+    // Reset form
+    setNewCustName("");
+    setNewCustPhone("");
+    setNewCustType("frecuente");
+    setNewCustCreditLimit("0");
+    setNewCustNotes("");
+  };
 
   const handleUnlockShift = (e: React.FormEvent) => {
     e.preventDefault();
@@ -500,6 +575,9 @@ export default function POSPage() {
         cashier: cashierName,
         cashGiven: currentCashGiven,
         change: currentChange,
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.name,
+        customerType: selectedCustomer.type,
       };
 
       if (activeBranch) {
@@ -523,6 +601,7 @@ export default function POSPage() {
   const resetSale = () => {
     setCart([]);
     setCashGiven("");
+    setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
     setShowReceiptModal(false);
     setCompletedSale(null);
   };
@@ -543,6 +622,18 @@ export default function POSPage() {
   };
 
   const activeCategory = CATEGORIES.find((c) => c.id === selectedCategory);
+
+  const filteredCustomers = customers.filter((c) => {
+    const q = customerSearchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      c.name.toLowerCase().includes(q) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.notes && c.notes.toLowerCase().includes(q)) ||
+      (c.address && c.address.toLowerCase().includes(q));
+    const matchesType = customerTypeFilter === "all" || c.type === customerTypeFilter;
+    return matchesSearch && matchesType;
+  });
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-stone-100/70">
@@ -889,6 +980,275 @@ export default function POSPage() {
           </div>
         </div>
 
+        {/* Customer Selector Ribbon / Bar */}
+        <div ref={customerPickerRef} className="p-2 sm:px-3 bg-gradient-to-r from-amber-50/90 via-stone-50 to-orange-50/70 border-b border-amber-200/80 shrink-0 relative">
+          <div className="flex items-center justify-between gap-2">
+            {/* Left: Active Customer Display */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs font-bold text-sm ${
+                selectedCustomer.type === "mayoreo"
+                  ? "bg-gradient-to-tr from-amber-500 to-orange-500 text-white shadow-amber-500/20"
+                  : selectedCustomer.type === "frecuente"
+                  ? "bg-gradient-to-tr from-emerald-500 to-teal-500 text-white shadow-emerald-500/20"
+                  : selectedCustomer.type === "evento"
+                  ? "bg-gradient-to-tr from-rose-500 to-pink-500 text-white shadow-rose-500/20"
+                  : "bg-stone-200 text-stone-700 border border-stone-300"
+              }`}>
+                {selectedCustomer.type === "mayoreo" ? "🏪" : selectedCustomer.type === "frecuente" ? "⭐" : selectedCustomer.type === "evento" ? "🎂" : "👤"}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-black text-xs text-stone-900 truncate" title={selectedCustomer.name}>
+                    {selectedCustomer.name}
+                  </span>
+                  {selectedCustomer.type === "general" ? (
+                    <span className="text-[9px] font-black uppercase tracking-wider bg-stone-200/80 text-stone-700 px-1.5 py-0.5 rounded-md">
+                      Venta Rápida
+                    </span>
+                  ) : (
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
+                      selectedCustomer.type === "mayoreo"
+                        ? "bg-amber-100 text-amber-900 border border-amber-300"
+                        : selectedCustomer.type === "frecuente"
+                        ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                        : "bg-rose-100 text-rose-900 border border-rose-300"
+                    }`}>
+                      {selectedCustomer.type === "mayoreo" ? "Mayoreo" : selectedCustomer.type === "frecuente" ? "Frecuente" : "Evento"}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-stone-500 font-medium truncate">
+                  {selectedCustomer.type === "general" 
+                    ? "Mostrador general sin registro" 
+                    : selectedCustomer.phone !== "N/A" ? `Tel: ${selectedCustomer.phone}` : "Cliente registrado"}
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Actions */}
+            <div className="flex items-center gap-1 shrink-0">
+              {selectedCustomer.type !== "general" && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER)}
+                  className="p-1.5 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-100/80 active:scale-95 transition-all"
+                  title="Volver a Público General"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+              
+              <button
+                type="button"
+                onClick={() => setIsCustomerPickerOpen(!isCustomerPickerOpen)}
+                className={`px-2.5 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs border ${
+                  isCustomerPickerOpen
+                    ? "bg-stone-900 text-amber-300 border-stone-900 shadow-md"
+                    : "bg-white hover:bg-amber-100/70 text-stone-800 hover:text-amber-950 border-stone-200"
+                }`}
+                title="Seleccionar o buscar cliente"
+              >
+                <Users className="w-3.5 h-3.5 text-amber-600" />
+                <span>Clientes</span>
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isCustomerPickerOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsNewCustomerModalOpen(true)}
+                className="p-1.5 px-2 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1"
+                title="Registrar nuevo cliente"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[11px]">Nuevo</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Customer Dropdown Popover */}
+          {isCustomerPickerOpen && (
+            <div className="absolute left-2 right-2 top-full mt-1.5 z-50 bg-white rounded-2xl shadow-2xl border-2 border-amber-400/90 p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-150 max-h-[380px] flex flex-col">
+              {/* Popover Header */}
+              <div className="flex items-center justify-between pb-1 border-b border-stone-100">
+                <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-amber-600" /> Seleccionar Cliente
+                </span>
+                <span className="text-[10px] text-stone-400 font-bold">
+                  {filteredCustomers.length} {filteredCustomers.length === 1 ? "opción" : "opciones"}
+                </span>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o teléfono..."
+                  value={customerSearchQuery}
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1.5 bg-stone-100 rounded-xl text-xs font-bold text-stone-900 border border-stone-200 focus:outline-none focus:border-amber-500 focus:bg-white transition-all placeholder:text-stone-400 placeholder:font-normal"
+                />
+                {customerSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomerSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Chips */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar text-[10px] font-black">
+                {[
+                  { id: "all", label: "Todos" },
+                  { id: "frecuente", label: "⭐ Frecuentes" },
+                  { id: "mayoreo", label: "🏪 Mayoreo" },
+                  { id: "evento", label: "🎂 Eventos" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setCustomerTypeFilter(tab.id as any)}
+                    className={`px-2 py-1 rounded-lg transition-all shrink-0 active:scale-95 ${
+                      customerTypeFilter === tab.id
+                        ? "bg-amber-600 text-white shadow-2xs"
+                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Options List */}
+              <div className="flex-1 overflow-y-auto space-y-1 pr-1 max-h-[190px]">
+                {/* Default Público General Quick Select Option */}
+                {customerTypeFilter === "all" && !customerSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+                      setIsCustomerPickerOpen(false);
+                    }}
+                    className={`w-full p-2 rounded-xl flex items-center justify-between text-left transition-all border ${
+                      selectedCustomer.id === DEFAULT_GENERAL_CUSTOMER.id
+                        ? "bg-amber-50 border-amber-300 ring-1 ring-amber-300"
+                        : "bg-stone-50/70 hover:bg-amber-50/50 border-stone-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-stone-200 text-stone-700 flex items-center justify-center font-bold text-xs shrink-0">
+                        👤
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-black text-xs text-stone-900">Público General (Mostrador)</p>
+                        <p className="text-[10px] text-stone-500 font-medium">Venta rápida al contado</p>
+                      </div>
+                    </div>
+                    {selectedCustomer.id === DEFAULT_GENERAL_CUSTOMER.id && (
+                      <Check className="w-4 h-4 text-amber-600 shrink-0" />
+                    )}
+                  </button>
+                )}
+
+                {filteredCustomers
+                  .filter((c) => c.id !== "cli-0")
+                  .map((c) => {
+                    const isSelected = selectedCustomer.id === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          setIsCustomerPickerOpen(false);
+                        }}
+                        className={`w-full p-2 rounded-xl flex items-center justify-between text-left transition-all border ${
+                          isSelected
+                            ? "bg-amber-50 border-amber-300 ring-1 ring-amber-300 shadow-2xs"
+                            : "bg-white hover:bg-amber-50/50 border-stone-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                            c.type === "mayoreo"
+                              ? "bg-amber-100 text-amber-900 border border-amber-300"
+                              : c.type === "frecuente"
+                              ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                              : c.type === "evento"
+                              ? "bg-rose-100 text-rose-900 border border-rose-300"
+                              : "bg-stone-100 text-stone-700"
+                          }`}>
+                            {c.type === "mayoreo" ? "🏪" : c.type === "frecuente" ? "⭐" : c.type === "evento" ? "🎂" : "👤"}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-black text-xs text-stone-900 truncate">
+                                {c.name}
+                              </span>
+                              <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded ${
+                                c.type === "mayoreo"
+                                  ? "bg-amber-100 text-amber-900"
+                                  : c.type === "frecuente"
+                                  ? "bg-emerald-100 text-emerald-900"
+                                  : "bg-rose-100 text-rose-900"
+                              }`}>
+                                {c.type}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-stone-500 font-medium truncate">
+                              {c.phone !== "N/A" ? `📞 ${c.phone}` : c.notes || "Sin teléfono"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <Check className="w-4 h-4 text-amber-600 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+
+                {filteredCustomers.filter((c) => c.id !== "cli-0").length === 0 && (
+                  <div className="p-3 text-center space-y-1">
+                    <p className="text-xs font-bold text-stone-600">No se encontraron clientes</p>
+                    <p className="text-[10px] text-stone-400">¿Deseas registrar "{customerSearchQuery}"?</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewCustName(customerSearchQuery);
+                        setIsNewCustomerModalOpen(true);
+                        setIsCustomerPickerOpen(false);
+                      }}
+                      className="mt-1 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-xs font-black transition-colors"
+                    >
+                      + Registrar como nuevo
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Quick Register Action */}
+              <div className="pt-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewCustomerModalOpen(true);
+                    setIsCustomerPickerOpen(false);
+                  }}
+                  className="w-full py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Registrar Nuevo Cliente</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Cart Items List - Optimizado para ver al menos 5 productos simultáneamente */}
         <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-1.5">
           {cart.length === 0 ? (
@@ -1186,11 +1546,136 @@ export default function POSPage() {
           cashGiven={completedSale.cashGiven}
           change={completedSale.change}
           cashierName={completedSale.cashier}
+          customerName={completedSale.customerName || "Público General"}
+          customerType={completedSale.customerType}
           branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
           branchAddress={activeBranch ? activeBranch.address : undefined}
           branchPhone={activeBranch ? activeBranch.phone : undefined}
           date={completedSale.date}
         />
+      )}
+
+      {/* Modal de Registro Rápido de Nuevo Cliente */}
+      {isNewCustomerModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-2 border-amber-900/30 text-stone-900 animate-in zoom-in-95 duration-200">
+            {/* Header café tostado oficial Panadería Brito */}
+            <div className="bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] p-4 px-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl text-white shadow-md">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-white">Registrar Nuevo Cliente</h3>
+                  <p className="text-[10px] text-amber-300 font-medium">Se asignará a la venta actual</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewCustomerModalOpen(false)}
+                className="p-1 rounded-lg text-amber-300 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCreateQuickCustomer} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="block text-stone-700 font-extrabold mb-1">
+                  Nombre Completo o Negocio <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ej. Abarrotes San Juan o Sra. Lupita"
+                  value={newCustName}
+                  onChange={(e) => setNewCustName(e.target.value)}
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-stone-700 font-extrabold mb-1">
+                    Teléfono / WhatsApp
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="55 1234 5678"
+                    value={newCustPhone}
+                    onChange={(e) => setNewCustPhone(e.target.value)}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-stone-700 font-extrabold mb-1">
+                    Tipo de Cliente
+                  </label>
+                  <select
+                    value={newCustType}
+                    onChange={(e) => setNewCustType(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 focus:border-amber-500 focus:bg-white rounded-xl font-black text-stone-900 focus:outline-none transition-all cursor-pointer"
+                  >
+                    <option value="frecuente">⭐ Cliente Frecuente</option>
+                    <option value="mayoreo">🏪 Negocio / Mayoreo</option>
+                    <option value="evento">🎂 Pedido / Evento</option>
+                    <option value="general">👤 Público General</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-stone-700 font-extrabold mb-1">
+                  Límite de Crédito / Fiado ($)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="50"
+                  placeholder="0.00"
+                  value={newCustCreditLimit}
+                  onChange={(e) => setNewCustCreditLimit(e.target.value)}
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-stone-700 font-extrabold mb-1">
+                  Notas / Pedido Habitual
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="ej. Pide 50 bolillos cada mañana, pago en fin de semana"
+                  value={newCustNotes}
+                  onChange={(e) => setNewCustNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-stone-50 border border-stone-300 focus:border-amber-500 focus:bg-white rounded-xl font-medium text-stone-900 focus:outline-none transition-all"
+                />
+              </div>
+
+              {/* Botones */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => setIsNewCustomerModalOpen(false)}
+                  className="px-4 py-2 text-stone-600 hover:text-stone-900 font-bold rounded-xl hover:bg-stone-100 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newCustName.trim()}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 text-white font-black rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Guardar y Seleccionar</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Recent Sales Drawer */}
