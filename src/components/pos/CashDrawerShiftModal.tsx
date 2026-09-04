@@ -159,7 +159,7 @@ export default function CashDrawerShiftModal({
   const [incomingCashier, setIncomingCashier] = useState("Cajera 2 - Turno Vespertino");
   const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
   const [countedCash, setCountedCash] = useState<string>("");
-  const [nextInitialFund, setNextInitialFund] = useState("500");
+  const [nextInitialFund, setNextInitialFund] = useState(initialFund ? initialFund.toString() : "500");
   const [shiftNotes, setShiftNotes] = useState("");
   const [hasAcceptedCash, setHasAcceptedCash] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
@@ -219,6 +219,12 @@ export default function CashDrawerShiftModal({
   }, [cashierName]);
 
   useEffect(() => {
+    if (initialFund) {
+      setNextInitialFund(initialFund.toString());
+    }
+  }, [initialFund, isOpen]);
+
+  useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       setCurrentTime(
@@ -253,6 +259,10 @@ export default function CashDrawerShiftModal({
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;
   const cashDifference = parsedCountedCash - expectedCashInDrawer;
 
+  // 5. Fondo Siguiente y Retiro a Administración
+  const parsedNextFund = nextInitialFund === "" ? 500 : Math.max(0, Number(nextInitialFund) || 0);
+  const cashToWithdraw = Math.max(0, parsedCountedCash - parsedNextFund);
+
   // 5. Existencias en mostrador
   const totalPiecesInStock = products.reduce((sum, p) => sum + p.stock, 0);
   const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
@@ -286,7 +296,7 @@ export default function CashDrawerShiftModal({
       expectedCash: expectedCashInDrawer,
       countedCash: parsedCountedCash,
       difference: cashDifference,
-      nextFund: Number(nextInitialFund) || 500,
+      nextFund: parsedNextFund,
       notes: shiftNotes.trim() || "Cierre de turno completado conforme y sin anomalías.",
       expensesList: [...expenses],
       stockPieces: totalPiecesInStock,
@@ -308,6 +318,11 @@ export default function CashDrawerShiftModal({
       console.error("Error guardando corte en historial:", e);
     }
 
+    // Guardar nuevo fondo inicial en localStorage
+    try {
+      localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
+    } catch (e) {}
+
     // NOTIFICACIÓN DIRECTA AL ADMINISTRADOR / SISTEMA CON ALTA PRIORIDAD
     addNotification({
       senderName: `🏁 Corte Guardado (${outgoingCashier})`,
@@ -315,7 +330,7 @@ export default function CashDrawerShiftModal({
       badgeIcon: "dinero",
       title: `Corte de Turno ${newFolio}: ${formatCurrency(parsedCountedCash)} en Caja`,
       highlightText: `${outgoingCashier} entregó a ${incomingCashier}`,
-      description: `Folio ${newFolio} archivado en historial. Horario: ${shiftStartTime} a ${currentTime}. Efectivo entregado: ${formatCurrency(parsedCountedCash)} (${cashDifference === 0 ? "Cuadrada Exacta" : cashDifference > 0 ? `Sobrante +${formatCurrency(cashDifference)}` : `Faltante ${formatCurrency(cashDifference)}`}). Ventas Efectivo: ${formatCurrency(cashSales)}, Gastos: ${formatCurrency(totalExpenses)}.`,
+      description: `Folio ${newFolio} archivado en historial. Horario: ${shiftStartTime} a ${currentTime}. Efectivo contado: ${formatCurrency(parsedCountedCash)} (${cashDifference === 0 ? "Cuadrada Exacta" : cashDifference > 0 ? `Sobrante +${formatCurrency(cashDifference)}` : `Faltante ${formatCurrency(cashDifference)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}, Efectivo entregado/retirado: ${formatCurrency(cashToWithdraw)}.`,
       category: "caja",
       actionLabel: "Consultar Historial",
       actionLink: "/caja",
@@ -324,7 +339,7 @@ export default function CashDrawerShiftModal({
     // Actualizar al nuevo cajero y turno
     onChangeCashier(incomingCashier);
     onChangeShift(nextShiftName);
-    onChangeInitialFund(Number(nextInitialFund) || 500);
+    onChangeInitialFund(parsedNextFund);
 
     setIsFinalizing(false);
     setShowCutSuccess(true);
@@ -476,6 +491,18 @@ export default function CashDrawerShiftModal({
                   ? `Sobrante +${formatCurrency(cut.difference)}`
                   : `Faltante ${formatCurrency(cut.difference)}`}
               </span>
+            </div>
+
+            {/* Desglose de Entrega & Fondo Siguiente */}
+            <div className="pt-2 mt-2 border-t border-dotted border-stone-300 space-y-1">
+              <div className="flex justify-between text-amber-950 font-bold">
+                <span>🪙 Fondo que se deja en Caja (Nuevo Turno):</span>
+                <span className="font-black text-stone-900">{formatCurrency(cut.nextFund || 500)}</span>
+              </div>
+              <div className="flex justify-between text-emerald-800 font-bold">
+                <span>💰 Efectivo Retirado / Entregado:</span>
+                <span className="font-black text-emerald-950">{formatCurrency(Math.max(0, cut.countedCash - (cut.nextFund || 500)))}</span>
+              </div>
             </div>
           </div>
 
@@ -769,7 +796,101 @@ export default function CashDrawerShiftModal({
                     )}
                   </div>
 
-                  {/* 4. Casilla de Confirmación y Botón Final */}
+                  {/* 4. Dinero que se dejará en caja para comenzar nuevamente el turno */}
+                  <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/70 rounded-3xl border-2 border-amber-300 shadow-sm space-y-3.5">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2 border-b border-amber-200/70">
+                      <div>
+                        <span className="text-sm sm:text-base font-black text-stone-900 uppercase flex items-center gap-2">
+                          <span className="text-xl">🪙</span> ¿Cuánto dinero se dejará en caja para el siguiente turno?
+                        </span>
+                        <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
+                          Fondo inicial con el que <strong className="text-stone-800">{incomingCashier}</strong> comenzará nuevamente a operar
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0 bg-amber-100/90 px-3.5 py-1.5 rounded-2xl border border-amber-300 shadow-2xs">
+                        <span className="text-[10px] font-black uppercase text-amber-800 block">Fondo Siguiente Turno</span>
+                        <span className="text-xl sm:text-2xl font-black text-amber-950">
+                          {formatCurrency(parsedNextFund)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Botones de Selección Rápida de Fondo */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[500, 1000, 1500].map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setNextInitialFund(preset.toString())}
+                            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all duration-150 border active:scale-95 ${
+                              nextInitialFund === preset.toString()
+                                ? "bg-[#2d1810] text-amber-100 border-amber-500 shadow-sm ring-2 ring-amber-400/40"
+                                : "bg-white hover:bg-amber-100/70 text-stone-800 border-stone-300"
+                            }`}
+                          >
+                            {formatCurrency(preset)}
+                          </button>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={() => setNextInitialFund(parsedCountedCash.toString())}
+                          className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all duration-150 border active:scale-95 ${
+                            nextInitialFund === parsedCountedCash.toString() && parsedCountedCash > 0
+                              ? "bg-[#2d1810] text-amber-100 border-amber-500 shadow-sm ring-2 ring-amber-400/40"
+                              : "bg-white hover:bg-amber-100/70 text-stone-800 border-stone-300"
+                          }`}
+                        >
+                          Todo el efectivo ({formatCurrency(parsedCountedCash)})
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setNextInitialFund("0")}
+                          className={`px-3 py-2 rounded-xl text-xs font-black transition-all duration-150 border active:scale-95 ${
+                            nextInitialFund === "0"
+                              ? "bg-[#2d1810] text-amber-100 border-amber-500 shadow-sm ring-2 ring-amber-400/40"
+                              : "bg-white hover:bg-stone-100 text-stone-600 border-stone-300"
+                          }`}
+                        >
+                          $0.00 (Sin Fondo)
+                        </button>
+                      </div>
+
+                      {/* Input Manual de Fondo Siguiente */}
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          placeholder="O escribe otro monto que se quedará en caja para el nuevo turno"
+                          value={nextInitialFund}
+                          onChange={(e) => setNextInitialFund(e.target.value)}
+                          className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Resumen de Entrega: Total Contado, Fondo que Queda, Efectivo a Entregar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                      <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-stone-200 text-center shadow-2xs">
+                        <span className="text-[10px] text-stone-500 font-black uppercase block">Efectivo Físico en Caja</span>
+                        <span className="text-base sm:text-lg font-black text-stone-900 block mt-0.5">{formatCurrency(parsedCountedCash)}</span>
+                      </div>
+                      <div className="bg-amber-50 p-2.5 sm:p-3 rounded-2xl border border-amber-300 text-center shadow-2xs">
+                        <span className="text-[10px] text-amber-900 font-black uppercase block">🪙 Se queda en Caja (Fondo)</span>
+                        <span className="text-base sm:text-lg font-black text-amber-950 block mt-0.5">{formatCurrency(parsedNextFund)}</span>
+                      </div>
+                      <div className="bg-emerald-50 p-2.5 sm:p-3 rounded-2xl border border-emerald-300 text-center shadow-2xs">
+                        <span className="text-[10px] text-emerald-800 font-black uppercase block">💰 Efectivo a Retirar / Entregar</span>
+                        <span className="text-base sm:text-lg font-black text-emerald-950 block mt-0.5">{formatCurrency(cashToWithdraw)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5. Casilla de Confirmación y Botón Final */}
                   <div className="space-y-3 pt-1">
                     <label className={`flex items-center gap-3.5 p-4 sm:p-4.5 rounded-2xl sm:rounded-3xl border-2 cursor-pointer select-none transition-all duration-300 ${
                       hasAcceptedCash
@@ -783,7 +904,7 @@ export default function CashDrawerShiftModal({
                         className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg accent-emerald-600 cursor-pointer shrink-0 transition-transform active:scale-90"
                       />
                       <span className="text-sm sm:text-base font-black text-stone-900 leading-snug">
-                        Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}), no hay detalles pendientes y entrego la caja a {incomingCashier}.
+                        Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}), se dejan <strong className="text-amber-950">{formatCurrency(parsedNextFund)}</strong> de fondo en caja para comenzar con {incomingCashier}, y se entregan <strong className="text-emerald-900">{formatCurrency(cashToWithdraw)}</strong> a administración.
                       </span>
                     </label>
 

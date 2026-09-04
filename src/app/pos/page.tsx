@@ -138,7 +138,15 @@ export default function POSPage() {
   // Shift & Cashier state
   const [cashierName, setCashierName] = useState(activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino");
   const [shiftName, setShiftName] = useState(activeBranch ? activeBranch.currentShift.name : "Turno Matutino (06:00 - 14:00)");
-  const [initialCashFund, setInitialCashFund] = useState(activeBranch ? activeBranch.currentShift.initialFund : 500);
+  const [initialCashFund, setInitialCashFund] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("brito_pos_initial_fund");
+        if (saved && !isNaN(Number(saved))) return Number(saved);
+      } catch (e) {}
+    }
+    return activeBranch ? activeBranch.currentShift.initialFund : 500;
+  });
 
   // Auto-sync user and branch
   useEffect(() => {
