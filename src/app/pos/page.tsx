@@ -41,7 +41,8 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
-  Menu
+  Menu,
+  Pencil
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -209,6 +210,8 @@ export default function POSPage() {
 
   // Shift Lock State (Candado de Seguridad por Cierre de Turno)
   const [isShiftLocked, setIsShiftLocked] = useState(false);
+  const [isEditingShiftFund, setIsEditingShiftFund] = useState(false);
+  const [tempShiftFund, setTempShiftFund] = useState("");
 
   const lastCutInfo = useMemo(() => {
     if (typeof window !== "undefined") {
@@ -226,6 +229,14 @@ export default function POSPage() {
   }, [isShiftLocked]);
 
   const handleDirectUnlockShift = () => {
+    if (isEditingShiftFund) {
+      const val = Math.max(0, Number(tempShiftFund) || 0);
+      setInitialCashFund(val);
+      try {
+        localStorage.setItem("brito_pos_initial_fund", val.toString());
+      } catch (e) {}
+      setIsEditingShiftFund(false);
+    }
     setIsShiftLocked(false);
     try {
       localStorage.removeItem("brito_pos_shift_locked");
@@ -685,21 +696,139 @@ export default function POSPage() {
             {/* Contenedor Principal de Información Financiera de Relevo */}
             <div className="bg-gradient-to-b from-[#24120a] to-[#1a0c06] border-2 border-amber-500/50 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
               
-              {/* 1. TARJETA PROMINENTE: CON CUÁNTO DINERO SE INICIARÁ EL TURNO (NÚMEROS GRANDES) */}
-              <div className="bg-gradient-to-br from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 p-5 rounded-3xl text-center space-y-1.5 shadow-xl ring-2 ring-amber-400/20 relative overflow-hidden">
+              {/* 1. TARJETA PROMINENTE: CON CUÁNTO DINERO SE INICIARÁ EL TURNO (NÚMEROS GRANDES Y EDITABLE) */}
+              <div className="bg-gradient-to-br from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 p-5 rounded-3xl text-center space-y-2 shadow-xl ring-2 ring-amber-400/20 relative overflow-hidden">
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
-                <span className="text-xs sm:text-sm font-black uppercase text-amber-300 tracking-wider flex items-center justify-center gap-1.5">
-                  <span>🪙</span> Con este dinero se iniciará el turno:
-                </span>
                 
-                {/* NÚMERO GIGANTE */}
-                <div className="text-5xl sm:text-6xl font-black text-amber-300 tracking-tight py-1 filter drop-shadow-[0_4px_12px_rgba(245,158,11,0.35)]">
-                  {formatCurrency(initialCashFund)}
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <span className="text-xs sm:text-sm font-black uppercase text-amber-300 tracking-wider flex items-center gap-1.5 text-left">
+                    <span>🪙</span> Con este dinero se iniciará el turno:
+                  </span>
+                  {!isEditingShiftFund && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempShiftFund(initialCashFund.toString());
+                        setIsEditingShiftFund(true);
+                      }}
+                      className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 border border-amber-400/40 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer"
+                      title="Modificar o agregar más dinero inicial"
+                    >
+                      <Pencil className="w-3 h-3" />
+                      <span>Editar</span>
+                    </button>
+                  )}
                 </div>
 
-                <div className="inline-block bg-amber-500/20 text-amber-200 text-xs font-bold px-4 py-1 rounded-full border border-amber-400/30">
-                  Fondo Inicial disponible en el cajón para cambio
-                </div>
+                {!isEditingShiftFund ? (
+                  /* MODO VISUALIZACIÓN */
+                  <div className="py-1">
+                    <div 
+                      onClick={() => {
+                        setTempShiftFund(initialCashFund.toString());
+                        setIsEditingShiftFund(true);
+                      }}
+                      className="cursor-pointer group/num inline-flex items-center justify-center gap-2 hover:scale-105 transition-transform"
+                      title="Clic para modificar o sumar más dinero"
+                    >
+                      <span className="text-5xl sm:text-6xl font-black text-amber-300 tracking-tight filter drop-shadow-[0_4px_12px_rgba(245,158,11,0.35)]">
+                        {formatCurrency(initialCashFund)}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-center gap-2 flex-wrap">
+                      <div className="inline-block bg-amber-500/20 text-amber-200 text-xs font-bold px-3 py-1 rounded-full border border-amber-400/30">
+                        Fondo Inicial disponible en el cajón para cambio
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTempShiftFund(initialCashFund.toString());
+                          setIsEditingShiftFund(true);
+                        }}
+                        className="text-xs font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer flex items-center gap-1"
+                      >
+                        <Pencil className="w-3 h-3" /> ¿Traes más dinero? Modifícalo aquí
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* MODO EDICIÓN */
+                  <div className="bg-black/40 border border-amber-400/50 p-3.5 rounded-2xl space-y-3 animate-in fade-in zoom-in-95 duration-200 text-center">
+                    <p className="text-xs font-bold text-amber-200 text-left">
+                      Escribe el nuevo monto total o suma dinero adicional traído:
+                    </p>
+
+                    <div className="relative max-w-xs mx-auto">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-2xl text-amber-400">$</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        autoFocus
+                        placeholder="0.00"
+                        value={tempShiftFund}
+                        onChange={(e) => setTempShiftFund(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-stone-900 border-2 border-amber-400 focus:border-amber-300 rounded-2xl font-black text-3xl sm:text-4xl text-amber-300 text-center focus:outline-none focus:ring-2 focus:ring-amber-400/40 shadow-inner"
+                      />
+                    </div>
+
+                    {/* Botones de incremento rápido */}
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-stone-400 font-bold uppercase mr-1">Sumar:</span>
+                      {[50, 100, 200, 500].map((addAmount) => (
+                        <button
+                          key={addAmount}
+                          type="button"
+                          onClick={() => {
+                            const current = Number(tempShiftFund) || 0;
+                            setTempShiftFund((current + addAmount).toString());
+                          }}
+                          className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 rounded-lg text-xs font-black transition-all active:scale-95"
+                        >
+                          +{formatCurrency(addAmount)}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setTempShiftFund("0")}
+                        className="px-2 py-1 bg-white/10 hover:bg-white/20 text-stone-300 rounded-lg text-xs font-bold"
+                        title="Poner en 0"
+                      >
+                        $0
+                      </button>
+                    </div>
+
+                    {/* Botones Guardar / Cancelar */}
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = Math.max(0, Number(tempShiftFund) || 0);
+                          setInitialCashFund(val);
+                          try {
+                            localStorage.setItem("brito_pos_initial_fund", val.toString());
+                          } catch (e) {}
+                          setIsEditingShiftFund(false);
+                        }}
+                        className="flex-1 py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-4 h-4 text-emerald-200" />
+                        <span>Guardar ({formatCurrency(Math.max(0, Number(tempShiftFund) || 0))})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingShiftFund(false);
+                          setTempShiftFund(initialCashFund.toString());
+                        }}
+                        className="py-2.5 px-3 bg-white/10 hover:bg-white/20 text-stone-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 2. RESUMEN: TOTAL DE DINERO QUE HUBO ANTERIORMENTE */}
