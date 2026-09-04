@@ -632,6 +632,22 @@ export default function POSPage() {
               </button>
             </div>
 
+            {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShiftModalTab("cambio");
+                  setShowCashDrawerModal(true);
+                }}
+                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-amber-600/80 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white text-sm sm:text-base font-black transition-all active:scale-95 shadow-md shadow-orange-950/20 whitespace-nowrap"
+                title="Cerrar turno de la cajera y bloquear la terminal con candado"
+              >
+                <Lock className="w-4 h-4 text-amber-200" />
+                <span>Cerrar Turno</span>
+              </button>
+            </div>
+
             {/* Botón Móvil para Ver Charola / Carrito */}
             <div className="relative shrink-0 lg:hidden">
               <button
@@ -1268,7 +1284,7 @@ export default function POSPage() {
 
       {/* PANTALLA DE BLOQUEO CON CANDADO DE SEGURIDAD (Cierre de Turno de Cajera) */}
       {isShiftLocked && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/95 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-stone-950/95 backdrop-blur-2xl p-4 animate-in fade-in duration-300">
           <div className="absolute w-96 h-96 bg-amber-600/10 rounded-full blur-3xl pointer-events-none -top-20 -left-20 animate-pulse" />
           <div className="absolute w-96 h-96 bg-orange-600/10 rounded-full blur-3xl pointer-events-none -bottom-20 -right-20 animate-pulse" />
 

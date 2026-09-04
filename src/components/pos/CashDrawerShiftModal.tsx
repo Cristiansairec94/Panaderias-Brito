@@ -194,12 +194,15 @@ export default function CashDrawerShiftModal({
     onChangeShift(nextShiftName);
     onChangeInitialFund(Number(nextInitialFund) || 500);
 
-    if (onCompleteShiftCut) {
-      onCompleteShiftCut();
-    }
-
     setIsFinalizing(false);
     setShowCutSuccess(true);
+  };
+
+  const handleClose = () => {
+    if (showCutSuccess && onCompleteShiftCut) {
+      onCompleteShiftCut();
+    }
+    onClose();
   };
 
   const handlePrintZCut = () => {
@@ -225,7 +228,7 @@ export default function CashDrawerShiftModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2.5 rounded-2xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-6 h-6" />
@@ -324,10 +327,10 @@ export default function CashDrawerShiftModal({
                     onClose();
                     if (onCompleteShiftCut) onCompleteShiftCut();
                   }}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95"
+                  className="flex-1 py-3.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white font-black rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-950/20 active:scale-95 animate-pulse"
                 >
                   <Lock className="w-4 h-4" />
-                  <span>Finalizar y Bloquear Caja</span>
+                  <span>Finalizar y Bloquear Punto de Venta</span>
                 </button>
               </div>
             </div>
@@ -518,7 +521,7 @@ export default function CashDrawerShiftModal({
             Panaderías Brito • Sucursal Matriz
           </span>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-6 py-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-xl text-xs sm:text-sm transition-colors"
           >
             Cerrar Ventana
