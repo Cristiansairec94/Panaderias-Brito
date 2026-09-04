@@ -500,12 +500,11 @@ export default function POSPage() {
       setIsMobileCartOpen(true);
       return;
     }
-    if (product.stock <= 0) return;
 
+    // Piezas de pan sin límites: se permite agregar libremente cualquier cantidad
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        if (existing.quantity >= product.stock) return prev;
         return prev.map((item) =>
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
@@ -520,8 +519,8 @@ export default function POSPage() {
       setIsMobileCartOpen(true);
       return;
     }
-    if (product.stock <= 0) return;
 
+    // Sin límites: se permite sumar cualquier cantidad de piezas
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
@@ -1185,18 +1184,13 @@ export default function POSPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12">
           {filteredProducts.map((product) => {
-            const isOutOfStock = product.stock <= 0;
             const itemInCart = cart.find((i) => i.product.id === product.id);
 
             return (
               <div
                 key={product.id}
                 onClick={() => addToCart(product)}
-                className={`group bg-white rounded-2xl border border-stone-200/90 overflow-hidden flex flex-col justify-between transition-all duration-200 relative select-none cursor-pointer ${
-                  isOutOfStock
-                    ? "opacity-60 cursor-not-allowed bg-stone-100"
-                    : "hover:shadow-lg hover:border-amber-400 hover:-translate-y-0.5 active:scale-[0.99]"
-                }`}
+                className="group bg-white rounded-2xl border border-stone-200/90 overflow-hidden flex flex-col justify-between transition-all duration-200 relative select-none cursor-pointer hover:shadow-lg hover:border-amber-400 hover:-translate-y-0.5 active:scale-[0.99]"
               >
                 {/* Active in-cart indicator */}
                 {itemInCart && (
@@ -1234,14 +1228,10 @@ export default function POSPage() {
                     </span>
                   </div>
 
-                  {/* Stock Tag on Image */}
+                  {/* Tag on Image: Disponible libre sin límites */}
                   <div className="absolute bottom-2.5 left-2.5 z-10">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md shadow-xs ${
-                      isOutOfStock
-                        ? "bg-rose-600/90 text-white font-black"
-                        : "bg-black/65 text-stone-100"
-                    }`}>
-                      {isOutOfStock ? "Agotado" : `${product.stock} disp.`}
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md shadow-xs bg-black/60 text-stone-100">
+                      {product.stock > 0 ? `${product.stock} piezas` : "Disponible"}
                     </span>
                   </div>
                 </div>
