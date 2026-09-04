@@ -680,6 +680,13 @@ export default function POSPage() {
       setRecentSalesList((prev) => [newSaleRecord, ...prev]);
       setIsSubmitting(false);
       setShowReceiptModal(true);
+
+      // Al completar la compra, la charola se limpia y vuelve automáticamente a Clientes Generales
+      setCart([]);
+      setCashGiven("");
+      setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+      setCustomerSearchQuery("");
+      setIsCustomerPickerOpen(false);
     }
   };
 
@@ -741,6 +748,8 @@ export default function POSPage() {
     setCart([]);
     setCashGiven("");
     setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+    setCustomerSearchQuery("");
+    setIsCustomerPickerOpen(false);
     setShowReceiptModal(false);
     setCompletedSale(null);
   };
@@ -1314,14 +1323,14 @@ export default function POSPage() {
               </div>
             </div>
 
-        {/* CUSTOMER SELECTION / SMART SEARCH QUICK BAR */}
+        {/* CUSTOMER SELECTION / SMART SEARCH QUICK BAR: TODO EN EL MISMO CUADRO */}
         <div ref={customerPickerRef} className="p-2 sm:px-3 bg-gradient-to-r from-amber-50/90 via-stone-50 to-orange-50/70 border-b border-amber-200/80 shrink-0 relative">
-          {selectedCustomer.type === "general" ? (
-            /* 1. MODO BÚSQUEDA RÁPIDA / CLIENTES GENERALES */
-            <div className="flex items-center gap-2 w-full">
-              {/* Buscador Inteligente Integrado con Clientes Generales permanente */}
-              <div className="flex-1 flex items-center bg-white rounded-2xl border-2 border-amber-300/90 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-400/20 px-2 sm:px-2.5 py-1.5 gap-2 shadow-2xs transition-all">
-                {/* Badge Permanente de Clientes Generales */}
+          {/* Cuadro unificado: Badge del cliente (Clientes Generales o Cliente Específico) + Buscador Integrado */}
+          <div className="flex items-center gap-2 w-full">
+            <div className="flex-1 flex items-center bg-white rounded-2xl border-2 border-amber-300/90 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-400/20 px-2 sm:px-2.5 py-1.5 gap-2 shadow-2xs transition-all">
+              
+              {/* 1. Badge / Indicador: Clientes Generales o Cliente Específico */}
+              {selectedCustomer.id === "cli-0" ? (
                 <div 
                   className="flex items-center gap-1.5 bg-amber-100 text-amber-950 border border-amber-300/90 px-2.5 py-1 rounded-xl text-xs font-black shrink-0 select-none shadow-2xs"
                   title="Cliente actual: Clientes Generales"
@@ -1329,146 +1338,93 @@ export default function POSPage() {
                   <span className="text-sm">👤</span>
                   <span className="whitespace-nowrap">Clientes Generales</span>
                 </div>
-
-                {/* Separador vertical */}
-                <div className="h-4 w-px bg-stone-200 shrink-0" />
-
-                {/* Campo de búsqueda específica */}
-                <div className="flex-1 relative flex items-center min-w-0">
-                  <Search className="w-3.5 h-3.5 text-stone-400 shrink-0 mr-1.5 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Buscar cliente específico..."
-                    value={customerSearchQuery}
-                    onFocus={() => {
-                      if (customerSearchQuery.trim().length > 0) {
-                        setIsCustomerPickerOpen(true);
-                      }
+              ) : (
+                <div 
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2.5 py-1 rounded-xl text-xs font-black shrink-0 shadow-xs max-w-[190px]"
+                  title={`Cliente asignado: ${selectedCustomer.name}. Clic en ✕ para volver a Clientes Generales`}
+                >
+                  <span className="text-xs shrink-0">👤</span>
+                  <span className="truncate max-w-[110px]">{selectedCustomer.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+                      setCustomerSearchQuery("");
+                      setIsCustomerPickerOpen(false);
                     }}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCustomerSearchQuery(val);
-                      setIsCustomerPickerOpen(val.trim().length > 0);
+                    className="p-0.5 hover:bg-black/25 rounded-full transition-colors cursor-pointer shrink-0 ml-0.5"
+                    title="Terminar y volver a Clientes Generales"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Separador vertical */}
+              <div className="h-4 w-px bg-stone-200 shrink-0" />
+
+              {/* 2. Campo de búsqueda de cliente en el mismo cuadro */}
+              <div className="flex-1 relative flex items-center min-w-0">
+                <Search className="w-3.5 h-3.5 text-stone-400 shrink-0 mr-1.5 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder={selectedCustomer.id === "cli-0" ? "Buscar cliente específico..." : "Buscar otro cliente..."}
+                  value={customerSearchQuery}
+                  onFocus={() => {
+                    setIsCustomerPickerOpen(true);
+                  }}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomerSearchQuery(val);
+                    setIsCustomerPickerOpen(true);
+                  }}
+                  className="w-full bg-transparent text-xs font-bold text-stone-900 focus:outline-none placeholder:text-stone-400 min-w-0 truncate"
+                />
+                {customerSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerSearchQuery("");
                     }}
-                    className="w-full bg-transparent text-xs font-bold text-stone-900 focus:outline-none placeholder:text-stone-400 min-w-0 truncate"
-                  />
-                  {customerSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCustomerSearchQuery("");
-                        setIsCustomerPickerOpen(false);
-                      }}
-                      className="text-stone-400 hover:text-stone-700 p-0.5 ml-1 shrink-0 cursor-pointer"
-                      title="Borrar búsqueda"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Botón Registrar Nuevo Cliente */}
-              <button
-                type="button"
-                onClick={() => {
-                  setNewCustName(customerSearchQuery || "");
-                  setNewCustPhone("");
-                  setNewCustNotes("");
-                  setIsNewCustomerModalOpen(true);
-                  setIsCustomerPickerOpen(false);
-                }}
-                className="py-2.5 px-3 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1 shrink-0 cursor-pointer"
-                title="Registrar nuevo cliente"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="text-[11px]">Nuevo</span>
-              </button>
-            </div>
-          ) : (
-            /* 2. MODO CLIENTE ASIGNADO */
-            <div className="flex items-center justify-between gap-2 w-full">
-              {/* Tarjeta del cliente asignado */}
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-xs font-bold text-sm">
-                  ⭐
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-black text-xs text-stone-900 truncate" title={selectedCustomer.name}>
-                      {selectedCustomer.name}
-                    </span>
-                    <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">
-                      Cliente Asignado
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-stone-500 font-medium truncate">
-                    {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && selectedCustomer.phone !== "Sin teléfono" ? `📞 ${selectedCustomer.phone}` : "Cliente frecuente"}
-                    {selectedCustomer.notes ? ` • 📝 ${selectedCustomer.notes}` : ""}
-                  </p>
-                </div>
-              </div>
-
-              {/* Acciones */}
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
-                    setCustomerSearchQuery("");
-                    setIsCustomerPickerOpen(false);
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl text-stone-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 text-xs font-bold transition-all flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer"
-                  title="Volver a Clientes Generales"
-                >
-                  <X className="w-3.5 h-3.5 text-rose-500" />
-                  <span className="text-[11px] font-black">Clientes Generales</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
-                    setCustomerSearchQuery("");
-                  }}
-                  className="p-1.5 px-2.5 rounded-xl text-xs font-black flex items-center gap-1 transition-all active:scale-95 shadow-2xs border bg-white hover:bg-amber-100/70 text-stone-800 border-stone-200 cursor-pointer"
-                  title="Buscar otro cliente"
-                >
-                  <Search className="w-3.5 h-3.5 text-amber-600" />
-                  <span className="text-[11px] hidden sm:inline">Cambiar</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewCustName("");
-                    setNewCustPhone("");
-                    setNewCustNotes("");
-                    setIsNewCustomerModalOpen(true);
-                    setIsCustomerPickerOpen(false);
-                  }}
-                  className="p-1.5 px-2.5 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1 cursor-pointer"
-                  title="Registrar nuevo cliente"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Nuevo</span>
-                </button>
+                    className="text-stone-400 hover:text-stone-700 p-0.5 ml-1 shrink-0 cursor-pointer"
+                    title="Borrar texto de búsqueda"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
-          )}
 
-          {/* Customer Dropdown Popover: SOLO SE DESPLIEGA CUANDO SE BUSCA ALGO EN ESPECÍFICO */}
-          {isCustomerPickerOpen && customerSearchQuery.trim().length > 0 && (
+            {/* Botón Registrar Nuevo Cliente */}
+            <button
+              type="button"
+              onClick={() => {
+                setNewCustName(customerSearchQuery || "");
+                setNewCustPhone("");
+                setNewCustNotes("");
+                setIsNewCustomerModalOpen(true);
+                setIsCustomerPickerOpen(false);
+              }}
+              className="py-2.5 px-3 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1 shrink-0 cursor-pointer"
+              title="Registrar nuevo cliente"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="text-[11px]">Nuevo</span>
+            </button>
+          </div>
+
+          {/* Customer Dropdown Popover: Se despliega al interactuar o buscar */}
+          {isCustomerPickerOpen && (
             <div className="absolute left-2 right-2 top-full mt-1.5 z-50 bg-white rounded-2xl shadow-2xl border-2 border-amber-400/90 p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-150 max-h-[400px] flex flex-col">
               {/* Popover Header */}
               <div className="flex items-center justify-between pb-1 border-b border-stone-100">
                 <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-amber-600" /> Clientes encontrados para &quot;{customerSearchQuery}&quot;
+                  <Users className="w-3.5 h-3.5 text-amber-600" />
+                  {customerSearchQuery.trim().length > 0 
+                    ? `Clientes encontrados para "${customerSearchQuery}"` 
+                    : "Selecciona un cliente o vuelve a Clientes Generales"}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-stone-400 font-bold">
-                    {filteredCustomers.filter((c) => c.id !== "cli-0").length} resultado(s)
-                  </span>
                   <button
                     type="button"
                     onClick={() => {
@@ -1484,6 +1440,39 @@ export default function POSPage() {
 
               {/* Options List */}
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[240px]">
+                {/* 1. Opción fija: Volver a Clientes Generales */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+                    setIsCustomerPickerOpen(false);
+                    setCustomerSearchQuery("");
+                  }}
+                  className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border cursor-pointer ${
+                    selectedCustomer.id === "cli-0"
+                      ? "bg-amber-100 border-amber-400 ring-1 ring-amber-400 shadow-2xs font-black"
+                      : "bg-amber-50/60 hover:bg-amber-100/70 border-amber-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                      👤
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="font-black text-xs text-amber-950 truncate block">
+                        Clientes Generales
+                      </span>
+                      <span className="text-[10px] text-amber-800 font-medium">
+                        Venta de mostrador al contado (predeterminado)
+                      </span>
+                    </div>
+                  </div>
+                  {selectedCustomer.id === "cli-0" && (
+                    <Check className="w-4 h-4 text-amber-700 shrink-0" />
+                  )}
+                </button>
+
+                {/* 2. Lista de clientes registrados coincidentes */}
                 {filteredCustomers
                   .filter((c) => c.id !== "cli-0")
                   .map((c) => {
@@ -1516,7 +1505,7 @@ export default function POSPage() {
                                 <span className="font-bold text-stone-700">📞 {c.phone}</span>
                               )}
                               {c.notes && (
-                                <span className="text-amber-900 bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded">
+                                <span className="text-amber-900 bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded truncate max-w-[200px]">
                                   📝 {c.notes}
                                 </span>
                               )}
@@ -1531,10 +1520,10 @@ export default function POSPage() {
                     );
                   })}
 
-                {filteredCustomers.filter((c) => c.id !== "cli-0").length === 0 && (
+                {filteredCustomers.filter((c) => c.id !== "cli-0").length === 0 && customerSearchQuery.trim().length > 0 && (
                   <div className="p-4 text-center space-y-1.5 bg-stone-50 rounded-xl border border-dashed border-stone-200">
                     <p className="text-xs font-black text-stone-700">No se encontró &quot;{customerSearchQuery}&quot;</p>
-                    <p className="text-[10px] text-stone-500">¿Deseas registrarlo como un nuevo cliente especial?</p>
+                    <p className="text-[10px] text-stone-500">¿Deseas registrarlo como un nuevo cliente?</p>
                     <button
                       type="button"
                       onClick={() => {
@@ -1816,6 +1805,9 @@ export default function POSPage() {
               onClick={() => {
                 setCart([]);
                 setCashGiven("");
+                setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+                setCustomerSearchQuery("");
+                setIsCustomerPickerOpen(false);
               }}
               disabled={cart.length === 0}
               className="col-span-1 py-3 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-stone-200 transition-all active:scale-95 shadow-xs"
