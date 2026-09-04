@@ -1882,7 +1882,23 @@ export default function POSPage() {
 
             {/* Formulario Simple */}
             <form onSubmit={handleCreateQuickCustomer} className="p-5 space-y-4 text-xs">
-              {/* 1. Teléfono */}
+              {/* 1. Nombre */}
+              <div>
+                <label className="block text-stone-700 font-extrabold mb-1">
+                  👤 Nombre del Cliente <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="ej. Doña Lupita o Don Carlos"
+                  value={newCustName}
+                  onChange={(e) => setNewCustName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border-2 border-stone-200 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all text-sm"
+                />
+              </div>
+
+              {/* 2. Teléfono */}
               <div>
                 <label className="block text-stone-700 font-extrabold mb-1">
                   📱 Número Telefónico (WhatsApp)
@@ -1891,26 +1907,10 @@ export default function POSPage() {
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  autoFocus
                   placeholder="ej. 55 1234 5678"
                   value={newCustPhone}
                   onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
                   onChange={(e) => setNewCustPhone(cleanOnlyNumbers(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-stone-50 border-2 border-stone-200 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all text-sm"
-                />
-              </div>
-
-              {/* 2. Nombre */}
-              <div>
-                <label className="block text-stone-700 font-extrabold mb-1">
-                  👤 Nombre del Cliente <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ej. Doña Lupita o Don Carlos"
-                  value={newCustName}
-                  onChange={(e) => setNewCustName(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-stone-50 border-2 border-stone-200 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all text-sm"
                 />
               </div>

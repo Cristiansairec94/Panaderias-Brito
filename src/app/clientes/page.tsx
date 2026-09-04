@@ -429,7 +429,24 @@ export default function ClientesPage() {
             </div>
 
             <form onSubmit={handleCreateCustomer} className="space-y-5 text-sm">
-              {/* 1. Número Telefónico (Solo números) */}
+              {/* 1. Nombre del Cliente */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <User className="w-4 h-4 text-amber-600" />
+                  <span>Nombre Completo del Cliente *</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="Ej. Doña Carmen o Juan Pérez"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all placeholder:text-stone-400 placeholder:font-normal"
+                />
+              </div>
+
+              {/* 2. Número Telefónico (Solo números) */}
               <div className="space-y-1.5">
                 <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
                   <Phone className="w-4 h-4 text-amber-600" />
@@ -456,23 +473,6 @@ export default function ClientesPage() {
                     </span>
                   </div>
                 )}
-              </div>
-
-              {/* 2. Nombre del Cliente */}
-              <div className="space-y-1.5">
-                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
-                  <User className="w-4 h-4 text-amber-600" />
-                  <span>Nombre Completo del Cliente *</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  placeholder="Ej. Doña Carmen o Juan Pérez"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all placeholder:text-stone-400 placeholder:font-normal"
-                />
               </div>
 
               {/* 3. Cuadro con Descripción del Cliente */}
@@ -537,7 +537,22 @@ export default function ClientesPage() {
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-5 text-sm">
-              {/* 1. Número Telefónico (Solo números) */}
+              {/* 1. Nombre del Cliente */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <User className="w-4 h-4 text-amber-600" />
+                  <span>Nombre Completo del Cliente *</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all"
+                />
+              </div>
+
+              {/* 2. Número Telefónico (Solo números) */}
               <div className="space-y-1.5">
                 <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
                   <Phone className="w-4 h-4 text-amber-600" />
@@ -564,21 +579,6 @@ export default function ClientesPage() {
                     </span>
                   </div>
                 )}
-              </div>
-
-              {/* 2. Nombre del Cliente */}
-              <div className="space-y-1.5">
-                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
-                  <User className="w-4 h-4 text-amber-600" />
-                  <span>Nombre Completo del Cliente *</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all"
-                />
               </div>
 
               {/* 3. Cuadro con Descripción del Cliente */}
