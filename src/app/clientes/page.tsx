@@ -62,9 +62,16 @@ export default function ClientesPage() {
   const [editNotes, setEditNotes] = useState("");
 
   useEffect(() => {
-    setCustomers(getStoredCustomers());
+    const loaded = getStoredCustomers();
+    const cleaned = loaded.filter((c) => c.id !== "cli-0" && c.type !== "general");
+    setCustomers(cleaned);
+    if (cleaned.length !== loaded.length) {
+      saveStoredCustomers(cleaned);
+    }
     const handleSync = () => {
-      setCustomers(getStoredCustomers());
+      const syncLoaded = getStoredCustomers();
+      const syncCleaned = syncLoaded.filter((c) => c.id !== "cli-0" && c.type !== "general");
+      setCustomers(syncCleaned);
     };
     window.addEventListener("brito_customers_updated", handleSync);
     return () => window.removeEventListener("brito_customers_updated", handleSync);
@@ -75,12 +82,13 @@ export default function ClientesPage() {
     setTimeout(() => setSuccessNotice(null), 3500);
   };
 
-  // Filtrado simple por búsqueda
+  // Filtrado simple por búsqueda (excluye cualquier cliente virtual de mostrador)
   const filteredCustomers = useMemo(() => {
+    const validCustomers = customers.filter((c) => c.id !== "cli-0" && c.type !== "general");
     const q = search.toLowerCase().trim();
     const qClean = q.replace(/\D/g, "");
-    if (!q) return customers;
-    return customers.filter((c) => {
+    if (!q) return validCustomers;
+    return validCustomers.filter((c) => {
       const cClean = c.phone ? c.phone.replace(/\D/g, "") : "";
       return (
         c.name.toLowerCase().includes(q) ||
@@ -157,7 +165,6 @@ export default function ClientesPage() {
   // Confirmar eliminación
   const handleConfirmDelete = () => {
     if (!deleteConfirm) return;
-    if (deleteConfirm.id === "cli-0") return; // Proteger cliente general
 
     const updated = customers.filter((c) => c.id !== deleteConfirm.id);
     setCustomers(updated);
@@ -284,35 +291,23 @@ export default function ClientesPage() {
               </thead>
               <tbody className="divide-y divide-stone-200">
                 {filteredCustomers.map((c) => {
-                  const isDefaultGeneral = c.id === "cli-0";
                   const cleanPhone = c.phone ? c.phone.replace(/\D/g, "") : "";
 
                   return (
                     <tr
                       key={c.id}
-                      className={`hover:bg-amber-50/50 transition-colors ${
-                        isDefaultGeneral ? "bg-amber-50/30 font-semibold" : ""
-                      }`}
+                      className="hover:bg-amber-50/50 transition-colors"
                     >
                       {/* 1. Nombre */}
                       <td className="py-4 px-5 sm:px-6">
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 font-black text-base sm:text-lg shadow-xs ${
-                            isDefaultGeneral 
-                            ? "bg-amber-600 text-white" 
-                            : "bg-amber-100 text-amber-900 border border-amber-300"
-                          }`}>
-                            {isDefaultGeneral ? "⭐" : c.name.charAt(0).toUpperCase()}
+                          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 font-black text-base sm:text-lg shadow-xs bg-amber-100 text-amber-900 border border-amber-300">
+                            {c.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
                             <span className="text-base sm:text-lg font-black text-stone-900 block leading-snug">
                               {c.name}
                             </span>
-                            {isDefaultGeneral && (
-                              <span className="inline-block text-[11px] font-extrabold bg-amber-200/80 text-amber-950 px-2 py-0.5 rounded-md mt-0.5">
-                                Cliente Predeterminado de Mostrador
-                              </span>
-                            )}
                           </div>
                         </div>
                       </td>
@@ -370,16 +365,14 @@ export default function ClientesPage() {
                             <Edit3 className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
 
-                          {!isDefaultGeneral && (
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirm({ id: c.id, name: c.name })}
-                              className="p-2.5 sm:p-3 rounded-2xl bg-stone-100 hover:bg-rose-100 text-stone-400 hover:text-rose-700 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
-                              title="Eliminar cliente"
-                            >
-                              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirm({ id: c.id, name: c.name })}
+                            className="p-2.5 sm:p-3 rounded-2xl bg-stone-100 hover:bg-rose-100 text-stone-400 hover:text-rose-700 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
+                            title="Eliminar cliente"
+                          >
+                            <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </button>
                         </div>
                       </td>
                     </tr>

@@ -15,7 +15,6 @@ export const DEFAULT_GENERAL_CUSTOMER: Customer = {
 };
 
 export const INITIAL_CUSTOMERS: Customer[] = [
-  DEFAULT_GENERAL_CUSTOMER,
   {
     id: "cli-1",
     name: "Abarrotes 'La Guadalupana' (Don Pepe)",
@@ -80,7 +79,12 @@ export function getStoredCustomers(): Customer[] {
       localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(INITIAL_CUSTOMERS));
       return INITIAL_CUSTOMERS;
     }
-    return parsed;
+    // Depurar y eliminar cualquier cliente virtual de mostrador (cli-0 / general) del listado guardado
+    const cleaned = parsed.filter((c: Customer) => c.id !== "cli-0" && c.type !== "general");
+    if (cleaned.length !== parsed.length) {
+      localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
     return INITIAL_CUSTOMERS;
   }
