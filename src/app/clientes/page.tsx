@@ -25,24 +25,6 @@ import { Customer } from "@/types";
 import { onlyNumbersKeyDown, cleanOnlyNumbers, formatCurrency } from "@/lib/utils";
 import { getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
 
-// Opciones de panes y productos más comunes para el selector de moda
-const PRESET_BREAD_OPTIONS = [
-  "Bolillo Caliente y Telera",
-  "Bolillo Tradicional",
-  "Telera Tradicional (Tortas)",
-  "Pan Dulce Surtido (Conchas)",
-  "Concha de Vainilla",
-  "Concha de Chocolate",
-  "Cuerno de Mantequilla",
-  "Pastel Tres Leches y Repostería",
-  "Pay de Queso con Zarzamora",
-  "Pambazo Tradicional",
-  "Pizza Artesanal / Pastes",
-  "Dona de Chocolate",
-  "Mantecada de Nuez",
-  "Oreja Crujiente",
-];
-
 // Ícono SVG oficial y ordenado de WhatsApp
 function WhatsAppIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
@@ -100,13 +82,11 @@ export default function ClientesPage() {
   // Form State: Nuevo Cliente
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [favoriteProduct, setFavoriteProduct] = useState("");
   const [notes, setNotes] = useState("");
 
   // Form State: Editar Cliente
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
-  const [editFavoriteProduct, setEditFavoriteProduct] = useState("");
   const [editNotes, setEditNotes] = useState("");
 
   useEffect(() => {
@@ -157,7 +137,6 @@ export default function ClientesPage() {
   const handleOpenCreate = () => {
     setName("");
     setPhone("");
-    setFavoriteProduct("");
     setNotes("");
     setIsModalOpen(true);
   };
@@ -175,7 +154,6 @@ export default function ClientesPage() {
       creditLimit: 0,
       currentDebt: 0,
       totalPurchases: 0,
-      favoriteProduct: favoriteProduct.trim() || undefined,
       notes: notes.trim() || undefined,
       registeredAt: new Date().toISOString().split("T")[0],
     };
@@ -192,7 +170,6 @@ export default function ClientesPage() {
     setEditingCustomer(c);
     setEditName(c.name);
     setEditPhone(c.phone === "N/A" ? "" : c.phone?.replace(/\D/g, "") || "");
-    setEditFavoriteProduct(c.favoriteProduct || "");
     setEditNotes(c.notes || "");
   };
 
@@ -207,7 +184,6 @@ export default function ClientesPage() {
           ...c,
           name: editName.trim(),
           phone: editPhone.trim() ? formatPhoneNumber(editPhone.trim()) : "N/A",
-          favoriteProduct: editFavoriteProduct.trim() || undefined,
           notes: editNotes.trim() || undefined,
         };
       }
@@ -505,7 +481,7 @@ export default function ClientesPage() {
                 </div>
                 <div>
                   <h3 className="font-black text-xl text-stone-900">Registrar Nuevo Cliente</h3>
-                  <p className="text-xs sm:text-sm text-stone-500 font-medium">Ingresa los 3 datos requeridos</p>
+                  <p className="text-xs sm:text-sm text-stone-500 font-medium">Ingresa los datos del cliente</p>
                 </div>
               </div>
               <button
@@ -564,63 +540,7 @@ export default function ClientesPage() {
                 )}
               </div>
 
-              {/* 3. Pan o Producto Habitual (Moda de compra) */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-600" />
-                    <span>Pan o Producto Habitual (Moda de Compra)</span>
-                  </label>
-                  <span className="text-xs text-stone-500 font-bold">Opcional</span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select
-                    value={favoriteProduct}
-                    onChange={(e) => setFavoriteProduct(e.target.value)}
-                    className="w-full sm:w-1/2 px-3.5 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-bold text-sm text-stone-900 focus:outline-none transition-all cursor-pointer shadow-2xs"
-                  >
-                    <option value="">-- Seleccionar de la lista desplegable --</option>
-                    {PRESET_BREAD_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-
-                  <input
-                    type="text"
-                    placeholder="O escribir personalizado..."
-                    value={favoriteProduct}
-                    onChange={(e) => setFavoriteProduct(e.target.value)}
-                    className="w-full sm:w-1/2 px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-sm text-stone-900 focus:outline-none transition-all placeholder:text-stone-400 placeholder:font-normal"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="text-xs text-stone-500 font-bold self-center mr-1">Común:</span>
-                  {[
-                    "🍞 Bolillo",
-                    "🥪 Telera",
-                    "🥐 Pan Dulce (Conchas)",
-                    "🥖 Pambazo",
-                    "🥧 Pastelería / Pastel",
-                    "🍕 Pizza / Pastes",
-                    "🥨 Repostería Fina",
-                  ].map((chip) => (
-                    <button
-                      key={chip}
-                      type="button"
-                      onClick={() => setFavoriteProduct(chip)}
-                      className="px-2.5 py-1 bg-stone-100 hover:bg-amber-100 hover:text-amber-900 text-stone-700 text-xs font-bold rounded-lg border border-stone-200 transition-colors cursor-pointer"
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 4. Cuadro con Descripción del Cliente */}
+              {/* 3. Cuadro con Descripción del Cliente */}
               <div className="space-y-1.5">
                 <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
                   <FileText className="w-4 h-4 text-amber-600" />
@@ -726,63 +646,7 @@ export default function ClientesPage() {
                 )}
               </div>
 
-              {/* 3. Pan o Producto Habitual (Moda de compra) */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-600" />
-                    <span>Pan o Producto Habitual (Moda de Compra)</span>
-                  </label>
-                  <span className="text-xs text-stone-500 font-bold">Opcional</span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select
-                    value={editFavoriteProduct}
-                    onChange={(e) => setEditFavoriteProduct(e.target.value)}
-                    className="w-full sm:w-1/2 px-3.5 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-bold text-sm text-stone-900 focus:outline-none transition-all cursor-pointer shadow-2xs"
-                  >
-                    <option value="">-- Seleccionar de la lista desplegable --</option>
-                    {PRESET_BREAD_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-
-                  <input
-                    type="text"
-                    placeholder="O escribir personalizado..."
-                    value={editFavoriteProduct}
-                    onChange={(e) => setEditFavoriteProduct(e.target.value)}
-                    className="w-full sm:w-1/2 px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-sm text-stone-900 focus:outline-none transition-all"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="text-xs text-stone-500 font-bold self-center mr-1">Común:</span>
-                  {[
-                    "🍞 Bolillo",
-                    "🥪 Telera",
-                    "🥐 Pan Dulce (Conchas)",
-                    "🥖 Pambazo",
-                    "🥧 Pastelería / Pastel",
-                    "🍕 Pizza / Pastes",
-                    "🥨 Repostería Fina",
-                  ].map((chip) => (
-                    <button
-                      key={chip}
-                      type="button"
-                      onClick={() => setEditFavoriteProduct(chip)}
-                      className="px-2.5 py-1 bg-stone-100 hover:bg-amber-100 hover:text-amber-900 text-stone-700 text-xs font-bold rounded-lg border border-stone-200 transition-colors cursor-pointer"
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 4. Cuadro con Descripción del Cliente */}
+              {/* 3. Cuadro con Descripción del Cliente */}
               <div className="space-y-1.5">
                 <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
                   <FileText className="w-4 h-4 text-amber-600" />
