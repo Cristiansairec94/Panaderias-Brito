@@ -54,16 +54,34 @@ function WhatsAppIcon({ className = "w-4 h-4" }: { className?: string }) {
 
 // Formateador limpio y ordenado de números telefónicos (evita que se dividan en 2 renglones)
 function formatPhoneNumber(phone: string | undefined | null): string {
-  if (!phone || phone === "N/A") return "";
+  if (!phone || phone === "N/A" || phone.toLowerCase().includes("sin")) return "";
   const digits = phone.replace(/\D/g, "");
-  // Formato mexicano de 10 dígitos con espacios indivisibles (\u00A0): 55 4433 2211
+  if (digits.length === 0) return "";
+  // 10 dígitos (México estándar): 55 4433 2211
   if (digits.length === 10) {
     return `${digits.slice(0, 2)}\u00A0${digits.slice(2, 6)}\u00A0${digits.slice(6)}`;
   }
+  // 9 dígitos: 213 213 123
+  if (digits.length === 9) {
+    return `${digits.slice(0, 3)}\u00A0${digits.slice(3, 6)}\u00A0${digits.slice(6)}`;
+  }
+  // 8 dígitos: 5544 2211
   if (digits.length === 8) {
     return `${digits.slice(0, 4)}\u00A0${digits.slice(4)}`;
   }
-  return phone.replace(/ /g, "\u00A0");
+  // 12 dígitos: 123 982 198 231
+  if (digits.length === 12) {
+    return `${digits.slice(0, 3)}\u00A0${digits.slice(3, 6)}\u00A0${digits.slice(6, 9)}\u00A0${digits.slice(9)}`;
+  }
+  // 11 dígitos: 123 4567 8901
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}\u00A0${digits.slice(3, 7)}\u00A0${digits.slice(7)}`;
+  }
+  // 7 dígitos: 123 4567
+  if (digits.length === 7) {
+    return `${digits.slice(0, 3)}\u00A0${digits.slice(3)}`;
+  }
+  return digits;
 }
 
 export default function ClientesPage() {
@@ -369,6 +387,9 @@ export default function ClientesPage() {
               <tbody className="divide-y divide-stone-200">
                 {filteredCustomers.map((c, idx) => {
                   const cleanPhone = c.phone ? c.phone.replace(/\D/g, "") : "";
+                  const formattedPhone = formatPhoneNumber(c.phone);
+                  const hasValidPhone = cleanPhone.length >= 7;
+                  const hasWhatsApp = cleanPhone.length >= 8;
 
                   return (
                     <tr
@@ -396,31 +417,46 @@ export default function ClientesPage() {
                         </div>
                       </td>
 
-                      {/* 2. Número / Teléfono y WhatsApp */}
+                      {/* 2. Número / Teléfono y WhatsApp (Emparejado y perfectamente alineado) */}
                       <td className="py-3.5 px-4 sm:px-5 whitespace-nowrap">
-                        {c.phone && c.phone !== "N/A" ? (
-                          <div className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-100/90 border border-stone-300/80 rounded-xl font-mono text-xs sm:text-sm font-black text-stone-900 tracking-wide select-all shadow-2xs">
+                        <div className="inline-flex items-center gap-2">
+                          {/* Pastilla de Teléfono con Ancho y Alto Fijo Uniforme */}
+                          {hasValidPhone ? (
+                            <div className="w-[165px] h-9 inline-flex items-center justify-between px-2.5 bg-stone-100/90 border border-stone-300/80 rounded-xl font-mono text-xs sm:text-sm font-black text-stone-900 tracking-wide select-all shadow-2xs">
                               <Phone className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                              <span className="tabular-nums tracking-wider">{formatPhoneNumber(c.phone)}</span>
+                              <span className="tabular-nums tracking-wider text-center flex-1 truncate">
+                                {formattedPhone}
+                              </span>
                             </div>
-                            {cleanPhone.length >= 8 && (
+                          ) : (
+                            <div className="w-[165px] h-9 inline-flex items-center justify-center gap-1.5 px-2.5 bg-stone-50 border border-dashed border-stone-300 rounded-xl font-mono text-xs font-bold text-stone-400 italic shadow-2xs">
+                              <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                              <span>Sin teléfono</span>
+                            </div>
+                          )}
+
+                          {/* Casilla de WhatsApp en Columna Fija (Mismas dimensiones w-8 h-8 siempre) */}
+                          <div className="w-8 h-8 shrink-0 flex items-center justify-center">
+                            {hasWhatsApp ? (
                               <a
                                 href={`https://wa.me/52${cleanPhone}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-90 text-white flex items-center justify-center transition-all shadow-2xs hover:shadow-md cursor-pointer shrink-0"
-                                title={`Abrir WhatsApp (${formatPhoneNumber(c.phone)})`}
+                                className="w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-90 text-white flex items-center justify-center transition-all shadow-2xs hover:shadow-md cursor-pointer shrink-0"
+                                title={`Abrir WhatsApp (${formattedPhone})`}
                               >
                                 <WhatsAppIcon className="w-4 h-4 fill-white" />
                               </a>
+                            ) : (
+                              <div
+                                className="w-8 h-8 rounded-xl border border-dashed border-stone-200 bg-stone-50/60 flex items-center justify-center text-stone-300"
+                                title="Sin WhatsApp disponible"
+                              >
+                                <WhatsAppIcon className="w-4 h-4 fill-stone-300/60" />
+                              </div>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-xs sm:text-sm font-medium text-stone-400 italic">
-                            Sin número registrado
-                          </span>
-                        )}
+                        </div>
                       </td>
 
                       {/* 3. Cuadro de Descripción */}
