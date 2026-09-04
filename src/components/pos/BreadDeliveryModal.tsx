@@ -62,18 +62,8 @@ export default function BreadDeliveryModal({
     ];
   });
 
-  const [driverName, setDriverName] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("brito_saved_drivers");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
-        }
-      } catch (e) {}
-    }
-    return "Manuel Sánchez";
-  });
+  // El panadero inicia vacío porque es estrictamente obligatorio seleccionarlo o escribirlo
+  const [driverName, setDriverName] = useState("");
   const [notes, setNotes] = useState("");
 
   // Estados para el buscador inteligente y el modal de gestión de choferes
@@ -296,9 +286,15 @@ export default function BreadDeliveryModal({
     e.preventDefault();
     if (totalPieces <= 0 || isSubmitting) return;
 
+    // Validación obligatoria: forzosamente se debe elegir un panadero
+    if (!driverName.trim()) {
+      setIsDriverDropdownOpen(true);
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Si el chofer no estaba registrado, recordarlo automáticamente para futuras recepciones
+    // Si el panadero no estaba registrado, recordarlo automáticamente para futuras recepciones
     if (
       driverName.trim() &&
       !savedDrivers.some((d) => d.toLowerCase() === driverName.trim().toLowerCase())
@@ -322,7 +318,7 @@ export default function BreadDeliveryModal({
     const newDelivery: BreadDeliveryRecord = {
       id: `CAM-${Date.now().toString().slice(-6)}`,
       source: finalSource,
-      driver: driverName.trim() || (savedDrivers[0] || "Manuel Sánchez"),
+      driver: driverName.trim(),
       cashier: cashierName,
       date: dateFormatted,
       timestamp: `${dateFormatted} • ${timeFormatted}`,
@@ -334,19 +330,15 @@ export default function BreadDeliveryModal({
 
     onConfirmDelivery(newDelivery);
 
-    setSuccessNotice(`¡Se ingresaron exitosamente +${totalPieces} piezas de pan al mostrador!`);
+    setSuccessNotice(`¡Se ingresaron exitosamente +${totalPieces} piezas de pan al mostrador entregadas por ${driverName.trim()}!`);
     setIsSubmitting(false);
 
-    // Reset items
+    // Reset items para la siguiente entrada
     setDeliveryItems({});
     setNotes("");
     setDriverName("");
 
-    // Auto cerrar tras mostrar confirmación
-    setTimeout(() => {
-      setSuccessNotice(null);
-      onClose();
-    }, 1200);
+    // NOTA: La ventana NO se cierra automáticamente; se mantiene abierta hasta que el usuario pulse la X.
   };
 
   return (
@@ -375,22 +367,33 @@ export default function BreadDeliveryModal({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Botón X destacado para cerrar la ventana cuando el usuario lo decida */}
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-              title="Cerrar ventana"
+              className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-rose-600 text-white flex items-center justify-center transition-all active:scale-95 cursor-pointer shadow-md border border-white/20"
+              title="Cerrar ventana (X)"
+              aria-label="Cerrar ventana"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6 stroke-[2.5]" />
             </button>
           </div>
         </div>
 
         {/* Success Banner Alert */}
         {successNotice && (
-          <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-2.5 flex items-center gap-2 text-emerald-900 font-bold text-sm animate-in slide-in-from-top duration-200">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>{successNotice}</span>
+          <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-3 flex items-center justify-between gap-3 text-emerald-950 font-bold text-sm sm:text-base animate-in slide-in-from-top duration-200 shadow-inner">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+              <span>{successNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSuccessNotice(null)}
+              className="text-emerald-700 hover:text-emerald-950 px-2.5 py-1 rounded-lg hover:bg-emerald-100/80 transition-colors cursor-pointer text-xs font-black uppercase"
+            >
+              Aceptar ✕
+            </button>
           </div>
         )}
 
@@ -444,23 +447,27 @@ export default function BreadDeliveryModal({
             {/* LEFT COLUMN: Selector de Pan & Buscador */}
             <div className="w-full lg:w-7/12 flex flex-col border-b lg:border-b-0 lg:border-r border-stone-200 overflow-hidden bg-stone-50/50">
               
-              {/* Buscador inteligente de chofer */}
+              {/* Buscador inteligente de panadero */}
               <div className="p-3 sm:p-3.5 bg-white border-b border-stone-200 shrink-0">
                 <div className="relative" ref={driverDropdownRef}>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-sm select-none">
-                      🚚
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-base select-none">
+                      👨‍🍳
                     </span>
                     <input
                       type="text"
-                      placeholder="Chofer o repartidor (ej. Manuel)..."
+                      placeholder="👨‍🍳 Selecciona o escribe el panadero (Obligatorio)..."
                       value={driverName}
                       onChange={(e) => {
                         setDriverName(e.target.value);
                         setIsDriverDropdownOpen(true);
                       }}
                       onFocus={() => setIsDriverDropdownOpen(true)}
-                      className="w-full pl-9 pr-14 py-2.5 text-sm sm:text-base rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-50/90 font-bold text-stone-900 shadow-2xs"
+                      className={`w-full pl-10 pr-14 py-2.5 text-sm sm:text-base rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-stone-900 shadow-2xs ${
+                        !driverName.trim()
+                          ? "border-amber-400 bg-amber-50/40 placeholder:text-amber-700/70"
+                          : "border-emerald-400 bg-emerald-50/30"
+                      }`}
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                       {driverName && (
@@ -480,7 +487,7 @@ export default function BreadDeliveryModal({
                         type="button"
                         onClick={() => setIsDriverDropdownOpen((prev) => !prev)}
                         className="p-1 text-stone-400 hover:text-stone-700 rounded-lg cursor-pointer"
-                        title="Desplegar choferes guardados"
+                        title="Desplegar panaderos guardados"
                       >
                         <ChevronDown
                           className={`w-4 h-4 transition-transform duration-150 ${
@@ -498,7 +505,7 @@ export default function BreadDeliveryModal({
                       <div className="bg-stone-100/90 px-3 py-1.5 border-b border-stone-200 flex items-center justify-between text-[11px] font-bold text-stone-600">
                         <div className="flex items-center gap-1 text-emerald-800">
                           <Sparkles className="w-3 h-3 text-emerald-600" />
-                          <span>Buscador inteligente ({filteredDrivers.length})</span>
+                          <span>Lista de panaderos ({filteredDrivers.length})</span>
                         </div>
                         <button
                           type="button"
@@ -513,7 +520,7 @@ export default function BreadDeliveryModal({
                         </button>
                       </div>
 
-                      {/* Guardado rápido de nuevo chofer si no existe en la lista */}
+                      {/* Guardado rápido de nuevo panadero si no existe en la lista */}
                       {driverName.trim() &&
                         !savedDrivers.some(
                           (d) => d.toLowerCase() === driverName.trim().toLowerCase()
@@ -535,11 +542,11 @@ export default function BreadDeliveryModal({
                           </div>
                         )}
 
-                      {/* Lista de choferes filtrados */}
+                      {/* Lista de panaderos filtrados */}
                       <div className="max-h-48 overflow-y-auto divide-y divide-stone-100">
                         {filteredDrivers.length === 0 ? (
                           <div className="p-3 text-center text-stone-400">
-                            <p className="font-semibold">No hay choferes que coincidan</p>
+                            <p className="font-semibold">No hay panaderos que coincidan</p>
                             <p className="text-[10px] mt-0.5 text-stone-500">
                               Haz clic en &quot;Guardar&quot; arriba para registrarlo.
                             </p>
@@ -556,18 +563,18 @@ export default function BreadDeliveryModal({
                                   setDriverName(driver);
                                   setIsDriverDropdownOpen(false);
                                 }}
-                                className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                                className={`w-full text-left px-3 py-2.5 flex items-center justify-between transition-colors cursor-pointer ${
                                   isSelected
                                     ? "bg-emerald-100/70 text-emerald-950 font-bold"
                                     : "hover:bg-emerald-50/60 text-stone-800"
                                 }`}
                               >
                                 <div className="flex items-center gap-2 truncate">
-                                  <span className="text-sm">🚚</span>
-                                  <span className="truncate font-semibold">{driver}</span>
+                                  <span className="text-base">👨‍🍳</span>
+                                  <span className="truncate font-semibold text-xs sm:text-sm">{driver}</span>
                                 </div>
                                 {isSelected && (
-                                  <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                                  <Check className="w-4 h-4 text-emerald-700 shrink-0" />
                                 )}
                               </button>
                             );
@@ -577,7 +584,7 @@ export default function BreadDeliveryModal({
 
                       {/* Pie del buscador */}
                       <div className="p-2 bg-stone-50 border-t border-stone-200 flex items-center justify-between text-[11px]">
-                        <span className="text-stone-400">Selecciona o escribe</span>
+                        <span className="text-stone-400">Selecciona o escribe el panadero</span>
                         <button
                           type="button"
                           onClick={() => {
@@ -587,7 +594,7 @@ export default function BreadDeliveryModal({
                           className="font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer flex items-center gap-1"
                         >
                           <Users className="w-3 h-3" />
-                          <span>Editar y gestionar lista</span>
+                          <span>Gestionar lista</span>
                         </button>
                       </div>
                     </div>
@@ -882,11 +889,22 @@ export default function BreadDeliveryModal({
               <div className="p-4 sm:p-5 border-t border-stone-200 bg-stone-50 space-y-3 shrink-0">
                 <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-stone-200/90 shadow-2xs space-y-2">
                   <div className="flex items-center justify-between text-xs sm:text-sm text-stone-600 font-bold">
-                    <span>Chofer / Repartidor:</span>
-                    <strong className="text-stone-950 font-black text-sm sm:text-base flex items-center gap-1.5">
-                      <span className="text-base sm:text-lg">🚚</span>
-                      <span>{driverName.trim() || (savedDrivers[0] || "Manuel Sánchez")}</span>
-                    </strong>
+                    <span>Panadero que entrega:</span>
+                    {driverName.trim() ? (
+                      <strong className="text-stone-950 font-black text-sm sm:text-base flex items-center gap-1.5">
+                        <span className="text-base sm:text-lg">👨‍🍳</span>
+                        <span>{driverName.trim()}</span>
+                      </strong>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsDriverDropdownOpen(true)}
+                        className="text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1 cursor-pointer animate-pulse"
+                        title="Haz clic para seleccionar o ingresar el panadero"
+                      >
+                        <span>⚠️ Obligatorio: Elige panadero</span>
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center justify-between text-xs sm:text-sm text-stone-600 font-bold">
                     <span>Valor estimado de venta:</span>
@@ -916,9 +934,9 @@ export default function BreadDeliveryModal({
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    disabled={totalPieces <= 0 || isSubmitting}
+                    disabled={totalPieces <= 0 || !driverName.trim() || isSubmitting}
                     className={`flex-1 py-4 px-6 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2.5 transition-all shadow-md active:scale-95 cursor-pointer ${
-                      totalPieces > 0 && !isSubmitting
+                      totalPieces > 0 && driverName.trim() && !isSubmitting
                         ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-900/20"
                         : "bg-stone-200 text-stone-400 cursor-not-allowed shadow-none"
                     }`}
@@ -927,6 +945,10 @@ export default function BreadDeliveryModal({
                     <span>
                       {isSubmitting
                         ? "Ingresando pan..."
+                        : totalPieces > 0 && !driverName.trim()
+                        ? "⚠️ Elige al panadero para ingresar"
+                        : totalPieces === 0
+                        ? "Selecciona pan para ingresar"
                         : `Ingresar ${totalPieces} Piezas al Mostrador`}
                     </span>
                   </button>
@@ -968,9 +990,9 @@ export default function BreadDeliveryModal({
                         <span className="font-mono font-black text-xs sm:text-sm text-emerald-900 bg-emerald-100/90 px-3 py-1 rounded-xl border border-emerald-300/80">
                           {rec.id}
                         </span>
-                        {/* Nombre del Chofer en la posición principal solicitada */}
-                        <strong className="text-stone-900 font-black text-base sm:text-lg flex items-center gap-1.5" title="Chofer o repartidor">
-                          <span className="text-emerald-700">🚚</span>
+                        {/* Nombre del Panadero en la posición principal solicitada */}
+                        <strong className="text-stone-900 font-black text-base sm:text-lg flex items-center gap-1.5" title="Panadero o repartidor">
+                          <span className="text-emerald-700">👨‍🍳</span>
                           <span>{rec.driver || (savedDrivers[0] || "Manuel Sánchez")}</span>
                         </strong>
 
