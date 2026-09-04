@@ -271,11 +271,11 @@ export default function SucursalesPage() {
               Control de Sucursales y Analítica General
             </h1>
             <p className="text-xs sm:text-sm text-stone-300 max-w-2xl leading-relaxed">
-              Monitoreo ejecutivo de las 3 tiendas de <strong>Panaderías Brito</strong>: gráfica desplegada de ventas y piezas de pan, tabla general de sucursales con estadísticas desplegables, turnos y simulador de flujo.
+              Monitoreo ejecutivo de las tiendas de <strong>Panaderías Brito</strong>: gráfica desplegada de ventas y piezas de pan, tabla general de sucursales con estadísticas detalladas y control de turnos.
             </p>
           </div>
 
-          {/* Quick Simulation Controls & Create Branch */}
+          {/* Action Button: Create Branch */}
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => setIsCreateBranchOpen(true)}
@@ -283,43 +283,6 @@ export default function SucursalesPage() {
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>+ Nueva Sucursal</span>
-            </button>
-
-            <button
-              onClick={() => handleSimulate()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-orange-500/20 transition-all active:scale-95"
-            >
-              <Zap className="w-4 h-4 fill-current animate-pulse" />
-              <span>⚡ Simular 1 Venta</span>
-            </button>
-
-            <button
-              onClick={() => handleSimulateShift()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white font-bold text-xs border border-white/10 transition-all active:scale-95"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-orange-400" />
-              <span>🎲 Simular Turno (12 Tkts)</span>
-            </button>
-
-            <button
-              onClick={toggleLiveSimulation}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all border ${
-                isLiveSimulating
-                  ? "bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-600/30"
-                  : "bg-stone-800 hover:bg-stone-700 border-stone-700 text-stone-300"
-              }`}
-            >
-              {isLiveSimulating ? (
-                <>
-                  <Pause className="w-3.5 h-3.5" />
-                  <span>Pausar En Vivo</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5 text-emerald-400 fill-current" />
-                  <span>Ventas en Vivo (Auto)</span>
-                </>
-              )}
             </button>
           </div>
         </div>
@@ -787,14 +750,6 @@ export default function SucursalesPage() {
                                   </div>
 
                                   <div className="flex items-center gap-2 self-end sm:self-auto">
-                                    <button
-                                      onClick={() => handleSimulate(b.id)}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-md shadow-orange-500/20 active:scale-95 transition-all"
-                                    >
-                                      <Zap className="w-3.5 h-3.5 fill-current" />
-                                      <span>+1 Venta en {b.shortName}</span>
-                                    </button>
-
                                     <button
                                       onClick={() => toggleExpand(b.id)}
                                       className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs transition-colors"
