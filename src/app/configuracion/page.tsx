@@ -36,7 +36,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { UserRole, Branch } from "@/types";
-import UserRoleManagement from "@/components/configuracion/UserRoleManagement";
+import RoleManagement from "@/components/configuracion/RoleManagement";
 import EmployeeManagement from "@/components/configuracion/EmployeeManagement";
 
 function ConfiguracionContent() {
@@ -46,8 +46,8 @@ function ConfiguracionContent() {
   const { usersList, addUser } = useAuth();
   const { branches, addBranch, updateBranch, deleteBranch, switchBranch } = useBranch();
 
-  const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "usuarios" | "empleados" | "ticket" | "operaciones" | "database">(
-    (tabQuery as any) || "usuarios"
+  const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "roles" | "empleados" | "ticket" | "operaciones" | "database">(
+    tabQuery === "usuarios" ? "roles" : (tabQuery as any) || "roles"
   );
 
   const [savedAlert, setSavedAlert] = useState(false);
@@ -78,7 +78,9 @@ function ConfiguracionContent() {
 
   // Sync tab with URL query parameter changes
   useEffect(() => {
-    if (tabQuery && ["general", "sucursales", "usuarios", "empleados", "ticket", "operaciones", "database"].includes(tabQuery)) {
+    if (tabQuery === "usuarios") {
+      setActiveTab("roles");
+    } else if (tabQuery && ["general", "sucursales", "roles", "empleados", "ticket", "operaciones", "database"].includes(tabQuery)) {
       setActiveTab(tabQuery as any);
     }
   }, [tabQuery]);
@@ -250,15 +252,15 @@ function ConfiguracionContent() {
       {/* Settings Navigation Tabs */}
       <div className="flex gap-2 border-b border-stone-200 pb-2 text-xs font-bold overflow-x-auto">
         <button
-          onClick={() => handleTabChange("usuarios")}
+          onClick={() => handleTabChange("roles")}
           className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === "usuarios" ? "bg-stone-900 text-white shadow-sm ring-2 ring-amber-400/50" : "bg-white text-stone-600 hover:bg-stone-100"
+            activeTab === "roles" ? "bg-stone-900 text-white shadow-sm ring-2 ring-amber-400/50" : "bg-white text-stone-600 hover:bg-stone-100"
           }`}
         >
           <ShieldCheck className="w-4 h-4 text-amber-400" />
-          <span>Usuarios</span>
+          <span>Roles</span>
           <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 font-black text-[9px] rounded-full uppercase shadow-xs">
-            Roles & Accesos
+            Roles en Sistema
           </span>
         </button>
         <button
@@ -986,14 +988,14 @@ function ConfiguracionContent() {
         </div>
       )}
 
-      {/* Tab: Users & Roles */}
-      {activeTab === "usuarios" && (
-        <UserRoleManagement />
+      {/* Tab: Roles in System */}
+      {activeTab === "roles" && (
+        <RoleManagement />
       )}
 
       {/* Tab: Employees & Staff */}
       {activeTab === "empleados" && (
-        <EmployeeManagement onGoToUsersTab={() => handleTabChange("usuarios")} />
+        <EmployeeManagement onGoToUsersTab={() => handleTabChange("roles")} />
       )}
 
       {/* Tab 3: Tickets & Printing */}

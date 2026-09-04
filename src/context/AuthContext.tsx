@@ -184,6 +184,8 @@ interface AuthContextType {
   updateUser: (userId: string, updatedData: Partial<User>) => void;
   deleteUser: (userId: string) => { success: boolean; message?: string };
   toggleUserStatus: (userId: string) => void;
+  rolePermissionsMap: Record<UserRole, RolePermissions>;
+  updateRolePermissions: (role: UserRole, newPermissions: RolePermissions, roleLabel?: string) => void;
   isLoading: boolean;
 }
 
@@ -192,6 +194,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [usersList, setUsersList] = useState<User[]>(DEMO_USERS);
+  const [rolePermissionsMap, setRolePermissionsMap] = useState<Record<UserRole, RolePermissions>>(ROLE_PERMISSIONS);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load custom users from localStorage on mount
@@ -206,6 +209,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.error("Error loading custom users:", e);
+    }
+  }, []);
+
+  // Load saved role permissions from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedRolePerms = localStorage.getItem("brito_role_permissions");
+      if (savedRolePerms) {
+        const parsed = JSON.parse(savedRolePerms);
+        setRolePermissionsMap((prev) => ({
+          ...prev,
+          ...parsed,
+        }));
+      }
+    } catch (e) {
+      console.error("Error loading saved role permissions:", e);
     }
   }, []);
 
@@ -227,9 +246,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  // Compute active permissions
+  // Compute active permissions combining role defaults (dynamically configured) and user overrides
   const permissions: RolePermissions = user
-    ? { ...ROLE_PERMISSIONS[user.role], ...(user.permissions || {}) }
+    ? { ...(rolePermissionsMap[user.role] || ROLE_PERMISSIONS[user.role]), ...(user.permissions || {}) }
     : {
         canAccessDashboard: false,
         canAccessPos: false,
@@ -476,6 +495,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Dynamically update permissions and labels for a role in the system
+  const updateRolePermissions = useCallback((role: UserRole, newPermissions: RolePermissions, roleLabel?: string) => {
+    setRolePermissionsMap((prev) => {
+      const updated = {
+        ...prev,
+        [role]: { ...newPermissions },
+      };
+      try {
+        localStorage.setItem("brito_role_permissions", JSON.stringify(updated));
+      } catch (e) {
+        console.error("Error saving role permissions:", e);
+      }
+      return updated;
+    });
+
+    // Also update users in usersList that have this role
+    setUsersList((prevUsers) => {
+      const updatedList = prevUsers.map((u) => {
+        if (u.role === role) {
+          return {
+            ...u,
+            roleLabel: roleLabel || u.roleLabel,
+            permissions: { ...newPermissions },
+          };
+        }
+        return u;
+      });
+      try {
+        localStorage.setItem("brito_custom_users", JSON.stringify(updatedList));
+      } catch (e) {
+        console.error("Error updating users with new role permissions:", e);
+      }
+      return updatedList;
+    });
+
+    // Update current active user if they have this role
+    setUser((curr) => {
+      if (curr && curr.role === role) {
+        const updatedUser = {
+          ...curr,
+          roleLabel: roleLabel || curr.roleLabel,
+          permissions: { ...newPermissions },
+        };
+        try {
+          localStorage.setItem("brito_user", JSON.stringify(updatedUser));
+        } catch (e) {}
+        return updatedUser;
+      }
+      return curr;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -493,6 +564,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateUser,
         deleteUser,
         toggleUserStatus,
+        rolePermissionsMap,
+        updateRolePermissions,
         isLoading,
       }}
     >

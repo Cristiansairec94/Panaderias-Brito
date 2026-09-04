@@ -24,6 +24,7 @@ import {
   Flame,
   Sparkles,
   Building2,
+  ShieldCheck,
   X
 } from "lucide-react";
 import AnimatedLogo from "@/components/ui/AnimatedLogo";
@@ -132,7 +133,7 @@ const navigationItems: NavItem[] = [
     badge: null,
     items: [
       { name: "Catálogos de sistema", href: "/configuracion?tab=general", icon: Sliders },
-      { name: "Usuarios", href: "/configuracion?tab=usuarios", icon: UserCheck, badge: "Roles" },
+      { name: "Roles", href: "/configuracion?tab=roles", icon: ShieldCheck, badge: "Roles" },
       { name: "Empleados", href: "/configuracion?tab=empleados", icon: Users, badge: "Personal" },
     ],
   },
