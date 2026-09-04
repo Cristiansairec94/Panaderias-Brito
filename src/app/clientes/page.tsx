@@ -70,8 +70,8 @@ export default function ClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
 
-  // Desplegable de Moda e Historial de Compras por Cliente
-  const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
+  // Modal de Historial y Moda de Compras por Cliente
+  const [historyModalCustomer, setHistoryModalCustomer] = useState<Customer | null>(null);
 
   // Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -115,10 +115,14 @@ export default function ClientesPage() {
   const handleUpdateFavoriteProduct = (customerId: string, newFavorite: string) => {
     const updated = customers.map((c) => {
       if (c.id === customerId) {
-        return {
+        const next = {
           ...c,
           favoriteProduct: newFavorite.trim() || undefined,
         };
+        if (historyModalCustomer && historyModalCustomer.id === customerId) {
+          setHistoryModalCustomer(next);
+        }
+        return next;
       }
       return c;
     });
@@ -367,382 +371,107 @@ export default function ClientesPage() {
                   const cleanPhone = c.phone ? c.phone.replace(/\D/g, "") : "";
 
                   return (
-                    <Fragment key={c.id}>
-                      <tr
-                        className={`transition-colors ${
-                          expandedClientId === c.id ? "bg-amber-50/70" : "hover:bg-amber-50/50"
-                        }`}
-                      >
-                        {/* Número de Orden de Lista */}
-                        <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
-                          <span className="inline-flex items-center justify-center min-w-8 h-8 px-2 rounded-xl bg-stone-100 border border-stone-300 font-mono text-xs sm:text-sm font-black text-stone-700 shadow-2xs">
-                            {idx + 1}
-                          </span>
-                        </td>
+                    <tr
+                      key={c.id}
+                      className="hover:bg-amber-50/50 transition-colors"
+                    >
+                      {/* Número de Orden de Lista */}
+                      <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center justify-center min-w-8 h-8 px-2 rounded-xl bg-stone-100 border border-stone-300 font-mono text-xs sm:text-sm font-black text-stone-700 shadow-2xs">
+                          {idx + 1}
+                        </span>
+                      </td>
 
-                        {/* 1. Nombre */}
-                        <td className="py-3.5 px-4 sm:px-5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 font-black text-sm sm:text-base shadow-xs bg-amber-100 text-amber-900 border border-amber-300">
-                              {c.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <span className="text-sm sm:text-base font-black text-stone-900 block leading-snug">
-                                {c.name}
-                              </span>
-                            </div>
+                      {/* 1. Nombre */}
+                      <td className="py-3.5 px-4 sm:px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 font-black text-sm sm:text-base shadow-xs bg-amber-100 text-amber-900 border border-amber-300">
+                            {c.name.charAt(0).toUpperCase()}
                           </div>
-                        </td>
-
-                        {/* 2. Número / Teléfono y WhatsApp */}
-                        <td className="py-3.5 px-4 sm:px-5 whitespace-nowrap">
-                          {c.phone && c.phone !== "N/A" ? (
-                            <div className="inline-flex items-center gap-2 whitespace-nowrap">
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-100/90 border border-stone-300/80 rounded-xl font-mono text-xs sm:text-sm font-black text-stone-900 tracking-wide select-all shadow-2xs">
-                                <Phone className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                                <span className="tabular-nums tracking-wider">{formatPhoneNumber(c.phone)}</span>
-                              </div>
-                              {cleanPhone.length >= 8 && (
-                                <a
-                                  href={`https://wa.me/52${cleanPhone}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-90 text-white flex items-center justify-center transition-all shadow-2xs hover:shadow-md cursor-pointer shrink-0"
-                                  title={`Abrir WhatsApp (${formatPhoneNumber(c.phone)})`}
-                                >
-                                  <WhatsAppIcon className="w-4 h-4 fill-white" />
-                                </a>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs sm:text-sm font-medium text-stone-400 italic">
-                              Sin número registrado
+                          <div>
+                            <span className="text-sm sm:text-base font-black text-stone-900 block leading-snug">
+                              {c.name}
                             </span>
-                          )}
-                        </td>
+                          </div>
+                        </div>
+                      </td>
 
-                        {/* 3. Cuadro de Descripción */}
-                        <td className="py-3.5 px-4 sm:px-5">
-                          {c.notes ? (
-                            <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-800 leading-relaxed max-w-sm">
-                              {c.notes}
+                      {/* 2. Número / Teléfono y WhatsApp */}
+                      <td className="py-3.5 px-4 sm:px-5 whitespace-nowrap">
+                        {c.phone && c.phone !== "N/A" ? (
+                          <div className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-100/90 border border-stone-300/80 rounded-xl font-mono text-xs sm:text-sm font-black text-stone-900 tracking-wide select-all shadow-2xs">
+                              <Phone className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                              <span className="tabular-nums tracking-wider">{formatPhoneNumber(c.phone)}</span>
                             </div>
-                          ) : (
-                            <span className="text-xs sm:text-sm font-medium text-stone-400 italic">
-                              Sin descripción
-                            </span>
-                          )}
-                        </td>
+                            {cleanPhone.length >= 8 && (
+                              <a
+                                href={`https://wa.me/52${cleanPhone}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-90 text-white flex items-center justify-center transition-all shadow-2xs hover:shadow-md cursor-pointer shrink-0"
+                                title={`Abrir WhatsApp (${formatPhoneNumber(c.phone)})`}
+                              >
+                                <WhatsAppIcon className="w-4 h-4 fill-white" />
+                              </a>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs sm:text-sm font-medium text-stone-400 italic">
+                            Sin número registrado
+                          </span>
+                        )}
+                      </td>
 
-                        {/* 4. Historial Desplegable */}
-                        <td className="py-3.5 px-4 sm:px-5 whitespace-nowrap">
+                      {/* 3. Cuadro de Descripción */}
+                      <td className="py-3.5 px-4 sm:px-5">
+                        {c.notes ? (
+                          <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-800 leading-relaxed max-w-sm">
+                            {c.notes}
+                          </div>
+                        ) : (
+                          <span className="text-xs sm:text-sm font-medium text-stone-400 italic">
+                            Sin descripción
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 4. Historial (Abre en Formato Modal) */}
+                      <td className="py-3.5 px-4 sm:px-5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setHistoryModalCustomer(c)}
+                          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-bold border border-amber-200/90 bg-gradient-to-r from-amber-50 to-orange-50/80 hover:bg-amber-100/90 text-amber-950 transition-all cursor-pointer shadow-2xs hover:shadow-md active:scale-95"
+                          title="Abrir historial y moda de compra en ventana modal"
+                        >
+                          <span className="text-base shrink-0">🍞</span>
+                          <span className="font-black leading-snug">Historial</span>
+                        </button>
+                      </td>
+
+                      {/* 5. Acciones (Editar y Eliminar) */}
+                      <td className="py-3.5 px-4 sm:px-5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setExpandedClientId(expandedClientId === c.id ? null : c.id)}
-                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl text-xs sm:text-sm font-bold border transition-all cursor-pointer shadow-2xs ${
-                              expandedClientId === c.id
-                                ? "bg-amber-600 text-white border-amber-700 shadow-md ring-2 ring-amber-400/40"
-                                : "bg-gradient-to-r from-amber-50 to-orange-50/80 hover:bg-amber-100/90 border-amber-200/90 text-amber-950"
-                            }`}
-                            title="Haz clic para ver el historial y moda de compra"
+                            onClick={() => handleOpenEdit(c)}
+                            className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
+                            title="Editar cliente"
                           >
-                            <span className="text-base shrink-0">🍞</span>
-                            <span className="font-black leading-snug">Historial</span>
-                            <ChevronDown
-                              className={`w-4 h-4 transition-transform duration-200 shrink-0 ${
-                                expandedClientId === c.id ? "rotate-180 text-white" : "text-amber-700"
-                              }`}
-                            />
+                            <Edit3 className="w-4 h-4" />
                           </button>
-                        </td>
 
-                        {/* 5. Acciones (Editar y Eliminar) */}
-                        <td className="py-3.5 px-4 sm:px-5 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(c)}
-                              className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
-                              title="Editar cliente"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirm({ id: c.id, name: c.name })}
-                              className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-rose-100 text-stone-400 hover:text-rose-700 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
-                              title="Eliminar cliente"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* FILA EXPANDIBLE: MODA DESPLEGABLE E HISTORIAL DE COMPRAS */}
-                      {expandedClientId === c.id && (() => {
-                        const purchaseCounts = c.purchaseCounts || {};
-                        const aggregatedCounts: Record<string, number> = { ...purchaseCounts };
-                        if (Object.keys(aggregatedCounts).length === 0 && c.purchaseHistory) {
-                          for (const purchase of c.purchaseHistory) {
-                            for (const item of purchase.items) {
-                              if (item.name) {
-                                aggregatedCounts[item.name] = (aggregatedCounts[item.name] || 0) + (item.quantity || 1);
-                              }
-                            }
-                          }
-                        }
-                        const sortedProducts = Object.entries(aggregatedCounts).sort((a, b) => b[1] - a[1]);
-                        const totalPieces = sortedProducts.reduce((sum, [, count]) => sum + count, 0);
-
-                        return (
-                          <tr key={`${c.id}-expanded`} className="bg-gradient-to-br from-amber-50/70 via-stone-50 to-amber-100/30 border-y-2 border-amber-300">
-                            <td colSpan={6} className="p-3 sm:p-5">
-                              <div className="bg-white rounded-3xl border-2 border-amber-300/80 p-5 sm:p-7 shadow-lg space-y-6">
-                                {/* Cabecera del Panel Desplegable */}
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-stone-200">
-                                  <div className="flex items-center gap-3">
-                                    <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-md">
-                                      <Sparkles className="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                      <div className="flex items-center gap-2.5 flex-wrap">
-                                        <h4 className="text-lg sm:text-xl font-black text-stone-900">
-                                          Historial y Moda de Compra: {c.name}
-                                        </h4>
-                                        <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs">
-                                          Cliente Registrado
-                                        </span>
-                                      </div>
-                                      <p className="text-xs sm:text-sm text-stone-500 font-medium mt-0.5">
-                                        Análisis de lo que más compra, moda estadística y detalle cronológico de compras
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-3 flex-wrap">
-                                    {/* Opción Desplegable para Asignar / Cambiar Moda */}
-                                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-2xl">
-                                      <span className="text-xs font-black text-amber-950 whitespace-nowrap">
-                                        Moda habitual:
-                                      </span>
-                                      <select
-                                        value={c.favoriteProduct || ""}
-                                        onChange={(e) => handleUpdateFavoriteProduct(c.id, e.target.value)}
-                                        className="bg-white text-stone-900 border border-amber-300 rounded-xl px-2.5 py-1 text-xs font-black focus:outline-none focus:border-amber-600 cursor-pointer shadow-2xs"
-                                      >
-                                        <option value="">-- Seleccionar producto habitual --</option>
-                                        {PRESET_BREAD_OPTIONS.map((opt) => (
-                                          <option key={opt} value={opt}>
-                                            {opt}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => setExpandedClientId(null)}
-                                      className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-black rounded-xl text-xs transition-colors cursor-pointer"
-                                    >
-                                      ✕ Cerrar
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Resumen Superior de Indicadores */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                  <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
-                                    <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
-                                      Pan Más Comprado (Moda)
-                                    </span>
-                                    <span className="text-sm sm:text-base font-black text-amber-800 flex items-center gap-1.5 mt-0.5">
-                                      <span>🍞</span>
-                                      <span className="truncate">{c.favoriteProduct || "Por definir"}</span>
-                                    </span>
-                                  </div>
-
-                                  <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
-                                    <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
-                                      Total Acumulado Comprado
-                                    </span>
-                                    <span className="text-base sm:text-lg font-black text-emerald-700 mt-0.5 block">
-                                      {formatCurrency(c.totalPurchases || 0)}
-                                    </span>
-                                  </div>
-
-                                  <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
-                                    <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
-                                      Tickets / Compras
-                                    </span>
-                                    <span className="text-base sm:text-lg font-black text-stone-900 mt-0.5 block">
-                                      {(c.purchaseHistory || []).length} {(c.purchaseHistory || []).length === 1 ? "ticket" : "tickets"}
-                                    </span>
-                                  </div>
-
-                                  <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
-                                    <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
-                                      Piezas Acumuladas
-                                    </span>
-                                    <span className="text-base sm:text-lg font-black text-stone-900 mt-0.5 block">
-                                      {totalPieces} piezas
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Grid de 2 Columnas: Moda/Desglose vs Historial */}
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                  {/* Columna 1: Desglose de qué es lo que más compra (5 cols) */}
-                                  <div className="lg:col-span-5 bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
-                                        <BarChart3 className="w-5 h-5 text-amber-600" />
-                                        <h5 className="font-black text-stone-900 text-sm sm:text-base">
-                                          ¿Qué es lo que más compra?
-                                        </h5>
-                                      </div>
-                                      <span className="text-xs font-bold text-stone-500">
-                                        Frecuencia de piezas
-                                      </span>
-                                    </div>
-
-                                    {sortedProducts.length === 0 ? (
-                                      <div className="text-center py-8 text-stone-400 text-xs sm:text-sm font-medium italic">
-                                        Aún no hay desglose estadístico acumulado para este cliente.
-                                      </div>
-                                    ) : (
-                                      <div className="space-y-3">
-                                        {sortedProducts.map(([prodName, count], pIdx) => {
-                                          const percent = totalPieces > 0 ? Math.round((count / totalPieces) * 100) : 0;
-                                          const isTop = pIdx === 0;
-
-                                          return (
-                                            <div
-                                              key={prodName}
-                                              className={`p-3 rounded-xl border transition-all ${
-                                                isTop
-                                                  ? "bg-amber-50/90 border-amber-300 shadow-2xs"
-                                                  : "bg-white border-stone-200"
-                                              }`}
-                                            >
-                                              <div className="flex items-center justify-between text-xs sm:text-sm font-black text-stone-900 mb-1.5">
-                                                <div className="flex items-center gap-1.5 truncate mr-2">
-                                                  <span>{isTop ? "⭐" : "🥖"}</span>
-                                                  <span className="truncate">{prodName}</span>
-                                                  {isTop && (
-                                                    <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded-md text-[10px] uppercase font-black shrink-0">
-                                                      Moda #1
-                                                    </span>
-                                                  )}
-                                                </div>
-                                                <span className="tabular-nums font-mono shrink-0 text-stone-700">
-                                                  {count} pz ({percent}%)
-                                                </span>
-                                              </div>
-                                              {/* Barra de progreso */}
-                                              <div className="w-full bg-stone-200 h-2.5 rounded-full overflow-hidden">
-                                                <div
-                                                  className={`h-full rounded-full transition-all duration-500 ${
-                                                    isTop ? "bg-amber-500" : "bg-stone-400"
-                                                  }`}
-                                                  style={{ width: `${percent}%` }}
-                                                />
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Columna 2: Historial de Compras (Tickets) (7 cols) */}
-                                  <div className="lg:col-span-7 bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
-                                        <Receipt className="w-5 h-5 text-amber-600" />
-                                        <h5 className="font-black text-stone-900 text-sm sm:text-base">
-                                          Historial de Compras (Tickets)
-                                        </h5>
-                                      </div>
-                                      <span className="text-xs font-bold text-stone-500">
-                                        {(c.purchaseHistory || []).length} registros
-                                      </span>
-                                    </div>
-
-                                    {(!c.purchaseHistory || c.purchaseHistory.length === 0) ? (
-                                      <div className="text-center py-10 px-4 bg-white rounded-2xl border border-dashed border-stone-300 space-y-2">
-                                        <Clock className="w-8 h-8 text-stone-400 mx-auto" />
-                                        <p className="text-sm font-black text-stone-700">
-                                          Sin tickets de venta registrados aún
-                                        </p>
-                                        <p className="text-xs text-stone-500 max-w-md mx-auto font-medium">
-                                          Al cobrar una venta en el Punto de Venta (POS) y asignarla a este cliente, aquí aparecerá el ticket con los panes que llevó, sucursal, cajero y total pagado.
-                                        </p>
-                                      </div>
-                                    ) : (
-                                      <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-                                        {c.purchaseHistory.map((purchase) => (
-                                          <div
-                                            key={purchase.id}
-                                            className="p-3.5 bg-white rounded-2xl border border-stone-200 hover:border-amber-300 shadow-2xs space-y-2.5 transition-all"
-                                          >
-                                            <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2 flex-wrap">
-                                              <div className="flex items-center gap-2 text-xs font-bold text-stone-600">
-                                                <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                                <span>{purchase.date}</span>
-                                                {purchase.branchName && (
-                                                  <span className="bg-stone-100 text-stone-700 px-2 py-0.5 rounded-lg text-[11px] font-bold">
-                                                    {purchase.branchName}
-                                                  </span>
-                                                )}
-                                                {purchase.cashier && (
-                                                  <span className="text-stone-400 text-[11px]">
-                                                    • Cajero: {purchase.cashier}
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                {purchase.paymentMethod && (
-                                                  <span className="text-[11px] uppercase font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200">
-                                                    {purchase.paymentMethod}
-                                                  </span>
-                                                )}
-                                                <span className="font-black text-base text-stone-900">
-                                                  {formatCurrency(purchase.total)}
-                                                </span>
-                                              </div>
-                                            </div>
-
-                                            {/* Detalle de productos del ticket */}
-                                            <div className="flex flex-wrap gap-2 pt-0.5">
-                                              {purchase.items.map((it, itIdx) => (
-                                                <div
-                                                  key={itIdx}
-                                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold text-stone-800"
-                                                >
-                                                  <span className="text-amber-700 font-mono font-black">{it.quantity}x</span>
-                                                  <span>{it.name}</span>
-                                                  {it.subtotal && (
-                                                    <span className="text-stone-400 text-[11px]">
-                                                      ({formatCurrency(it.subtotal)})
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })()}
-                    </Fragment>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirm({ id: c.id, name: c.name })}
+                            className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-rose-100 text-stone-400 hover:text-rose-700 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
+                            title="Eliminar cliente"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -1109,6 +838,280 @@ export default function ClientesPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL 4: FORMATO MODAL DE HISTORIAL Y MODA DE COMPRA */}
+      {historyModalCustomer && (() => {
+        const c = historyModalCustomer;
+        const purchaseCounts = c.purchaseCounts || {};
+        const aggregatedCounts: Record<string, number> = { ...purchaseCounts };
+        if (Object.keys(aggregatedCounts).length === 0 && c.purchaseHistory) {
+          for (const purchase of c.purchaseHistory) {
+            for (const item of purchase.items) {
+              if (item.name) {
+                aggregatedCounts[item.name] = (aggregatedCounts[item.name] || 0) + (item.quantity || 1);
+              }
+            }
+          }
+        }
+        const sortedProducts = Object.entries(aggregatedCounts).sort((a, b) => b[1] - a[1]);
+        const totalPieces = sortedProducts.reduce((sum, [, count]) => sum + count, 0);
+
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl p-5 sm:p-8 max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl space-y-6 border-2 border-stone-300 animate-in zoom-in-95">
+              {/* Header del Modal */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b-2 border-stone-100">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-md shrink-0">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h3 className="text-xl sm:text-2xl font-black text-stone-900">
+                        Historial y Moda de Compra: {c.name}
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs">
+                        Cliente Registrado
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-stone-500 font-medium mt-0.5">
+                      Análisis de lo que más compra, moda estadística y detalle cronológico de compras
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Selector Desplegable para Asignar / Cambiar Moda */}
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-2xl">
+                    <span className="text-xs font-black text-amber-950 whitespace-nowrap">
+                      Moda habitual:
+                    </span>
+                    <select
+                      value={c.favoriteProduct || ""}
+                      onChange={(e) => handleUpdateFavoriteProduct(c.id, e.target.value)}
+                      className="bg-white text-stone-900 border border-amber-300 rounded-xl px-2.5 py-1 text-xs font-black focus:outline-none focus:border-amber-600 cursor-pointer shadow-2xs"
+                    >
+                      <option value="">-- Seleccionar producto habitual --</option>
+                      {PRESET_BREAD_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setHistoryModalCustomer(null)}
+                    className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 cursor-pointer font-bold transition-colors"
+                    title="Cerrar modal"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Resumen Superior de Indicadores */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+                    Pan Más Comprado (Moda)
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-amber-800 flex items-center gap-1.5 mt-0.5">
+                    <span>🍞</span>
+                    <span className="truncate">{c.favoriteProduct || "Por definir"}</span>
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+                    Total Acumulado Comprado
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-emerald-700 mt-0.5 block">
+                    {formatCurrency(c.totalPurchases || 0)}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+                    Tickets / Compras
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-stone-900 mt-0.5 block">
+                    {(c.purchaseHistory || []).length} {(c.purchaseHistory || []).length === 1 ? "ticket" : "tickets"}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+                    Piezas Acumuladas
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-stone-900 mt-0.5 block">
+                    {totalPieces} piezas
+                  </span>
+                </div>
+              </div>
+
+              {/* Grid de 2 Columnas: Moda/Desglose vs Historial */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Columna 1: Desglose de qué es lo que más compra (5 cols) */}
+                <div className="lg:col-span-5 bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-amber-600" />
+                      <h5 className="font-black text-stone-900 text-sm sm:text-base">
+                        ¿Qué es lo que más compra?
+                      </h5>
+                    </div>
+                    <span className="text-xs font-bold text-stone-500">
+                      Frecuencia de piezas
+                    </span>
+                  </div>
+
+                  {sortedProducts.length === 0 ? (
+                    <div className="text-center py-8 text-stone-400 text-xs sm:text-sm font-medium italic">
+                      Aún no hay desglose estadístico acumulado para este cliente.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {sortedProducts.map(([prodName, count], pIdx) => {
+                        const percent = totalPieces > 0 ? Math.round((count / totalPieces) * 100) : 0;
+                        const isTop = pIdx === 0;
+
+                        return (
+                          <div
+                            key={prodName}
+                            className={`p-3 rounded-xl border transition-all ${
+                              isTop
+                                ? "bg-amber-50/90 border-amber-300 shadow-2xs"
+                                : "bg-white border-stone-200"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-xs sm:text-sm font-black text-stone-900 mb-1.5">
+                              <div className="flex items-center gap-1.5 truncate mr-2">
+                                <span>{isTop ? "⭐" : "🥖"}</span>
+                                <span className="truncate">{prodName}</span>
+                                {isTop && (
+                                  <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded-md text-[10px] uppercase font-black shrink-0">
+                                    Moda #1
+                                  </span>
+                                )}
+                              </div>
+                              <span className="tabular-nums font-mono shrink-0 text-stone-700">
+                                {count} pz ({percent}%)
+                              </span>
+                            </div>
+                            {/* Barra de progreso */}
+                            <div className="w-full bg-stone-200 h-2.5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  isTop ? "bg-amber-500" : "bg-stone-400"
+                                }`}
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Columna 2: Historial de Compras (Tickets) (7 cols) */}
+                <div className="lg:col-span-7 bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Receipt className="w-5 h-5 text-amber-600" />
+                      <h5 className="font-black text-stone-900 text-sm sm:text-base">
+                        Historial de Compras (Tickets)
+                      </h5>
+                    </div>
+                    <span className="text-xs font-bold text-stone-500">
+                      {(c.purchaseHistory || []).length} registros
+                    </span>
+                  </div>
+
+                  {(!c.purchaseHistory || c.purchaseHistory.length === 0) ? (
+                    <div className="text-center py-10 px-4 bg-white rounded-2xl border border-dashed border-stone-300 space-y-2">
+                      <Clock className="w-8 h-8 text-stone-400 mx-auto" />
+                      <p className="text-sm font-black text-stone-700">
+                        Sin tickets de venta registrados aún
+                      </p>
+                      <p className="text-xs text-stone-500 max-w-md mx-auto font-medium">
+                        Al cobrar una venta en el Punto de Venta (POS) y asignarla a este cliente, aquí aparecerá el ticket con los panes que llevó, sucursal, cajero y total pagado.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                      {c.purchaseHistory.map((purchase) => (
+                        <div
+                          key={purchase.id}
+                          className="p-3.5 bg-white rounded-2xl border border-stone-200 hover:border-amber-300 shadow-2xs space-y-2.5 transition-all"
+                        >
+                          <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2 flex-wrap">
+                            <div className="flex items-center gap-2 text-xs font-bold text-stone-600">
+                              <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>{purchase.date}</span>
+                              {purchase.branchName && (
+                                <span className="bg-stone-100 text-stone-700 px-2 py-0.5 rounded-lg text-[11px] font-bold">
+                                  {purchase.branchName}
+                                </span>
+                              )}
+                              {purchase.cashier && (
+                                <span className="text-stone-400 text-[11px]">
+                                  • Cajero: {purchase.cashier}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {purchase.paymentMethod && (
+                                <span className="text-[11px] uppercase font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200">
+                                  {purchase.paymentMethod}
+                                </span>
+                              )}
+                              <span className="font-black text-base text-stone-900">
+                                {formatCurrency(purchase.total)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Detalle de productos del ticket */}
+                          <div className="flex flex-wrap gap-2 pt-0.5">
+                            {purchase.items.map((it, itIdx) => (
+                              <div
+                                key={itIdx}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold text-stone-800"
+                              >
+                                <span className="text-amber-700 font-mono font-black">{it.quantity}x</span>
+                                <span>{it.name}</span>
+                                {it.subtotal && (
+                                  <span className="text-stone-400 text-[11px]">
+                                    ({formatCurrency(it.subtotal)})
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer con Botón de Cierre */}
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setHistoryModalCustomer(null)}
+                  className="px-6 py-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-2xl transition-all cursor-pointer text-sm"
+                >
+                  Cerrar Historial
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
