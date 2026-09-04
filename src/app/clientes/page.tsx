@@ -82,21 +82,26 @@ export default function ClientesPage() {
     setTimeout(() => setSuccessNotice(null), 3500);
   };
 
-  // Filtrado simple por búsqueda (excluye cualquier cliente virtual de mostrador)
+  // Filtrado por búsqueda y ordenamiento en estricto orden de lista (A - Z)
   const filteredCustomers = useMemo(() => {
     const validCustomers = customers.filter((c) => c.id !== "cli-0" && c.type !== "general");
     const q = search.toLowerCase().trim();
     const qClean = q.replace(/\D/g, "");
-    if (!q) return validCustomers;
-    return validCustomers.filter((c) => {
-      const cClean = c.phone ? c.phone.replace(/\D/g, "") : "";
-      return (
-        c.name.toLowerCase().includes(q) ||
-        (c.phone && c.phone.toLowerCase().includes(q)) ||
-        (qClean.length > 0 && cClean.includes(qClean)) ||
-        (c.notes && c.notes.toLowerCase().includes(q))
-      );
-    });
+    const matched = !q
+      ? validCustomers
+      : validCustomers.filter((c) => {
+          const cClean = c.phone ? c.phone.replace(/\D/g, "") : "";
+          return (
+            c.name.toLowerCase().includes(q) ||
+            (c.phone && c.phone.toLowerCase().includes(q)) ||
+            (qClean.length > 0 && cClean.includes(qClean)) ||
+            (c.notes && c.notes.toLowerCase().includes(q))
+          );
+        });
+
+    return [...matched].sort((a, b) =>
+      a.name.localeCompare(b.name, "es", { sensitivity: "base", numeric: true })
+    );
   }, [customers, search]);
 
   // Apertura modal nuevo cliente
@@ -234,9 +239,16 @@ export default function ClientesPage() {
           )}
         </div>
 
-        <div className="px-4 py-2 bg-stone-100 rounded-2xl border border-stone-200 shrink-0 text-center">
-          <span className="text-xs text-stone-500 font-bold block uppercase tracking-wider">Total</span>
-          <span className="text-base sm:text-lg font-black text-stone-900">{customers.length} Clientes</span>
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 rounded-2xl border border-amber-200 text-xs font-black text-amber-900 shadow-2xs">
+            <span>🔤 Orden de lista: A - Z</span>
+          </div>
+          <div className="px-4 py-2 bg-stone-100 rounded-2xl border border-stone-200 shrink-0 text-center">
+            <span className="text-xs text-stone-500 font-bold block uppercase tracking-wider">Total</span>
+            <span className="text-base sm:text-lg font-black text-stone-900">
+              {filteredCustomers.length} {filteredCustomers.length === 1 ? "Cliente" : "Clientes"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -278,6 +290,7 @@ export default function ClientesPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-stone-100 border-b-2 border-stone-200 text-xs sm:text-sm font-black text-stone-700 uppercase tracking-wider">
+                  <th className="py-4 px-4 sm:px-5 w-20 text-center whitespace-nowrap"># Lista</th>
                   <th className="py-4 px-5 sm:px-6 min-w-[240px]">Cliente / Nombre</th>
                   <th className="py-4 px-5 sm:px-6 min-w-[320px] whitespace-nowrap">
                     <div className="flex items-center gap-2">
@@ -290,7 +303,7 @@ export default function ClientesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
-                {filteredCustomers.map((c) => {
+                {filteredCustomers.map((c, idx) => {
                   const cleanPhone = c.phone ? c.phone.replace(/\D/g, "") : "";
 
                   return (
@@ -298,6 +311,13 @@ export default function ClientesPage() {
                       key={c.id}
                       className="hover:bg-amber-50/50 transition-colors"
                     >
+                      {/* Número de Orden de Lista */}
+                      <td className="py-4 px-4 sm:px-5 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center justify-center min-w-8 h-8 px-2 rounded-xl bg-stone-100 border border-stone-300 font-mono text-xs sm:text-sm font-black text-stone-700 shadow-2xs">
+                          {idx + 1}
+                        </span>
+                      </td>
+
                       {/* 1. Nombre */}
                       <td className="py-4 px-5 sm:px-6">
                         <div className="flex items-center gap-3">
