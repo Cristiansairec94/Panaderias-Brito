@@ -40,7 +40,8 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  ShieldCheck
+  ShieldCheck,
+  Menu
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -54,11 +55,13 @@ import {
 } from "@/lib/customers";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
+import { useSidebar } from "@/context/SidebarContext";
 import { useNotifications } from "@/context/NotificationContext";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
 import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
+import NotificationsDropdown from "@/components/layout/NotificationsDropdown";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
 
@@ -126,6 +129,7 @@ export default function POSPage() {
   const { user } = useAuth();
   const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
   const { addNotification } = useNotifications();
+  const { toggleMobile } = useSidebar();
   const activeBranch = currentBranch || branches[0];
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -771,6 +775,16 @@ export default function POSPage() {
         {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
         <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
           <div className="flex items-center justify-between gap-3 w-full">
+            {/* Botón Menú Móvil */}
+            <button
+              type="button"
+              onClick={toggleMobile}
+              className="md:hidden p-3 rounded-2xl bg-white hover:bg-stone-50 text-stone-700 transition-colors border-2 border-stone-200 shrink-0 shadow-xs"
+              title="Abrir menú"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
             {/* Buscador de Productos (Grande, Claro y Cómodo) */}
             <div className="relative flex-1 max-w-xl">
               <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -880,6 +894,11 @@ export default function POSPage() {
                 <Lock className="w-4 h-4 text-amber-200" />
                 <span>{isShiftLocked ? "Turno Cerrado 🔒" : "Cerrar Turno"}</span>
               </button>
+            </div>
+
+            {/* Campana de Notificaciones Frontal */}
+            <div className="relative shrink-0">
+              <NotificationsDropdown />
             </div>
 
             {/* Botón Móvil para Ver Charola / Carrito */}

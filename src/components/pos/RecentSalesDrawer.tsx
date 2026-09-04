@@ -43,7 +43,7 @@ export default function RecentSalesDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex justify-end bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
         {/* Drawer Header */}
         <div className="p-5 border-b border-stone-200 bg-amber-950 text-white flex items-center justify-between">
