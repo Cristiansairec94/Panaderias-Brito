@@ -205,10 +205,6 @@ export default function CashDrawerShiftModal({
     onClose();
   };
 
-  const handlePrintZCut = () => {
-    window.print();
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -313,23 +309,16 @@ export default function CashDrawerShiftModal({
                 </div>
               </div>
 
-              {/* Botones de acción post-corte */}
-              <div className="flex gap-3 max-w-md mx-auto">
-                <button
-                  onClick={handlePrintZCut}
-                  className="flex-1 py-3.5 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md"
-                >
-                  <Printer className="w-4 h-4 text-amber-400" />
-                  <span>Imprimir Ticket de Corte</span>
-                </button>
+              {/* Botón de acción post-corte */}
+              <div className="max-w-md mx-auto">
                 <button
                   onClick={() => {
                     onClose();
                     if (onCompleteShiftCut) onCompleteShiftCut();
                   }}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white font-black rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-950/20 active:scale-95 animate-pulse"
+                  className="w-full py-4 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white font-black rounded-2xl text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-xl shadow-orange-950/20 active:scale-95 animate-pulse"
                 >
-                  <Lock className="w-4 h-4" />
+                  <Lock className="w-5 h-5" />
                   <span>Finalizar y Bloquear Punto de Venta</span>
                 </button>
               </div>
