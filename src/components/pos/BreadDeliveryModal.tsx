@@ -732,22 +732,8 @@ export default function BreadDeliveryModal({
                           </div>
                         </div>
 
-                        {/* Espacio para ingresar piezas directamente + botones rápidos */}
+                        {/* Espacio para ingresar piezas directamente */}
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {/* Botones de incremento rápido (+10, +25, +50) */}
-                          <div className="hidden sm:flex items-center gap-1">
-                            {[10, 25, 50].map((step) => (
-                              <button
-                                key={step}
-                                type="button"
-                                onClick={() => handleAddQuantity(prod.id, step)}
-                                className="px-2 py-1 rounded-xl text-xs font-black bg-stone-100 hover:bg-emerald-100 hover:text-emerald-900 text-stone-700 transition-colors border border-stone-200 cursor-pointer active:scale-95"
-                                title={`Sumar +${step} piezas`}
-                              >
-                                +{step}
-                              </button>
-                            ))}
-                          </div>
 
                           {/* Control con recuadro donde poner las piezas */}
                           <div
@@ -845,7 +831,7 @@ export default function BreadDeliveryModal({
                     <div>
                       <p className="text-sm font-bold text-stone-600">No has agregado pan a la entrega</p>
                       <p className="text-xs text-stone-400 mt-1 max-w-xs">
-                        Selecciona panes a la izquierda o usa los botones rápidos (+10, +25, +50) para cargar lo que dejó la camioneta.
+                        Selecciona panes a la izquierda e ingresa las piezas recibidas para cargar lo que dejó la camioneta.
                       </p>
                     </div>
                   </div>
