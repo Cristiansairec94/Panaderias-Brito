@@ -4,13 +4,13 @@ export const STORAGE_CUSTOMERS_KEY = "brito_customers";
 
 export const DEFAULT_GENERAL_CUSTOMER: Customer = {
   id: "cli-0",
-  name: "Público General",
+  name: "Clientes Generales",
   phone: "N/A",
   type: "general",
   creditLimit: 0,
   currentDebt: 0,
   totalPurchases: 45800,
-  notes: "Venta de mostrador al contado sin registro previo.",
+  notes: "Venta de mostrador al contado para clientes generales.",
   registeredAt: "2026-01-01",
 };
 

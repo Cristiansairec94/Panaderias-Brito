@@ -1319,47 +1319,68 @@ export default function POSPage() {
         {/* CUSTOMER SELECTION / SMART SEARCH QUICK BAR */}
         <div ref={customerPickerRef} className="p-2 sm:px-3 bg-gradient-to-r from-amber-50/90 via-stone-50 to-orange-50/70 border-b border-amber-200/80 shrink-0 relative">
           {selectedCustomer.type === "general" ? (
-            /* 1. MODO BÚSQUEDA RÁPIDA / PÚBLICO GENERAL */
+            /* 1. MODO BÚSQUEDA RÁPIDA / CLIENTES GENERALES */
             <div className="flex items-center gap-2 w-full">
-              {/* Buscador Inteligente Integrado Directo */}
-              <div className="flex-1 relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="🔍 Buscar cliente rápido (Teléfono, Nombre o Característica)..."
-                  value={customerSearchQuery}
-                  onFocus={() => setIsCustomerPickerOpen(true)}
-                  onChange={(e) => {
-                    setCustomerSearchQuery(e.target.value);
-                    if (!isCustomerPickerOpen) setIsCustomerPickerOpen(true);
-                  }}
-                  className="w-full pl-9 pr-8 py-2 bg-white rounded-xl text-xs font-bold text-stone-900 border-2 border-amber-300/90 focus:border-amber-500 focus:ring-2 focus:ring-amber-400/20 focus:outline-none transition-all placeholder:text-stone-400 shadow-2xs"
-                />
-                {customerSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomerSearchQuery("");
-                    }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+              {/* Buscador Inteligente Integrado con Clientes Generales permanente */}
+              <div className="flex-1 flex items-center bg-white rounded-2xl border-2 border-amber-300/90 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-400/20 px-2 sm:px-2.5 py-1.5 gap-2 shadow-2xs transition-all">
+                {/* Badge Permanente de Clientes Generales */}
+                <div 
+                  className="flex items-center gap-1.5 bg-amber-100 text-amber-950 border border-amber-300/90 px-2.5 py-1 rounded-xl text-xs font-black shrink-0 select-none shadow-2xs"
+                  title="Cliente actual: Clientes Generales"
+                >
+                  <span className="text-sm">👤</span>
+                  <span className="whitespace-nowrap">Clientes Generales</span>
+                </div>
 
+                {/* Separador vertical */}
+                <div className="h-4 w-px bg-stone-200 shrink-0" />
+
+                {/* Campo de búsqueda específica */}
+                <div className="flex-1 relative flex items-center min-w-0">
+                  <Search className="w-3.5 h-3.5 text-stone-400 shrink-0 mr-1.5 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Buscar cliente específico..."
+                    value={customerSearchQuery}
+                    onFocus={() => {
+                      if (customerSearchQuery.trim().length > 0) {
+                        setIsCustomerPickerOpen(true);
+                      }
+                    }}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomerSearchQuery(val);
+                      setIsCustomerPickerOpen(val.trim().length > 0);
+                    }}
+                    className="w-full bg-transparent text-xs font-bold text-stone-900 focus:outline-none placeholder:text-stone-400 min-w-0 truncate"
+                  />
+                  {customerSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerSearchQuery("");
+                        setIsCustomerPickerOpen(false);
+                      }}
+                      className="text-stone-400 hover:text-stone-700 p-0.5 ml-1 shrink-0 cursor-pointer"
+                      title="Borrar búsqueda"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {/* Botón Registrar Nuevo Cliente */}
               <button
                 type="button"
                 onClick={() => {
-                  setNewCustName("");
+                  setNewCustName(customerSearchQuery || "");
                   setNewCustPhone("");
                   setNewCustNotes("");
                   setIsNewCustomerModalOpen(true);
                   setIsCustomerPickerOpen(false);
                 }}
-                className="py-2 px-3 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1 shrink-0"
+                className="py-2.5 px-3 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1 shrink-0 cursor-pointer"
                 title="Registrar nuevo cliente"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -1399,25 +1420,24 @@ export default function POSPage() {
                     setCustomerSearchQuery("");
                     setIsCustomerPickerOpen(false);
                   }}
-                  className="px-2.5 py-1.5 rounded-xl text-stone-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 text-xs font-bold transition-all flex items-center gap-1 shadow-2xs active:scale-95"
-                  title="Volver a Público General"
+                  className="px-2.5 py-1.5 rounded-xl text-stone-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 text-xs font-bold transition-all flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer"
+                  title="Volver a Clientes Generales"
                 >
                   <X className="w-3.5 h-3.5 text-rose-500" />
-                  <span className="text-[11px]">General</span>
+                  <span className="text-[11px] font-black">Clientes Generales</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setIsCustomerPickerOpen(!isCustomerPickerOpen)}
-                  className={`p-1.5 px-2.5 rounded-xl text-xs font-black flex items-center gap-1 transition-all active:scale-95 shadow-2xs border ${
-                    isCustomerPickerOpen
-                      ? "bg-stone-900 text-amber-300 border-stone-900 shadow-md"
-                      : "bg-white hover:bg-amber-100/70 text-stone-800 border-stone-200"
-                  }`}
+                  onClick={() => {
+                    setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+                    setCustomerSearchQuery("");
+                  }}
+                  className="p-1.5 px-2.5 rounded-xl text-xs font-black flex items-center gap-1 transition-all active:scale-95 shadow-2xs border bg-white hover:bg-amber-100/70 text-stone-800 border-stone-200 cursor-pointer"
                   title="Buscar otro cliente"
                 >
                   <Search className="w-3.5 h-3.5 text-amber-600" />
-                  <span className="text-[11px] hidden sm:inline">Buscar</span>
+                  <span className="text-[11px] hidden sm:inline">Cambiar</span>
                 </button>
 
                 <button
@@ -1429,7 +1449,7 @@ export default function POSPage() {
                     setIsNewCustomerModalOpen(true);
                     setIsCustomerPickerOpen(false);
                   }}
-                  className="p-1.5 px-2.5 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1"
+                  className="p-1.5 px-2.5 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1 cursor-pointer"
                   title="Registrar nuevo cliente"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1439,22 +1459,25 @@ export default function POSPage() {
             </div>
           )}
 
-          {/* Customer Dropdown Popover con resultados desplegables */}
-          {isCustomerPickerOpen && (
+          {/* Customer Dropdown Popover: SOLO SE DESPLIEGA CUANDO SE BUSCA ALGO EN ESPECÍFICO */}
+          {isCustomerPickerOpen && customerSearchQuery.trim().length > 0 && (
             <div className="absolute left-2 right-2 top-full mt-1.5 z-50 bg-white rounded-2xl shadow-2xl border-2 border-amber-400/90 p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-150 max-h-[400px] flex flex-col">
               {/* Popover Header */}
               <div className="flex items-center justify-between pb-1 border-b border-stone-100">
                 <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-amber-600" /> Resultados de Clientes
+                  <Users className="w-3.5 h-3.5 text-amber-600" /> Clientes encontrados para &quot;{customerSearchQuery}&quot;
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-stone-400 font-bold">
-                    {filteredCustomers.length} {filteredCustomers.length === 1 ? "resultado" : "resultados"}
+                    {filteredCustomers.filter((c) => c.id !== "cli-0").length} resultado(s)
                   </span>
                   <button
                     type="button"
-                    onClick={() => setIsCustomerPickerOpen(false)}
-                    className="p-0.5 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+                    onClick={() => {
+                      setIsCustomerPickerOpen(false);
+                      setCustomerSearchQuery("");
+                    }}
+                    className="p-0.5 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1463,35 +1486,6 @@ export default function POSPage() {
 
               {/* Options List */}
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[240px]">
-                {/* Default Público General Quick Select Option */}
-                {!customerSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
-                      setIsCustomerPickerOpen(false);
-                    }}
-                    className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border ${
-                      selectedCustomer.id === DEFAULT_GENERAL_CUSTOMER.id
-                        ? "bg-amber-50 border-amber-300 ring-1 ring-amber-300"
-                        : "bg-stone-50/70 hover:bg-amber-50/50 border-stone-200"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-stone-200 text-stone-700 flex items-center justify-center font-bold text-sm shrink-0">
-                        👤
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-black text-xs text-stone-900">Público General (Mostrador)</p>
-                        <p className="text-[10px] text-stone-500 font-medium">Venta rápida sin registro</p>
-                      </div>
-                    </div>
-                    {selectedCustomer.id === DEFAULT_GENERAL_CUSTOMER.id && (
-                      <Check className="w-4 h-4 text-amber-600 shrink-0" />
-                    )}
-                  </button>
-                )}
-
                 {filteredCustomers
                   .filter((c) => c.id !== "cli-0")
                   .map((c) => {
@@ -1505,7 +1499,7 @@ export default function POSPage() {
                           setIsCustomerPickerOpen(false);
                           setCustomerSearchQuery("");
                         }}
-                        className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border ${
+                        className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border cursor-pointer ${
                           isSelected
                             ? "bg-amber-50 border-amber-300 ring-1 ring-amber-300 shadow-2xs"
                             : "bg-white hover:bg-amber-50/50 border-stone-200"
@@ -1541,8 +1535,8 @@ export default function POSPage() {
 
                 {filteredCustomers.filter((c) => c.id !== "cli-0").length === 0 && (
                   <div className="p-4 text-center space-y-1.5 bg-stone-50 rounded-xl border border-dashed border-stone-200">
-                    <p className="text-xs font-black text-stone-700">No se encontró el cliente</p>
-                    <p className="text-[10px] text-stone-500">¿Deseas registrarlo con estos datos?</p>
+                    <p className="text-xs font-black text-stone-700">No se encontró &quot;{customerSearchQuery}&quot;</p>
+                    <p className="text-[10px] text-stone-500">¿Deseas registrarlo como un nuevo cliente especial?</p>
                     <button
                       type="button"
                       onClick={() => {
@@ -1571,7 +1565,7 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setNewCustName("");
+                    setNewCustName(customerSearchQuery || "");
                     setNewCustPhone("");
                     setNewCustNotes("");
                     setIsNewCustomerModalOpen(true);
@@ -1580,7 +1574,7 @@ export default function POSPage() {
                   className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Registrar Nuevo Cliente</span>
+                  <span>+ Registrar Nuevo Cliente</span>
                 </button>
               </div>
             </div>
@@ -1884,7 +1878,7 @@ export default function POSPage() {
           cashGiven={completedSale.cashGiven}
           change={completedSale.change}
           cashierName={completedSale.cashier}
-          customerName={completedSale.customerName || "Público General"}
+          customerName={completedSale.customerName || "Clientes Generales"}
           customerType={completedSale.customerType}
           branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
           branchAddress={activeBranch ? activeBranch.address : undefined}
