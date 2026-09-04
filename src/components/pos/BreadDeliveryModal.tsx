@@ -473,64 +473,48 @@ export default function BreadDeliveryModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   {/* Selector y buscador inteligente de chofer con editor */}
                   <div className="relative" ref={driverDropdownRef}>
-                    <div className="flex items-center gap-1.5">
-                      <div className="relative flex-1">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400 text-xs select-none">
-                          🚚
-                        </span>
-                        <input
-                          type="text"
-                          placeholder="Chofer o repartidor (ej. Manuel)..."
-                          value={driverName}
-                          onChange={(e) => {
-                            setDriverName(e.target.value);
-                            setIsDriverDropdownOpen(true);
-                          }}
-                          onFocus={() => setIsDriverDropdownOpen(true)}
-                          className="w-full pl-8 pr-12 py-1.5 text-xs rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-50/80 font-medium"
-                        />
-                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                          {driverName && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDriverName("");
-                                setIsDriverDropdownOpen(true);
-                              }}
-                              className="p-1 text-stone-400 hover:text-stone-600 rounded-lg cursor-pointer"
-                              title="Borrar texto"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400 text-xs select-none">
+                        🚚
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Chofer o repartidor (ej. Manuel)..."
+                        value={driverName}
+                        onChange={(e) => {
+                          setDriverName(e.target.value);
+                          setIsDriverDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsDriverDropdownOpen(true)}
+                        className="w-full pl-8 pr-12 py-1.5 text-xs rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-50/80 font-medium"
+                      />
+                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                        {driverName && (
                           <button
                             type="button"
-                            onClick={() => setIsDriverDropdownOpen((prev) => !prev)}
-                            className="p-1 text-stone-400 hover:text-stone-700 rounded-lg cursor-pointer"
-                            title="Desplegar choferes guardados"
+                            onClick={() => {
+                              setDriverName("");
+                              setIsDriverDropdownOpen(true);
+                            }}
+                            className="p-1 text-stone-400 hover:text-stone-600 rounded-lg cursor-pointer"
+                            title="Borrar texto"
                           >
-                            <ChevronDown
-                              className={`w-3.5 h-3.5 transition-transform duration-150 ${
-                                isDriverDropdownOpen ? "rotate-180 text-emerald-600" : ""
-                              }`}
-                            />
+                            <X className="w-3.5 h-3.5" />
                           </button>
-                        </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIsDriverDropdownOpen((prev) => !prev)}
+                          className="p-1 text-stone-400 hover:text-stone-700 rounded-lg cursor-pointer"
+                          title="Desplegar choferes guardados"
+                        >
+                          <ChevronDown
+                            className={`w-3.5 h-3.5 transition-transform duration-150 ${
+                              isDriverDropdownOpen ? "rotate-180 text-emerald-600" : ""
+                            }`}
+                          />
+                        </button>
                       </div>
-
-                      {/* Botón para abrir modal de editar y guardar choferes */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsDriverDropdownOpen(false);
-                          setIsManageDriversOpen(true);
-                        }}
-                        className="px-2.5 py-1.5 rounded-xl border border-emerald-300/80 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold flex items-center gap-1 shrink-0 transition-colors shadow-2xs cursor-pointer"
-                        title="Editar y guardar nombres de choferes"
-                      >
-                        <Users className="w-3.5 h-3.5 text-emerald-700" />
-                        <span className="hidden sm:inline">Choferes</span>
-                      </button>
                     </div>
 
                     {/* Buscador Inteligente Dropdown */}
