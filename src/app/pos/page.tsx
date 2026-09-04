@@ -54,6 +54,7 @@ import {
 } from "@/lib/customers";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
+import { useNotifications } from "@/context/NotificationContext";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
@@ -141,6 +142,7 @@ const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500];
 export default function POSPage() {
   const { user } = useAuth();
   const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
+  const { addNotification } = useNotifications();
   const activeBranch = currentBranch || branches[0];
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -705,29 +707,62 @@ export default function POSPage() {
             <div className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => setShowExpensesModal(true)}
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 border-rose-200 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/80 text-rose-900 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap"
-                title="Registrar salida o gasto de dinero"
+                onClick={() => {
+                  if (isShiftLocked) {
+                    addNotification({
+                      senderName: "🔒 Terminal Bloqueada",
+                      senderAvatar: "⚠️",
+                      badgeIcon: "alerta",
+                      title: "Terminal Bloqueada",
+                      highlightText: "Turno cerrado por seguridad",
+                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar gastos.",
+                      category: "caja",
+                    });
+                    return;
+                  }
+                  setShowExpensesModal(true);
+                }}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                  isShiftLocked
+                    ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
+                    : "border-rose-200 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/80 text-rose-900 text-sm sm:text-base font-black"
+                }`}
+                title={isShiftLocked ? "Terminal bloqueada" : "Registrar salida o gasto de dinero"}
               >
                 <span className="text-lg">💸</span>
                 <span>Gasto</span>
               </button>
             </div>
 
-
             {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
             <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => {
+                  if (isShiftLocked) {
+                    addNotification({
+                      senderName: "🔒 Terminal Bloqueada",
+                      senderAvatar: "ℹ️",
+                      badgeIcon: "alerta",
+                      title: "Turno Ya Cerrado",
+                      highlightText: "La terminal ya está bloqueada",
+                      description: "El turno anterior ya fue cerrado. Ingresa las credenciales de la encargada en la terminal para habilitar el nuevo turno.",
+                      category: "caja",
+                    });
+                    return;
+                  }
                   setShiftModalTab("cambio");
                   setShowCashDrawerModal(true);
                 }}
-                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-amber-600/80 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white text-sm sm:text-base font-black transition-all active:scale-95 shadow-md shadow-orange-950/20 whitespace-nowrap"
-                title="Cerrar turno de la cajera y bloquear la terminal con candado"
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-md shadow-orange-950/20 whitespace-nowrap ${
+                  isShiftLocked
+                    ? "border-amber-900/60 bg-gradient-to-r from-stone-800 to-stone-900 text-amber-300"
+                    : "border-amber-600/80 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white text-sm sm:text-base font-black"
+                }`}
+                title={isShiftLocked ? "Turno ya cerrado y bloqueado" : "Cerrar turno de la cajera y bloquear la terminal con candado"}
               >
                 <Lock className="w-4 h-4 text-amber-200" />
-                <span>Cerrar Turno</span>
+                <span>{isShiftLocked ? "Turno Cerrado 🔒" : "Cerrar Turno"}</span>
               </button>
             </div>
 
@@ -954,39 +989,154 @@ export default function POSPage() {
       <div className={`fixed lg:static inset-y-0 right-0 z-50 w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out relative overflow-hidden ${
         isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       }`}>
-        {/* Header con colores de la marca y micro-animación */}
-        <div className="p-2.5 px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden shrink-0">
-          <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
-          <div className="flex items-center gap-2.5 relative z-10">
-            <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40">
-              <ShoppingBag className="w-4 h-4 text-white" />
+        {isShiftLocked ? (
+          /* PANTALLA DE BLOQUEO COMPLETA DE LA TERMINAL DE COBRO (100% Sólida, sin elementos filtrados) */
+          <div className="flex flex-col h-full w-full bg-gradient-to-b from-[#1c0e08] via-[#140a05] to-[#0d0603] text-white overflow-y-auto animate-in fade-in duration-200 justify-between">
+            {/* Header del Bloqueo con degradado café oficial y candado animado */}
+            <div className="bg-gradient-to-r from-[#2a140c] via-[#351a0f] to-[#452013] p-6 border-b border-amber-900/60 text-center relative overflow-hidden shrink-0 shadow-lg">
+              <div className="absolute -top-6 -right-6 w-32 h-32 bg-amber-500/15 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-orange-600/15 rounded-full blur-2xl pointer-events-none" />
+              <div className="relative z-10 space-y-3">
+                <div className="w-16 h-16 mx-auto bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 rounded-3xl flex items-center justify-center shadow-xl shadow-amber-500/40 ring-4 ring-amber-400/40 text-stone-950 animate-bounce">
+                  <Lock className="w-8 h-8 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white tracking-wide">
+                    Terminal Bloqueada
+                  </h3>
+                  <p className="text-xs text-amber-300 font-bold mt-0.5">
+                    Turno de cajera cerrado por seguridad
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
-                Charola de Cobro
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              </h3>
-              <p className="text-[11px] text-amber-300 font-bold">{cashierName} • Mostrador</p>
+
+            {/* Contenido del formulario para encargada */}
+            <div className="p-5 sm:p-6 space-y-4 flex-1 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="bg-amber-950/60 border border-amber-500/40 p-4 rounded-2xl text-xs space-y-1.5 text-amber-100/90 shadow-inner">
+                  <p className="font-black flex items-center gap-1.5 text-amber-300 text-sm">
+                    <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" /> Candado de Seguridad Activo
+                  </p>
+                  <p className="text-xs text-stone-300 leading-relaxed">
+                    El corte de turno fue guardado y verificado. Para habilitar el cobro y aperturar el siguiente turno, la encargada debe ingresar sus credenciales.
+                  </p>
+                </div>
+
+                {lockError && (
+                  <div className="p-3 bg-rose-950/90 border-2 border-rose-500 text-rose-200 text-xs font-black rounded-xl flex items-center gap-2 animate-in shake">
+                    <span>⚠️</span> {lockError}
+                  </div>
+                )}
+
+                <form onSubmit={handleUnlockShift} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1">
+                      Usuario de Encargada:
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="admin"
+                      value={lockUser}
+                      onChange={(e) => {
+                        setLockUser(e.target.value);
+                        setLockError("");
+                      }}
+                      className="w-full px-4 py-3 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1">
+                      Contraseña:
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showLockPassword ? "text" : "password"}
+                        required
+                        placeholder="••••••"
+                        value={lockPassword}
+                        onChange={(e) => {
+                          setLockPassword(e.target.value);
+                          setLockError("");
+                        }}
+                        className="w-full pl-4 pr-11 py-3 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLockPassword(!showLockPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-amber-300 transition-colors p-1"
+                      >
+                        {showLockPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black text-sm rounded-xl shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center justify-center gap-2 border border-amber-300 mt-2"
+                  >
+                    <Unlock className="w-4 h-4" />
+                    <span>Desbloquear Terminal & Habilitar Cobro</span>
+                  </button>
+                </form>
+              </div>
+
+              {/* Footer con acceso rápido y créditos */}
+              <div className="pt-3 border-t border-amber-900/40 text-center space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLockUser("admin");
+                    setLockPassword("admin");
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/50 text-xs font-bold text-amber-300 hover:text-amber-200 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <span>⚡</span>
+                  <span>Autocompletar credenciales (admin / admin)</span>
+                </button>
+                <p className="text-[10px] text-amber-500/60 font-medium">
+                  Panaderías Brito • Don Antonio Brito
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 relative z-10">
-            <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all ${
-              totalPieces > 0
-                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/60 scale-105 animate-pulse"
-                : "bg-amber-900/60 text-amber-200 border border-amber-800"
-            }`}>
-              {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsMobileCartOpen(false)}
-              className="lg:hidden p-1 rounded-lg bg-white/10 hover:bg-white/20 text-amber-200 transition-colors"
-              title="Cerrar charola"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        ) : (
+          <>
+            {/* Header con colores de la marca y micro-animación */}
+            <div className="p-2.5 px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden shrink-0">
+              <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
+              <div className="flex items-center gap-2.5 relative z-10">
+                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40">
+                  <ShoppingBag className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
+                    Charola de Cobro
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  </h3>
+                  <p className="text-[11px] text-amber-300 font-bold">{cashierName} • Mostrador</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 relative z-10">
+                <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all ${
+                  totalPieces > 0
+                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/60 scale-105 animate-pulse"
+                    : "bg-amber-900/60 text-amber-200 border border-amber-800"
+                }`}>
+                  {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileCartOpen(false)}
+                  className="lg:hidden p-1 rounded-lg bg-white/10 hover:bg-white/20 text-amber-200 transition-colors"
+                  title="Cerrar charola"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
 
         {/* Customer Selector Ribbon / Bar */}
         <div ref={customerPickerRef} className="p-2 sm:px-3 bg-gradient-to-r from-amber-50/90 via-stone-50 to-orange-50/70 border-b border-amber-200/80 shrink-0 relative">
@@ -1513,117 +1663,9 @@ export default function POSPage() {
             </button>
           </div>
         </div>
-
-        {/* PANTALLA DE BLOQUEO EXCLUSIVA DE LA CHAROLA / TERMINAL DE COBRO */}
-        {isShiftLocked && (
-          <div className="absolute inset-0 z-50 bg-stone-950/95 text-white flex flex-col h-full overflow-y-auto animate-in fade-in duration-200">
-            {/* Header del Bloqueo con degradado café oficial */}
-            <div className="bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] p-5 border-b border-amber-900/60 text-center relative overflow-hidden shrink-0">
-              <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
-              <div className="relative z-10 space-y-2">
-                <div className="w-14 h-14 mx-auto bg-gradient-to-tr from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-xl shadow-amber-500/30 ring-4 ring-amber-400/40 text-white animate-bounce">
-                  <Lock className="w-7 h-7 stroke-[2.5]" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-white tracking-wide">
-                    Terminal Bloqueada
-                  </h3>
-                  <p className="text-[11px] text-amber-300 font-bold">
-                    Turno de cajera cerrado
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Contenido del formulario para encargada */}
-            <div className="p-4 sm:p-5 space-y-3.5 flex-1 flex flex-col justify-between">
-              <div className="space-y-3">
-                <div className="bg-amber-900/40 border border-amber-500/30 p-3 rounded-2xl text-xs space-y-1 text-amber-100/90">
-                  <p className="font-black flex items-center gap-1.5 text-amber-300">
-                    <ShieldCheck className="w-4 h-4 text-amber-400" /> Candado de Seguridad Activo
-                  </p>
-                  <p className="text-[11px] text-stone-300 leading-relaxed">
-                    El corte de turno fue guardado. Ingresa las credenciales de la encargada para habilitar el cobro y abrir el siguiente turno.
-                  </p>
-                </div>
-
-                {lockError && (
-                  <div className="p-2.5 bg-rose-950/80 border-2 border-rose-500 text-rose-200 text-xs font-black rounded-xl flex items-center gap-2 animate-in shake">
-                    <span>⚠️</span> {lockError}
-                  </div>
-                )}
-
-                <form onSubmit={handleUnlockShift} className="space-y-3 text-xs">
-                  <div>
-                    <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1">
-                      Usuario de Encargada:
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="admin"
-                      value={lockUser}
-                      onChange={(e) => {
-                        setLockUser(e.target.value);
-                        setLockError("");
-                      }}
-                      className="w-full px-3.5 py-2.5 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-xs sm:text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1">
-                      Contraseña:
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showLockPassword ? "text" : "password"}
-                        required
-                        placeholder="••••••"
-                        value={lockPassword}
-                        onChange={(e) => {
-                          setLockPassword(e.target.value);
-                          setLockError("");
-                        }}
-                        className="w-full pl-3.5 pr-10 py-2.5 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-xs sm:text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowLockPassword(!showLockPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-amber-300 transition-colors"
-                      >
-                        {showLockPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 border border-amber-300"
-                  >
-                    <Unlock className="w-4 h-4" />
-                    <span>Desbloquear Terminal</span>
-                  </button>
-                </form>
-              </div>
-
-              {/* Botón de acceso rápido con demo/admin */}
-              <div className="pt-2.5 border-t border-stone-800 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLockUser("admin");
-                    setLockPassword("admin");
-                  }}
-                  className="text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:underline transition-colors"
-                >
-                  ⚡ Autocompletar credenciales (admin / admin)
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      </>
+    )}
+  </div>
 
       {/* Floating Bottom Bar on Mobile when Cart has items */}
       {cart.length > 0 && !isMobileCartOpen && (
