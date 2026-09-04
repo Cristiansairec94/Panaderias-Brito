@@ -130,29 +130,6 @@ export default function ClientesPage() {
     setTimeout(() => setSuccessNotice(null), 3500);
   };
 
-  const handleUpdateFavoriteProduct = (customerId: string, newFavorite: string) => {
-    const updated = customers.map((c) => {
-      if (c.id === customerId) {
-        const next = {
-          ...c,
-          favoriteProduct: newFavorite.trim() || undefined,
-        };
-        if (historyModalCustomer && historyModalCustomer.id === customerId) {
-          setHistoryModalCustomer(next);
-        }
-        return next;
-      }
-      return c;
-    });
-    setCustomers(updated);
-    saveStoredCustomers(updated);
-    showNotification(
-      newFavorite
-        ? `¡Moda habitual de compra actualizada a "${newFavorite}"!`
-        : "Moda habitual de compra restablecida."
-    );
-  };
-
   // Filtrado por búsqueda y ordenamiento en estricto orden de lista (A - Z)
   const filteredCustomers = useMemo(() => {
     const validCustomers = customers.filter((c) => c.id !== "cli-0" && c.type !== "general");
@@ -917,23 +894,14 @@ export default function ClientesPage() {
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
-                  {/* Selector Desplegable para Asignar / Cambiar Moda */}
+                  {/* Moda habitual estática (sin menú desplegable) */}
                   <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-2xl">
                     <span className="text-xs font-black text-amber-950 whitespace-nowrap">
                       Moda habitual:
                     </span>
-                    <select
-                      value={c.favoriteProduct || ""}
-                      onChange={(e) => handleUpdateFavoriteProduct(c.id, e.target.value)}
-                      className="bg-white text-stone-900 border border-amber-300 rounded-xl px-2.5 py-1 text-xs font-black focus:outline-none focus:border-amber-600 cursor-pointer shadow-2xs"
-                    >
-                      <option value="">-- Seleccionar producto habitual --</option>
-                      {PRESET_BREAD_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                    <span className="bg-white text-stone-900 border border-amber-300 rounded-xl px-2.5 py-1 text-xs font-black shadow-2xs select-none">
+                      {c.favoriteProduct || (sortedProducts.length > 0 ? sortedProducts[0][0] : "Por definir")}
+                    </span>
                   </div>
 
                   <button
@@ -955,7 +923,9 @@ export default function ClientesPage() {
                   </span>
                   <span className="text-sm sm:text-base font-black text-amber-800 flex items-center gap-1.5 mt-0.5">
                     <span>🍞</span>
-                    <span className="break-words leading-tight">{c.favoriteProduct || "Por definir"}</span>
+                    <span className="break-words leading-tight">
+                      {c.favoriteProduct || (sortedProducts.length > 0 ? sortedProducts[0][0] : "Por definir")}
+                    </span>
                   </span>
                 </div>
 
