@@ -1281,12 +1281,21 @@ export default function POSPage() {
               <ShoppingBag className="w-4 h-4 text-white" />
             </div>
             <div>
-                  <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
-                    Charola de Cobro
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  </h3>
-                  <p className="text-[11px] text-amber-300 font-bold">{cashierName} • Mostrador</p>
-                </div>
+              <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
+                Charola de Cobro
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              </h3>
+              <div className="flex items-center gap-1.5 text-[11px] text-amber-300 font-bold flex-wrap mt-0.5">
+                <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-400/30 text-[10px] font-black tracking-wide shadow-2xs">
+                  <Store className="w-3 h-3 text-amber-300" />
+                  <span>{activeBranch ? activeBranch.name : "Sucursal Matriz"}</span>
+                </span>
+                <span className="text-amber-400/60">•</span>
+                <span className="text-stone-100 font-semibold">{cashierName}</span>
+                <span className="text-amber-400/60">•</span>
+                <span className="text-amber-300/80 font-medium">Mostrador</span>
+              </div>
+            </div>
               </div>
               <div className="flex items-center gap-2 relative z-10">
                 <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all ${
