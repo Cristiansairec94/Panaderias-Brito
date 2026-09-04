@@ -259,9 +259,16 @@ export default function CashDrawerShiftModal({
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;
   const cashDifference = parsedCountedCash - expectedCashInDrawer;
 
-  // 5. Fondo Siguiente y Retiro a Administración
-  const parsedNextFund = nextInitialFund === "" ? 0 : Math.max(0, Number(nextInitialFund) || 0);
+  // 5. Fondo Siguiente y Retiro a Administración (No puede exceder el dinero disponible en caja)
+  const maxAllowedFund = Math.max(0, parsedCountedCash);
+  const parsedNextFund = nextInitialFund === "" ? 0 : Math.min(maxAllowedFund, Math.max(0, Number(nextInitialFund) || 0));
   const cashToWithdraw = Math.max(0, parsedCountedCash - parsedNextFund);
+
+  useEffect(() => {
+    if (nextInitialFund !== "" && Number(nextInitialFund) > maxAllowedFund) {
+      setNextInitialFund(maxAllowedFund > 0 ? maxAllowedFund.toString() : "");
+    }
+  }, [maxAllowedFund, nextInitialFund]);
 
   // 5. Existencias en mostrador
   const totalPiecesInStock = products.reduce((sum, p) => sum + p.stock, 0);
@@ -815,18 +822,46 @@ export default function CashDrawerShiftModal({
                       </div>
                     </div>
 
-                    {/* Input Manual de Fondo Siguiente */}
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        placeholder="0.00 (Escribe el monto para el nuevo turno)"
-                        value={nextInitialFund}
-                        onChange={(e) => setNextInitialFund(e.target.value)}
-                        className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
-                      />
+                    {/* Input Manual de Fondo Siguiente (Limitado al efectivo físico en caja) */}
+                    <div className="space-y-1.5">
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          max={maxAllowedFund}
+                          placeholder="0.00 (Escribe el monto para el nuevo turno)"
+                          value={nextInitialFund}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "") {
+                              setNextInitialFund("");
+                              return;
+                            }
+                            const num = parseFloat(val);
+                            if (!isNaN(num)) {
+                              if (num > maxAllowedFund) {
+                                setNextInitialFund(maxAllowedFund.toString());
+                                return;
+                              }
+                            }
+                            setNextInitialFund(val);
+                          }}
+                          className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs px-1 text-stone-500 font-medium">
+                        <span>
+                          Máximo permitido a dejar: <strong className="text-stone-800">{formatCurrency(maxAllowedFund)}</strong>
+                        </span>
+                        {Number(nextInitialFund) >= maxAllowedFund && maxAllowedFund > 0 && (
+                          <span className="text-amber-700 font-bold">
+                            ⚠️ Límite total en caja alcanzado
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Resumen de Entrega: Total Contado, Fondo que Queda, Efectivo a Entregar */}
