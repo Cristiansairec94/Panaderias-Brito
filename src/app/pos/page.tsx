@@ -784,28 +784,27 @@ export default function POSPage() {
                     $
                   </span>
                   <input
-                    type="number"
-                    step="any"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={shiftFundInput}
-                    onChange={(e) => setShiftFundInput(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                        setShiftFundInput(val);
+                      }
+                    }}
                     placeholder="0.00"
-                    className="w-full pl-12 pr-12 py-4 bg-black/65 border-2 border-amber-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-400/30 rounded-2xl font-black text-4xl sm:text-5xl text-amber-300 text-center tracking-tight focus:outline-none transition-all shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full pl-12 pr-32 py-4 bg-black/65 border-2 border-amber-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-400/30 rounded-2xl font-black text-4xl sm:text-5xl text-amber-300 text-center tracking-tight focus:outline-none transition-all shadow-inner"
                   />
-                  {shiftFundInput && (
-                    <button
-                      type="button"
-                      onClick={() => setShiftFundInput("")}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-stone-800/80 hover:bg-stone-700 text-stone-300 hover:text-white flex items-center justify-center font-black text-sm transition-all cursor-pointer"
-                      title="Borrar para escribir nuevo monto"
-                    >
-                      ✕
-                    </button>
-                  )}
+                  {/* Leyenda en lugar de las opciones */}
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black select-none pointer-events-none">
+                    <Pencil className="w-3 h-3 text-amber-400" />
+                    <span>Editar texto</span>
+                  </div>
                 </div>
 
-                <div className="inline-block bg-amber-500/20 text-amber-200 text-[11px] font-bold px-3 py-1 rounded-full border border-amber-400/30">
-                  Fondo Inicial disponible en el cajón para cambio
+                <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-200 text-[11px] font-bold px-3 py-1 rounded-full border border-amber-400/30">
+                  <span>Fondo Inicial disponible en el cajón para cambio</span>
                 </div>
               </div>
 
