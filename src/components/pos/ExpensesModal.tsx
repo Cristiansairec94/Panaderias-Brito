@@ -53,7 +53,15 @@ export default function ExpensesModal({
 
   if (!isOpen) return null;
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  // Filtrar exclusivamente las salidas correspondientes a la cajera y turno en operación
+  const shiftExpenses = expenses.filter((e) => {
+    if (!e.cashier) return true;
+    const cName = cashierName.toLowerCase().trim();
+    const expCashier = e.cashier.toLowerCase().trim();
+    return expCashier === cName || cName.includes(expCashier) || expCashier.includes(cName);
+  });
+
+  const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
   const netCashInDrawer = Math.max(0, cashSalesTotal - totalExpenses);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,8 +129,13 @@ export default function ExpensesModal({
               <TrendingDown className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-black text-base leading-tight">Salida de Efectivo / Gastos</h3>
-              <p className="text-[11px] text-amber-300 font-medium">Registro rápido y notificación directa al administrador</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-black text-base leading-tight">Salida de Efectivo / Gastos</h3>
+                <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                  👤 {cashierName}
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-200/80 font-medium">Historial exclusivo del turno en operación</p>
             </div>
           </div>
           <button
@@ -173,7 +186,7 @@ export default function ExpensesModal({
             }`}
           >
             <Receipt className="w-4 h-4 text-amber-700" />
-            <span>Ver Salidas ({expenses.length})</span>
+            <span>Ver Salidas ({shiftExpenses.length})</span>
           </button>
         </div>
 
@@ -262,14 +275,14 @@ export default function ExpensesModal({
             </form>
           ) : (
             <div className="space-y-2.5">
-              {expenses.length === 0 ? (
+              {shiftExpenses.length === 0 ? (
                 <div className="text-center py-12 text-stone-400 space-y-2">
                   <Receipt className="w-10 h-10 mx-auto text-stone-300" />
-                  <p className="font-bold text-xs text-stone-600">No hay salidas registradas en este turno.</p>
+                  <p className="font-bold text-xs text-stone-600">No hay salidas registradas en el turno de {cashierName}.</p>
                   <p className="text-[11px]">Todo el dinero de ventas permanece íntegro en caja.</p>
                 </div>
               ) : (
-                expenses.map((exp) => (
+                shiftExpenses.map((exp) => (
                   <div
                     key={exp.id}
                     className="p-3.5 bg-stone-50 hover:bg-stone-100 rounded-2xl border border-stone-200/80 flex items-start justify-between gap-3 transition-colors"
@@ -279,7 +292,7 @@ export default function ExpensesModal({
                         <span className="font-black text-rose-600 text-sm">
                           -{formatCurrency(exp.amount)}
                         </span>
-                        <span className="text-[10px] bg-stone-200 text-stone-700 px-2 py-0.5 rounded-full font-bold">
+                        <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-bold">
                           {exp.cashier}
                         </span>
                       </div>

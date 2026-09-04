@@ -441,10 +441,7 @@
       const [initialCashFund, setInitialCashFund] = useState(500);
       const [expensesList, setExpensesList] = useState(() => {
         const saved = localStorage.getItem("brito_expenses");
-        return saved ? JSON.parse(saved) : [
-          { id: "EXP-01", amount: 145, category: "limpieza", description: "2 escobas y 1 bolsa de jabón Roma para charolas", cashier: "Don Toño Brito", date: "Hoy, 09:30 AM" },
-          { id: "EXP-02", amount: 300, category: "retiro_personal", description: "Retiro para gastos personales de Don Toño", cashier: "Don Toño Brito", date: "Hoy, 11:15 AM" }
-        ];
+        return saved ? JSON.parse(saved) : [];
       });
 
       const [salesList, setSalesList] = useState(() => {
@@ -675,9 +672,19 @@
       const change = paymentMethod === "efectivo" && parsedCash >= total ? parsedCash - total : 0;
       const isValid = paymentMethod !== "efectivo" || parsedCash >= total;
 
+      // Salidas exclusivas del turno actual de la cajera en operación
+      const currentShiftExpenses = useMemo(() => {
+        return expensesList.filter((exp) => {
+          if (!exp.cashier) return true;
+          const cName = cashierName.toLowerCase().trim();
+          const expCashier = exp.cashier.toLowerCase().trim();
+          return expCashier === cName || cName.includes(expCashier) || expCashier.includes(cName);
+        });
+      }, [expensesList, cashierName]);
+
       // Balances
       const totalCashSales = salesList.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
-      const totalExpenses = expensesList.reduce((sum, e) => sum + e.amount, 0);
+      const totalExpenses = currentShiftExpenses.reduce((sum, e) => sum + e.amount, 0);
       const cashInDrawer = initialCashFund + totalCashSales - totalExpenses;
       const totalStockVal = products.reduce((sum, p) => sum + p.stock * p.price, 0);
       const totalPiecesInStock = products.reduce((sum, p) => sum + p.stock, 0);
@@ -1953,8 +1960,13 @@
               <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="bg-amber-950 text-white p-4 px-6 flex items-center justify-between">
                   <div>
-                    <span className="font-bold text-sm block">💸 Salida de Efectivo / Gastos</span>
-                    <span className="text-[10px] text-amber-300">Registro rápido sin opciones complicadas</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm block">💸 Salida de Efectivo / Gastos</span>
+                      <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                        👤 {cashierName}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-amber-300">Historial exclusivo del turno en operación</span>
                   </div>
                   <button onClick={() => setShowExpenses(false)} className="text-xl font-bold hover:text-white">✕</button>
                 </div>
@@ -2017,15 +2029,18 @@
 
                   {/* List */}
                   <div className="space-y-2 pt-2">
-                    <span className="text-xs font-bold text-stone-600 block">Historial de Salidas del Turno ({expensesList.length}):</span>
-                    {expensesList.length === 0 ? (
-                      <p className="text-stone-400 text-center py-4">No hay salidas en este turno.</p>
+                    <span className="text-xs font-bold text-stone-600 block">Historial de Salidas del Turno ({currentShiftExpenses.length}):</span>
+                    {currentShiftExpenses.length === 0 ? (
+                      <div className="text-stone-400 text-center py-4 text-xs space-y-1">
+                        <p className="font-bold text-stone-600">No hay salidas registradas en el turno de {cashierName}.</p>
+                        <p className="text-[10px]">Todo el dinero permanece íntegro en caja.</p>
+                      </div>
                     ) : (
-                      expensesList.map((exp) => (
+                      currentShiftExpenses.map((exp) => (
                         <div key={exp.id} className="p-3 bg-stone-50 rounded-xl border flex justify-between items-center text-xs">
                           <div>
                             <p className="font-bold text-stone-800">{exp.description}</p>
-                            <p className="text-[10px] text-stone-400">{exp.date} • {exp.cashier}</p>
+                            <p className="text-[10px] text-stone-400">{exp.date} • <span className="text-amber-900 font-bold">{exp.cashier}</span></p>
                           </div>
                           <span className="font-black text-rose-600 text-sm">-{formatCurrency(exp.amount)}</span>
                         </div>

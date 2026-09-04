@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { 
   Search, 
   Trash2, 
@@ -60,24 +60,7 @@ import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
 import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
 
-const INITIAL_EXPENSES: CashExpense[] = [
-  {
-    id: "EXP-001",
-    amount: 145,
-    category: "limpieza",
-    description: "2 escobas y 1 bolsa de jabón Roma para lavado de charolas",
-    cashier: "Don Toño Brito",
-    date: "Hoy, 09:30 AM",
-  },
-  {
-    id: "EXP-002",
-    amount: 300,
-    category: "retiro_personal",
-    description: "Retiro para gastos personales de Don Toño",
-    cashier: "Don Toño Brito",
-    date: "Hoy, 11:15 AM",
-  },
-];
+const INITIAL_EXPENSES: CashExpense[] = [];
 
 const POS_CATEGORIES = [
   { id: "all", label: "Todo el Pan", priceTag: "", icon: "🧺" },
@@ -495,11 +478,20 @@ export default function POSPage() {
   const change = paymentMethod === "efectivo" && parsedCashGiven >= total ? parsedCashGiven - total : 0;
   const isPaymentValid = paymentMethod !== "efectivo" || parsedCashGiven >= total;
 
-  // Financial calculations
+  // Financial calculations strictly for the current operating cashier's shift
+  const currentShiftExpenses = useMemo(() => {
+    return expensesList.filter((e) => {
+      if (!e.cashier) return true;
+      const cName = cashierName.toLowerCase().trim();
+      const expCashier = e.cashier.toLowerCase().trim();
+      return expCashier === cName || cName.includes(expCashier) || expCashier.includes(cName);
+    });
+  }, [expensesList, cashierName]);
+
   const totalCashSales = recentSalesList
     .filter((s) => s.paymentMethod === "efectivo")
     .reduce((sum, s) => sum + s.total, 0);
-  const totalExpenses = expensesList.reduce((sum, e) => sum + e.amount, 0);
+  const totalExpenses = currentShiftExpenses.reduce((sum, e) => sum + e.amount, 0);
   const netCashInDrawer = initialCashFund + totalCashSales - totalExpenses;
   const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
 
