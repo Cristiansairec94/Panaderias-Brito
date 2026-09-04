@@ -23,7 +23,7 @@ import {
   Building
 } from "lucide-react";
 import { CashShift, CashMovement } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 const INITIAL_MOVEMENTS: CashMovement[] = [
@@ -290,12 +290,13 @@ export default function CajaPage() {
               <div className="space-y-1">
                 <label className="font-bold text-stone-700">Monto ($ MXN) *</label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   required
                   placeholder="Ej. 250"
                   value={movAmount}
-                  onChange={(e) => setMovAmount(e.target.value)}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                  onChange={(e) => setMovAmount(cleanDecimalNumbers(e.target.value))}
                   className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 text-base font-black text-stone-900 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
                 />
               </div>
@@ -404,11 +405,12 @@ export default function CajaPage() {
               <div className="space-y-1.5">
                 <label className="font-bold text-stone-800">Efectivo Físico Contado en Caja ($ MXN) *</label>
                 <input
-                  type="number"
-                  step="1"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="Total de billetes y monedas en el cajón"
                   value={countedCash}
-                  onChange={(e) => setCountedCash(e.target.value)}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                  onChange={(e) => setCountedCash(cleanDecimalNumbers(e.target.value))}
                   className="w-full px-4 py-3 bg-white rounded-xl border-2 border-stone-300 text-lg font-black text-stone-900 focus:ring-2 focus:ring-brito-orange-500 focus:border-brito-orange-500 focus:outline-none"
                 />
               </div>

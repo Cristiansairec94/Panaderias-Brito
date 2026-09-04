@@ -27,7 +27,7 @@ import {
   Barcode
 } from "lucide-react";
 import { Product } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { 
   getStoredProducts, 
   createProduct, 
@@ -823,20 +823,8 @@ export default function ProductosPage() {
                       inputMode="decimal"
                       required
                       value={formData.price}
-                      onChange={(e) => {
-                        // Filtro estrictamente numérico: solo dígitos y un punto decimal
-                        let val = e.target.value.replace(/[^0-9.]/g, "");
-                        const parts = val.split(".");
-                        if (parts.length > 2) {
-                          val = parts[0] + "." + parts.slice(1).join("");
-                        }
-                        setFormData({ ...formData, price: val });
-                      }}
-                      onKeyDown={(e) => {
-                        if (["e", "E", "+", "-", ",", " "].includes(e.key)) {
-                          e.preventDefault();
-                        }
-                      }}
+                      onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                      onChange={(e) => setFormData({ ...formData, price: cleanDecimalNumbers(e.target.value) })}
                       placeholder="12.00"
                       className="w-full pl-7 pr-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />

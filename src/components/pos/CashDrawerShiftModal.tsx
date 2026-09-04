@@ -32,7 +32,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useNotifications } from "@/context/NotificationContext";
 
 export interface ShiftCutRecord {
@@ -771,15 +771,17 @@ export default function CashDrawerShiftModal({
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
                         <input
-                          type="number"
-                          step="any"
+                          type="text"
+                          inputMode="decimal"
                           placeholder={`O escribe otro monto`}
                           value={countedCash}
+                          onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                           onChange={(e) => {
-                            setCountedCash(e.target.value);
+                            const val = cleanDecimalNumbers(e.target.value);
+                            setCountedCash(val);
                             setHasAcceptedCash(true);
                           }}
-                          className="w-full pl-9 pr-4 py-4 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base sm:text-lg text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-full pl-9 pr-4 py-4 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base sm:text-lg text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
                         />
                       </div>
                     </div>
@@ -849,28 +851,27 @@ export default function CashDrawerShiftModal({
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
                         <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          max={maxAllowedFund}
+                          type="text"
+                          inputMode="decimal"
                           placeholder="0.00 (Escribe el monto para el nuevo turno)"
                           value={nextInitialFund}
+                          onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                           onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === "") {
+                            const raw = cleanDecimalNumbers(e.target.value);
+                            if (raw === "") {
                               setNextInitialFund("");
                               return;
                             }
-                            const num = parseFloat(val);
+                            const num = parseFloat(raw);
                             if (!isNaN(num)) {
                               if (num > maxAllowedFund) {
                                 setNextInitialFund(maxAllowedFund.toString());
                                 return;
                               }
                             }
-                            setNextInitialFund(val);
+                            setNextInitialFund(raw);
                           }}
-                          className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
                         />
                       </div>
 

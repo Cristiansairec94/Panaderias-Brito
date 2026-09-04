@@ -28,7 +28,7 @@ import {
   Building
 } from "lucide-react";
 import { Customer } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers } from "@/lib/utils";
 import { getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
 
 type SortOption = "deuda_desc" | "nombre_asc" | "nombre_desc" | "ventas_desc" | "reciente";
@@ -825,9 +825,11 @@ export default function ClientesPage() {
                   <label className="font-bold text-stone-700">Teléfono / WhatsApp</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
                     placeholder="Ej. 55 1234 5678"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                    onChange={(e) => setPhone(cleanOnlyNumbers(e.target.value))}
                     className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none font-medium"
                   />
                 </div>
@@ -860,11 +862,12 @@ export default function ClientesPage() {
               <div className="space-y-1">
                 <label className="font-bold text-stone-700">Límite de Crédito Permitido ($ MXN)</label>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="0 para clientes sin crédito"
                   value={creditLimit}
-                  onChange={(e) => setCreditLimit(e.target.value)}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                  onChange={(e) => setCreditLimit(cleanDecimalNumbers(e.target.value))}
                   className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none font-medium"
                 />
               </div>
@@ -939,8 +942,10 @@ export default function ClientesPage() {
                   <label className="font-bold text-stone-700">Teléfono / WhatsApp</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
                     value={editingCustomer.phone || ""}
-                    onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: cleanOnlyNumbers(e.target.value) })}
                     className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
                   />
                 </div>
@@ -972,10 +977,11 @@ export default function ClientesPage() {
               <div className="space-y-1">
                 <label className="font-bold text-stone-700">Límite de Crédito ($ MXN)</label>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   value={editingCustomer.creditLimit}
-                  onChange={(e) => setEditingCustomer({ ...editingCustomer, creditLimit: Number(e.target.value) || 0 })}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, creditLimit: Number(cleanDecimalNumbers(e.target.value)) || 0 })}
                   className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
                 />
               </div>
@@ -1057,15 +1063,14 @@ export default function ClientesPage() {
                     $
                   </span>
                   <input
-                    type="number"
-                    step="any"
-                    min="1"
-                    max={payingCustomer.currentDebt}
+                    type="text"
+                    inputMode="decimal"
                     required
                     autoFocus
                     placeholder="0.00"
                     value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => setPaymentAmount(cleanDecimalNumbers(e.target.value))}
                     className="w-full pl-8 pr-4 py-2.5 bg-stone-50 text-stone-900 font-black text-base rounded-xl border border-stone-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>

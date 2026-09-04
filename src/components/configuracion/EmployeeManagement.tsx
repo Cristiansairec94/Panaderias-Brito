@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useAuth, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
+import { onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
 
 const PUESTOS_PANADERIA = [
   "Maestro Panadero",
@@ -720,9 +721,11 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                   <label className="font-bold text-stone-700">Teléfono / WhatsApp</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
                     placeholder="55 1234 5678"
                     value={formPhone}
-                    onChange={(e) => setFormPhone(e.target.value)}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                    onChange={(e) => setFormPhone(cleanOnlyNumbers(e.target.value))}
                     className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-medium text-stone-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>

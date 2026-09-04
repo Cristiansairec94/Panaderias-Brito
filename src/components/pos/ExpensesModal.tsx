@@ -17,7 +17,7 @@ import {
   UserCheck
 } from "lucide-react";
 import { CashExpense } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 
@@ -212,13 +212,14 @@ export default function ExpensesModal({
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-xl text-rose-600">$</span>
                   <input
-                    type="number"
-                    step="any"
+                    type="text"
+                    inputMode="decimal"
                     required
                     autoFocus
                     placeholder="0.00"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => setAmount(cleanDecimalNumbers(e.target.value))}
                     className="w-full pl-9 pr-4 py-3.5 bg-stone-50 rounded-2xl border-2 border-stone-200 focus:border-rose-500 focus:bg-white focus:outline-none text-2xl font-black text-stone-900 transition-all shadow-inner"
                   />
                 </div>

@@ -32,7 +32,7 @@ import {
   AlertCircle,
   UserCheck
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, cleanOnlyNumbers } from "@/lib/utils";
 import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { UserRole, Branch } from "@/types";
@@ -354,9 +354,11 @@ function ConfiguracionContent() {
             <div className="space-y-1">
               <label className="font-bold text-stone-700">Teléfono / WhatsApp de Atención</label>
               <input
-                type="text"
+                type="tel"
+                inputMode="numeric"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                onChange={(e) => setPhone(cleanOnlyNumbers(e.target.value))}
                 className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
               />
             </div>
@@ -673,9 +675,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Teléfono / WhatsApp de la Tienda</label>
                       <input
-                        type="text"
+                        type="tel"
+                        inputMode="numeric"
                         value={bPhone}
-                        onChange={(e) => setBPhone(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                        onChange={(e) => setBPhone(cleanOnlyNumbers(e.target.value))}
                         placeholder="55 1234 5678"
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
                       />
@@ -757,9 +761,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Meta Diaria de Venta ($ MXN)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={bDailyGoal}
-                        onChange={(e) => setBDailyGoal(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                        onChange={(e) => setBDailyGoal(cleanDecimalNumbers(e.target.value))}
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold"
                       />
                     </div>
@@ -862,9 +868,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Teléfono / WhatsApp</label>
                       <input
-                        type="text"
+                        type="tel"
+                        inputMode="numeric"
                         value={bPhone}
-                        onChange={(e) => setBPhone(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                        onChange={(e) => setBPhone(cleanOnlyNumbers(e.target.value))}
                         placeholder="55 1234 5678"
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
                       />
@@ -931,9 +939,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Fondo Inicial de Caja ($ MXN)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={bInitialFund}
-                        onChange={(e) => setBInitialFund(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                        onChange={(e) => setBInitialFund(cleanDecimalNumbers(e.target.value))}
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold"
                       />
                     </div>
@@ -941,9 +951,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Meta Diaria ($ MXN)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={bDailyGoal}
-                        onChange={(e) => setBDailyGoal(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                        onChange={(e) => setBDailyGoal(cleanDecimalNumbers(e.target.value))}
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold"
                       />
                     </div>
@@ -1076,9 +1088,11 @@ function ConfiguracionContent() {
             <div className="space-y-1">
               <label className="font-bold text-stone-700">Fondo Inicial Predeterminado de Caja ($ MXN)</label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={defaultCashFund}
-                onChange={(e) => setDefaultCashFund(e.target.value)}
+                onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                onChange={(e) => setDefaultCashFund(cleanDecimalNumbers(e.target.value))}
                 className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-black text-stone-900 text-sm focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
               />
               <p className="text-[10px] text-stone-400">Dinero sugerido en monedas/billetes al abrir turno.</p>
@@ -1087,9 +1101,11 @@ function ConfiguracionContent() {
             <div className="space-y-1">
               <label className="font-bold text-stone-700">Límite Máximo de Merma Tolerable (%)</label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={minWasteAlertPercent}
-                onChange={(e) => setMinWasteAlertPercent(e.target.value)}
+                onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                onChange={(e) => setMinWasteAlertPercent(cleanDecimalNumbers(e.target.value))}
                 className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-rose-600 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
               />
               <p className="text-[10px] text-stone-400">Genera alerta si la merma supera este porcentaje de la producción.</p>

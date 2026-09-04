@@ -45,7 +45,7 @@ import {
   Pencil
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
 import { 
@@ -824,11 +824,9 @@ export default function POSPage() {
                     type="text"
                     inputMode="decimal"
                     value={shiftFundInput}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                     onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === "" || /^\d*\.?\d*$/.test(val)) {
-                        setShiftFundInput(val);
-                      }
+                      setShiftFundInput(cleanDecimalNumbers(e.target.value));
                     }}
                     placeholder="0.00"
                     className="w-full pl-12 pr-32 py-4 bg-black/65 border-2 border-amber-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-400/30 rounded-2xl font-black text-4xl sm:text-5xl text-amber-300 text-center tracking-tight focus:outline-none transition-all shadow-inner"
@@ -1646,12 +1644,14 @@ export default function POSPage() {
 
                     {/* Input editable directo para escribir piezas (ej. 100 bolillos) */}
                     <input
-                      type="number"
-                      min="1"
-                      max="9999"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={item.quantity}
+                      onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
                       onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
+                        const clean = cleanOnlyNumbers(e.target.value);
+                        const val = parseInt(clean, 10);
                         setExactQuantity(item.product.id, isNaN(val) ? 1 : Math.max(1, val));
                       }}
                       onFocus={(e) => e.target.select()}
@@ -1783,10 +1783,12 @@ export default function POSPage() {
                 <div className="relative flex-1">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-black text-sm">💵</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="Paga con... ($)"
                     value={cashGiven}
-                    onChange={(e) => setCashGiven(e.target.value)}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => setCashGiven(cleanDecimalNumbers(e.target.value))}
                     className="w-full pl-9 pr-3 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 text-sm sm:text-base font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all"
                   />
                 </div>
@@ -1919,11 +1921,14 @@ export default function POSPage() {
                   📱 Número Telefónico (WhatsApp)
                 </label>
                 <input
-                  type="tel"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   autoFocus
                   placeholder="ej. 55 1234 5678"
                   value={newCustPhone}
-                  onChange={(e) => setNewCustPhone(e.target.value)}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                  onChange={(e) => setNewCustPhone(cleanOnlyNumbers(e.target.value))}
                   className="w-full px-3.5 py-2.5 bg-stone-50 border-2 border-stone-200 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all text-sm"
                 />
               </div>

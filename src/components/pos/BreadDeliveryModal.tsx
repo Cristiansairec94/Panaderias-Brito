@@ -20,7 +20,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { Product, BreadDeliveryRecord, BreadDeliveryItem } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
 
 interface BreadDeliveryModalProps {
   isOpen: boolean;
@@ -807,8 +807,9 @@ export default function BreadDeliveryModal({
                                 pattern="[0-9]*"
                                 placeholder="0"
                                 value={selectedQty > 0 ? selectedQty : ""}
+                                onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
                                 onChange={(e) => {
-                                  const val = e.target.value.replace(/\D/g, "");
+                                  const val = cleanOnlyNumbers(e.target.value);
                                   handleSetQuantity(prod.id, val);
                                 }}
                                 onFocus={(e) => e.target.select()}
@@ -930,11 +931,13 @@ export default function BreadDeliveryModal({
                             </button>
 
                             <input
-                              type="number"
-                              min="1"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
                               value={quantity}
-                              onChange={(e) => handleSetQuantity(product.id, e.target.value)}
-                              className="w-20 text-center py-1.5 text-sm sm:text-base font-black rounded-xl border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-stone-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none shadow-2xs"
+                              onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                              onChange={(e) => handleSetQuantity(product.id, cleanOnlyNumbers(e.target.value))}
+                              className="w-20 text-center py-1.5 text-sm sm:text-base font-black rounded-xl border border-stone-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-stone-900 shadow-2xs"
                             />
 
                             <button
