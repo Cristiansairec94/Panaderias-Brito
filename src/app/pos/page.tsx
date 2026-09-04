@@ -976,18 +976,20 @@ export default function POSPage() {
               </button>
             </div>
 
-            {/* Botón Surtir / Entrada de Pan (Camionetas) */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowBreadDeliveryModal(true)}
-                className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black shadow-sm transition-all active:scale-95 whitespace-nowrap cursor-pointer"
-                title="Registrar pan recibido de las camionetas o taller"
-              >
-                <span className="text-lg">🚐</span>
-                <span>Entrada de Pan</span>
-              </button>
-            </div>
+            {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto hasta indicación del usuario */}
+            {false && (
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowBreadDeliveryModal(true)}
+                  className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black shadow-sm transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+                  title="Registrar pan recibido de las camionetas o taller"
+                >
+                  <span className="text-lg">🚐</span>
+                  <span>Entrada de Pan</span>
+                </button>
+              </div>
+            )}
 
             {/* Botón Gasto Rápido (Colores, texto y tamaño estables) */}
             <div className="relative shrink-0">
