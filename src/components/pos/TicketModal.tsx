@@ -204,7 +204,7 @@ export default function TicketModal({
                 <span>¡PAN CALIENTITO RECIÉN HORNEADO!</span>
               </div>
               <p className="text-xs sm:text-sm font-extrabold text-stone-800">
-                🥐 Mañanas: <span className="text-amber-900 font-black underline decoration-amber-500">6:30 AM</span> &nbsp;•&nbsp; Tardes: <span className="text-amber-900 font-black underline decoration-amber-500">5:30 PM</span>
+                🥐 De <span className="text-amber-900 font-black underline decoration-amber-500">6:00 AM</span> a <span className="text-amber-900 font-black underline decoration-amber-500">10:00 PM</span>
               </p>
             </div>
 
