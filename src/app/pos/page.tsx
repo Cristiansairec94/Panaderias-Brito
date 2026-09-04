@@ -67,6 +67,40 @@ import NotificationsDropdown from "@/components/layout/NotificationsDropdown";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
 
+const INITIAL_BREAD_DELIVERIES: BreadDeliveryRecord[] = [
+  {
+    id: "CAM-49201",
+    source: "Camioneta 1 (Ruta Poniente)",
+    driver: "Manuel Sánchez",
+    cashier: "Cajera 1 - Turno Matutino",
+    date: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }),
+    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 07:30 AM`,
+    items: [
+      { productId: "p-bolillo", productName: "Bolillo Tradicional Caliente", quantity: 200, unitPrice: 3, previousStock: 20, newStock: 220 },
+      { productId: "p-telera", productName: "Telera para Torta", quantity: 120, unitPrice: 3.5, previousStock: 15, newStock: 135 },
+      { productId: "p-concha", productName: "Concha de Vainilla", quantity: 50, unitPrice: 10, previousStock: 10, newStock: 60 },
+    ],
+    totalPieces: 370,
+    totalEstimatedValue: 1520,
+    notes: "Primera descarga de la mañana recién salido del horno",
+  },
+  {
+    id: "CAM-49202",
+    source: "Camioneta 2 (Ruta Centro)",
+    driver: "Pedro Ramírez",
+    cashier: "Cajera 2 - Turno Vespertino",
+    date: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }),
+    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 02:45 PM`,
+    items: [
+      { productId: "p-cuerno", productName: "Cuerno de Mantequilla", quantity: 60, unitPrice: 10, previousStock: 8, newStock: 68 },
+      { productId: "p-dona", productName: "Dona de Azúcar", quantity: 50, unitPrice: 10, previousStock: 5, newStock: 55 },
+    ],
+    totalPieces: 110,
+    totalEstimatedValue: 1100,
+    notes: "Surtido de media tarde para merienda",
+  },
+];
+
 const POS_CATEGORIES = [
   { id: "all", label: "Todo el Pan", priceTag: "", icon: "🧺" },
   { id: "bolillo_3", label: "Bolillo $3", priceTag: "$3", icon: "🍞" },
@@ -186,10 +220,13 @@ export default function POSPage() {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("brito_bread_deliveries");
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
       } catch (e) {}
     }
-    return [];
+    return INITIAL_BREAD_DELIVERIES;
   });
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>([]);

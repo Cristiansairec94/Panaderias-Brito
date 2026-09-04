@@ -119,6 +119,74 @@ export default function BreadDeliveryModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
+  // Historial de recepciones por cajera
+  // "current" = filtrado por la cajera en turno (cashierName)
+  // "all" = todas las recepciones registradas hoy
+  // O un string con el nombre exacto de otra cajera
+  const [cashierFilter, setCashierFilter] = useState<string>("current");
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+
+  const isMatchCurrentCashier = (recordCashier?: string) => {
+    if (!recordCashier) return false;
+    const cName = cashierName.toLowerCase().trim();
+    const recC = recordCashier.toLowerCase().trim();
+    return recC === cName || cName.includes(recC) || recC.includes(cName);
+  };
+
+  // Recepciones exclusivas de la cajera en turno
+  const currentCashierDeliveries = useMemo(() => {
+    return deliveriesHistory.filter((rec) => isMatchCurrentCashier(rec.cashier));
+  }, [deliveriesHistory, cashierName]);
+
+  // Lista de cajeras únicas que han recibido pan hoy
+  const uniqueCashiers = useMemo(() => {
+    const map = new Map<string, number>();
+    deliveriesHistory.forEach((rec) => {
+      if (rec.cashier) {
+        map.set(rec.cashier, (map.get(rec.cashier) || 0) + 1);
+      }
+    });
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
+  }, [deliveriesHistory]);
+
+  // Lista filtrada para mostrar en el historial
+  const filteredDeliveriesHistory = useMemo(() => {
+    let list = deliveriesHistory;
+
+    if (cashierFilter === "current") {
+      list = list.filter((rec) => isMatchCurrentCashier(rec.cashier));
+    } else if (cashierFilter !== "all") {
+      list = list.filter((rec) => rec.cashier?.toLowerCase() === cashierFilter.toLowerCase());
+    }
+
+    if (historySearchQuery.trim()) {
+      const q = historySearchQuery.toLowerCase().trim();
+      list = list.filter(
+        (rec) =>
+          rec.id.toLowerCase().includes(q) ||
+          (rec.driver && rec.driver.toLowerCase().includes(q)) ||
+          (rec.cashier && rec.cashier.toLowerCase().includes(q)) ||
+          rec.items.some((item) => item.productName.toLowerCase().includes(q))
+      );
+    }
+
+    return list;
+  }, [deliveriesHistory, cashierFilter, cashierName, historySearchQuery]);
+
+  // Estadísticas del filtro activo
+  const filteredHistoryStats = useMemo(() => {
+    const totalDeliveries = filteredDeliveriesHistory.length;
+    const totalPieces = filteredDeliveriesHistory.reduce(
+      (sum, r) => sum + (Number(r.totalPieces) || 0),
+      0
+    );
+    const totalValue = filteredDeliveriesHistory.reduce(
+      (sum, r) => sum + (Number(r.totalEstimatedValue) || 0),
+      0
+    );
+    return { totalDeliveries, totalPieces, totalValue };
+  }, [filteredDeliveriesHistory]);
+
   // Unique categories in products (Called unconditionally at top level)
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -427,10 +495,14 @@ export default function BreadDeliveryModal({
                   : "text-stone-600 hover:text-stone-900 hover:bg-white/60"
               }`}
             >
-              <Clock className="w-4 h-4 text-amber-600" />
+              <Clock className="w-4 h-4 text-emerald-600" />
               <span>Historial de Recepciones</span>
-              <span className="bg-stone-200 text-stone-700 text-[11px] font-black px-2 py-0.5 rounded-full">
-                {deliveriesHistory.length}
+              <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${
+                activeTab === "history"
+                  ? "bg-emerald-100 text-emerald-900 border border-emerald-300/80"
+                  : "bg-stone-200 text-stone-700"
+              }`}>
+                {currentCashierDeliveries.length} mi turno
               </span>
             </button>
           </div>
@@ -957,87 +1029,272 @@ export default function BreadDeliveryModal({
             </div>
           </div>
         ) : (
-          /* PESTAÑA: HISTORIAL DE RECEPCIONES */
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-stone-50 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-stone-200">
-              <div>
-                <h3 className="text-sm sm:text-base font-black text-stone-900">
-                  Recepciones Registradas ({deliveriesHistory.length})
-                </h3>
-                <p className="text-xs text-stone-500 font-medium">
-                  Entregas de camionetas y surtido de taller registradas en esta terminal.
-                </p>
+          /* PESTAÑA: HISTORIAL DE RECEPCIONES (ORGANIZADO POR CAJERA) */
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-stone-50 space-y-4">
+            {/* Header del Historial con filtro y selector por cajera */}
+            <div className="space-y-3 pb-3 border-b border-stone-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+                      <span>📋</span> Historial de Recepciones de Pan
+                    </h3>
+                    <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-black px-2.5 py-0.5 rounded-full">
+                      Organizado por Cajera
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500 font-medium mt-0.5">
+                    Entradas de pan registradas organizadas por turno y cajera responsable.
+                  </p>
+                </div>
+
+                {/* Badge informativo de cajera activa en turno */}
+                <div className="flex items-center gap-2.5 bg-white px-3.5 py-2 rounded-2xl border border-stone-200 shadow-2xs self-start sm:self-auto">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm">
+                    👩‍🍳
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase font-black text-stone-400 leading-none">
+                      Tu Turno Actual
+                    </span>
+                    <strong className="text-xs sm:text-sm font-black text-stone-900">
+                      {cashierName}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra de Filtros Rápidos por Cajera */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {/* 1. Mi Turno (Filtro por defecto) */}
+                <button
+                  type="button"
+                  onClick={() => setCashierFilter("current")}
+                  className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer border ${
+                    cashierFilter === "current"
+                      ? "bg-emerald-900 text-white border-emerald-950 shadow-sm ring-2 ring-emerald-500/30"
+                      : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
+                  }`}
+                >
+                  <span className="text-base">👤</span>
+                  <span>Mi Turno ({cashierName})</span>
+                  <span
+                    className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                      cashierFilter === "current"
+                        ? "bg-emerald-800 text-emerald-100"
+                        : "bg-stone-100 text-stone-700 border border-stone-200"
+                    }`}
+                  >
+                    {currentCashierDeliveries.length}
+                  </span>
+                </button>
+
+                {/* 2. Todas las Cajeras */}
+                <button
+                  type="button"
+                  onClick={() => setCashierFilter("all")}
+                  className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer border ${
+                    cashierFilter === "all"
+                      ? "bg-stone-900 text-white border-stone-950 shadow-sm ring-2 ring-stone-400/30"
+                      : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
+                  }`}
+                >
+                  <span className="text-base">👥</span>
+                  <span>Todas las Cajeras</span>
+                  <span
+                    className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                      cashierFilter === "all"
+                        ? "bg-stone-800 text-stone-100"
+                        : "bg-stone-100 text-stone-700 border border-stone-200"
+                    }`}
+                  >
+                    {deliveriesHistory.length}
+                  </span>
+                </button>
+
+                {/* 3. Otras cajeras individuales detectadas en el historial */}
+                {uniqueCashiers
+                  .filter((c) => !isMatchCurrentCashier(c.name))
+                  .map((c) => (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => setCashierFilter(c.name)}
+                      className={`px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer border ${
+                        cashierFilter.toLowerCase() === c.name.toLowerCase()
+                          ? "bg-amber-900 text-amber-100 border-amber-950 shadow-sm ring-2 ring-amber-500/30"
+                          : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
+                      }`}
+                    >
+                      <span className="text-sm">👩‍💼</span>
+                      <span>{c.name}</span>
+                      <span
+                        className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                          cashierFilter.toLowerCase() === c.name.toLowerCase()
+                            ? "bg-amber-800 text-amber-100"
+                            : "bg-stone-100 text-stone-600 border border-stone-200"
+                        }`}
+                      >
+                        {c.count}
+                      </span>
+                    </button>
+                  ))}
+              </div>
+
+              {/* Barra de Búsqueda rápida y Resumen de Totales del filtro */}
+              <div className="flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center justify-between pt-1">
+                {/* Buscador */}
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="text"
+                    placeholder={`Buscar en este historial por panadero, folio o tipo de pan...`}
+                    value={historySearchQuery}
+                    onChange={(e) => setHistorySearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-9 py-2.5 bg-white border-2 border-stone-200 rounded-2xl text-xs sm:text-sm font-bold text-stone-900 focus:outline-none focus:border-emerald-600 transition-colors placeholder:text-stone-400 shadow-2xs"
+                  />
+                  {historySearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setHistorySearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Resumen de Métricas */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 shrink-0">
+                  <div className="bg-white px-3.5 py-2 rounded-2xl border border-stone-200 flex items-center gap-2 shadow-2xs">
+                    <span className="text-stone-400 text-xs font-medium">Entregas:</span>
+                    <strong className="text-stone-900 font-black text-xs sm:text-sm">
+                      {filteredHistoryStats.totalDeliveries}
+                    </strong>
+                  </div>
+                  <div className="bg-emerald-50 px-3.5 py-2 rounded-2xl border border-emerald-200 flex items-center gap-2 shadow-2xs">
+                    <span className="text-emerald-700 text-xs font-bold">Total piezas:</span>
+                    <strong className="text-emerald-950 font-black text-xs sm:text-sm">
+                      +{filteredHistoryStats.totalPieces} pz
+                    </strong>
+                  </div>
+                  <div className="bg-amber-50 px-3.5 py-2 rounded-2xl border border-amber-200 flex items-center gap-2 shadow-2xs">
+                    <span className="text-amber-700 text-xs font-bold">Valor est.:</span>
+                    <strong className="text-amber-950 font-black text-xs sm:text-sm">
+                      {formatCurrency(filteredHistoryStats.totalValue)}
+                    </strong>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {deliveriesHistory.length === 0 ? (
-              <div className="text-center py-16 text-stone-400 space-y-2">
-                <Truck className="w-12 h-12 text-stone-300 mx-auto" />
-                <p className="font-bold text-sm text-stone-600">No hay recepciones registradas el día de hoy</p>
-                <p className="text-xs text-stone-400">
-                  Cuando una camioneta descargue pan y lo ingreses, aparecerá aquí el desglose completo.
+            {/* Listado de Entregas o Estado Vacío */}
+            {filteredDeliveriesHistory.length === 0 ? (
+              <div className="text-center py-14 px-4 bg-white rounded-3xl border-2 border-dashed border-stone-200 space-y-3">
+                <div className="w-16 h-16 rounded-2xl bg-stone-100 text-stone-500 flex items-center justify-center mx-auto text-3xl border border-stone-200 shadow-2xs">
+                  {cashierFilter === "current" ? "👩‍🍳" : "🚚"}
+                </div>
+                <h4 className="font-black text-base sm:text-lg text-stone-800">
+                  {cashierFilter === "current"
+                    ? `No hay recepciones registradas en el turno de ${cashierName}`
+                    : historySearchQuery
+                    ? `No se encontraron recepciones con "${historySearchQuery}"`
+                    : "No hay recepciones registradas para este filtro"}
+                </h4>
+                <p className="text-xs sm:text-sm text-stone-500 max-w-md mx-auto font-medium">
+                  {cashierFilter === "current"
+                    ? "Cuando recibas pan de una camioneta o panadero en la pestaña 'Recibir Pan', se guardará en tu historial personal de turno."
+                    : "Intenta cambiar el término de búsqueda o selecciona otra cajera."}
                 </p>
+                {cashierFilter === "current" && deliveriesHistory.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setCashierFilter("all")}
+                    className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-stone-900 hover:bg-stone-800 text-white text-xs sm:text-sm font-black shadow-sm cursor-pointer transition-all"
+                  >
+                    <span>👥 Ver recepciones de todas las cajeras ({deliveriesHistory.length})</span>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
-                {deliveriesHistory.map((rec) => (
-                  <div
-                    key={rec.id}
-                    className="bg-white p-5 sm:p-6 rounded-3xl border-2 border-stone-200/90 shadow-sm space-y-4"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-stone-200/80">
-                      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-                        <span className="font-mono font-black text-xs sm:text-sm text-emerald-900 bg-emerald-100/90 px-3 py-1 rounded-xl border border-emerald-300/80">
-                          {rec.id}
-                        </span>
-                        {/* Nombre del Panadero en la posición principal solicitada */}
-                        <strong className="text-stone-900 font-black text-base sm:text-lg flex items-center gap-1.5" title="Panadero o repartidor">
-                          <span className="text-emerald-700">👨‍🍳</span>
-                          <span>{rec.driver || (savedDrivers[0] || "Manuel Sánchez")}</span>
-                        </strong>
-
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs sm:text-sm text-stone-600 font-medium">
-                        <span>{rec.timestamp}</span>
-                        <span>•</span>
-                        <span>Recibió: <strong className="font-bold text-stone-900">{rec.cashier}</strong></span>
-                      </div>
-                    </div>
-
-                    {/* Desglose de piezas */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
-                      {rec.items.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-stone-50/90 hover:bg-stone-100/80 p-3 sm:p-3.5 rounded-2xl border border-stone-200/80 flex items-center justify-between gap-2 shadow-2xs transition-colors"
-                        >
-                          <span className="font-bold text-stone-900 text-xs sm:text-sm truncate pr-1">
-                            {item.productName}
+                {filteredDeliveriesHistory.map((rec) => {
+                  const isCurrent = isMatchCurrentCashier(rec.cashier);
+                  return (
+                    <div
+                      key={rec.id}
+                      className="bg-white p-5 sm:p-6 rounded-3xl border-2 border-stone-200/90 shadow-sm space-y-4 hover:border-emerald-500/40 transition-colors"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3.5 border-b border-stone-200/80">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className="font-mono font-black text-xs sm:text-sm text-emerald-900 bg-emerald-100/90 px-3 py-1 rounded-xl border border-emerald-300/80">
+                            {rec.id}
                           </span>
-                          <span className="font-black text-sm sm:text-base text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-xl shrink-0">
-                            +{item.quantity} pz
+                          {/* Nombre del Panadero */}
+                          <strong className="text-stone-900 font-black text-base sm:text-lg flex items-center gap-1.5" title="Panadero o chofer">
+                            <span className="text-emerald-700">👨‍🍳</span>
+                            <span>{rec.driver || (savedDrivers[0] || "Manuel Sánchez")}</span>
+                          </strong>
+
+                          {/* Badge de Cajera Receptora */}
+                          <div
+                            className={`flex items-center gap-1.5 text-xs sm:text-sm font-black px-3 py-1 rounded-xl border ${
+                              isCurrent
+                                ? "bg-emerald-50 text-emerald-900 border-emerald-300"
+                                : "bg-amber-50 text-amber-900 border-amber-300"
+                            }`}
+                            title={`Recepción registrada por: ${rec.cashier}`}
+                          >
+                            <span>👩‍🍳</span>
+                            <span>Cajera: <strong className="font-black">{rec.cashier}</strong></span>
+                            {isCurrent && (
+                              <span className="bg-emerald-200/80 text-emerald-900 text-[10px] font-black px-1.5 py-0.2 rounded-md">
+                                Tú
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-stone-600 font-medium">
+                          <Clock className="w-3.5 h-3.5 text-stone-400" />
+                          <span>{rec.timestamp}</span>
+                        </div>
+                      </div>
+
+                      {/* Desglose de piezas recibidas */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
+                        {rec.items.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-stone-50/90 hover:bg-stone-100/80 p-3 sm:p-3.5 rounded-2xl border border-stone-200/80 flex items-center justify-between gap-2 shadow-2xs transition-colors"
+                          >
+                            <span className="font-bold text-stone-900 text-xs sm:text-sm truncate pr-1">
+                              {item.productName}
+                            </span>
+                            <span className="font-black text-sm sm:text-base text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-xl shrink-0">
+                              +{item.quantity} pz
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Footer con total y notas */}
+                      <div className="pt-3 sm:pt-4 border-t border-stone-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs sm:text-sm">
+                        <span className="text-stone-500 font-medium italic">
+                          {rec.notes ? `Nota: "${rec.notes}"` : "Recepción normal sin incidencias"}
+                        </span>
+                        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+                          <span className="text-stone-600 font-medium text-xs sm:text-sm">
+                            Valor: <strong className="text-stone-900 font-black text-sm sm:text-base">{formatCurrency(Number(rec.totalEstimatedValue) || 0)}</strong>
+                          </span>
+                          <span className="font-black text-sm sm:text-base text-emerald-950 bg-emerald-200/90 border border-emerald-300/80 px-4 py-1.5 rounded-2xl shadow-2xs">
+                            +{rec.totalPieces} piezas totales
                           </span>
                         </div>
-                      ))}
-                    </div>
-
-                    {/* Footer con total */}
-                    <div className="pt-3 sm:pt-4 border-t border-stone-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs sm:text-sm">
-                      <span className="text-stone-500 font-medium italic">
-                        {rec.notes ? `Nota: "${rec.notes}"` : "Recepción normal sin incidencias"}
-                      </span>
-                      <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-                        <span className="text-stone-600 font-medium text-xs sm:text-sm">
-                          Valor: <strong className="text-stone-900 font-black text-sm sm:text-base">{formatCurrency(Number(rec.totalEstimatedValue) || 0)}</strong>
-                        </span>
-                        <span className="font-black text-sm sm:text-base text-emerald-950 bg-emerald-200/90 border border-emerald-300/80 px-4 py-1.5 rounded-2xl shadow-2xs">
-                          +{rec.totalPieces} piezas totales
-                        </span>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
