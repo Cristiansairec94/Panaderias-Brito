@@ -1119,69 +1119,6 @@ export default function RoleManagement() {
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* STEP 3: COMPARATIVE MATRIX TABLE                                          */}
-      {/* ========================================================================= */}
-      <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-          <div>
-            <h4 className="font-black text-sm text-stone-900 flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-amber-600" />
-              <span>Matriz Comparativa de Accesos por Rol</span>
-            </h4>
-            <p className="text-xs text-stone-500 mt-0.5">
-              Auditoría rápida para visualizar de un vistazo los accesos asignados a cada rol del sistema.
-            </p>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead>
-              <tr className="border-b border-stone-200 bg-stone-50/80 text-stone-600">
-                <th className="py-3 px-4 font-black">Módulo / Permiso ERP</th>
-                {rolesList.map((r) => (
-                  <th key={r.id} className="py-3 px-4 font-black text-center">
-                    <span className="inline-flex items-center gap-1">
-                      <span>{r.icon}</span>
-                      <span>{r.name}</span>
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100">
-              {PERMISSION_GROUPS.flatMap((g) => g.items).map((item) => (
-                <tr key={item.key} className="hover:bg-stone-50/60 transition-colors">
-                  <td className="py-2.5 px-4 font-bold text-stone-800">
-                    <div className="flex items-center gap-2">
-                      <span className="text-stone-400">•</span>
-                      <span>{item.label}</span>
-                    </div>
-                  </td>
-                  {rolesList.map((r) => {
-                    const rPerms = rolePermissionsMap?.[r.id] || ROLE_PERMISSIONS[r.id] || ROLE_PERMISSIONS.cajero;
-                    const hasAccess = Boolean(rPerms[item.key]);
-                    return (
-                      <td key={r.id} className="py-2.5 px-4 text-center">
-                        {hasAccess ? (
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-black text-xs">
-                            ✓
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-stone-100 text-stone-400 font-bold text-xs">
-                            ✕
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* ========================================================================= */}
       {/* MODAL 1: CREAR NUEVO ROL EN EL SISTEMA                                     */}
