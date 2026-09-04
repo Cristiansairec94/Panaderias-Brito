@@ -580,6 +580,42 @@
         }
       }, [cashierName]);
 
+      const currentCashierKey = cashierName.includes("Cajera 1")
+        ? "Cajera 1"
+        : cashierName.includes("Cajera 2")
+        ? "Cajera 2"
+        : cashierName;
+
+      const currentCashierCuts = useMemo(() => {
+        return cutsHistory.filter((cut) => {
+          return (
+            (cut.outgoingCashier && cut.outgoingCashier.toLowerCase().includes(currentCashierKey.toLowerCase())) ||
+            (cut.incomingCashier && cut.incomingCashier.toLowerCase().includes(currentCashierKey.toLowerCase()))
+          );
+        });
+      }, [cutsHistory, currentCashierKey]);
+
+      const filteredHistory = useMemo(() => {
+        return currentCashierCuts.filter((cut) => {
+          const q = historySearchQuery.toLowerCase().trim();
+          const matchesQuery =
+            !q ||
+            cut.id.toLowerCase().includes(q) ||
+            cut.date.toLowerCase().includes(q) ||
+            (cut.notes && cut.notes.toLowerCase().includes(q));
+
+          if (!matchesQuery) return false;
+
+          if (historyFilterType === "cuadrado") {
+            return cut.difference === 0;
+          }
+          if (historyFilterType === "diferencia") {
+            return cut.difference !== 0;
+          }
+          return true;
+        });
+      }, [currentCashierCuts, historySearchQuery, historyFilterType]);
+
       // Filter products
       const filtered = useMemo(() => {
         return products.filter((p) => {
@@ -2124,7 +2160,7 @@
                       <span>📜</span>
                       <span>Historial de Comprobantes</span>
                       <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-stone-900/80 text-amber-300 border border-amber-400/40">
-                        {cutsHistory.length}
+                        {currentCashierCuts.length}
                       </span>
                     </button>
                   </div>
@@ -2626,7 +2662,7 @@
                             <div className="relative flex-1">
                               <input
                                 type="text"
-                                placeholder="Buscar por folio (ej. CORTE-9482), cajera o fecha..."
+                                placeholder="Buscar por folio (ej. CORTE-9482) o fecha..."
                                 value={historySearchQuery}
                                 onChange={(e) => setHistorySearchQuery(e.target.value)}
                                 className="w-full pl-8 pr-4 py-2.5 bg-stone-50 border-2 border-stone-200 rounded-2xl text-xs sm:text-sm font-bold text-stone-900 focus:outline-none focus:border-amber-600 transition-colors placeholder:text-stone-400"
@@ -2637,99 +2673,139 @@
                               <button
                                 type="button"
                                 onClick={() => setHistoryFilterType("all")}
-                                className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
+                                className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
                                   historyFilterType === "all"
-                                    ? "bg-amber-950 text-amber-100 font-black shadow-xs"
-                                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                                    ? "bg-amber-950 text-amber-100 border-amber-950 shadow-xs ring-2 ring-amber-500/30"
+                                    : "bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200"
                                 }`}
                               >
-                                Todos ({cutsHistory.length})
+                                Mis Cortes ({currentCashierCuts.length})
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setHistoryFilterType("cajera1")}
-                                className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
-                                  historyFilterType === "cajera1"
-                                    ? "bg-amber-950 text-amber-100 font-black shadow-xs"
-                                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                                onClick={() => setHistoryFilterType("cuadrado")}
+                                className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                                  historyFilterType === "cuadrado"
+                                    ? "bg-emerald-900 text-emerald-100 border-emerald-950 shadow-xs ring-2 ring-emerald-500/30"
+                                    : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200"
                                 }`}
                               >
-                                👩‍🍳 Cajera 1
+                                🟢 Cuadrados ({currentCashierCuts.filter(c => c.difference === 0).length})
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setHistoryFilterType("cajera2")}
-                                className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
-                                  historyFilterType === "cajera2"
-                                    ? "bg-amber-950 text-amber-100 font-black shadow-xs"
-                                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                                onClick={() => setHistoryFilterType("diferencia")}
+                                className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                                  historyFilterType === "diferencia"
+                                    ? "bg-rose-900 text-rose-100 border-rose-950 shadow-xs ring-2 ring-rose-500/30"
+                                    : "bg-stone-50 text-stone-700 hover:bg-rose-50/60 border-stone-200"
                                 }`}
                               >
-                                👩‍🍳 Cajera 2
+                                ⚠️ Diferencias ({currentCashierCuts.filter(c => c.difference !== 0).length})
                               </button>
                             </div>
                           </div>
 
-                          {/* Grid de Comprobantes */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {cutsHistory
-                              .filter((c) => {
-                                const q = historySearchQuery.toLowerCase();
-                                const matches = !q || c.id.toLowerCase().includes(q) || c.outgoingCashier.toLowerCase().includes(q) || c.incomingCashier.toLowerCase().includes(q);
-                                if (!matches) return false;
-                                if (historyFilterType === "cajera1") return c.outgoingCashier.includes("Cajera 1") || c.incomingCashier.includes("Cajera 1");
-                                if (historyFilterType === "cajera2") return c.outgoingCashier.includes("Cajera 2") || c.incomingCashier.includes("Cajera 2");
-                                return true;
-                              })
-                              .map((cut) => (
-                                <div
-                                  key={cut.id}
-                                  onClick={() => setSelectedHistoryCut(cut)}
-                                  className="bg-white hover:bg-amber-50/50 p-4 rounded-2xl sm:rounded-3xl border-2 border-stone-200 hover:border-amber-400 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer space-y-3 group"
-                                >
-                                  <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-mono font-black text-xs sm:text-sm text-stone-900 bg-stone-100 group-hover:bg-amber-200/80 px-2 py-0.5 rounded-lg transition-colors">
-                                        {cut.id}
-                                      </span>
-                                      <span className="text-[11px] text-stone-500 font-semibold">{cut.date}</span>
-                                    </div>
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
-                                      cut.difference === 0
-                                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                        : "bg-rose-100 text-rose-800 border border-rose-300"
-                                    }`}>
-                                      {cut.difference === 0 ? "✓ Cuadrado" : formatCurrency(cut.difference)}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-xs font-bold text-stone-700 bg-stone-50 p-2 rounded-xl">
-                                    <span>Saliente: {cut.outgoingCashier.split(" - ")[0]}</span>
-                                    <span>➔</span>
-                                    <span>Entrante: {cut.incomingCashier.split(" - ")[0]}</span>
-                                  </div>
-
-                                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                                    <div className="bg-amber-50 p-1.5 rounded-xl border border-amber-200/60">
-                                      <span className="text-[10px] text-amber-900 font-bold block">Entregado</span>
-                                      <span className="font-black text-amber-950 block">{formatCurrency(cut.countedCash)}</span>
-                                    </div>
-                                    <div className="bg-emerald-50 p-1.5 rounded-xl border border-emerald-200/60">
-                                      <span className="text-[10px] text-emerald-800 font-bold block">Ventas</span>
-                                      <span className="font-black text-emerald-900 block">{formatCurrency(cut.totalSales || cut.cashSales)}</span>
-                                    </div>
-                                    <div className="bg-rose-50 p-1.5 rounded-xl border border-rose-200/60">
-                                      <span className="text-[10px] text-rose-800 font-bold block">Gastos</span>
-                                      <span className="font-black text-rose-900 block">-{formatCurrency(cut.totalExpenses)}</span>
-                                    </div>
-                                  </div>
-
-                                  <div className="text-right text-xs font-black text-amber-900 group-hover:underline">
-                                    Ver Comprobante ➔
-                                  </div>
-                                </div>
-                              ))}
+                          {/* Badge informativo de la cajera actual */}
+                          <div className="flex items-center justify-between text-xs bg-amber-50/80 px-3.5 py-2 rounded-xl border border-amber-200/80 text-stone-700">
+                            <span className="font-bold flex items-center gap-1.5 text-stone-900">
+                              <span>👩‍🍳</span> Historial exclusivo de: <strong className="text-amber-950 font-black">{currentCashierKey}</strong>
+                            </span>
+                            <span className="text-[11px] text-stone-500 font-medium">
+                              Mostrando {filteredHistory.length} comprobante(s)
+                            </span>
                           </div>
+
+                          {/* Lista Limpia, Clara y Fácil de Comprender */}
+                          {filteredHistory.length === 0 ? (
+                            <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-3xl p-8 text-center space-y-2">
+                              <div className="text-4xl">📜</div>
+                              <h4 className="font-black text-stone-800 text-base">No hay comprobantes para {currentCashierKey}</h4>
+                              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                                {historySearchQuery 
+                                  ? `No hay ningún corte que coincida con "${historySearchQuery}".`
+                                  : `Los cortes de turno que realices se guardarán aquí automáticamente para cualquier duda o aclaración.`}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2.5">
+                              {filteredHistory.map((cut) => {
+                                const totalSalesValue = cut.totalSalesAll || cut.totalSales || (cut.cashSales + cut.cardSales + cut.transferSales) || 0;
+                                const isSquare = cut.difference === 0;
+                                const isPositive = cut.difference > 0;
+
+                                return (
+                                  <div
+                                    key={cut.id}
+                                    onClick={() => setSelectedHistoryCut(cut)}
+                                    className="bg-white hover:bg-amber-50/60 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-stone-200 hover:border-amber-400 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 group"
+                                  >
+                                    {/* 1. Folio y Fechas */}
+                                    <div className="flex items-start sm:items-center gap-3 min-w-[210px]">
+                                      <div className="w-11 h-11 rounded-2xl bg-amber-100/90 border border-amber-300 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
+                                        🧾
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-mono font-black text-xs sm:text-sm text-stone-950 bg-stone-100 group-hover:bg-amber-200 px-2 py-0.5 rounded-lg transition-colors">
+                                            {cut.id}
+                                          </span>
+                                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide border md:hidden ${
+                                            isSquare
+                                              ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                              : isPositive
+                                              ? "bg-blue-100 text-blue-900 border-blue-300"
+                                              : "bg-rose-100 text-rose-900 border-rose-300"
+                                          }`}>
+                                            {isSquare ? "✓ Cuadrado" : isPositive ? `+${formatCurrency(cut.difference)}` : `${formatCurrency(cut.difference)}`}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-stone-600 font-bold mt-1 flex items-center gap-1.5 flex-wrap">
+                                          <span>📅 {cut.date}</span>
+                                          <span className="text-stone-300">•</span>
+                                          <span className="text-stone-500 font-medium">🕒 {cut.shiftRange}</span>
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* 2. Cifras Clave (Entregado, Ventas, Gastos) */}
+                                    <div className="grid grid-cols-3 gap-2 sm:gap-3 flex-1 max-w-md bg-stone-50/90 group-hover:bg-white p-2.5 sm:px-3 rounded-2xl border border-stone-200 transition-colors text-center">
+                                      <div>
+                                        <span className="text-[10px] text-stone-500 font-bold block uppercase tracking-wider">Entregado</span>
+                                        <span className="text-xs sm:text-sm font-black text-amber-950">{formatCurrency(cut.countedCash)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-[10px] text-emerald-700 font-bold block uppercase tracking-wider">Ventas</span>
+                                        <span className="text-xs sm:text-sm font-black text-emerald-700">+{formatCurrency(totalSalesValue)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-[10px] text-rose-700 font-bold block uppercase tracking-wider">Gastos</span>
+                                        <span className="text-xs sm:text-sm font-black text-rose-700">-{formatCurrency(cut.totalExpenses)}</span>
+                                      </div>
+                                    </div>
+
+                                    {/* 3. Estado & Botón de Acción */}
+                                    <div className="flex items-center justify-between md:justify-end gap-3 shrink-0">
+                                      <span className={`hidden md:inline-flex px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wide border ${
+                                        isSquare
+                                          ? "bg-emerald-100 text-emerald-900 border-emerald-300 shadow-2xs"
+                                          : isPositive
+                                          ? "bg-blue-100 text-blue-900 border-blue-300 shadow-2xs"
+                                          : "bg-rose-100 text-rose-900 border-rose-300 shadow-2xs"
+                                      }`}>
+                                        {isSquare ? "✓ Cuadrado" : isPositive ? `Sobrante +${formatCurrency(cut.difference)}` : `Faltante ${formatCurrency(cut.difference)}`}
+                                      </span>
+
+                                      <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-950 text-amber-200 group-hover:bg-amber-900 group-hover:text-white font-black text-xs transition-all shadow-xs shrink-0">
+                                        <span>👁️</span>
+                                        <span>Ver Ticket ➔</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

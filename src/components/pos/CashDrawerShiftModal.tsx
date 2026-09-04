@@ -338,25 +338,33 @@ export default function CashDrawerShiftModal({
   };
 
 
-  // Filtrado para el historial de cortes
-  const filteredHistory = useMemo(() => {
+  // Filtrado exclusivo para la cajera del turno actual
+  const currentCashierKey = cashierName.includes("Cajera 1") 
+    ? "Cajera 1" 
+    : cashierName.includes("Cajera 2") 
+    ? "Cajera 2" 
+    : cashierName;
+
+  const currentCashierCuts = useMemo(() => {
     return cutsHistory.filter((cut) => {
+      return (
+        cut.outgoingCashier.toLowerCase().includes(currentCashierKey.toLowerCase()) ||
+        cut.incomingCashier.toLowerCase().includes(currentCashierKey.toLowerCase())
+      );
+    });
+  }, [cutsHistory, currentCashierKey]);
+
+  const filteredHistory = useMemo(() => {
+    return currentCashierCuts.filter((cut) => {
       const q = historySearchQuery.toLowerCase().trim();
       const matchesQuery = 
         !q || 
         cut.id.toLowerCase().includes(q) ||
-        cut.outgoingCashier.toLowerCase().includes(q) ||
-        cut.incomingCashier.toLowerCase().includes(q) ||
-        cut.date.toLowerCase().includes(q);
+        cut.date.toLowerCase().includes(q) ||
+        (cut.notes && cut.notes.toLowerCase().includes(q));
 
       if (!matchesQuery) return false;
 
-      if (historyFilterType === "cajera1") {
-        return cut.outgoingCashier.includes("Cajera 1") || cut.incomingCashier.includes("Cajera 1");
-      }
-      if (historyFilterType === "cajera2") {
-        return cut.outgoingCashier.includes("Cajera 2") || cut.incomingCashier.includes("Cajera 2");
-      }
       if (historyFilterType === "cuadrado") {
         return cut.difference === 0;
       }
@@ -365,7 +373,7 @@ export default function CashDrawerShiftModal({
       }
       return true;
     });
-  }, [cutsHistory, historySearchQuery, historyFilterType]);
+  }, [currentCashierCuts, historySearchQuery, historyFilterType]);
 
   // Componente del Ticket Digital Animado (Reutilizable para Corte Actual e Historial)
   const renderDigitalTicket = (cut: ShiftCutRecord, isHistoryView = false) => {
@@ -827,165 +835,162 @@ export default function CashDrawerShiftModal({
               ) : (
                 /* Listado y Filtros del Historial */
                 <div className="space-y-3.5">
-                  {/* Barra de Búsqueda y Filtros */}
-                  <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
-                    <div className="relative flex-1">
-                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
-                      <input
-                        type="text"
-                        placeholder="Buscar por folio (ej. CORTE-9482), cajera o fecha..."
-                        value={historySearchQuery}
-                        onChange={(e) => setHistorySearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border-2 border-stone-200 rounded-2xl text-xs sm:text-sm font-bold text-stone-900 focus:outline-none focus:border-amber-600 transition-colors placeholder:text-stone-400"
-                      />
-                      {historySearchQuery && (
+                  {/* Barra de Búsqueda y Filtros de la Cajera en Turno */}
+                  <div className="space-y-2.5">
+                    <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between">
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                        <input
+                          type="text"
+                          placeholder={`Buscar en mis cortes (${currentCashierKey}) por folio o fecha...`}
+                          value={historySearchQuery}
+                          onChange={(e) => setHistorySearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border-2 border-stone-200 rounded-2xl text-xs sm:text-sm font-bold text-stone-900 focus:outline-none focus:border-amber-600 transition-colors placeholder:text-stone-400"
+                        />
+                        {historySearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setHistorySearchQuery("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Filtros Rápidos */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                         <button
                           type="button"
-                          onClick={() => setHistorySearchQuery("")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold"
+                          onClick={() => setHistoryFilterType("all")}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                            historyFilterType === "all"
+                              ? "bg-amber-950 text-amber-100 border-amber-950 shadow-xs"
+                              : "bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200"
+                          }`}
                         >
-                          ✕
+                          Mis Cortes ({currentCashierCuts.length})
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => setHistoryFilterType("cuadrado")}
+                          className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                            historyFilterType === "cuadrado"
+                              ? "bg-emerald-850 bg-emerald-900 text-emerald-100 border-emerald-950 shadow-xs ring-2 ring-emerald-500/30"
+                              : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200"
+                          }`}
+                        >
+                          🟢 Cuadrados ({currentCashierCuts.filter(c => c.difference === 0).length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHistoryFilterType("diferencia")}
+                          className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                            historyFilterType === "diferencia"
+                              ? "bg-rose-900 text-rose-100 border-rose-950 shadow-xs ring-2 ring-rose-500/30"
+                              : "bg-stone-50 text-stone-700 hover:bg-rose-50/60 border-stone-200"
+                          }`}
+                        >
+                          ⚠️ Diferencias ({currentCashierCuts.filter(c => c.difference !== 0).length})
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Filtros Rápidos */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-                      <button
-                        type="button"
-                        onClick={() => setHistoryFilterType("all")}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
-                          historyFilterType === "all"
-                            ? "bg-amber-950 text-amber-100 font-black shadow-xs"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        }`}
-                      >
-                        Todos ({cutsHistory.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHistoryFilterType("cajera1")}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
-                          historyFilterType === "cajera1"
-                            ? "bg-amber-950 text-amber-100 font-black shadow-xs"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        }`}
-                      >
-                        👩‍🍳 Cajera 1
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHistoryFilterType("cajera2")}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
-                          historyFilterType === "cajera2"
-                            ? "bg-amber-950 text-amber-100 font-black shadow-xs"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        }`}
-                      >
-                        👩‍🍳 Cajera 2
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHistoryFilterType("cuadrado")}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
-                          historyFilterType === "cuadrado"
-                            ? "bg-emerald-800 text-emerald-100 font-black shadow-xs"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        }`}
-                      >
-                        🟢 Cuadrados
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHistoryFilterType("diferencia")}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition-all ${
-                          historyFilterType === "diferencia"
-                            ? "bg-rose-800 text-rose-100 font-black shadow-xs"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        }`}
-                      >
-                        ⚠️ Con Diferencia
-                      </button>
+                    {/* Badge informativo de la cajera actual */}
+                    <div className="flex items-center justify-between text-xs bg-amber-50/80 px-3.5 py-2 rounded-xl border border-amber-200/80 text-stone-700">
+                      <span className="font-bold flex items-center gap-1.5 text-stone-900">
+                        <span>👩‍🍳</span> Historial exclusivo de: <strong className="text-amber-950 font-black">{currentCashierKey}</strong>
+                      </span>
+                      <span className="text-[11px] text-stone-500 font-medium">
+                        Mostrando {filteredHistory.length} comprobante(s)
+                      </span>
                     </div>
                   </div>
 
-                  {/* Lista de Tarjetas de Cortes */}
+                  {/* Lista Limpia, Clara y Fácil de Comprender */}
                   {filteredHistory.length === 0 ? (
                     <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-3xl p-8 text-center space-y-2">
                       <div className="text-4xl">📜</div>
-                      <h4 className="font-black text-stone-800 text-base">No se encontraron comprobantes</h4>
+                      <h4 className="font-black text-stone-800 text-base">No hay comprobantes para {currentCashierKey}</h4>
                       <p className="text-xs text-stone-500 max-w-sm mx-auto">
                         {historySearchQuery 
                           ? `No hay ningún corte que coincida con "${historySearchQuery}".`
-                          : "Los cortes de turno que realices se guardarán aquí automáticamente para cualquier duda o aclaración."}
+                          : `Los cortes de turno que realices se guardarán aquí automáticamente para cualquier duda o aclaración.`}
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2.5">
                       {filteredHistory.map((cut) => {
                         const totalSalesValue = cut.totalSalesAll || cut.totalSales || (cut.cashSales + cut.cardSales + cut.transferSales) || 0;
+                        const isSquare = cut.difference === 0;
+                        const isPositive = cut.difference > 0;
+
                         return (
                           <div
                             key={cut.id}
                             onClick={() => setSelectedHistoryTicket(cut)}
-                            className="bg-white hover:bg-amber-50/50 p-4 rounded-2xl sm:rounded-3xl border-2 border-stone-200 hover:border-amber-400 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer space-y-3 group"
+                            className="bg-white hover:bg-amber-50/60 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-stone-200 hover:border-amber-400 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 group"
                           >
-                            <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2.5">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-black text-xs sm:text-sm text-stone-900 bg-stone-100 group-hover:bg-amber-200/80 px-2 py-0.5 rounded-lg transition-colors">
-                                  {cut.id}
-                                </span>
-                                <span className="text-[11px] text-stone-500 font-semibold">{cut.date}</span>
+                            {/* 1. Folio y Fechas */}
+                            <div className="flex items-start sm:items-center gap-3 min-w-[210px]">
+                              <div className="w-11 h-11 rounded-2xl bg-amber-100/90 border border-amber-300 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
+                                🧾
                               </div>
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
-                                cut.difference === 0
-                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                  : cut.difference > 0
-                                  ? "bg-blue-100 text-blue-800 border border-blue-300"
-                                  : "bg-rose-100 text-rose-800 border border-rose-300"
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono font-black text-xs sm:text-sm text-stone-950 bg-stone-100 group-hover:bg-amber-200 px-2 py-0.5 rounded-lg transition-colors">
+                                    {cut.id}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide border md:hidden ${
+                                    isSquare
+                                      ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                      : isPositive
+                                      ? "bg-blue-100 text-blue-900 border-blue-300"
+                                      : "bg-rose-100 text-rose-900 border-rose-300"
+                                  }`}>
+                                    {isSquare ? "✓ Cuadrado" : isPositive ? `+${formatCurrency(cut.difference)}` : `${formatCurrency(cut.difference)}`}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-stone-600 font-bold mt-1 flex items-center gap-1.5 flex-wrap">
+                                  <span>📅 {cut.date}</span>
+                                  <span className="text-stone-300">•</span>
+                                  <span className="text-stone-500 font-medium">🕒 {cut.shiftRange}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* 2. Cifras Clave (Entregado, Ventas, Gastos) */}
+                            <div className="grid grid-cols-3 gap-2 sm:gap-3 flex-1 max-w-md bg-stone-50/90 group-hover:bg-white p-2.5 sm:px-3 rounded-2xl border border-stone-200 transition-colors text-center">
+                              <div>
+                                <span className="text-[10px] text-stone-500 font-bold block uppercase tracking-wider">Entregado</span>
+                                <span className="text-xs sm:text-sm font-black text-amber-950">{formatCurrency(cut.countedCash)}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-emerald-700 font-bold block uppercase tracking-wider">Ventas</span>
+                                <span className="text-xs sm:text-sm font-black text-emerald-700">+{formatCurrency(totalSalesValue)}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-rose-700 font-bold block uppercase tracking-wider">Gastos</span>
+                                <span className="text-xs sm:text-sm font-black text-rose-700">-{formatCurrency(cut.totalExpenses)}</span>
+                              </div>
+                            </div>
+
+                            {/* 3. Estado & Botón de Acción */}
+                            <div className="flex items-center justify-between md:justify-end gap-3 shrink-0">
+                              <span className={`hidden md:inline-flex px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wide border ${
+                                isSquare
+                                  ? "bg-emerald-100 text-emerald-900 border-emerald-300 shadow-2xs"
+                                  : isPositive
+                                  ? "bg-blue-100 text-blue-900 border-blue-300 shadow-2xs"
+                                  : "bg-rose-100 text-rose-900 border-rose-300 shadow-2xs"
                               }`}>
-                                {cut.difference === 0 ? "✓ Cuadrado" : formatCurrency(cut.difference)}
+                                {isSquare ? "✓ Cuadrado" : isPositive ? `Sobrante +${formatCurrency(cut.difference)}` : `Faltante ${formatCurrency(cut.difference)}`}
                               </span>
-                            </div>
 
-                            {/* Relevo */}
-                            <div className="flex items-center justify-between text-xs font-bold text-stone-700 bg-stone-50 p-2.5 rounded-xl">
-                              <div className="flex items-center gap-1.5 truncate">
-                                <span className="text-rose-600 font-extrabold text-[10px] uppercase">Saliente:</span>
-                                <span className="truncate">{cut.outgoingCashier.split(" - ")[0]}</span>
-                              </div>
-                              <ArrowRight className="w-3.5 h-3.5 text-stone-400 shrink-0 mx-1" />
-                              <div className="flex items-center gap-1.5 truncate">
-                                <span className="text-emerald-600 font-extrabold text-[10px] uppercase">Entrante:</span>
-                                <span className="truncate">{cut.incomingCashier.split(" - ")[0]}</span>
-                              </div>
-                            </div>
-
-                            {/* Cifras Financieras Clave */}
-                            <div className="grid grid-cols-3 gap-2 text-center text-xs pt-0.5">
-                              <div className="bg-amber-50/80 p-2 rounded-xl border border-amber-200/60">
-                                <span className="text-[10px] text-amber-900 font-bold block">Entregado</span>
-                                <span className="font-black text-amber-950 block">{formatCurrency(cut.countedCash)}</span>
-                              </div>
-                              <div className="bg-emerald-50/80 p-2 rounded-xl border border-emerald-200/60">
-                                <span className="text-[10px] text-emerald-800 font-bold block">Venta Total</span>
-                                <span className="font-black text-emerald-900 block">{formatCurrency(totalSalesValue)}</span>
-                              </div>
-                              <div className="bg-rose-50/80 p-2 rounded-xl border border-rose-200/60">
-                                <span className="text-[10px] text-rose-800 font-bold block">Gastos</span>
-                                <span className="font-black text-rose-900 block">-{formatCurrency(cut.totalExpenses)}</span>
-                              </div>
-                            </div>
-
-                            {/* Botón de Apertura */}
-                            <div className="flex items-center justify-between pt-1 text-xs">
-                              <span className="text-[11px] text-stone-400 font-medium">
-                                🕒 {cut.shiftRange}
-                              </span>
-                              <span className="font-black text-amber-900 group-hover:text-amber-950 flex items-center gap-1 group-hover:underline">
+                              <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-950 text-amber-200 group-hover:bg-amber-900 group-hover:text-white font-black text-xs transition-all shadow-xs shrink-0">
                                 <Eye className="w-3.5 h-3.5" />
-                                <span>Ver Comprobante ➔</span>
-                              </span>
+                                <span>Ver Ticket ➔</span>
+                              </div>
                             </div>
                           </div>
                         );
