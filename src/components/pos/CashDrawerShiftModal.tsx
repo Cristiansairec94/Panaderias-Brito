@@ -573,24 +573,46 @@ export default function CashDrawerShiftModal({
                 <Coins className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
               </div>
               <div>
-                <h2 className="font-black text-lg sm:text-2xl leading-tight text-white tracking-wide">
-                  {modalView === "cut" ? "Cierre de Turno & Entrega de Caja" : "Historial de Tickets de Corte"}
-                </h2>
-                <p className="text-xs sm:text-sm text-amber-300 font-bold mt-0.5">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="font-black text-lg sm:text-2xl leading-tight text-white tracking-wide">
+                    {modalView === "cut" ? "Cierre de Turno & Entrega de Caja" : "Historial de Tickets de Corte"}
+                  </h2>
+                  <span className="bg-amber-500/25 text-amber-200 border border-amber-400/50 text-xs sm:text-sm font-black px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
+                    <span>👩‍🍳</span>
+                    <span>Cajero(a) en turno: <strong className="text-white font-black">{cashierName}</strong></span>
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-amber-300 font-bold mt-1">
                   {modalView === "cut" 
-                    ? "Arqueo digital sin detalles y entrega conforme al relevo" 
-                    : "Consulta comprobantes anteriores para cualquier duda o aclaración"}
+                    ? `Arqueo digital sin detalles y entrega conforme al relevo • Turno actual: ${cashierName}` 
+                    : `Consulta comprobantes anteriores para cualquier duda o aclaración • Turno operado por: ${cashierName}`}
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={handleClose}
-              className="p-2.5 rounded-2xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
-              title="Cerrar modal"
-            >
-              <X className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="hidden md:flex items-center gap-2.5 bg-black/40 border border-amber-400/30 px-3.5 py-1.5 rounded-2xl shadow-inner">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-black text-sm">
+                  👩‍🍳
+                </div>
+                <div className="text-left">
+                  <span className="block text-[10px] uppercase tracking-wider font-extrabold text-amber-300/80 leading-none">
+                    Operando Turno
+                  </span>
+                  <strong className="text-xs sm:text-sm font-black text-white">
+                    {cashierName}
+                  </strong>
+                </div>
+              </div>
+
+              <button
+                onClick={handleClose}
+                className="p-2.5 rounded-2xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+                title="Cerrar modal"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
           </div>
 
           {/* Selector de Pestañas: [ Corte Actual ] vs [ Historial de Comprobantes ] */}
