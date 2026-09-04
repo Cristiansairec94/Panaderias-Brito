@@ -23,7 +23,8 @@ import {
   BellRing,
   Send,
   UserPlus,
-  Calendar
+  Calendar,
+  Lock
 } from "lucide-react";
 import { Product, Sale, CashExpense } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -42,6 +43,7 @@ interface CashDrawerShiftModalProps {
   expenses: CashExpense[];
   products: Product[];
   onCompleteShiftCut?: () => void;
+  initialTab?: "cuentas" | "cambio";
 }
 
 export default function CashDrawerShiftModal({
@@ -57,9 +59,10 @@ export default function CashDrawerShiftModal({
   expenses,
   products,
   onCompleteShiftCut,
+  initialTab = "cuentas",
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
-  const [activeTab, setActiveTab] = useState<"status" | "corte">("status");
+  const [activeTab, setActiveTab] = useState<"cuentas" | "cambio">(initialTab);
   
   // Shift Times
   const [shiftStartTime, setShiftStartTime] = useState("06:00 AM");
@@ -72,9 +75,16 @@ export default function CashDrawerShiftModal({
   const [countedCash, setCountedCash] = useState<string>("");
   const [nextInitialFund, setNextInitialFund] = useState("500");
   const [shiftNotes, setShiftNotes] = useState("");
+  const [hasAcceptedCash, setHasAcceptedCash] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [showCutSuccess, setShowCutSuccess] = useState(false);
   const [lastCutData, setLastCutData] = useState<any>(null);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, isOpen]);
 
   // Initial Fund Quick Edit in Status Tab
   const [isEditingFund, setIsEditingFund] = useState(false);
@@ -184,71 +194,49 @@ export default function CashDrawerShiftModal({
     onChangeShift(nextShiftName);
     onChangeInitialFund(Number(nextInitialFund) || 500);
 
-    if (onCompleteShiftCut) {
-      onCompleteShiftCut();
-    }
-
     setIsFinalizing(false);
     setShowCutSuccess(true);
+  };
+
+  const handleClose = () => {
+    if (showCutSuccess && onCompleteShiftCut) {
+      onCompleteShiftCut();
+    }
+    onClose();
   };
 
   const handlePrintZCut = () => {
     window.print();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[92vh] border-2 border-amber-900/30">
         {/* Header Modal */}
-        <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-5 px-6 flex items-center justify-between border-b border-amber-900/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-amber-600/90 rounded-2xl shadow-inner">
-              <Coins className="w-6 h-6 text-white" />
+        <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-5 sm:p-6 px-6 sm:px-8 flex items-center justify-between border-b border-amber-900/50 shadow-md">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-amber-500/30">
+              <Coins className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h2 className="font-black text-lg leading-tight">Corte de Caja & Cambio de Turno</h2>
-              <p className="text-xs text-amber-300 font-medium">
-                Arqueo financiero, entrega de cuentas y notificación directa al administrador
+              <h2 className="font-black text-xl sm:text-2xl leading-tight text-white tracking-wide">Cierre de Turno & Entrega de Caja</h2>
+              <p className="text-xs sm:text-sm text-amber-300 font-bold mt-0.5">
+                Confirmación de arqueo sin detalles en caja y entrega conforme al relevo
               </p>
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
+            onClick={handleClose}
+            className="p-2.5 rounded-2xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Tabs de Navegación */}
-        <div className="flex border-b border-stone-200 bg-stone-100/80 p-1.5 gap-2 px-6">
-          <button
-            onClick={() => { setActiveTab("status"); setShowCutSuccess(false); }}
-            className={`flex-1 py-3 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 ${
-              activeTab === "status" && !showCutSuccess
-                ? "bg-white text-stone-900 shadow-sm border border-stone-200"
-                : "text-stone-600 hover:text-stone-900"
-            }`}
-          >
-            <Wallet className="w-4 h-4 text-amber-700" />
-            <span>1. Estado de Caja & Existencias en Vivo</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("corte")}
-            className={`flex-1 py-3 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 ${
-              activeTab === "corte" || showCutSuccess
-                ? "bg-gradient-to-r from-amber-900 to-amber-950 text-white shadow-md"
-                : "text-stone-600 hover:text-stone-900"
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4 text-amber-400" />
-            <span>2. 🏁 Realizar Corte de Caja & Entregar Cuentas</span>
-          </button>
-        </div>
-
-        {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Modal Scrollable Body: UN SOLO APARTADO SIMPLE Y DIRECTO */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
           {showCutSuccess && lastCutData ? (
             /* Vista de Éxito y Ticket de Corte */
             <div className="space-y-6 animate-in zoom-in-95">
@@ -256,9 +244,9 @@ export default function CashDrawerShiftModal({
                 <div className="w-14 h-14 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-lg">
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
-                <h3 className="text-xl font-black text-emerald-950">¡Corte y Cambio de Turno Completado!</h3>
+                <h3 className="text-xl font-black text-emerald-950">¡Cierre de Turno Conforme y Exitoso!</h3>
                 <p className="text-xs text-emerald-800 max-w-md mx-auto">
-                  Se ha registrado el corte correctamente, se envió la notificación directa al administrador y la caja quedó lista para <strong>{lastCutData.incomingCashier}</strong>.
+                  El turno cerró correctamente sin detalles en caja. Cuentas cuadradas al 100%, comprobante emitido y caja entregada a <strong>{lastCutData.incomingCashier}</strong>.
                 </p>
               </div>
 
@@ -289,54 +277,43 @@ export default function CashDrawerShiftModal({
                   </div>
                   <div className="flex justify-between"><span>(+) Fondo Inicial de Turno:</span><span>{formatCurrency(lastCutData.initialFund)}</span></div>
                   <div className="flex justify-between text-emerald-700"><span>(+) Ventas en Efectivo:</span><span className="font-bold">+{formatCurrency(lastCutData.cashSales)}</span></div>
-                  <div className="flex justify-between text-rose-700"><span>(-) Gastos y Salidas:</span><span className="font-bold">-{formatCurrency(lastCutData.totalExpenses)}</span></div>
-                  <div className="flex justify-between font-black text-stone-900 border-t border-dashed border-stone-300 pt-1">
-                    <span>(=) EFECTIVO ESPERADO:</span>
+                  <div className="flex justify-between text-rose-700"><span>(-) Gastos de Turno:</span><span>-{formatCurrency(lastCutData.totalExpenses)}</span></div>
+                  <div className="flex justify-between font-black text-stone-900 border-t border-dashed border-stone-300 pt-1.5 text-xs">
+                    <span>(=) Total Esperado en Caja:</span>
                     <span>{formatCurrency(lastCutData.expectedCash)}</span>
                   </div>
-                  <div className="flex justify-between font-black text-amber-900">
-                    <span>($) EFECTIVO CONTADO FÍSICO:</span>
+                  <div className="flex justify-between font-black text-amber-950 pt-0.5 text-xs">
+                    <span>(=) Efectivo Físico Entregado:</span>
                     <span>{formatCurrency(lastCutData.countedCash)}</span>
                   </div>
-                  <div className={`flex justify-between font-black p-1 rounded ${
+                  <div className={`flex justify-between font-black p-1.5 rounded-lg mt-1 text-xs ${
                     lastCutData.difference === 0
-                      ? "bg-emerald-100 text-emerald-900"
+                      ? "bg-emerald-100 text-emerald-950"
                       : lastCutData.difference > 0
-                      ? "bg-blue-100 text-blue-900"
-                      : "bg-rose-100 text-rose-900"
+                      ? "bg-blue-100 text-blue-950"
+                      : "bg-rose-100 text-rose-950"
                   }`}>
-                    <span>DIFERENCIA / RESULTADO:</span>
-                    <span>{lastCutData.difference === 0 ? "CUADRADO $0.00" : (lastCutData.difference > 0 ? `SOBRANTE +${formatCurrency(lastCutData.difference)}` : `FALTANTE ${formatCurrency(lastCutData.difference)}`)}</span>
+                    <span>DIFERENCIA:</span>
+                    <span>{lastCutData.difference === 0 ? "$0.00 (Cuadrada)" : formatCurrency(lastCutData.difference)}</span>
                   </div>
                 </div>
 
-                {/* Otros Métodos */}
-                <div className="space-y-1 border-b border-dashed border-stone-300 pb-2 text-[10px] text-stone-600">
-                  <div className="flex justify-between"><span>Cobros con Tarjeta:</span><span>{formatCurrency(lastCutData.cardSales)}</span></div>
-                  <div className="flex justify-between"><span>Cobros con Transferencia:</span><span>{formatCurrency(lastCutData.transferSales)}</span></div>
-                  <div className="flex justify-between font-bold text-stone-900"><span>TOTAL VENTAS DEL TURNO:</span><span>{formatCurrency(lastCutData.totalSales)}</span></div>
-                  <div className="flex justify-between text-stone-500"><span>Fondo dejado para siguiente turno:</span><span className="font-bold">{formatCurrency(lastCutData.nextFund)}</span></div>
+                {/* Additional payment stats */}
+                <div className="space-y-1 text-[10px] text-stone-500 pt-1 border-b border-dashed border-stone-300 pb-2">
+                  <div className="flex justify-between"><span>Ventas con Tarjeta:</span><span>{formatCurrency(lastCutData.cardSales)}</span></div>
+                  <div className="flex justify-between"><span>Ventas con Transferencia:</span><span>{formatCurrency(lastCutData.transferSales)}</span></div>
+                  <div className="flex justify-between font-bold text-stone-800"><span>Gran Total Vendido:</span><span>{formatCurrency(lastCutData.totalSalesAll)}</span></div>
                 </div>
 
-                {/* Observaciones */}
-                <div className="text-[10px] text-stone-600 border-b border-dashed border-stone-300 pb-2">
-                  <span className="font-bold block text-stone-800">OBSERVACIONES:</span>
-                  <p className="italic font-sans">{lastCutData.notes}</p>
-                </div>
-
-                {/* Firmas */}
-                <div className="pt-6 grid grid-cols-2 gap-4 text-center text-[9px] font-sans">
-                  <div className="border-t border-stone-400 pt-1">
-                    <p className="font-bold">{lastCutData.outgoingCashier}</p>
-                    <p className="text-stone-400">Entregó Conforme</p>
-                  </div>
-                  <div className="border-t border-stone-400 pt-1">
-                    <p className="font-bold">{lastCutData.incomingCashier}</p>
-                    <p className="text-stone-400">Recibió Conforme</p>
-                  </div>
+                <div className="text-center pt-2 space-y-1 text-[10px] text-stone-400 font-sans">
+                  <p className="font-bold text-stone-700">ENTREGA DE TURNO CONFORME</p>
+                  <p>Firma Saliente: _____________________</p>
+                  <p>Firma Entrante: _____________________</p>
+                  <p className="pt-1 text-[9px]">Panaderías Brito • Sucursal Matriz</p>
                 </div>
               </div>
 
+              {/* Botones de acción post-corte */}
               <div className="flex gap-3 max-w-md mx-auto">
                 <button
                   onClick={handlePrintZCut}
@@ -346,401 +323,228 @@ export default function CashDrawerShiftModal({
                   <span>Imprimir Ticket de Corte</span>
                 </button>
                 <button
-                  onClick={onClose}
-                  className="flex-1 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs"
+                  onClick={() => {
+                    onClose();
+                    if (onCompleteShiftCut) onCompleteShiftCut();
+                  }}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white font-black rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-950/20 active:scale-95 animate-pulse"
                 >
-                  Cerrar
+                  <Lock className="w-4 h-4" />
+                  <span>Finalizar y Bloquear Punto de Venta</span>
                 </button>
               </div>
             </div>
-          ) : activeTab === "status" ? (
-            /* PESTAÑA 1: ESTADO ACTUAL EN VIVO */
-            <>
-              {/* Operator & Shift Badges */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-stone-50 rounded-2xl border border-stone-200 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-amber-100 text-amber-800 rounded-xl font-bold">👤</div>
-                  <div>
-                    <span className="text-[10px] text-stone-400 font-bold block">Cajero en Turno</span>
-                    <span className="font-black text-stone-900 text-sm">{cashierName}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-rose-100 text-rose-800 rounded-xl font-bold">⏰</div>
-                  <div>
-                    <span className="text-[10px] text-stone-400 font-bold block">Turno Activo & Horario</span>
-                    <span className="font-black text-stone-900 text-sm">{shiftName}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl font-bold">⏱️</div>
-                  <div>
-                    <span className="text-[10px] text-stone-400 font-bold block">Hora del Sistema</span>
-                    <span className="font-black text-stone-900 text-sm tabular-nums">{currentTime || "En vivo"}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3 Metric Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Card 1: Dinero en Caja */}
-                <div className="bg-gradient-to-br from-amber-950 via-stone-900 to-amber-900 p-5 rounded-3xl text-white shadow-lg space-y-2">
-                  <div className="flex items-center justify-between text-amber-300">
-                    <span className="text-xs font-bold uppercase tracking-wider">Dinero Físico en Caja</span>
-                    <Coins className="w-5 h-5 text-amber-400" />
-                  </div>
-                  <p className="text-3xl font-black text-white">{formatCurrency(expectedCashInDrawer)}</p>
-                  <p className="text-[11px] text-amber-200/80">Efectivo en cajón disponible</p>
-                  <div className="pt-2 border-t border-amber-800/60 text-[10px] text-amber-300 flex justify-between">
-                    <span>Fondo: {formatCurrency(initialFund)}</span>
-                    <span className="font-bold">+{cashTicketsCount} ventas efvo</span>
-                  </div>
-                </div>
-
-                {/* Card 2: Salidas / Gastos */}
-                <div className="bg-gradient-to-br from-rose-900 to-stone-900 p-5 rounded-3xl text-white shadow-lg space-y-2">
-                  <div className="flex items-center justify-between text-rose-300">
-                    <span className="text-xs font-bold uppercase tracking-wider">Salidas & Gastos</span>
-                    <TrendingDown className="w-5 h-5 text-rose-400" />
-                  </div>
-                  <p className="text-3xl font-black text-white">-{formatCurrency(totalExpenses)}</p>
-                  <p className="text-[11px] text-rose-200/80">{expenses.length} salidas registradas</p>
-                  <div className="pt-2 border-t border-rose-800/60 text-[10px] text-rose-300 flex justify-between">
-                    <span>Total Ventas: {formatCurrency(totalSalesAll)}</span>
-                    <span className="font-bold">Mostrador</span>
-                  </div>
-                </div>
-
-                {/* Card 3: Existencias */}
-                <div className="bg-gradient-to-br from-emerald-900 to-stone-900 p-5 rounded-3xl text-white shadow-lg space-y-2">
-                  <div className="flex items-center justify-between text-emerald-300">
-                    <span className="text-xs font-bold uppercase tracking-wider">Valor en Existencia</span>
-                    <Croissant className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  <p className="text-3xl font-black text-white">{formatCurrency(totalStockValue)}</p>
-                  <p className="text-[11px] text-emerald-200/80">{totalPiecesInStock} piezas de pan en vitrina</p>
-                  <div className="pt-2 border-t border-emerald-800/60 text-[10px] text-emerald-300 flex justify-between">
-                    <span>{products.length} modelos de pan</span>
-                    <span className="font-bold">En exhibición</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Botón destacado para pasar al corte */}
-              <div className="p-4 bg-amber-50 rounded-2xl border-2 border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-black text-stone-900 text-sm">¿Terminó el turno de {cashierName}?</h4>
-                  <p className="text-xs text-stone-600">
-                    Realiza el arqueo final, entrega cuentas al nuevo cajero y envía el reporte directo a Don Toño.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActiveTab("corte")}
-                  className="px-6 py-3 bg-amber-950 hover:bg-black text-white font-black text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap"
-                >
-                  <span>Hacer Corte y Entrega</span>
-                  <ArrowRight className="w-4 h-4 text-amber-400" />
-                </button>
-              </div>
-            </>
           ) : (
-            /* PESTAÑA 2: FORMULARIO DE CORTE DE CAJA Y CAMBIO DE TURNO */
-            <div className="space-y-5">
-              {/* Sección 1: Horario & Relevo de Cajeras (Solo Cajera 1 y Cajera 2) */}
-              <div className="p-5 bg-stone-50 rounded-3xl border border-stone-200/90 space-y-4 shadow-sm">
-                <div className="flex items-center justify-between border-b border-stone-200 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-amber-100 text-amber-800 rounded-lg">
-                      <Calendar className="w-4 h-4" />
-                    </div>
-                    <h3 className="font-extrabold text-sm text-stone-900">1. Horario del Turno & Relevo de Cajeras</h3>
-                  </div>
-                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-amber-200">
-                    Puesto Fijo: 2 Turnos
-                  </span>
+            /* UN SOLO APARTADO SIMPLE Y DIRECTO (SIN PESTAÑAS) */
+            <div className="space-y-3">
+              {/* 1. Resumen Financiero del Turno en 1 Sola Franja */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs">
+                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                  <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
+                  <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(initialFund)}</span>
                 </div>
-
-                {/* Horario y Turno */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  {/* Hora Inicio y Fin */}
-                  <div className="p-3 bg-white rounded-2xl border border-stone-200/80 space-y-1.5 shadow-xs">
-                    <label className="text-[10px] font-black text-stone-500 block uppercase tracking-wider">
-                      ⏰ Horario del Turno Actual:
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={shiftStartTime}
-                        onChange={(e) => setShiftStartTime(e.target.value)}
-                        className="w-24 p-2 border-2 border-stone-200 rounded-xl font-black text-xs text-center text-stone-900 focus:border-amber-500 focus:outline-none"
-                        placeholder="06:00 AM"
-                      />
-                      <span className="font-bold text-stone-400">hasta</span>
-                      <span className="p-2 bg-amber-100 text-amber-950 font-black rounded-xl text-xs shadow-xs">
-                        {currentTime || "Ahora"} (Corte)
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Próximo Turno */}
-                  <div className="p-3 bg-white rounded-2xl border border-stone-200/80 space-y-1.5 shadow-xs">
-                    <label className="text-[10px] font-black text-stone-500 block uppercase tracking-wider">
-                      📋 Turno que se Iniciará:
-                    </label>
-                    <div className="p-2 bg-stone-100 rounded-xl font-black text-xs text-stone-800 flex items-center justify-between">
-                      <span>{nextShiftName}</span>
-                      <span className="text-[10px] text-stone-400">Automático</span>
-                    </div>
-                  </div>
+                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                  <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
+                  <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(cashSales)}</span>
                 </div>
-
-                {/* Selector Visual Animado: Cajera Saliente vs Cajera Entrante */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-                  {/* Cajera Saliente (Entrega Cuentas) */}
-                  <div className="p-3.5 bg-white rounded-2xl border border-rose-200 shadow-xs space-y-2">
-                    <label className="text-[10px] font-black text-rose-800 uppercase tracking-wide flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse" />
-                      <span>Cajera que Entrega Cuentas (Saliente):</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOutgoingCashier("Cajera 1 - Turno Matutino");
-                          setIncomingCashier("Cajera 2 - Turno Vespertino");
-                          setNextShiftName("Turno Vespertino (14:00 - 22:00)");
-                        }}
-                        className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all duration-300 active:scale-95 border ${
-                          outgoingCashier.includes("Cajera 1")
-                            ? "bg-gradient-to-br from-rose-900 to-rose-950 text-white border-rose-950 shadow-md ring-2 ring-rose-500/40 font-black scale-[1.02]"
-                            : "bg-stone-50 text-stone-700 hover:bg-rose-50/60 border-stone-200 hover:scale-[1.01]"
-                        }`}
-                      >
-                        <span className="text-xl">👩‍🍳</span>
-                        <span className="font-extrabold text-[11px]">Cajera 1</span>
-                        <span className="text-[9px] opacity-75">Turno Matutino</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOutgoingCashier("Cajera 2 - Turno Vespertino");
-                          setIncomingCashier("Cajera 1 - Turno Matutino");
-                          setNextShiftName("Turno Matutino (06:00 - 14:00)");
-                        }}
-                        className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all duration-300 active:scale-95 border ${
-                          outgoingCashier.includes("Cajera 2")
-                            ? "bg-gradient-to-br from-rose-900 to-rose-950 text-white border-rose-950 shadow-md ring-2 ring-rose-500/40 font-black scale-[1.02]"
-                            : "bg-stone-50 text-stone-700 hover:bg-rose-50/60 border-stone-200 hover:scale-[1.01]"
-                        }`}
-                      >
-                        <span className="text-xl">👩‍🍳</span>
-                        <span className="font-extrabold text-[11px]">Cajera 2</span>
-                        <span className="text-[9px] opacity-75">Turno Vespertino</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Cajera Entrante (Recibe la Caja) */}
-                  <div className="p-3.5 bg-white rounded-2xl border-2 border-emerald-400 shadow-md shadow-emerald-900/5 space-y-2">
-                    <label className="text-[10px] font-black text-emerald-900 uppercase tracking-wide flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
-                      <span>Cajera que Recibe la Caja (Entrante):</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIncomingCashier("Cajera 1 - Turno Matutino");
-                          setNextShiftName("Turno Matutino (06:00 - 14:00)");
-                        }}
-                        className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all duration-300 active:scale-95 border ${
-                          incomingCashier.includes("Cajera 1")
-                            ? "bg-gradient-to-br from-emerald-800 to-emerald-950 text-white border-emerald-950 shadow-lg ring-2 ring-emerald-400/50 font-black scale-[1.02]"
-                            : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200 hover:scale-[1.01]"
-                        }`}
-                      >
-                        <span className="text-xl">👩‍🍳</span>
-                        <span className="font-extrabold text-[11px]">Cajera 1</span>
-                        <span className="text-[9px] opacity-75">Turno Matutino</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIncomingCashier("Cajera 2 - Turno Vespertino");
-                          setNextShiftName("Turno Vespertino (14:00 - 22:00)");
-                        }}
-                        className={`p-3 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all duration-300 active:scale-95 border ${
-                          incomingCashier.includes("Cajera 2")
-                            ? "bg-gradient-to-br from-emerald-800 to-emerald-950 text-white border-emerald-950 shadow-lg ring-2 ring-emerald-400/50 font-black scale-[1.02]"
-                            : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200 hover:scale-[1.01]"
-                        }`}
-                      >
-                        <span className="text-xl">👩‍🍳</span>
-                        <span className="font-extrabold text-[11px]">Cajera 2</span>
-                        <span className="text-[9px] opacity-75">Turno Vespertino</span>
-                      </button>
-                    </div>
-                  </div>
+                <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                  <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos</span>
+                  <span className="text-xl sm:text-2xl font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
+                </div>
+                <div className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20">
+                  <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">En Caja</span>
+                  <span className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(expectedCashInDrawer)}</span>
                 </div>
               </div>
 
-              {/* Sección 2: Arqueo Financiero & Conteo Físico */}
-              <div className="p-5 bg-amber-50/70 rounded-3xl border-2 border-amber-200/90 space-y-4">
-                <div className="flex items-center justify-between border-b border-amber-200 pb-2">
-                  <div className="flex items-center gap-2">
-                    <Receipt className="w-5 h-5 text-amber-800" />
-                    <h3 className="font-extrabold text-sm text-stone-900">2. Arqueo y Conteo Físico de Dinero</h3>
-                  </div>
-                  <span className="text-xs font-black text-amber-900 bg-amber-200/70 px-3 py-0.5 rounded-full">
-                    Esperado en Cajón: {formatCurrency(expectedCashInDrawer)}
+              {/* 1. Relevo Directo: Quién Entrega y Quién Recibe (Solo Cajera 1 y Cajera 2) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-stone-50 rounded-3xl border-2 border-stone-200">
+                <div className="flex items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-stone-200/90 shadow-xs">
+                  <span className="font-black text-rose-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
+                    <span className="text-base">👤</span> Entrega:
                   </span>
-                </div>
-
-                {/* Fórmula compacta */}
-                <div className="grid grid-cols-3 gap-2 text-center text-xs bg-white p-3 rounded-2xl border border-amber-200">
-                  <div>
-                    <span className="text-[10px] text-stone-400 font-bold block">(+) Fondo Inicial</span>
-                    <span className="font-black text-stone-800">{formatCurrency(initialFund)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-emerald-700 font-bold block">(+) Ventas Efvo</span>
-                    <span className="font-black text-emerald-700">+{formatCurrency(cashSales)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-rose-700 font-bold block">(-) Gastos / Salidas</span>
-                    <span className="font-black text-rose-700">-{formatCurrency(totalExpenses)}</span>
+                  <div className="font-black text-stone-900 text-sm sm:text-base truncate flex-1 text-right">
+                    {outgoingCashier} ({shiftName.split(" ")[0]})
                   </div>
                 </div>
 
-                {/* Input de Efectivo Contado */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-black text-stone-900">
-                      ¿Cuánto dinero físico en efectivo contaste en el cajón? ($ MXN):
-                    </label>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-white p-2.5 rounded-2xl border-2 border-emerald-400 shadow-xs">
+                  <span className="font-black text-emerald-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5 pl-1">
+                    <span className="text-base">👤</span> Recibe:
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5 flex-1 w-full sm:w-auto">
                     <button
                       type="button"
-                      onClick={() => setCountedCash(expectedCashInDrawer.toString())}
-                      className="text-[11px] font-black text-amber-800 hover:underline"
+                      onClick={() => {
+                        setIncomingCashier("Cajera 1 - Turno Matutino");
+                        setNextShiftName("Turno Matutino (06:00 - 14:00)");
+                      }}
+                      className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all duration-200 active:scale-95 border ${
+                        incomingCashier.includes("Cajera 1")
+                          ? "bg-gradient-to-r from-emerald-800 to-emerald-950 text-white border-emerald-950 shadow-md ring-2 ring-emerald-400/50 font-black scale-[1.02]"
+                          : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200"
+                      }`}
                     >
-                      Poner Monto Esperado ({formatCurrency(expectedCashInDrawer)})
+                      <span>👩‍🍳</span>
+                      <span>Cajera 1</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIncomingCashier("Cajera 2 - Turno Vespertino");
+                        setNextShiftName("Turno Vespertino (14:00 - 22:00)");
+                      }}
+                      className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all duration-200 active:scale-95 border ${
+                        incomingCashier.includes("Cajera 2")
+                          ? "bg-gradient-to-r from-emerald-800 to-emerald-950 text-white border-emerald-950 shadow-md ring-2 ring-emerald-400/50 font-black scale-[1.02]"
+                          : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200"
+                      }`}
+                    >
+                      <span>👩‍🍳</span>
+                      <span>Cajera 2</span>
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* 2. Verificación de Dinero en Caja (Resumido y Claro) */}
+              <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-50 via-orange-50/50 to-amber-100/60 rounded-3xl border-2 border-amber-300 shadow-sm space-y-3.5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                  <div>
+                    <span className="text-sm sm:text-base font-black text-stone-900 uppercase flex items-center gap-2">
+                      <span className="text-xl">💵</span> Dinero que debe haber en caja:
+                    </span>
+                    <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
+                      Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)} • Gastos: -{formatCurrency(totalExpenses)}
+                    </span>
+                  </div>
+                  <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">
+                    {formatCurrency(expectedCashInDrawer)}
+                  </span>
+                </div>
+
+                {/* Conteo Rápido: Botón 1 Toque o Input Manual */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCountedCash(expectedCashInDrawer.toString());
+                      setHasAcceptedCash(true);
+                    }}
+                    className={`py-4 px-5 rounded-2xl font-black text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2.5 shadow-md active:scale-95 group relative overflow-hidden ${
+                      countedCash === expectedCashInDrawer.toString() && hasAcceptedCash
+                        ? "bg-gradient-to-r from-amber-700 to-orange-700 text-white ring-4 ring-amber-400/40 shadow-lg scale-[1.01]"
+                        : "bg-gradient-to-r from-amber-600 via-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white hover:scale-[1.02] hover:shadow-lg"
+                    }`}
+                  >
+                    <span className="text-xl group-hover:scale-125 group-hover:rotate-12 transition-transform duration-300">⚡</span>
+                    <span className="tracking-wide">El dinero está completo ({formatCurrency(expectedCashInDrawer)})</span>
+                  </button>
 
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-xl text-stone-700">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
                     <input
                       type="number"
                       step="any"
-                      required
-                      placeholder={expectedCashInDrawer.toString()}
+                      placeholder={`O escribe otro monto`}
                       value={countedCash}
-                      onChange={(e) => setCountedCash(e.target.value)}
-                      className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none text-2xl font-black text-stone-900 shadow-inner"
+                      onChange={(e) => {
+                        setCountedCash(e.target.value);
+                        setHasAcceptedCash(true);
+                      }}
+                      className="w-full pl-9 pr-4 py-4 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base sm:text-lg text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
                     />
                   </div>
                 </div>
 
-                {/* Cuadro de Diferencia en vivo */}
-                <div className={`p-3.5 rounded-2xl border flex items-center justify-between font-black text-xs ${
-                  cashDifference === 0
-                    ? "bg-emerald-100 text-emerald-950 border-emerald-300"
-                    : cashDifference > 0
-                    ? "bg-blue-100 text-blue-950 border-blue-300"
-                    : "bg-rose-100 text-rose-950 border-rose-300"
-                }`}>
-                  <div className="flex items-center gap-2">
-                    {cashDifference === 0 ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-                    ) : cashDifference > 0 ? (
-                      <TrendingUp className="w-5 h-5 text-blue-700" />
-                    ) : (
-                      <AlertTriangle className="w-5 h-5 text-rose-700" />
-                    )}
-                    <span>
-                      {cashDifference === 0
-                        ? "¡Caja Cuadrada Perfecta!"
-                        : cashDifference > 0
-                        ? "Sobrante de Efectivo en Caja:"
-                        : "Faltante de Efectivo en Caja:"}
+                {/* Dictamen y Confirmación del Cierre de Turno */}
+                {countedCash && (
+                  <div className={`p-4 rounded-2xl border-2 transition-all duration-300 flex items-center justify-between gap-3 shadow-sm animate-in fade-in zoom-in-95 ${
+                    cashDifference === 0
+                      ? "bg-emerald-50 text-emerald-950 border-emerald-400"
+                      : cashDifference > 0
+                      ? "bg-blue-50 text-blue-950 border-blue-400"
+                      : "bg-rose-50 text-rose-950 border-rose-400"
+                  }`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-base shrink-0 shadow-md ${
+                        cashDifference === 0 ? "bg-emerald-600 text-white animate-bounce" : cashDifference > 0 ? "bg-blue-600 text-white" : "bg-rose-600 text-white"
+                      }`}>
+                        {cashDifference === 0 ? "✓" : "!"}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-black block text-sm sm:text-base leading-tight">
+                          {cashDifference === 0
+                            ? "🟢 Cierre de Turno Conforme: Todo está bien y no hay detalles en caja"
+                            : cashDifference > 0
+                            ? "🟡 Detalle en Cierre: Sobrante detectado en caja"
+                            : "🔴 Detalle en Cierre: Faltante detectado en caja"}
+                        </span>
+                        <span className={`text-xs sm:text-sm font-bold block mt-0.5 ${
+                          cashDifference === 0 ? "text-emerald-800" : cashDifference > 0 ? "text-blue-800" : "text-rose-800"
+                        }`}>
+                          {cashDifference === 0
+                            ? "Cuentas cuadradas al 100%. El dinero en caja coincide exactamente con el sistema ($0.00)."
+                            : `Diferencia de ${formatCurrency(cashDifference)}. Se registrará el detalle en el comprobante del turno.`}
+                        </span>
+                      </div>
+                    </div>
+                    <span className={`shrink-0 px-3.5 py-1.5 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wide shadow-xs ${
+                      cashDifference === 0 ? "bg-emerald-200 text-emerald-950 border border-emerald-300" : cashDifference > 0 ? "bg-blue-200 text-blue-900" : "bg-rose-200 text-rose-900"
+                    }`}>
+                      {cashDifference === 0 ? "Sin Detalles ✓" : formatCurrency(cashDifference)}
                     </span>
                   </div>
-                  <span className="text-sm sm:text-base">
-                    {cashDifference === 0
-                      ? "$0.00 MXN"
-                      : cashDifference > 0
-                      ? `+${formatCurrency(cashDifference)}`
-                      : formatCurrency(cashDifference)}
-                  </span>
-                </div>
+                )}
               </div>
 
-              {/* Sección 3: Fondo para el nuevo turno y Observaciones */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                {/* Fondo nuevo */}
-                <div className="p-3.5 bg-stone-50 rounded-2xl border space-y-1.5">
-                  <label className="font-black text-stone-900 block">
-                    Fondo que se deja en caja para {incomingCashier} ($):
-                  </label>
+              {/* 3. Casilla de Confirmación y Botón Final de Cierre de Turno */}
+              <div className="space-y-3 pt-1">
+                <label className={`flex items-center gap-3.5 p-4 sm:p-4.5 rounded-2xl sm:rounded-3xl border-2 cursor-pointer select-none transition-all duration-300 ${
+                  hasAcceptedCash
+                    ? "bg-emerald-50/90 border-emerald-400 shadow-md ring-2 ring-emerald-500/20"
+                    : "bg-amber-50/90 border-amber-300 hover:border-amber-400"
+                }`}>
                   <input
-                    type="number"
-                    value={nextInitialFund}
-                    onChange={(e) => setNextInitialFund(e.target.value)}
-                    className="w-full p-2.5 bg-white border rounded-xl font-black text-stone-900"
-                    placeholder="500"
+                    type="checkbox"
+                    checked={hasAcceptedCash}
+                    onChange={(e) => setHasAcceptedCash(e.target.checked)}
+                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg accent-emerald-600 cursor-pointer shrink-0 transition-transform active:scale-90"
                   />
-                  <p className="text-[10px] text-stone-400">Para cambio y cobro de los primeros clientes.</p>
-                </div>
+                  <span className="text-sm sm:text-base font-black text-stone-900 leading-snug">
+                    Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: todo está bien, conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}) y no hay detalles pendientes en caja.
+                  </span>
+                </label>
 
-                {/* Notas / Observaciones */}
-                <div className="p-3.5 bg-stone-50 rounded-2xl border space-y-1.5">
-                  <label className="font-black text-stone-900 block">
-                    Observaciones o Notas de Entrega de Turno:
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={shiftNotes}
-                    onChange={(e) => setShiftNotes(e.target.value)}
-                    placeholder="Ej. Charolas limpias, vitrina surtida, todo en orden..."
-                    className="w-full p-2 bg-white border rounded-xl text-xs font-medium"
-                  />
-                </div>
-              </div>
-
-              {/* Botón Finalizar Corte */}
-              <div className="pt-2">
                 <button
                   type="button"
                   onClick={handleExecuteShiftCut}
-                  disabled={isFinalizing}
-                  className="w-full py-4 bg-gradient-to-r from-amber-900 via-amber-950 to-stone-900 hover:from-black hover:to-black text-white font-black rounded-2xl text-sm shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                  disabled={!countedCash || !hasAcceptedCash || isFinalizing}
+                  className={`w-full py-5 px-6 rounded-2xl sm:rounded-3xl font-black text-base sm:text-lg tracking-wide shadow-xl transition-all duration-300 flex items-center justify-center gap-3 group active:scale-98 ${
+                    !countedCash || !hasAcceptedCash || isFinalizing
+                      ? "bg-stone-300 text-stone-500 cursor-not-allowed opacity-60"
+                      : "bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-emerald-700/30 hover:shadow-2xl hover:scale-[1.01] animate-pulse"
+                  }`}
                 >
-                  <ShieldCheck className="w-5 h-5 text-amber-400" />
+                  <CheckCircle2 className="w-6 h-6 text-emerald-200 shrink-0 group-hover:scale-125 transition-transform duration-300" />
                   <span>
-                    {isFinalizing ? "Procesando Corte..." : "🏁 Finalizar Corte de Caja & Entregar Turno"}
+                    {isFinalizing ? "Cerrando Turno..." : `🔒 CERRAR TURNO Y ENTREGAR CAJA (${incomingCashier}) ➔`}
                   </span>
                 </button>
-                <p className="text-[10px] text-center text-stone-500 mt-2 flex items-center justify-center gap-1">
-                  <BellRing className="w-3 h-3 text-amber-600" />
-                  Se enviará automáticamente la notificación con el reporte completo al administrador
-                </p>
               </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-4 bg-white border-t border-stone-200 flex items-center justify-between">
-          <span className="text-xs font-medium text-stone-500">
+        <div className="p-4 px-6 bg-white border-t border-stone-200 flex items-center justify-between">
+          <span className="text-xs font-bold text-stone-500">
             Panaderías Brito • Sucursal Matriz
           </span>
           <button
-            onClick={onClose}
-            className="px-5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors"
+            onClick={handleClose}
+            className="px-6 py-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-xl text-xs sm:text-sm transition-colors"
           >
             Cerrar Ventana
           </button>

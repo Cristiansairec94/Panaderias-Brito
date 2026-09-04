@@ -10,7 +10,8 @@ import {
   Upload, 
   X, 
   Check, 
-  AlertTriangle, 
+  AlertTriangle,
+  AlertCircle,
   Croissant, 
   Package, 
   Layers, 
@@ -21,7 +22,9 @@ import {
   ArrowUpDown,
   RefreshCw,
   Tag as TagIcon,
-  CheckCircle2
+  CheckCircle2,
+  Scale,
+  Barcode
 } from "lucide-react";
 import { Product } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -30,7 +33,8 @@ import {
   createProduct, 
   updateProduct, 
   deleteProduct, 
-  PRODUCT_CATEGORIES 
+  PRODUCT_CATEGORIES,
+  generateProductCode
 } from "@/lib/products";
 
 export default function ProductosPage() {
@@ -39,13 +43,14 @@ export default function ProductosPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
-  // Modals state
+  // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Delete modal state
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Success toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -55,9 +60,11 @@ export default function ProductosPage() {
 
   // Form state
   const [formData, setFormData] = useState({
+    code: "",
     name: "",
     price: "",
     category: "pan_dulce" as Product["category"],
+    unit: "pieza" as "pieza" | "kg" | "g",
     description: "",
     image: "",
     icon: "🥖",
@@ -92,6 +99,7 @@ export default function ProductosPage() {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch = 
         !q ||
+        (p.code && p.code.toLowerCase().includes(q)) ||
         p.name.toLowerCase().includes(q) ||
         (p.description && p.description.toLowerCase().includes(q)) ||
         (p.tag && p.tag.toLowerCase().includes(q));
@@ -103,13 +111,16 @@ export default function ProductosPage() {
   const handleOpenCreate = () => {
     setModalMode("create");
     setEditingId(null);
+    const initialCat = (selectedCategory !== "all" ? selectedCategory : "pan_dulce") as Product["category"];
     setFormData({
+      code: generateProductCode(initialCat),
       name: "",
       price: "",
-      category: "pan_dulce",
+      category: initialCat,
+      unit: initialCat === "materia_prima" ? "kg" : "pieza",
       description: "",
       image: "",
-      icon: "🥖",
+      icon: initialCat === "abarrotes" ? "🥫" : initialCat === "materia_prima" ? "🌾" : "🥖",
     });
     setIsModalOpen(true);
   };
@@ -119,9 +130,11 @@ export default function ProductosPage() {
     setModalMode("edit");
     setEditingId(product.id);
     setFormData({
+      code: product.code || generateProductCode(product.category),
       name: product.name,
       price: product.price.toString(),
       category: product.category,
+      unit: (product.unit as "pieza" | "kg" | "g") || (product.category === "materia_prima" ? "kg" : "pieza"),
       description: product.description || "",
       image: product.image || "",
       icon: product.icon || "🥖",
@@ -163,41 +176,65 @@ export default function ProductosPage() {
       return;
     }
 
+    const isUnitApplicable = formData.category === "abarrotes" || formData.category === "materia_prima";
+    const selectedUnit = isUnitApplicable ? (formData.unit || "pieza") : undefined;
+    const assignedCode = formData.code.trim().toUpperCase() || generateProductCode(formData.category);
+
     if (modalMode === "create") {
       const created = createProduct({
+        code: assignedCode,
         name: formData.name.trim(),
         price: priceNum,
         category: formData.category,
+        unit: selectedUnit,
         stock: 50,
         description: formData.description.trim() || undefined,
         image: formData.image.trim() || undefined,
-        icon: formData.icon || "🥖",
+        icon: formData.icon || (formData.category === "abarrotes" ? "🥫" : formData.category === "materia_prima" ? "🌾" : "🥖"),
       });
       setProducts(getStoredProducts());
       setIsModalOpen(false);
-      showToast(`¡Producto "${created.name}" creado con éxito!`);
+      showToast(`¡Producto "${created.name}" [${created.code}] creado con éxito!`);
     } else if (modalMode === "edit" && editingId) {
       const updated = updateProduct(editingId, {
+        code: assignedCode,
         name: formData.name.trim(),
         price: priceNum,
         category: formData.category,
+        unit: selectedUnit,
         description: formData.description.trim() || undefined,
         image: formData.image.trim() || undefined,
         icon: formData.icon || "🥖",
       });
       setProducts(getStoredProducts());
       setIsModalOpen(false);
-      showToast(`¡Producto "${updated?.name || formData.name}" actualizado!`);
+      showToast(`¡Producto "${updated?.name || formData.name}" [${updated?.code || assignedCode}] actualizado!`);
     }
   };
 
-  // Delete product confirm
+  // Delete product handlers
+  const handleOpenDelete = (product: Product) => {
+    setDeletingProduct(product);
+    setDeleteConfirmText("");
+  };
+
   const handleConfirmDelete = () => {
     if (!deletingProduct) return;
+    const clean = deleteConfirmText.trim().toLowerCase();
+    if (clean === "no") {
+      setDeletingProduct(null);
+      setDeleteConfirmText("");
+      return;
+    }
+    if (clean !== "si" && clean !== "sí") {
+      alert("Por favor escribe 'si' para confirmar o 'no' para cancelar.");
+      return;
+    }
     deleteProduct(deletingProduct.id);
     setProducts(getStoredProducts());
     showToast(`Producto "${deletingProduct.name}" eliminado del catálogo.`);
     setDeletingProduct(null);
+    setDeleteConfirmText("");
   };
 
   const getCategoryBadge = (cat: Product["category"]) => {
@@ -222,7 +259,7 @@ export default function ProductosPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto select-none">
+    <div className="p-3 sm:p-6 md:p-8 space-y-4 sm:space-y-8 max-w-7xl mx-auto select-none">
       {/* Toast notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-amber-500/40 flex items-center gap-3 animate-in slide-in-from-bottom-5">
@@ -232,7 +269,7 @@ export default function ProductosPage() {
       )}
 
       {/* Header Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-2xl sm:rounded-3xl p-5 sm:p-8 text-white shadow-2xl border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
         <div className="absolute -right-10 -top-10 w-72 h-72 bg-amber-600/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-10 -bottom-10 w-72 h-72 bg-orange-600/20 rounded-full blur-3xl pointer-events-none" />
 
@@ -245,7 +282,7 @@ export default function ProductosPage() {
               <Sparkles className="w-3.5 h-3.5" /> Sincronizado con POS
             </span>
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             Catálogo de Productos
           </h1>
           <p className="text-stone-300 text-xs max-w-xl leading-relaxed">
@@ -254,10 +291,10 @@ export default function ProductosPage() {
         </div>
 
         {/* Action Button */}
-        <div className="relative z-10 flex items-center gap-3">
+        <div className="relative z-10 flex items-center gap-3 w-full sm:w-auto">
           <button
             onClick={handleOpenCreate}
-            className="px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-xl shadow-orange-500/25 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider"
+            className="w-full sm:w-auto justify-center px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-xl shadow-orange-500/25 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>Nuevo Producto</span>
@@ -375,24 +412,20 @@ export default function ProductosPage() {
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                        setIsCategoriesVisible(false);
+                      }
+                    }}
+                    className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2.5 group ${
                       isSelected
                         ? "bg-[#3e2723] text-amber-50 shadow-md shadow-amber-950/25 font-black scale-[1.02] border-2 border-amber-500 ring-2 ring-amber-700/30"
                         : "text-stone-700 hover:bg-stone-50 hover:text-stone-950 border border-transparent hover:border-stone-200"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-base shrink-0">{cat.icon}</span>
-                      <span className="truncate">{cat.label}</span>
-                    </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 transition-colors ${
-                      isSelected 
-                        ? "bg-amber-500 text-stone-950 font-black" 
-                        : "bg-stone-100 text-stone-500 group-hover:bg-stone-200 group-hover:text-stone-800"
-                    }`}>
-                      {count}
-                    </span>
+                    <span className="text-base shrink-0">{cat.icon}</span>
+                    <span className="truncate">{cat.label}</span>
                   </button>
                 );
               })}
@@ -452,27 +485,21 @@ export default function ProductosPage() {
 
                   {/* Top Badges */}
                   <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase shadow-sm ${catBadge.color}`}>
-                      {catBadge.label}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {product.code && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-black font-mono tracking-wider bg-stone-950/90 text-amber-300 border border-amber-500/40 backdrop-blur-md shadow-md">
+                          #{product.code}
+                        </span>
+                      )}
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border uppercase shadow-sm ${catBadge.color}`}>
+                        {catBadge.label}
+                      </span>
+                    </div>
                     {product.tag && (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-stone-900/80 text-white backdrop-blur-sm border border-white/20 shadow-sm">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-stone-900/80 text-white backdrop-blur-sm border border-white/20 shadow-sm w-max">
                         {product.tag}
                       </span>
                     )}
-                  </div>
-
-                  {/* Stock Tag on Top Right */}
-                  <div className="absolute top-3 right-3 z-10">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black shadow-sm ${
-                        product.stock <= 20
-                          ? "bg-rose-500 text-white"
-                          : "bg-emerald-500 text-white"
-                      }`}
-                    >
-                      {product.stock} disp.
-                    </span>
                   </div>
                 </div>
 
@@ -480,12 +507,26 @@ export default function ProductosPage() {
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
                   <div className="space-y-1">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-base font-black text-stone-900 leading-snug">
-                        {product.name}
-                      </h3>
-                      <span className="text-base font-black text-amber-600 shrink-0">
-                        {formatCurrency(product.price)}
-                      </span>
+                      <div className="space-y-0.5 min-w-0">
+                        {product.code && (
+                          <span className="inline-block text-[10px] font-mono font-black text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            COD: {product.code}
+                          </span>
+                        )}
+                        <h3 className="text-base font-black text-stone-900 leading-snug">
+                          {product.name}
+                        </h3>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-base font-black text-amber-600">
+                          {formatCurrency(product.price)}
+                        </span>
+                        {product.unit && (
+                          <span className="text-[11px] font-bold text-stone-500 ml-1">
+                            /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {product.description && (
                       <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
@@ -503,7 +544,7 @@ export default function ProductosPage() {
                       <Edit3 className="w-3.5 h-3.5" /> Editar
                     </button>
                     <button
-                      onClick={() => setDeletingProduct(product)}
+                      onClick={() => handleOpenDelete(product)}
                       className="p-2 bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-500 rounded-xl transition-colors"
                       title="Eliminar producto"
                     >
@@ -522,10 +563,10 @@ export default function ProductosPage() {
             <table className="w-full text-left text-xs">
               <thead className="bg-stone-50 text-stone-600 font-bold uppercase tracking-wider border-b border-stone-200">
                 <tr>
+                  <th className="py-3.5 px-4">Código</th>
                   <th className="py-3.5 px-4">Producto</th>
                   <th className="py-3.5 px-4">Categoría</th>
                   <th className="py-3.5 px-4 text-right">Precio</th>
-                  <th className="py-3.5 px-4 text-center">Stock</th>
                   <th className="py-3.5 px-4">Etiqueta</th>
                   <th className="py-3.5 px-4 text-right">Acciones</th>
                 </tr>
@@ -535,6 +576,11 @@ export default function ProductosPage() {
                   const catBadge = getCategoryBadge(product.category);
                   return (
                     <tr key={product.id} className="hover:bg-stone-50/70 transition-colors">
+                      <td className="py-3 px-4 font-mono font-black text-xs whitespace-nowrap">
+                        <span className="px-2 py-1 rounded-lg bg-stone-100 border border-stone-200 text-stone-800 tracking-wider">
+                          {product.code || "—"}
+                        </span>
+                      </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           <div className="relative w-11 h-11 rounded-xl bg-stone-100 overflow-hidden shrink-0 border border-stone-200">
@@ -565,15 +611,13 @@ export default function ProductosPage() {
                           {catBadge.label}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-black text-amber-600 text-sm">
+                      <td className="py-3 px-4 text-right font-black text-amber-600 text-sm whitespace-nowrap">
                         {formatCurrency(product.price)}
-                      </td>
-                      <td className="py-3 px-4 text-center font-bold">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                          product.stock <= 20 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-800"
-                        }`}>
-                          {product.stock} pzas
-                        </span>
+                        {product.unit && (
+                          <span className="text-[10px] font-bold text-stone-400 ml-1">
+                            /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-stone-500 font-medium">
                         {product.tag || "—"}
@@ -588,7 +632,7 @@ export default function ProductosPage() {
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => setDeletingProduct(product)}
+                            onClick={() => handleOpenDelete(product)}
                             className="p-1.5 bg-stone-100 hover:bg-rose-100 text-stone-500 hover:text-rose-600 rounded-lg transition-colors"
                             title="Eliminar"
                           >
@@ -609,8 +653,8 @@ export default function ProductosPage() {
 
       {/* Modal: Crear / Editar Producto */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-[32px] max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-stone-200 relative my-8 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl sm:rounded-[32px] max-w-lg w-full p-5 sm:p-8 shadow-2xl border border-stone-200 relative my-auto max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-stone-100">
               <div className="flex items-center gap-2.5">
@@ -622,7 +666,7 @@ export default function ProductosPage() {
                     {modalMode === "create" ? "Nuevo Producto de Panadería" : "Modificar Producto"}
                   </h3>
                   <p className="text-xs text-stone-500 font-medium">
-                    {modalMode === "create" ? "Agrega un pan o producto al catálogo" : "Actualiza precio, stock o fotografía"}
+                    {modalMode === "create" ? "Agrega un pan o producto al catálogo" : "Actualiza precio, categoría o fotografía"}
                   </p>
                 </div>
               </div>
@@ -702,17 +746,44 @@ export default function ProductosPage() {
                 </div>
               </div>
 
-              {/* Nombre */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-stone-700">Nombre del Producto *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="ej. Concha de Vainilla, Bolillo, Pastel 3 Leches"
-                  className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                />
+              {/* Código & Nombre */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-stone-700 flex items-center gap-1">
+                      <Barcode className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Código *</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, code: generateProductCode(formData.category) })}
+                      className="text-[10px] text-amber-700 hover:underline font-bold"
+                      title="Generar código sugerido"
+                    >
+                      Auto
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    placeholder="PAN-001"
+                    className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-black tracking-wider uppercase text-amber-950 font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="text-xs font-bold text-stone-700">Nombre del Producto *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="ej. Concha de Vainilla, Bolillo, Pastel 3 Leches"
+                    className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
               </div>
 
               {/* Categoría & Precio */}
@@ -721,7 +792,16 @@ export default function ProductosPage() {
                   <label className="text-xs font-bold text-stone-700">Categoría *</label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                    onChange={(e) => {
+                      const newCat = e.target.value as any;
+                      const autoCode = generateProductCode(newCat);
+                      setFormData({ 
+                        ...formData, 
+                        category: newCat,
+                        code: (!formData.code || formData.code.includes("-")) ? autoCode : formData.code,
+                        unit: newCat === "materia_prima" ? "kg" : (formData.unit || "pieza")
+                      });
+                    }}
                     className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   >
                     <option value="pan_dulce">🥖 Pan Dulce Tradicional</option>
@@ -764,6 +844,53 @@ export default function ProductosPage() {
                 </div>
               </div>
 
+              {/* Apartado de Unidad (solo para Abarrotes y Materia Prima) */}
+              {(formData.category === "abarrotes" || formData.category === "materia_prima") && (
+                <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/90 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                      <Scale className="w-4 h-4 text-amber-600" />
+                      <span>Unidad de Venta / Medida *</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      {formData.category === "abarrotes" ? "Abarrotes" : "Materia Prima"}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-amber-900/80">
+                    Selecciona si este producto se vende o pesa por pieza, kilogramo o gramos:
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "pieza", label: "Por Pieza", short: "pz", icon: "📦" },
+                      { id: "kg", label: "Kilogramo", short: "kg", icon: "⚖️" },
+                      { id: "g", label: "Gramos", short: "g", icon: "🥄" },
+                    ].map((u) => {
+                      const isSelected = formData.unit === u.id;
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, unit: u.id as "pieza" | "kg" | "g" })}
+                          className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center gap-0.5 ${
+                            isSelected
+                              ? "bg-[#3e2723] text-amber-50 border-amber-500 ring-2 ring-amber-700/30 shadow-md scale-[1.02]"
+                              : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
+                          }`}
+                        >
+                          <span className="text-base">{u.icon}</span>
+                          <span className="text-xs font-black">{u.label}</span>
+                          <span className={`text-[10px] font-mono ${isSelected ? "text-amber-300" : "text-stone-400"}`}>
+                            ({u.short})
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Descripción */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-stone-700">Descripción del Pan</label>
@@ -777,17 +904,17 @@ export default function ProductosPage() {
               </div>
 
               {/* Actions */}
-              <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2.5">
+              <div className="pt-3 border-t border-stone-100 flex flex-col-reverse sm:flex-row items-center justify-end gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/25 flex items-center gap-1.5 transition-all active:scale-95"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/25 flex items-center justify-center gap-1.5 transition-all active:scale-95"
                 >
                   <Check className="w-4 h-4 stroke-[3]" />
                   <span>{modalMode === "create" ? "Guardar en Catálogo" : "Actualizar Producto"}</span>
@@ -798,35 +925,95 @@ export default function ProductosPage() {
         </div>
       )}
 
-      {/* Modal: Confirmar Eliminación */}
+      {/* Modal: Confirmar Eliminación con "si" o "no" */}
       {deletingProduct && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
-            <div className="w-14 h-14 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-2xl">
-              <Trash2 className="w-7 h-7" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-7 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
+            <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-3xl shadow-inner">
+              <Trash2 className="w-8 h-8" />
             </div>
 
-            <div className="space-y-1">
-              <h3 className="text-base font-black text-stone-900">
-                ¿Eliminar este producto?
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-black uppercase tracking-wider">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                Confirmación de Seguridad
+              </div>
+
+              <h3 className="text-lg font-black text-stone-900 leading-snug">
+                ¿Deseas eliminar {deletingProduct.name}?
               </h3>
-              <p className="text-xs text-stone-500">
-                Estás a punto de eliminar <strong className="text-stone-800">&ldquo;{deletingProduct.name}&rdquo;</strong>. Ya no aparecerá en el catálogo ni en el Punto de Venta (POS).
+
+              <p className="text-xs text-stone-500 max-w-xs mx-auto leading-relaxed">
+                Estás a punto de borrar permanentemente este producto {deletingProduct.code ? `[${deletingProduct.code}]` : ""}. No aparecerá en el catálogo ni en el mostrador del POS.
               </p>
             </div>
 
-            <div className="flex items-center gap-2 pt-2">
+            {/* Input de confirmación obligatorio: 'si' o 'no' */}
+            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-2.5 text-left">
+              <label className="text-xs font-bold text-stone-700 block leading-snug">
+                Escribe <span className="text-rose-600 font-black uppercase bg-rose-100 px-1.5 py-0.5 rounded">si</span> para eliminar o <span className="text-stone-700 font-black uppercase bg-stone-200 px-1.5 py-0.5 rounded">no</span> para cancelar:
+              </label>
+
+              <input
+                type="text"
+                autoFocus
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleConfirmDelete();
+                  }
+                }}
+                placeholder="Escribe 'si' o 'no'..."
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm font-black tracking-widest text-center uppercase transition-all focus:outline-none ${
+                  deleteConfirmText.trim().toLowerCase() === "si" || deleteConfirmText.trim().toLowerCase() === "sí"
+                    ? "bg-rose-50 border-rose-400 text-rose-700 ring-2 ring-rose-500/20"
+                    : deleteConfirmText.trim().toLowerCase() === "no"
+                    ? "bg-stone-100 border-stone-400 text-stone-700"
+                    : "bg-white border-stone-300 text-stone-900 focus:ring-2 focus:ring-amber-500"
+                }`}
+              />
+
+              {deleteConfirmText.trim().toLowerCase() === "si" || deleteConfirmText.trim().toLowerCase() === "sí" ? (
+                <p className="text-[11px] font-bold text-rose-600 text-center">
+                  ✓ Confirmación &ldquo;SI&rdquo; detectada. Puedes presionar Enter o dar clic en Sí, Eliminar.
+                </p>
+              ) : deleteConfirmText.trim().toLowerCase() === "no" ? (
+                <p className="text-[11px] font-bold text-stone-600 text-center">
+                  ✕ Cancelación &ldquo;NO&rdquo; detectada. Presiona Enter o da clic en No, Cancelar.
+                </p>
+              ) : (
+                <p className="text-[10px] text-stone-400 text-center">
+                  Escribe exactamente <strong className="text-stone-600 font-bold">si</strong> para autorizar la eliminación.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-1">
               <button
-                onClick={() => setDeletingProduct(null)}
-                className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors"
+                type="button"
+                onClick={() => {
+                  setDeletingProduct(null);
+                  setDeleteConfirmText("");
+                }}
+                className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-xl transition-colors active:scale-95"
               >
-                Cancelar
+                No, Cancelar
               </button>
+
               <button
+                type="button"
                 onClick={handleConfirmDelete}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-600/25 transition-all"
+                disabled={deleteConfirmText.trim().toLowerCase() !== "si" && deleteConfirmText.trim().toLowerCase() !== "sí"}
+                className={`flex-1 py-3 text-xs font-black rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                  deleteConfirmText.trim().toLowerCase() === "si" || deleteConfirmText.trim().toLowerCase() === "sí"
+                    ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/30 cursor-pointer animate-pulse"
+                    : "bg-stone-200 text-stone-400 cursor-not-allowed shadow-none"
+                }`}
               >
-                Sí, Eliminar
+                <Trash2 className="w-4 h-4" />
+                <span>Sí, Eliminar</span>
               </button>
             </div>
           </div>

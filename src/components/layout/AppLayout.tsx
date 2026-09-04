@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { SidebarProvider } from "@/context/SidebarContext";
+import { BranchProvider } from "@/context/BranchContext";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import LoginForm from "@/components/auth/LoginForm";
@@ -31,12 +32,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAllowed = canAccessRoute ? canAccessRoute(pathname) : true;
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
+    <BranchProvider>
+      <SidebarProvider>
+        <div className="flex min-h-screen bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 max-h-screen overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-y-auto bg-stone-50/60 p-4 sm:p-6 md:p-8">
+          <main className={`flex-1 ${pathname === "/pos" ? "overflow-hidden p-0" : "overflow-y-auto bg-stone-50/60 p-2.5 sm:p-6 md:p-8"}`}>
             {isAllowed ? (
               children
             ) : (
@@ -66,6 +68,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Caja & Turnos</span>
                         <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Pedidos Especiales</span>
                         <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Clientes</span>
+                        <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-[11px]">Catálogo de Productos</span>
+                      </>
+                    )}
+                    {user.role === "auxiliar_admin" && (
+                      <>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Dashboard General</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Clientes & Mayoristas</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Inventario & Insumos</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Pedidos & Encargos</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Finanzas & Gastos</span>
+                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-lg font-semibold text-[11px]">Reportes & Métricas</span>
                       </>
                     )}
                     {user.role === "panadero" && (
@@ -99,5 +112,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     </SidebarProvider>
+    </BranchProvider>
   );
 }
