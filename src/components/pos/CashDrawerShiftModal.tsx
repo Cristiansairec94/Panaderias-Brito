@@ -159,7 +159,7 @@ export default function CashDrawerShiftModal({
   const [incomingCashier, setIncomingCashier] = useState("Cajera 2 - Turno Vespertino");
   const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
   const [countedCash, setCountedCash] = useState<string>("");
-  const [nextInitialFund, setNextInitialFund] = useState(initialFund ? initialFund.toString() : "500");
+  const [nextInitialFund, setNextInitialFund] = useState("");
   const [shiftNotes, setShiftNotes] = useState("");
   const [hasAcceptedCash, setHasAcceptedCash] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
@@ -219,10 +219,10 @@ export default function CashDrawerShiftModal({
   }, [cashierName]);
 
   useEffect(() => {
-    if (initialFund) {
-      setNextInitialFund(initialFund.toString());
+    if (isOpen) {
+      setNextInitialFund("");
     }
-  }, [initialFund, isOpen]);
+  }, [isOpen]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -260,7 +260,7 @@ export default function CashDrawerShiftModal({
   const cashDifference = parsedCountedCash - expectedCashInDrawer;
 
   // 5. Fondo Siguiente y Retiro a Administración
-  const parsedNextFund = nextInitialFund === "" ? 500 : Math.max(0, Number(nextInitialFund) || 0);
+  const parsedNextFund = nextInitialFund === "" ? 0 : Math.max(0, Number(nextInitialFund) || 0);
   const cashToWithdraw = Math.max(0, parsedCountedCash - parsedNextFund);
 
   // 5. Existencias en mostrador
@@ -497,11 +497,11 @@ export default function CashDrawerShiftModal({
             <div className="pt-2 mt-2 border-t border-dotted border-stone-300 space-y-1">
               <div className="flex justify-between text-amber-950 font-bold">
                 <span>🪙 Fondo que se deja en Caja (Nuevo Turno):</span>
-                <span className="font-black text-stone-900">{formatCurrency(cut.nextFund || 500)}</span>
+                <span className="font-black text-stone-900">{formatCurrency(cut.nextFund ?? 0)}</span>
               </div>
               <div className="flex justify-between text-emerald-800 font-bold">
                 <span>💰 Efectivo Retirado / Entregado:</span>
-                <span className="font-black text-emerald-950">{formatCurrency(Math.max(0, cut.countedCash - (cut.nextFund || 500)))}</span>
+                <span className="font-black text-emerald-950">{formatCurrency(Math.max(0, cut.countedCash - (cut.nextFund ?? 0)))}</span>
               </div>
             </div>
           </div>
@@ -822,7 +822,7 @@ export default function CashDrawerShiftModal({
                         type="number"
                         step="any"
                         min="0"
-                        placeholder="Monto de dinero que se quedará en caja para el nuevo turno"
+                        placeholder="0.00 (Escribe el monto para el nuevo turno)"
                         value={nextInitialFund}
                         onChange={(e) => setNextInitialFund(e.target.value)}
                         className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
