@@ -615,22 +615,6 @@ export default function POSPage() {
               </button>
             </div>
 
-            {/* Botón Grande: Caja & Turno (Colores oficiales, texto y tamaño estables) */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setShiftModalTab("cambio");
-                  setShowCashDrawerModal(true);
-                }}
-                className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 border-amber-900 bg-[#2d1810] hover:bg-[#3d2015] text-amber-100 text-sm sm:text-base font-black transition-all active:scale-95 shadow-md ring-2 ring-amber-500/40 whitespace-nowrap"
-                title="Abrir Corte de Caja y Cierre de Turno directamente"
-              >
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-xs ${isDbConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                <span className="text-xl">💼</span>
-                <span>Caja & Turno</span>
-              </button>
-            </div>
 
             {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
             <div className="relative shrink-0">
