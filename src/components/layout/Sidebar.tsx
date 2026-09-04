@@ -142,7 +142,7 @@ const navigationItems: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, canAccessRoute } = useAuth();
-  const { currentBranch, isAllBranches } = useBranch();
+  const { currentBranch, isAllBranches, branches } = useBranch();
   const { 
     isCollapsed, 
     toggleCollapse, 
@@ -317,7 +317,7 @@ export default function Sidebar() {
                       {!isCollapsed && <span className="tracking-tight">{item.name}</span>}
                     </div>
 
-                    {!isCollapsed && item.badge && (
+                    {!isCollapsed && (item.badge || item.href === "/sucursales") && (
                       <span
                         className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
                           isActive
@@ -325,7 +325,7 @@ export default function Sidebar() {
                             : "bg-white/[0.05] text-stone-400 border border-white/[0.06]"
                         }`}
                       >
-                        {item.badge}
+                        {item.href === "/sucursales" ? `${branches.length} Tiendas` : item.badge}
                       </span>
                     )}
                   </Link>

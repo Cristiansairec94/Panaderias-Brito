@@ -35,11 +35,17 @@ import {
   Flame,
   Award,
   Coffee,
-  PieChart
+  PieChart,
+  Plus
 } from "lucide-react";
 import { useBranch, SimulatedSale } from "@/context/BranchContext";
+import { Branch, BranchShift } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import GoogleBranchChart, { PeriodType } from "@/components/sucursales/GoogleBranchChart";
+import RealTimeSalesMonitor from "@/components/sucursales/RealTimeSalesMonitor";
+import CashFlowPanel from "@/components/sucursales/CashFlowPanel";
+import CreateBranchModal from "@/components/sucursales/CreateBranchModal";
+import EditShiftModal from "@/components/sucursales/EditShiftModal";
 
 export default function SucursalesPage() {
   const { 
@@ -47,17 +53,27 @@ export default function SucursalesPage() {
     currentBranch, 
     isAllBranches, 
     switchBranch, 
+    addBranch,
+    updateBranch,
     simulateSale, 
     simulateBulkSales,
     advanceShift,
     isLiveSimulating,
     toggleLiveSimulation,
     recentSimulatedSales,
+    cashMovements,
+    addCashMovement,
     consolidatedMetrics
   } = useBranch();
 
   const [lastSimulatedSale, setLastSimulatedSale] = useState<SimulatedSale | null>(null);
-  const [activeTab, setActiveTab] = useState<"general" | "turnos" | "feed">("general");
+  const [activeTab, setActiveTab] = useState<"realtime" | "cashflow" | "general" | "turnos">("realtime");
+  const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
+  const [editingShiftBranch, setEditingShiftBranch] = useState<Branch | null>(null);
+
+  const handleSaveShift = (branchId: string, updatedShift: any) => {
+    updateBranch(branchId, { currentShift: updatedShift });
+  };
 
   // Filter periods for Google-Style Chart & Table
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>("semana");
@@ -259,8 +275,16 @@ export default function SucursalesPage() {
             </p>
           </div>
 
-          {/* Quick Simulation Controls */}
+          {/* Quick Simulation Controls & Create Branch */}
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => setIsCreateBranchOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>+ Nueva Sucursal</span>
+            </button>
+
             <button
               onClick={() => handleSimulate()}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-orange-500/20 transition-all active:scale-95"
@@ -321,59 +345,152 @@ export default function SucursalesPage() {
             </div>
           </div>
         )}
+
+        {/* Live KPI Pulse Ribbon */}
+        <div className="mt-6 pt-5 border-t border-stone-800/80 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="bg-white/[0.04] p-3 rounded-2xl border border-white/5">
+            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
+              Ventas Hoy (En Vivo)
+            </span>
+            <span className="text-lg sm:text-xl font-black text-white">
+              {formatCurrency(consolidatedMetrics.totalSales)}
+            </span>
+          </div>
+
+          <div className="bg-white/[0.04] p-3 rounded-2xl border border-white/5">
+            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
+              Efectivo en Gavetas
+            </span>
+            <span className="text-lg sm:text-xl font-black text-emerald-400">
+              {formatCurrency(consolidatedMetrics.totalCashInDrawer)}
+            </span>
+          </div>
+
+          <div className="bg-white/[0.04] p-3 rounded-2xl border border-white/5">
+            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
+              Tickets Emitidos
+            </span>
+            <span className="text-lg sm:text-xl font-black text-amber-300">
+              {consolidatedMetrics.totalTickets} tickets
+            </span>
+          </div>
+
+          <div className="bg-white/[0.04] p-3 rounded-2xl border border-white/5">
+            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
+              Cumplimiento de Meta
+            </span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-lg sm:text-xl font-black text-orange-400">
+                {consolidatedMetrics.percentGoal}%
+              </span>
+              <span className="text-[10px] text-stone-400">({formatCurrency(consolidatedMetrics.totalDailyGoal)})</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Navigation View Switcher (Tabs) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-3">
         <div className="flex flex-wrap items-center gap-2">
+          {/* TAB 1: Ventas en Tiempo Real */}
+          <button
+            onClick={() => setActiveTab("realtime")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
+              activeTab === "realtime"
+                ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-lg shadow-orange-500/20"
+                : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
+            }`}
+          >
+            <Zap className="w-4 h-4 text-amber-300 fill-current animate-pulse" />
+            <span>⚡ Ventas en Tiempo Real</span>
+          </button>
+
+          {/* TAB 2: Flujo de Dinero */}
+          <button
+            onClick={() => setActiveTab("cashflow")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
+              activeTab === "cashflow"
+                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/20"
+                : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
+            }`}
+          >
+            <Wallet className="w-4 h-4 text-emerald-300" />
+            <span>💰 Flujo de Dinero & Caja</span>
+          </button>
+
+          {/* TAB 3: Analítica & Gráfica Google */}
           <button
             onClick={() => setActiveTab("general")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
               activeTab === "general"
                 ? "bg-stone-900 text-white shadow-md"
                 : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
             }`}
           >
             <TableIcon className="w-4 h-4 text-orange-500" />
-            <span>Resumen General & Gráfica</span>
+            <span>📊 Analítica & Gráfica Google</span>
           </button>
+
+          {/* TAB 4: Turnos & Arqueo */}
           <button
             onClick={() => setActiveTab("turnos")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
               activeTab === "turnos"
                 ? "bg-stone-900 text-white shadow-md"
                 : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
             }`}
           >
             <Clock className="w-4 h-4 text-rose-500" />
-            <span>Estado de Turnos & Arqueo</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("feed")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === "feed"
-                ? "bg-stone-900 text-white shadow-md"
-                : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
-            }`}
-          >
-            <Zap className="w-4 h-4 text-amber-500" />
-            <span>Ventas Simuladas ({recentSimulatedSales.length})</span>
+            <span>⏱️ Estado de Turnos & Arqueo</span>
           </button>
         </div>
 
-        <button
-          onClick={() => switchBranch("all")}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border self-start sm:self-auto ${
-            isAllBranches
-              ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
-              : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
-          }`}
-        >
-          {isAllBranches ? "✓ Consolidado Activo" : "Ver Toda la Cadena"}
-        </button>
+        {/* Global branch selector pill */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => switchBranch("all")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border self-start sm:self-auto ${
+              isAllBranches
+                ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
+                : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
+            }`}
+          >
+            {isAllBranches ? "✓ Toda la Red" : "Ver Toda la Red"}
+          </button>
+        </div>
       </div>
 
-      {/* TAB 1: Main Overview (Google-Style Chart + General Table) */}
+      {/* TAB 1: Monitor de Ventas en Tiempo Real */}
+      {activeTab === "realtime" && (
+        <RealTimeSalesMonitor
+          branches={branches}
+          currentBranch={currentBranch}
+          isAllBranches={isAllBranches}
+          onSwitchBranch={switchBranch}
+          recentSales={recentSimulatedSales}
+          onSimulateSale={handleSimulate}
+          onSimulateBulk={handleSimulateShift}
+          isLiveSimulating={isLiveSimulating}
+          onToggleLive={toggleLiveSimulation}
+          lastSimulatedSale={lastSimulatedSale}
+          onOpenCreateBranch={() => setIsCreateBranchOpen(true)}
+        />
+      )}
+
+      {/* TAB 2: Panel Específico de Flujo de Dinero */}
+      {activeTab === "cashflow" && (
+        <CashFlowPanel
+          branches={branches}
+          currentBranch={currentBranch}
+          isAllBranches={isAllBranches}
+          onSwitchBranch={switchBranch}
+          cashMovements={cashMovements}
+          onAddCashMovement={addCashMovement}
+          onAdvanceShift={advanceShift}
+        />
+      )}
+
+      {/* TAB 3: Main Overview (Google-Style Chart + General Table) */}
       {activeTab === "general" && (
         <div className="space-y-6 animate-in fade-in">
           {/* SECCIÓN DESPLEGABLE: Gráfica de Análisis & Estadísticas Estilo Google (Oculta al inicio) */}
@@ -457,6 +574,14 @@ export default function SucursalesPage() {
 
               <div className="flex flex-wrap items-center gap-3">
                 <button
+                  onClick={() => setIsCreateBranchOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-xs shadow-sm active:scale-95 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>+ Nueva Sucursal</span>
+                </button>
+
+                <button
                   onClick={toggleAllExpanded}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs border border-stone-200 shadow-sm transition-all"
                 >
@@ -487,9 +612,8 @@ export default function SucursalesPage() {
                     <th className="py-3.5 px-4">Piezas Vendidas</th>
                     <th className="py-3.5 px-4">Ventas Totales</th>
                     <th className="py-3.5 px-4">Ticket Prom.</th>
-                    <th className="py-3.5 px-4">Meta & Cumplimiento</th>
                     <th className="py-3.5 px-4">Caja & Turno Actual</th>
-                    <th className="py-3.5 px-4 text-right">Estadísticas & Acciones</th>
+                    <th className="py-3.5 px-4 text-right">Estadísticas</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 font-medium">
@@ -588,29 +712,9 @@ export default function SucursalesPage() {
                             </div>
                           </td>
 
-                          {/* 6. Meta & Cumplimiento */}
-                          <td className="py-4 px-4 min-w-[140px]">
-                            <div className="space-y-1.5">
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="font-black text-stone-800">{b.percentGoal}%</span>
-                                <span className="text-[10px] text-stone-400">Meta: {formatCurrency(b.periodGoal)}</span>
-                              </div>
-                              <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-700 ${
-                                    b.percentGoal >= 90 ? "bg-emerald-500" :
-                                    b.percentGoal >= 70 ? "bg-amber-500" :
-                                    "bg-orange-500"
-                                  }`}
-                                  style={{ width: `${b.percentGoal}%` }}
-                                />
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* 7. Caja & Turno Actual */}
+                          {/* 6. Caja & Turno Actual */}
                           <td className="py-4 px-4">
-                            <div className="space-y-0.5">
+                            <div className="space-y-1">
                               <p className="font-black text-stone-900 flex items-center gap-1 text-xs">
                                 <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                 {formatCurrency(b.cashInDrawer)}
@@ -618,16 +722,25 @@ export default function SucursalesPage() {
                               <p className="text-[11px] text-stone-600 font-semibold truncate max-w-[140px]">
                                 {b.currentShift.cashier}
                               </p>
-                              <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600">
-                                {b.currentShift.name.split("(")[0]}
-                              </span>
+                              <div className="flex items-center gap-1.5 pt-0.5">
+                                <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200">
+                                  {b.currentShift.name}
+                                </span>
+                                <button
+                                  onClick={() => setEditingShiftBranch(b)}
+                                  className="inline-flex items-center gap-0.5 text-[10px] text-orange-600 hover:text-orange-700 font-bold px-1.5 py-0.5 rounded hover:bg-orange-50 transition-colors"
+                                  title="Modificar horario del turno"
+                                >
+                                  <Clock className="w-3 h-3" />
+                                  <span>Horario</span>
+                                </button>
+                              </div>
                             </div>
                           </td>
 
-                          {/* 8. Botón Ver Estadísticas Desplegable & Acciones */}
+                          {/* 7. Botón Ver Estadísticas Desplegable */}
                           <td className="py-4 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                              {/* BOTÓN PRINCIPAL SOLICITADO: Ver Estadísticas Desplegable */}
+                            <div className="flex items-center justify-end">
                               <button
                                 onClick={() => toggleExpand(b.id)}
                                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all border shadow-sm ${
@@ -641,36 +754,6 @@ export default function SucursalesPage() {
                                 <span>{isExpanded ? "Ocultar Estadísticas" : "Ver Estadísticas"}</span>
                                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                               </button>
-
-                              <button
-                                onClick={() => handleSimulate(b.id)}
-                                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold transition-all active:scale-95 shadow-sm"
-                                title="Simular 1 venta rápida en esta tienda"
-                              >
-                                <Zap className="w-3.5 h-3.5 fill-current text-amber-600" />
-                              </button>
-
-                              <button
-                                onClick={() => switchBranch(b.id)}
-                                className={`px-2.5 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1 ${
-                                  isSelected
-                                    ? "bg-emerald-600 text-white shadow-sm"
-                                    : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200"
-                                }`}
-                                title={isSelected ? "Sucursal activa seleccionada" : "Seleccionar en POS"}
-                              >
-                                {isSelected ? (
-                                  <>
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                                    <span>Activa</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span>Ir a POS</span>
-                                    <ChevronRight className="w-3 h-3 text-stone-400" />
-                                  </>
-                                )}
-                              </button>
                             </div>
                           </td>
                         </tr>
@@ -678,7 +761,7 @@ export default function SucursalesPage() {
                         {/* PANEL DESPLEGABLE: Estadísticas Detalladas de la Sucursal */}
                         {isExpanded && (
                           <tr className="bg-orange-50/20 border-b-2 border-orange-200/70">
-                            <td colSpan={8} className="p-4 sm:p-6 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <td colSpan={7} className="p-4 sm:p-6 animate-in fade-in slide-in-from-top-2 duration-200">
                               <div className="bg-white rounded-3xl border border-orange-200/90 shadow-xl p-5 sm:p-6 space-y-6">
                                 {/* Header del Panel Desplegable */}
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-4">
@@ -873,6 +956,14 @@ export default function SucursalesPage() {
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-stone-400">Turno Activo:</span>
                                       <strong className="text-stone-900">{b.currentShift.name}</strong>
+                                      <button
+                                        onClick={() => setEditingShiftBranch(b)}
+                                        className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white hover:bg-orange-50 text-orange-600 font-bold text-[10px] border border-stone-200 hover:border-orange-300 transition-colors shadow-xs"
+                                        title="Modificar horario del turno"
+                                      >
+                                        <Clock className="w-3 h-3 text-orange-500" />
+                                        <span>Modificar Horario</span>
+                                      </button>
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-stone-400">Cajera / Operador:</span>
@@ -890,16 +981,17 @@ export default function SucursalesPage() {
 
                                   <div className="flex items-center gap-2">
                                     <button
+                                      onClick={() => setEditingShiftBranch(b)}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs border border-orange-200 transition-colors"
+                                    >
+                                      <Clock className="w-3.5 h-3.5" />
+                                      <span>Modificar Horario</span>
+                                    </button>
+                                    <button
                                       onClick={() => advanceShift(b.id)}
                                       className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold border border-stone-200 transition-colors"
                                     >
                                       Corte de Turno
-                                    </button>
-                                    <button
-                                      onClick={() => switchBranch(b.id)}
-                                      className="px-3.5 py-1.5 rounded-xl bg-stone-900 hover:bg-black text-white font-bold transition-all shadow-sm"
-                                    >
-                                      Usar en POS
                                     </button>
                                   </div>
                                 </div>
@@ -925,7 +1017,7 @@ export default function SucursalesPage() {
                       </div>
                     </td>
                     <td className="py-4 px-4 text-stone-300 text-[11px]">
-                      3 Sucursales Activas
+                      {branches.length} Sucursales Activas
                     </td>
                     <td className="py-4 px-4 text-amber-300 text-sm">
                       {consolidatedOverview.totalPieces.toLocaleString("es-MX")}{" "}
@@ -936,19 +1028,6 @@ export default function SucursalesPage() {
                     </td>
                     <td className="py-4 px-4 text-stone-200">
                       {formatCurrency(consolidatedOverview.averageTicket)}
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="space-y-1">
-                        <span className="text-emerald-400 text-xs">
-                          {consolidatedOverview.percentGoal}% Alcanzado
-                        </span>
-                        <div className="w-28 bg-stone-800 rounded-full h-1.5 overflow-hidden">
-                          <div 
-                            className="bg-emerald-400 h-full rounded-full"
-                            style={{ width: `${consolidatedOverview.percentGoal}%` }}
-                          />
-                        </div>
-                      </div>
                     </td>
                     <td className="py-4 px-4 text-emerald-300 text-sm">
                       {formatCurrency(consolidatedOverview.totalCashInDrawers)}
@@ -969,7 +1048,7 @@ export default function SucursalesPage() {
         </div>
       )}
 
-      {/* TAB 2: Shift Management & Arqueo Comparison */}
+      {/* TAB 4: Shift Management & Arqueo Comparison */}
       {activeTab === "turnos" && (
         <div className="space-y-6 animate-in fade-in">
           <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
@@ -1002,9 +1081,19 @@ export default function SucursalesPage() {
                         {b.name}
                       </td>
                       <td className="py-3.5 px-3">
-                        <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 font-semibold border border-orange-200">
-                          {b.currentShift.name}
-                        </span>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 font-bold border border-orange-200 inline-block text-xs shadow-xs">
+                            {b.currentShift.name}
+                          </span>
+                          <button
+                            onClick={() => setEditingShiftBranch(b)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-orange-500 hover:text-white text-orange-600 font-bold text-[11px] border border-orange-200 shadow-xs transition-all active:scale-95 group shrink-0"
+                            title="Modificar horario y nombre del turno"
+                          >
+                            <Clock className="w-3.5 h-3.5 group-hover:rotate-45 transition-transform" />
+                            <span>Modificar Horario</span>
+                          </button>
+                        </div>
                       </td>
                       <td className="py-3.5 px-3 font-bold text-stone-800">
                         {b.currentShift.cashier}
@@ -1025,12 +1114,22 @@ export default function SucursalesPage() {
                         {formatCurrency(b.cashInDrawer)}
                       </td>
                       <td className="py-3.5 px-3 text-right">
-                        <button
-                          onClick={() => advanceShift(b.id)}
-                          className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-white font-bold text-[11px] transition-colors"
-                        >
-                          Corte / Siguiente Turno
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setEditingShiftBranch(b)}
+                            className="px-2.5 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-bold text-[11px] transition-all flex items-center gap-1"
+                            title="Cambiar horario del turno"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Horario</span>
+                          </button>
+                          <button
+                            onClick={() => advanceShift(b.id)}
+                            className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-white font-bold text-[11px] transition-colors"
+                          >
+                            Corte / Siguiente Turno
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1041,72 +1140,21 @@ export default function SucursalesPage() {
         </div>
       )}
 
-      {/* TAB 3: Live Sales Simulation Feed */}
-      {activeTab === "feed" && (
-        <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4 animate-in fade-in">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-black text-stone-900">
-                Historial de Ventas Simuladas en Tiempo Real
-              </h3>
-              <p className="text-xs text-stone-500">
-                Tickets emitidos recientemente a través del simulador de ventas multi-sucursal
-              </p>
-            </div>
+      {/* Modal para Crear Nueva Sucursal y Asignar Encargado */}
+      <CreateBranchModal
+        isOpen={isCreateBranchOpen}
+        onClose={() => setIsCreateBranchOpen(false)}
+        onAddBranch={addBranch}
+        existingCount={branches.length}
+      />
 
-            <button
-              onClick={() => handleSimulate()}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-md transition-all active:scale-95"
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Emitir Ticket Ahora</span>
-            </button>
-          </div>
-
-          {recentSimulatedSales.length === 0 ? (
-            <div className="text-center py-12 text-stone-400 space-y-2">
-              <Receipt className="w-10 h-10 mx-auto opacity-40" />
-              <p className="font-semibold text-xs">No hay ventas simuladas recientes.</p>
-              <p className="text-[11px]">Presiona &quot;Simular 1 Venta&quot; para comenzar a generar tickets.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-stone-100">
-              {recentSimulatedSales.map((sale) => (
-                <div key={sale.id} className="py-3 flex items-center justify-between gap-4 text-xs hover:bg-stone-50/60 px-2 rounded-xl transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-black">
-                      <ShoppingBag className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-stone-900">{sale.branchName}</span>
-                        <span className="text-stone-300">•</span>
-                        <span className="text-[11px] text-stone-500">{sale.cashier}</span>
-                        <span className="text-stone-300">•</span>
-                        <span className="text-[10px] text-stone-400 font-mono">{sale.timestamp}</span>
-                      </div>
-                      <p className="text-[11px] text-stone-600 mt-0.5">{sale.itemsSummary}</p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-sm font-black text-stone-900">{formatCurrency(sale.total)}</p>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                      sale.paymentMethod === "efectivo"
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : sale.paymentMethod === "tarjeta"
-                        ? "bg-blue-50 text-blue-700 border border-blue-200"
-                        : "bg-purple-50 text-purple-700 border border-purple-200"
-                    }`}>
-                      {sale.paymentMethod}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Modal para Modificar Horario del Turno */}
+      <EditShiftModal
+        isOpen={!!editingShiftBranch}
+        onClose={() => setEditingShiftBranch(null)}
+        branch={editingShiftBranch}
+        onSaveShift={handleSaveShift}
+      />
     </div>
   );
 }

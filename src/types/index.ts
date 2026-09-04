@@ -205,6 +205,19 @@ export interface Branch {
   color: string; // e.g. "orange", "rose", "emerald", "blue", "purple"
 }
 
+export interface BranchCashMovement {
+  id: string;
+  branchId: string;
+  branchName: string;
+  type: "entrada" | "salida";
+  category: "gasto_gas" | "compra_insumos" | "pago_proveedor" | "retiro_seguridad" | "abono_cliente" | "otro";
+  categoryLabel: string;
+  amount: number;
+  reason: string;
+  authorizedBy: string;
+  timestamp: string;
+}
+
 export interface BreadDeliveryItem {
   productId: string;
   productName: string;
