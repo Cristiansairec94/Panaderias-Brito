@@ -790,7 +790,7 @@ export default function POSPage() {
                     value={shiftFundInput}
                     onChange={(e) => setShiftFundInput(e.target.value)}
                     placeholder="0.00"
-                    className="w-full pl-12 pr-12 py-4 bg-black/65 border-2 border-amber-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-400/30 rounded-2xl font-black text-4xl sm:text-5xl text-amber-300 text-center tracking-tight focus:outline-none transition-all shadow-inner"
+                    className="w-full pl-12 pr-12 py-4 bg-black/65 border-2 border-amber-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-400/30 rounded-2xl font-black text-4xl sm:text-5xl text-amber-300 text-center tracking-tight focus:outline-none transition-all shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   {shiftFundInput && (
                     <button
