@@ -197,7 +197,7 @@ export default function BreadDeliveryModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-950/75 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl border-2 border-emerald-500/20 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-white w-full max-w-5xl xl:max-w-6xl max-h-[92vh] rounded-3xl shadow-2xl border-2 border-emerald-500/20 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Header con colores artesanales y acento esmeralda de frescura */}
         <div className="bg-gradient-to-r from-emerald-950 via-stone-900 to-[#24130c] text-white px-5 sm:px-6 py-4 flex items-center justify-between border-b border-emerald-800/40 relative shrink-0">
@@ -679,45 +679,45 @@ export default function BreadDeliveryModal({
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {deliveriesHistory.map((rec) => (
                   <div
                     key={rec.id}
-                    className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-2xs space-y-3"
+                    className="bg-white p-5 sm:p-6 rounded-3xl border-2 border-stone-200/90 shadow-sm space-y-4"
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-stone-100 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-stone-200/80">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                        <span className="font-mono font-black text-xs sm:text-sm text-emerald-900 bg-emerald-100/90 px-3 py-1 rounded-xl border border-emerald-300/80">
                           {rec.id}
                         </span>
-                        <strong className="text-stone-900 font-bold text-sm">
+                        <strong className="text-stone-900 font-black text-base sm:text-lg">
                           {rec.source}
                         </strong>
                         {rec.driver && (
-                          <span className="text-stone-500">
+                          <span className="text-stone-600 text-xs sm:text-sm font-semibold">
                             (Chofer: {rec.driver})
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 text-stone-500">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-stone-600 font-medium">
                         <span>{rec.timestamp}</span>
                         <span>•</span>
-                        <span>Recibió: <strong>{rec.cashier}</strong></span>
+                        <span>Recibió: <strong className="font-bold text-stone-900">{rec.cashier}</strong></span>
                       </div>
                     </div>
 
                     {/* Desglose de piezas */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
                       {rec.items.map((item, idx) => (
                         <div
                           key={idx}
-                          className="bg-stone-50 p-2 rounded-xl border border-stone-100 flex items-center justify-between text-xs"
+                          className="bg-stone-50/90 hover:bg-stone-100/80 p-3 sm:p-3.5 rounded-2xl border border-stone-200/80 flex items-center justify-between gap-2 shadow-2xs transition-colors"
                         >
-                          <span className="font-medium text-stone-800 truncate pr-2">
+                          <span className="font-bold text-stone-900 text-xs sm:text-sm truncate pr-1">
                             {item.productName}
                           </span>
-                          <span className="font-black text-emerald-700 shrink-0">
+                          <span className="font-black text-sm sm:text-base text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-xl shrink-0">
                             +{item.quantity} pz
                           </span>
                         </div>
@@ -725,15 +725,15 @@ export default function BreadDeliveryModal({
                     </div>
 
                     {/* Footer con total */}
-                    <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs">
-                      <span className="text-stone-500">
+                    <div className="pt-3 sm:pt-4 border-t border-stone-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs sm:text-sm">
+                      <span className="text-stone-500 font-medium italic">
                         {rec.notes ? `Nota: "${rec.notes}"` : "Recepción normal sin incidencias"}
                       </span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-stone-500">
-                          Valor: <strong className="text-stone-800">{formatCurrency(Number(rec.totalEstimatedValue) || 0)}</strong>
+                      <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+                        <span className="text-stone-600 font-medium text-xs sm:text-sm">
+                          Valor: <strong className="text-stone-900 font-black text-sm sm:text-base">{formatCurrency(Number(rec.totalEstimatedValue) || 0)}</strong>
                         </span>
-                        <span className="font-black text-sm text-emerald-800 bg-emerald-100 px-3 py-1 rounded-xl">
+                        <span className="font-black text-sm sm:text-base text-emerald-950 bg-emerald-200/90 border border-emerald-300/80 px-4 py-1.5 rounded-2xl shadow-2xs">
                           +{rec.totalPieces} piezas totales
                         </span>
                       </div>
