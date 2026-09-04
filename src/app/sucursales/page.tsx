@@ -42,6 +42,7 @@ import { useBranch, SimulatedSale } from "@/context/BranchContext";
 import { Branch, BranchShift } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import GoogleBranchChart, { PeriodType } from "@/components/sucursales/GoogleBranchChart";
+import PeriodSelectorButton from "@/components/sucursales/PeriodSelectorButton";
 import RealTimeSalesMonitor from "@/components/sucursales/RealTimeSalesMonitor";
 import CashFlowPanel from "@/components/sucursales/CashFlowPanel";
 import CreateBranchModal from "@/components/sucursales/CreateBranchModal";
@@ -478,22 +479,37 @@ export default function SucursalesPage() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setShowStatisticsChart((prev) => !prev)}
-                className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs transition-all shadow-md active:scale-95 ${
-                  showStatisticsChart
-                    ? "bg-stone-900 text-white hover:bg-black"
-                    : "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-orange-500/20 hover:brightness-110"
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                <span>{showStatisticsChart ? "Ocultar Estadísticas" : "Ver Estadísticas"}</span>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform duration-300 ${
-                    showStatisticsChart ? "rotate-180" : ""
-                  }`}
+              <div className="flex flex-wrap items-center gap-2.5">
+                <PeriodSelectorButton
+                  selectedPeriod={selectedPeriod}
+                  onPeriodChange={setSelectedPeriod}
+                  customStartDate={customStartDate}
+                  customEndDate={customEndDate}
+                  onCustomDateChange={(start, end) => {
+                    setCustomStartDate(start);
+                    setCustomEndDate(end);
+                    setSelectedPeriod("custom");
+                  }}
+                  size="md"
                 />
-              </button>
+
+                <button
+                  onClick={() => setShowStatisticsChart((prev) => !prev)}
+                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs transition-all shadow-md active:scale-95 ${
+                    showStatisticsChart
+                      ? "bg-stone-900 text-white hover:bg-black"
+                      : "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-orange-500/20 hover:brightness-110"
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>{showStatisticsChart ? "Ocultar Estadísticas" : "Ver Estadísticas"}</span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform duration-300 ${
+                      showStatisticsChart ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Gráfica desplegada únicamente cuando showStatisticsChart es true */}

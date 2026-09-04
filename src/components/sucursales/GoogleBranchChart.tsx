@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Branch } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import PeriodSelectorButton from "./PeriodSelectorButton";
 
 export type PeriodType = "hoy" | "semana" | "mes" | "año" | "custom";
 export type MetricType = "dinero" | "piezas" | "tickets" | "meta";
@@ -492,64 +493,19 @@ export default function GoogleBranchChart({
           </div>
         </div>
 
-        {/* Period Selector Pills & Custom Date Trigger */}
+        {/* Period Selector Button & Custom Date Trigger */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex bg-stone-100/80 p-1 rounded-2xl border border-stone-200 text-xs font-bold">
-            <button
-              onClick={() => { onPeriodChange("hoy"); setShowDatePicker(false); }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "hoy"
-                  ? "bg-stone-900 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              Hoy
-            </button>
-            <button
-              onClick={() => { onPeriodChange("semana"); setShowDatePicker(false); }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "semana"
-                  ? "bg-stone-900 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              Esta Semana
-            </button>
-            <button
-              onClick={() => { onPeriodChange("mes"); setShowDatePicker(false); }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "mes"
-                  ? "bg-stone-900 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              Este Mes
-            </button>
-            <button
-              onClick={() => { onPeriodChange("año"); setShowDatePicker(false); }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "año"
-                  ? "bg-stone-900 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              Este Año
-            </button>
-            <button
-              onClick={() => { 
-                onPeriodChange("custom"); 
-                setShowDatePicker(true); 
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "custom"
-                  ? "bg-orange-600 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              <CalendarRange className="w-3.5 h-3.5" />
-              <span>Entre Fechas</span>
-            </button>
-          </div>
+          <PeriodSelectorButton
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={(p) => {
+              onPeriodChange(p);
+              setShowDatePicker(p === "custom");
+            }}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
+            onCustomDateChange={onCustomDateChange}
+            size="sm"
+          />
 
           {onClose && (
             <button
