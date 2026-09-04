@@ -221,8 +221,7 @@ export default function POSPage() {
 
   // Shift Lock State (Candado de Seguridad por Cierre de Turno)
   const [isShiftLocked, setIsShiftLocked] = useState(false);
-  const [fundAdjustMode, setFundAdjustMode] = useState<"add" | "sub" | "exact">("add");
-  const [fundAdjustInput, setFundAdjustInput] = useState<string>("");
+  const [shiftFundInput, setShiftFundInput] = useState<string>("");
 
   const lastCutInfo = useMemo(() => {
     if (typeof window !== "undefined") {
@@ -246,19 +245,18 @@ export default function POSPage() {
     return initialCashFund;
   }, [lastCutInfo, initialCashFund]);
 
+  // Sincronizar el cuadro editable cuando se bloquea la terminal o cambia baseShiftFund
+  useEffect(() => {
+    if (isShiftLocked) {
+      setShiftFundInput(baseShiftFund ? baseShiftFund.toString() : "0");
+    }
+  }, [isShiftLocked, baseShiftFund]);
+
   const finalShiftFund = useMemo(() => {
-    const adjustVal = Number(fundAdjustInput) || 0;
-    if (!fundAdjustInput.trim() || isNaN(adjustVal)) {
-      return baseShiftFund;
-    }
-    if (fundAdjustMode === "add") {
-      return baseShiftFund + adjustVal;
-    }
-    if (fundAdjustMode === "sub") {
-      return Math.max(0, baseShiftFund - adjustVal);
-    }
-    return Math.max(0, adjustVal);
-  }, [baseShiftFund, fundAdjustMode, fundAdjustInput]);
+    if (!shiftFundInput.trim()) return 0;
+    const val = Number(shiftFundInput);
+    return isNaN(val) ? 0 : Math.max(0, val);
+  }, [shiftFundInput]);
 
   const handleDirectUnlockShift = () => {
     setInitialCashFund(finalShiftFund);
@@ -267,7 +265,6 @@ export default function POSPage() {
       localStorage.removeItem("brito_pos_shift_locked");
     } catch (e) {}
     setIsShiftLocked(false);
-    setFundAdjustInput("");
   };
 
   useEffect(() => {
@@ -773,100 +770,38 @@ export default function POSPage() {
             {/* Contenedor Principal de Información Financiera de Relevo */}
             <div className="bg-gradient-to-b from-[#24120a] to-[#1a0c06] border-2 border-amber-500/50 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
               
-              {/* 1. TARJETA PROMINENTE: CON CUÁNTO DINERO SE INICIARÁ EL TURNO */}
-              <div className="bg-gradient-to-br from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 p-5 rounded-3xl text-center space-y-3.5 shadow-xl ring-2 ring-amber-400/20 relative overflow-hidden">
+              {/* 1. TARJETA PROMINENTE: CON CUÁNTO DINERO SE INICIARÁ EL TURNO (CUADRO DIRECTO PARA EDITAR) */}
+              <div className="bg-gradient-to-br from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 p-5 sm:p-6 rounded-3xl text-center space-y-3 shadow-xl ring-2 ring-amber-400/20 relative overflow-hidden">
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
                 
                 <span className="text-xs sm:text-sm font-black uppercase text-amber-300 tracking-wider flex items-center justify-center gap-1.5">
                   <span>🪙</span> Con este dinero se iniciará el turno:
                 </span>
 
-                {/* NÚMERO GIGANTE RESULTANTE */}
-                <div className="py-1">
-                  <div className="text-5xl sm:text-6xl font-black text-amber-300 tracking-tight filter drop-shadow-[0_4px_12px_rgba(245,158,11,0.35)]">
-                    {formatCurrency(finalShiftFund)}
-                  </div>
-                  
-                  {/* Desglose explicativo si hay ajuste */}
-                  {fundAdjustInput.trim() && Number(fundAdjustInput) > 0 && (
-                    <p className="text-xs font-bold text-amber-200 mt-1 animate-in fade-in">
-                      {fundAdjustMode === "add" && `(${formatCurrency(baseShiftFund)} base + ${formatCurrency(Number(fundAdjustInput))} adicionales)`}
-                      {fundAdjustMode === "sub" && `(${formatCurrency(baseShiftFund)} base - ${formatCurrency(Number(fundAdjustInput))} retirados)`}
-                      {fundAdjustMode === "exact" && `(Monto exacto fijado directamente)`}
-                    </p>
+                {/* EL CUADRO PARA EDITAR DIRECTO */}
+                <div className="relative max-w-sm mx-auto my-2">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-3xl sm:text-4xl text-amber-400 select-none">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={shiftFundInput}
+                    onChange={(e) => setShiftFundInput(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-12 pr-12 py-4 bg-black/65 border-2 border-amber-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-400/30 rounded-2xl font-black text-4xl sm:text-5xl text-amber-300 text-center tracking-tight focus:outline-none transition-all shadow-inner"
+                  />
+                  {shiftFundInput && (
+                    <button
+                      type="button"
+                      onClick={() => setShiftFundInput("")}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-stone-800/80 hover:bg-stone-700 text-stone-300 hover:text-white flex items-center justify-center font-black text-sm transition-all cursor-pointer"
+                      title="Borrar para escribir nuevo monto"
+                    >
+                      ✕
+                    </button>
                   )}
-                </div>
-
-                {/* BARRA DONDE INGRESAR EL PRECIO QUE SE SUME O RESTE */}
-                <div className="bg-black/40 border border-amber-400/40 p-3 rounded-2xl space-y-2.5">
-                  {/* Selector de Circunstancia: Sumar o Restar */}
-                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-stone-900/90 rounded-xl border border-stone-800 text-xs font-black">
-                    <button
-                      type="button"
-                      onClick={() => setFundAdjustMode("add")}
-                      className={`py-2 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${
-                        fundAdjustMode === "add"
-                          ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
-                          : "text-stone-400 hover:text-white"
-                      }`}
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Sumar (+)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFundAdjustMode("sub")}
-                      className={`py-2 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${
-                        fundAdjustMode === "sub"
-                          ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
-                          : "text-stone-400 hover:text-white"
-                      }`}
-                    >
-                      <Minus className="w-4 h-4" />
-                      <span>Restar (-)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFundAdjustMode("exact")}
-                      className={`py-2 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${
-                        fundAdjustMode === "exact"
-                          ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
-                          : "text-stone-400 hover:text-white"
-                      }`}
-                    >
-                      <span>= Exacto</span>
-                    </button>
-                  </div>
-
-                  {/* La Barra para ingresar la cantidad */}
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-xl text-amber-400">$</span>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={fundAdjustInput}
-                      onChange={(e) => setFundAdjustInput(e.target.value)}
-                      placeholder={
-                        fundAdjustMode === "add"
-                          ? "Escribe cuánto dinero traes de más... (ej. 200)"
-                          : fundAdjustMode === "sub"
-                          ? "Escribe cuánto dinero se retiró... (ej. 100)"
-                          : "Escribe el monto total que hay en caja"
-                      }
-                      className="w-full pl-9 pr-10 py-3.5 bg-stone-900/90 border-2 border-amber-400/60 focus:border-amber-400 focus:bg-stone-900 rounded-xl font-black text-base sm:text-lg text-white placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-400/30 transition-all text-left"
-                    />
-                    {fundAdjustInput && (
-                      <button
-                        type="button"
-                        onClick={() => setFundAdjustInput("")}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-white p-1 text-xs font-bold cursor-pointer"
-                        title="Borrar"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
                 </div>
 
                 <div className="inline-block bg-amber-500/20 text-amber-200 text-[11px] font-bold px-3 py-1 rounded-full border border-amber-400/30">
