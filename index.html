@@ -804,21 +804,21 @@
           {/* Cart & Cashier Sidebar (Right - Amplia y Espaciosa) */}
           <div className="w-80 sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl">
             {/* Header con colores de la marca y micro-animación */}
-            <div className="p-3.5 px-5 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden shrink-0">
+            <div className="p-2.5 px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden shrink-0">
               <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none"></div>
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="p-2.5 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-2xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40 text-xl">
+              <div className="flex items-center gap-2.5 relative z-10">
+                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40 text-base">
                   🥖
                 </div>
                 <div>
-                  <h3 className="font-black text-base sm:text-lg leading-tight tracking-wide text-white flex items-center gap-1.5">
+                  <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
                     Charola de Cobro
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                   </h3>
-                  <p className="text-xs text-amber-300 font-bold mt-0.5">{cashierName} • Mostrador</p>
+                  <p className="text-[11px] text-amber-300 font-bold">{cashierName} • Mostrador</p>
                 </div>
               </div>
-              <span className={`text-xs sm:text-sm px-3.5 py-1.5 rounded-full font-black tracking-wide transition-all relative z-10 ${
+              <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all relative z-10 ${
                 totalPieces > 0
                   ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/60 scale-105 animate-pulse"
                   : "bg-amber-900/60 text-amber-200 border border-amber-800"
@@ -827,23 +827,22 @@
               </span>
             </div>
 
-            {/* Cart Items List - Mucho más grande, espacioso y claro */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {/* Cart Items List - Optimizado para ver al menos 5 productos simultáneamente */}
+            <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-1.5">
               {cart.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 animate-in fade-in duration-300">
-                  <div className="relative group">
-                    <div className="absolute inset-0 bg-amber-400/20 rounded-full blur-xl animate-pulse"></div>
-                    <div className="relative w-20 h-20 bg-gradient-to-br from-amber-100 via-orange-50 to-amber-50 rounded-3xl flex items-center justify-center text-4xl shadow-lg border-2 border-amber-200 shadow-amber-900/5 transition-transform duration-300 hover:scale-110">
+                <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-2 animate-in fade-in duration-200">
+                  <div className="relative">
+                    <div className="w-14 h-14 bg-gradient-to-br from-amber-100 via-orange-50 to-amber-50 rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-amber-200">
                       🧺
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <span className="px-3 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider border border-amber-200">
+                  <div className="space-y-0.5">
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider border border-amber-200">
                       Mostrador Listo
                     </span>
-                    <p className="text-base sm:text-lg font-black text-stone-900">Charola vacía</p>
-                    <p className="text-xs text-stone-500 max-w-[240px] leading-relaxed mx-auto font-medium">
-                      Toca cualquier pan del catálogo para agregarlo a la cuenta y ver aquí sus detalles en grande.
+                    <p className="text-sm font-black text-stone-900">Charola vacía</p>
+                    <p className="text-[11px] text-stone-500 max-w-[220px] leading-relaxed mx-auto font-medium">
+                      Toca cualquier pan del catálogo para agregarlo a la cuenta.
                     </p>
                   </div>
                 </div>
@@ -851,30 +850,33 @@
                 cart.map((item) => (
                   <div
                     key={item.product.id}
-                    className="p-3.5 sm:p-4 bg-gradient-to-br from-stone-50 via-white to-amber-50/20 hover:to-amber-50/40 rounded-3xl border-2 border-stone-200 hover:border-amber-300 transition-all space-y-3 shadow-sm hover:shadow-md"
+                    className="p-2 sm:p-2.5 bg-white hover:bg-amber-50/30 rounded-2xl border border-stone-200 hover:border-amber-300 transition-all shadow-2xs hover:shadow-xs space-y-1.5"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      {/* Foto Grande y Clara del Pan */}
+                    <div className="flex items-center gap-2 sm:gap-2.5">
+                      {/* Foto del Pan */}
                       <img
                         src={item.product.image}
                         alt={item.product.name}
-                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-2xl shrink-0 border-2 border-amber-200 shadow-xs"
+                        className="w-11 h-11 sm:w-12 sm:h-12 object-cover rounded-xl shrink-0 border border-amber-200 shadow-2xs"
                       />
                       
-                      {/* Nombre y Precio Grande */}
+                      {/* Nombre y Precio Unitario */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-black text-sm sm:text-base text-stone-900 leading-tight">{item.product.name}</p>
-                        <p className="text-xs sm:text-sm text-amber-800 font-extrabold mt-1">
-                          {formatCurrency(item.product.price)} <span className="text-[11px] font-medium text-stone-500">c/pieza</span>
-                        </p>
+                        <p className="font-black text-xs sm:text-sm text-stone-900 leading-tight truncate" title={item.product.name}>{item.product.name}</p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-xs text-amber-800 font-black">
+                            {formatCurrency(item.product.price)}
+                          </span>
+                          <span className="text-[10px] text-stone-400 font-medium">c/pieza</span>
+                        </div>
                       </div>
 
                       {/* Controles de Piezas y Total de línea */}
-                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => updateQty(item.product.id, -1)}
-                          className="w-8 h-8 sm:w-9 sm:h-9 bg-stone-100 hover:bg-amber-100 active:scale-90 border-2 border-stone-200 rounded-xl font-black text-sm text-stone-800 shadow-xs transition-all"
+                          className="w-7 h-7 bg-stone-100 hover:bg-amber-100 active:scale-90 border border-stone-200 rounded-lg font-black text-xs text-stone-800 shadow-2xs transition-all flex items-center justify-center"
                           title="Restar 1 pieza"
                         >
                           -
@@ -891,69 +893,78 @@
                             setExactQty(item.product.id, isNaN(val) ? 1 : Math.max(1, val));
                           }}
                           onFocus={(e) => e.target.select()}
-                          className="w-16 h-9 sm:w-18 sm:h-10 text-center font-black text-base sm:text-lg bg-white border-2 border-amber-400 focus:border-amber-600 rounded-xl focus:outline-none shadow-inner text-stone-900 cursor-text"
+                          className="w-11 h-7 text-center font-black text-xs sm:text-sm bg-white border border-amber-400 focus:border-amber-600 rounded-lg focus:outline-none shadow-inner text-stone-900 cursor-text"
                           title="Haz clic para escribir la cantidad de piezas directamente (ej. 100)"
                         />
 
                         <button
                           type="button"
                           onClick={() => updateQty(item.product.id, 1)}
-                          className="w-8 h-8 sm:w-9 sm:h-9 bg-stone-100 hover:bg-amber-100 active:scale-90 border-2 border-stone-200 rounded-xl font-black text-sm text-stone-800 shadow-xs transition-all"
+                          className="w-7 h-7 bg-stone-100 hover:bg-amber-100 active:scale-90 border border-stone-200 rounded-lg font-black text-xs text-stone-800 shadow-2xs transition-all flex items-center justify-center"
                           title="Sumar 1 pieza"
                         >
                           +
                         </button>
 
-                        <span className="font-black text-base sm:text-lg text-stone-900 min-w-[75px] text-right pl-1">
+                        <span className="font-black text-xs sm:text-sm text-stone-900 min-w-[56px] text-right pl-1">
                           {formatCurrency(item.product.price * item.quantity)}
                         </span>
+
+                        <button
+                          type="button"
+                          onClick={() => setExactQty(item.product.id, 0)}
+                          className="p-1 text-stone-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg font-black text-xs ml-0.5 transition-colors"
+                          title="Eliminar de la charola"
+                        >
+                          ✕
+                        </button>
                       </div>
                     </div>
 
-                    {/* Accesos directos de piezas para mayoreo (ej. 10, 20, 50, 100 piezas) */}
-                    <div className="flex items-center gap-1.5 pt-2 border-t border-stone-200/80 justify-end">
-                      <span className="text-xs text-stone-500 font-extrabold mr-auto">Elegir mayoreo:</span>
+                    {/* Micro-chips de mayoreo sutiles y compactos */}
+                    <div className="flex items-center gap-1 pt-1 border-t border-stone-100 text-[10px] justify-end">
+                      <span className="text-stone-400 font-extrabold mr-auto text-[10px]">Mayoreo rápido:</span>
                       {[10, 20, 50, 100].map((qty) => (
                         <button
                           key={qty}
                           type="button"
                           onClick={() => setExactQty(item.product.id, qty)}
-                          className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all active:scale-95 border-2 ${
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-black transition-all active:scale-95 ${
                             item.quantity === qty
-                              ? "bg-amber-600 text-white border-amber-600 shadow-xs"
-                              : "bg-white hover:bg-amber-100 text-stone-700 border-stone-200 hover:border-amber-300"
+                              ? "bg-amber-600 text-white shadow-2xs"
+                              : "bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900"
                           }`}
                           title={`Fijar a ${qty} piezas de ${item.product.name}`}
                         >
                           {qty} pzs
                         </button>
                       ))}
-                      <button
-                        type="button"
-                        onClick={() => setExactQty(item.product.id, 0)}
-                        className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl font-black text-xs ml-1 transition-colors"
-                        title="Eliminar de la charola"
-                      >
-                        ✕
-                      </button>
                     </div>
                   </div>
                 ))
               )}
             </div>
 
-            {/* Payment Summary Area (Compacta y estilizada) */}
-            <div className="p-3.5 sm:p-4 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/40 space-y-2.5 shadow-lg shrink-0">
-              {/* Method Selector */}
-              <div className="space-y-1">
-                <span className="text-[10px] sm:text-[11px] font-black text-stone-600 uppercase tracking-wider flex items-center gap-1">
-                  <span>💳</span> Forma de Pago:
-                </span>
-                <div className="grid grid-cols-3 gap-1.5">
+            {/* Payment Configuration & Checkout Area (Compacta, ultraligera y eficiente) */}
+            <div className="p-2.5 sm:p-3 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/30 space-y-2 shadow-lg shrink-0">
+              {/* Fila compacta: Total a Cobrar + Selector de Forma de Pago */}
+              <div className="bg-gradient-to-br from-[#24130c] via-[#2d1810] to-[#1f100a] text-white p-2 sm:p-2.5 px-3 rounded-2xl shadow-md border border-amber-900/60 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-300/90 flex items-center gap-1">
+                    <span>Total a Cobrar</span>
+                    <span className="text-amber-200/60 font-normal">({totalPieces} {totalPieces === 1 ? "pz" : "pzs"})</span>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight leading-none mt-0.5">
+                    {formatCurrency(total)}
+                  </div>
+                </div>
+
+                {/* Selector de Método de Pago integrado y compacto */}
+                <div className="flex items-center bg-black/40 p-1 rounded-xl border border-white/10 gap-1 shrink-0">
                   {[
                     { id: "efectivo", label: "Efectivo", icon: "💵" },
                     { id: "tarjeta", label: "Tarjeta", icon: "💳" },
-                    { id: "transferencia", label: "Transfer.", icon: "📱" },
+                    { id: "transferencia", label: "Transf.", icon: "📱" },
                   ].map((m) => {
                     const isSelected = paymentMethod === m.id;
                     return (
@@ -961,112 +972,102 @@
                         key={m.id}
                         type="button"
                         onClick={() => setPaymentMethod(m.id)}
-                        className={`flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-xl text-xs font-black transition-all active:scale-95 duration-200 ${
+                        className={`flex items-center gap-1 py-1 px-2 rounded-lg text-xs font-black transition-all duration-150 ${
                           isSelected
-                            ? "bg-gradient-to-r from-[#24130c] to-[#3d1d11] text-amber-100 shadow-sm ring-2 ring-amber-500/50 scale-[1.01]"
-                            : "bg-white text-stone-700 hover:bg-amber-50/80 border-2 border-stone-200 hover:border-amber-300 shadow-2xs"
+                            ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-sm scale-[1.02]"
+                            : "text-amber-200/80 hover:text-white hover:bg-white/10"
                         }`}
                       >
-                        <span>{m.icon}</span>
-                        <span>{m.label}</span>
+                        <span className="text-xs">{m.icon}</span>
+                        <span className="hidden xs:inline">{m.label}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Total Banner */}
-              <div className="bg-gradient-to-br from-white via-amber-50/40 to-orange-50/30 p-2.5 sm:p-3 rounded-2xl border-2 border-amber-300/80 space-y-1 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-20 h-20 bg-amber-400/10 rounded-full blur-xl pointer-events-none"></div>
-                <div className="flex justify-between items-center text-xs font-bold text-stone-500">
-                  <span className="flex items-center gap-1">🥖 Subtotal ({totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}):</span>
-                  <span className="font-black text-stone-700">{formatCurrency(total)}</span>
-                </div>
-                <div className="flex justify-between items-baseline border-t border-amber-200/80 pt-1.5">
-                  <span className="text-xs sm:text-sm font-black text-stone-800 tracking-wide uppercase">Total a Cobrar:</span>
-                  <span className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-amber-700 via-amber-800 to-orange-600 bg-clip-text text-transparent">
-                    {formatCurrency(total)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Cash Billetes */}
+              {/* Manejo de Efectivo Compacto */}
               {paymentMethod === "efectivo" && (
-                <div className="space-y-2 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 p-2.5 sm:p-3 rounded-2xl border-2 border-amber-300 shadow-2xs transition-all">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-black text-stone-900 flex items-center gap-1">
-                      <span>💵</span> Paga con ($ Efectivo):
-                    </label>
+                <div className="p-2 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 rounded-xl border border-amber-300/80 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                  {/* Billetes rápidos + Cobro Exacto en una sola línea */}
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => setCashGiven(total.toString())}
                       disabled={cart.length === 0}
-                      className="px-2 py-0.5 rounded-lg bg-amber-200/80 hover:bg-amber-300 text-amber-950 text-[10px] font-black transition-all active:scale-95 shadow-2xs"
+                      className="px-2 py-1 rounded-lg bg-amber-200/90 hover:bg-amber-300 text-stone-900 text-[10px] font-black shrink-0 transition-all active:scale-95 shadow-2xs"
+                      title="Cobro Exacto"
                     >
-                      ⚡ Cobro Exacto
+                      ⚡ Exacto
                     </button>
-                  </div>
-
-                  <div className="grid grid-cols-5 gap-1">
-                    {[20, 50, 100, 200, 500].map((bill) => (
-                      <button
-                        key={bill}
-                        type="button"
-                        onClick={() => setCashGiven(bill.toString())}
-                        disabled={cart.length === 0}
-                        className="py-1.5 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-xs rounded-xl border border-amber-200 shadow-2xs transition-all active:scale-95 hover:scale-105"
-                      >
-                        ${bill}
-                      </button>
-                    ))}
-                  </div>
-
-                  <input
-                    type="number"
-                    placeholder="O teclea la cantidad recibida..."
-                    value={cashGiven}
-                    onChange={(e) => setCashGiven(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/20 text-xs sm:text-sm font-black text-stone-900 focus:outline-none shadow-inner transition-all placeholder:text-stone-400"
-                  />
-
-                  {parsedCash > 0 && (
-                    <div className={`flex justify-between items-center p-2 sm:p-2.5 rounded-xl text-xs font-black border-2 transition-all shadow-xs ${
-                      parsedCash >= total
-                        ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-400 shadow-emerald-600/20"
-                        : "bg-gradient-to-r from-rose-600 to-red-600 text-white border-rose-400 shadow-rose-600/20"
-                    }`}>
-                      <span className="flex items-center gap-1 text-[11px] tracking-wide">
-                        {parsedCash >= total ? "🟢 Cambio a Entregar:" : "🔴 Falta por cubrir:"}
-                      </span>
-                      <span className="text-base sm:text-lg font-black drop-shadow-xs">
-                        {parsedCash >= total ? formatCurrency(change) : formatCurrency(total - parsedCash)}
-                      </span>
+                    <div className="grid grid-cols-5 gap-1 flex-1">
+                      {[20, 50, 100, 200, 500].map((bill) => (
+                        <button
+                          key={bill}
+                          type="button"
+                          onClick={() => setCashGiven(bill.toString())}
+                          disabled={cart.length === 0}
+                          className="py-1 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-xs rounded-lg border border-amber-200 shadow-2xs transition-all active:scale-95 text-center"
+                        >
+                          ${bill}
+                        </button>
+                      ))}
                     </div>
-                  )}
+                  </div>
+
+                  {/* Input de cantidad recibida y badge de cambio en una sola línea */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400 font-black text-xs">💵</span>
+                      <input
+                        type="number"
+                        placeholder="Paga con... ($)"
+                        value={cashGiven}
+                        onChange={(e) => setCashGiven(e.target.value)}
+                        className="w-full pl-7 pr-2 py-1 bg-white rounded-lg border-2 border-amber-400 focus:border-amber-600 focus:ring-1 focus:ring-amber-400 text-xs font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-normal"
+                      />
+                    </div>
+
+                    {parsedCash > 0 && (
+                      <div className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 shrink-0 ${
+                        parsedCash >= total
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "bg-rose-600 text-white shadow-xs"
+                      }`}>
+                        <span className="text-[10px] opacity-90">{parsedCash >= total ? "Cambio:" : "Falta:"}</span>
+                        <span className="font-black text-xs sm:text-sm">
+                          {parsedCash >= total ? formatCurrency(change) : formatCurrency(total - parsedCash)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="grid grid-cols-3 gap-2 pt-0.5">
+              {/* Botones de Acción */}
+              <div className="grid grid-cols-4 gap-1.5 pt-0.5">
                 <button
                   type="button"
                   onClick={() => { setCart([]); setCashGiven(""); }}
                   disabled={cart.length === 0}
-                  className="px-2 py-3 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-xl text-xs flex items-center justify-center gap-1 border-2 border-stone-200 transition-all active:scale-95 shadow-2xs"
+                  className="col-span-1 py-2 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-xl text-xs flex items-center justify-center gap-1 border border-stone-200 transition-all active:scale-95 shadow-2xs"
+                  title="Limpiar charola"
                 >
-                  <span>🗑️</span> Cancelar
+                  <span className="text-xs">🗑️</span>
+                  <span className="hidden sm:inline">Limpiar</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleCheckout}
                   disabled={cart.length === 0 || !isValid}
-                  className={`col-span-2 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
+                  className={`col-span-3 py-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
                     cart.length > 0 && isValid
-                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border-2 border-amber-300/70 ring-2 ring-amber-400/40"
-                      : "bg-stone-200 text-stone-400 border-2 border-stone-300/60 opacity-60 cursor-not-allowed"
+                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-1 ring-amber-400/40"
+                      : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed"
                   }`}
                 >
-                  <span>🖨️</span> Cobrar & Ticket
+                  <span className="text-xs">🖨️</span>
+                  <span>Cobrar & Ticket</span>
                 </button>
               </div>
             </div>
