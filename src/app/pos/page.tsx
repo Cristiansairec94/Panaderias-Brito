@@ -935,8 +935,8 @@ export default function POSPage() {
                 </div>
               </div>
 
-              {/* Cuadrícula Compacta: 7 columnas en escritorio (2 filas exactas) para dejar todo el pan visible abajo */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-1.5 sm:gap-2 max-h-[160px] overflow-y-auto pr-0.5">
+              {/* Cuadrícula de Categorías y Precios Completos (Sin cortes ni puntos suspensivos) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7 gap-2 max-h-[190px] overflow-y-auto pr-1">
                 {CATEGORIES.map((cat) => {
                   const isSelected = selectedCategory === cat.id;
                   const count = cat.id === "all"
@@ -950,17 +950,17 @@ export default function POSPage() {
                       onClick={() => {
                         setSelectedCategory(cat.id);
                       }}
-                      className={`relative px-2.5 py-2 rounded-xl text-left transition-all duration-150 flex items-center justify-between gap-1.5 border active:scale-95 shadow-2xs ${
+                      className={`relative px-3 py-2.5 rounded-xl text-left transition-all duration-150 flex items-center justify-between gap-2 border active:scale-95 shadow-2xs ${
                         isSelected
                           ? "bg-[#2d1810] text-amber-50 shadow-xs font-black border-amber-500 ring-1 ring-amber-400"
-                          : "bg-stone-50/80 hover:bg-amber-50/90 hover:border-amber-300 text-stone-800 border-stone-200/90"
+                          : "bg-stone-50/90 hover:bg-amber-50/90 hover:border-amber-300 text-stone-900 border-stone-200/90"
                       }`}
                       title={`${cat.label} (${count} productos)`}
                     >
-                      {/* Icono + Nombre Compacto */}
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-base shrink-0">{cat.icon}</span>
-                        <span className="font-black text-xs leading-tight truncate">
+                      {/* Icono + Nombre y Precio Completo */}
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-lg shrink-0">{cat.icon}</span>
+                        <span className="font-black text-xs leading-snug whitespace-normal break-words">
                           {cat.label}
                         </span>
                       </div>
@@ -970,7 +970,7 @@ export default function POSPage() {
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-black ${
                           isSelected
                             ? "bg-amber-500 text-stone-950"
-                            : "bg-stone-200/80 text-stone-600"
+                            : "bg-stone-200/90 text-stone-700"
                         }`}>
                           {count}
                         </span>
@@ -1064,7 +1064,7 @@ export default function POSPage() {
                   <div>
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="min-w-0">
-                        <h3 className="font-extrabold text-stone-900 text-sm sm:text-base leading-snug group-hover:text-amber-800 transition-colors truncate">
+                        <h3 className="font-extrabold text-stone-900 text-sm sm:text-base leading-snug group-hover:text-amber-800 transition-colors line-clamp-2 break-words">
                           {product.name}
                         </h3>
                       </div>
