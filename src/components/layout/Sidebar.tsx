@@ -133,6 +133,7 @@ const navigationItems: NavItem[] = [
     items: [
       { name: "Catálogos de sistema", href: "/configuracion?tab=general", icon: Sliders },
       { name: "Usuarios", href: "/configuracion?tab=usuarios", icon: UserCheck, badge: "Roles" },
+      { name: "Empleados", href: "/configuracion?tab=empleados", icon: Users, badge: "Personal" },
     ],
   },
 ];

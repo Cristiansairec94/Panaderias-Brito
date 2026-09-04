@@ -572,16 +572,16 @@ export default function UserRoleManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-black uppercase tracking-wider">
-              <ShieldCheck className="w-4 h-4 text-amber-600" /> Control de Personal & Roles ERP
+              <ShieldCheck className="w-4 h-4 text-amber-600" /> Cuentas de Usuario & Seguridad ERP
             </div>
             <h3 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
-              Gestión de Empleados, Roles & Accesos
+              Cuentas de Usuarios, Roles & Permisos
             </h3>
             <p className="text-xs text-stone-600 max-w-2xl leading-relaxed">
-              Administra al personal de Panaderías Brito: consulta contraseñas, asigna fotografías, define roles (
+              Administra las credenciales de acceso al sistema: consulta o genera contraseñas, asigna nombres de usuario (@), define el rol de trabajo (
               <strong className="text-stone-900 font-bold">Administrador</strong>, 
               <strong className="text-stone-900 font-bold"> Auxiliar Administrativo</strong> o 
-              <strong className="text-stone-900 font-bold"> Cajeros / Auxiliares de Tienda</strong>) y edita sus permisos del sistema.
+              <strong className="text-stone-900 font-bold"> Cajeros / Auxiliares de Tienda</strong>) y personaliza los 13 accesos del sistema.
             </p>
           </div>
 
@@ -590,7 +590,7 @@ export default function UserRoleManagement() {
             className="self-start sm:self-center flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs sm:text-sm rounded-2xl shadow-md shadow-orange-500/20 transition-all active:scale-95 cursor-pointer shrink-0"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Nuevo Empleado</span>
+            <span>Nueva Cuenta</span>
           </button>
         </div>
 

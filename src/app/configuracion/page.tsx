@@ -37,6 +37,7 @@ import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { UserRole, Branch } from "@/types";
 import UserRoleManagement from "@/components/configuracion/UserRoleManagement";
+import EmployeeManagement from "@/components/configuracion/EmployeeManagement";
 
 function ConfiguracionContent() {
   const router = useRouter();
@@ -45,7 +46,7 @@ function ConfiguracionContent() {
   const { usersList, addUser } = useAuth();
   const { branches, addBranch, updateBranch, deleteBranch, switchBranch } = useBranch();
 
-  const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "usuarios" | "ticket" | "operaciones" | "database">(
+  const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "usuarios" | "empleados" | "ticket" | "operaciones" | "database">(
     (tabQuery as any) || "usuarios"
   );
 
@@ -77,7 +78,7 @@ function ConfiguracionContent() {
 
   // Sync tab with URL query parameter changes
   useEffect(() => {
-    if (tabQuery && ["general", "sucursales", "usuarios", "ticket", "operaciones", "database"].includes(tabQuery)) {
+    if (tabQuery && ["general", "sucursales", "usuarios", "empleados", "ticket", "operaciones", "database"].includes(tabQuery)) {
       setActiveTab(tabQuery as any);
     }
   }, [tabQuery]);
@@ -254,10 +255,22 @@ function ConfiguracionContent() {
             activeTab === "usuarios" ? "bg-stone-900 text-white shadow-sm ring-2 ring-amber-400/50" : "bg-white text-stone-600 hover:bg-stone-100"
           }`}
         >
-          <Users className="w-4 h-4 text-blue-500" />
-          <span>Usuarios & Empleados</span>
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
+          <span>Usuarios</span>
           <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 font-black text-[9px] rounded-full uppercase shadow-xs">
             Roles & Accesos
+          </span>
+        </button>
+        <button
+          onClick={() => handleTabChange("empleados")}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === "empleados" ? "bg-stone-900 text-white shadow-sm ring-2 ring-blue-400/50" : "bg-white text-stone-600 hover:bg-stone-100"
+          }`}
+        >
+          <Users className="w-4 h-4 text-blue-400" />
+          <span>Empleados</span>
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-900 font-black text-[9px] rounded-full uppercase shadow-xs">
+            Personal
           </span>
         </button>
         <button
@@ -973,9 +986,14 @@ function ConfiguracionContent() {
         </div>
       )}
 
-      {/* Tab 2: Users & Roles */}
+      {/* Tab: Users & Roles */}
       {activeTab === "usuarios" && (
         <UserRoleManagement />
+      )}
+
+      {/* Tab: Employees & Staff */}
+      {activeTab === "empleados" && (
+        <EmployeeManagement onGoToUsersTab={() => handleTabChange("usuarios")} />
       )}
 
       {/* Tab 3: Tickets & Printing */}

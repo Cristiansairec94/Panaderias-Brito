@@ -147,6 +147,7 @@ export interface AppUser {
   password?: string;
   role: UserRole;
   roleLabel: string;
+  jobTitle?: string;
   avatar: string;
   photoUrl?: string;
   phone?: string;
