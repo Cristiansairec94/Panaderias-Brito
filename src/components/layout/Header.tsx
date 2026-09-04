@@ -123,7 +123,7 @@ export default function Header() {
   const current = getPageTitle();
 
   return (
-    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-[70] shadow-sm">
       {/* Left: Hamburger / Collapse Toggle + Page Title */}
       <div className="flex items-center gap-3">
         {/* Mobile Hamburger Drawer Toggle */}
@@ -235,7 +235,7 @@ export default function Header() {
 
           {/* Branch Dropdown Menu */}
           {showBranchMenu && (
-            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-[100] animate-in fade-in zoom-in-95">
               <div className="p-2 border-b border-stone-100 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Red de Sucursales</p>
@@ -368,7 +368,7 @@ export default function Header() {
 
           {/* User & Role Switcher Menu */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-[100] animate-in fade-in zoom-in-95">
               <div className="p-2.5 border-b border-stone-100 bg-stone-50/60 rounded-xl mb-1.5">
                 <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Sesión activa:</p>
                 <p className="text-xs font-black text-stone-900">{user?.name}</p>

@@ -81,7 +81,7 @@ export default function NotificationsDropdown() {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative z-[90]" ref={dropdownRef}>
       {/* Bell Button (Facebook Style with dynamic badge) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -102,7 +102,7 @@ export default function NotificationsDropdown() {
 
       {/* Facebook Style Popover Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-[420px] sm:w-[440px] bg-white rounded-3xl shadow-[0_12px_40px_rgba(0,0,0,0.18)] border border-stone-200/90 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 flex flex-col max-h-[85vh]">
+        <div className="absolute right-0 mt-3 w-[420px] sm:w-[440px] max-w-[calc(100vw-2rem)] bg-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.25)] border-2 border-stone-200 z-[100] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 flex flex-col max-h-[85vh]">
           {/* Header Bar */}
           <div className="p-4 pb-3 border-b border-stone-100 space-y-3">
             <div className="flex items-center justify-between">
@@ -119,7 +119,7 @@ export default function NotificationsDropdown() {
                 </button>
 
                 {showOptionsMenu && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-stone-200 p-2 z-50 text-xs font-semibold space-y-1 animate-in fade-in zoom-in-95">
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-stone-200 p-2 z-[110] text-xs font-semibold space-y-1 animate-in fade-in zoom-in-95">
                     <button
                       onClick={() => {
                         markAllAsRead();
