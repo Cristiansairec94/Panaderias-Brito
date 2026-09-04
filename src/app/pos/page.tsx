@@ -1530,24 +1530,6 @@ export default function POSPage() {
                   </div>
                 )}
               </div>
-
-              {/* Bottom Quick Register Action */}
-              <div className="pt-2 border-t border-stone-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewCustName(customerSearchQuery || "");
-                    setNewCustPhone("");
-                    setNewCustNotes("");
-                    setIsNewCustomerModalOpen(true);
-                    setIsCustomerPickerOpen(false);
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Registrar Nuevo Cliente</span>
-                </button>
-              </div>
             </div>
           )}
         </div>
