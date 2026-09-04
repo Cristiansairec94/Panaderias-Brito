@@ -646,7 +646,123 @@ export default function POSPage() {
   });
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-stone-100/70">
+    <div className="flex h-full w-full overflow-hidden bg-stone-100/70 relative">
+      {/* PANTALLA DE BLOQUEO COMPLETA DE TODA LA HOJA DEL PUNTO DE VENTA */}
+      {isShiftLocked && (
+        <div className="absolute inset-0 z-50 bg-gradient-to-b from-[#1c0e08] via-[#140a05] to-[#0d0603] text-white flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto animate-in fade-in duration-300">
+          {/* Luces de fondo ambient */}
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-10 left-1/3 w-80 h-80 bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="w-full max-w-md my-auto relative z-10 flex flex-col justify-between py-6 space-y-6">
+            {/* Header del Bloqueo con candado animado */}
+            <div className="text-center space-y-3">
+              <div className="w-20 h-20 mx-auto bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-amber-500/40 ring-4 ring-amber-400/40 text-stone-950 animate-bounce">
+                <Lock className="w-10 h-10 stroke-[2.5]" />
+              </div>
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide">
+                  Terminal Bloqueada
+                </h2>
+                <p className="text-xs sm:text-sm text-amber-300 font-bold mt-1">
+                  Turno de cajera cerrado por seguridad
+                </p>
+              </div>
+            </div>
+
+            {/* Tarjeta de Seguridad & Formulario */}
+            <div className="bg-gradient-to-b from-[#24120a] to-[#1a0c06] border-2 border-amber-900/60 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+              <div className="bg-amber-950/70 border border-amber-500/40 p-4 rounded-2xl text-xs space-y-1.5 text-amber-100/90 shadow-inner">
+                <p className="font-black flex items-center gap-1.5 text-amber-300 text-sm">
+                  <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" /> Candado de Seguridad Activo
+                </p>
+                <p className="text-xs text-stone-300 leading-relaxed">
+                  El corte de turno fue guardado y verificado. Para habilitar el cobro y aperturar el siguiente turno, la encargada debe ingresar sus credenciales.
+                </p>
+              </div>
+
+              {lockError && (
+                <div className="p-3 bg-rose-950/90 border-2 border-rose-500 text-rose-200 text-xs font-black rounded-xl flex items-center gap-2 animate-in shake">
+                  <span>⚠️</span> {lockError}
+                </div>
+              )}
+
+              <form onSubmit={handleUnlockShift} className="space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1.5 text-xs">
+                    USUARIO DE ENCARGADA:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="admin"
+                    value={lockUser}
+                    onChange={(e) => {
+                      setLockUser(e.target.value);
+                      setLockError("");
+                    }}
+                    className="w-full px-4 py-3.5 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600 shadow-inner"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1.5 text-xs">
+                    CONTRASEÑA:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showLockPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••"
+                      value={lockPassword}
+                      onChange={(e) => {
+                        setLockPassword(e.target.value);
+                        setLockError("");
+                      }}
+                      className="w-full pl-4 pr-11 py-3.5 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600 shadow-inner"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLockPassword(!showLockPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-amber-300 transition-colors p-1"
+                      title={showLockPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                    >
+                      {showLockPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/20 active:scale-95 transition-all mt-2 cursor-pointer"
+                >
+                  <Unlock className="w-5 h-5 stroke-[2.5]" />
+                  <span>Desbloquear Terminal & Habilitar Cobro</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Botón de acceso rápido para desarrollo/pruebas */}
+            <div className="pt-2 text-center space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setLockUser("admin");
+                  setLockPassword("admin");
+                  setLockError("");
+                }}
+                className="w-full py-2.5 px-4 rounded-xl border border-amber-900/50 bg-stone-950/60 hover:bg-amber-950/40 text-amber-400/90 text-xs font-bold transition-all hover:border-amber-500/50"
+              >
+                ⚡ Autocompletar credenciales (admin / admin)
+              </button>
+              <p className="text-[11px] text-stone-500 font-medium">
+                Panaderías Brito • Don Antonio Brito
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Product Catalog Area (Main) con espacio y scrollbar estilizado */}
       <div 
         ref={catalogScrollRef}
@@ -986,132 +1102,17 @@ export default function POSPage() {
       )}
 
       {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone - Amplia y Espaciosa) */}
-      <div className={`fixed lg:static inset-y-0 right-0 z-50 w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out relative overflow-hidden ${
+      <div className={`fixed lg:static inset-y-0 right-0 z-40 w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out relative overflow-hidden ${
         isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       }`}>
-        {isShiftLocked ? (
-          /* PANTALLA DE BLOQUEO COMPLETA DE LA TERMINAL DE COBRO (100% Sólida, sin elementos filtrados) */
-          <div className="flex flex-col h-full w-full bg-gradient-to-b from-[#1c0e08] via-[#140a05] to-[#0d0603] text-white overflow-y-auto animate-in fade-in duration-200 justify-between">
-            {/* Header del Bloqueo con degradado café oficial y candado animado */}
-            <div className="bg-gradient-to-r from-[#2a140c] via-[#351a0f] to-[#452013] p-6 border-b border-amber-900/60 text-center relative overflow-hidden shrink-0 shadow-lg">
-              <div className="absolute -top-6 -right-6 w-32 h-32 bg-amber-500/15 rounded-full blur-2xl pointer-events-none" />
-              <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-orange-600/15 rounded-full blur-2xl pointer-events-none" />
-              <div className="relative z-10 space-y-3">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 rounded-3xl flex items-center justify-center shadow-xl shadow-amber-500/40 ring-4 ring-amber-400/40 text-stone-950 animate-bounce">
-                  <Lock className="w-8 h-8 stroke-[2.5]" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-white tracking-wide">
-                    Terminal Bloqueada
-                  </h3>
-                  <p className="text-xs text-amber-300 font-bold mt-0.5">
-                    Turno de cajera cerrado por seguridad
-                  </p>
-                </div>
-              </div>
+        {/* Header con colores de la marca y micro-animación */}
+        <div className="p-2.5 px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden shrink-0">
+          <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
+          <div className="flex items-center gap-2.5 relative z-10">
+            <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40">
+              <ShoppingBag className="w-4 h-4 text-white" />
             </div>
-
-            {/* Contenido del formulario para encargada */}
-            <div className="p-5 sm:p-6 space-y-4 flex-1 flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="bg-amber-950/60 border border-amber-500/40 p-4 rounded-2xl text-xs space-y-1.5 text-amber-100/90 shadow-inner">
-                  <p className="font-black flex items-center gap-1.5 text-amber-300 text-sm">
-                    <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" /> Candado de Seguridad Activo
-                  </p>
-                  <p className="text-xs text-stone-300 leading-relaxed">
-                    El corte de turno fue guardado y verificado. Para habilitar el cobro y aperturar el siguiente turno, la encargada debe ingresar sus credenciales.
-                  </p>
-                </div>
-
-                {lockError && (
-                  <div className="p-3 bg-rose-950/90 border-2 border-rose-500 text-rose-200 text-xs font-black rounded-xl flex items-center gap-2 animate-in shake">
-                    <span>⚠️</span> {lockError}
-                  </div>
-                )}
-
-                <form onSubmit={handleUnlockShift} className="space-y-3.5 text-xs">
-                  <div>
-                    <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1">
-                      Usuario de Encargada:
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="admin"
-                      value={lockUser}
-                      onChange={(e) => {
-                        setLockUser(e.target.value);
-                        setLockError("");
-                      }}
-                      className="w-full px-4 py-3 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1">
-                      Contraseña:
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showLockPassword ? "text" : "password"}
-                        required
-                        placeholder="••••••"
-                        value={lockPassword}
-                        onChange={(e) => {
-                          setLockPassword(e.target.value);
-                          setLockError("");
-                        }}
-                        className="w-full pl-4 pr-11 py-3 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowLockPassword(!showLockPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-amber-300 transition-colors p-1"
-                      >
-                        {showLockPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black text-sm rounded-xl shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center justify-center gap-2 border border-amber-300 mt-2"
-                  >
-                    <Unlock className="w-4 h-4" />
-                    <span>Desbloquear Terminal & Habilitar Cobro</span>
-                  </button>
-                </form>
-              </div>
-
-              {/* Footer con acceso rápido y créditos */}
-              <div className="pt-3 border-t border-amber-900/40 text-center space-y-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLockUser("admin");
-                    setLockPassword("admin");
-                  }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/50 text-xs font-bold text-amber-300 hover:text-amber-200 transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <span>⚡</span>
-                  <span>Autocompletar credenciales (admin / admin)</span>
-                </button>
-                <p className="text-[10px] text-amber-500/60 font-medium">
-                  Panaderías Brito • Don Antonio Brito
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Header con colores de la marca y micro-animación */}
-            <div className="p-2.5 px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden shrink-0">
-              <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
-              <div className="flex items-center gap-2.5 relative z-10">
-                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40">
-                  <ShoppingBag className="w-4 h-4 text-white" />
-                </div>
-                <div>
+            <div>
                   <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
                     Charola de Cobro
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -1663,9 +1664,7 @@ export default function POSPage() {
             </button>
           </div>
         </div>
-      </>
-    )}
-  </div>
+      </div>
 
       {/* Floating Bottom Bar on Mobile when Cart has items */}
       {cart.length > 0 && !isMobileCartOpen && (
