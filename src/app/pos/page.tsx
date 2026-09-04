@@ -684,12 +684,12 @@ export default function POSPage() {
 
     // 4. Disparar notificación de pan surtido
     addNotification({
-      senderName: `🚐 Camioneta Brito (${delivery.source})`,
+      senderName: `🚚 ${delivery.driver || "Chofer"} (${delivery.source})`,
       senderAvatar: "🥖",
       badgeIcon: "horno",
       title: "Entrada de Pan Recibida",
       highlightText: `+${delivery.totalPieces} piezas agregadas`,
-      description: `Se ingresaron ${delivery.totalPieces} piezas de pan al mostrador recibidas por ${delivery.cashier}.`,
+      description: `Se ingresaron ${delivery.totalPieces} piezas de pan al mostrador entregadas por ${delivery.driver || "el chofer"} y recibidas por ${delivery.cashier}.`,
       category: "inventario",
     });
   };

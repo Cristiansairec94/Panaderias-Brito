@@ -49,8 +49,6 @@ export default function BreadDeliveryModal({
   const [activeTab, setActiveTab] = useState<"receive" | "history">("receive");
   const [source, setSource] = useState("Camioneta 1 (Ruta Norte)");
   const [customSource, setCustomSource] = useState("");
-  const [driverName, setDriverName] = useState("");
-  const [notes, setNotes] = useState("");
   
   // Lista de choferes frecuentes guardados (persistente en localStorage)
   const [savedDrivers, setSavedDrivers] = useState<string[]>(() => {
@@ -72,6 +70,20 @@ export default function BreadDeliveryModal({
       "Don Toño Brito",
     ];
   });
+
+  const [driverName, setDriverName] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("brito_saved_drivers");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+        }
+      } catch (e) {}
+    }
+    return "Manuel Sánchez";
+  });
+  const [notes, setNotes] = useState("");
 
   // Estados para el buscador inteligente y el modal de gestión de choferes
   const [isDriverDropdownOpen, setIsDriverDropdownOpen] = useState(false);
@@ -319,7 +331,7 @@ export default function BreadDeliveryModal({
     const newDelivery: BreadDeliveryRecord = {
       id: `CAM-${Date.now().toString().slice(-6)}`,
       source: finalSource,
-      driver: driverName.trim() || undefined,
+      driver: driverName.trim() || (savedDrivers[0] || "Manuel Sánchez"),
       cashier: cashierName,
       date: dateFormatted,
       timestamp: `${dateFormatted} • ${timeFormatted}`,
@@ -921,15 +933,16 @@ export default function BreadDeliveryModal({
               <div className="p-4 border-t border-stone-200 bg-stone-50 space-y-3 shrink-0">
                 <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs space-y-1.5">
                   <div className="flex items-center justify-between text-xs text-stone-600 font-medium">
+                    <span>Chofer / Repartidor:</span>
+                    <strong className="text-stone-900 font-bold flex items-center gap-1">
+                      <span>🚚</span>
+                      <span>{driverName.trim() || (savedDrivers[0] || "Manuel Sánchez")}</span>
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-stone-600 font-medium">
                     <span>Origen / Camioneta:</span>
                     <strong className="text-stone-900 truncate max-w-[200px]">{finalSource}</strong>
                   </div>
-                  {driverName && (
-                    <div className="flex items-center justify-between text-xs text-stone-600 font-medium">
-                      <span>Repartidor:</span>
-                      <strong className="text-stone-900">{driverName}</strong>
-                    </div>
-                  )}
                   <div className="flex items-center justify-between text-xs text-stone-600 font-medium">
                     <span>Valor estimado de venta:</span>
                     <strong className="text-amber-800">{formatCurrency(totalEstimatedValue)}</strong>
@@ -1008,14 +1021,17 @@ export default function BreadDeliveryModal({
                         <span className="font-mono font-black text-xs sm:text-sm text-emerald-900 bg-emerald-100/90 px-3 py-1 rounded-xl border border-emerald-300/80">
                           {rec.id}
                         </span>
-                        <strong className="text-stone-900 font-black text-base sm:text-lg">
-                          {rec.source}
+                        {/* Nombre del Chofer en la posición principal solicitada */}
+                        <strong className="text-stone-900 font-black text-base sm:text-lg flex items-center gap-1.5" title="Chofer o repartidor">
+                          <span className="text-emerald-700">🚚</span>
+                          <span>{rec.driver || (savedDrivers[0] || "Manuel Sánchez")}</span>
                         </strong>
-                        {rec.driver && (
-                          <span className="text-stone-600 text-xs sm:text-sm font-semibold">
-                            (Chofer: {rec.driver})
-                          </span>
-                        )}
+
+                        {/* Origen o Camioneta como distintivo */}
+                        <span className="text-stone-700 text-xs sm:text-sm font-bold bg-stone-100/90 px-2.5 py-1 rounded-xl border border-stone-200 flex items-center gap-1">
+                          <span>🚐</span>
+                          <span>{rec.source}</span>
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-2 text-xs sm:text-sm text-stone-600 font-medium">
