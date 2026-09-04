@@ -352,13 +352,13 @@ export default function ClientesPage() {
                       <span>Teléfono / WhatsApp</span>
                     </div>
                   </th>
+                  <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">Descripción del Cliente</th>
                   <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 text-amber-600" />
                       <span>Lo que más compra (Moda)</span>
                     </div>
                   </th>
-                  <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">Descripción del Cliente</th>
                   <th className="py-3.5 px-4 sm:px-5 text-center w-28 whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
@@ -421,7 +421,20 @@ export default function ClientesPage() {
                           )}
                         </td>
 
-                        {/* 3. Lo que más compra (Moda Desplegable) */}
+                        {/* 3. Cuadro de Descripción */}
+                        <td className="py-3.5 px-4 sm:px-5">
+                          {c.notes ? (
+                            <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-800 leading-relaxed max-w-sm">
+                              {c.notes}
+                            </div>
+                          ) : (
+                            <span className="text-xs sm:text-sm font-medium text-stone-400 italic">
+                              Sin descripción
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 4. Lo que más compra (Moda Desplegable - a la derecha antes de Acciones) */}
                         <td className="py-3.5 px-4 sm:px-5">
                           <button
                             type="button"
@@ -445,20 +458,7 @@ export default function ClientesPage() {
                           </button>
                         </td>
 
-                        {/* 4. Cuadro de Descripción */}
-                        <td className="py-3.5 px-4 sm:px-5">
-                          {c.notes ? (
-                            <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-800 leading-relaxed max-w-sm">
-                              {c.notes}
-                            </div>
-                          ) : (
-                            <span className="text-xs sm:text-sm font-medium text-stone-400 italic">
-                              Sin descripción
-                            </span>
-                          )}
-                        </td>
-
-                        {/* 5. Acciones */}
+                        {/* 5. Acciones (Editar y Eliminar) */}
                         <td className="py-3.5 px-4 sm:px-5 text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
