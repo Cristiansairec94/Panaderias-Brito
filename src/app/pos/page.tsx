@@ -205,10 +205,28 @@ export default function POSPage() {
 
   // Shift Lock State (Candado de Seguridad por Cierre de Turno)
   const [isShiftLocked, setIsShiftLocked] = useState(false);
-  const [lockUser, setLockUser] = useState("");
-  const [lockPassword, setLockPassword] = useState("");
-  const [lockError, setLockError] = useState("");
-  const [showLockPassword, setShowLockPassword] = useState(false);
+
+  const lastCutInfo = useMemo(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("brito_shift_cuts_history");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed[0];
+          }
+        }
+      } catch (e) {}
+    }
+    return null;
+  }, [isShiftLocked]);
+
+  const handleDirectUnlockShift = () => {
+    setIsShiftLocked(false);
+    try {
+      localStorage.removeItem("brito_pos_shift_locked");
+    } catch (e) {}
+  };
 
   useEffect(() => {
     try {
@@ -266,21 +284,6 @@ export default function POSPage() {
     setNewCustNotes("");
   };
 
-  const handleUnlockShift = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (lockUser.trim().toLowerCase() === "admin" && lockPassword.trim() === "admin") {
-      setIsShiftLocked(false);
-      setLockUser("");
-      setLockPassword("");
-      setLockError("");
-      setShowLockPassword(false);
-      try {
-        localStorage.removeItem("brito_pos_shift_locked");
-      } catch (e) {}
-    } else {
-      setLockError("Usuario o contraseña de encargada incorrectos.");
-    }
-  };
 
   const handleCompleteShiftCut = () => {
     setRecentSalesList([]);
@@ -659,110 +662,102 @@ export default function POSPage() {
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-10 left-1/3 w-80 h-80 bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="w-full max-w-md my-auto relative z-10 flex flex-col justify-between py-6 space-y-6">
-            {/* Header del Bloqueo con candado animado */}
-            <div className="text-center space-y-3">
-              <div className="w-20 h-20 mx-auto bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-amber-500/40 ring-4 ring-amber-400/40 text-stone-950 animate-bounce">
-                <Lock className="w-10 h-10 stroke-[2.5]" />
+          <div className="w-full max-w-lg my-auto relative z-10 flex flex-col justify-between py-6 space-y-5 animate-in zoom-in-95 duration-200">
+            {/* Header del Relevo */}
+            <div className="text-center space-y-2">
+              <div className="w-18 h-18 sm:w-20 sm:h-20 mx-auto bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-amber-500/40 ring-4 ring-amber-400/40 text-white text-3xl sm:text-4xl animate-bounce">
+                🪙
               </div>
               <div>
                 <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide">
-                  Terminal Bloqueada
+                  Relevo & Apertura de Turno
                 </h2>
-                <p className="text-xs sm:text-sm text-amber-300 font-bold mt-1">
-                  Turno de cajera cerrado por seguridad
+                <p className="text-xs sm:text-sm text-amber-300 font-bold mt-0.5">
+                  Corte de caja registrado. Lista para que la cajera entrante comience a vender.
                 </p>
               </div>
             </div>
 
-            {/* Tarjeta de Seguridad & Formulario */}
-            <div className="bg-gradient-to-b from-[#24120a] to-[#1a0c06] border-2 border-amber-900/60 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
-              <div className="bg-amber-950/70 border border-amber-500/40 p-4 rounded-2xl text-xs space-y-1.5 text-amber-100/90 shadow-inner">
-                <p className="font-black flex items-center gap-1.5 text-amber-300 text-sm">
-                  <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" /> Candado de Seguridad Activo
-                </p>
-                <p className="text-xs text-stone-300 leading-relaxed">
-                  El corte de turno fue guardado y verificado. Para habilitar el cobro y aperturar el siguiente turno, la encargada debe ingresar sus credenciales.
-                </p>
+            {/* Contenedor Principal de Información Financiera de Relevo */}
+            <div className="bg-gradient-to-b from-[#24120a] to-[#1a0c06] border-2 border-amber-500/50 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
+              
+              {/* 1. TARJETA PROMINENTE: CON CUÁNTO DINERO SE INICIARÁ EL TURNO (NÚMEROS GRANDES) */}
+              <div className="bg-gradient-to-br from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 p-5 rounded-3xl text-center space-y-1.5 shadow-xl ring-2 ring-amber-400/20 relative overflow-hidden">
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
+                <span className="text-xs sm:text-sm font-black uppercase text-amber-300 tracking-wider flex items-center justify-center gap-1.5">
+                  <span>🪙</span> Con este dinero se iniciará el turno:
+                </span>
+                
+                {/* NÚMERO GIGANTE */}
+                <div className="text-5xl sm:text-6xl font-black text-amber-300 tracking-tight py-1 filter drop-shadow-[0_4px_12px_rgba(245,158,11,0.35)]">
+                  {formatCurrency(initialCashFund)}
+                </div>
+
+                <div className="inline-block bg-amber-500/20 text-amber-200 text-xs font-bold px-4 py-1 rounded-full border border-amber-400/30">
+                  Fondo Inicial disponible en el cajón para cambio
+                </div>
               </div>
 
-              {lockError && (
-                <div className="p-3 bg-rose-950/90 border-2 border-rose-500 text-rose-200 text-xs font-black rounded-xl flex items-center gap-2 animate-in shake">
-                  <span>⚠️</span> {lockError}
-                </div>
-              )}
-
-              <form onSubmit={handleUnlockShift} className="space-y-4 text-xs">
-                <div>
-                  <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1.5 text-xs">
-                    USUARIO DE ENCARGADA:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="admin"
-                    value={lockUser}
-                    onChange={(e) => {
-                      setLockUser(e.target.value);
-                      setLockError("");
-                    }}
-                    className="w-full px-4 py-3.5 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600 shadow-inner"
-                  />
+              {/* 2. RESUMEN: TOTAL DE DINERO QUE HUBO ANTERIORMENTE */}
+              <div className="bg-stone-900/90 border border-stone-700/80 p-4 rounded-2xl text-xs space-y-2 shadow-inner">
+                <div className="flex items-center justify-between pb-2 border-b border-stone-800">
+                  <span className="text-stone-400 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span>📊</span> Total de dinero en el turno anterior:
+                  </span>
+                  <span className="font-black text-white text-base sm:text-lg">
+                    {formatCurrency(lastCutInfo ? lastCutInfo.countedCash : initialCashFund)}
+                  </span>
                 </div>
 
-                <div>
-                  <label className="font-bold text-amber-200/90 uppercase tracking-wider block mb-1.5 text-xs">
-                    CONTRASEÑA:
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showLockPassword ? "text" : "password"}
-                      required
-                      placeholder="••••••"
-                      value={lockPassword}
-                      onChange={(e) => {
-                        setLockPassword(e.target.value);
-                        setLockError("");
-                      }}
-                      className="w-full pl-4 pr-11 py-3.5 bg-stone-900 border-2 border-amber-900/80 focus:border-amber-500 focus:bg-stone-950 rounded-xl text-sm font-bold text-white focus:outline-none transition-all placeholder:text-stone-600 shadow-inner"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowLockPassword(!showLockPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-amber-300 transition-colors p-1"
-                      title={showLockPassword ? "Ocultar contraseña" : "Ver contraseña"}
-                    >
-                      {showLockPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                <div className="grid grid-cols-2 gap-2 text-[11px] pt-0.5">
+                  <div className="bg-stone-950/60 p-2 rounded-xl border border-stone-800">
+                    <span className="text-stone-400 block text-[10px]">Entregó el turno:</span>
+                    <span className="font-extrabold text-stone-200 truncate block mt-0.5">
+                      👩‍🍳 {lastCutInfo ? lastCutInfo.outgoingCashier : "Cajera Anterior"}
+                    </span>
+                  </div>
+                  <div className="bg-stone-950/60 p-2 rounded-xl border border-stone-800">
+                    <span className="text-stone-400 block text-[10px]">Comprobante / Folio:</span>
+                    <span className="font-extrabold text-amber-300 truncate block mt-0.5 font-mono">
+                      🧾 {lastCutInfo ? lastCutInfo.id : "CORTE-RELEVO"}
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/20 active:scale-95 transition-all mt-2 cursor-pointer"
-                >
-                  <Unlock className="w-5 h-5 stroke-[2.5]" />
-                  <span>Desbloquear Terminal & Habilitar Cobro</span>
-                </button>
-              </form>
-            </div>
+              {/* 3. RELEVO DE QUIÉN TOMA EL TURNO */}
+              <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-emerald-950/80 to-stone-900 border border-emerald-500/40 rounded-2xl">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 bg-emerald-600/30 rounded-xl border border-emerald-400/40 flex items-center justify-center text-lg shrink-0">
+                    👩‍🍳
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-emerald-400 uppercase font-black tracking-wider block">
+                      Toma el turno ahora:
+                    </span>
+                    <span className="text-sm font-black text-white truncate block">
+                      {cashierName}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-emerald-300 bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-500/30 shrink-0">
+                  {shiftName.split(" ")[0]}
+                </span>
+              </div>
 
-            {/* Botón de acceso rápido para desarrollo/pruebas */}
-            <div className="pt-2 text-center space-y-3">
+              {/* 4. BOTÓN DIRECTO DE 1 SOLO TOQUE PARA COMENZAR INMEDIATAMENTE (SIN CONTRASEÑAS) */}
               <button
                 type="button"
-                onClick={() => {
-                  setLockUser("admin");
-                  setLockPassword("admin");
-                  setLockError("");
-                }}
-                className="w-full py-2.5 px-4 rounded-xl border border-amber-900/50 bg-stone-950/60 hover:bg-amber-950/40 text-amber-400/90 text-xs font-bold transition-all hover:border-amber-500/50"
+                onClick={handleDirectUnlockShift}
+                className="w-full py-4.5 sm:py-5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black rounded-2xl text-base sm:text-lg flex items-center justify-center gap-2.5 shadow-2xl shadow-amber-500/30 active:scale-95 transition-all hover:scale-[1.02] cursor-pointer animate-pulse"
               >
-                ⚡ Autocompletar credenciales (admin / admin)
+                <span>🚀</span>
+                <span>TOMAR TURNO Y COMENZAR A COBRAR ➔</span>
               </button>
-              <p className="text-[11px] text-stone-500 font-medium">
-                Panaderías Brito • Don Antonio Brito
-              </p>
+            </div>
+
+            <div className="text-center text-[11px] text-stone-500 font-medium">
+              Panaderías Brito • Sistema Punto de Venta • Relevo Rápido
             </div>
           </div>
         </div>
