@@ -192,5 +192,24 @@ export interface Branch {
   color: string; // e.g. "orange", "rose", "emerald", "blue", "purple"
 }
 
+export interface BreadDeliveryItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  previousStock: number;
+  newStock: number;
+}
 
-
+export interface BreadDeliveryRecord {
+  id: string;
+  source: string; // e.g. "Camioneta 1", "Taller Central", etc.
+  driver?: string;
+  cashier: string;
+  date: string;
+  timestamp: string;
+  items: BreadDeliveryItem[];
+  totalPieces: number;
+  totalEstimatedValue: number;
+  notes?: string;
+}

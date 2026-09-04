@@ -44,10 +44,10 @@ import {
   Menu,
   Pencil
 } from "lucide-react";
-import { Product, CartItem, Sale, CashExpense, Customer } from "@/types";
+import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
+import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
 import { 
   DEFAULT_GENERAL_CUSTOMER, 
   getStoredCustomers, 
@@ -62,6 +62,7 @@ import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
 import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
+import BreadDeliveryModal from "@/components/pos/BreadDeliveryModal";
 import NotificationsDropdown from "@/components/layout/NotificationsDropdown";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
@@ -180,6 +181,16 @@ export default function POSPage() {
   const [showRecentSales, setShowRecentSales] = useState(false);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
+  const [showBreadDeliveryModal, setShowBreadDeliveryModal] = useState(false);
+  const [breadDeliveriesList, setBreadDeliveriesList] = useState<BreadDeliveryRecord[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("brito_bread_deliveries");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [];
+  });
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>([]);
   const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
@@ -600,15 +611,17 @@ export default function POSPage() {
     } catch (e) {
       console.log("Offline sale or db pending", e);
     } finally {
-      setProducts((prev) =>
-        prev.map((prod) => {
+      setProducts((prev) => {
+        const updated = prev.map((prod) => {
           const bought = currentItems.find((ci) => ci.product.id === prod.id);
           if (bought) {
             return { ...prod, stock: Math.max(0, prod.stock - bought.quantity) };
           }
           return prod;
-        })
-      );
+        });
+        saveStoredProducts(updated);
+        return updated;
+      });
 
       const newSaleRecord: Sale = {
         id: createdSaleId,
@@ -634,6 +647,54 @@ export default function POSPage() {
       setIsSubmitting(false);
       setShowReceiptModal(true);
     }
+  };
+
+  const handleReceiveBreadDelivery = async (delivery: BreadDeliveryRecord) => {
+    // 1. Sumar existencias en el catálogo local y estado
+    setProducts((prev) => {
+      const updated = prev.map((prod) => {
+        const delivered = delivery.items.find((item) => item.productId === prod.id);
+        if (delivered) {
+          return { ...prod, stock: prod.stock + delivered.quantity };
+        }
+        return prod;
+      });
+      saveStoredProducts(updated);
+      return updated;
+    });
+
+    // 2. Guardar en el historial de camionetas
+    const updatedDeliveries = [delivery, ...breadDeliveriesList];
+    setBreadDeliveriesList(updatedDeliveries);
+    try {
+      localStorage.setItem("brito_bread_deliveries", JSON.stringify(updatedDeliveries));
+    } catch (e) {}
+
+    // 3. Sincronizar en Supabase si está disponible
+    try {
+      const supabase = createClient();
+      for (const item of delivery.items) {
+        if (item.productId.includes("-")) {
+          await supabase
+            .from("products")
+            .update({ stock: item.newStock })
+            .eq("id", item.productId);
+        }
+      }
+    } catch (err) {
+      console.log("Offline mode or pending db sync", err);
+    }
+
+    // 4. Disparar notificación de pan surtido
+    addNotification({
+      senderName: `🚐 Camioneta Brito (${delivery.source})`,
+      senderAvatar: "🥖",
+      badgeIcon: "horno",
+      title: "Entrada de Pan Recibida",
+      highlightText: `+${delivery.totalPieces} piezas agregadas`,
+      description: `Se ingresaron ${delivery.totalPieces} piezas de pan al mostrador recibidas por ${delivery.cashier}.`,
+      category: "inventario",
+    });
   };
 
   const handleReprintSale = (sale: Sale) => {
@@ -941,6 +1002,37 @@ export default function POSPage() {
                   </span>
                 )}
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
+              </button>
+            </div>
+
+            {/* Botón Surtir / Entrada de Pan (Camionetas) */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isShiftLocked) {
+                    addNotification({
+                      senderName: "🔒 Terminal Bloqueada",
+                      senderAvatar: "⚠️",
+                      badgeIcon: "alerta",
+                      title: "Terminal Bloqueada",
+                      highlightText: "Turno cerrado por seguridad",
+                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar entrada de pan.",
+                      category: "caja",
+                    });
+                    return;
+                  }
+                  setShowBreadDeliveryModal(true);
+                }}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                  isShiftLocked
+                    ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
+                    : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black shadow-sm"
+                }`}
+                title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
+              >
+                <span className="text-lg">🚐</span>
+                <span>Entrada de Pan</span>
               </button>
             </div>
 
@@ -1975,6 +2067,16 @@ export default function POSPage() {
           onCompleteShiftCut={handleCompleteShiftCut}
         />
       )}
+
+      {/* Bread Delivery Modal (Recepción de Pan de Camionetas) */}
+      <BreadDeliveryModal
+        isOpen={showBreadDeliveryModal}
+        onClose={() => setShowBreadDeliveryModal(false)}
+        products={products}
+        onConfirmDelivery={handleReceiveBreadDelivery}
+        cashierName={cashierName}
+        deliveriesHistory={breadDeliveriesList}
+      />
     </div>
   );
 }
