@@ -159,18 +159,6 @@ const COLOR_THEMES: Record<string, { label: string; preview: string; colors: The
   },
 };
 
-const EMOJI_OPTIONS = [
-  "👑", "💼", "🛒", "🥐", "🥖", "👨‍🍳", "🛡️", "🔍", 
-  "📊", "⚡", "📦", "🎯", "🏷️", "🔑", "📋", "☕"
-];
-
-const PRESET_OPTIONS = [
-  { id: "cajero", title: "Cajero / Atención POS", desc: "Cobro, tickets y arqueo de caja", icon: "🛒" },
-  { id: "auxiliar_admin", title: "Auxiliar Administrativo", desc: "Almacén, inventarios y compras", icon: "💼" },
-  { id: "admin", title: "Administrador Total", desc: "Todos los 13 permisos habilitados", icon: "👑" },
-  { id: "empty", title: "En Blanco (Sin accesos)", desc: "Configurar todos los permisos desde cero", icon: "⚪" },
-];
-
 const DEFAULT_SYSTEM_ROLES: RoleConfig[] = [
   {
     id: "admin",
@@ -361,12 +349,8 @@ export default function RoleManagement() {
 
   // Form states for creating a new role
   const [newRoleName, setNewRoleName] = useState("");
-  const [newRoleSubtitle, setNewRoleSubtitle] = useState("");
   const [newRoleBadge, setNewRoleBadge] = useState("Personalizado");
-  const [newRoleIcon, setNewRoleIcon] = useState("🥐");
-  const [newRoleTheme, setNewRoleTheme] = useState<string>("purple");
   const [newRoleDescription, setNewRoleDescription] = useState("");
-  const [newRolePreset, setNewRolePreset] = useState<string>("cajero");
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -515,12 +499,8 @@ export default function RoleManagement() {
   // Open Create Role Modal
   const handleOpenCreateModal = () => {
     setNewRoleName("");
-    setNewRoleSubtitle("");
-    setNewRoleBadge("Supervisión");
-    setNewRoleIcon("🥐");
-    setNewRoleTheme("purple");
+    setNewRoleBadge("Personalizado");
     setNewRoleDescription("");
-    setNewRolePreset("cajero");
     setIsCreateModalOpen(true);
   };
 
@@ -533,41 +513,22 @@ export default function RoleManagement() {
     }
 
     const roleSlug = `rol_${newRoleName.trim().toLowerCase().replace(/[^a-z0-9]/g, "_").slice(0, 15)}_${Date.now().toString().slice(-4)}`;
-    const themeObj = COLOR_THEMES[newRoleTheme] || COLOR_THEMES.amber;
+    const themeObj = COLOR_THEMES.amber;
 
-    // Get preset permissions
-    let initialPerms: RolePermissions;
-    if (newRolePreset === "empty") {
-      initialPerms = {
-        canAccessDashboard: false,
-        canAccessPos: false,
-        canAccessCaja: false,
-        canAccessInventario: false,
-        canAccessPedidos: false,
-        canAccessClientes: false,
-        canAccessFinanzas: false,
-        canAccessReportes: false,
-        canAccessConfiguracion: false,
-        canAccessProductos: false,
-        canViewProfitMargins: false,
-        canEditPrices: false,
-        canManageUsers: false,
-      };
-    } else {
-      const basePreset = ROLE_PERMISSIONS[newRolePreset as UserRole] || ROLE_PERMISSIONS.cajero;
-      initialPerms = { ...basePreset };
-    }
+    // Default base permissions: cajero
+    const basePreset = ROLE_PERMISSIONS.cajero;
+    const initialPerms: RolePermissions = { ...basePreset };
 
     const newRoleObj: RoleConfig = {
       id: roleSlug,
       name: newRoleName.trim(),
       defaultTitle: newRoleName.trim(),
-      subtitle: newRoleSubtitle.trim() || "Puesto especializado en panadería",
+      subtitle: "Rol personalizado del sistema",
       badge: newRoleBadge.trim() || "Personalizado",
-      icon: newRoleIcon || "🥐",
+      icon: "🛡️",
       description: newRoleDescription.trim() || `Funciones y responsabilidades de ${newRoleName.trim()} en Panaderías Brito.`,
       isSystemRole: false,
-      colorTheme: newRoleTheme,
+      colorTheme: "amber",
       colorClass: themeObj.colors,
     };
 
@@ -1130,12 +1091,12 @@ export default function RoleManagement() {
       {/* ========================================================================= */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-5 sm:p-6 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border-b border-amber-200/80 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-stone-950 flex items-center justify-center text-2xl shadow-md font-bold shrink-0">
-                  {newRoleIcon}
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-stone-950 flex items-center justify-center text-xl shadow-md font-bold shrink-0">
+                  <ShieldCheck className="w-6 h-6 text-stone-950" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -1147,7 +1108,7 @@ export default function RoleManagement() {
                     </span>
                   </div>
                   <p className="text-xs text-stone-500">
-                    Define un nuevo puesto operativo, su diseño visual y su plantilla de accesos.
+                    Define un nuevo puesto de trabajo para el personal del sistema.
                   </p>
                 </div>
               </div>
@@ -1162,140 +1123,37 @@ export default function RoleManagement() {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleCreateRoleSubmit} className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs">
-              
-              {/* Live Preview Card */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-stone-700 text-xs flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Previsualización en Tiempo Real de la Tarjeta:</span>
-                </label>
-                
-                {(() => {
-                  const previewTheme = COLOR_THEMES[newRoleTheme] || COLOR_THEMES.amber;
-                  return (
-                    <div className={`p-4 rounded-2xl border-2 ${previewTheme.colors.border} ${previewTheme.colors.bg} flex items-start justify-between gap-3`}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl p-2 rounded-xl bg-white border border-stone-200/80 shadow-xs">
-                          {newRoleIcon}
-                        </span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <h5 className="font-black text-sm text-stone-900">
-                              {newRoleName.trim() || "Nombre del Nuevo Rol"}
-                            </h5>
-                            <span className="px-1.5 py-0.2 bg-purple-100 text-purple-800 rounded text-[9px] font-bold">
-                              Nuevo
-                            </span>
-                          </div>
-                          <p className="text-[11px] font-bold text-stone-500">
-                            {newRoleSubtitle.trim() || "Subtítulo o descripción de puesto"}
-                          </p>
-                          <p className="text-xs text-stone-600 mt-1 max-w-md line-clamp-1">
-                            {newRoleDescription.trim() || "Descripción de responsabilidades y operaciones..."}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border shrink-0 ${previewTheme.colors.badgeBg}`}>
-                        {newRoleBadge.trim() || "Personalizado"}
-                      </span>
-                    </div>
-                  );
-                })()}
+            <form onSubmit={handleCreateRoleSubmit} className="p-5 sm:p-6 space-y-4 text-xs">
+              {/* Name */}
+              <div className="space-y-1">
+                <label className="font-bold text-stone-700">Nombre del Rol *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Supervisor de Tienda, Encargado de Producción, Auditor..."
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
               </div>
 
-              {/* Name & Subtitle */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="font-bold text-stone-700">Nombre del Rol *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Supervisor de Panadería, Jefe de Turno, Auditor..."
-                    value={newRoleName}
-                    onChange={(e) => setNewRoleName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Subtítulo / Especialidad</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Control de producción & mermas"
-                    value={newRoleSubtitle}
-                    onChange={(e) => setNewRoleSubtitle(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-medium text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Etiqueta / Badge</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Supervisión, Calidad, Turno..."
-                    value={newRoleBadge}
-                    onChange={(e) => setNewRoleBadge(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Icon / Emoji Selector */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-stone-700 flex items-center justify-between">
-                  <span>Icono / Emoji Representativo</span>
-                  <span className="text-stone-400 font-normal text-[11px]">Selecciona uno para el rol</span>
-                </label>
-                <div className="grid grid-cols-8 gap-2">
-                  {EMOJI_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setNewRoleIcon(emoji)}
-                      className={`h-10 rounded-xl flex items-center justify-center text-xl transition-all cursor-pointer ${
-                        newRoleIcon === emoji
-                          ? "bg-amber-500 text-white scale-110 shadow-md ring-2 ring-amber-300"
-                          : "bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-800"
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Color Theme Selector */}
-              <div className="space-y-1.5">
-                <label className="font-bold text-stone-700 flex items-center gap-1.5">
-                  <Palette className="w-3.5 h-3.5 text-stone-500" />
-                  <span>Color Temático del Rol:</span>
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {Object.entries(COLOR_THEMES).map(([key, theme]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setNewRoleTheme(key)}
-                      className={`px-3 py-2 rounded-xl border flex items-center gap-2 font-bold text-xs transition-all cursor-pointer ${
-                        newRoleTheme === key
-                          ? "bg-stone-900 text-white border-stone-900 shadow-sm ring-2 ring-amber-400/60"
-                          : "bg-white hover:bg-stone-50 border-stone-200 text-stone-700"
-                      }`}
-                    >
-                      <span className={`w-3.5 h-3.5 rounded-full ${theme.preview} shrink-0`} />
-                      <span className="truncate">{theme.label}</span>
-                    </button>
-                  ))}
-                </div>
+              {/* Badge */}
+              <div className="space-y-1">
+                <label className="font-bold text-stone-700">Etiqueta / Distintivo</label>
+                <input
+                  type="text"
+                  placeholder="Ej. Supervisión, Calidad, Turno..."
+                  value={newRoleBadge}
+                  onChange={(e) => setNewRoleBadge(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
               </div>
 
               {/* Description */}
               <div className="space-y-1">
                 <label className="font-bold text-stone-700">Descripción del Rol y Responsabilidades</label>
                 <textarea
-                  rows={2}
+                  rows={3}
                   placeholder="Describe las tareas y funciones que desempeñarán los empleados con este rol..."
                   value={newRoleDescription}
                   onChange={(e) => setNewRoleDescription(e.target.value)}
@@ -1303,38 +1161,16 @@ export default function RoleManagement() {
                 />
               </div>
 
-              {/* Base Permission Template Preset */}
-              <div className="space-y-1.5 bg-stone-50/80 p-3.5 rounded-2xl border border-stone-200">
-                <label className="font-bold text-stone-800 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-amber-600" />
-                    <span>Plantilla de Permisos Iniciales</span>
-                  </span>
-                  <span className="text-[10px] text-stone-500 font-normal">(Podrás afinar los switches luego)</span>
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  {PRESET_OPTIONS.map((preset) => (
-                    <div
-                      key={preset.id}
-                      onClick={() => setNewRolePreset(preset.id)}
-                      className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center gap-2.5 ${
-                        newRolePreset === preset.id
-                          ? "bg-amber-100/70 border-amber-400 text-stone-900 font-bold shadow-xs"
-                          : "bg-white border-stone-200 text-stone-700 hover:border-stone-300"
-                      }`}
-                    >
-                      <span className="text-xl">{preset.icon}</span>
-                      <div className="space-y-0.5 flex-1">
-                        <p className="font-black text-xs leading-tight">{preset.title}</p>
-                        <p className="text-[10px] text-stone-500 leading-tight">{preset.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              {/* Information Note */}
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center gap-2.5 text-[11px] text-amber-900">
+                <span className="text-base shrink-0">💡</span>
+                <p>
+                  Al crearse, el rol se activará automáticamente para que puedas encender o apagar sus <strong>13 accesos y permisos</strong> con los interruptores de la pantalla.
+                </p>
               </div>
 
               {/* Modal Footer */}
-              <div className="pt-4 border-t border-stone-100 flex items-center justify-between shrink-0">
+              <div className="pt-3 border-t border-stone-100 flex items-center justify-between shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
