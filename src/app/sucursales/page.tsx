@@ -27,7 +27,6 @@ import {
   Croissant,
   Calendar,
   Layers,
-  Table as TableIcon,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -43,8 +42,6 @@ import { Branch, BranchShift } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import GoogleBranchChart, { PeriodType } from "@/components/sucursales/GoogleBranchChart";
 import PeriodSelectorButton from "@/components/sucursales/PeriodSelectorButton";
-import RealTimeSalesMonitor from "@/components/sucursales/RealTimeSalesMonitor";
-import CashFlowPanel from "@/components/sucursales/CashFlowPanel";
 import CreateBranchModal from "@/components/sucursales/CreateBranchModal";
 import EditShiftModal from "@/components/sucursales/EditShiftModal";
 
@@ -57,18 +54,11 @@ export default function SucursalesPage() {
     addBranch,
     updateBranch,
     simulateSale, 
-    simulateBulkSales,
     advanceShift,
-    isLiveSimulating,
-    toggleLiveSimulation,
-    recentSimulatedSales,
-    cashMovements,
-    addCashMovement,
     consolidatedMetrics
   } = useBranch();
 
   const [lastSimulatedSale, setLastSimulatedSale] = useState<SimulatedSale | null>(null);
-  const [activeTab, setActiveTab] = useState<"realtime" | "cashflow" | "general" | "turnos">("realtime");
   const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
   const [editingShiftBranch, setEditingShiftBranch] = useState<Branch | null>(null);
 
@@ -107,10 +97,6 @@ export default function SucursalesPage() {
     const sale = simulateSale(branchId);
     setLastSimulatedSale(sale);
     setTimeout(() => setLastSimulatedSale(null), 3500);
-  };
-
-  const handleSimulateShift = (branchId?: string) => {
-    simulateBulkSales(branchId, 12);
   };
 
   // Compute period multiplier and days count for realistic period calculations
@@ -276,8 +262,18 @@ export default function SucursalesPage() {
             </p>
           </div>
 
-          {/* Action Button: Create Branch */}
+          {/* Action Buttons: Ver Toda la Red & Create Branch */}
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => switchBranch("all")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                isAllBranches
+                  ? "bg-white/20 text-white border-white/30 shadow-md"
+                  : "bg-white/10 hover:bg-white/15 text-stone-200 border-white/10"
+              }`}
+            >
+              {isAllBranches ? "✓ Toda la Red" : "Ver Toda la Red"}
+            </button>
             <button
               onClick={() => setIsCreateBranchOpen(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
@@ -341,110 +337,8 @@ export default function SucursalesPage() {
         </div>
       </div>
 
-      {/* Navigation View Switcher (Tabs) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* TAB 1: Ventas en Tiempo Real */}
-          <button
-            onClick={() => setActiveTab("realtime")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
-              activeTab === "realtime"
-                ? "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-lg shadow-orange-500/20"
-                : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
-            }`}
-          >
-            <Zap className="w-4 h-4 text-amber-300 fill-current animate-pulse" />
-            <span>⚡ Ventas en Tiempo Real</span>
-          </button>
-
-          {/* TAB 2: Flujo de Dinero */}
-          <button
-            onClick={() => setActiveTab("cashflow")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
-              activeTab === "cashflow"
-                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/20"
-                : "bg-white text-stone-700 hover:bg-stone-100 border border-stone-200"
-            }`}
-          >
-            <Wallet className="w-4 h-4 text-emerald-300" />
-            <span>💰 Flujo de Dinero & Caja</span>
-          </button>
-
-          {/* TAB 3: Analítica & Gráfica Google */}
-          <button
-            onClick={() => setActiveTab("general")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
-              activeTab === "general"
-                ? "bg-stone-900 text-white shadow-md"
-                : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
-            }`}
-          >
-            <TableIcon className="w-4 h-4 text-orange-500" />
-            <span>📊 Analítica & Gráfica Google</span>
-          </button>
-
-          {/* TAB 4: Turnos & Arqueo */}
-          <button
-            onClick={() => setActiveTab("turnos")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
-              activeTab === "turnos"
-                ? "bg-stone-900 text-white shadow-md"
-                : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
-            }`}
-          >
-            <Clock className="w-4 h-4 text-rose-500" />
-            <span>⏱️ Estado de Turnos & Arqueo</span>
-          </button>
-        </div>
-
-        {/* Global branch selector pill */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => switchBranch("all")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border self-start sm:self-auto ${
-              isAllBranches
-                ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
-                : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
-            }`}
-          >
-            {isAllBranches ? "✓ Toda la Red" : "Ver Toda la Red"}
-          </button>
-        </div>
-      </div>
-
-      {/* TAB 1: Monitor de Ventas en Tiempo Real */}
-      {activeTab === "realtime" && (
-        <RealTimeSalesMonitor
-          branches={branches}
-          currentBranch={currentBranch}
-          isAllBranches={isAllBranches}
-          onSwitchBranch={switchBranch}
-          recentSales={recentSimulatedSales}
-          onSimulateSale={handleSimulate}
-          onSimulateBulk={handleSimulateShift}
-          isLiveSimulating={isLiveSimulating}
-          onToggleLive={toggleLiveSimulation}
-          lastSimulatedSale={lastSimulatedSale}
-          onOpenCreateBranch={() => setIsCreateBranchOpen(true)}
-        />
-      )}
-
-      {/* TAB 2: Panel Específico de Flujo de Dinero */}
-      {activeTab === "cashflow" && (
-        <CashFlowPanel
-          branches={branches}
-          currentBranch={currentBranch}
-          isAllBranches={isAllBranches}
-          onSwitchBranch={switchBranch}
-          cashMovements={cashMovements}
-          onAddCashMovement={addCashMovement}
-          onAdvanceShift={advanceShift}
-        />
-      )}
-
-      {/* TAB 3: Main Overview (Google-Style Chart + General Table) */}
-      {activeTab === "general" && (
-        <div className="space-y-6 animate-in fade-in">
+      {/* SECCIÓN PRINCIPAL: Gráfica de Análisis & Tabla General de Sucursales */}
+      <div className="space-y-6 animate-in fade-in">
           {/* SECCIÓN DESPLEGABLE: Gráfica de Análisis & Estadísticas Estilo Google (Oculta al inicio) */}
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 bg-white rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-md transition-all">
@@ -1005,99 +899,6 @@ export default function SucursalesPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* TAB 4: Shift Management & Arqueo Comparison */}
-      {activeTab === "turnos" && (
-        <div className="space-y-6 animate-in fade-in">
-          <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
-            <h3 className="text-base font-black text-stone-900 mb-1">
-              Comparativa de Turnos Activos por Sucursal
-            </h3>
-            <p className="text-xs text-stone-500 mb-4">
-              Estado en tiempo real del fondo inicial, ventas por medio de pago y arqueo de caja
-            </p>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-stone-200 text-stone-500 uppercase tracking-wider font-bold">
-                    <th className="pb-3 px-3">Sucursal</th>
-                    <th className="pb-3 px-3">Turno Actual</th>
-                    <th className="pb-3 px-3">Cajera / Operador</th>
-                    <th className="pb-3 px-3">Fondo Inicial</th>
-                    <th className="pb-3 px-3">Venta Efectivo</th>
-                    <th className="pb-3 px-3">Venta Tarjeta/Transfer</th>
-                    <th className="pb-3 px-3">Total en Turno</th>
-                    <th className="pb-3 px-3">Efectivo en Caja</th>
-                    <th className="pb-3 px-3 text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100 font-medium">
-                  {branches.map((b) => (
-                    <tr key={b.id} className="hover:bg-stone-50/80 transition-colors">
-                      <td className="py-3.5 px-3 font-bold text-stone-900">
-                        {b.name}
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                          <span className="px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 font-bold border border-orange-200 inline-block text-xs shadow-xs">
-                            {b.currentShift.name}
-                          </span>
-                          <button
-                            onClick={() => setEditingShiftBranch(b)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-orange-500 hover:text-white text-orange-600 font-bold text-[11px] border border-orange-200 shadow-xs transition-all active:scale-95 group shrink-0"
-                            title="Modificar horario y nombre del turno"
-                          >
-                            <Clock className="w-3.5 h-3.5 group-hover:rotate-45 transition-transform" />
-                            <span>Modificar Horario</span>
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-3 font-bold text-stone-800">
-                        {b.currentShift.cashier}
-                      </td>
-                      <td className="py-3.5 px-3 text-stone-600">
-                        {formatCurrency(b.currentShift.initialFund)}
-                      </td>
-                      <td className="py-3.5 px-3 font-bold text-emerald-700">
-                        {formatCurrency(b.currentShift.cashSales)}
-                      </td>
-                      <td className="py-3.5 px-3 text-stone-600">
-                        {formatCurrency(b.currentShift.cardSales + b.currentShift.transferSales)}
-                      </td>
-                      <td className="py-3.5 px-3 font-black text-stone-900">
-                        {formatCurrency(b.currentShift.totalSales)}
-                      </td>
-                      <td className="py-3.5 px-3 font-black text-stone-900 bg-stone-50">
-                        {formatCurrency(b.cashInDrawer)}
-                      </td>
-                      <td className="py-3.5 px-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => setEditingShiftBranch(b)}
-                            className="px-2.5 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-bold text-[11px] transition-all flex items-center gap-1"
-                            title="Cambiar horario del turno"
-                          >
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>Horario</span>
-                          </button>
-                          <button
-                            onClick={() => advanceShift(b.id)}
-                            className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-white font-bold text-[11px] transition-colors"
-                          >
-                            Corte / Siguiente Turno
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal para Crear Nueva Sucursal y Asignar Encargado */}
       <CreateBranchModal
