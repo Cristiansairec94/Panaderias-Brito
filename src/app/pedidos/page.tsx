@@ -23,7 +23,6 @@ import {
   ChevronRight,
   ChevronDown,
   TrendingUp,
-  LayoutGrid,
   List,
   Flame,
   ArrowUpRight,
@@ -55,7 +54,6 @@ export default function PedidosPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
 
   // Expanded rows in list view
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
@@ -325,8 +323,8 @@ export default function PedidosPage() {
       {/* Filter and Search Toolbar */}
       <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-          {/* Search bar (5 cols) */}
-          <div className="md:col-span-5 relative">
+          {/* Search bar (6 cols) */}
+          <div className="md:col-span-6 relative">
             <Search className="w-4 h-4 absolute left-3.5 top-3 text-stone-400" />
             <input
               type="text"
@@ -353,8 +351,8 @@ export default function PedidosPage() {
             </select>
           </div>
 
-          {/* Payment filter (2 cols) */}
-          <div className="md:col-span-2">
+          {/* Payment filter (3 cols) */}
+          <div className="md:col-span-3">
             <select
               value={paymentFilter}
               onChange={(e) => setPaymentFilter(e.target.value)}
@@ -364,34 +362,6 @@ export default function PedidosPage() {
               <option value="pendientes">⚠️ Con Saldo Pendiente</option>
               <option value="liquidados">✓ 100% Liquidados</option>
             </select>
-          </div>
-
-          {/* View mode toggle: List (default) vs Cards */}
-          <div className="md:col-span-2 flex items-center justify-end gap-1.5">
-            <button
-              onClick={() => setViewMode("table")}
-              className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                viewMode === "table"
-                  ? "bg-amber-600 text-white border-amber-600 shadow-sm"
-                  : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
-              }`}
-              title="Vista en Lista (Ordenada)"
-            >
-              <List className="w-4 h-4" />
-              <span className="hidden sm:inline">Lista</span>
-            </button>
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                viewMode === "grid"
-                  ? "bg-amber-600 text-white border-amber-600 shadow-sm"
-                  : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
-              }`}
-              title="Vista en Tarjetas"
-            >
-              <LayoutGrid className="w-4 h-4" />
-              <span className="hidden sm:inline">Tarjetas</span>
-            </button>
           </div>
         </div>
 
@@ -497,9 +467,9 @@ export default function PedidosPage() {
             <Plus className="w-4 h-4" /> Tomar Nuevo Pedido
           </button>
         </div>
-      ) : viewMode === "table" ? (
+      ) : (
         /* ============================================================ */
-        /* LIST / TABLE VIEW (DEFAULT): CLEAN, ELEGANT, ORDERED */
+        /* LIST / TABLE VIEW: CLEAN, ELEGANT, ORDERED */
         /* ============================================================ */
         <div className="bg-white rounded-3xl border border-stone-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
@@ -824,205 +794,6 @@ export default function PedidosPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      ) : (
-        /* ============================================================ */
-        /* CARDS / GRID VIEW (OPTIONAL) */
-        /* ============================================================ */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredOrders.map((order) => {
-            const isToday = order.deliveryDate === todayStr;
-            const isTomorrow = order.deliveryDate === tomorrowStr;
-
-            return (
-              <div
-                key={order.id}
-                className={`bg-white rounded-3xl border transition-all flex flex-col justify-between overflow-hidden shadow-sm hover:shadow-md ${
-                  isToday && order.status !== "entregado"
-                    ? "border-rose-400 ring-2 ring-rose-300/40"
-                    : "border-stone-200"
-                }`}
-              >
-                {/* Card Top */}
-                <div className="p-5 space-y-3.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-black text-xs text-amber-900 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200 shadow-2xs font-mono">
-                        {order.orderNumber}
-                      </span>
-                      {isToday && order.status !== "entregado" && (
-                        <span className="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-black animate-pulse">
-                          ¡ENTREGA HOY!
-                        </span>
-                      )}
-                      {isTomorrow && order.status !== "entregado" && (
-                        <span className="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold">
-                          Mañana
-                        </span>
-                      )}
-                    </div>
-                    {getStatusBadge(order.status)}
-                  </div>
-
-                  <div>
-                    <h3 className="font-extrabold text-base text-stone-900 leading-tight">
-                      {order.customerName}
-                    </h3>
-                    <div className="flex items-center justify-between mt-1 text-xs text-stone-500">
-                      <span className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-stone-400" /> {order.phone}
-                      </span>
-                      <span className="text-[11px] font-bold text-amber-800 bg-stone-100 px-2 py-0.5 rounded-md">
-                        {order.branchName.replace("Sucursal ", "")}
-                      </span>
-                    </div>
-                  </div>
-
-                  {order.dedication && (
-                    <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 text-xs text-amber-950 font-medium flex items-start gap-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      <div className="leading-snug">
-                        <strong className="block text-[10px] text-amber-800 uppercase tracking-wider">
-                          Observaciones:
-                        </strong>
-                        "{order.dedication}"
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="bg-stone-50/90 rounded-2xl p-3 border border-stone-100 space-y-1.5">
-                    <span className="text-[10px] font-bold uppercase text-stone-400 block tracking-wider">
-                      Productos Encargados
-                    </span>
-                    {(order.items && order.items.length > 0 ? order.items : []).map((it, idx) => (
-                      <div key={idx} className="text-xs text-stone-800 flex justify-between gap-2">
-                        <span className="font-semibold line-clamp-1">
-                          {it.quantity}x {it.name}
-                        </span>
-                        <span className="font-mono text-stone-600 font-bold shrink-0">
-                          {formatCurrency(it.subtotal)}
-                        </span>
-                      </div>
-                    ))}
-                    {order.deliveryType === "domicilio" && (
-                      <div className="pt-1 border-t border-stone-200 text-[10px] text-stone-600 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-amber-600" />
-                        <span className="truncate">Domicilio: {order.deliveryAddress || "A domicilio"}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Card Footer */}
-                <div className="bg-stone-50/80 border-t border-stone-200 p-4 space-y-3 text-xs">
-                  <div className="flex items-center justify-between text-stone-600">
-                    <span className="flex items-center gap-1 text-[11px]">
-                      <Clock className="w-3.5 h-3.5 text-amber-600" /> Entrega prometida:
-                    </span>
-                    <span className="font-black text-stone-900 text-xs bg-white px-2 py-0.5 rounded-lg border border-stone-200">
-                      {order.deliveryDate} • {order.deliveryTime || "16:00"} hrs
-                    </span>
-                  </div>
-
-                  <div className="space-y-1 pt-1 border-t border-stone-200 font-semibold">
-                    <div className="flex items-center justify-between text-stone-600 text-xs">
-                      <span>Total:</span>
-                      <span className="font-extrabold text-stone-900">{formatCurrency(order.total)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-emerald-700 text-xs">
-                      <span>Adelanto pagado:</span>
-                      <span>{formatCurrency(order.deposit)}</span>
-                    </div>
-                    <div className="flex items-center justify-between font-black text-sm pt-1 border-t border-dashed border-stone-200">
-                      <span>Falta por Liquidar:</span>
-                      <span
-                        className={`px-2 py-0.5 rounded-lg font-mono ${
-                          order.remainingBalance === 0
-                            ? "text-emerald-700 bg-emerald-100"
-                            : "text-rose-600 bg-rose-50 border border-rose-200"
-                        }`}
-                      >
-                        {order.remainingBalance === 0 ? "¡Liquidado!" : formatCurrency(order.remainingBalance)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-stone-200 flex flex-col gap-2">
-                    {order.status !== "entregado" && order.status !== "cancelado" && (
-                      <button
-                        onClick={() => handleAdvanceStatus(order)}
-                        className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs"
-                      >
-                        {(order.status === "pendiente" || order.status === "en_horno") && (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" /> Marcar Listo en Mostrador
-                          </>
-                        )}
-                        {order.status === "listo" && (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-400" /> Entregar Pedido al Cliente
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    <div className="flex items-center gap-1.5">
-                      {order.remainingBalance > 0 && order.status !== "cancelado" && (
-                        <button
-                          onClick={() => setSelectedOrderForPayment(order)}
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] py-1.5 px-2 rounded-xl transition-colors flex items-center justify-center gap-1 shadow-2xs"
-                        >
-                          <DollarSign className="w-3 h-3" /> Cobrar
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => setSelectedOrderForReceipt(order)}
-                        className="p-2 bg-white hover:bg-stone-100 border border-stone-200 text-stone-700 rounded-xl transition-colors"
-                        title="Ver / Imprimir Ticket"
-                      >
-                        <Receipt className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        onClick={() => handleSendWhatsApp(order)}
-                        className="p-2 bg-white hover:bg-emerald-50 border border-stone-200 text-emerald-600 rounded-xl transition-colors"
-                        title="Enviar aviso por WhatsApp"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
-
-                      <button
-                        onClick={() => setSelectedOrderForEdit(order)}
-                        className="p-2 bg-white hover:bg-stone-100 border border-stone-200 text-stone-700 rounded-xl transition-colors"
-                        title="Editar pedido"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-
-                      {order.status !== "cancelado" ? (
-                        <button
-                          onClick={() => handleCancelOrder(order.id)}
-                          className="p-2 bg-white hover:bg-rose-50 border border-stone-200 text-rose-500 rounded-xl transition-colors"
-                          title="Cancelar pedido"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleDeletePermanent(order.id)}
-                          className="p-2 bg-white hover:bg-rose-50 border border-stone-200 text-rose-600 rounded-xl transition-colors"
-                          title="Eliminar definitivamente"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
         </div>
       )}
 
