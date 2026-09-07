@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   CalendarClock,
+  Calendar,
   Plus,
   Phone,
   Cake,
@@ -20,12 +21,14 @@ import {
   Sparkles,
   MapPin,
   ChevronRight,
+  ChevronDown,
   TrendingUp,
   LayoutGrid,
   List,
   Flame,
   ArrowUpRight,
-  User
+  User,
+  Check
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -45,14 +48,17 @@ export default function PedidosPage() {
   const { branches, currentBranch } = useBranch();
   const { user } = useAuth();
 
-  // State
+  // State: Default view is "table" (lista) as requested by user
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchFilter, setSelectedBranchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+
+  // Expanded rows in list view
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -175,7 +181,7 @@ export default function PedidosPage() {
     const cleanPhone = order.phone.replace(/\D/g, "");
     const formattedPhone = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
     
-    let statusText = "está siendo preparado en nuestro horno";
+    let statusText = "está siendo elaborado en nuestro taller de horneado";
     if (order.status === "listo") statusText = "¡ya está LISTO para entrega en mostrador!";
     if (order.status === "entregado") statusText = "ha sido marcado como entregado. ¡Esperamos lo disfruten!";
 
@@ -195,31 +201,31 @@ export default function PedidosPage() {
     switch (status) {
       case "pendiente":
         return (
-          <span className="bg-amber-100 text-amber-800 border border-amber-300/60 px-3 py-1 rounded-full font-bold text-xs flex items-center gap-1">
-            <Clock className="w-3 h-3 text-amber-600" /> Pendiente
+          <span className="bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
+            <Clock className="w-3.5 h-3.5 text-amber-600" /> Pendiente
           </span>
         );
       case "en_horno":
         return (
-          <span className="bg-blue-100 text-blue-800 border border-blue-300/60 px-3 py-1 rounded-full font-bold text-xs flex items-center gap-1">
-            <Flame className="w-3 h-3 text-blue-600" /> En Horno / Prep.
+          <span className="bg-blue-100 text-blue-900 border border-blue-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
+            <Flame className="w-3.5 h-3.5 text-blue-600" /> En Preparación
           </span>
         );
       case "listo":
         return (
-          <span className="bg-emerald-100 text-emerald-800 border border-emerald-300/60 px-3 py-1 rounded-full font-bold text-xs flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Listo en Mostrador
+          <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Listo en Tienda
           </span>
         );
       case "entregado":
         return (
-          <span className="bg-stone-100 text-stone-600 border border-stone-300/60 px-3 py-1 rounded-full font-bold text-xs flex items-center gap-1">
-            ✓ Entregado
+          <span className="bg-stone-100 text-stone-700 border border-stone-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5 text-stone-600" /> Entregado
           </span>
         );
       case "cancelado":
         return (
-          <span className="bg-rose-100 text-rose-700 border border-rose-300/60 px-3 py-1 rounded-full font-bold text-xs flex items-center gap-1">
+          <span className="bg-rose-100 text-rose-800 border border-rose-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5">
             ✕ Cancelado
           </span>
         );
@@ -231,16 +237,16 @@ export default function PedidosPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-amber-600 text-white rounded-2xl shadow-md">
-              <CalendarClock className="w-6 h-6" />
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-600 text-white rounded-2xl shadow-md">
+              <CalendarClock className="w-7 h-7" />
             </div>
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
                 Encargos & Pedidos de Pastelería
               </h1>
               <p className="text-xs text-stone-500 font-medium mt-0.5">
-                Levantamiento de pedidos, productos sobre diseño, control de anticipos y saldos por liquidar.
+                Control de pedidos de pan y pasteles, fechas de entrega, anticipos recibidos y saldos por liquidar.
               </p>
             </div>
           </div>
@@ -248,7 +254,7 @@ export default function PedidosPage() {
 
         <button
           onClick={() => setIsCreateOpen(true)}
-          className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-extrabold px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all text-xs tracking-wide self-start sm:self-auto"
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all text-xs tracking-wide self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" /> Tomar Nuevo Pedido
         </button>
@@ -264,7 +270,7 @@ export default function PedidosPage() {
             <span className="text-2xl font-black text-stone-900 mt-1 block">
               {metrics.activeCount}
             </span>
-            <span className="text-[10px] text-amber-700 font-semibold">En taller y por entregar</span>
+            <span className="text-[10px] text-amber-700 font-semibold">En proceso de elaboración</span>
           </div>
           <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100">
             <Cake className="w-5 h-5" />
@@ -279,7 +285,7 @@ export default function PedidosPage() {
             <span className="text-2xl font-black text-rose-700 mt-1 block">
               {metrics.todayCount}
             </span>
-            <span className="text-[10px] text-stone-500 font-medium">Requieren atención prioritaria</span>
+            <span className="text-[10px] text-stone-500 font-medium">Prioridad en mostrador</span>
           </div>
           <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100 animate-pulse">
             <Clock className="w-5 h-5" />
@@ -291,7 +297,7 @@ export default function PedidosPage() {
             <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
               Por Cobrar (Saldos)
             </span>
-            <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-1 block">
+            <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-1 block font-mono">
               {formatCurrency(metrics.totalRemainingBalance)}
             </span>
             <span className="text-[10px] text-stone-500 font-medium">Falta por liquidar al entregar</span>
@@ -361,29 +367,31 @@ export default function PedidosPage() {
             </select>
           </div>
 
-          {/* View mode toggle (2 cols) */}
+          {/* View mode toggle: List (default) vs Cards */}
           <div className="md:col-span-2 flex items-center justify-end gap-1.5">
             <button
+              onClick={() => setViewMode("table")}
+              className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                viewMode === "table"
+                  ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                  : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
+              }`}
+              title="Vista en Lista (Ordenada)"
+            >
+              <List className="w-4 h-4" />
+              <span className="hidden sm:inline">Lista</span>
+            </button>
+            <button
               onClick={() => setViewMode("grid")}
-              className={`p-2 rounded-xl border text-xs font-bold transition-colors ${
+              className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 ${
                 viewMode === "grid"
-                  ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                  ? "bg-amber-600 text-white border-amber-600 shadow-sm"
                   : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
               }`}
               title="Vista en Tarjetas"
             >
               <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("table")}
-              className={`p-2 rounded-xl border text-xs font-bold transition-colors ${
-                viewMode === "table"
-                  ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
-                  : "bg-white text-stone-600 border-stone-200 hover:bg-stone-50"
-              }`}
-              title="Vista en Lista / Tabla"
-            >
-              <List className="w-4 h-4" />
+              <span className="hidden sm:inline">Tarjetas</span>
             </button>
           </div>
         </div>
@@ -396,7 +404,7 @@ export default function PedidosPage() {
               onClick={() => setStatusFilter("all")}
               className={`px-3 py-1.5 rounded-xl font-bold transition-colors ${
                 statusFilter === "all"
-                  ? "bg-stone-900 text-white"
+                  ? "bg-stone-900 text-white shadow-xs"
                   : "bg-stone-100 text-stone-600 hover:bg-stone-200"
               }`}
             >
@@ -406,7 +414,7 @@ export default function PedidosPage() {
               onClick={() => setStatusFilter("pendiente")}
               className={`px-3 py-1.5 rounded-xl font-bold transition-colors ${
                 statusFilter === "pendiente"
-                  ? "bg-amber-600 text-white"
+                  ? "bg-amber-600 text-white shadow-xs"
                   : "bg-stone-100 text-stone-600 hover:bg-amber-50"
               }`}
             >
@@ -416,7 +424,7 @@ export default function PedidosPage() {
               onClick={() => setStatusFilter("en_horno")}
               className={`px-3 py-1.5 rounded-xl font-bold transition-colors ${
                 statusFilter === "en_horno"
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white shadow-xs"
                   : "bg-stone-100 text-stone-600 hover:bg-blue-50"
               }`}
             >
@@ -426,7 +434,7 @@ export default function PedidosPage() {
               onClick={() => setStatusFilter("listo")}
               className={`px-3 py-1.5 rounded-xl font-bold transition-colors ${
                 statusFilter === "listo"
-                  ? "bg-emerald-600 text-white"
+                  ? "bg-emerald-600 text-white shadow-xs"
                   : "bg-stone-100 text-stone-600 hover:bg-emerald-50"
               }`}
             >
@@ -436,7 +444,7 @@ export default function PedidosPage() {
               onClick={() => setStatusFilter("entregado")}
               className={`px-3 py-1.5 rounded-xl font-bold transition-colors ${
                 statusFilter === "entregado"
-                  ? "bg-stone-700 text-white"
+                  ? "bg-stone-700 text-white shadow-xs"
                   : "bg-stone-100 text-stone-600 hover:bg-stone-200"
               }`}
             >
@@ -446,7 +454,7 @@ export default function PedidosPage() {
 
           {/* Quick Date Pills */}
           <div className="flex items-center gap-1 font-semibold">
-            <span className="text-[11px] text-stone-400 mr-1">Fecha:</span>
+            <span className="text-[11px] text-stone-400 mr-1">Fecha de Entrega:</span>
             <button
               onClick={() => setDateFilter("all")}
               className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors ${
@@ -483,7 +491,7 @@ export default function PedidosPage() {
         </div>
       </div>
 
-      {/* Orders Grid / Table View */}
+      {/* Orders List / Grid Rendering */}
       {filteredOrders.length === 0 ? (
         <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-3">
           <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center mx-auto border border-amber-200 shadow-inner">
@@ -491,7 +499,7 @@ export default function PedidosPage() {
           </div>
           <h3 className="font-extrabold text-lg text-stone-800">No se encontraron pedidos</h3>
           <p className="text-xs text-stone-500 max-w-md mx-auto">
-            No hay pedidos que coincidan con los filtros seleccionados. Intenta modificar los términos de búsqueda o levanta un nuevo pedido.
+            No hay pedidos registrados que coincidan con los filtros seleccionados.
           </p>
           <button
             onClick={() => setIsCreateOpen(true)}
@@ -500,8 +508,337 @@ export default function PedidosPage() {
             <Plus className="w-4 h-4" /> Tomar Nuevo Pedido
           </button>
         </div>
-      ) : viewMode === "grid" ? (
-        /* GRID VIEW */
+      ) : viewMode === "table" ? (
+        /* ============================================================ */
+        /* LIST / TABLE VIEW (DEFAULT): CLEAN, ELEGANT, ORDERED */
+        /* ============================================================ */
+        <div className="bg-white rounded-3xl border border-stone-200 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-stone-100/90 border-b border-stone-200 text-stone-600 font-extrabold uppercase tracking-wider text-[10px]">
+                  <th className="py-4 px-4">Folio</th>
+                  <th className="py-4 px-3">Fecha y Hora Entrega</th>
+                  <th className="py-4 px-3">Cliente</th>
+                  <th className="py-4 px-3">Sucursal</th>
+                  <th className="py-4 px-3">Productos Encargados</th>
+                  <th className="py-4 px-3">Estado</th>
+                  <th className="py-4 px-3">Total / Anticipo</th>
+                  <th className="py-4 px-3">Falta por Liquidar</th>
+                  <th className="py-4 px-4 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {filteredOrders.map((order) => {
+                  const isToday = order.deliveryDate === todayStr;
+                  const isTomorrow = order.deliveryDate === tomorrowStr;
+                  const isExpanded = expandedRowId === order.id;
+
+                  return (
+                    <React.Fragment key={order.id}>
+                      <tr
+                        className={`hover:bg-amber-50/40 transition-colors group cursor-pointer ${
+                          isExpanded ? "bg-amber-50/60" : ""
+                        }`}
+                        onClick={() => setExpandedRowId(isExpanded ? null : order.id)}
+                      >
+                        {/* 1. Folio */}
+                        <td className="py-4 px-4 font-mono">
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                              {order.orderNumber}
+                            </span>
+                            {isToday && order.status !== "entregado" && (
+                              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" title="Entrega Hoy" />
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 2. Fecha y hora */}
+                        <td className="py-4 px-3">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-stone-400" />
+                              <span className={`font-bold text-xs ${
+                                isToday && order.status !== "entregado"
+                                  ? "text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md font-black"
+                                  : isTomorrow && order.status !== "entregado"
+                                  ? "text-amber-800 font-black"
+                                  : "text-stone-900"
+                              }`}>
+                                {isToday ? "¡HOY!" : isTomorrow ? "Mañana" : order.deliveryDate}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px] text-stone-500 pl-5">
+                              <Clock className="w-3 h-3 text-stone-400" />
+                              <span>{order.deliveryTime || "16:00"} hrs</span>
+                              {order.deliveryType === "domicilio" && (
+                                <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-1.5 py-0.2 rounded">
+                                  Envío
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 3. Cliente */}
+                        <td className="py-4 px-3">
+                          <div className="space-y-0.5">
+                            <strong className="font-extrabold text-stone-900 text-xs block">
+                              {order.customerName}
+                            </strong>
+                            <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+                              <Phone className="w-3 h-3 text-stone-400" />
+                              <span>{order.phone}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 4. Sucursal */}
+                        <td className="py-4 px-3">
+                          <span className="text-xs font-bold text-stone-700 bg-stone-100 px-2.5 py-1 rounded-xl">
+                            {order.branchName.replace("Sucursal ", "")}
+                          </span>
+                        </td>
+
+                        {/* 5. Productos Encargados */}
+                        <td className="py-4 px-3 max-w-xs">
+                          <div className="line-clamp-1 text-xs text-stone-800 font-medium">
+                            {order.description}
+                          </div>
+                          {order.dedication && (
+                            <div className="text-[10px] text-amber-800 italic font-semibold flex items-center gap-1 mt-0.5">
+                              <Sparkles className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span className="truncate">"{order.dedication}"</span>
+                            </div>
+                          )}
+                          <span className="text-[10px] text-stone-400">
+                            {order.items?.length || 1} producto(s) • Clic para ver detalle
+                          </span>
+                        </td>
+
+                        {/* 6. Estado */}
+                        <td className="py-4 px-3">
+                          {getStatusBadge(order.status)}
+                        </td>
+
+                        {/* 7. Total y Anticipo */}
+                        <td className="py-4 px-3 font-mono">
+                          <div className="text-xs font-black text-stone-900">
+                            {formatCurrency(order.total)}
+                          </div>
+                          <div className="text-[10px] text-emerald-700 font-bold">
+                            Anticipo: {formatCurrency(order.deposit)}
+                          </div>
+                        </td>
+
+                        {/* 8. Falta por Liquidar */}
+                        <td className="py-4 px-3 font-mono">
+                          <span
+                            className={`inline-block font-black text-xs px-2.5 py-1 rounded-xl ${
+                              order.remainingBalance === 0
+                                ? "text-emerald-700 bg-emerald-50 border border-emerald-200"
+                                : "text-rose-700 bg-rose-50 border border-rose-200 font-extrabold"
+                            }`}
+                          >
+                            {order.remainingBalance === 0 ? "¡Liquidado!" : formatCurrency(order.remainingBalance)}
+                          </span>
+                        </td>
+
+                        {/* 9. Acciones */}
+                        <td
+                          className="py-4 px-4 text-right"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Botón rápido de cobrar saldo */}
+                            {order.remainingBalance > 0 && order.status !== "cancelado" && (
+                              <button
+                                onClick={() => setSelectedOrderForPayment(order)}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] rounded-xl shadow-2xs transition-all flex items-center gap-1"
+                                title="Liquidar saldo o abonar"
+                              >
+                                <DollarSign className="w-3.5 h-3.5" /> Cobrar
+                              </button>
+                            )}
+
+                            {/* Avanzar estado rápido */}
+                            {order.status !== "entregado" && order.status !== "cancelado" && (
+                              <button
+                                onClick={() => handleAdvanceStatus(order)}
+                                className="p-2 bg-stone-100 hover:bg-stone-900 hover:text-white text-stone-700 rounded-xl transition-all"
+                                title={
+                                  order.status === "pendiente"
+                                    ? "Pasar a Preparación / Horno"
+                                    : order.status === "en_horno"
+                                    ? "Marcar Listo en Mostrador"
+                                    : "Marcar como Entregado"
+                                }
+                              >
+                                {order.status === "pendiente" && <Flame className="w-4 h-4 text-amber-600" />}
+                                {order.status === "en_horno" && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
+                                {order.status === "listo" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                              </button>
+                            )}
+
+                            {/* Ticket térmico */}
+                            <button
+                              onClick={() => setSelectedOrderForReceipt(order)}
+                              className="p-2 bg-stone-100 hover:bg-amber-100 text-stone-700 rounded-xl transition-all"
+                              title="Imprimir Ticket Térmico"
+                            >
+                              <Receipt className="w-4 h-4" />
+                            </button>
+
+                            {/* WhatsApp */}
+                            <button
+                              onClick={() => handleSendWhatsApp(order)}
+                              className="p-2 bg-stone-100 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-all"
+                              title="Enviar recordatorio / aviso por WhatsApp"
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+
+                            {/* Editar */}
+                            <button
+                              onClick={() => setSelectedOrderForEdit(order)}
+                              className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl transition-all"
+                              title="Editar pedido"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+
+                            {/* Desplegable chevron */}
+                            <button
+                              onClick={() => setExpandedRowId(isExpanded ? null : order.id)}
+                              className="p-1.5 text-stone-400 hover:text-stone-700"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expanded row with full product breakdown & details */}
+                      {isExpanded && (
+                        <tr className="bg-amber-50/30 border-b border-stone-200 animate-in fade-in duration-150">
+                          <td colSpan={9} className="p-5 px-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                              
+                              {/* Col 1: Itemized list */}
+                              <div className="space-y-2 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
+                                <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
+                                  Desglose de Productos
+                                </span>
+                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                  {(order.items && order.items.length > 0 ? order.items : []).map((it, idx) => (
+                                    <div key={idx} className="space-y-0.5 border-b border-stone-100 pb-1.5 last:border-none">
+                                      <div className="flex justify-between font-bold text-stone-900">
+                                        <span>{it.quantity}x {it.name}</span>
+                                        <span className="font-mono">{formatCurrency(it.subtotal)}</span>
+                                      </div>
+                                      {it.notes && (
+                                        <p className="text-[11px] text-stone-500 italic pl-3">↳ {it.notes}</p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Col 2: Dedication & Delivery address */}
+                              <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
+                                <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
+                                  Detalles de Entrega & Letrero
+                                </span>
+                                {order.dedication ? (
+                                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-950">
+                                    <strong className="block text-[10px] text-amber-800 uppercase">✨ Letrero:</strong>
+                                    <span className="italic font-bold">"{order.dedication}"</span>
+                                  </div>
+                                ) : (
+                                  <p className="text-stone-400 italic">Sin letrero especial especificado.</p>
+                                )}
+
+                                {order.deliveryType === "domicilio" ? (
+                                  <div className="text-[11px] text-stone-700 bg-stone-50 p-2.5 rounded-xl border border-stone-200">
+                                    <strong className="block text-stone-900">🚚 Entrega a Domicilio:</strong>
+                                    <span>{order.deliveryAddress || "Dirección pendiente"}</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-stone-700">
+                                    <strong>🏬 Recoger en Tienda:</strong> {order.branchName}
+                                  </div>
+                                )}
+
+                                {order.notes && (
+                                  <p className="text-[11px] text-stone-500 bg-stone-50 p-2 rounded-lg">
+                                    <strong>Notas:</strong> {order.notes}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Col 3: Payment History & Balances */}
+                              <div className="space-y-2 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
+                                <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
+                                  Historial de Cobros & Saldo
+                                </span>
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex justify-between text-stone-600">
+                                    <span>Total:</span>
+                                    <span className="font-black text-stone-900">{formatCurrency(order.total)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-emerald-700 font-bold">
+                                    <span>Anticipo Inicial:</span>
+                                    <span>{formatCurrency(order.deposit)}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center pt-1.5 border-t border-dashed border-stone-300 font-black">
+                                    <span className="text-stone-800">Falta por Liquidar:</span>
+                                    <span className={`text-sm ${
+                                      order.remainingBalance === 0 ? "text-emerald-600" : "text-rose-600 font-mono"
+                                    }`}>
+                                      {order.remainingBalance === 0 ? "¡Liquidado!" : formatCurrency(order.remainingBalance)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 flex items-center justify-between">
+                                  <span className="text-[10px] text-stone-400">Atendió: {order.cashier}</span>
+                                  {order.status !== "cancelado" ? (
+                                    <button
+                                      onClick={() => handleCancelOrder(order.id)}
+                                      className="text-[11px] text-rose-600 hover:underline font-bold"
+                                    >
+                                      Cancelar Pedido
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleDeletePermanent(order.id)}
+                                      className="text-[11px] text-rose-700 hover:underline font-bold"
+                                    >
+                                      Eliminar Definitivamente
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* ============================================================ */
+        /* CARDS / GRID VIEW (OPTIONAL) */
+        /* ============================================================ */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredOrders.map((order) => {
             const isToday = order.deliveryDate === todayStr;
@@ -518,10 +855,9 @@ export default function PedidosPage() {
               >
                 {/* Card Top */}
                 <div className="p-5 space-y-3.5">
-                  {/* Badge Row */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-black text-xs text-amber-800 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200 shadow-2xs font-mono">
+                      <span className="font-black text-xs text-amber-900 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200 shadow-2xs font-mono">
                         {order.orderNumber}
                       </span>
                       {isToday && order.status !== "entregado" && (
@@ -538,7 +874,6 @@ export default function PedidosPage() {
                     {getStatusBadge(order.status)}
                   </div>
 
-                  {/* Customer and phone */}
                   <div>
                     <h3 className="font-extrabold text-base text-stone-900 leading-tight">
                       {order.customerName}
@@ -553,20 +888,18 @@ export default function PedidosPage() {
                     </div>
                   </div>
 
-                  {/* Dedication / Theme banner */}
                   {order.dedication && (
                     <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 text-xs text-amber-950 font-medium flex items-start gap-1.5">
                       <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <div className="leading-snug">
                         <strong className="block text-[10px] text-amber-800 uppercase tracking-wider">
-                          Dedicatoria / Letrero:
+                          Letrero del Pastel:
                         </strong>
                         "{order.dedication}"
                       </div>
                     </div>
                   )}
 
-                  {/* Items list */}
                   <div className="bg-stone-50/90 rounded-2xl p-3 border border-stone-100 space-y-1.5">
                     <span className="text-[10px] font-bold uppercase text-stone-400 block tracking-wider">
                       Productos Encargados
@@ -590,9 +923,8 @@ export default function PedidosPage() {
                   </div>
                 </div>
 
-                {/* Financial & Delivery Footer */}
+                {/* Card Footer */}
                 <div className="bg-stone-50/80 border-t border-stone-200 p-4 space-y-3 text-xs">
-                  {/* Delivery time */}
                   <div className="flex items-center justify-between text-stone-600">
                     <span className="flex items-center gap-1 text-[11px]">
                       <Clock className="w-3.5 h-3.5 text-amber-600" /> Entrega prometida:
@@ -602,7 +934,6 @@ export default function PedidosPage() {
                     </span>
                   </div>
 
-                  {/* Balance / Remaining breakdown */}
                   <div className="space-y-1 pt-1 border-t border-stone-200 font-semibold">
                     <div className="flex items-center justify-between text-stone-600 text-xs">
                       <span>Total:</span>
@@ -626,9 +957,7 @@ export default function PedidosPage() {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="pt-2 border-t border-stone-200 flex flex-col gap-2">
-                    {/* Status progression button */}
                     {order.status !== "entregado" && order.status !== "cancelado" && (
                       <button
                         onClick={() => handleAdvanceStatus(order)}
@@ -641,7 +970,7 @@ export default function PedidosPage() {
                         )}
                         {order.status === "en_horno" && (
                           <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Marcar Listo en Mostrador
+                            <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" /> Marcar Listo en Mostrador
                           </>
                         )}
                         {order.status === "listo" && (
@@ -652,14 +981,13 @@ export default function PedidosPage() {
                       </button>
                     )}
 
-                    {/* Secondary action tools */}
                     <div className="flex items-center gap-1.5">
                       {order.remainingBalance > 0 && order.status !== "cancelado" && (
                         <button
                           onClick={() => setSelectedOrderForPayment(order)}
                           className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] py-1.5 px-2 rounded-xl transition-colors flex items-center justify-center gap-1 shadow-2xs"
                         >
-                          <DollarSign className="w-3 h-3" /> Liquidar / Abonar
+                          <DollarSign className="w-3 h-3" /> Cobrar
                         </button>
                       )}
 
@@ -710,119 +1038,6 @@ export default function PedidosPage() {
               </div>
             );
           })}
-        </div>
-      ) : (
-        /* TABLE VIEW */
-        <div className="bg-white rounded-3xl border border-stone-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-stone-100/80 border-b border-stone-200 text-stone-500 font-bold uppercase tracking-wider text-[10px]">
-                  <th className="p-3.5 px-4">Folio / Fecha</th>
-                  <th className="p-3.5">Cliente</th>
-                  <th className="p-3.5">Sucursal</th>
-                  <th className="p-3.5">Detalle Productos</th>
-                  <th className="p-3.5">Estado</th>
-                  <th className="p-3.5">Total</th>
-                  <th className="p-3.5">Falta por Liquidar</th>
-                  <th className="p-3.5 text-right px-4">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {filteredOrders.map((order) => {
-                  const isToday = order.deliveryDate === todayStr;
-
-                  return (
-                    <tr key={order.id} className="hover:bg-stone-50/70 transition-colors">
-                      <td className="p-3.5 px-4">
-                        <span className="font-mono font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                          {order.orderNumber}
-                        </span>
-                        <div className="text-[11px] text-stone-500 font-semibold mt-1 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-amber-600" />
-                          <span className={isToday ? "text-rose-600 font-bold" : ""}>
-                            {order.deliveryDate} {order.deliveryTime}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="p-3.5">
-                        <strong className="text-stone-900 block font-bold">{order.customerName}</strong>
-                        <span className="text-[11px] text-stone-500 flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-stone-400" /> {order.phone}
-                        </span>
-                      </td>
-
-                      <td className="p-3.5">
-                        <span className="text-[11px] font-semibold text-stone-700">
-                          {order.branchName}
-                        </span>
-                      </td>
-
-                      <td className="p-3.5 max-w-xs">
-                        <div className="line-clamp-2 text-stone-700">
-                          {order.description}
-                        </div>
-                        {order.dedication && (
-                          <div className="text-[10px] text-amber-700 italic font-medium mt-0.5">
-                            "{order.dedication}"
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="p-3.5">
-                        {getStatusBadge(order.status)}
-                      </td>
-
-                      <td className="p-3.5 font-bold text-stone-900">
-                        {formatCurrency(order.total)}
-                      </td>
-
-                      <td className="p-3.5">
-                        <span
-                          className={`font-black text-xs px-2 py-1 rounded-lg ${
-                            order.remainingBalance === 0
-                              ? "text-emerald-700 bg-emerald-50"
-                              : "text-rose-600 bg-rose-50 border border-rose-200"
-                          }`}
-                        >
-                          {order.remainingBalance === 0 ? "Liquidado" : formatCurrency(order.remainingBalance)}
-                        </span>
-                      </td>
-
-                      <td className="p-3.5 text-right px-4">
-                        <div className="flex items-center justify-end gap-1">
-                          {order.remainingBalance > 0 && (
-                            <button
-                              onClick={() => setSelectedOrderForPayment(order)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg shadow-2xs"
-                              title="Liquidar / Abonar"
-                            >
-                              Cobrar
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setSelectedOrderForReceipt(order)}
-                            className="p-1.5 text-stone-600 hover:bg-stone-200 rounded-lg"
-                            title="Ticket"
-                          >
-                            <Receipt className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedOrderForEdit(order)}
-                            className="p-1.5 text-stone-600 hover:bg-stone-200 rounded-lg"
-                            title="Editar"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 

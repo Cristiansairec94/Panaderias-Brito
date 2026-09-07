@@ -11,7 +11,8 @@ import {
   MapPin,
   Sparkles,
   Save,
-  CheckCircle2
+  CheckCircle2,
+  FileText
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { useBranch } from "@/context/BranchContext";
@@ -93,14 +94,14 @@ export default function EditOrderModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-stone-200 flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden border border-stone-200 flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="bg-stone-900 text-white p-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-stone-900 to-amber-950 text-white p-5 px-6 flex items-center justify-between border-b border-stone-800">
           <div>
             <h3 className="font-extrabold text-base flex items-center gap-2">
               Editar Pedido
-              <span className="text-amber-400 font-mono text-sm bg-stone-800 px-2 py-0.5 rounded">
+              <span className="text-amber-400 font-mono text-xs bg-stone-800 px-2 py-0.5 rounded-lg border border-stone-700">
                 {order.orderNumber}
               </span>
             </h3>
@@ -108,142 +109,154 @@ export default function EditOrderModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-stone-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+            className="p-2 text-stone-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* Customer */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-stone-700 block mb-1">Nombre del Cliente</label>
-              <input
-                type="text"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-stone-700 block mb-1">Teléfono</label>
-              <input
-                type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Branch */}
-          <div>
-            <label className="text-xs font-bold text-stone-700 block mb-1">Sucursal Asignada</label>
-            <select
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-              className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-semibold"
-            >
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Delivery Date & Time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-stone-700 block mb-1">Fecha de Entrega</label>
-              <input
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-bold text-stone-800"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-stone-700 block mb-1">Hora Estimada</label>
-              <input
-                type="time"
-                value={deliveryTime}
-                onChange={(e) => setDeliveryTime(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-bold text-stone-800"
-              />
+        <div className="p-6 sm:p-7 space-y-5 overflow-y-auto">
+          {/* Customer info card */}
+          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+              Datos del Cliente
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">Nombre del Cliente *</label>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-bold text-stone-800"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">Teléfono de Contacto</label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-bold text-stone-800"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Delivery Type */}
-          <div>
-            <label className="text-xs font-bold text-stone-700 block mb-1">Modalidad de Entrega</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDeliveryType("sucursal")}
-                className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
-                  deliveryType === "sucursal"
-                    ? "bg-amber-600 text-white border-amber-600"
-                    : "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
-                }`}
+          {/* Delivery & Branch card */}
+          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+              Sucursal & Entrega Prometida
+            </span>
+            <div>
+              <label className="text-xs font-bold text-stone-700 block mb-1">Sucursal Asignada</label>
+              <select
+                value={branchId}
+                onChange={(e) => setBranchId(e.target.value)}
+                className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-semibold text-stone-800"
               >
-                🏬 En Tienda (Mostrador)
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeliveryType("domicilio")}
-                className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
-                  deliveryType === "domicilio"
-                    ? "bg-amber-600 text-white border-amber-600"
-                    : "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
-                }`}
-              >
-                🚚 Envío a Domicilio
-              </button>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
             </div>
-            {deliveryType === "domicilio" && (
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">Fecha de Entrega</label>
+                <input
+                  type="date"
+                  value={deliveryDate}
+                  onChange={(e) => setDeliveryDate(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-bold text-stone-800"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">Hora Estimada</label>
+                <input
+                  type="time"
+                  value={deliveryTime}
+                  onChange={(e) => setDeliveryTime(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-bold text-stone-800"
+                />
+              </div>
+            </div>
+
+            {/* Delivery type */}
+            <div className="pt-1">
+              <label className="text-xs font-bold text-stone-700 block mb-1.5">Modalidad de Entrega</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryType("sucursal")}
+                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
+                    deliveryType === "sucursal"
+                      ? "bg-amber-600 text-white border-amber-600"
+                      : "bg-white text-stone-700 border-stone-300 hover:bg-stone-100"
+                  }`}
+                >
+                  🏬 En Mostrador
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeliveryType("domicilio")}
+                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
+                    deliveryType === "domicilio"
+                      ? "bg-amber-600 text-white border-amber-600"
+                      : "bg-white text-stone-700 border-stone-300 hover:bg-stone-100"
+                  }`}
+                >
+                  🚚 A Domicilio
+                </button>
+              </div>
+              {deliveryType === "domicilio" && (
+                <input
+                  type="text"
+                  placeholder="Dirección completa de entrega..."
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none mt-2"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Dedication & Notes card */}
+          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+              Dedicatoria & Notas
+            </span>
+            <div>
+              <label className="text-xs font-bold text-stone-700 block mb-1">Letrero / Dedicatoria del Pastel</label>
               <input
                 type="text"
-                placeholder="Dirección completa de entrega..."
-                value={deliveryAddress}
-                onChange={(e) => setDeliveryAddress(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none mt-2"
+                placeholder="Ej. ¡Feliz Cumpleaños Mariana!"
+                value={dedication}
+                onChange={(e) => setDedication(e.target.value)}
+                className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
               />
-            )}
-          </div>
-
-          {/* Dedication */}
-          <div>
-            <label className="text-xs font-bold text-stone-700 block mb-1">Dedicatoria / Letrero del Pastel</label>
-            <input
-              type="text"
-              placeholder="Ej. ¡Feliz Cumpleaños Mariana!"
-              value={dedication}
-              onChange={(e) => setDedication(e.target.value)}
-              className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="text-xs font-bold text-stone-700 block mb-1">Notas / Observaciones</label>
-            <textarea
-              rows={2}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
-            />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-stone-700 block mb-1">Notas u Observaciones Generales</label>
+              <textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              />
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex justify-end gap-2.5">
+        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-stone-600 hover:bg-stone-200 rounded-xl transition-colors"
+            className="px-5 py-2.5 text-xs font-bold text-stone-600 hover:bg-stone-200 rounded-xl transition-colors"
           >
             Cancelar
           </button>
@@ -251,7 +264,7 @@ export default function EditOrderModal({
             type="button"
             disabled={isSubmitting}
             onClick={handleSave}
-            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5"
+            className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
             {isSubmitting ? "Guardando..." : "Guardar Cambios"}

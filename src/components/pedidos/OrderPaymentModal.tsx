@@ -11,7 +11,8 @@ import {
   Receipt,
   User,
   Store,
-  Calendar
+  Calendar,
+  Sparkles
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -81,17 +82,17 @@ export default function OrderPaymentModal({
   const isFullPayment = amount === order.remainingBalance;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-stone-200 flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-stone-200 flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-800 to-stone-900 text-white p-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-emerald-800 to-stone-900 text-white p-5 px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-emerald-500/20 border border-emerald-400/30 rounded-2xl text-emerald-300">
               <DollarSign className="w-6 h-6" />
             </div>
             <div>
               <h3 className="font-extrabold text-lg leading-tight">
-                {order.remainingBalance > 0 ? "Liquidar / Abonar a Pedido" : "Pedido Liquidado"}
+                {order.remainingBalance > 0 ? "Liquidar / Abonar al Pedido" : "Pedido Liquidado"}
               </h3>
               <span className="text-xs text-emerald-200/90 font-mono font-bold">
                 {order.orderNumber} • {order.customerName}
@@ -100,138 +101,154 @@ export default function OrderPaymentModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-stone-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+            className="p-2 text-stone-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
-          {/* Summary Box */}
-          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-2.5 text-xs">
-            <div className="flex justify-between text-stone-600">
-              <span>Monto Total del Pedido:</span>
-              <span className="font-bold text-stone-900">{formatCurrency(order.total)}</span>
+        <div className="p-6 sm:p-7 space-y-5">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
+              <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">Total del Pedido</span>
+              <span className="text-lg font-black text-stone-900 mt-0.5 block">{formatCurrency(order.total)}</span>
+              <span className="text-[10px] text-emerald-700 font-semibold">Anticipo: {formatCurrency(order.deposit)}</span>
             </div>
-            <div className="flex justify-between text-emerald-700">
-              <span>Anticipo Previo Pagado:</span>
-              <span className="font-bold">{formatCurrency(order.deposit)}</span>
-            </div>
-            <div className="flex justify-between items-center pt-2 border-t border-stone-200 font-extrabold">
-              <span className="text-stone-800 text-sm">Falta por Liquidar:</span>
-              <span className="text-base text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-200">
+            <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-4">
+              <span className="text-[11px] font-bold text-rose-500 uppercase tracking-wider block">Falta por Liquidar</span>
+              <span className="text-xl font-black text-rose-700 mt-0.5 block font-mono">
                 {formatCurrency(order.remainingBalance)}
               </span>
+              <span className="text-[10px] text-rose-600 font-medium">Saldo pendiente</span>
             </div>
           </div>
 
           {/* Amount input */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-stone-700 block">
-              Monto a Cobrar / Abonar ($ MXN)
-            </label>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-stone-800">
+                Monto que entrega el cliente ($ MXN)
+              </label>
+              <button
+                type="button"
+                onClick={() => setAmount(order.remainingBalance)}
+                className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-lg transition-colors"
+              >
+                Liquidar todo ({formatCurrency(order.remainingBalance)})
+              </button>
+            </div>
+
             <div className="relative">
-              <span className="absolute left-3.5 top-2.5 text-stone-400 font-bold text-base">$</span>
+              <span className="absolute left-4 top-3 text-stone-400 font-bold text-lg">$</span>
               <input
                 type="number"
                 min="1"
                 max={order.remainingBalance}
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
-                className="w-full pl-8 pr-4 py-2.5 border-2 border-stone-300 rounded-xl font-black text-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
+                className="w-full pl-10 pr-4 py-3 border-2 border-stone-300 rounded-2xl font-black text-xl text-stone-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
               />
             </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setAmount(order.remainingBalance)}
-                className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-lg transition-colors"
-              >
-                Cobrar saldo restante completo ({formatCurrency(order.remainingBalance)})
-              </button>
-            </div>
+
+            {/* Quick chips if partial */}
+            {order.remainingBalance > 100 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {[100, 200, 500].filter((val) => val < order.remainingBalance).map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setAmount(val)}
+                    className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700"
+                  >
+                    + ${val}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Payment Method */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-stone-700 block">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-stone-800 block">
               Método de Pago
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2.5">
               <button
                 type="button"
                 onClick={() => setPaymentMethod("efectivo")}
-                className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                className={`p-3 rounded-2xl border-2 text-xs font-bold flex flex-col items-center gap-1.5 transition-all ${
                   paymentMethod === "efectivo"
-                    ? "bg-emerald-50 border-emerald-500 text-emerald-800 shadow-2xs"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-xs"
                     : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                <Banknote className="w-4 h-4 text-emerald-600" /> Efectivo
+                <Banknote className="w-5 h-5 text-emerald-600" /> Efectivo
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentMethod("tarjeta")}
-                className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                className={`p-3 rounded-2xl border-2 text-xs font-bold flex flex-col items-center gap-1.5 transition-all ${
                   paymentMethod === "tarjeta"
-                    ? "bg-emerald-50 border-emerald-500 text-emerald-800 shadow-2xs"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-xs"
                     : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                <CreditCard className="w-4 h-4 text-blue-600" /> Tarjeta
+                <CreditCard className="w-5 h-5 text-blue-600" /> Tarjeta
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentMethod("transferencia")}
-                className={`p-2.5 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                className={`p-3 rounded-2xl border-2 text-xs font-bold flex flex-col items-center gap-1.5 transition-all ${
                   paymentMethod === "transferencia"
-                    ? "bg-emerald-50 border-emerald-500 text-emerald-800 shadow-2xs"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-xs"
                     : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                <Store className="w-4 h-4 text-purple-600" /> SPEI
+                <Store className="w-5 h-5 text-purple-600" /> SPEI
               </button>
             </div>
           </div>
 
           {/* Mark as delivered option */}
           {isFullPayment && (
-            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 flex items-start gap-2.5">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-start gap-3">
               <input
                 type="checkbox"
                 id="deliveredCheck"
                 checked={markAsDelivered}
                 onChange={(e) => setMarkAsDelivered(e.target.checked)}
-                className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                className="mt-1 rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4"
               />
               <label htmlFor="deliveredCheck" className="text-xs text-emerald-950 font-medium cursor-pointer">
-                <strong>Marcar pedido como Entregado</strong>
-                <span className="block text-[11px] text-emerald-700">
-                  El cliente está recogiendo o recibiendo el pedido en este momento.
+                <strong className="block text-emerald-900">Marcar pedido como Entregado</strong>
+                <span className="text-[11px] text-emerald-700">
+                  El cliente está recogiendo el pedido en mostrador o se está enviando a domicilio.
                 </span>
               </label>
             </div>
           )}
 
           {/* Notes */}
-          <div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-stone-500 block">Nota o referencia de pago (opcional)</label>
             <input
               type="text"
-              placeholder="Nota adicional sobre el cobro (opcional)..."
+              placeholder="Ej. Pagó con billete de $500, entregado por Lupita..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full text-xs px-3 py-2 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="w-full text-xs px-3.5 py-2.5 border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex justify-end gap-2.5">
+        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-stone-600 hover:bg-stone-200 rounded-xl transition-colors"
+            className="px-5 py-2.5 text-xs font-bold text-stone-600 hover:bg-stone-200 rounded-xl transition-colors"
           >
             Cancelar
           </button>
@@ -239,10 +256,10 @@ export default function OrderPaymentModal({
             type="button"
             disabled={isSubmitting || amount <= 0}
             onClick={handleConfirmPayment}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
           >
             <CheckCircle2 className="w-4 h-4" />
-            {isSubmitting ? "Registrando..." : `Cobrar ${formatCurrency(amount)}`}
+            {isSubmitting ? "Registrando cobro..." : `Cobrar ${formatCurrency(amount)}`}
           </button>
         </div>
       </div>
