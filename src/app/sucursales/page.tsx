@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { 
   Building2, 
@@ -61,6 +61,37 @@ export default function SucursalesPage() {
   const [lastSimulatedSale, setLastSimulatedSale] = useState<SimulatedSale | null>(null);
   const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
   const [editingShiftBranch, setEditingShiftBranch] = useState<Branch | null>(null);
+
+  // Fecha del día actual formateada
+  const [todayDateFormatted, setTodayDateFormatted] = useState<string>(() => {
+    try {
+      const now = new Date();
+      const dayName = now.toLocaleDateString("es-MX", { weekday: "long" });
+      const dayNum = now.getDate();
+      const monthName = now.toLocaleDateString("es-MX", { month: "long" });
+      const year = now.getFullYear();
+      const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      const capMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+      return `${capDay}, ${dayNum} de ${capMonth} de ${year}`;
+    } catch {
+      return "Lunes, 7 de Septiembre de 2026";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const now = new Date();
+      const dayName = now.toLocaleDateString("es-MX", { weekday: "long" });
+      const dayNum = now.getDate();
+      const monthName = now.toLocaleDateString("es-MX", { month: "long" });
+      const year = now.getFullYear();
+      const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      const capMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+      setTodayDateFormatted(`${capDay}, ${dayNum} de ${capMonth} de ${year}`);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleSaveShift = (branchId: string, updatedShift: any) => {
     updateBranch(branchId, { currentShift: updatedShift });
@@ -318,11 +349,16 @@ export default function SucursalesPage() {
           </div>
 
           <div className="bg-white/[0.04] p-3.5 rounded-2xl border border-white/5">
-            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
-              Efectivo en Gavetas
+            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-3 h-3 text-amber-400" />
+              Fecha del Día
             </span>
-            <span className="text-lg sm:text-xl font-black text-emerald-400">
-              {formatCurrency(consolidatedMetrics.totalCashInDrawer)}
+            <span 
+              suppressHydrationWarning
+              className="text-base sm:text-lg font-black text-amber-400 block mt-0.5 truncate"
+              title={todayDateFormatted}
+            >
+              {todayDateFormatted}
             </span>
           </div>
 
