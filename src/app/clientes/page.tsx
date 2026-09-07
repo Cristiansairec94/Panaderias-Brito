@@ -749,17 +749,7 @@ export default function ClientesPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  {/* Moda habitual estática (sin menú desplegable) */}
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-2xl">
-                    <span className="text-xs font-black text-amber-950 whitespace-nowrap">
-                      Moda habitual:
-                    </span>
-                    <span className="bg-white text-stone-900 border border-amber-300 rounded-xl px-2.5 py-1 text-xs font-black shadow-2xs select-none">
-                      {c.favoriteProduct || (sortedProducts.length > 0 ? sortedProducts[0][0] : "Por definir")}
-                    </span>
-                  </div>
-
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() => setHistoryModalCustomer(null)}

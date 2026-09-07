@@ -34,6 +34,7 @@ import {
 import { Product, Sale, CashExpense } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useNotifications } from "@/context/NotificationContext";
+import { playCashRegisterSound } from "@/lib/sound";
 
 export interface ShiftCutRecord {
   id: string;
@@ -673,18 +674,40 @@ export default function CashDrawerShiftModal({
                   {/* Render del Ticket Digital */}
                   {renderDigitalTicket(lastCutData, false)}
 
-                  {/* Botón Principal de Bloqueo y Conclusión */}
-                  <div className="max-w-md mx-auto pt-1">
+                  {/* Botón Principal Gigante de Conclusión de Turno e Información Clara */}
+                  <div className="max-w-xl mx-auto pt-2 pb-2">
                     <button
                       type="button"
                       onClick={() => {
+                        playCashRegisterSound();
                         onClose();
                         if (onCompleteShiftCut) onCompleteShiftCut();
                       }}
-                      className="w-full py-4.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white font-black rounded-2xl text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-xl shadow-orange-950/20 active:scale-95 transition-all animate-pulse"
+                      className="w-full py-5 sm:py-6 px-6 sm:px-8 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:via-orange-500 hover:to-amber-600 text-white font-black rounded-3xl shadow-2xl shadow-orange-950/30 border-2 border-amber-300/60 ring-4 ring-orange-500/25 hover:ring-orange-500/40 active:scale-[0.98] transition-all cursor-pointer group text-left sm:text-center"
                     >
-                      <Lock className="w-5 h-5" />
-                      <span>Finalizar y Bloquear Punto de Venta</span>
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform">
+                          <Lock className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                        </div>
+
+                        <div className="flex-1 text-center">
+                          <div className="flex items-center justify-center gap-2 mb-1.5">
+                            <span className="bg-emerald-400 text-emerald-950 text-xs sm:text-sm font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                              ✓ Turno Cerrado Sin Problemas
+                            </span>
+                          </div>
+                          <h4 className="text-lg sm:text-2xl font-black tracking-wide leading-tight drop-shadow-xs">
+                            Finalizar y Bloquear Punto de Venta
+                          </h4>
+                          <p className="text-xs sm:text-sm text-amber-100 font-bold mt-1.5 opacity-95">
+                            Caja cuadrada correctamente • Toca aquí para salir y entregar turno
+                          </p>
+                        </div>
+
+                        <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform">
+                          <ArrowRight className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
                     </button>
                   </div>
                 </div>
@@ -1144,12 +1167,14 @@ export default function CashDrawerShiftModal({
             <span className="text-amber-600">🥖</span>
             <span>Panaderías Brito • Sucursal Matriz</span>
           </div>
-          <button
-            onClick={handleClose}
-            className="px-6 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-xl text-xs sm:text-sm transition-colors"
-          >
-            Cerrar
-          </button>
+          {!showCutSuccess && (
+            <button
+              onClick={handleClose}
+              className="px-6 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-xl text-xs sm:text-sm transition-colors cursor-pointer"
+            >
+              Cerrar
+            </button>
+          )}
         </div>
       </div>
     </div>

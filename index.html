@@ -601,6 +601,8 @@
       const [showCategoryPanel, setShowCategoryPanel] = useState(false);
       const [showOperationsMenu, setShowOperationsMenu] = useState(false);
       const [completedSale, setCompletedSale] = useState(null);
+      const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+      const [saleToCancel, setSaleToCancel] = useState(null);
       const [shiftModalTab, setShiftModalTab] = useState("cambio");
       const [countedCashInput, setCountedCashInput] = useState("");
       const [nextInitialFundInput, setNextInitialFundInput] = useState("500");
@@ -874,27 +876,30 @@
         setCompletedSale(null);
       };
 
-      const cancelTicket = () => {
-        if (!completedSale) {
-          setShowTicket(false);
+      const handleOpenCancelTicket = () => {
+        if (!completedSale) return;
+        setSaleToCancel(completedSale);
+        setShowTicket(false); // Hace desaparecer el ticket de compra
+        setIsCancelModalOpen(true); // Muestra solo el mensaje de confirmación
+      };
+
+      const handleDismissCancelModal = () => {
+        setIsCancelModalOpen(false);
+        setShowTicket(true); // Vuelve a mostrar el ticket de compra
+      };
+
+      const handleConfirmCancelTicket = () => {
+        const sale = saleToCancel || completedSale;
+        if (!sale) {
+          setIsCancelModalOpen(false);
           return;
         }
 
-        const totalPieces = completedSale.items ? completedSale.items.reduce((sum, i) => sum + i.quantity, 0) : 0;
-        const confirmCancel = window.confirm(
-          `¿Deseas cancelar el ticket #${completedSale.id}?\n\n` +
-          `• Se anulará esta compra por completo.\n` +
-          `• NO se cobrará el monto (${formatCurrency(completedSale.total)} MXN) en caja ni en reportes.\n` +
-          `• Las ${totalPieces} piezas de pan volverán al inventario disponible.`
-        );
-
-        if (!confirmCancel) return;
-
         // 1. Reintegrar piezas de pan al inventario
-        if (completedSale.items && completedSale.items.length > 0) {
+        if (sale.items && sale.items.length > 0) {
           setProducts((prev) =>
             prev.map((prod) => {
-              const returnedItem = completedSale.items.find((ci) => ci.product.id === prod.id);
+              const returnedItem = sale.items.find((ci) => ci.product.id === prod.id);
               return returnedItem
                 ? { ...prod, stock: prod.stock + returnedItem.quantity }
                 : prod;
@@ -903,16 +908,12 @@
         }
 
         // 2. Eliminar la venta para que no se cobre ni afecte el corte de caja
-        setSalesList((prev) => prev.filter((s) => s.id !== completedSale.id));
+        setSalesList((prev) => prev.filter((s) => s.id !== sale.id));
 
-        // 3. Limpiar estado de la venta y cerrar el modal
-        setCart([]);
-        setCashGiven("");
-        setSelectedCustomer(DEFAULT_CUSTOMERS_DATA[0]);
-        setShowTicket(false);
-        setCompletedSale(null);
-
-        alert("✅ Ticket cancelado: La compra fue anulada y los panes se reintegraron al inventario.");
+        // 3. Limpiar estado de la venta y cerrar
+        setIsCancelModalOpen(false);
+        setSaleToCancel(null);
+        resetSale();
       };
 
       const filteredCustomers = useMemo(() => {
@@ -1908,7 +1909,7 @@
                 <div className="bg-amber-950 text-amber-100 p-4 px-6 flex items-center justify-between">
                   <span className="font-bold text-sm">🧾 Comprobante de Venta</span>
                   <button
-                    onClick={cancelTicket}
+                    onClick={handleOpenCancelTicket}
                     className="text-xl font-bold hover:text-rose-400 p-1 rounded-lg hover:bg-amber-900/60 transition-colors cursor-pointer"
                     title="Cancelar ticket y anular compra (no cobrar panes)"
                   >
@@ -2077,7 +2078,7 @@
                 <div className="p-4 bg-white border-t border-stone-200 flex gap-2.5 sm:gap-3">
                   <button
                     type="button"
-                    onClick={cancelTicket}
+                    onClick={handleOpenCancelTicket}
                     className="py-3 px-3.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 shadow-xs"
                     title="Cancelar compra y regresar panes al inventario"
                   >
@@ -2097,6 +2098,108 @@
                   >
                     ✓ Siguiente Cliente
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL PERSONALIZADO DE CANCELACIÓN DE TICKET (ESTILO PANADERÍAS BRITO) */}
+          {isCancelModalOpen && saleToCancel && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-2 border-amber-900/30 text-stone-900 animate-in zoom-in-95 duration-200">
+                {/* Header café tostado oficial Panadería Brito */}
+                <div className="bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] p-4 px-5 text-white flex items-center justify-between border-b border-amber-900/40">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl text-white shadow-md text-base">
+                      🥐
+                    </div>
+                    <div>
+                      <h3 className="font-black text-sm text-white flex items-center gap-1.5">
+                        ¿Cancelar Ticket de Compra?
+                      </h3>
+                      <p className="text-[10px] text-amber-300 font-bold font-mono">
+                        Folio #{saleToCancel.id}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDismissCancelModal}
+                    className="p-1 rounded-lg text-amber-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer text-xl font-bold leading-none"
+                    title="Volver al ticket"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Cuerpo del modal con diseño elegante y colores cálidos de panadería */}
+                <div className="p-5 space-y-4 bg-[#fdfbf7]">
+                  {/* Tarjeta de impacto de la cancelación */}
+                  <div className="bg-amber-50/80 rounded-2xl border-2 border-amber-200/90 p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 font-black flex items-center justify-center text-base shrink-0 border border-orange-200">
+                        🥖
+                      </div>
+                      <div>
+                        <h4 className="font-black text-stone-900 text-xs sm:text-sm">
+                          Reintegrar Panes a Vitrina
+                        </h4>
+                        <p className="text-[11px] text-stone-600 leading-snug">
+                          Las <strong className="text-amber-900 font-black">{saleToCancel.items ? saleToCancel.items.reduce((sum, i) => sum + i.quantity, 0) : 0} piezas de pan</strong> regresarán automáticamente al inventario para que sigan disponibles a la venta.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 pt-2 border-t border-amber-200/60">
+                      <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 font-black flex items-center justify-center text-sm shrink-0 border border-rose-200">
+                        🚫
+                      </div>
+                      <div>
+                        <h4 className="font-black text-stone-900 text-xs sm:text-sm">
+                          Anular Cobro de Dinero
+                        </h4>
+                        <p className="text-[11px] text-stone-600 leading-snug">
+                          <strong className="text-rose-700 font-black">NO se cobrará</strong> el importe de <strong className="text-stone-950 font-black">{formatCurrency(saleToCancel.total)} MXN</strong>. Este ticket no sumará a tu caja ni afectará el corte del turno.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Detalle rápido de la orden */}
+                  <div className="bg-white rounded-xl border border-stone-200 p-3 text-[11px] space-y-1.5">
+                    <div className="flex justify-between text-stone-500">
+                      <span>Cliente asignado:</span>
+                      <span className="font-bold text-stone-800">{saleToCancel.customerName || "Público General"}</span>
+                    </div>
+                    <div className="flex justify-between text-stone-500">
+                      <span>Método registrado:</span>
+                      <span className="font-bold text-stone-800 uppercase">[ {saleToCancel.paymentMethod} ]</span>
+                    </div>
+                    <div className="flex justify-between text-stone-500">
+                      <span>Atendió:</span>
+                      <span className="font-bold text-stone-800">{saleToCancel.cashier}</span>
+                    </div>
+                  </div>
+
+                  {/* Botones de acción elegantes */}
+                  <div className="pt-2 flex flex-col-reverse sm:flex-row gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleDismissCancelModal}
+                      className="flex-1 py-3 px-4 bg-stone-100 hover:bg-stone-200 border border-stone-300 text-stone-700 font-bold rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                    >
+                      <span>⬅</span>
+                      <span>Volver al Ticket</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmCancelTicket}
+                      className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-700 via-orange-700 to-rose-700 hover:from-amber-800 hover:to-rose-800 text-white font-black rounded-2xl text-xs sm:text-sm shadow-md shadow-orange-900/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                    >
+                      <span>✓</span>
+                      <span>Sí, Anular Compra</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2506,10 +2609,12 @@
                           </div>
                         </div>
 
-                        <div className="max-w-md mx-auto pt-1">
+                        {/* Botón Principal Gigante de Conclusión de Turno e Información Clara */}
+                        <div className="max-w-xl mx-auto pt-2 pb-2">
                           <button
                             type="button"
                             onClick={() => {
+                              playCashRegisterSound();
                               setShowCutSuccessModal(false);
                               setShowDrawerModal(false);
                               setIsShiftLocked(true);
@@ -2517,10 +2622,31 @@
                                 localStorage.setItem("brito_pos_shift_locked", "true");
                               } catch(e) {}
                             }}
-                            className="w-full py-4.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white font-black rounded-2xl text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-xl shadow-orange-950/20 active:scale-95 transition-all animate-pulse"
+                            className="w-full py-5 sm:py-6 px-6 sm:px-8 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:via-orange-500 hover:to-amber-600 text-white font-black rounded-3xl shadow-2xl shadow-orange-950/30 border-2 border-amber-300/60 ring-4 ring-orange-500/25 hover:ring-orange-500/40 active:scale-[0.98] transition-all cursor-pointer group text-left sm:text-center"
                           >
-                            <span>🔒</span>
-                            <span>Finalizar y Bloquear Punto de Venta</span>
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform text-2xl">
+                                🔒
+                              </div>
+
+                              <div className="flex-1 text-center">
+                                <div className="flex items-center justify-center gap-2 mb-1.5">
+                                  <span className="bg-emerald-400 text-emerald-950 text-xs sm:text-sm font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                                    ✓ Turno Cerrado Sin Problemas
+                                  </span>
+                                </div>
+                                <h4 className="text-lg sm:text-2xl font-black tracking-wide leading-tight drop-shadow-xs">
+                                  Finalizar y Bloquear Punto de Venta
+                                </h4>
+                                <p className="text-xs sm:text-sm text-amber-100 font-bold mt-1.5 opacity-95">
+                                  Caja cuadrada correctamente • Toca aquí para salir y entregar turno
+                                </p>
+                              </div>
+
+                              <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform text-lg">
+                                ➔
+                              </div>
+                            </div>
                           </button>
                         </div>
                       </div>
@@ -3090,20 +3216,15 @@
                   <span className="text-xs font-bold text-stone-500">
                     Panaderías Brito • Sucursal Matriz
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (showCutSuccessModal) {
-                        setShowCutSuccessModal(false);
-                        setIsShiftLocked(true);
-                        try { localStorage.setItem("brito_pos_shift_locked", "true"); } catch(e) {}
-                      }
-                      setShowDrawerModal(false);
-                    }}
-                    className="px-6 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-xl text-xs sm:text-sm transition-colors"
-                  >
-                    Cerrar Ventana
-                  </button>
+                  {!showCutSuccessModal && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDrawerModal(false)}
+                      className="px-6 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-xl text-xs sm:text-sm transition-colors cursor-pointer"
+                    >
+                      Cerrar Ventana
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

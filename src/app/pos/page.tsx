@@ -205,28 +205,27 @@ function CartQuantityInput({
   value: number;
   onChange: (qty: number) => void;
 }) {
-  const [text, setText] = useState<string>(value.toString());
+  const [text, setText] = useState<string>(value > 0 ? value.toString() : "");
 
   useEffect(() => {
-    setText(value.toString());
+    setText(value > 0 ? value.toString() : "");
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const clean = cleanOnlyNumbers(e.target.value);
     setText(clean);
-    if (clean !== "") {
+    if (clean === "") {
+      onChange(0);
+    } else {
       const num = parseInt(clean, 10);
-      if (!isNaN(num) && num > 0) {
-        onChange(num);
-      }
+      onChange(isNaN(num) ? 0 : num);
     }
   };
 
   const handleBlur = () => {
-    if (!text || text === "" || isNaN(parseInt(text, 10)) || parseInt(text, 10) <= 0) {
-      const fallback = value > 0 ? value : 1;
-      setText(fallback.toString());
-      onChange(fallback);
+    if (text === "" || parseInt(text, 10) === 0) {
+      setText("");
+      onChange(0);
     } else {
       const num = parseInt(text, 10);
       setText(num.toString());
@@ -248,11 +247,10 @@ function CartQuantityInput({
         onlyNumbersKeyDown(e, false);
       }}
       onChange={handleChange}
-      onFocus={(e) => e.target.select()}
-      onClick={(e) => e.currentTarget.select()}
       onBlur={handleBlur}
-      className="w-11 h-7 text-center font-black text-xs sm:text-sm bg-white border border-amber-400 focus:border-amber-600 rounded-lg focus:outline-none shadow-inner text-stone-900 cursor-text select-all"
-      title="Haz clic para escribir la cantidad de piezas directamente (ej. 100)"
+      placeholder=""
+      className="w-11 h-7 text-center font-black text-xs sm:text-sm bg-white border border-amber-400 focus:border-amber-600 rounded-lg focus:outline-none shadow-inner text-stone-900 cursor-text"
+      title="Cantidad de piezas (puedes borrarlo y escribir libremente)"
     />
   );
 }
@@ -268,27 +266,27 @@ function CartPriceInput({
   value: number;
   onChange: (price: number) => void;
 }) {
-  const [text, setText] = useState<string>(value.toString());
+  const [text, setText] = useState<string>(value > 0 ? value.toString() : "");
 
   useEffect(() => {
-    setText(value.toString());
+    setText(value > 0 ? value.toString() : "");
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const clean = cleanDecimalNumbers(e.target.value);
     setText(clean);
-    if (clean !== "" && clean !== ".") {
+    if (clean === "" || clean === ".") {
+      onChange(0);
+    } else {
       const num = parseFloat(clean);
-      if (!isNaN(num) && num >= 0) {
-        onChange(num);
-      }
+      onChange(isNaN(num) ? 0 : num);
     }
   };
 
   const handleBlur = () => {
-    if (!text || text === "" || text === "." || isNaN(parseFloat(text))) {
-      setText(value.toString());
-      onChange(value);
+    if (text === "" || text === "." || parseFloat(text) === 0) {
+      setText("");
+      onChange(0);
     } else {
       const num = parseFloat(text);
       setText(num.toString());
@@ -314,10 +312,9 @@ function CartPriceInput({
           onlyNumbersKeyDown(e, true);
         }}
         onChange={handleChange}
-        onFocus={(e) => e.target.select()}
-        onClick={(e) => e.currentTarget.select()}
         onBlur={handleBlur}
-        className="w-12 text-xs font-black text-stone-900 bg-transparent text-center focus:outline-none cursor-text select-all"
+        placeholder=""
+        className="w-12 text-xs font-black text-stone-900 bg-transparent text-center focus:outline-none cursor-text"
       />
       <span className="text-[10px] text-stone-400 font-bold select-none">c/pza</span>
     </div>
@@ -394,6 +391,8 @@ export default function POSPage() {
 
   // Modals & Drawers state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [saleToCancel, setSaleToCancel] = useState<Sale | null>(null);
   const [showRecentSales, setShowRecentSales] = useState(false);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
@@ -738,20 +737,20 @@ export default function POSPage() {
     );
   };
 
+  const removeFromCart = (id: string) => {
+    setCart((prev) => prev.filter((item) => item.product.id !== id));
+  };
+
   const setExactQuantity = (id: string, qty: number) => {
-    if (qty <= 0) {
-      setCart((prev) => prev.filter((item) => item.product.id !== id));
-      return;
-    }
     setCart((prev) =>
       prev.map((item) =>
-        item.product.id === id ? { ...item, quantity: qty } : item
+        item.product.id === id ? { ...item, quantity: Math.max(0, qty) } : item
       )
     );
   };
 
-  const total = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const totalPieces = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const total = cart.reduce((sum, item) => sum + (item.product.price || 0) * (item.quantity || 0), 0);
+  const totalPieces = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const parsedCashGiven = Number(cashGiven) || 0;
   const change = paymentMethod === "efectivo" && parsedCashGiven >= total ? parsedCashGiven - total : 0;
   const isPaymentValid = paymentMethod !== "efectivo" || parsedCashGiven >= total;
@@ -786,10 +785,11 @@ export default function POSPage() {
   };
 
   const handleCheckout = async () => {
-    if (cart.length === 0 || !isPaymentValid || isSubmitting) return;
+    const validItems = cart.filter((item) => (item.quantity || 0) > 0);
+    if (validItems.length === 0 || !isPaymentValid || isSubmitting) return;
     setIsSubmitting(true);
 
-    const currentItems = [...cart];
+    const currentItems = [...validItems];
     const currentTotal = total;
     const currentPaymentMethod = paymentMethod;
     const currentCashGiven = paymentMethod === "efectivo" ? parsedCashGiven : undefined;
@@ -957,26 +957,29 @@ export default function POSPage() {
     setCompletedSale(null);
   };
 
-  const handleCancelTicket = () => {
-    if (!completedSale) {
-      setShowReceiptModal(false);
+  const handleOpenCancelTicket = () => {
+    if (!completedSale) return;
+    setSaleToCancel(completedSale);
+    setShowReceiptModal(false); // Oculta el ticket para que no aparezca en pantalla
+    setIsCancelModalOpen(true); // Abre el modal de confirmación con diseño Panaderías Brito
+  };
+
+  const handleDismissCancelModal = () => {
+    setIsCancelModalOpen(false);
+    setShowReceiptModal(true); // Vuelve a mostrar el ticket si se cancela la acción
+  };
+
+  const handleConfirmCancelTicket = () => {
+    const sale = saleToCancel || completedSale;
+    if (!sale) {
+      setIsCancelModalOpen(false);
       return;
     }
 
-    const totalPieces = completedSale.items ? completedSale.items.reduce((sum, i) => sum + i.quantity, 0) : 0;
-    const confirmCancel = window.confirm(
-      `¿Deseas cancelar el comprobante #${completedSale.id}?\n\n` +
-      `• Se anulará esta compra por completo.\n` +
-      `• NO se cobrará el monto (${formatCurrency(completedSale.total)} MXN) en caja ni en reportes.\n` +
-      `• Las ${totalPieces} piezas de pan volverán al inventario disponible.`
-    );
-
-    if (!confirmCancel) return;
-
-    // 1. Devolver los panes al stock local
+    // 1. Devolver los panes al inventario local
     setProducts((prev) => {
       const updated = prev.map((prod) => {
-        const returnedItem = completedSale.items.find((ci) => ci.product.id === prod.id);
+        const returnedItem = sale.items.find((ci) => ci.product.id === prod.id);
         if (returnedItem) {
           return { ...prod, stock: prod.stock + returnedItem.quantity };
         }
@@ -989,7 +992,7 @@ export default function POSPage() {
     // 2. Reintegrar stock en Supabase si aplica
     try {
       const supabase = createClient();
-      for (const item of completedSale.items) {
+      for (const item of sale.items) {
         if (item.product.id.includes("-")) {
           const currentProd = products.find((p) => p.id === item.product.id);
           const restoredStock = (currentProd?.stock || 0) + item.quantity;
@@ -1004,13 +1007,24 @@ export default function POSPage() {
       console.log("Offline mode, stock restored locally", e);
     }
 
-    // 3. Eliminar la venta de recentSalesList
-    setRecentSalesList((prev) => prev.filter((s) => s.id !== completedSale.id));
+    // 3. Eliminar la venta de recentSalesList (no se cobrará el dinero ni afectará el corte)
+    setRecentSalesList((prev) => prev.filter((s) => s.id !== sale.id));
 
-    // 4. Limpiar estado de venta y cerrar modal
+    // 4. Notificación en el sistema de Panaderías Brito
+    addNotification({
+      senderName: "🥖 Panaderías Brito",
+      senderAvatar: "🥐",
+      badgeIcon: "alerta",
+      title: "Ticket Cancelado",
+      highlightText: `Compra #${sale.id} Anulada`,
+      description: `Se canceló el ticket de ${formatCurrency(sale.total)} MXN y se devolvieron ${sale.items.reduce((s, i) => s + i.quantity, 0)} piezas de pan al mostrador.`,
+      category: "caja",
+    });
+
+    // 5. Cerrar modal y reiniciar estado de venta
+    setIsCancelModalOpen(false);
+    setSaleToCancel(null);
     resetSale();
-
-    alert("✅ Ticket cancelado: La compra fue anulada y los panes se reintegraron al inventario.");
   };
 
   const catalogScrollRef = useRef<HTMLDivElement>(null);
@@ -1893,13 +1907,13 @@ export default function POSPage() {
                     </button>
 
                     <span className="font-black text-xs sm:text-sm text-stone-900 min-w-[56px] text-right pl-1">
-                      {formatCurrency(item.product.price * item.quantity)}
+                      {formatCurrency((item.product.price || 0) * (item.quantity || 0))}
                     </span>
 
                     <button
                       type="button"
-                      onClick={() => setExactQuantity(item.product.id, 0)}
-                      className="p-1 text-stone-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-0.5"
+                      onClick={() => removeFromCart(item.product.id)}
+                      className="p-1 text-stone-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-0.5 cursor-pointer"
                       title="Eliminar de la charola"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -2011,8 +2025,6 @@ export default function POSPage() {
                     inputMode="decimal"
                     placeholder="Paga con... ($)"
                     value={cashGiven}
-                    onFocus={(e) => e.target.select()}
-                    onClick={(e) => e.currentTarget.select()}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.currentTarget.blur();
@@ -2021,7 +2033,7 @@ export default function POSPage() {
                       onlyNumbersKeyDown(e, true);
                     }}
                     onChange={(e) => setCashGiven(cleanDecimalNumbers(e.target.value))}
-                    className="w-full pl-9 pr-3 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 text-sm sm:text-base font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all select-all"
+                    className="w-full pl-9 pr-3 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 text-sm sm:text-base font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all"
                   />
                 </div>
 
@@ -2199,7 +2211,7 @@ export default function POSPage() {
         <TicketModal
           isOpen={showReceiptModal}
           onClose={resetSale}
-          onCancelTicket={handleCancelTicket}
+          onCancelTicket={handleOpenCancelTicket}
           saleId={completedSale.id}
           items={completedSale.items}
           total={completedSale.total}
@@ -2215,6 +2227,108 @@ export default function POSPage() {
           branchPhone={activeBranch ? activeBranch.phone : undefined}
           date={completedSale.date}
         />
+      )}
+
+      {/* Modal Personalizado de Confirmación de Cancelación de Ticket con diseño Panadería Brito */}
+      {isCancelModalOpen && saleToCancel && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-2 border-amber-900/30 text-stone-900 animate-in zoom-in-95 duration-200">
+            {/* Header café tostado oficial Panadería Brito */}
+            <div className="bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] p-4 px-5 text-white flex items-center justify-between border-b border-amber-900/40">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl text-white shadow-md text-base">
+                  🥐
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-white flex items-center gap-1.5">
+                    ¿Cancelar Ticket de Compra?
+                  </h3>
+                  <p className="text-[10px] text-amber-300 font-bold font-mono">
+                    Folio #{saleToCancel.id}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDismissCancelModal}
+                className="p-1 rounded-lg text-amber-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Volver al ticket"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Cuerpo del modal con diseño elegante y colores cálidos de panadería */}
+            <div className="p-5 space-y-4 bg-[#fdfbf7]">
+              {/* Tarjeta de impacto de la cancelación */}
+              <div className="bg-amber-50/80 rounded-2xl border-2 border-amber-200/90 p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 font-black flex items-center justify-center text-base shrink-0 border border-orange-200">
+                    🥖
+                  </div>
+                  <div>
+                    <h4 className="font-black text-stone-900 text-xs sm:text-sm">
+                      Reintegrar Panes a Vitrina
+                    </h4>
+                    <p className="text-[11px] text-stone-600 leading-snug">
+                      Las <strong className="text-amber-900 font-black">{saleToCancel.items.reduce((sum, i) => sum + i.quantity, 0)} piezas de pan</strong> regresarán automáticamente al inventario para que sigan disponibles a la venta.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 pt-2 border-t border-amber-200/60">
+                  <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 font-black flex items-center justify-center text-sm shrink-0 border border-rose-200">
+                    🚫
+                  </div>
+                  <div>
+                    <h4 className="font-black text-stone-900 text-xs sm:text-sm">
+                      Anular Cobro de Dinero
+                    </h4>
+                    <p className="text-[11px] text-stone-600 leading-snug">
+                      <strong className="text-rose-700 font-black">NO se cobrará</strong> el importe de <strong className="text-stone-950 font-black">{formatCurrency(saleToCancel.total)} MXN</strong>. Este ticket no sumará a tu caja ni afectará el corte del turno.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detalle rápido de la orden */}
+              <div className="bg-white rounded-xl border border-stone-200 p-3 text-[11px] space-y-1.5">
+                <div className="flex justify-between text-stone-500">
+                  <span>Cliente asignado:</span>
+                  <span className="font-bold text-stone-800">{saleToCancel.customerName || "Público General"}</span>
+                </div>
+                <div className="flex justify-between text-stone-500">
+                  <span>Método registrado:</span>
+                  <span className="font-bold text-stone-800 uppercase">[ {saleToCancel.paymentMethod} ]</span>
+                </div>
+                <div className="flex justify-between text-stone-500">
+                  <span>Atendió:</span>
+                  <span className="font-bold text-stone-800">{saleToCancel.cashier}</span>
+                </div>
+              </div>
+
+              {/* Botones de acción elegantes */}
+              <div className="pt-2 flex flex-col-reverse sm:flex-row gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleDismissCancelModal}
+                  className="flex-1 py-3 px-4 bg-stone-100 hover:bg-stone-200 border border-stone-300 text-stone-700 font-bold rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <span>⬅</span>
+                  <span>Volver al Ticket</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmCancelTicket}
+                  className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-700 via-orange-700 to-rose-700 hover:from-amber-800 hover:to-rose-800 text-white font-black rounded-2xl text-xs sm:text-sm shadow-md shadow-orange-900/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <span>✓</span>
+                  <span>Sí, Anular Compra</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal de Registro Rápido de Nuevo Cliente (Simple: Teléfono, Nombre y Característica) */}
