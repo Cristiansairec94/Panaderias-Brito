@@ -4,6 +4,7 @@ import React, { useRef } from "react";
 import { Printer, CheckCircle, X, Receipt } from "lucide-react";
 import { CartItem } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { playCashRegisterSound } from "@/lib/sound";
 
 interface TicketModalProps {
   isOpen: boolean;
@@ -240,25 +241,7 @@ export default function TicketModal({
                 </div>
               </div>
 
-              {/* Simulación de Código de Barras POS */}
-              <div className="flex flex-col items-center pt-1">
-                <div className="flex justify-center items-center gap-[2px] h-8 w-44 py-0.5">
-                  {[2, 1, 3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 4, 2, 1, 3, 1, 2, 3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 3, 2].map(
-                    (w, i) => (
-                      <div
-                        key={i}
-                        className="bg-black h-full"
-                        style={{ width: `${w * 1.5}px` }}
-                      />
-                    )
-                  )}
-                </div>
-                <p className="text-[10px] font-mono tracking-widest text-black mt-0.5 font-bold">
-                  *{folio}*
-                </p>
-              </div>
-
-              <div className="pt-0.5 space-y-0.5">
+              <div className="pt-1 space-y-0.5">
                 <p className="font-black text-black text-sm tracking-wide uppercase">
                   ¡GRACIAS POR SU PREFERENCIA!
                 </p>
@@ -291,8 +274,11 @@ export default function TicketModal({
             <Printer className="w-4 h-4" /> Imprimir Ticket (B&N)
           </button>
           <button
-            onClick={onClose}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-neutral-800 hover:bg-neutral-900 text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+            onClick={() => {
+              playCashRegisterSound();
+              onClose();
+            }}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
           >
             <CheckCircle className="w-4 h-4" /> Siguiente Cliente
           </button>
