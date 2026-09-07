@@ -23,7 +23,9 @@ import {
   ArrowLeft,
   Receipt,
   FileText,
-  ChevronRight
+  ChevronRight,
+  Lock,
+  ShieldCheck
 } from "lucide-react";
 import { Product, Customer, OrderItem } from "@/types";
 import { getStoredProducts } from "@/lib/products";
@@ -56,7 +58,11 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [isNewCustomer, setIsNewCustomer] = useState(false);
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(currentBranch?.id || "branch-matriz");
+  const isAdmin = user?.role === "admin";
+  const userActiveBranchId = user?.assignedBranchId || currentBranch?.id || "branch-matriz";
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(
+    !isAdmin ? userActiveBranchId : (currentBranch?.id || "branch-matriz")
+  );
 
   // Step 2: Order items & Dedication
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -87,12 +93,13 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
     if (isOpen) {
       setProducts(getStoredProducts());
       setCustomers(getStoredCustomers());
-      if (currentBranch) {
-        setSelectedBranchId(currentBranch.id);
-      }
+      const defaultBranch = !isAdmin
+        ? userActiveBranchId
+        : currentBranch?.id || "branch-matriz";
+      setSelectedBranchId(defaultBranch);
       setCurrentStep(1);
     }
-  }, [isOpen, currentBranch]);
+  }, [isOpen, currentBranch, user, isAdmin, userActiveBranchId]);
 
   // Total calculation
   const total = useMemo(() => {
@@ -266,7 +273,8 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
     setIsSubmitting(true);
 
     try {
-      const branch = branches.find((b) => b.id === selectedBranchId) || branches[0];
+      const effectiveBranchId = !isAdmin ? userActiveBranchId : selectedBranchId;
+      const branch = branches.find((b) => b.id === effectiveBranchId) || branches[0];
 
       let finalCustomerId = selectedCustomerId;
       if (!selectedCustomerId && isNewCustomer && customerName.trim()) {
@@ -286,7 +294,7 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
         customerName: customerName.trim(),
         phone: customerPhone.trim() || "55 0000 0000",
         customerId: finalCustomerId || undefined,
-        branchId: branch?.id || "branch-matriz",
+        branchId: branch?.id || effectiveBranchId || "branch-matriz",
         branchName: branch?.name || "Sucursal Matriz (Centro)",
         description: desc,
         items: items,
@@ -575,40 +583,73 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
 
               {/* Card 2: Sucursal de Elaboración / Entrega */}
               <div className="bg-white border border-stone-200 rounded-3xl p-6 shadow-xs space-y-4">
-                <div className="flex items-center gap-2.5 border-b border-stone-100 pb-3">
-                  <div className="p-2 bg-stone-100 text-stone-700 rounded-xl border border-stone-200">
-                    <Store className="w-5 h-5 text-amber-700" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-stone-100 text-stone-700 rounded-xl border border-stone-200">
+                      <Store className="w-5 h-5 text-amber-700" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-stone-900">Sucursal Asignada</h3>
+                      <p className="text-xs text-stone-500">¿En qué panadería se elaborará y gestionará el pedido?</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-extrabold text-base text-stone-900">Sucursal Asignada</h3>
-                    <p className="text-xs text-stone-500">¿En qué panadería se elaborará y gestionará el pedido?</p>
-                  </div>
+                  {isAdmin ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-[11px] font-bold text-amber-800 self-start sm:self-auto">
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                      Permiso Administrador (Sucursales Abiertas)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-stone-100 border border-stone-200 rounded-full text-[11px] font-bold text-stone-600 self-start sm:self-auto">
+                      <Lock className="w-3.5 h-3.5 text-stone-500" />
+                      Sucursal Fija (Tu Tienda Activa)
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {branches.map((b) => {
                     const isSelected = selectedBranchId === b.id;
+                    const isAllowed = isAdmin || b.id === userActiveBranchId;
                     return (
                       <button
                         key={b.id}
                         type="button"
-                        onClick={() => setSelectedBranchId(b.id)}
+                        disabled={!isAllowed}
+                        onClick={() => {
+                          if (isAllowed) setSelectedBranchId(b.id);
+                        }}
                         className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between ${
                           isSelected
                             ? "border-amber-600 bg-amber-50/50 shadow-sm"
-                            : "border-stone-200 hover:border-stone-300 bg-white"
+                            : isAllowed
+                            ? "border-stone-200 hover:border-stone-300 bg-white"
+                            : "border-stone-200/60 bg-stone-100/60 opacity-60 cursor-not-allowed"
                         }`}
                       >
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-extrabold text-xs text-stone-900">{b.shortName}</span>
-                            {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-600" />}
+                            {isSelected ? (
+                              <CheckCircle2 className="w-4 h-4 text-amber-600" />
+                            ) : !isAllowed ? (
+                              <Lock className="w-3.5 h-3.5 text-stone-400" />
+                            ) : null}
                           </div>
                           <p className="text-[11px] text-stone-500 line-clamp-1">{b.name}</p>
                           <p className="text-[10px] text-stone-400 mt-1 flex items-center gap-1">
                             <MapPin className="w-3 h-3" /> {b.address.split(",")[0]}
                           </p>
                         </div>
+                        {!isAllowed && (
+                          <div className="mt-2 pt-2 border-t border-stone-200/70 flex items-center justify-between text-[10px] font-semibold text-stone-400">
+                            <span>Bloqueada para cajero</span>
+                          </div>
+                        )}
+                        {isSelected && !isAdmin && (
+                          <div className="mt-2 pt-2 border-t border-amber-200/70 flex items-center justify-between text-[10px] font-bold text-amber-700">
+                            <span>✓ Tu Sucursal Actual</span>
+                          </div>
+                        )}
                       </button>
                     );
                   })}

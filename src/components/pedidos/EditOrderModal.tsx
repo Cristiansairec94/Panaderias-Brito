@@ -12,9 +12,11 @@ import {
   Sparkles,
   Save,
   CheckCircle2,
-  FileText
+  FileText,
+  Lock
 } from "lucide-react";
 import { CustomOrder } from "@/types";
+import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { updateCustomOrder } from "@/lib/orders";
 
@@ -31,6 +33,8 @@ export default function EditOrderModal({
   order,
   onOrderUpdated,
 }: EditOrderModalProps) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const { branches } = useBranch();
 
   const [customerName, setCustomerName] = useState("");
@@ -68,12 +72,13 @@ export default function EditOrderModal({
 
     setIsSubmitting(true);
     try {
-      const selectedBranch = branches.find((b) => b.id === branchId);
+      const targetBranchId = !isAdmin ? (order.branchId || "branch-matriz") : branchId;
+      const selectedBranch = branches.find((b) => b.id === targetBranchId);
 
       updateCustomOrder(order.id, {
         customerName: customerName.trim(),
         phone: phone.trim(),
-        branchId: branchId,
+        branchId: targetBranchId,
         branchName: selectedBranch?.name || order.branchName,
         deliveryDate: deliveryDate,
         deliveryTime: deliveryTime,
@@ -150,11 +155,23 @@ export default function EditOrderModal({
               Sucursal & Entrega Prometida
             </span>
             <div>
-              <label className="text-xs font-bold text-stone-700 block mb-1">Sucursal Asignada</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-stone-700">Sucursal Asignada</label>
+                {!isAdmin && (
+                  <span className="text-[10px] text-stone-500 font-semibold flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-stone-400" /> Fija (Solo Administrador)
+                  </span>
+                )}
+              </div>
               <select
                 value={branchId}
+                disabled={!isAdmin}
                 onChange={(e) => setBranchId(e.target.value)}
-                className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-semibold text-stone-800"
+                className={`w-full text-xs px-3.5 py-2.5 rounded-xl border focus:outline-none font-semibold ${
+                  !isAdmin
+                    ? "bg-stone-100 text-stone-500 border-stone-200 cursor-not-allowed"
+                    : "bg-white border-stone-300 focus:ring-2 focus:ring-amber-500 text-stone-800"
+                }`}
               >
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
