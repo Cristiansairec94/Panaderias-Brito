@@ -40,8 +40,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
-import { useBranch, SimulatedSale } from "@/context/BranchContext";
-import AnimatedLogo from "@/components/ui/AnimatedLogo";
+import { useBranch } from "@/context/BranchContext";
 
 // Top bakery products data
 const TOP_BAKERY_PRODUCTS = [
@@ -73,8 +72,7 @@ export default function Home() {
     simulateSale,
     simulateBulkSales,
     isLiveSimulating,
-    toggleLiveSimulation,
-    recentSimulatedSales 
+    toggleLiveSimulation
   } = useBranch();
 
   // Filters state
@@ -193,51 +191,7 @@ export default function Home() {
   const activeChartItems = activeChartTab === "horas" ? hourlyData : weeklyData;
   const maxChartAmount = Math.max(...activeChartItems.map((d) => d.amount), 1);
 
-  // Fallback simulated sales
-  const displaySales: SimulatedSale[] = recentSimulatedSales.length > 0 
-    ? recentSimulatedSales.slice(0, 6)
-    : [
-        {
-          id: "rec-1",
-          branchId: "branch-matriz",
-          branchName: "Matriz",
-          itemsSummary: "3x Concha Vainilla, 2x Bolillo Artesanal, 1x Café",
-          total: 82,
-          paymentMethod: "efectivo",
-          cashier: "Lupita Brito",
-          timestamp: "15:28:10",
-        },
-        {
-          id: "rec-2",
-          branchId: "branch-benito",
-          branchName: "San Benito",
-          itemsSummary: "10x Bolillo Artesanal, 2x Telera",
-          total: 74,
-          paymentMethod: "efectivo",
-          cashier: "Carlos Mendoza",
-          timestamp: "15:25:40",
-        },
-        {
-          id: "rec-3",
-          branchId: "branch-flores",
-          branchName: "Las Flores",
-          itemsSummary: "1x Rebanada Pastel 3 Leches, 2x Cuerno Mantequilla",
-          total: 84,
-          paymentMethod: "tarjeta",
-          cashier: "Sofía Morales",
-          timestamp: "15:21:15",
-        },
-        {
-          id: "rec-4",
-          branchId: "branch-matriz",
-          branchName: "Matriz",
-          itemsSummary: "4x Concha Chocolate, 4x Oreja Caramelizada",
-          total: 120,
-          paymentMethod: "transferencia",
-          cashier: "Lupita Brito",
-          timestamp: "15:15:02",
-        },
-      ];
+
 
   // Ranked branches by today sales
   const sortedBranches = useMemo(() => {
@@ -826,61 +780,57 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Two Column Layout: Top Bakery Products & Real-time Live Sales Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-7">
-        {/* Left Col: Top Selling Products (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-5">
-          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-            <div>
-              <h2 className="text-base font-black text-stone-900 flex items-center gap-2">
-                <Croissant className="w-5 h-5 text-orange-600" />
-                Los Panes Más Vendidos Hoy
-              </h2>
-              <p className="text-xs text-stone-500">
-                Ranking de salida de piezas en mostrador y aporte a ingresos
-              </p>
-            </div>
-            <Link
-              href="/productos"
-              className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1"
-            >
-              Ver Catálogo <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+      {/* Top Bakery Products Ranking */}
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-5">
+        <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+          <div>
+            <h2 className="text-base font-black text-stone-900 flex items-center gap-2">
+              <Croissant className="w-5 h-5 text-orange-600" />
+              Los Panes Más Vendidos Hoy
+            </h2>
+            <p className="text-xs text-stone-500">
+              Ranking de salida de piezas en mostrador y aporte a ingresos
+            </p>
           </div>
+          <Link
+            href="/productos"
+            className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1"
+          >
+            Ver Catálogo <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
 
-          <div className="space-y-3">
-            {TOP_BAKERY_PRODUCTS.map((prod, idx) => (
-              <div 
-                key={prod.id} 
-                className="p-3.5 rounded-2xl bg-stone-50/70 border border-stone-200/80 hover:border-orange-300 hover:bg-orange-50/20 transition-all space-y-2"
-              >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          {TOP_BAKERY_PRODUCTS.map((prod, idx) => (
+            <div 
+              key={prod.id} 
+              className="p-4 rounded-2xl bg-stone-50/70 border border-stone-200/80 hover:border-orange-300 hover:bg-orange-50/20 transition-all flex flex-col justify-between space-y-3"
+            >
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="w-7 h-7 rounded-xl bg-stone-200 text-stone-800 flex items-center justify-center font-black text-xs">
-                      #{idx + 1}
-                    </span>
-                    <div>
-                      <p className="font-black text-xs sm:text-sm text-stone-900 flex items-center gap-2">
-                        <span>{prod.name}</span>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-800">
-                          {prod.tag}
-                        </span>
-                      </p>
-                      <p className="text-[11px] text-stone-500">
-                        {prod.piecesSold} piezas vendidas • {formatCurrency(prod.price)} c/u
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="font-black text-sm text-stone-900">{formatCurrency(prod.revenue)}</p>
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      {prod.trend} hoy
-                    </span>
-                  </div>
+                  <span className="w-7 h-7 rounded-xl bg-stone-200 text-stone-800 flex items-center justify-center font-black text-xs">
+                    #{idx + 1}
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    {prod.trend} hoy
+                  </span>
                 </div>
 
-                {/* Progress bar of revenue share */}
+                <div>
+                  <p className="font-black text-sm text-stone-900 leading-snug">
+                    {prod.name}
+                  </p>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
+                    {prod.piecesSold} piezas vendidas • {formatCurrency(prod.price)} c/u
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-baseline justify-between text-xs mb-1">
+                  <span className="text-[10px] text-stone-400 font-bold uppercase">{prod.category}</span>
+                  <span className="font-black text-stone-900">{formatCurrency(prod.revenue)}</span>
+                </div>
                 <div className="w-full bg-stone-200 rounded-full h-1.5 overflow-hidden">
                   <div
                     className="bg-gradient-to-r from-orange-500 to-rose-500 h-full rounded-full transition-all duration-500"
@@ -888,78 +838,8 @@ export default function Home() {
                   />
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right Col: Live Sales Feed / Ticker (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-5 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div>
-                <h2 className="text-base font-black text-stone-900 flex items-center gap-2">
-                  <Receipt className="w-5 h-5 text-emerald-600" />
-                  Feed de Ventas en Vivo
-                </h2>
-                <p className="text-xs text-stone-500">
-                  Tickets emitidos al instante en caja
-                </p>
-              </div>
-              <button
-                onClick={() => simulateSale()}
-                className="text-[10px] font-black text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2.5 py-1.5 rounded-xl border border-orange-200 transition-colors flex items-center gap-1 active:scale-95"
-              >
-                <Zap className="w-3.5 h-3.5 fill-orange-600" />
-                +1 Venta
-              </button>
             </div>
-
-            {/* Sales Feed List */}
-            <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1 scrollbar-thin">
-              {displaySales.map((sale) => (
-                <div
-                  key={sale.id}
-                  className="p-3 rounded-2xl border border-stone-200/80 bg-stone-50/60 hover:bg-white hover:shadow-sm transition-all flex items-start justify-between gap-3 text-xs"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-black text-stone-800 text-[11px]">{sale.timestamp}</span>
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-stone-200 text-stone-700">
-                        {sale.branchName}
-                      </span>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                        sale.paymentMethod === "efectivo"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : sale.paymentMethod === "tarjeta"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-purple-100 text-purple-800"
-                      }`}>
-                        {sale.paymentMethod}
-                      </span>
-                    </div>
-                    <p className="text-stone-600 text-[11px] font-medium leading-tight">
-                      {sale.itemsSummary}
-                    </p>
-                    <p className="text-[10px] text-stone-400">Atendió: {sale.cashier}</p>
-                  </div>
-
-                  <div className="text-right whitespace-nowrap">
-                    <span className="font-black text-emerald-600 text-sm">
-                      {formatCurrency(sale.total)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Link
-            href="/pos"
-            className="w-full mt-3 py-3.5 rounded-2xl bg-gradient-to-r from-stone-900 to-black hover:brightness-125 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
-          >
-            <ShoppingBag className="w-4 h-4 text-orange-400" />
-            <span>Cobrar en Mostrador (POS)</span>
-          </Link>
+          ))}
         </div>
       </div>
 
