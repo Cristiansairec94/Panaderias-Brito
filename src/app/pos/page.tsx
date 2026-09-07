@@ -391,8 +391,6 @@ export default function POSPage() {
 
   // Modals & Drawers state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [saleToCancel, setSaleToCancel] = useState<Sale | null>(null);
   const [showRecentSales, setShowRecentSales] = useState(false);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
@@ -422,6 +420,16 @@ export default function POSPage() {
   const [customerTypeFilter, setCustomerTypeFilter] = useState<"all" | Customer["type"]>("all");
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
   const customerPickerRef = useRef<HTMLDivElement>(null);
+
+  // Al seleccionar o cambiar de cliente, el método de pago SIEMPRE regresa a 'efectivo' como opción principal
+  const selectCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setPaymentMethod("efectivo");
+    setCashGiven("");
+    setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+    setIsCustomerPickerOpen(false);
+    setCustomerSearchQuery("");
+  };
 
   // New Customer Form State
   const [newCustName, setNewCustName] = useState("");
@@ -529,8 +537,7 @@ export default function POSPage() {
       notes: newCustNotes.trim(),
     });
 
-    setSelectedCustomer(created);
-    setIsCustomerPickerOpen(false);
+    selectCustomer(created);
     setIsNewCustomerModalOpen(false);
     
     // Reset form
@@ -884,9 +891,11 @@ export default function POSPage() {
       setIsSubmitting(false);
       setShowReceiptModal(true);
 
-      // Al completar la compra, la charola se limpia y vuelve automáticamente a Clientes Generales
+      // Al completar la compra, la charola se limpia y vuelve automáticamente a Clientes Generales con efectivo
       setCart([]);
       setCashGiven("");
+      setPaymentMethod("efectivo");
+      setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
       setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
       setCustomerSearchQuery("");
       setIsCustomerPickerOpen(false);
@@ -950,6 +959,8 @@ export default function POSPage() {
   const resetSale = () => {
     setCart([]);
     setCashGiven("");
+    setPaymentMethod("efectivo");
+    setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
     setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
     setCustomerSearchQuery("");
     setIsCustomerPickerOpen(false);
@@ -957,24 +968,13 @@ export default function POSPage() {
     setCompletedSale(null);
   };
 
-  const handleOpenCancelTicket = () => {
-    if (!completedSale) return;
-    setSaleToCancel(completedSale);
-    setShowReceiptModal(false); // Oculta el ticket para que no aparezca en pantalla
-    setIsCancelModalOpen(true); // Abre el modal de confirmación con diseño Panaderías Brito
-  };
-
-  const handleDismissCancelModal = () => {
-    setIsCancelModalOpen(false);
-    setShowReceiptModal(true); // Vuelve a mostrar el ticket si se cancela la acción
-  };
-
-  const handleConfirmCancelTicket = () => {
-    const sale = saleToCancel || completedSale;
-    if (!sale) {
-      setIsCancelModalOpen(false);
+  const handleCancelTicket = () => {
+    if (!completedSale) {
+      setShowReceiptModal(false);
       return;
     }
+
+    const sale = completedSale;
 
     // 1. Devolver los panes al inventario local
     setProducts((prev) => {
@@ -1021,9 +1021,8 @@ export default function POSPage() {
       category: "caja",
     });
 
-    // 5. Cerrar modal y reiniciar estado de venta
-    setIsCancelModalOpen(false);
-    setSaleToCancel(null);
+    // 5. Cerrar ticket directamente y reiniciar estado de venta
+    setShowReceiptModal(false);
     resetSale();
   };
 
@@ -1615,11 +1614,7 @@ export default function POSPage() {
                   <span className="truncate max-w-[110px]">{selectedCustomer.name}</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
-                      setCustomerSearchQuery("");
-                      setIsCustomerPickerOpen(false);
-                    }}
+                    onClick={() => selectCustomer(DEFAULT_GENERAL_CUSTOMER)}
                     className="p-0.5 hover:bg-black/25 rounded-full transition-colors cursor-pointer shrink-0 ml-0.5"
                     title="Terminar y volver a Clientes Generales"
                   >
@@ -1711,11 +1706,7 @@ export default function POSPage() {
                 {/* 1. Opción fija: Volver a Clientes Generales */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
-                    setIsCustomerPickerOpen(false);
-                    setCustomerSearchQuery("");
-                  }}
+                  onClick={() => selectCustomer(DEFAULT_GENERAL_CUSTOMER)}
                   className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border cursor-pointer ${
                     selectedCustomer.id === "cli-0"
                       ? "bg-amber-100 border-amber-400 ring-1 ring-amber-400 shadow-2xs font-black"
@@ -1749,11 +1740,7 @@ export default function POSPage() {
                       <button
                         key={c.id}
                         type="button"
-                        onClick={() => {
-                          setSelectedCustomer(c);
-                          setIsCustomerPickerOpen(false);
-                          setCustomerSearchQuery("");
-                        }}
+                        onClick={() => selectCustomer(c)}
                         className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border cursor-pointer ${
                           isSelected
                             ? "bg-amber-50 border-amber-300 ring-1 ring-amber-300 shadow-2xs"
@@ -2150,10 +2137,7 @@ export default function POSPage() {
               type="button"
               onClick={() => {
                 setCart([]);
-                setCashGiven("");
-                setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
-                setCustomerSearchQuery("");
-                setIsCustomerPickerOpen(false);
+                selectCustomer(DEFAULT_GENERAL_CUSTOMER);
               }}
               disabled={cart.length === 0}
               className="col-span-1 py-3 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-stone-200 transition-all active:scale-95 shadow-xs"
@@ -2211,7 +2195,7 @@ export default function POSPage() {
         <TicketModal
           isOpen={showReceiptModal}
           onClose={resetSale}
-          onCancelTicket={handleOpenCancelTicket}
+          onCancelTicket={handleCancelTicket}
           saleId={completedSale.id}
           items={completedSale.items}
           total={completedSale.total}
@@ -2227,108 +2211,6 @@ export default function POSPage() {
           branchPhone={activeBranch ? activeBranch.phone : undefined}
           date={completedSale.date}
         />
-      )}
-
-      {/* Modal Personalizado de Confirmación de Cancelación de Ticket con diseño Panadería Brito */}
-      {isCancelModalOpen && saleToCancel && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-2 border-amber-900/30 text-stone-900 animate-in zoom-in-95 duration-200">
-            {/* Header café tostado oficial Panadería Brito */}
-            <div className="bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] p-4 px-5 text-white flex items-center justify-between border-b border-amber-900/40">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl text-white shadow-md text-base">
-                  🥐
-                </div>
-                <div>
-                  <h3 className="font-black text-sm text-white flex items-center gap-1.5">
-                    ¿Cancelar Ticket de Compra?
-                  </h3>
-                  <p className="text-[10px] text-amber-300 font-bold font-mono">
-                    Folio #{saleToCancel.id}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleDismissCancelModal}
-                className="p-1 rounded-lg text-amber-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                title="Volver al ticket"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Cuerpo del modal con diseño elegante y colores cálidos de panadería */}
-            <div className="p-5 space-y-4 bg-[#fdfbf7]">
-              {/* Tarjeta de impacto de la cancelación */}
-              <div className="bg-amber-50/80 rounded-2xl border-2 border-amber-200/90 p-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 font-black flex items-center justify-center text-base shrink-0 border border-orange-200">
-                    🥖
-                  </div>
-                  <div>
-                    <h4 className="font-black text-stone-900 text-xs sm:text-sm">
-                      Reintegrar Panes a Vitrina
-                    </h4>
-                    <p className="text-[11px] text-stone-600 leading-snug">
-                      Las <strong className="text-amber-900 font-black">{saleToCancel.items.reduce((sum, i) => sum + i.quantity, 0)} piezas de pan</strong> regresarán automáticamente al inventario para que sigan disponibles a la venta.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 pt-2 border-t border-amber-200/60">
-                  <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 font-black flex items-center justify-center text-sm shrink-0 border border-rose-200">
-                    🚫
-                  </div>
-                  <div>
-                    <h4 className="font-black text-stone-900 text-xs sm:text-sm">
-                      Anular Cobro de Dinero
-                    </h4>
-                    <p className="text-[11px] text-stone-600 leading-snug">
-                      <strong className="text-rose-700 font-black">NO se cobrará</strong> el importe de <strong className="text-stone-950 font-black">{formatCurrency(saleToCancel.total)} MXN</strong>. Este ticket no sumará a tu caja ni afectará el corte del turno.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Detalle rápido de la orden */}
-              <div className="bg-white rounded-xl border border-stone-200 p-3 text-[11px] space-y-1.5">
-                <div className="flex justify-between text-stone-500">
-                  <span>Cliente asignado:</span>
-                  <span className="font-bold text-stone-800">{saleToCancel.customerName || "Público General"}</span>
-                </div>
-                <div className="flex justify-between text-stone-500">
-                  <span>Método registrado:</span>
-                  <span className="font-bold text-stone-800 uppercase">[ {saleToCancel.paymentMethod} ]</span>
-                </div>
-                <div className="flex justify-between text-stone-500">
-                  <span>Atendió:</span>
-                  <span className="font-bold text-stone-800">{saleToCancel.cashier}</span>
-                </div>
-              </div>
-
-              {/* Botones de acción elegantes */}
-              <div className="pt-2 flex flex-col-reverse sm:flex-row gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleDismissCancelModal}
-                  className="flex-1 py-3 px-4 bg-stone-100 hover:bg-stone-200 border border-stone-300 text-stone-700 font-bold rounded-2xl text-xs sm:text-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
-                >
-                  <span>⬅</span>
-                  <span>Volver al Ticket</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmCancelTicket}
-                  className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-700 via-orange-700 to-rose-700 hover:from-amber-800 hover:to-rose-800 text-white font-black rounded-2xl text-xs sm:text-sm shadow-md shadow-orange-900/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
-                >
-                  <span>✓</span>
-                  <span>Sí, Anular Compra</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Modal de Registro Rápido de Nuevo Cliente (Simple: Teléfono, Nombre y Característica) */}

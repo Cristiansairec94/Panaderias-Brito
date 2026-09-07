@@ -4,32 +4,78 @@
  * señalando que la venta se cerró y el cliente fue atendido con excelencia.
  */
 
-/**
- * Síntesis de sonido de caja registradora utilizando la Web Audio API nativa.
- * Diseñado con múltiples capas acústicas:
- * 1. Ruido y golpe mecánico de expulsión de la gaveta de efectivo ("Ka-")
- * 2. Golpe de campana de bronce metálica con armónicos brillantes ("-CH-")
- * 3. Segunda campana armónica con tintineo de monedas ("-ING!")
- */
-export function playCashRegisterWebAudio() {
+let sharedAudioContext: AudioContext | null = null;
+let cachedAudioBuffer: AudioBuffer | null = null;
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
   try {
-    const AudioContextClass =
-      typeof window !== "undefined"
-        ? window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-        : null;
+    if (!sharedAudioContext) {
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        sharedAudioContext = new AudioContextClass();
+      }
+    }
+    if (sharedAudioContext && sharedAudioContext.state === "suspended") {
+      sharedAudioContext.resume();
+    }
+    return sharedAudioContext;
+  } catch {
+    return null;
+  }
+}
 
-    if (!AudioContextClass) return;
+// Pre-cargar el audio físico en memoria nada más cargar el módulo en el navegador
+if (typeof window !== "undefined") {
+  const preloadAudio = () => {
+    fetch("/sounds/cash-register.wav")
+      .then((res) => {
+        if (!res.ok) throw new Error("Audio not found");
+        return res.arrayBuffer();
+      })
+      .then((arrayBuf) => {
+        const ctx = getAudioContext();
+        if (ctx) {
+          ctx.decodeAudioData(
+            arrayBuf,
+            (decoded) => {
+              cachedAudioBuffer = decoded;
+            },
+            () => {}
+          );
+        }
+      })
+      .catch(() => {});
+  };
 
-    const ctx = new AudioContextClass();
+  if (document.readyState === "complete") {
+    preloadAudio();
+  } else {
+    window.addEventListener("load", preloadAudio, { once: true });
+  }
+}
+
+/**
+ * Síntesis acústica de caja registradora ("Ka-ching!") de alta fidelidad vía Web Audio.
+ * 100% autónomo: no depende de archivos externos ni de la red.
+ */
+export function playCashRegisterWebAudio(customCtx?: AudioContext) {
+  try {
+    const ctx = customCtx || getAudioContext();
+    if (!ctx) return;
     if (ctx.state === "suspended") {
       ctx.resume();
     }
 
     const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.9, now);
+    master.connect(ctx.destination);
 
-    // --- CAPA 1: Mecanismo de gaveta / trinquete de apertura ("Ka-") ---
-    // Pequeño estallido de ruido metálico filtrado (80ms)
-    const noiseDuration = 0.07;
+    // --- 1. GOLPE MECÁNICO Y TRINQUETE DE APERTURA ("Ka-") ---
+    const noiseDuration = 0.08;
     const bufferSize = Math.floor(ctx.sampleRate * noiseDuration);
     const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const channelData = noiseBuffer.getChannelData(0);
@@ -39,48 +85,46 @@ export function playCashRegisterWebAudio() {
 
     const noiseSource = ctx.createBufferSource();
     noiseSource.buffer = noiseBuffer;
-
     const noiseFilter = ctx.createBiquadFilter();
     noiseFilter.type = "bandpass";
-    noiseFilter.frequency.setValueAtTime(1400, now);
-    noiseFilter.Q.setValueAtTime(2.5, now);
+    noiseFilter.frequency.setValueAtTime(1800, now);
+    noiseFilter.Q.setValueAtTime(3.0, now);
 
     const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.22, now);
+    noiseGain.gain.setValueAtTime(0.35, now);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, now + noiseDuration);
 
     noiseSource.connect(noiseFilter);
     noiseFilter.connect(noiseGain);
-    noiseGain.connect(ctx.destination);
+    noiseGain.connect(master);
 
     noiseSource.start(now);
     noiseSource.stop(now + noiseDuration);
 
-    // Golpe sordo de apertura mecánica (transiente de baja frecuencia)
-    const thudOsc = ctx.createOscillator();
+    // Golpe sordo de la gaveta abriéndose
+    const thud = ctx.createOscillator();
     const thudGain = ctx.createGain();
-    thudOsc.type = "sine";
-    thudOsc.frequency.setValueAtTime(240, now + 0.01);
-    thudOsc.frequency.exponentialRampToValueAtTime(55, now + 0.08);
-    thudGain.gain.setValueAtTime(0.25, now + 0.01);
-    thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
+    thud.type = "sine";
+    thud.frequency.setValueAtTime(260, now);
+    thud.frequency.exponentialRampToValueAtTime(50, now + 0.09);
+    thudGain.gain.setValueAtTime(0.4, now);
+    thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    thud.connect(thudGain);
+    thudGain.connect(master);
+    thud.start(now);
+    thud.stop(now + 0.09);
 
-    thudOsc.connect(thudGain);
-    thudGain.connect(ctx.destination);
-    thudOsc.start(now + 0.01);
-    thudOsc.stop(now + 0.085);
-
-    // --- CAPA 2: Campana principal de bronce (#1) a los 0.075s ---
-    const t1 = now + 0.075;
-    const bell1Tones = [
-      { freq: 1567.98, gain: 0.35, decay: 0.7 }, // G6
-      { freq: 2093.0, gain: 0.3, decay: 0.6 },  // C7
-      { freq: 2637.02, gain: 0.25, decay: 0.5 }, // E7
-      { freq: 3135.96, gain: 0.2, decay: 0.4 },  // G7
-      { freq: 4186.01, gain: 0.15, decay: 0.3 }, // C8
+    // --- 2. CAMPANA DE BRONCE PRINCIPAL ("-CH-") a los 0.065s ---
+    const t1 = now + 0.065;
+    const bell1Frequencies = [
+      { freq: 1760.0, gain: 0.45, decay: 0.8 }, // A6
+      { freq: 2093.0, gain: 0.5, decay: 0.9 },  // C7
+      { freq: 2637.0, gain: 0.4, decay: 0.75 }, // E7
+      { freq: 3520.0, gain: 0.35, decay: 0.6 }, // A7
+      { freq: 4186.0, gain: 0.25, decay: 0.45 },// C8
     ];
 
-    bell1Tones.forEach(({ freq, gain, decay }) => {
+    bell1Frequencies.forEach(({ freq, gain, decay }) => {
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
       osc.type = "sine";
@@ -88,23 +132,23 @@ export function playCashRegisterWebAudio() {
       g.gain.setValueAtTime(gain, t1);
       g.gain.exponentialRampToValueAtTime(0.0001, t1 + decay);
       osc.connect(g);
-      g.connect(ctx.destination);
+      g.connect(master);
       osc.start(t1);
       osc.stop(t1 + decay);
     });
 
-    // --- CAPA 3: Campana de rebote y tintineo de monedas (#2) a los 0.135s ---
-    const t2 = now + 0.135;
-    const bell2Tones = [
-      { freq: 2093.0, gain: 0.4, decay: 0.95 },  // C7
-      { freq: 2637.02, gain: 0.35, decay: 0.85 }, // E7
-      { freq: 3135.96, gain: 0.28, decay: 0.75 }, // G7
-      { freq: 4186.01, gain: 0.22, decay: 0.6 },  // C8
-      { freq: 5274.04, gain: 0.16, decay: 0.45 }, // E8
-      { freq: 6271.93, gain: 0.1, decay: 0.3 },   // G8
+    // --- 3. SEGUNDA CAMPANA Y TINTINEO DE MONEDAS ("-INGGG!") a los 0.13s ---
+    const t2 = now + 0.13;
+    const bell2Frequencies = [
+      { freq: 2093.0, gain: 0.55, decay: 1.2 },  // C7 (campana brillante sostenida)
+      { freq: 2637.0, gain: 0.45, decay: 1.1 },  // E7
+      { freq: 3136.0, gain: 0.4, decay: 0.95 },  // G7
+      { freq: 4186.0, gain: 0.35, decay: 0.8 },  // C8
+      { freq: 5274.0, gain: 0.25, decay: 0.6 },  // E8
+      { freq: 6272.0, gain: 0.15, decay: 0.4 },  // G8
     ];
 
-    bell2Tones.forEach(({ freq, gain, decay }) => {
+    bell2Frequencies.forEach(({ freq, gain, decay }) => {
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
       osc.type = "sine";
@@ -112,50 +156,60 @@ export function playCashRegisterWebAudio() {
       g.gain.setValueAtTime(gain, t2);
       g.gain.exponentialRampToValueAtTime(0.0001, t2 + decay);
       osc.connect(g);
-      g.connect(ctx.destination);
+      g.connect(master);
       osc.start(t2);
       osc.stop(t2 + decay);
     });
 
-    // --- CAPA 4: Resonancia metálica fina (tintineo brillante a los 0.19s) ---
-    const t3 = now + 0.19;
-    [3520, 4400].forEach((freq) => {
+    // --- 4. TINTINEO DE MONEDAS METÁLICAS a los 0.18s ---
+    const t3 = now + 0.18;
+    [4698.6, 5587.6, 7040.0].forEach((freq) => {
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
-      osc.type = "sine";
+      osc.type = "triangle";
       osc.frequency.setValueAtTime(freq, t3);
-      g.gain.setValueAtTime(0.12, t3);
-      g.gain.exponentialRampToValueAtTime(0.0001, t3 + 0.35);
+      g.gain.setValueAtTime(0.18, t3);
+      g.gain.exponentialRampToValueAtTime(0.0001, t3 + 0.4);
       osc.connect(g);
-      g.connect(ctx.destination);
+      g.connect(master);
       osc.start(t3);
-      osc.stop(t3 + 0.35);
+      osc.stop(t3 + 0.4);
     });
   } catch (err) {
-    console.warn("No se pudo sintetizar audio de caja registradora:", err);
+    console.warn("Error en síntesis WebAudio de caja registradora:", err);
   }
 }
 
 /**
  * Función principal para disparar el sonido de caja registradora.
- * Intenta primero reproducir el archivo físico WAV (/sounds/cash-register.wav).
- * Si no está disponible o falla por políticas de red, utiliza síntesis Web Audio en tiempo real.
+ * 1. Reproduce inmediatamente vía Web Audio el buffer decodificado de la grabación real WAV.
+ * 2. Si el buffer no estuviese listo, sintetiza el sonido acústico con cero latencia.
+ * 3. También reproduce vía elemento HTML5 Audio como refuerzo sonoro.
  */
 export function playCashRegisterSound() {
   if (typeof window === "undefined") return;
 
   try {
-    const audio = new Audio("/sounds/cash-register.wav");
-    audio.volume = 0.9;
-    const playPromise = audio.play();
-
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        // Fallback inmediato a síntesis acústica nativa
-        playCashRegisterWebAudio();
-      });
+    const ctx = getAudioContext();
+    if (ctx) {
+      if (cachedAudioBuffer) {
+        const source = ctx.createBufferSource();
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(1.0, ctx.currentTime);
+        source.buffer = cachedAudioBuffer;
+        source.connect(gain);
+        gain.connect(ctx.destination);
+        source.start(0);
+      } else {
+        playCashRegisterWebAudio(ctx);
+      }
     }
-  } catch {
-    playCashRegisterWebAudio();
+
+    // Refuerzo vía HTML5 Audio
+    const audio = new Audio("/sounds/cash-register.wav");
+    audio.volume = 1.0;
+    audio.play().catch(() => {});
+  } catch (err) {
+    console.warn("No se pudo reproducir sonido de caja registradora:", err);
   }
 }

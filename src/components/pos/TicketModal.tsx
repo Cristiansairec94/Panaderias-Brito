@@ -272,8 +272,14 @@ export default function TicketModal({
             <button
               type="button"
               onClick={() => {
-                playCashRegisterSound();
-                onClose();
+                try {
+                  playCashRegisterSound();
+                } catch (e) {
+                  console.error("Error al reproducir caja registradora:", e);
+                }
+                setTimeout(() => {
+                  onClose();
+                }, 100);
               }}
               className="flex items-center justify-center gap-2 py-3.5 px-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-2xl text-xs sm:text-sm shadow-lg shadow-orange-500/25 transition-all active:scale-95 cursor-pointer"
             >

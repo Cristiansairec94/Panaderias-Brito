@@ -310,10 +310,10 @@ export function addQuickCustomer(customerData: {
     notes: customerData.notes?.trim(),
     address: customerData.address?.trim(),
     email: customerData.email?.trim(),
-    registeredAt: new Date().toISOString().split("T")[0],
+    registeredAt: new Date().toISOString(),
   };
 
-  const updated = [...current, newCustomer];
+  const updated = [newCustomer, ...current];
   saveStoredCustomers(updated);
   return newCustomer;
 }
