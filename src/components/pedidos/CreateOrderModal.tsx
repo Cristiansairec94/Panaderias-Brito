@@ -725,9 +725,19 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
                         <input
                           type="number"
                           min="1"
+                          step="1"
                           value={customItemQty}
-                          onChange={(e) => setCustomItemQty(Number(e.target.value))}
-                          className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-bold"
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "") {
+                              setCustomItemQty(1);
+                              return;
+                            }
+                            const clean = val.replace(/^0+(?=\d)/, "");
+                            setCustomItemQty(Math.max(1, Number(clean) || 1));
+                          }}
+                          className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-black text-stone-900"
                         />
                       </div>
                       <div className="sm:col-span-3 flex gap-2 items-end">
@@ -862,34 +872,74 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
 
                           <div className="flex flex-wrap items-center gap-3">
                             {/* Qty controller */}
-                            <div className="flex items-center border border-stone-300 rounded-xl overflow-hidden bg-white">
+                            <div className="flex items-center border border-stone-300 rounded-xl overflow-hidden bg-white shadow-xs focus-within:ring-2 focus-within:ring-amber-500 focus-within:border-amber-500">
                               <button
                                 type="button"
                                 onClick={() => handleUpdateItemQty(idx, it.quantity - 1)}
-                                className="px-2.5 py-1 text-xs font-bold hover:bg-stone-100 text-stone-700"
+                                title="Disminuir cantidad"
+                                className="px-2.5 py-1 text-xs font-black hover:bg-stone-100 text-stone-700 transition-colors border-r border-stone-200"
                               >
                                 -
                               </button>
-                              <span className="w-10 text-center text-xs font-bold text-stone-900">
-                                {it.quantity}
-                              </span>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={it.quantity === 0 ? "" : it.quantity}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === "") {
+                                    const updated = [...items];
+                                    updated[idx].quantity = 0;
+                                    updated[idx].subtotal = 0;
+                                    setItems(updated);
+                                    return;
+                                  }
+                                  const clean = val.replace(/^0+(?=\d)/, "");
+                                  const qty = parseInt(clean, 10);
+                                  if (!isNaN(qty)) {
+                                    handleUpdateItemQty(idx, qty);
+                                  }
+                                }}
+                                onBlur={() => {
+                                  if (it.quantity <= 0) {
+                                    handleUpdateItemQty(idx, 1);
+                                  }
+                                }}
+                                className="w-14 text-center text-xs font-black text-stone-900 focus:outline-none bg-transparent py-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
                               <button
                                 type="button"
                                 onClick={() => handleUpdateItemQty(idx, it.quantity + 1)}
-                                className="px-2.5 py-1 text-xs font-bold hover:bg-stone-100 text-stone-700"
+                                title="Aumentar cantidad"
+                                className="px-2.5 py-1 text-xs font-black hover:bg-stone-100 text-stone-700 transition-colors border-l border-stone-200"
                               >
                                 +
                               </button>
                             </div>
 
                             {/* Price */}
-                            <div className="flex items-center gap-1 text-[11px] text-stone-500 font-semibold">
+                            <div className="flex items-center gap-1.5 text-[11px] text-stone-600 font-bold bg-stone-50 border border-stone-200 rounded-xl px-2.5 py-1">
                               <span>Precio c/u: $</span>
                               <input
                                 type="number"
-                                value={it.unitPrice}
-                                onChange={(e) => handleUpdateItemPrice(idx, Number(e.target.value))}
-                                className="w-16 px-2 py-1 text-xs bg-white border border-stone-200 rounded-lg font-bold focus:outline-none"
+                                min="0"
+                                step="any"
+                                value={it.unitPrice === 0 ? "" : it.unitPrice}
+                                placeholder="0"
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === "") {
+                                    handleUpdateItemPrice(idx, 0);
+                                    return;
+                                  }
+                                  const clean = val.replace(/^0+(?=\d)/, "");
+                                  const price = parseFloat(clean);
+                                  handleUpdateItemPrice(idx, isNaN(price) ? 0 : price);
+                                }}
+                                className="w-16 px-1.5 py-0.5 text-xs bg-white border border-stone-300 rounded-lg font-black text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
                               />
                             </div>
 
