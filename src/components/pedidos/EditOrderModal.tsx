@@ -224,16 +224,16 @@ export default function EditOrderModal({
             </div>
           </div>
 
-          {/* Dedication & Notes card */}
+          {/* Observaciones card */}
           <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
             <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
-              Dedicatoria & Notas
+              Observaciones & Especificaciones
             </span>
             <div>
-              <label className="text-xs font-bold text-stone-700 block mb-1">Letrero / Dedicatoria del Pastel</label>
+              <label className="text-xs font-bold text-stone-700 block mb-1">Observaciones del Pedido / Dedicatoria</label>
               <input
                 type="text"
-                placeholder="Ej. ¡Feliz Cumpleaños Mariana!"
+                placeholder="Ej. Pastel con letrero 'Feliz Cumpleaños', empaque especial..."
                 value={dedication}
                 onChange={(e) => setDedication(e.target.value)}
                 className="w-full text-xs px-3.5 py-2.5 bg-white border border-stone-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none"

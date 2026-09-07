@@ -331,7 +331,7 @@ export default function PedidosPage() {
             <Search className="w-4 h-4 absolute left-3.5 top-3 text-stone-400" />
             <input
               type="text"
-              placeholder="Buscar por # pedido (PED-101), cliente, teléfono o dedicatoria..."
+              placeholder="Buscar por # pedido (PED-101), cliente, teléfono u observaciones..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full text-xs pl-10 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none transition-all"
@@ -749,18 +749,18 @@ export default function PedidosPage() {
                                 </div>
                               </div>
 
-                              {/* Col 2: Dedication & Delivery address */}
+                              {/* Col 2: Observaciones & Delivery address */}
                               <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
                                 <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
-                                  Detalles de Entrega & Letrero
+                                  Detalles de Entrega & Observaciones
                                 </span>
                                 {order.dedication ? (
                                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-950">
-                                    <strong className="block text-[10px] text-amber-800 uppercase">✨ Letrero:</strong>
+                                    <strong className="block text-[10px] text-amber-800 uppercase">📝 Observaciones:</strong>
                                     <span className="italic font-bold">"{order.dedication}"</span>
                                   </div>
                                 ) : (
-                                  <p className="text-stone-400 italic">Sin letrero especial especificado.</p>
+                                  <p className="text-stone-400 italic">Sin observaciones especiales especificadas.</p>
                                 )}
 
                                 {order.deliveryType === "domicilio" ? (
@@ -893,7 +893,7 @@ export default function PedidosPage() {
                       <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <div className="leading-snug">
                         <strong className="block text-[10px] text-amber-800 uppercase tracking-wider">
-                          Letrero del Pastel:
+                          Observaciones:
                         </strong>
                         "{order.dedication}"
                       </div>

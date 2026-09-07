@@ -331,7 +331,7 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
               </h2>
               <p className="text-xs text-amber-200/80">
                 {currentStep === 1 && "Paso 1: Identificación del cliente y selección de sucursal"}
-                {currentStep === 2 && "Paso 2: Selección de productos, dedicatoria y detalles del pedido"}
+                {currentStep === 2 && "Paso 2: Selección de productos, observaciones y detalles del pedido"}
                 {currentStep === 3 && "Paso 3: Fecha prometida de entrega y cobro del anticipo"}
               </p>
             </div>
@@ -863,33 +863,33 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
                   )}
                 </div>
 
-                {/* Dedication / Theme Box (5 cols) */}
+                {/* Observaciones Box (5 cols) */}
                 <div className="lg:col-span-5 bg-white border border-stone-200 rounded-3xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 border-b border-stone-100 pb-3">
-                      <Sparkles className="w-4 h-4 text-amber-600" />
-                      <h4 className="font-extrabold text-sm text-stone-900">Dedicatoria / Letrero</h4>
+                      <FileText className="w-4 h-4 text-amber-600" />
+                      <h4 className="font-extrabold text-sm text-stone-900">Observaciones</h4>
                     </div>
                     
                     <p className="text-xs text-stone-500">
-                      Mensaje decorativo para pasteles o cajas de evento:
+                      Instrucciones especiales, dedicatorias para el pastel, empaque o detalles del pedido:
                     </p>
 
-                    <input
-                      type="text"
-                      placeholder='Ej. "¡Mis XV Años - Mariana!" o "Feliz Cumpleaños Papá"'
+                    <textarea
+                      rows={3}
+                      placeholder='Ej. "Pastel con letrero: Feliz Cumpleaños Papá", entregar con velas y base alta...'
                       value={dedication}
                       onChange={(e) => setDedication(e.target.value)}
-                      className="w-full text-xs px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none font-medium"
+                      className="w-full text-xs px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none font-medium resize-none"
                     />
 
                     {/* Preview banner */}
                     {dedication.trim() && (
-                      <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-3 text-center space-y-1 animate-in fade-in duration-150">
+                      <div className="bg-amber-50/90 border border-amber-200 rounded-2xl p-3 space-y-1 animate-in fade-in duration-150">
                         <span className="text-[10px] font-bold text-amber-800 uppercase tracking-widest block">
-                          Vista Previa en el Pastel
+                          Observaciones Registradas
                         </span>
-                        <p className="text-sm font-black text-amber-950 italic">
+                        <p className="text-xs font-bold text-amber-950 italic">
                           "{dedication}"
                         </p>
                       </div>

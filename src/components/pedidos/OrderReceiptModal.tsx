@@ -50,7 +50,7 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
       `🏬 *Sucursal:* ${order.branchName}\n` +
       `📅 *Fecha de entrega:* ${order.deliveryDate} a las ${order.deliveryTime || "16:00"} hrs\n` +
       (order.deliveryType === "domicilio" ? `📍 *Entrega a domicilio:* ${order.deliveryAddress}\n` : `📍 *Recoger en:* Mostrador de sucursal\n`) +
-      (order.dedication ? `✨ *Letrero/Dedicatoria:* "${order.dedication}"\n` : "") +
+      (order.dedication ? `📝 *Observaciones:* "${order.dedication}"\n` : "") +
       `\n*Detalle del pedido:*\n${itemsText}\n\n` +
       `💰 *Total:* ${formatCurrency(order.total)}\n` +
       `💵 *Anticipo Pagado:* ${formatCurrency(order.deposit)}\n` +
@@ -141,10 +141,10 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
               </span>
             </div>
 
-            {/* Dedication */}
+            {/* Observaciones */}
             {order.dedication && (
               <div className="bg-stone-50 border border-stone-200 rounded-xl p-2 font-sans text-stone-800">
-                <span className="text-[10px] font-bold text-stone-500 block uppercase">✨ Dedicatoria:</span>
+                <span className="text-[10px] font-bold text-stone-500 block uppercase">📝 Observaciones:</span>
                 <span className="text-xs font-bold text-amber-900 italic">"{order.dedication}"</span>
               </div>
             )}
@@ -198,7 +198,7 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
               </p>
               {order.dedication && (
                 <p className="text-[10px] text-amber-800 font-bold italic">
-                  Letrero: "{order.dedication}"
+                  Observaciones: "{order.dedication}"
                 </p>
               )}
             </div>
