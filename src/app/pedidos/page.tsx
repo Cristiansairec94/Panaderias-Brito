@@ -156,8 +156,7 @@ export default function PedidosPage() {
   // Handlers for quick actions
   const handleAdvanceStatus = (order: CustomOrder) => {
     let nextStatus: CustomOrder["status"] = order.status;
-    if (order.status === "pendiente") nextStatus = "en_horno";
-    else if (order.status === "en_horno") nextStatus = "listo";
+    if (order.status === "pendiente" || order.status === "en_horno") nextStatus = "listo";
     else if (order.status === "listo") nextStatus = "entregado";
 
     if (nextStatus !== order.status) {
@@ -181,7 +180,7 @@ export default function PedidosPage() {
     const cleanPhone = order.phone.replace(/\D/g, "");
     const formattedPhone = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
     
-    let statusText = "está siendo elaborado en nuestro taller de horneado";
+    let statusText = "está registrado y programado para entrega";
     if (order.status === "listo") statusText = "¡ya está LISTO para entrega en mostrador!";
     if (order.status === "entregado") statusText = "ha sido marcado como entregado. ¡Esperamos lo disfruten!";
 
@@ -421,16 +420,6 @@ export default function PedidosPage() {
               Pendientes
             </button>
             <button
-              onClick={() => setStatusFilter("en_horno")}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-colors ${
-                statusFilter === "en_horno"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "bg-stone-100 text-stone-600 hover:bg-blue-50"
-              }`}
-            >
-              En Preparación
-            </button>
-            <button
               onClick={() => setStatusFilter("listo")}
               className={`px-3 py-1.5 rounded-xl font-bold transition-colors ${
                 statusFilter === "listo"
@@ -668,16 +657,17 @@ export default function PedidosPage() {
                                 onClick={() => handleAdvanceStatus(order)}
                                 className="p-2 bg-stone-100 hover:bg-stone-900 hover:text-white text-stone-700 rounded-xl transition-all"
                                 title={
-                                  order.status === "pendiente"
-                                    ? "Pasar a Preparación / Horno"
-                                    : order.status === "en_horno"
+                                  order.status === "pendiente" || order.status === "en_horno"
                                     ? "Marcar Listo en Mostrador"
                                     : "Marcar como Entregado"
                                 }
                               >
-                                {order.status === "pendiente" && <Flame className="w-4 h-4 text-amber-600" />}
-                                {order.status === "en_horno" && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
-                                {order.status === "listo" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                                {(order.status === "pendiente" || order.status === "en_horno") && (
+                                  <CheckCircle2 className="w-4 h-4 text-blue-600 hover:text-white" />
+                                )}
+                                {order.status === "listo" && (
+                                  <Check className="w-4 h-4 text-emerald-600 hover:text-white" />
+                                )}
                               </button>
                             )}
 
@@ -963,19 +953,14 @@ export default function PedidosPage() {
                         onClick={() => handleAdvanceStatus(order)}
                         className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs"
                       >
-                        {order.status === "pendiente" && (
-                          <>
-                            <Flame className="w-3.5 h-3.5 text-amber-400" /> Pasar a Preparación / Horno
-                          </>
-                        )}
-                        {order.status === "en_horno" && (
+                        {(order.status === "pendiente" || order.status === "en_horno") && (
                           <>
                             <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" /> Marcar Listo en Mostrador
                           </>
                         )}
                         {order.status === "listo" && (
                           <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Entregar Pedido al Cliente
+                            <Check className="w-3.5 h-3.5 text-emerald-400" /> Entregar Pedido al Cliente
                           </>
                         )}
                       </button>

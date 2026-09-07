@@ -33,7 +33,7 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     deliveryDate: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString().split("T")[0], // Mañana
     deliveryTime: "16:00",
     deliveryType: "sucursal",
-    status: "en_horno",
+    status: "pendiente",
     total: 950,
     deposit: 500,
     remainingBalance: 450,
