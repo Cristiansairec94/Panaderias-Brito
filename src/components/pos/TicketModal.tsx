@@ -257,31 +257,43 @@ export default function TicketModal({
         </div>
 
         {/* Action Buttons */}
-        <div className="p-4 bg-white border-t border-neutral-200 flex gap-2.5 sm:gap-3">
+        <div className="p-4 bg-white border-t border-neutral-200 space-y-2.5">
+          {/* Fila principal: Imprimir y Siguiente Cliente */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="flex items-center justify-center gap-2 py-3.5 px-3 bg-gradient-to-r from-[#24130c] to-[#3a1d12] hover:from-[#1b0d08] hover:to-[#2e160e] text-amber-200 hover:text-amber-100 font-bold rounded-2xl text-xs sm:text-sm shadow-md border border-amber-900/40 transition-all active:scale-95 cursor-pointer"
+            >
+              <Printer className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="whitespace-nowrap font-bold">Imprimir Ticket</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                playCashRegisterSound();
+                onClose();
+              }}
+              className="flex items-center justify-center gap-2 py-3.5 px-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-2xl text-xs sm:text-sm shadow-lg shadow-orange-500/25 transition-all active:scale-95 cursor-pointer"
+            >
+              <CheckCircle className="w-4 h-4 text-white shrink-0" />
+              <span className="whitespace-nowrap font-black">Siguiente Cliente</span>
+            </button>
+          </div>
+
+          {/* Botón de Cancelar Ticket */}
           {onCancelTicket && (
             <button
+              type="button"
               onClick={onCancelTicket}
-              className="py-3 px-3.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 shadow-xs"
+              className="w-full py-2.5 px-3 bg-rose-50 hover:bg-rose-100/90 border-2 border-rose-200 hover:border-rose-300 text-rose-700 hover:text-rose-800 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer shadow-2xs"
               title="Cancelar compra y regresar panes al inventario"
             >
-              <X className="w-4 h-4" /> Cancelar Ticket
+              <X className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>Cancelar Ticket (Anular compra y reponer panes)</span>
             </button>
           )}
-          <button
-            onClick={handlePrint}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-black hover:bg-neutral-800 text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
-          >
-            <Printer className="w-4 h-4" /> Imprimir Ticket (B&N)
-          </button>
-          <button
-            onClick={() => {
-              playCashRegisterSound();
-              onClose();
-            }}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
-          >
-            <CheckCircle className="w-4 h-4" /> Siguiente Cliente
-          </button>
         </div>
       </div>
     </div>
