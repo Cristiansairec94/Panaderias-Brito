@@ -131,6 +131,7 @@ export interface Customer {
   totalPurchases: number;
   notes?: string;
   registeredAt: string;
+  createdAt?: number; // Timestamp en milisegundos de registro para ordenamiento exacto
   favoriteProduct?: string; // Pan o producto que más compra (Moda de compra)
   purchaseCounts?: Record<string, number>; // Conteo de compras acumuladas por producto
   purchaseHistory?: CustomerPurchase[]; // Historial detallado de compras

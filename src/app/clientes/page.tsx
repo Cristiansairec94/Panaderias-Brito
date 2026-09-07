@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   Sparkles,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Receipt,
   Calendar,
   BarChart3,
@@ -66,9 +68,28 @@ function formatPhoneNumber(phone: string | undefined | null): string {
   return digits;
 }
 
+// Generador de índices de paginación amigable (ej: 1, 2, 3 ... 10)
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 3) {
+    return [1, 2, 3, 4, "...", total];
+  }
+  if (current >= total - 2) {
+    return [1, "...", total - 3, total - 2, total - 1, total];
+  }
+  return [1, "...", current - 1, current, current + 1, "...", total];
+}
+
 export default function ClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState<"recent" | "alpha">("recent");
+
+  // Paginación: 10 clientes por página
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // Modal de Historial y Moda de Compras por Cliente
   const [historyModalCustomer, setHistoryModalCustomer] = useState<Customer | null>(null);
@@ -105,12 +126,43 @@ export default function ClientesPage() {
     return () => window.removeEventListener("brito_customers_updated", handleSync);
   }, []);
 
+  // Al cambiar la búsqueda o el criterio de ordenamiento, regresar a la primera página
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortOrder]);
+
   const showNotification = (msg: string) => {
     setSuccessNotice(msg);
     setTimeout(() => setSuccessNotice(null), 3500);
   };
 
-  // Filtrado por búsqueda y ordenamiento en estricto orden de lista (A - Z)
+  // Timestamp numérico de recencia para ordenar empezando por el más reciente registro
+  const getCustomerRecency = (c: Customer): number => {
+    if (typeof (c as any).createdAt === "number" && (c as any).createdAt > 0) {
+      return (c as any).createdAt;
+    }
+
+    // Extraer timestamp de id generado con Date.now() (ej. cli-1741369482103)
+    if (c.id && c.id.startsWith("cli-")) {
+      const rawNum = Number(c.id.replace("cli-", ""));
+      if (!isNaN(rawNum) && rawNum > 10000000) {
+        return rawNum;
+      }
+    }
+
+    // Extraer fecha ISO de registeredAt
+    if (c.registeredAt) {
+      const parsed = Date.parse(c.registeredAt);
+      if (!isNaN(parsed) && parsed > 0) {
+        const smallId = Number(c.id.replace(/\D/g, "")) || 0;
+        return parsed + Math.min(smallId, 9999);
+      }
+    }
+
+    return 0;
+  };
+
+  // Filtrado por búsqueda y ordenamiento (predeterminado: del más reciente al más antiguo)
   const filteredCustomers = useMemo(() => {
     const validCustomers = customers.filter((c) => c.id !== "cli-0" && c.type !== "general");
     const q = search.toLowerCase().trim();
@@ -128,10 +180,31 @@ export default function ClientesPage() {
           );
         });
 
-    return [...matched].sort((a, b) =>
-      a.name.localeCompare(b.name, "es", { sensitivity: "base", numeric: true })
-    );
-  }, [customers, search]);
+    if (sortOrder === "alpha") {
+      return [...matched].sort((a, b) =>
+        a.name.localeCompare(b.name, "es", { sensitivity: "base", numeric: true })
+      );
+    }
+
+    // Ordenar empezando por el más reciente registro
+    return [...matched].sort((a, b) => {
+      const timeA = getCustomerRecency(a);
+      const timeB = getCustomerRecency(b);
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+      return a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+    });
+  }, [customers, search, sortOrder]);
+
+  // Cálculos de Paginación (10 clientes por página)
+  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE) || 1;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedCustomers = useMemo(() => {
+    const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+    return filteredCustomers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredCustomers, safeCurrentPage]);
 
   // Apertura modal nuevo cliente
   const handleOpenCreate = () => {
@@ -141,7 +214,7 @@ export default function ClientesPage() {
     setIsModalOpen(true);
   };
 
-  // Guardar nuevo cliente
+  // Guardar nuevo cliente (se agrega al inicio como el más reciente)
   const handleCreateCustomer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -155,12 +228,14 @@ export default function ClientesPage() {
       currentDebt: 0,
       totalPurchases: 0,
       notes: notes.trim() || undefined,
-      registeredAt: new Date().toISOString().split("T")[0],
+      registeredAt: new Date().toISOString(),
+      createdAt: Date.now(),
     };
 
-    const updated = [...customers, newCustomer];
+    const updated = [newCustomer, ...customers];
     setCustomers(updated);
     saveStoredCustomers(updated);
+    setCurrentPage(1); // Muestra la primera página donde aparece el nuevo cliente recién creado
     setIsModalOpen(false);
     showNotification(`¡Cliente "${newCustomer.name}" registrado correctamente!`);
   };
@@ -269,9 +344,34 @@ export default function ClientesPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 rounded-2xl border border-amber-200 text-xs font-black text-amber-900 shadow-2xs">
-            <span>🔤 Orden de lista: A - Z</span>
+          {/* Selector de ordenamiento: Más recientes (predeterminado) o A - Z */}
+          <div className="inline-flex items-center bg-stone-100 p-1 rounded-2xl border border-stone-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setSortOrder("recent")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                sortOrder === "recent"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+              }`}
+              title="Mostrar primero los clientes registrados más recientemente"
+            >
+              ⏱️ Más Recientes
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortOrder("alpha")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                sortOrder === "alpha"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+              }`}
+              title="Ordenar alfabéticamente por nombre (A - Z)"
+            >
+              🔤 A - Z
+            </button>
           </div>
+
           <div className="px-4 py-2 bg-stone-100 rounded-2xl border border-stone-200 shrink-0 text-center">
             <span className="text-xs text-stone-500 font-bold block uppercase tracking-wider">Total</span>
             <span className="text-base sm:text-lg font-black text-stone-900">
@@ -315,46 +415,47 @@ export default function ClientesPage() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-stone-100 border-b-2 border-stone-200 text-xs sm:text-sm font-black text-stone-700 uppercase tracking-wider">
-                  <th className="py-3.5 px-3 sm:px-4 w-16 text-center whitespace-nowrap"># Lista</th>
-                  <th className="py-3.5 px-4 sm:px-5 min-w-[200px]">Cliente / Nombre</th>
-                  <th className="py-3.5 px-4 sm:px-5 min-w-[210px] whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      <Phone className="w-4 h-4 text-stone-500" />
-                      <span>Teléfono / WhatsApp</span>
-                    </div>
-                  </th>
-                  <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">Descripción del Cliente</th>
-                  <th className="py-3.5 px-4 sm:px-5 min-w-[160px] whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-600" />
-                      <span>Historial</span>
-                    </div>
-                  </th>
-                  <th className="py-3.5 px-4 sm:px-5 text-center w-28 whitespace-nowrap">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-200">
-                {filteredCustomers.map((c, idx) => {
-                  const cleanPhone = c.phone ? c.phone.replace(/\D/g, "") : "";
-                  const formattedPhone = formatPhoneNumber(c.phone);
-                  const hasValidPhone = cleanPhone.length >= 7;
-                  const hasWhatsApp = cleanPhone.length >= 8;
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-stone-100 border-b-2 border-stone-200 text-xs sm:text-sm font-black text-stone-700 uppercase tracking-wider">
+                    <th className="py-3.5 px-3 sm:px-4 w-16 text-center whitespace-nowrap"># Lista</th>
+                    <th className="py-3.5 px-4 sm:px-5 min-w-[200px]">Cliente / Nombre</th>
+                    <th className="py-3.5 px-4 sm:px-5 min-w-[210px] whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="w-4 h-4 text-stone-500" />
+                        <span>Teléfono / WhatsApp</span>
+                      </div>
+                    </th>
+                    <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">Descripción del Cliente</th>
+                    <th className="py-3.5 px-4 sm:px-5 min-w-[160px] whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-600" />
+                        <span>Historial</span>
+                      </div>
+                    </th>
+                    <th className="py-3.5 px-4 sm:px-5 text-center w-28 whitespace-nowrap">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-200">
+                  {paginatedCustomers.map((c, idx) => {
+                    const cleanPhone = c.phone ? c.phone.replace(/\D/g, "") : "";
+                    const formattedPhone = formatPhoneNumber(c.phone);
+                    const hasValidPhone = cleanPhone.length >= 7;
+                    const hasWhatsApp = cleanPhone.length >= 8;
 
-                  return (
-                    <tr
-                      key={c.id}
-                      className="hover:bg-amber-50/50 transition-colors"
-                    >
-                      {/* Número de Orden de Lista */}
-                      <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center justify-center min-w-8 h-8 px-2 rounded-xl bg-stone-100 border border-stone-300 font-mono text-xs sm:text-sm font-black text-stone-700 shadow-2xs">
-                          {idx + 1}
-                        </span>
-                      </td>
+                    return (
+                      <tr
+                        key={c.id}
+                        className="hover:bg-amber-50/50 transition-colors"
+                      >
+                        {/* Número de Orden de Lista */}
+                        <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center min-w-8 h-8 px-2 rounded-xl bg-stone-100 border border-stone-300 font-mono text-xs sm:text-sm font-black text-stone-700 shadow-2xs">
+                            {(safeCurrentPage - 1) * ITEMS_PER_PAGE + idx + 1}
+                          </span>
+                        </td>
 
                       {/* 1. Nombre */}
                       <td className="py-3.5 px-4 sm:px-5">
@@ -466,8 +567,89 @@ export default function ClientesPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+
+          {/* BARRA DE PAGINACIÓN INFERIOR (10 Clientes por Página) */}
+          {filteredCustomers.length > 0 && (
+            <div className="p-4 sm:px-6 bg-stone-50 border-t-2 border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm">
+              {/* Contador de registros visibles */}
+              <div className="text-stone-600 font-bold text-center sm:text-left">
+                Mostrando <span className="text-stone-900 font-black">{(safeCurrentPage - 1) * ITEMS_PER_PAGE + 1}</span> a{" "}
+                <span className="text-stone-900 font-black">
+                  {Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredCustomers.length)}
+                </span>{" "}
+                de <span className="text-amber-950 font-black">{filteredCustomers.length}</span> clientes registrados
+              </div>
+
+              {/* Controles de Paginación */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5 sm:gap-2 select-none">
+                  {/* Botón Anterior */}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-xl font-black text-xs transition-all ${
+                      safeCurrentPage === 1
+                        ? "text-stone-300 bg-stone-100/50 cursor-not-allowed border border-stone-200/60"
+                        : "text-stone-700 bg-white hover:bg-amber-50 hover:text-amber-900 border border-stone-300 shadow-2xs active:scale-95 cursor-pointer"
+                    }`}
+                    title="Página anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span className="hidden sm:inline">Anterior</span>
+                  </button>
+
+                  {/* Botones numéricos de página */}
+                  <div className="flex items-center gap-1">
+                    {getPageNumbers(safeCurrentPage, totalPages).map((pageNum, pageIdx) => {
+                      if (pageNum === "...") {
+                        return (
+                          <span key={`ellipsis-${pageIdx}`} className="px-2 text-stone-400 font-bold">
+                            ...
+                          </span>
+                        );
+                      }
+                      const num = Number(pageNum);
+                      const isActive = num === safeCurrentPage;
+                      return (
+                        <button
+                          key={`page-${num}`}
+                          type="button"
+                          onClick={() => setCurrentPage(num)}
+                          className={`min-w-9 h-9 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center cursor-pointer ${
+                            isActive
+                              ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-105 border border-amber-600"
+                              : "bg-white text-stone-700 hover:bg-amber-50 hover:text-amber-900 border border-stone-300 shadow-2xs active:scale-95"
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Botón Siguiente */}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-xl font-black text-xs transition-all ${
+                      safeCurrentPage === totalPages
+                        ? "text-stone-300 bg-stone-100/50 cursor-not-allowed border border-stone-200/60"
+                        : "text-stone-700 bg-white hover:bg-amber-50 hover:text-amber-900 border border-stone-300 shadow-2xs active:scale-95 cursor-pointer"
+                    }`}
+                    title="Página siguiente"
+                  >
+                    <span className="hidden sm:inline">Siguiente</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
 
       {/* MODAL 1: REGISTRAR NUEVO CLIENTE (SIMPLE: NÚMERO, NOMBRE Y DESCRIPCIÓN) */}
       {isModalOpen && (

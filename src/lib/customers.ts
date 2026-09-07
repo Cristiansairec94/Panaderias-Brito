@@ -311,6 +311,7 @@ export function addQuickCustomer(customerData: {
     address: customerData.address?.trim(),
     email: customerData.email?.trim(),
     registeredAt: new Date().toISOString(),
+    createdAt: Date.now(),
   };
 
   const updated = [newCustomer, ...current];
