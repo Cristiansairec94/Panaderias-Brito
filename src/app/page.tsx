@@ -18,7 +18,6 @@ import {
   TrendingUp,
   Receipt,
   Flame,
-  Cake,
   Play,
   Pause,
   PlusCircle,
@@ -51,49 +50,6 @@ const TOP_BAKERY_PRODUCTS = [
   { id: "3", name: "Cuerno de Mantequilla Francés", category: "Hojaldre", icon: "🥐", price: 18, piecesSold: 165, revenue: 2970, share: 15, trend: "+8%", tag: "Favorito" },
   { id: "4", name: "Dona Glaseada de Azúcar", category: "Pan Dulce", icon: "🍩", price: 15, piecesSold: 180, revenue: 2700, share: 14, trend: "+6%", tag: "Popular" },
   { id: "5", name: "Rebanada Pastel Tres Leches", category: "Pastelería", icon: "🍰", price: 48, piecesSold: 46, revenue: 2208, share: 11, trend: "+18%", tag: "Gourmet" },
-];
-
-// Scheduled baking batches (Hornadas del día)
-const TODAY_BAKING_SCHEDULE = [
-  { id: "h-1", time: "06:30 AM", name: "Bolillo & Telera Primera Hornada", oven: "Horno de Leña #1", pieces: 450, status: "completada" },
-  { id: "h-2", time: "07:30 AM", name: "Conchas, Cuernos & Bisquets", oven: "Horno de Gas #2", pieces: 320, status: "completada" },
-  { id: "h-3", time: "12:00 PM", name: "Bolillo Caliente de Mediodía", oven: "Horno de Leña #1", pieces: 300, status: "completada" },
-  { id: "h-4", time: "17:30 PM", name: "Pan de Merienda (Conchas, Donas, Orejas)", oven: "Horno de Gas #2", pieces: 380, status: "en_proceso" },
-  { id: "h-5", time: "19:00 PM", name: "Segunda Tanda Bolillo Caliente", oven: "Horno de Leña #1", pieces: 250, status: "programada" },
-];
-
-// Urgent cake orders for today
-const TODAY_URGENT_ORDERS = [
-  {
-    id: "PED-101",
-    client: "Sra. María González",
-    description: "Pastel 3 Leches Durazno (50 personas) - XV Años",
-    deliveryTime: "16:00 hrs",
-    total: 950,
-    deposit: 500,
-    balance: 450,
-    status: "listo",
-  },
-  {
-    id: "PED-103",
-    client: "Familia Brito",
-    description: "Pastel Mil Hojas Chocolate & Café (Cumpleaños Don Toño)",
-    deliveryTime: "18:00 hrs",
-    total: 650,
-    deposit: 300,
-    balance: 350,
-    status: "en_decoracion",
-  },
-  {
-    id: "PED-104",
-    client: "Colegio Guadalupe",
-    description: "80 Mini Cuernitos Mixtos para graduación",
-    deliveryTime: "19:30 hrs",
-    total: 1120,
-    deposit: 600,
-    balance: 520,
-    status: "pendiente",
-  },
 ];
 
 interface ChartDataPoint {
@@ -1007,127 +963,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Baking Batches & Urgent Cake Orders Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-7">
-        {/* Baking Batches (Hornadas del Día) */}
-        <div className="bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-            <div>
-              <h2 className="text-base font-black text-stone-900 flex items-center gap-2">
-                <Flame className="w-5 h-5 text-orange-600" />
-                Programa de Hornadas del Día
-              </h2>
-              <p className="text-xs text-stone-500">
-                Control de tandas de leña y gas para pan caliente
-              </p>
-            </div>
-            <Link
-              href="/inventario"
-              className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1"
-            >
-              Control Almacén <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
 
-          <div className="space-y-2.5">
-            {TODAY_BAKING_SCHEDULE.map((batch) => (
-              <div
-                key={batch.id}
-                className="p-3 rounded-2xl bg-stone-50/70 border border-stone-200/80 flex items-center justify-between gap-3 text-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-orange-100 text-orange-800 font-black text-[11px] whitespace-nowrap">
-                    {batch.time}
-                  </div>
-                  <div>
-                    <p className="font-black text-stone-900">{batch.name}</p>
-                    <p className="text-[10px] text-stone-400">{batch.oven} • {batch.pieces} piezas estimadas</p>
-                  </div>
-                </div>
-
-                <div>
-                  {batch.status === "completada" ? (
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Horneado
-                    </span>
-                  ) : batch.status === "en_proceso" ? (
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-orange-100 text-orange-800 animate-pulse flex items-center gap-1">
-                      <Flame className="w-3 h-3" /> En Horno
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-stone-200 text-stone-700">
-                      Programada
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Urgent Cake Orders (Encargos Especiales de Hoy) */}
-        <div className="bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-            <div>
-              <h2 className="text-base font-black text-stone-900 flex items-center gap-2">
-                <Cake className="w-5 h-5 text-rose-600" />
-                Encargos de Pastelería para Hoy
-              </h2>
-              <p className="text-xs text-stone-500">
-                Pasteles de XV años, bodas y pedidos con horario de entrega
-              </p>
-            </div>
-            <Link
-              href="/pedidos"
-              className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
-            >
-              Ver Pedidos <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="space-y-2.5">
-            {TODAY_URGENT_ORDERS.map((order) => (
-              <div
-                key={order.id}
-                className="p-3.5 rounded-2xl bg-stone-50/70 border border-stone-200/80 space-y-2"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-xs text-stone-900">{order.client}</span>
-                      <span className="text-[10px] font-bold text-stone-400">({order.id})</span>
-                    </div>
-                    <p className="text-xs text-stone-600 mt-0.5">{order.description}</p>
-                  </div>
-
-                  <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${
-                    order.status === "listo"
-                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                      : order.status === "en_decoracion"
-                      ? "bg-blue-100 text-blue-800 border border-blue-200"
-                      : "bg-amber-100 text-amber-800 border border-amber-200"
-                  }`}>
-                    {order.status === "listo" ? "Listo en Mostrador" : order.status === "en_decoracion" ? "En Decoración" : "Pendiente"}
-                  </span>
-                </div>
-
-                <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between text-xs font-semibold">
-                  <span className="text-stone-500 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-stone-400" />
-                    Entrega: <strong>{order.deliveryTime}</strong>
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-stone-500">Total: {formatCurrency(order.total)}</span>
-                    <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
-                      Resta: {formatCurrency(order.balance)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* Quick Direct ERP Links Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
