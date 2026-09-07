@@ -35,7 +35,9 @@ import {
   Award,
   Coffee,
   PieChart,
-  Plus
+  Plus,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { useBranch, SimulatedSale } from "@/context/BranchContext";
 import { Branch, BranchShift } from "@/types";
@@ -107,6 +109,12 @@ export default function SucursalesPage() {
 
   // Expandable statistics per branch state (hidden by default)
   const [expandedBranchIds, setExpandedBranchIds] = useState<Record<string, boolean>>({});
+
+  // Modo de visualización para la Tabla General de Sucursales:
+  // "auto": móvil usa tarjetas intuitivas, laptop usa tabla ejecutiva
+  // "cards": fuerza vista de tarjetas
+  // "table": fuerza vista de tabla
+  const [displayMode, setDisplayMode] = useState<"auto" | "cards" | "table">("auto");
 
   const toggleExpand = (branchId: string) => {
     setExpandedBranchIds((prev) => ({
@@ -273,7 +281,7 @@ export default function SucursalesPage() {
   }, [branchesOverview, branches]);
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12 px-3 sm:px-6 lg:px-8">
       {/* Top Header Banner */}
       <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-stone-800">
         <div className="absolute -right-12 -top-12 w-80 h-80 bg-orange-500/20 rounded-full blur-3xl pointer-events-none" />
@@ -453,11 +461,11 @@ export default function SucursalesPage() {
 
           {/* SECTION 2: General Overview Table */}
           <div className="bg-white rounded-3xl border border-stone-200/90 shadow-xl overflow-hidden">
-            {/* Table Header with Details & Action to toggle all statistics */}
-            <div className="p-6 border-b border-stone-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-stone-50/50">
+            {/* Table Header with Details, View Switcher & Action to toggle all statistics */}
+            <div className="p-4 sm:p-6 border-b border-stone-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-stone-50/50">
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-black text-stone-900 tracking-tight">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
                     Tabla General de Sucursales
                   </h3>
                   <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-stone-200/70 text-stone-700">
@@ -469,8 +477,51 @@ export default function SucursalesPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {/* Selector de Modo de Vista (Auto / Tarjetas / Tabla) */}
+                <div className="inline-flex items-center bg-stone-200/60 p-0.5 rounded-xl border border-stone-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setDisplayMode("auto")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      displayMode === "auto"
+                        ? "bg-white text-stone-900 shadow-xs"
+                        : "text-stone-500 hover:text-stone-800"
+                    }`}
+                    title="Adaptar automáticamente a la resolución (móvil = tarjetas, laptop = tabla)"
+                  >
+                    Auto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDisplayMode("cards")}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      displayMode === "cards"
+                        ? "bg-white text-stone-900 shadow-xs"
+                        : "text-stone-500 hover:text-stone-800"
+                    }`}
+                    title="Forzar vista en tarjetas móviles"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5 text-orange-600" />
+                    <span className="hidden sm:inline">Tarjetas</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDisplayMode("table")}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      displayMode === "table"
+                        ? "bg-white text-stone-900 shadow-xs"
+                        : "text-stone-500 hover:text-stone-800"
+                    }`}
+                    title="Forzar vista en tabla ejecutiva"
+                  >
+                    <List className="w-3.5 h-3.5 text-orange-600" />
+                    <span className="hidden sm:inline">Tabla</span>
+                  </button>
+                </div>
+
                 <button
+                  type="button"
                   onClick={() => setIsCreateBranchOpen(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-xs shadow-sm active:scale-95 transition-all"
                 >
@@ -479,6 +530,7 @@ export default function SucursalesPage() {
                 </button>
 
                 <button
+                  type="button"
                   onClick={toggleAllExpanded}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs border border-stone-200 shadow-sm transition-all"
                 >
@@ -486,31 +538,442 @@ export default function SucursalesPage() {
                   <span>
                     {branches.every((b) => expandedBranchIds[b.id])
                       ? "Colapsar Todas"
-                      : "Desplegar Todas las Estadísticas"}
+                      : "Desplegar Todas"}
                   </span>
                 </button>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-stone-500 font-medium">Activa:</span>
-                  <span className="text-xs font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-xl border border-orange-200">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-stone-400 font-medium hidden sm:inline">Activa:</span>
+                  <span className="text-xs font-black text-orange-600 bg-orange-50 px-2.5 py-1 rounded-xl border border-orange-200">
                     {isAllBranches ? "🌐 Cadena Completa" : currentBranch?.shortName}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* General Overview Table Content */}
-            <div className="overflow-x-auto">
+            {/* 1. VISTA MÓVIL: Tarjetas Operativas Intuitivas (< md por defecto) */}
+            <div
+              className={
+                displayMode === "cards"
+                  ? "block space-y-4 p-3.5 sm:p-5"
+                  : displayMode === "table"
+                  ? "hidden"
+                  : "block md:hidden space-y-4 p-3.5 sm:p-5"
+              }
+            >
+              {branchesOverview.map((b) => {
+                const isSelected = !isAllBranches && currentBranch?.id === b.id;
+                const isExpanded = !!expandedBranchIds[b.id];
+
+                return (
+                  <div
+                    key={`mobile-${b.id}`}
+                    className={`rounded-2xl sm:rounded-3xl border transition-all duration-200 overflow-hidden shadow-xs ${
+                      isSelected
+                        ? "border-orange-400 bg-orange-50/30 ring-2 ring-orange-400/20"
+                        : isExpanded
+                        ? "border-orange-300 bg-stone-50/70 shadow-md"
+                        : "border-stone-200 bg-white hover:border-stone-300"
+                    }`}
+                  >
+                    {/* Cabecera de la Tarjeta Móvil */}
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-sm ${
+                              b.id === "branch-matriz"
+                                ? "bg-gradient-to-br from-orange-500 to-orange-600"
+                                : b.id === "branch-benito"
+                                ? "bg-gradient-to-br from-rose-500 to-rose-600"
+                                : "bg-gradient-to-br from-amber-500 to-amber-600"
+                            }`}
+                          >
+                            <Store className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h4 className="font-black text-stone-900 text-sm sm:text-base">{b.name}</h4>
+                              {isSelected && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                                  Activa
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <span className="font-mono text-[10px] text-stone-400 font-extrabold uppercase">
+                                {b.code}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                {b.status}
+                              </span>
+                              <span className="text-[10px] font-bold text-orange-700 bg-orange-100/70 px-1.5 py-0.5 rounded border border-orange-200">
+                                {b.marketShare}% de la red
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Encargado y Contacto */}
+                      <div className="pt-2 border-t border-stone-100 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-600">
+                        <span className="font-bold text-stone-800 flex items-center gap-1 text-[11px]">
+                          <ShieldCheck className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          {b.manager}
+                        </span>
+                        <span className="text-[11px] text-stone-500 flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-stone-400 shrink-0" />
+                          {b.phone}
+                        </span>
+                      </div>
+
+                      {/* Cuadrícula de 4 Métricas Clave Operativas (2x2) */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-amber-50/70 p-2.5 rounded-2xl border border-amber-200/70 space-y-0.5">
+                          <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                            <Croissant className="w-3.5 h-3.5 text-amber-600" />
+                            Piezas de Pan
+                          </span>
+                          <p className="font-black text-amber-950 text-sm">
+                            {b.periodPieces.toLocaleString("es-MX")}{" "}
+                            <span className="text-[10px] text-stone-500 font-normal">pzas</span>
+                          </p>
+                          <p className="text-[9px] text-stone-500">
+                            Prom. ~{b.dailyAveragePieces.toLocaleString("es-MX")} pz/día
+                          </p>
+                        </div>
+
+                        <div className="bg-orange-50/70 p-2.5 rounded-2xl border border-orange-200/70 space-y-0.5">
+                          <span className="text-[10px] font-bold text-orange-900 uppercase tracking-wider flex items-center gap-1">
+                            <TrendingUp className="w-3.5 h-3.5 text-orange-600" />
+                            Ventas Totales
+                          </span>
+                          <p className="font-black text-stone-900 text-sm">
+                            {formatCurrency(b.periodSales)}
+                          </p>
+                          <p className="text-[9px] text-orange-700 font-bold">
+                            {b.marketShare}% participación
+                          </p>
+                        </div>
+
+                        <div className="bg-stone-50 p-2.5 rounded-2xl border border-stone-200/80 space-y-0.5">
+                          <span className="text-[10px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1">
+                            <Receipt className="w-3.5 h-3.5 text-stone-500" />
+                            Ticket Promedio
+                          </span>
+                          <p className="font-black text-stone-900 text-sm">
+                            {formatCurrency(b.averageTicket)}
+                          </p>
+                          <p className="text-[9px] text-stone-500">
+                            {b.periodTickets.toLocaleString("es-MX")} tickets
+                          </p>
+                        </div>
+
+                        <div className="bg-emerald-50/70 p-2.5 rounded-2xl border border-emerald-200/70 space-y-0.5">
+                          <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1">
+                            <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                            Caja en Gaveta
+                          </span>
+                          <p className="font-black text-emerald-900 text-sm">
+                            {formatCurrency(b.cashInDrawer)}
+                          </p>
+                          <p className="text-[9px] text-emerald-700 font-bold truncate">
+                            {b.currentShift.cashier}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Turno Actual y Acciones de la Tarjeta */}
+                      <div className="p-2.5 rounded-2xl bg-stone-100/80 border border-stone-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200">
+                            {b.currentShift.name}
+                          </span>
+                          <span className="text-[11px] text-stone-600 font-semibold truncate max-w-[130px]">
+                            {b.currentShift.cashier}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => setEditingShiftBranch(b)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-orange-50 text-orange-700 font-bold text-[11px] border border-stone-200 shadow-xs transition-colors"
+                            title="Modificar horario del turno"
+                          >
+                            <Clock className="w-3 h-3 text-orange-500" />
+                            <span>Horario</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(b.id)}
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-xl font-black text-[11px] transition-all border shadow-xs ${
+                              isExpanded
+                                ? "bg-stone-900 text-white border-stone-900"
+                                : "bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                            }`}
+                          >
+                            <BarChart3 className="w-3 h-3" />
+                            <span>{isExpanded ? "Ocultar" : "Estadísticas"}</span>
+                            <ChevronDown
+                              className={`w-3 h-3 transition-transform duration-200 ${
+                                isExpanded ? "rotate-180" : ""
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cajón Desplegable con Analítica Operativa para Móvil */}
+                    {isExpanded && (
+                      <div className="p-4 bg-orange-50/20 border-t border-orange-200/80 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center justify-between">
+                          <h5 className="font-black text-stone-900 text-xs flex items-center gap-1.5">
+                            <BarChart3 className="w-4 h-4 text-orange-600" />
+                            Estadísticas Operativas: {b.name}
+                          </h5>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(b.id)}
+                            className="text-xs text-stone-500 hover:text-stone-800 font-bold flex items-center gap-1"
+                          >
+                            <span>Cerrar</span>
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Bloques apilados o en 2 cols según el ancho de teléfono/phablet */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Variedad de Pan */}
+                          <div className="bg-white p-3 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                                <Croissant className="w-3.5 h-3.5 text-amber-600" />
+                                Variedad de Pan
+                              </span>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+                                {b.periodPieces.toLocaleString("es-MX")} pzas
+                              </span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {b.details.categories.map((cat, idx) => (
+                                <div key={idx} className="space-y-1">
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-stone-600 font-medium">{cat.name}</span>
+                                    <span className={`font-bold ${cat.textColor}`}>
+                                      {cat.pieces.toLocaleString("es-MX")} pz ({cat.pct}%)
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                      className={`${cat.color} h-full rounded-full`}
+                                      style={{ width: `${cat.pct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Medios de Pago */}
+                          <div className="bg-white p-3 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                                <Coins className="w-3.5 h-3.5 text-emerald-600" />
+                                Medios de Pago
+                              </span>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-900">
+                                {formatCurrency(b.periodSales)}
+                              </span>
+                            </div>
+                            <div className="space-y-1 text-xs">
+                              <div className="flex items-center justify-between p-1.5 rounded-xl bg-stone-50 border border-stone-100">
+                                <span className="text-stone-600 font-medium flex items-center gap-1 text-[11px]">
+                                  <Wallet className="w-3 h-3 text-emerald-600" /> Efectivo:
+                                </span>
+                                <span className="font-bold text-stone-900 text-[11px]">
+                                  {formatCurrency(b.details.payment.cashAmount)}{" "}
+                                  <span className="text-[9px] text-stone-400 font-normal">({b.details.payment.cashPct}%)</span>
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between p-1.5 rounded-xl bg-stone-50 border border-stone-100">
+                                <span className="text-stone-600 font-medium flex items-center gap-1 text-[11px]">
+                                  <CreditCard className="w-3 h-3 text-blue-600" /> Tarjeta:
+                                </span>
+                                <span className="font-bold text-stone-900 text-[11px]">
+                                  {formatCurrency(b.details.payment.cardAmount)}{" "}
+                                  <span className="text-[9px] text-stone-400 font-normal">({b.details.payment.cardPct}%)</span>
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between p-1.5 rounded-xl bg-stone-50 border border-stone-100">
+                                <span className="text-stone-600 font-medium flex items-center gap-1 text-[11px]">
+                                  <Receipt className="w-3 h-3 text-purple-600" /> Transf.:
+                                </span>
+                                <span className="font-bold text-stone-900 text-[11px]">
+                                  {formatCurrency(b.details.payment.transferAmount)}{" "}
+                                  <span className="text-[9px] text-stone-400 font-normal">({b.details.payment.transferPct}%)</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Horas Pico */}
+                          <div className="bg-white p-3 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-orange-600" />
+                                Horas Pico Mostrador
+                              </span>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-orange-100 text-orange-900">
+                                Afluencia
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {b.details.peakHours.map((peak, idx) => (
+                                <div key={idx} className="p-1.5 rounded-xl bg-stone-50 border border-stone-100 space-y-0.5">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span className="font-bold text-stone-800 flex items-center gap-1">
+                                      <span>{peak.icon}</span> {peak.hour}
+                                    </span>
+                                    <span className="font-black text-orange-600">
+                                      {peak.intensity}%
+                                    </span>
+                                  </div>
+                                  <p className="text-[9px] text-stone-500">{peak.label}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Panes Estrella */}
+                          <div className="bg-white p-3 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                                <Award className="w-3.5 h-3.5 text-amber-500" />
+                                Top Panes Estrella
+                              </span>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+                                Top 4
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {b.details.topProducts.map((prod, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-1 rounded-xl bg-stone-50 border border-stone-100">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="w-4 h-4 rounded-full bg-stone-200 text-stone-700 font-bold text-[9px] flex items-center justify-center shrink-0">
+                                      #{idx + 1}
+                                    </span>
+                                    <span className="font-bold text-stone-800 text-[10px] truncate">
+                                      {prod.name}
+                                    </span>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <p className="font-bold text-stone-900 text-[10px]">
+                                      {prod.pieces.toLocaleString("es-MX")} <span className="text-[8px] text-stone-400">pz</span>
+                                    </p>
+                                    <p className="text-[9px] text-emerald-600 font-bold">
+                                      {formatCurrency(prod.revenue)}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Barra inferior del cajón en móvil */}
+                        <div className="pt-2 border-t border-stone-200/80 flex items-center justify-between gap-2 flex-wrap text-xs">
+                          <div className="text-[11px] text-stone-600">
+                            <span>Fondo Inicial: </span>
+                            <strong className="text-stone-900">{formatCurrency(b.currentShift.initialFund)}</strong>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingShiftBranch(b)}
+                              className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-800 font-bold text-xs border border-orange-200 transition-colors"
+                            >
+                              Modificar Horario
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => advanceShift(b.id)}
+                              className="px-3 py-1.5 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-xs transition-colors"
+                            >
+                              Corte de Turno
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Resumen Móvil Consolidado de la Cadena */}
+              <div className="rounded-2xl sm:rounded-3xl bg-stone-900 text-white p-4 sm:p-5 space-y-3 shadow-lg border border-stone-800">
+                <div className="flex items-center justify-between border-b border-stone-800 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-orange-400" />
+                    <div>
+                      <h4 className="text-sm font-black text-orange-400 uppercase tracking-wider">Total Cadena</h4>
+                      <p className="text-[10px] text-stone-400">{branches.length} Sucursales Activas</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => switchBranch("all")}
+                    className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition-all active:scale-95 shadow-sm"
+                  >
+                    Ver Toda la Red
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white/[0.06] p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                    <span className="text-[10px] text-stone-400 uppercase font-bold">Ventas Totales</span>
+                    <p className="text-sm font-black text-white">{formatCurrency(consolidatedOverview.totalSales)}</p>
+                  </div>
+                  <div className="bg-white/[0.06] p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                    <span className="text-[10px] text-stone-400 uppercase font-bold">Piezas de Pan</span>
+                    <p className="text-sm font-black text-amber-300">{consolidatedOverview.totalPieces.toLocaleString("es-MX")} pz</p>
+                  </div>
+                  <div className="bg-white/[0.06] p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                    <span className="text-[10px] text-stone-400 uppercase font-bold">Ticket Promedio</span>
+                    <p className="text-sm font-black text-stone-200">{formatCurrency(consolidatedOverview.averageTicket)}</p>
+                  </div>
+                  <div className="bg-white/[0.06] p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                    <span className="text-[10px] text-stone-400 uppercase font-bold">Efectivo en Cajas</span>
+                    <p className="text-sm font-black text-emerald-400">{formatCurrency(consolidatedOverview.totalCashInDrawers)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. VISTA LAPTOP / ESCRITORIO: Tabla Ejecutiva Ampliada (≥ md por defecto) */}
+            <div
+              className={
+                displayMode === "table"
+                  ? "block overflow-x-auto"
+                  : displayMode === "cards"
+                  ? "hidden"
+                  : "hidden md:block overflow-x-auto"
+              }
+            >
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-stone-200 bg-stone-100/60 text-stone-600 uppercase tracking-wider font-extrabold text-[10px]">
-                    <th className="py-3.5 px-4">Sucursal</th>
-                    <th className="py-3.5 px-4">Encargado & Contacto</th>
-                    <th className="py-3.5 px-4">Piezas Vendidas</th>
-                    <th className="py-3.5 px-4">Ventas Totales</th>
-                    <th className="py-3.5 px-4">Ticket Prom.</th>
-                    <th className="py-3.5 px-4">Caja & Turno Actual</th>
-                    <th className="py-3.5 px-4 text-right">Estadísticas</th>
+                  <tr className="border-b border-stone-200 bg-stone-100/70 text-stone-700 uppercase tracking-wider font-extrabold text-[11px]">
+                    <th className="py-4 px-4 min-w-[200px]">Sucursal & Código</th>
+                    <th className="py-4 px-4 min-w-[170px]">Encargado & Contacto</th>
+                    <th className="py-4 px-4 min-w-[130px]">Piezas Vendidas</th>
+                    <th className="py-4 px-4 min-w-[140px]">Ventas Totales</th>
+                    <th className="py-4 px-4 min-w-[120px]">Ticket Prom.</th>
+                    <th className="py-4 px-4 min-w-[170px]">Caja & Turno Actual</th>
+                    <th className="py-4 px-4 min-w-[150px] text-right">Estadísticas</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 font-medium">
