@@ -133,14 +133,26 @@ CREATE TABLE IF NOT EXISTS sale_items (
 CREATE TABLE IF NOT EXISTS custom_orders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   order_number TEXT UNIQUE NOT NULL,
+  customer_id UUID REFERENCES customers(id),
   customer_name TEXT NOT NULL,
   phone TEXT NOT NULL,
+  branch_id TEXT DEFAULT 'branch-matriz',
+  branch_name TEXT DEFAULT 'Sucursal Matriz (Centro)',
   description TEXT NOT NULL,
-  delivery_date TIMESTAMPTZ NOT NULL,
-  status TEXT DEFAULT 'pendiente' NOT NULL,
+  items JSONB DEFAULT '[]'::jsonb,
+  delivery_date DATE NOT NULL,
+  delivery_time TEXT DEFAULT '16:00',
+  delivery_type TEXT DEFAULT 'sucursal', -- 'sucursal', 'domicilio'
+  delivery_address TEXT,
+  status TEXT DEFAULT 'pendiente' NOT NULL, -- 'pendiente', 'en_horno', 'listo', 'entregado', 'cancelado'
   total NUMERIC(10, 2) NOT NULL,
   deposit NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  remaining_balance NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  payment_status TEXT DEFAULT 'anticipo' NOT NULL, -- 'anticipo', 'liquidado', 'sin_anticipo'
+  payment_method TEXT DEFAULT 'efectivo',
+  dedication TEXT,
   notes TEXT,
+  cashier TEXT,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

@@ -63,17 +63,49 @@ export interface InventoryMovement {
   timestamp: string;
 }
 
+export interface OrderItem {
+  productId?: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  notes?: string;
+}
+
+export interface OrderPayment {
+  id: string;
+  date: string;
+  amount: number;
+  paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  cashier: string;
+  notes?: string;
+}
+
 export interface CustomOrder {
   id: string;
-  orderNumber?: string;
+  orderNumber: string;
+  customerId?: string;
   customerName: string;
   phone: string;
+  branchId?: string;
+  branchName: string;
   description: string;
+  items?: OrderItem[];
   deliveryDate: string;
-  status: "pendiente" | "en_horno" | "listo" | "entregado";
+  deliveryTime?: string;
+  deliveryType?: "sucursal" | "domicilio";
+  deliveryAddress?: string;
+  status: "pendiente" | "en_horno" | "listo" | "entregado" | "cancelado";
   total: number;
   deposit: number;
+  remainingBalance: number;
+  paymentStatus: "anticipo" | "liquidado" | "sin_anticipo";
+  paymentMethod?: "efectivo" | "tarjeta" | "transferencia";
+  dedication?: string;
   notes?: string;
+  createdAt: string;
+  cashier: string;
+  payments?: OrderPayment[];
 }
 
 export interface CustomerPurchase {
