@@ -192,6 +192,138 @@ const DEFAULT_TRANSFER_ACCOUNTS: TransferAccount[] = [
   },
 ];
 
+/**
+ * Input editable directo y fluido para la cantidad de piezas de un producto en la charola.
+ * Permite borrar libremente el número 1 (sin trabas ni rebotes instantáneos),
+ * auto-selecciona el texto al hacer clic/foco para sobreescribir al instante,
+ * y valida con seguridad al desenfocar (blur).
+ */
+function CartQuantityInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (qty: number) => void;
+}) {
+  const [text, setText] = useState<string>(value.toString());
+
+  useEffect(() => {
+    setText(value.toString());
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const clean = cleanOnlyNumbers(e.target.value);
+    setText(clean);
+    if (clean !== "") {
+      const num = parseInt(clean, 10);
+      if (!isNaN(num) && num > 0) {
+        onChange(num);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    if (!text || text === "" || isNaN(parseInt(text, 10)) || parseInt(text, 10) <= 0) {
+      const fallback = value > 0 ? value : 1;
+      setText(fallback.toString());
+      onChange(fallback);
+    } else {
+      const num = parseInt(text, 10);
+      setText(num.toString());
+      onChange(num);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={text}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+          return;
+        }
+        onlyNumbersKeyDown(e, false);
+      }}
+      onChange={handleChange}
+      onFocus={(e) => e.target.select()}
+      onClick={(e) => e.currentTarget.select()}
+      onBlur={handleBlur}
+      className="w-11 h-7 text-center font-black text-xs sm:text-sm bg-white border border-amber-400 focus:border-amber-600 rounded-lg focus:outline-none shadow-inner text-stone-900 cursor-text select-all"
+      title="Haz clic para escribir la cantidad de piezas directamente (ej. 100)"
+    />
+  );
+}
+
+/**
+ * Control editable de precio unitario por pieza para el producto en la charola.
+ * Permite cambiar el precio c/pieza para esa venta específica de forma completamente editable y fluida.
+ */
+function CartPriceInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (price: number) => void;
+}) {
+  const [text, setText] = useState<string>(value.toString());
+
+  useEffect(() => {
+    setText(value.toString());
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const clean = cleanDecimalNumbers(e.target.value);
+    setText(clean);
+    if (clean !== "" && clean !== ".") {
+      const num = parseFloat(clean);
+      if (!isNaN(num) && num >= 0) {
+        onChange(num);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    if (!text || text === "" || text === "." || isNaN(parseFloat(text))) {
+      setText(value.toString());
+      onChange(value);
+    } else {
+      const num = parseFloat(text);
+      setText(num.toString());
+      onChange(num);
+    }
+  };
+
+  return (
+    <div
+      className="inline-flex items-center gap-0.5 bg-amber-50 hover:bg-amber-100/70 focus-within:bg-white border border-amber-300 focus-within:border-amber-600 rounded-lg px-1.5 py-0.5 transition-all shadow-2xs group"
+      title="Precio por pieza editable (haz clic para cambiar el precio de esta pieza)"
+    >
+      <span className="text-[11px] font-black text-amber-800 select-none">$</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={text}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+            return;
+          }
+          onlyNumbersKeyDown(e, true);
+        }}
+        onChange={handleChange}
+        onFocus={(e) => e.target.select()}
+        onClick={(e) => e.currentTarget.select()}
+        onBlur={handleBlur}
+        className="w-12 text-xs font-black text-stone-900 bg-transparent text-center focus:outline-none cursor-text select-all"
+      />
+      <span className="text-[10px] text-stone-400 font-bold select-none">c/pza</span>
+    </div>
+  );
+}
+
 export default function POSPage() {
   const { user } = useAuth();
   const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
@@ -584,15 +716,25 @@ export default function POSPage() {
 
   const updateQuantity = (id: string, delta: number) => {
     setCart((prev) =>
-      prev
-        .map((item) => {
-          if (item.product.id === id) {
-            const newQ = item.quantity + delta;
-            return newQ > 0 ? { ...item, quantity: newQ } : null;
-          }
-          return item;
-        })
-        .filter(Boolean) as CartItem[]
+      prev.map((item) => {
+        if (item.product.id === id) {
+          const newQ = item.quantity + delta;
+          // No permitir que el botón (-) baje de 1 para evitar borrar accidentalmente el producto.
+          // Para eliminarlo definitivamente de la charola se utiliza el botón de basurero.
+          return { ...item, quantity: Math.max(1, newQ) };
+        }
+        return item;
+      })
+    );
+  };
+
+  const updateCartItemPrice = (id: string, newPrice: number) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product.id === id
+          ? { ...item, product: { ...item.product, price: Math.max(0, newPrice) } }
+          : item
+      )
     );
   };
 
@@ -813,6 +955,62 @@ export default function POSPage() {
     setIsCustomerPickerOpen(false);
     setShowReceiptModal(false);
     setCompletedSale(null);
+  };
+
+  const handleCancelTicket = () => {
+    if (!completedSale) {
+      setShowReceiptModal(false);
+      return;
+    }
+
+    const totalPieces = completedSale.items ? completedSale.items.reduce((sum, i) => sum + i.quantity, 0) : 0;
+    const confirmCancel = window.confirm(
+      `¿Deseas cancelar el comprobante #${completedSale.id}?\n\n` +
+      `• Se anulará esta compra por completo.\n` +
+      `• NO se cobrará el monto (${formatCurrency(completedSale.total)} MXN) en caja ni en reportes.\n` +
+      `• Las ${totalPieces} piezas de pan volverán al inventario disponible.`
+    );
+
+    if (!confirmCancel) return;
+
+    // 1. Devolver los panes al stock local
+    setProducts((prev) => {
+      const updated = prev.map((prod) => {
+        const returnedItem = completedSale.items.find((ci) => ci.product.id === prod.id);
+        if (returnedItem) {
+          return { ...prod, stock: prod.stock + returnedItem.quantity };
+        }
+        return prod;
+      });
+      saveStoredProducts(updated);
+      return updated;
+    });
+
+    // 2. Reintegrar stock en Supabase si aplica
+    try {
+      const supabase = createClient();
+      for (const item of completedSale.items) {
+        if (item.product.id.includes("-")) {
+          const currentProd = products.find((p) => p.id === item.product.id);
+          const restoredStock = (currentProd?.stock || 0) + item.quantity;
+          supabase
+            .from("products")
+            .update({ stock: restoredStock })
+            .eq("id", item.product.id)
+            .then();
+        }
+      }
+    } catch (e) {
+      console.log("Offline mode, stock restored locally", e);
+    }
+
+    // 3. Eliminar la venta de recentSalesList
+    setRecentSalesList((prev) => prev.filter((s) => s.id !== completedSale.id));
+
+    // 4. Limpiar estado de venta y cerrar modal
+    resetSale();
+
+    alert("✅ Ticket cancelado: La compra fue anulada y los panes se reintegraron al inventario.");
   };
 
   const catalogScrollRef = useRef<HTMLDivElement>(null);
@@ -1656,10 +1854,10 @@ export default function POSPage() {
                       {item.product.name}
                     </p>
                     <div className="flex items-center gap-1 mt-0.5">
-                      <span className="text-xs text-amber-800 font-black">
-                        {formatCurrency(item.product.price)}
-                      </span>
-                      <span className="text-[10px] text-stone-400 font-medium">c/pieza</span>
+                      <CartPriceInput
+                        value={item.product.price}
+                        onChange={(newPrice) => updateCartItemPrice(item.product.id, newPrice)}
+                      />
                     </div>
                   </div>
 
@@ -1668,33 +1866,27 @@ export default function POSPage() {
                     <button
                       type="button"
                       onClick={() => updateQuantity(item.product.id, -1)}
-                      className="w-7 h-7 flex items-center justify-center bg-stone-100 hover:bg-amber-100 active:scale-90 rounded-lg text-stone-800 transition-all font-black border border-stone-200 shadow-2xs"
-                      title="Restar 1 pieza"
+                      disabled={item.quantity <= 1}
+                      className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all font-black border border-stone-200 shadow-2xs ${
+                        item.quantity <= 1
+                          ? "opacity-35 cursor-not-allowed bg-stone-100 text-stone-400"
+                          : "bg-stone-100 hover:bg-amber-100 active:scale-90 text-stone-800 cursor-pointer"
+                      }`}
+                      title={item.quantity <= 1 ? "Mínimo 1 pieza (usa el bote de basura para quitar)" : "Restar 1 pieza"}
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
 
                     {/* Input editable directo para escribir piezas (ej. 100 bolillos) */}
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
+                    <CartQuantityInput
                       value={item.quantity}
-                      onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
-                      onChange={(e) => {
-                        const clean = cleanOnlyNumbers(e.target.value);
-                        const val = parseInt(clean, 10);
-                        setExactQuantity(item.product.id, isNaN(val) ? 1 : Math.max(1, val));
-                      }}
-                      onFocus={(e) => e.target.select()}
-                      className="w-11 h-7 text-center font-black text-xs sm:text-sm bg-white border border-amber-400 focus:border-amber-600 rounded-lg focus:outline-none shadow-inner text-stone-900 cursor-text"
-                      title="Haz clic para escribir la cantidad de piezas directamente (ej. 100)"
+                      onChange={(newQty) => setExactQuantity(item.product.id, newQty)}
                     />
 
                     <button
                       type="button"
                       onClick={() => updateQuantity(item.product.id, 1)}
-                      className="w-7 h-7 flex items-center justify-center bg-stone-100 hover:bg-amber-100 active:scale-90 rounded-lg text-stone-800 transition-all font-black border border-stone-200 shadow-2xs"
+                      className="w-7 h-7 flex items-center justify-center bg-stone-100 hover:bg-amber-100 active:scale-90 rounded-lg text-stone-800 transition-all font-black border border-stone-200 shadow-2xs cursor-pointer"
                       title="Sumar 1 pieza"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -1819,9 +2011,17 @@ export default function POSPage() {
                     inputMode="decimal"
                     placeholder="Paga con... ($)"
                     value={cashGiven}
-                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => e.currentTarget.select()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                        return;
+                      }
+                      onlyNumbersKeyDown(e, true);
+                    }}
                     onChange={(e) => setCashGiven(cleanDecimalNumbers(e.target.value))}
-                    className="w-full pl-9 pr-3 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 text-sm sm:text-base font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all"
+                    className="w-full pl-9 pr-3 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 text-sm sm:text-base font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all select-all"
                   />
                 </div>
 
@@ -1999,6 +2199,7 @@ export default function POSPage() {
         <TicketModal
           isOpen={showReceiptModal}
           onClose={resetSale}
+          onCancelTicket={handleCancelTicket}
           saleId={completedSale.id}
           items={completedSale.items}
           total={completedSale.total}

@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 interface TicketModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onCancelTicket?: () => void;
   saleId?: string;
   items: CartItem[];
   total: number;
@@ -27,6 +28,7 @@ interface TicketModalProps {
 export default function TicketModal({
   isOpen,
   onClose,
+  onCancelTicket,
   saleId,
   items,
   total,
@@ -59,174 +61,212 @@ export default function TicketModal({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header bar */}
-        <div className="bg-amber-950 text-amber-100 p-4 px-6 flex items-center justify-between">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[92vh]">
+        {/* Header bar del modal */}
+        <div className="bg-neutral-900 text-white p-4 px-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-amber-400" />
-            <span className="font-bold text-sm">Comprobante de Venta</span>
+            <Receipt className="w-5 h-5 text-neutral-300" />
+            <div>
+              <span className="font-bold text-sm block leading-tight">Comprobante de Venta</span>
+              <span className="text-[10px] text-neutral-400 font-normal">Optimizado para Impresión Láser B&N</span>
+            </div>
           </div>
           <button
-            onClick={onClose}
-            className="p-1 hover:bg-amber-900 rounded-lg text-amber-300 hover:text-white transition-colors"
+            onClick={onCancelTicket || onClose}
+            className="p-1.5 hover:bg-neutral-800 rounded-xl text-neutral-400 hover:text-rose-400 transition-colors cursor-pointer"
+            title={onCancelTicket ? "Cancelar ticket y compra (no cobrar panes)" : "Cerrar"}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Printable Ticket Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-stone-100/70">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-neutral-100">
           <div
             ref={ticketRef}
             id="thermal-receipt"
-            className="bg-white p-5 sm:p-6 rounded-3xl border-2 border-stone-200 shadow-md font-mono text-xs text-stone-800 space-y-3.5 max-w-sm mx-auto"
+            className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3.5 max-w-sm mx-auto"
           >
-            {/* Business Header con Logotipo Oficial */}
-            <div className="text-center space-y-1 border-b-2 border-dashed border-stone-300 pb-3.5">
-              {/* Logotipo Oficial Panaderías Brito */}
+            {/* Business Header con Logotipo Oficial en escala de grises de alto contraste */}
+            <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3.5">
+              {/* Logotipo Oficial Panaderías Brito (Filtrado para Láser B&N) */}
               <div className="flex justify-center mb-1">
                 <img
                   src="/logo.svg"
                   alt="Panadería Brito Logo"
-                  className="w-20 h-20 object-contain drop-shadow-xs"
+                  className="w-20 h-20 object-contain filter grayscale contrast-200"
                 />
               </div>
-              <h2 className="font-black text-base tracking-wider uppercase text-stone-900">
+              <h1 className="font-black text-lg tracking-wider uppercase text-black font-mono leading-none">
                 PANADERÍAS BRITO
-              </h2>
-              <p className="text-[10px] font-black uppercase tracking-widest text-amber-900 bg-amber-100/80 px-2.5 py-0.5 rounded-full inline-block">
+              </h1>
+              <div className="inline-block border border-black px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-black">
                 Tradición & Sabor Familiar
-              </p>
-              <p className="text-xs font-bold text-stone-800 font-sans mt-1">{branchName}</p>
+              </div>
+              <p className="text-xs font-bold text-black font-sans mt-1">{branchName}</p>
               {branchAddress && (
-                <p className="text-[10px] text-stone-500 font-sans leading-tight px-3">{branchAddress}</p>
+                <p className="text-[10px] text-neutral-700 font-sans leading-tight px-3">{branchAddress}</p>
               )}
-              <p className="text-[10px] text-stone-500 font-sans font-medium">
-                {branchPhone ? `Tel / WhatsApp: ${branchPhone}` : "Don Antonio Brito & Hijos"}
+              <p className="text-[10px] text-neutral-800 font-sans font-semibold">
+                {branchPhone ? `Tel: ${branchPhone}` : "Don Antonio Brito & Hijos"}
               </p>
             </div>
 
-            {/* Ticket Metadata */}
-            <div className="text-[11px] space-y-1 text-stone-600 border-b border-dashed border-stone-300 pb-3">
-              <div className="flex justify-between">
+            {/* Ticket Metadata (Folio, Fecha, Atendió, Pago) */}
+            <div className="text-[11px] space-y-1.5 text-black border-b-2 border-dashed border-black pb-3">
+              <div className="flex justify-between items-center">
                 <span className="font-bold">FOLIO:</span>
-                <span className="font-black text-stone-900">#{folio}</span>
+                <span className="bg-black text-white font-mono font-black px-2 py-0.5 rounded text-[11px]">
+                  #{folio}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span>FECHA:</span>
-                <span>{formattedDate}</span>
+                <span className="font-semibold text-neutral-800">FECHA:</span>
+                <span className="font-mono font-bold">{formattedDate}</span>
               </div>
-              <div className="flex justify-between">
-                <span>CLIENTE:</span>
-                <span className="font-bold text-stone-900 text-right max-w-[200px] truncate">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-neutral-800">CLIENTE:</span>
+                <span className="font-bold text-black text-right max-w-[200px] truncate">
                   {customerName || "Clientes Generales"}
                   {customerType && customerType !== "general" && (
-                    <span className="ml-1 text-[9px] font-black uppercase text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">
+                    <span className="ml-1 text-[9px] font-black uppercase border border-black px-1.5 py-0.5 rounded">
                       {customerType}
                     </span>
                   )}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>ATENDIÓ:</span>
-                <span className="font-bold text-stone-800">{cashierName}</span>
+                <span className="font-semibold text-neutral-800">ATENDIÓ:</span>
+                <span className="font-bold text-black">{cashierName}</span>
               </div>
-              <div className="flex justify-between">
-                <span>PAGO:</span>
-                <span className="uppercase font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                  {paymentMethod}
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-neutral-800">MÉTODO DE PAGO:</span>
+                <span className="uppercase font-black border-1.5 border-black px-2 py-0.5 rounded text-[10px] text-black">
+                  [ {paymentMethod} ]
                 </span>
               </div>
               {paymentMethod === "transferencia" && transferAccount && (
-                <div className="flex justify-between text-[10px] text-stone-600 border-t border-stone-100 pt-1">
-                  <span>CUENTA:</span>
-                  <span className="font-bold text-stone-900 text-right max-w-[190px] truncate">{transferAccount}</span>
+                <div className="flex justify-between text-[10px] border-t border-dotted border-black pt-1">
+                  <span className="font-bold text-black">CUENTA DEPÓSITO:</span>
+                  <span className="font-black text-black text-right max-w-[190px] truncate">{transferAccount}</span>
                 </div>
               )}
             </div>
 
             {/* Items Breakdown */}
-            <div className="space-y-2 border-b border-dashed border-stone-300 pb-3">
-              <div className="flex justify-between font-black text-[10px] text-stone-400 uppercase tracking-wider pb-1">
+            <div className="space-y-2 border-b-2 border-dashed border-black pb-3">
+              <div className="border-y border-black py-1 flex justify-between font-black text-[10px] text-black uppercase tracking-wider">
                 <span>CANT / PRODUCTO</span>
-                <span>IMPORTE</span>
+                <span className="text-right">IMPORTE</span>
               </div>
 
-              {items.map((item, idx) => (
-                <div key={idx} className="flex justify-between text-stone-800 text-[11px] leading-tight items-start">
-                  <span className="flex-1 pr-2">
-                    <span className="font-black text-stone-900">{item.quantity}x</span> {item.product.name}
-                    <span className="block text-[10px] text-stone-400 font-sans">
-                      @{formatCurrency(item.product.price)} c/u
-                    </span>
-                  </span>
-                  <span className="font-black text-stone-900 whitespace-nowrap">
-                    {formatCurrency(item.product.price * item.quantity)}
-                  </span>
-                </div>
-              ))}
+              <div className="space-y-1.5 pt-1">
+                {items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between text-black text-[11px] leading-tight items-start">
+                    <div className="flex-1 pr-2">
+                      <div className="font-bold text-black">
+                        <span className="font-black text-black border border-black px-1 py-0.2 rounded text-[10px] mr-1">
+                          {item.quantity}x
+                        </span>
+                        {item.product.name}
+                      </div>
+                      <div className="text-[10px] text-neutral-600 font-sans pl-6">
+                        @{formatCurrency(item.product.price)} c/u
+                      </div>
+                    </div>
+                    <div className="font-black text-black whitespace-nowrap text-right pt-0.5">
+                      {formatCurrency(item.product.price * item.quantity)}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Totals Breakdown */}
-            <div className="space-y-1.5 pt-1 text-[11px]">
-              <div className="flex justify-between text-stone-600">
+            <div className="space-y-1.5 pt-1 text-[11px] text-black">
+              <div className="flex justify-between text-neutral-800">
                 <span>Total de piezas:</span>
-                <span className="font-bold text-stone-900">{totalPieces} pzas</span>
+                <span className="font-bold text-black">{totalPieces} pzas</span>
               </div>
-              <div className="flex justify-between text-stone-600">
+              <div className="flex justify-between text-neutral-800">
                 <span>Subtotal:</span>
-                <span>{formatCurrency(total)}</span>
+                <span className="font-semibold text-black">{formatCurrency(total)}</span>
               </div>
-              <div className="flex justify-between text-base font-black text-stone-900 border-t-2 border-dashed border-stone-300 pt-2">
-                <span>TOTAL A PAGAR:</span>
-                <span className="text-amber-800">{formatCurrency(total)} MXN</span>
+
+              {/* Total Destacado en Bloque Negro Sólido (Alto Contraste para Láser) */}
+              <div className="bg-black text-white p-2.5 rounded-lg flex justify-between items-center my-2">
+                <span className="font-black text-xs tracking-wider uppercase">TOTAL A PAGAR:</span>
+                <span className="font-black text-base tracking-wide">{formatCurrency(total)} MXN</span>
               </div>
 
               {paymentMethod === "efectivo" && (
-                <div className="space-y-1 pt-1">
-                  <div className="flex justify-between text-stone-600 text-[11px]">
+                <div className="space-y-1 pt-0.5">
+                  <div className="flex justify-between text-neutral-800 text-[11px]">
                     <span>Efectivo recibido:</span>
-                    <span className="font-semibold">{formatCurrency(cashGiven || total)}</span>
+                    <span className="font-semibold text-black">{formatCurrency(cashGiven || total)}</span>
                   </div>
-                  <div className="flex justify-between text-emerald-800 font-black bg-emerald-100/80 p-2 rounded-xl border border-emerald-200 text-xs">
+                  <div className="flex justify-between items-center border-2 border-black p-2 rounded-lg font-black text-xs bg-white text-black">
                     <span>SU CAMBIO:</span>
-                    <span className="text-sm">{formatCurrency(change || 0)}</span>
+                    <span className="text-sm font-black">{formatCurrency(change || 0)}</span>
                   </div>
                 </div>
               )}
             </div>
 
-
-            {/* Horarios de Pan Calientito (Llamativo y Letras Grandes) */}
-            <div className="p-3.5 bg-gradient-to-br from-amber-100/90 to-orange-100/90 rounded-2xl text-center border-2 border-amber-400/90 space-y-1 font-sans shadow-xs">
-              <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wide">
-                <span className="text-base">🔥</span>
+            {/* Horarios de Pan Calientito (Optimizado para B&N: Letras Grandes y Claridad Total) */}
+            <div className="p-3 border-2 border-black rounded-xl text-center space-y-1 font-sans bg-white my-2">
+              <div className="flex items-center justify-center gap-1 text-xs font-black text-black uppercase tracking-wider">
+                <span>★</span>
                 <span>¡PAN CALIENTITO RECIÉN HORNEADO!</span>
+                <span>★</span>
               </div>
-              <p className="text-xs sm:text-sm font-extrabold text-stone-800">
-                🥐 De <span className="text-amber-900 font-black underline decoration-amber-500">6:00 AM</span> a <span className="text-amber-900 font-black underline decoration-amber-500">10:00 PM</span>
+              <p className="text-xs sm:text-sm font-black text-black">
+                🥐 De 6:00 AM a 10:00 PM 🥐
+              </p>
+              <p className="text-[9px] text-neutral-700 uppercase font-semibold">
+                Horneado continuo todos los días
               </p>
             </div>
 
-            {/* Pedidos Especiales y Agradecimiento (Grande, Claro y Muy Visible) */}
-            <div className="text-center pt-2 space-y-2 font-sans border-t-2 border-dashed border-stone-300">
-              <div className="space-y-0.5">
-                <p className="text-xs sm:text-sm font-black text-stone-900 flex items-center justify-center gap-1">
-                  <span>🎂</span>
-                  <span>¿Tienes fiesta o evento? Pedidos Especiales:</span>
+            {/* Pedidos Especiales y Agradecimiento (Encuadre B&N limpio) */}
+            <div className="text-center pt-2 space-y-2.5 font-sans border-t-2 border-dashed border-black">
+              <div className="space-y-1 border border-black rounded-lg p-2 bg-neutral-50">
+                <p className="text-[11px] font-black text-black uppercase">
+                  ¿Tienes fiesta o evento? Pedidos Especiales:
                 </p>
-                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-100 text-emerald-900 font-black text-xs sm:text-sm rounded-xl border border-emerald-300 shadow-xs mt-1">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-black font-black text-xs rounded-md border border-black">
                   <span>📲 WhatsApp:</span>
                   <span className="tracking-wider">{branchPhone || "55 1234 5678"}</span>
                 </div>
               </div>
 
-              <div className="pt-1 space-y-0.5">
-                <p className="font-black text-stone-950 text-sm sm:text-base tracking-wide">
-                  ¡GRACIAS POR SU PREFERENCIA! 🥐
+              {/* Simulación de Código de Barras POS */}
+              <div className="flex flex-col items-center pt-1">
+                <div className="flex justify-center items-center gap-[2px] h-8 w-44 py-0.5">
+                  {[2, 1, 3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 4, 2, 1, 3, 1, 2, 3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 3, 2].map(
+                    (w, i) => (
+                      <div
+                        key={i}
+                        className="bg-black h-full"
+                        style={{ width: `${w * 1.5}px` }}
+                      />
+                    )
+                  )}
+                </div>
+                <p className="text-[10px] font-mono tracking-widest text-black mt-0.5 font-bold">
+                  *{folio}*
                 </p>
-                <p className="text-[11px] font-bold text-stone-500">
+              </div>
+
+              <div className="pt-0.5 space-y-0.5">
+                <p className="font-black text-black text-sm tracking-wide uppercase">
+                  ¡GRACIAS POR SU PREFERENCIA!
+                </p>
+                <p className="text-[10px] font-bold text-neutral-600">
                   Consérvese en un lugar fresco y seco • Panaderías Brito
+                </p>
+                <p className="text-[8px] text-neutral-500 uppercase tracking-widest pt-0.5">
+                  Comprobante simplificado de venta
                 </p>
               </div>
             </div>
@@ -234,16 +274,25 @@ export default function TicketModal({
         </div>
 
         {/* Action Buttons */}
-        <div className="p-4 bg-white border-t border-stone-200 flex gap-3">
+        <div className="p-4 bg-white border-t border-neutral-200 flex gap-2.5 sm:gap-3">
+          {onCancelTicket && (
+            <button
+              onClick={onCancelTicket}
+              className="py-3 px-3.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 shadow-xs"
+              title="Cancelar compra y regresar panes al inventario"
+            >
+              <X className="w-4 h-4" /> Cancelar Ticket
+            </button>
+          )}
           <button
             onClick={handlePrint}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95"
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-black hover:bg-neutral-800 text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
           >
-            <Printer className="w-4 h-4" /> Imprimir Ticket
+            <Printer className="w-4 h-4" /> Imprimir Ticket (B&N)
           </button>
           <button
             onClick={onClose}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95"
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-neutral-800 hover:bg-neutral-900 text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
           >
             <CheckCircle className="w-4 h-4" /> Siguiente Cliente
           </button>

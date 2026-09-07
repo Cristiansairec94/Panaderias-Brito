@@ -20,6 +20,20 @@ body {
 }
 
 @media print {
+  @page {
+    size: auto;
+    margin: 0;
+  }
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
   body * {
     visibility: hidden;
   }
@@ -32,10 +46,11 @@ body {
     left: 0;
     top: 0;
     width: 80mm !important;
-    max-width: 100% !important;
+    max-width: 80mm !important;
     margin: 0 !important;
-    padding: 10px !important;
+    padding: 5mm 4mm !important;
     border: none !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
     background: white !important;
     color: black !important;

@@ -97,6 +97,20 @@
     }
     
     @media print {
+      @page {
+        size: auto;
+        margin: 0;
+      }
+      *, *::before, *::after {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body {
+        background: white !important;
+        color: black !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
       body * {
         visibility: hidden !important;
       }
@@ -108,11 +122,13 @@
         left: 0;
         top: 0;
         width: 80mm !important;
+        max-width: 80mm !important;
         margin: 0 !important;
-        padding: 8px !important;
+        padding: 5mm 4mm !important;
         background: white !important;
         color: black !important;
         border: none !important;
+        border-radius: 0 !important;
         box-shadow: none !important;
       }
     }
@@ -732,6 +748,47 @@
         setSelectedCustomer(DEFAULT_CUSTOMERS_DATA[0]);
         setShowTicket(false);
         setCompletedSale(null);
+      };
+
+      const cancelTicket = () => {
+        if (!completedSale) {
+          setShowTicket(false);
+          return;
+        }
+
+        const totalPieces = completedSale.items ? completedSale.items.reduce((sum, i) => sum + i.quantity, 0) : 0;
+        const confirmCancel = window.confirm(
+          `¿Deseas cancelar el ticket #${completedSale.id}?\n\n` +
+          `• Se anulará esta compra por completo.\n` +
+          `• NO se cobrará el monto (${formatCurrency(completedSale.total)} MXN) en caja ni en reportes.\n` +
+          `• Las ${totalPieces} piezas de pan volverán al inventario disponible.`
+        );
+
+        if (!confirmCancel) return;
+
+        // 1. Reintegrar piezas de pan al inventario
+        if (completedSale.items && completedSale.items.length > 0) {
+          setProducts((prev) =>
+            prev.map((prod) => {
+              const returnedItem = completedSale.items.find((ci) => ci.product.id === prod.id);
+              return returnedItem
+                ? { ...prod, stock: prod.stock + returnedItem.quantity }
+                : prod;
+            })
+          );
+        }
+
+        // 2. Eliminar la venta para que no se cobre ni afecte el corte de caja
+        setSalesList((prev) => prev.filter((s) => s.id !== completedSale.id));
+
+        // 3. Limpiar estado de la venta y cerrar el modal
+        setCart([]);
+        setCashGiven("");
+        setSelectedCustomer(DEFAULT_CUSTOMERS_DATA[0]);
+        setShowTicket(false);
+        setCompletedSale(null);
+
+        alert("✅ Ticket cancelado: La compra fue anulada y los panes se reintegraron al inventario.");
       };
 
       const filteredCustomers = useMemo(() => {
@@ -1726,180 +1783,211 @@
               <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="bg-amber-950 text-amber-100 p-4 px-6 flex items-center justify-between">
                   <span className="font-bold text-sm">🧾 Comprobante de Venta</span>
-                  <button onClick={resetSale} className="text-xl font-bold hover:text-white">✕</button>
+                  <button
+                    onClick={cancelTicket}
+                    className="text-xl font-bold hover:text-rose-400 p-1 rounded-lg hover:bg-amber-900/60 transition-colors cursor-pointer"
+                    title="Cancelar ticket y anular compra (no cobrar panes)"
+                  >
+                    ✕
+                  </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-stone-100/70">
-                  <div id="printable-ticket" className="bg-white p-5 sm:p-6 rounded-3xl border-2 border-stone-200 shadow-md font-mono text-xs text-stone-800 space-y-3.5 max-w-sm mx-auto">
-                    {/* Header con Logotipo Oficial */}
-                    <div className="text-center space-y-1 border-b-2 border-dashed border-stone-300 pb-3.5">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-neutral-100">
+                  <div id="printable-ticket" className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3.5 max-w-sm mx-auto">
+                    {/* Header con Logotipo Oficial en escala de grises */}
+                    <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3.5">
                       <div className="flex justify-center mb-1">
-                        <svg viewBox="0 0 500 550" className="w-20 h-20 mx-auto drop-shadow-xs">
-                          <defs>
-                            <linearGradient id="ticketOrangeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor="#ff8c38"/>
-                              <stop offset="50%" stopColor="#f56e18"/>
-                              <stop offset="100%" stopColor="#d64906"/>
-                            </linearGradient>
-                            <linearGradient id="ticketCrimsonBase" x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor="#fb2576"/>
-                              <stop offset="40%" stopColor="#e0105d"/>
-                              <stop offset="100%" stopColor="#a80540"/>
-                            </linearGradient>
-                            <path id="ticketPanaderiaArc" d="M 60 145 A 200 135 0 0 1 440 145" fill="none" />
-                          </defs>
-                          <text fontFamily="'Impact', 'Arial Black', sans-serif" fontWeight="900" fontSize="52" fill="url(#ticketOrangeGrad)" stroke="#1a120b" strokeWidth="4.5" strokeLinejoin="round" letterSpacing="3">
-                            <textPath href="#ticketPanaderiaArc" startOffset="50%" textAnchor="middle">PANADERIA</textPath>
-                          </text>
-                          <path d="M 50 215 C 55 185, 75 160, 115 140 C 150 122, 175 130, 205 125 C 225 122, 235 115, 250 115 C 265 115, 275 122, 295 125 C 325 130, 350 122, 385 140 C 425 160, 445 185, 450 215 C 430 195, 395 175, 345 165 C 300 156, 275 162, 250 162 C 225 162, 200 156, 155 165 C 105 175, 70 195, 50 215 Z" fill="#141416" stroke="#000000" strokeWidth="2" />
-                          <text x="250" y="210" textAnchor="middle" fontFamily="'Trebuchet MS', 'Arial Black', sans-serif" fontWeight="800" fontSize="34" fill="#a44210" stroke="#1a120b" strokeWidth="2.5" letterSpacing="2">Bakery</text>
-                          <text x="250" y="325" textAnchor="middle" fontFamily="'Brush Script MT', 'Dancing Script', 'Segoe Script', cursive" fontWeight="bold" fontStyle="italic" fontSize="122" fill="#141416" stroke="#ffffff" strokeWidth="14" strokeLinejoin="round" opacity="0.95">Brito</text>
-                          <text x="250" y="325" textAnchor="middle" fontFamily="'Brush Script MT', 'Dancing Script', 'Segoe Script', cursive" fontWeight="bold" fontStyle="italic" fontSize="122" fill="#141416">Brito</text>
-                          <g>
-                            <path d="M 85 365 C 140 378, 360 378, 415 365 L 385 458 C 340 472, 160 472, 115 458 Z" fill="url(#ticketCrimsonBase)" stroke="#730328" strokeWidth="3" />
-                            <path d="M 250 377 L 250 464" stroke="#ffccd5" strokeWidth="4.5" strokeLinecap="round"/>
-                            <path d="M 230 376 L 227 463" stroke="#ffe3e8" strokeWidth="4.5" strokeLinecap="round"/>
-                            <path d="M 270 376 L 273 463" stroke="#ffe3e8" strokeWidth="4.5" strokeLinecap="round"/>
-                            <path d="M 210 375 L 204 461" stroke="#ffccd5" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 290 375 L 296 461" stroke="#ffccd5" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 190 374 L 182 458" stroke="#ffe3e8" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 310 374 L 318 458" stroke="#ffe3e8" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 170 373 L 160 455" stroke="#ffccd5" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 330 373 L 340 455" stroke="#ffccd5" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 150 371 L 138 451" stroke="#ffe3e8" strokeWidth="3.5" strokeLinecap="round"/>
-                            <path d="M 350 371 L 362 451" stroke="#ffe3e8" strokeWidth="3.5" strokeLinecap="round"/>
-                            <path d="M 130 369 L 118 446" stroke="#ffccd5" strokeWidth="3.5" strokeLinecap="round"/>
-                            <path d="M 370 369 L 382 446" stroke="#ffccd5" strokeWidth="3.5" strokeLinecap="round"/>
-                            <path d="M 110 367 L 98 440" stroke="#ffe3e8" strokeWidth="3" strokeLinecap="round"/>
-                            <path d="M 390 367 L 402 440" stroke="#ffe3e8" strokeWidth="3" strokeLinecap="round"/>
-                          </g>
-                        </svg>
+                        <img
+                          src="/logo.svg"
+                          alt="Panaderías Brito"
+                          className="w-20 h-20 object-contain filter grayscale contrast-200"
+                        />
                       </div>
-                      <h2 className="font-black text-base tracking-wider uppercase text-stone-900">
+                      <h1 className="font-black text-lg tracking-wider uppercase text-black font-mono leading-none">
                         PANADERÍAS BRITO
-                      </h2>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-900 bg-amber-100/80 px-2.5 py-0.5 rounded-full inline-block">
+                      </h1>
+                      <div className="inline-block border border-black px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-black">
                         Tradición & Sabor Familiar
-                      </p>
-                      <p className="text-xs font-bold text-stone-800 font-sans mt-1">Sucursal Matriz (Centro)</p>
-                      <p className="text-[10px] text-stone-500 font-sans leading-tight px-3">Av. Principal #450, Centro Histórico</p>
-                      <p className="text-[10px] text-stone-500 font-sans font-medium">Tel / WhatsApp: 55 1234 5678</p>
+                      </div>
+                      <p className="text-xs font-bold text-black font-sans mt-1">Sucursal Matriz (Centro)</p>
+                      <p className="text-[10px] text-neutral-700 font-sans leading-tight px-3">Av. Principal #450, Centro Histórico</p>
+                      <p className="text-[10px] text-neutral-800 font-sans font-semibold">Tel / WhatsApp: 55 1234 5678</p>
                     </div>
 
                     {/* Ticket Metadata */}
-                    <div className="text-[11px] space-y-1 text-stone-600 border-b border-dashed border-stone-300 pb-3">
-                      <div className="flex justify-between"><span className="font-bold">FOLIO:</span><span className="font-black text-stone-900">#{completedSale.id}</span></div>
-                      <div className="flex justify-between"><span>FECHA:</span><span>{completedSale.date}</span></div>
+                    <div className="text-[11px] space-y-1.5 text-black border-b-2 border-dashed border-black pb-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold">FOLIO:</span>
+                        <span className="bg-black text-white font-mono font-black px-2 py-0.5 rounded text-[11px]">
+                          #{completedSale.id}
+                        </span>
+                      </div>
                       <div className="flex justify-between">
-                        <span>CLIENTE:</span>
-                        <span className="font-bold text-stone-900 text-right max-w-[200px] truncate">
-                          {completedSale.customerName || "Público General"}
+                        <span className="font-semibold text-neutral-800">FECHA:</span>
+                        <span className="font-mono font-bold">{completedSale.date}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-neutral-800">CLIENTE:</span>
+                        <span className="font-bold text-black text-right max-w-[200px] truncate">
+                          {completedSale.customerName || "Clientes Generales"}
                           {completedSale.customerType && completedSale.customerType !== "general" && (
-                            <span className="ml-1 text-[9px] font-black uppercase text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">
+                            <span className="ml-1 text-[9px] font-black uppercase border border-black px-1.5 py-0.5 rounded">
                               {completedSale.customerType}
                             </span>
                           )}
                         </span>
                       </div>
-                      <div className="flex justify-between"><span>ATENDIÓ:</span><span className="font-bold text-stone-800">{completedSale.cashier}</span></div>
                       <div className="flex justify-between">
-                        <span>PAGO:</span>
-                        <span className="uppercase font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                          {completedSale.paymentMethod}
+                        <span className="font-semibold text-neutral-800">ATENDIÓ:</span>
+                        <span className="font-bold text-black">{completedSale.cashier}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-neutral-800">MÉTODO DE PAGO:</span>
+                        <span className="uppercase font-black border-1.5 border-black px-2 py-0.5 rounded text-[10px] text-black">
+                          [ {completedSale.paymentMethod} ]
                         </span>
                       </div>
                     </div>
 
                     {/* Detalle de Productos */}
-                    <div className="space-y-2 border-b border-dashed border-stone-300 pb-3">
-                      <div className="flex justify-between font-black text-[10px] text-stone-400 uppercase tracking-wider pb-1">
+                    <div className="space-y-2 border-b-2 border-dashed border-black pb-3">
+                      <div className="border-y border-black py-1 flex justify-between font-black text-[10px] text-black uppercase tracking-wider">
                         <span>CANT / PRODUCTO</span>
-                        <span>IMPORTE</span>
+                        <span className="text-right">IMPORTE</span>
                       </div>
-                      {completedSale.items.map((i, idx) => (
-                        <div key={idx} className="flex justify-between text-stone-800 text-[11px] leading-tight items-start">
-                          <span className="flex-1 pr-2">
-                            <span className="font-black text-stone-900">{i.quantity}x</span> {i.product.name}
-                            <span className="block text-[10px] text-stone-400 font-sans">
-                              @{formatCurrency(i.product.price)} c/u
-                            </span>
-                          </span>
-                          <span className="font-black text-stone-900 whitespace-nowrap">{formatCurrency(i.product.price * i.quantity)}</span>
-                        </div>
-                      ))}
+                      <div className="space-y-1.5 pt-1">
+                        {completedSale.items.map((i, idx) => (
+                          <div key={idx} className="flex justify-between text-black text-[11px] leading-tight items-start">
+                            <div className="flex-1 pr-2">
+                              <div className="font-bold text-black">
+                                <span className="font-black text-black border border-black px-1 py-0.2 rounded text-[10px] mr-1">
+                                  {i.quantity}x
+                                </span>
+                                {i.product.name}
+                              </div>
+                              <div className="text-[10px] text-neutral-600 font-sans pl-6">
+                                @{formatCurrency(i.product.price)} c/u
+                              </div>
+                            </div>
+                            <div className="font-black text-black whitespace-nowrap text-right pt-0.5">
+                              {formatCurrency(i.product.price * i.quantity)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Totales y Cambio */}
-                    <div className="space-y-1.5 pt-1 text-[11px]">
-                      <div className="flex justify-between text-stone-600">
+                    <div className="space-y-1.5 pt-1 text-[11px] text-black">
+                      <div className="flex justify-between text-neutral-800">
                         <span>Total de piezas:</span>
-                        <span className="font-bold text-stone-900">{completedSale.items.reduce((acc, i) => acc + i.quantity, 0)} pzas</span>
+                        <span className="font-bold text-black">{completedSale.items.reduce((acc, i) => acc + i.quantity, 0)} pzas</span>
                       </div>
-                      <div className="flex justify-between text-base font-black text-stone-900 border-t-2 border-dashed border-stone-300 pt-2">
-                        <span>TOTAL A PAGAR:</span>
-                        <span className="text-amber-800">{formatCurrency(completedSale.total)} MXN</span>
+                      <div className="flex justify-between text-neutral-800">
+                        <span>Subtotal:</span>
+                        <span className="font-semibold text-black">{formatCurrency(completedSale.total)}</span>
                       </div>
+
+                      {/* Total Destacado en Bloque Negro Sólido */}
+                      <div className="bg-black text-white p-2.5 rounded-lg flex justify-between items-center my-2">
+                        <span className="font-black text-xs tracking-wider uppercase">TOTAL A PAGAR:</span>
+                        <span className="font-black text-base tracking-wide">{formatCurrency(completedSale.total)} MXN</span>
+                      </div>
+
                       {completedSale.paymentMethod === "efectivo" && (
-                        <div className="space-y-1 pt-1">
-                          <div className="flex justify-between text-stone-600 text-[11px]">
+                        <div className="space-y-1 pt-0.5">
+                          <div className="flex justify-between text-neutral-800 text-[11px]">
                             <span>Efectivo recibido:</span>
-                            <span className="font-semibold">{formatCurrency(completedSale.cashGiven)}</span>
+                            <span className="font-semibold text-black">{formatCurrency(completedSale.cashGiven)}</span>
                           </div>
-                          <div className="flex justify-between text-emerald-800 font-black bg-emerald-100/80 p-2 rounded-xl border border-emerald-200 text-xs">
+                          <div className="flex justify-between items-center border-2 border-black p-2 rounded-lg font-black text-xs bg-white text-black">
                             <span>SU CAMBIO:</span>
-                            <span className="text-sm">{formatCurrency(completedSale.change)}</span>
+                            <span className="text-sm font-black">{formatCurrency(completedSale.change)}</span>
                           </div>
                         </div>
                       )}
                     </div>
 
-
-                    {/* Horarios de Pan Calientito (Llamativo y Letras Grandes) */}
-                    <div className="p-3.5 bg-gradient-to-br from-amber-100/90 to-orange-100/90 rounded-2xl text-center border-2 border-amber-400/90 space-y-1 font-sans shadow-xs">
-                      <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wide">
-                        <span className="text-base">🔥</span>
+                    {/* Horarios de Pan Calientito (B&N nítido) */}
+                    <div className="p-3 border-2 border-black rounded-xl text-center space-y-1 font-sans bg-white my-2">
+                      <div className="flex items-center justify-center gap-1 text-xs font-black text-black uppercase tracking-wider">
+                        <span>★</span>
                         <span>¡PAN CALIENTITO RECIÉN HORNEADO!</span>
+                        <span>★</span>
                       </div>
-                      <p className="text-xs sm:text-sm font-extrabold text-stone-800">
-                        🥐 Mañanas: <span className="text-amber-900 font-black underline decoration-amber-500">6:30 AM</span> &nbsp;•&nbsp; Tardes: <span className="text-amber-900 font-black underline decoration-amber-500">5:30 PM</span>
+                      <p className="text-xs sm:text-sm font-black text-black">
+                        🥐 De 6:00 AM a 10:00 PM 🥐
+                      </p>
+                      <p className="text-[9px] text-neutral-700 uppercase font-semibold">
+                        Horneado continuo todos los días
                       </p>
                     </div>
 
-                    {/* Pedidos Especiales y Agradecimiento (Grande, Claro y Muy Visible) */}
-                    <div className="text-center pt-2 space-y-2 font-sans border-t-2 border-dashed border-stone-300">
-                      <div className="space-y-0.5">
-                        <p className="text-xs sm:text-sm font-black text-stone-900 flex items-center justify-center gap-1">
-                          <span>🎂</span>
-                          <span>¿Tienes fiesta o evento? Pedidos Especiales:</span>
+                    {/* Pedidos Especiales y Agradecimiento */}
+                    <div className="text-center pt-2 space-y-2.5 font-sans border-t-2 border-dashed border-black">
+                      <div className="space-y-1 border border-black rounded-lg p-2 bg-neutral-50">
+                        <p className="text-[11px] font-black text-black uppercase">
+                          ¿Tienes fiesta o evento? Pedidos Especiales:
                         </p>
-                        <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-100 text-emerald-900 font-black text-xs sm:text-sm rounded-xl border border-emerald-300 shadow-xs mt-1">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-black font-black text-xs rounded-md border border-black">
                           <span>📲 WhatsApp:</span>
                           <span className="tracking-wider">55 1234 5678</span>
                         </div>
                       </div>
 
-                      <div className="pt-1 space-y-0.5">
-                        <p className="font-black text-stone-950 text-sm sm:text-base tracking-wide">
-                          ¡GRACIAS POR SU PREFERENCIA! 🥐
+                      {/* Simulación Código de Barras POS */}
+                      <div className="flex flex-col items-center pt-1">
+                        <div className="flex justify-center items-center gap-[2px] h-8 w-44 py-0.5">
+                          {[2, 1, 3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 4, 2, 1, 3, 1, 2, 3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 3, 2].map(
+                            (w, i) => (
+                              <div
+                                key={i}
+                                className="bg-black h-full"
+                                style={{ width: `${w * 1.5}px` }}
+                              />
+                            )
+                          )}
+                        </div>
+                        <p className="text-[10px] font-mono tracking-widest text-black mt-0.5 font-bold">
+                          *{completedSale.id}*
                         </p>
-                        <p className="text-[11px] font-bold text-stone-500">
+                      </div>
+
+                      <div className="pt-0.5 space-y-0.5">
+                        <p className="font-black text-black text-sm tracking-wide uppercase">
+                          ¡GRACIAS POR SU PREFERENCIA!
+                        </p>
+                        <p className="text-[10px] font-bold text-neutral-600">
                           Consérvese en un lugar fresco y seco • Panaderías Brito
+                        </p>
+                        <p className="text-[8px] text-neutral-500 uppercase tracking-widest pt-0.5">
+                          Comprobante simplificado de venta
                         </p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-4 bg-white border-t border-stone-200 flex gap-3">
+                <div className="p-4 bg-white border-t border-stone-200 flex gap-2.5 sm:gap-3">
                   <button
+                    type="button"
+                    onClick={cancelTicket}
+                    className="py-3 px-3.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 shadow-xs"
+                    title="Cancelar compra y regresar panes al inventario"
+                  >
+                    ✕ Cancelar Ticket
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => window.print()}
-                    className="flex-1 py-3 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs"
+                    className="flex-1 py-3 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs transition-colors cursor-pointer active:scale-95"
                   >
                     🖨️ Imprimir Ticket
                   </button>
                   <button
+                    type="button"
                     onClick={resetSale}
-                    className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs"
+                    className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs transition-colors cursor-pointer active:scale-95"
                   >
                     ✓ Siguiente Cliente
                   </button>
