@@ -111,7 +111,7 @@ const navigationItems: NavItem[] = [
     icon: TrendingDown,
     badge: "Control",
     items: [
-      { name: "Registro de gastos", href: "/caja?tab=salidas", icon: Receipt, badge: "Compras" },
+      { name: "Registro de gastos", href: "/gastos", icon: Receipt, badge: "Control" },
     ],
   },
   {

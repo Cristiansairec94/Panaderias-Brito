@@ -327,7 +327,7 @@ export default function Home() {
                 + Abono
               </Link>
               <Link
-                href="/caja?tab=salidas"
+                href="/gastos"
                 className="flex-1 flex items-center justify-center gap-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 font-bold px-3 py-2.5 rounded-xl border border-rose-500/30 transition-all text-xs"
               >
                 <TrendingDown className="w-3.5 h-3.5 text-rose-400" />

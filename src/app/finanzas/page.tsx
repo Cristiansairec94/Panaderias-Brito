@@ -66,6 +66,12 @@ export default function FinanzasPage() {
         </div>
         <div className="flex gap-2">
           <Link
+            href="/gastos"
+            className="flex items-center gap-1.5 bg-rose-700 hover:bg-rose-800 text-white font-extrabold px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
+          >
+            <TrendingDown className="w-4 h-4 text-white" /> Registro de Gastos
+          </Link>
+          <Link
             href="/caja"
             className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-extrabold px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
           >

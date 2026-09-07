@@ -87,6 +87,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, keyof RolePermissions> = {
   "/": "canAccessDashboard",
   "/pos": "canAccessPos",
   "/ingresos": "canAccessCaja",
+  "/gastos": "canAccessCaja",
   "/caja": "canAccessCaja",
   "/inventario": "canAccessInventario",
   "/pedidos": "canAccessPedidos",
