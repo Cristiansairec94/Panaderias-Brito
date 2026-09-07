@@ -1384,14 +1384,7 @@ export default function SucursalesPage() {
                     <td className="py-4 px-4 text-emerald-300 text-sm">
                       {formatCurrency(consolidatedOverview.totalCashInDrawers)}
                     </td>
-                    <td className="py-4 px-4 text-right">
-                      <button
-                        onClick={() => switchBranch("all")}
-                        className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition-all active:scale-95 shadow-md"
-                      >
-                        Ver Consolidado
-                      </button>
-                    </td>
+                    <td className="py-4 px-4 text-right"></td>
                   </tr>
                 </tfoot>
               </table>
