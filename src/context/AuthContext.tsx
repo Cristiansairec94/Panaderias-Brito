@@ -52,7 +52,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageUsers: false,
   },
   cajero: {
-    canAccessDashboard: false,
+    canAccessDashboard: true,
     canAccessPos: true,
     canAccessCaja: true,
     canAccessInventario: false,
@@ -67,7 +67,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageUsers: false,
   },
   panadero: {
-    canAccessDashboard: false,
+    canAccessDashboard: true,
     canAccessPos: false,
     canAccessCaja: false,
     canAccessInventario: true,
@@ -221,9 +221,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const savedRolePerms = localStorage.getItem("brito_role_permissions");
       if (savedRolePerms) {
         const parsed = JSON.parse(savedRolePerms);
+        // Garantizar que canAccessDashboard siempre permanezca activo para todos los roles
+        const sanitized: Record<string, Partial<RolePermissions>> = {};
+        Object.keys(parsed).forEach((key) => {
+          sanitized[key] = { ...parsed[key], canAccessDashboard: true };
+        });
         setRolePermissionsMap((prev) => ({
           ...prev,
           ...parsed,
+          ...sanitized,
         }));
       }
     } catch (e) {
@@ -251,7 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Compute active permissions combining role defaults (dynamically configured) and user overrides
   const permissions: RolePermissions = user
-    ? { ...(rolePermissionsMap[user.role] || ROLE_PERMISSIONS[user.role]), ...(user.permissions || {}) }
+    ? { ...(rolePermissionsMap[user.role] || ROLE_PERMISSIONS[user.role]), ...(user.permissions || {}), canAccessDashboard: true }
     : {
         canAccessDashboard: false,
         canAccessPos: false,
@@ -297,16 +303,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, permissions]
   );
 
-    const getDefaultRouteForUser = useCallback(
-    (targetUser?: User | null): string => {
-      const u = targetUser || user;
-      if (!u) return "/";
-      if (u.role === "cajero") return "/pos";
-      if (u.role === "panadero") return "/inventario";
-      if (u.role === "auxiliar_admin") return "/";
+  const getDefaultRouteForUser = useCallback(
+    (_targetUser?: User | null): string => {
       return "/";
     },
-    [user]
+    []
   );
 
   const login = (identifier: string, pass: string, rememberMe: boolean = true) => {
@@ -419,6 +420,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     localStorage.removeItem("brito_user");
     sessionStorage.removeItem("brito_user");
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brito_session_active");
+    }
   };
 
   const addUser = (newUser: User) => {

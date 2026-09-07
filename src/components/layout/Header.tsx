@@ -104,15 +104,18 @@ export default function Header() {
   const handleRoleSwitch = (demo: User) => {
     loginAs(demo);
     setShowUserMenu(false);
-    if (getDefaultRouteForUser) {
-      const targetRoute = getDefaultRouteForUser(demo);
-      router.push(targetRoute);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("brito_session_active", "true");
     }
+    router.push("/");
   };
 
   const handleLogout = () => {
     logout();
     setShowUserMenu(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brito_session_active");
+    }
     router.push("/");
   };
 
