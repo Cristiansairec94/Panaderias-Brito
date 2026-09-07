@@ -20,7 +20,8 @@ import {
   Minus,
   X,
   CreditCard,
-  Building
+  Building,
+  TrendingUp
 } from "lucide-react";
 import { CashShift, CashMovement } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
@@ -121,6 +122,12 @@ export default function CajaPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            href="/ingresos"
+            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
+          >
+            <TrendingUp className="w-4 h-4" /> Registro de Ingresos
+          </Link>
           <Link
             href="/pos"
             className="flex items-center gap-1.5 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-500 hover:to-brito-crimson-500 text-white font-extrabold px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"

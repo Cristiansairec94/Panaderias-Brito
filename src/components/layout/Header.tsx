@@ -90,6 +90,8 @@ export default function Header() {
         return { title: "Configuración del Sistema", subtitle: "Catálogos de sistema, datos de tickets y usuarios" };
       case "/pos":
         return { title: "Punto de Venta (POS)", subtitle: "Caja rápida mostrador y tickets de venta" };
+      case "/ingresos":
+        return { title: "Registro de Ingresos", subtitle: "Control de entradas de dinero, abonos a pedidos y cobros de clientes" };
       case "/caja":
         return { title: "Caja & Flujo de Efectivo", subtitle: "Historial de caja, arqueos y registro de movimientos" };
       case "/pedidos":

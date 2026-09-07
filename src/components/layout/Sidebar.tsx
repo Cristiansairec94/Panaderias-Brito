@@ -101,7 +101,7 @@ const navigationItems: NavItem[] = [
     badge: "+Ventas",
     items: [
       { name: "Ventas (POS)", href: "/pos", icon: ShoppingBag, badge: "Caja" },
-      { name: "Registro de ingresos", href: "/caja?tab=entradas", icon: PlusCircle, badge: "Abonos" },
+      { name: "Registro de ingresos", href: "/ingresos", icon: PlusCircle, badge: "Abonos" },
     ],
   },
   {

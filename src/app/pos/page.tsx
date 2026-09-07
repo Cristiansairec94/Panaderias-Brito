@@ -33,7 +33,6 @@ import {
   Filter,
   X,
   Building2,
-  MapPin,
   ArrowRight,
   Lock,
   Unlock,
@@ -42,9 +41,10 @@ import {
   EyeOff,
   ShieldCheck,
   Menu,
-  Pencil
+  Pencil,
+  TrendingUp
 } from "lucide-react";
-import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount } from "@/types";
+import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CashIncome } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
@@ -62,6 +62,8 @@ import { useNotifications } from "@/context/NotificationContext";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
+import IncomesModal from "@/components/pos/IncomesModal";
+import IncomeReceiptModal from "@/components/ingresos/IncomeReceiptModal";
 import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
 import BreadDeliveryModal from "@/components/pos/BreadDeliveryModal";
 
@@ -411,6 +413,10 @@ export default function POSPage() {
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>([]);
   const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
   const [shiftModalTab, setShiftModalTab] = useState<"cuentas" | "cambio" | "corte" | "historial">("cambio");
+  const [showIncomesModal, setShowIncomesModal] = useState(false);
+  const [incomesList, setIncomesList] = useState<CashIncome[]>([]);
+  const [receiptIncome, setReceiptIncome] = useState<CashIncome | null>(null);
+  const [showIncomeReceiptModal, setShowIncomeReceiptModal] = useState(false);
   
   // Customer State (Público General + Clientes Frecuentes, Mayoreo y Eventos)
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -667,6 +673,18 @@ export default function POSPage() {
           }));
           setExpensesList(mappedExp);
         }
+        // 4. Load cash incomes from localStorage
+        try {
+          const savedIncomes = localStorage.getItem("brito_cash_incomes");
+          if (savedIncomes) {
+            const parsedInc = JSON.parse(savedIncomes);
+            if (Array.isArray(parsedInc) && parsedInc.length > 0) {
+              setIncomesList(parsedInc);
+            }
+          }
+        } catch (incErr) {
+          console.log("No local incomes yet", incErr);
+        }
       } catch (err) {
         console.log("Using fallback demo mode", err);
       }
@@ -776,7 +794,10 @@ export default function POSPage() {
     .filter((s) => s.paymentMethod === "efectivo")
     .reduce((sum, s) => sum + s.total, 0);
   const totalExpenses = currentShiftExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const netCashInDrawer = initialCashFund + totalCashSales - totalExpenses;
+  const totalExtraInCash = incomesList
+    .filter((i) => i.paymentMethod === "efectivo")
+    .reduce((sum, i) => sum + i.amount, 0);
+  const netCashInDrawer = initialCashFund + totalCashSales + totalExtraInCash - totalExpenses;
   const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
 
   const handleQuickCash = (amount: number) => {
@@ -789,6 +810,31 @@ export default function POSPage() {
 
   const handleAddExpense = (newExpense: CashExpense) => {
     setExpensesList((prev) => [newExpense, ...prev]);
+  };
+
+  const handleAddIncome = (newIncome: CashIncome) => {
+    setIncomesList((prev) => {
+      const updated = [newIncome, ...prev];
+      try {
+        localStorage.setItem("brito_cash_incomes", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleDeleteIncome = (id: string) => {
+    setIncomesList((prev) => {
+      const updated = prev.filter((i) => i.id !== id);
+      try {
+        localStorage.setItem("brito_cash_incomes", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleOpenIncomeReceipt = (income: CashIncome) => {
+    setReceiptIncome(income);
+    setShowIncomeReceiptModal(true);
   };
 
   const handleCheckout = async () => {
@@ -2326,6 +2372,30 @@ export default function POSPage() {
         onAddExpense={handleAddExpense}
         cashSalesTotal={totalCashSales}
         cashierName={cashierName}
+      />
+
+      {/* Incomes & Cash In Modal */}
+      <IncomesModal
+        isOpen={showIncomesModal}
+        onClose={() => setShowIncomesModal(false)}
+        incomes={incomesList}
+        onAddIncome={handleAddIncome}
+        onDeleteIncome={handleDeleteIncome}
+        cashSalesTotal={totalCashSales}
+        totalExpenses={totalExpenses}
+        initialFund={initialCashFund}
+        branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
+        defaultCashier={cashierName}
+        onOpenReceipt={handleOpenIncomeReceipt}
+      />
+
+      {/* Income Receipt Thermal Ticket Modal */}
+      <IncomeReceiptModal
+        isOpen={showIncomeReceiptModal}
+        onClose={() => setShowIncomeReceiptModal(false)}
+        income={receiptIncome}
+        branchAddress={activeBranch?.address}
+        branchPhone={activeBranch?.phone}
       />
 
       {/* Cash Drawer & Shift Control Modal */}

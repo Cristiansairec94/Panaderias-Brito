@@ -144,6 +144,33 @@ export interface CashExpense {
   date: string;
 }
 
+export type CashIncomeCategory =
+  | "abono_pedido"
+  | "abono_cliente"
+  | "fondo_cambio"
+  | "venta_costales"
+  | "ingreso_extraordinario"
+  | "otro";
+
+export interface CashIncome {
+  id: string;
+  amount: number;
+  category: CashIncomeCategory;
+  categoryLabel: string;
+  paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  concept: string;
+  customerId?: string;
+  customerName?: string;
+  orderId?: string;
+  orderNumber?: string;
+  cashier: string;
+  branchId?: string;
+  branchName?: string;
+  date: string;
+  timestamp?: string;
+  referenceNumber?: string;
+}
+
 export type UserRole = "admin" | "auxiliar_admin" | "cajero" | "panadero" | "supervisor" | (string & {});
 
 export interface RolePermissions {
