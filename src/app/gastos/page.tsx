@@ -1010,30 +1010,35 @@ export default function GastosPage() {
 
       {/* ── Tabla de Gastos con Diseño Panadería Brito ── */}
       <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-stone-100 flex items-center justify-between">
+        <div className="p-5 border-b border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-rose-600" />
-            <h3 className="font-black text-base text-stone-900">Historial Detallado de Gastos</h3>
+            <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
+              <Receipt className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-black text-base text-stone-900">Historial Detallado de Gastos</h3>
+              <p className="text-[11px] text-stone-400">Orden cronológico más reciente primero • {filteredGastos.length} registros</p>
+            </div>
           </div>
-          <span className="text-xs text-stone-500 font-bold">
-            Orden cronológico más reciente primero
+          <span className="text-xs font-mono font-bold text-stone-700 bg-stone-100 px-3 py-1.5 rounded-xl border border-stone-200 self-start sm:self-auto">
+            Total filtrado: <span className="text-rose-700">{formatCurrency(filteredGastos.filter(g => g.status !== "anulado").reduce((sum, g) => sum + g.amount, 0))}</span>
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-stone-50 text-stone-500 font-extrabold border-b border-stone-200 uppercase tracking-wider text-[10px]">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs border-collapse min-w-[1040px]">
+            <thead className="bg-stone-100/80 text-stone-600 font-extrabold border-b border-stone-200 uppercase tracking-wider text-[10px] select-none">
               <tr>
-                <th className="p-4">Folio</th>
-                <th className="p-4">Fecha</th>
-                <th className="p-4">Categoría</th>
-                <th className="p-4">Sucursal</th>
-                <th className="p-4">Concepto / Motivo</th>
-                <th className="p-4">Método</th>
-                <th className="p-4">Origen / Cuenta</th>
-                <th className="p-4">Cajero / Autorizó</th>
-                <th className="p-4 text-right">Monto</th>
-                <th className="p-4 text-center">Acciones</th>
+                <th className="py-3.5 px-3.5 align-middle w-24">Folio</th>
+                <th className="py-3.5 px-3.5 align-middle w-32">Fecha</th>
+                <th className="py-3.5 px-3.5 align-middle w-40">Sucursal</th>
+                <th className="py-3.5 px-3.5 align-middle w-44">Categoría</th>
+                <th className="py-3.5 px-3.5 align-middle min-w-[240px] max-w-[320px]">Concepto / Motivo</th>
+                <th className="py-3.5 px-3.5 align-middle w-32 text-right">Monto</th>
+                <th className="py-3.5 px-3.5 align-middle w-32 text-center">Forma de Pago</th>
+                <th className="py-3.5 px-3.5 align-middle w-40">Cuenta / Origen</th>
+                <th className="py-3.5 px-3.5 align-middle w-32">Cajero</th>
+                <th className="py-3.5 px-3.5 align-middle w-28 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
@@ -1054,18 +1059,22 @@ export default function GastosPage() {
                   return (
                     <tr
                       key={g.id}
-                      className={`hover:bg-stone-50/70 transition-colors ${
-                        isAnulado ? "bg-stone-50/80 opacity-60" : ""
+                      className={`hover:bg-amber-50/40 transition-colors h-14 ${
+                        isAnulado
+                          ? "bg-stone-50/80 opacity-60 border-l-[3px] border-l-stone-300"
+                          : isHoy
+                          ? "border-l-[3px] border-l-amber-500 bg-amber-50/15"
+                          : "border-l-[3px] border-l-stone-200"
                       }`}
                     >
-                      {/* Folio */}
-                      <td className="p-4 font-mono font-bold text-stone-900 whitespace-nowrap">
+                      {/* 1. Folio */}
+                      <td className="py-2.5 px-3.5 align-middle font-mono font-bold text-stone-900 whitespace-nowrap text-xs">
                         #{g.id}
                       </td>
 
-                      {/* Fecha */}
-                      <td className="p-4 whitespace-nowrap">
-                        <span className={`font-medium ${isAnulado ? "line-through text-stone-400" : "text-stone-700"}`}>
+                      {/* 2. Fecha */}
+                      <td className="py-2.5 px-3.5 align-middle whitespace-nowrap">
+                        <span className={`font-semibold ${isAnulado ? "line-through text-stone-400" : "text-stone-700"}`}>
                           {g.displayDate || formatExpenseDisplayDate(g.date)}
                         </span>
                         {isHoy && !isAnulado && (
@@ -1075,10 +1084,18 @@ export default function GastosPage() {
                         )}
                       </td>
 
-                      {/* Categoría */}
-                      <td className="p-4">
+                      {/* 3. Sucursal */}
+                      <td className="py-2.5 px-3.5 align-middle whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-800 bg-stone-100 px-2.5 py-1 rounded-xl border border-stone-200/80">
+                          <Store className="w-3.5 h-3.5 text-brito-orange-600" />
+                          <span>{g.branchName.replace("Sucursal ", "")}</span>
+                        </span>
+                      </td>
+
+                      {/* 4. Categoría */}
+                      <td className="py-2.5 px-3.5 align-middle whitespace-nowrap">
                         <span
-                          className={`px-2.5 py-1 rounded-lg font-bold text-[10px] whitespace-nowrap inline-flex items-center gap-1 border ${
+                          className={`px-2.5 py-1 rounded-xl font-bold text-[10px] inline-flex items-center gap-1.5 border ${
                             isAnulado
                               ? "bg-stone-200 text-stone-600 border-stone-300 line-through"
                               : `${catInfo.bg} ${catInfo.text} ${catInfo.border}`
@@ -1089,68 +1106,63 @@ export default function GastosPage() {
                         </span>
                       </td>
 
-                      {/* Sucursal (Con badge distintivo por tienda) */}
-                      <td className="p-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-800 bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200">
-                          <Store className="w-3 h-3 text-brito-orange-600" />
-                          <span>{g.branchName.replace("Sucursal ", "")}</span>
-                        </span>
-                      </td>
-
-                      {/* Concepto / Motivo */}
-                      <td className="p-4 max-w-xs font-medium text-stone-900">
-                        <div className={isAnulado ? "line-through text-stone-500" : ""}>
+                      {/* 5. Concepto / Motivo */}
+                      <td className="py-2.5 px-3.5 align-middle max-w-[300px]">
+                        <div
+                          className={`font-bold text-stone-900 truncate text-xs ${isAnulado ? "line-through text-stone-500" : ""}`}
+                          title={g.description}
+                        >
                           {g.description}
                         </div>
                         {g.supplier && (
-                          <span className="text-[10px] text-stone-500 block font-normal">
-                            Proveedor: <strong className="text-stone-700">{g.supplier}</strong>
-                          </span>
+                          <div className="text-[10px] text-stone-400 truncate mt-0.5">
+                            Prov: <strong className="text-stone-600 font-medium">{g.supplier}</strong>
+                          </div>
                         )}
                         {isAnulado && g.cancelReason && (
-                          <span className="inline-block mt-0.5 px-2 py-0.5 bg-red-100 text-red-800 font-bold text-[9px] rounded border border-red-200">
-                            Motivo anulación: {g.cancelReason}
+                          <span className="inline-block mt-0.5 px-1.5 py-0.5 bg-red-100 text-red-800 font-bold text-[9px] rounded border border-red-200">
+                            Motivo: {g.cancelReason}
                           </span>
                         )}
                       </td>
 
-                      {/* Método de Pago */}
-                      <td className="p-4">
-                        <span
-                          className={`px-2 py-0.5 rounded-lg font-black text-[10px] uppercase inline-flex items-center gap-1 ${
-                            g.paymentMethod === "efectivo"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : g.paymentMethod === "tarjeta"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-purple-100 text-purple-800"
-                          }`}
-                        >
-                          {g.paymentMethod === "efectivo" && <Wallet className="w-3 h-3" />}
-                          {g.paymentMethod === "tarjeta" && <CreditCard className="w-3 h-3" />}
-                          {g.paymentMethod === "transferencia" && <Building className="w-3 h-3" />}
-                          {g.paymentMethod}
-                        </span>
-                      </td>
-
-                      {/* Origen / Cuenta */}
-                      <td className="p-4 text-stone-600 font-medium whitespace-nowrap">
-                        {g.accountOrigin}
-                      </td>
-
-                      {/* Cajero */}
-                      <td className="p-4 text-stone-600 font-medium whitespace-nowrap">
-                        {g.cashier}
-                      </td>
-
-                      {/* Monto */}
-                      <td className="p-4 text-right font-mono font-black text-base whitespace-nowrap">
+                      {/* 6. Monto (Directamente al lado de Concepto) */}
+                      <td className="py-2.5 px-3.5 align-middle text-right font-mono font-black text-sm whitespace-nowrap">
                         <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700"}>
                           -{formatCurrency(g.amount)}
                         </span>
                       </td>
 
-                      {/* Acciones (Dropdown como Sairec ERP) */}
-                      <td className="p-4 text-center relative">
+                      {/* 7. Forma de Pago */}
+                      <td className="py-2.5 px-3.5 align-middle text-center whitespace-nowrap">
+                        <span
+                          className={`px-2.5 py-1 rounded-xl font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
+                            g.paymentMethod === "efectivo"
+                              ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                              : g.paymentMethod === "tarjeta"
+                              ? "bg-blue-100 text-blue-800 border-blue-200"
+                              : "bg-purple-100 text-purple-800 border-purple-200"
+                          }`}
+                        >
+                          {g.paymentMethod === "efectivo" && <Wallet className="w-3 h-3" />}
+                          {g.paymentMethod === "tarjeta" && <CreditCard className="w-3 h-3" />}
+                          {g.paymentMethod === "transferencia" && <Building className="w-3 h-3" />}
+                          <span>{g.paymentMethod}</span>
+                        </span>
+                      </td>
+
+                      {/* 8. Origen / Cuenta */}
+                      <td className="py-2.5 px-3.5 align-middle text-stone-600 font-medium whitespace-nowrap text-xs max-w-[140px] truncate" title={g.accountOrigin}>
+                        {g.accountOrigin}
+                      </td>
+
+                      {/* 9. Cajero */}
+                      <td className="py-2.5 px-3.5 align-middle text-stone-700 font-semibold whitespace-nowrap text-xs">
+                        {g.cashier}
+                      </td>
+
+                      {/* 10. Acciones */}
+                      <td className="py-2.5 px-3.5 align-middle text-center whitespace-nowrap relative">
                         <div className="inline-block text-left">
                           <button
                             onClick={(e) => {
