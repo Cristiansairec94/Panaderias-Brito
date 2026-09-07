@@ -33,11 +33,14 @@ export default function OrderPaymentModal({
   onPaymentSuccess,
 }: OrderPaymentModalProps) {
   const { user } = useAuth();
-  const [amount, setAmount] = useState<number>(0);
+  const [amount, setAmount] = useState<number | "">(0);
+  const [isAmountFocused, setIsAmountFocused] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [markAsDelivered, setMarkAsDelivered] = useState(true);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const numericAmount = typeof amount === "number" ? amount : (amount === "" ? 0 : Number(amount) || 0);
 
   useEffect(() => {
     if (order) {
@@ -50,11 +53,11 @@ export default function OrderPaymentModal({
   if (!isOpen || !order) return null;
 
   const handleConfirmPayment = () => {
-    if (amount <= 0) {
+    if (numericAmount <= 0) {
       alert("El monto del abono o liquidación debe ser mayor a $0.");
       return;
     }
-    if (amount > order.remainingBalance) {
+    if (numericAmount > order.remainingBalance) {
       alert(`El monto no puede ser mayor al saldo pendiente de ${formatCurrency(order.remainingBalance)}.`);
       return;
     }
@@ -62,11 +65,11 @@ export default function OrderPaymentModal({
     setIsSubmitting(true);
     try {
       addOrderPayment(order.id, {
-        amount,
+        amount: numericAmount,
         paymentMethod,
         cashier: user?.name || "Cajero en Turno",
         notes: notes.trim() || undefined,
-        markAsDelivered: markAsDelivered && amount === order.remainingBalance,
+        markAsDelivered: markAsDelivered && numericAmount === order.remainingBalance,
       });
 
       onPaymentSuccess();
@@ -141,15 +144,53 @@ export default function OrderPaymentModal({
             </div>
 
             <div className="relative">
-              <span className="absolute left-4 top-3 text-stone-400 font-bold text-lg">$</span>
+              <span className="absolute left-4 top-3.5 text-stone-400 font-bold text-lg pointer-events-none">$</span>
               <input
                 type="number"
                 min="1"
                 max={order.remainingBalance}
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
-                className="w-full pl-10 pr-4 py-3 border-2 border-stone-300 rounded-2xl font-black text-xl text-stone-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
+                step="any"
+                placeholder="0"
+                value={amount === 0 && isAmountFocused ? "" : amount}
+                onFocus={(e) => {
+                  setIsAmountFocused(true);
+                  if (amount === 0) {
+                    setAmount("");
+                  } else {
+                    e.target.select();
+                  }
+                }}
+                onBlur={() => {
+                  setIsAmountFocused(false);
+                  if (amount === "" || isNaN(Number(amount))) {
+                    setAmount(0);
+                  } else {
+                    setAmount(Number(amount));
+                  }
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "") {
+                    setAmount("");
+                    return;
+                  }
+                  const clean = val.replace(/^0+(?=\d)/, "");
+                  setAmount(clean === "" ? "" : Number(clean));
+                }}
+                className="w-full pl-10 pr-10 py-3 border-2 border-stone-300 rounded-2xl font-black text-xl text-stone-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
               />
+              {amount !== "" && amount !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => setAmount(0)}
+                  title="Borrar monto"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-stone-400 hover:text-stone-600"
+                >
+                  <span className="bg-stone-200 hover:bg-stone-300 text-stone-600 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold">
+                    ✕
+                  </span>
+                </button>
+              )}
             </div>
 
             {/* Quick chips if partial */}
@@ -254,12 +295,12 @@ export default function OrderPaymentModal({
           </button>
           <button
             type="button"
-            disabled={isSubmitting || amount <= 0}
+            disabled={isSubmitting || numericAmount <= 0}
             onClick={handleConfirmPayment}
             className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
           >
             <CheckCircle2 className="w-4 h-4" />
-            {isSubmitting ? "Registrando cobro..." : `Cobrar ${formatCurrency(amount)}`}
+            {isSubmitting ? "Registrando cobro..." : `Cobrar ${formatCurrency(numericAmount)}`}
           </button>
         </div>
       </div>

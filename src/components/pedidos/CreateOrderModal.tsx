@@ -84,9 +84,13 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
   const [deliveryType, setDeliveryType] = useState<"sucursal" | "domicilio">("sucursal");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [generalNotes, setGeneralNotes] = useState("");
-  const [deposit, setDeposit] = useState<number>(0);
+  const [deposit, setDeposit] = useState<number | "">(0);
+  const [isDepositFocused, setIsDepositFocused] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Numeric helper for deposit
+  const numericDeposit = typeof deposit === "number" ? deposit : (deposit === "" ? 0 : Number(deposit) || 0);
 
   // Load data on open
   useEffect(() => {
@@ -108,8 +112,8 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
 
   // Remaining balance
   const remainingBalance = useMemo(() => {
-    return Math.max(0, total - deposit);
-  }, [total, deposit]);
+    return Math.max(0, total - numericDeposit);
+  }, [total, numericDeposit]);
 
   // Filtered customers for autocomplete
   const filteredCustomers = useMemo(() => {
@@ -245,7 +249,7 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
         return;
       }
       // Pre-set 50% deposit recommendation if deposit is still 0
-      if (deposit === 0 && total > 0) {
+      if (numericDeposit === 0 && total > 0) {
         setDeposit(Math.round(total * 0.5));
       }
       setCurrentStep(3);
@@ -303,7 +307,7 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
         deliveryType: deliveryType,
         deliveryAddress: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
         total: total,
-        deposit: deposit,
+        deposit: Math.max(0, numericDeposit),
         paymentMethod: paymentMethod,
         dedication: dedication.trim(),
         notes: generalNotes.trim(),
@@ -1079,87 +1083,197 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
                 </div>
 
                 {/* Right: Payment & Balance Calculator (6 cols) */}
-                <div className="md:col-span-6 bg-stone-900 text-white rounded-3xl p-6 shadow-md flex flex-col justify-between space-y-5">
+                <div className="md:col-span-6 bg-gradient-to-b from-stone-900 via-stone-900 to-stone-950 text-white rounded-3xl p-6 shadow-xl border border-stone-800 flex flex-col justify-between space-y-5">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-stone-800 pb-3">
                       <div>
-                        <span className="text-xs font-bold uppercase text-stone-400 tracking-wider block">
+                        <span className="text-[11px] font-extrabold uppercase text-stone-400 tracking-wider block">
                           Total del Pedido
                         </span>
-                        <span className="text-2xl sm:text-3xl font-black text-amber-400 mt-1 block">
+                        <span className="text-3xl sm:text-4xl font-black text-amber-400 mt-0.5 block tracking-tight">
                           {formatCurrency(total)}
                         </span>
                       </div>
-                      <span className="text-xs bg-stone-800 text-stone-300 px-3 py-1 rounded-xl font-bold">
-                        {items.length} productos
+                      <span className="text-xs bg-stone-800/90 border border-stone-700 text-stone-300 px-3 py-1.5 rounded-xl font-bold">
+                        {items.length} {items.length === 1 ? "producto" : "productos"}
                       </span>
                     </div>
 
                     {/* Anticipo Selector */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-stone-200 flex items-center gap-1.5">
+                        <label className="text-xs font-black text-stone-200 flex items-center gap-1.5">
                           <Banknote className="w-4 h-4 text-emerald-400" /> Adelanto / Anticipo Recibido:
                         </label>
+                        {numericDeposit > 0 && total > 0 && (
+                          <span className="text-[11px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/50 px-2 py-0.5 rounded-lg">
+                            {Math.round((numericDeposit / total) * 100)}% cubierto
+                          </span>
+                        )}
                       </div>
 
-                      {/* Quick preset buttons */}
+                      {/* Quick preset buttons with active states */}
                       <div className="grid grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setDeposit(Math.round(total * 0.5))}
-                          className="py-2 px-2.5 text-xs font-bold rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-300 border border-stone-700 transition-colors text-center"
-                        >
-                          50% ({formatCurrency(Math.round(total * 0.5))})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeposit(total)}
-                          className="py-2 px-2.5 text-xs font-bold rounded-xl bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 transition-colors text-center"
-                        >
-                          100% Liquidado
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeposit(0)}
-                          className="py-2 px-2.5 text-xs font-bold rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-400 border border-stone-700 transition-colors text-center"
-                        >
-                          Sin anticipo
-                        </button>
+                        {/* 50% preset */}
+                        {(() => {
+                          const halfAmount = Math.round(total * 0.5);
+                          const isHalfActive = total > 0 && numericDeposit === halfAmount;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setDeposit(halfAmount)}
+                              className={`py-2 px-1.5 rounded-xl transition-all text-center border flex flex-col items-center justify-center gap-0.5 ${
+                                isHalfActive
+                                  ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-md shadow-amber-500/20 ring-2 ring-amber-400/50 scale-[1.02]"
+                                  : "bg-stone-800/90 hover:bg-stone-800 text-stone-300 hover:text-white border-stone-700 font-bold"
+                              }`}
+                            >
+                              <span className="text-xs">50%</span>
+                              <span className={`text-[10px] ${isHalfActive ? "text-stone-950 font-black" : "text-amber-400 font-bold"}`}>
+                                {formatCurrency(halfAmount)}
+                              </span>
+                            </button>
+                          );
+                        })()}
+
+                        {/* 100% preset */}
+                        {(() => {
+                          const isFullActive = total > 0 && numericDeposit === total;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setDeposit(total)}
+                              className={`py-2 px-1.5 rounded-xl transition-all text-center border flex flex-col items-center justify-center gap-0.5 ${
+                                isFullActive
+                                  ? "bg-emerald-500 text-stone-950 border-emerald-400 font-black shadow-md shadow-emerald-500/20 ring-2 ring-emerald-400/50 scale-[1.02]"
+                                  : "bg-stone-800/90 hover:bg-stone-800 text-stone-300 hover:text-white border-stone-700 font-bold"
+                              }`}
+                            >
+                              <span className="text-xs">100%</span>
+                              <span className={`text-[10px] ${isFullActive ? "text-stone-950 font-black" : "text-emerald-400 font-bold"}`}>
+                                Liquidado
+                              </span>
+                            </button>
+                          );
+                        })()}
+
+                        {/* Sin anticipo preset */}
+                        {(() => {
+                          const isZeroActive = numericDeposit === 0;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setDeposit(0)}
+                              className={`py-2 px-1.5 rounded-xl transition-all text-center border flex flex-col items-center justify-center gap-0.5 ${
+                                isZeroActive
+                                  ? "bg-stone-700 text-white border-stone-500 font-black shadow-sm ring-2 ring-stone-400/30 scale-[1.02]"
+                                  : "bg-stone-800/90 hover:bg-stone-800 text-stone-400 hover:text-stone-200 border-stone-700 font-bold"
+                              }`}
+                            >
+                              <span className="text-xs">Sin anticipo</span>
+                              <span className="text-[10px] font-bold text-stone-400">$0.00</span>
+                            </button>
+                          );
+                        })()}
                       </div>
 
                       {/* Manual Amount Input & Payment Method */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                         <div className="relative">
-                          <span className="absolute left-3.5 top-3 text-stone-400 text-xs font-bold">$</span>
+                          <span className="absolute left-3.5 top-3 text-amber-400 text-base font-black pointer-events-none">$</span>
                           <input
                             type="number"
                             min="0"
                             max={total}
-                            value={deposit}
-                            onChange={(e) => setDeposit(Number(e.target.value))}
-                            className="w-full pl-8 pr-3 py-2.5 bg-stone-800 border border-stone-700 rounded-xl text-white font-black text-base focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                            step="any"
+                            placeholder="0"
+                            value={deposit === 0 && isDepositFocused ? "" : deposit}
+                            onFocus={(e) => {
+                              setIsDepositFocused(true);
+                              if (deposit === 0) {
+                                setDeposit("");
+                              } else {
+                                e.target.select();
+                              }
+                            }}
+                            onBlur={() => {
+                              setIsDepositFocused(false);
+                              if (deposit === "" || isNaN(Number(deposit))) {
+                                setDeposit(0);
+                              } else {
+                                setDeposit(Number(deposit));
+                              }
+                            }}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === "") {
+                                setDeposit("");
+                                return;
+                              }
+                              // Clean leading zeros (e.g. "05" -> "5")
+                              const clean = val.replace(/^0+(?=\d)/, "");
+                              setDeposit(clean === "" ? "" : Number(clean));
+                            }}
+                            className="w-full pl-8 pr-8 py-2.5 bg-stone-950 border-2 border-stone-700 focus:border-amber-400 rounded-xl text-white font-black text-lg focus:ring-2 focus:ring-amber-500/30 focus:outline-none transition-all placeholder:text-stone-600"
                           />
+                          {deposit !== "" && deposit !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setDeposit(0)}
+                              title="Borrar monto y poner en 0"
+                              className="absolute right-2.5 top-3.5 text-stone-400 hover:text-stone-200"
+                            >
+                              <span className="w-5 h-5 bg-stone-800 hover:bg-stone-700 rounded-full flex items-center justify-center text-[10px] font-bold text-stone-300">
+                                ✕
+                              </span>
+                            </button>
+                          )}
                         </div>
 
                         <select
                           value={paymentMethod}
                           onChange={(e) => setPaymentMethod(e.target.value as any)}
-                          className="w-full px-3 py-2.5 bg-stone-800 border border-stone-700 rounded-xl text-stone-200 font-bold text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                          className="w-full px-3 py-2.5 bg-stone-800 border-2 border-stone-700 rounded-xl text-stone-200 font-bold text-xs focus:ring-2 focus:ring-amber-500 focus:border-amber-400 focus:outline-none"
                         >
                           <option value="efectivo">💵 Efectivo en Caja</option>
                           <option value="tarjeta">💳 Tarjeta Débito/Crédito</option>
                           <option value="transferencia">📱 Transferencia SPEI</option>
                         </select>
                       </div>
+
+                      {/* Quick add chips */}
+                      {total > 0 && remainingBalance > 0 && (
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <span className="text-[10px] text-stone-400 font-semibold">Sumar rápido:</span>
+                          {[50, 100, 200].map((step) => (
+                            <button
+                              key={step}
+                              type="button"
+                              onClick={() => {
+                                const nextVal = Math.min(total, numericDeposit + step);
+                                setDeposit(nextVal);
+                              }}
+                              className="px-2 py-0.5 text-[11px] font-bold bg-stone-800 hover:bg-stone-700 text-amber-300 border border-stone-700 rounded-lg transition-colors"
+                            >
+                              +${step}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Falta por Liquidar Callout Box */}
                     <div className="pt-3 border-t border-stone-800">
-                      <div className="bg-stone-800/80 border border-stone-700 rounded-2xl p-4 flex items-center justify-between">
+                      <div className={`border rounded-2xl p-4 flex items-center justify-between transition-all ${
+                        remainingBalance === 0
+                          ? "bg-emerald-950/60 border-emerald-600/50"
+                          : "bg-stone-800/90 border-stone-700"
+                      }`}>
                         <div>
-                          <span className="text-xs font-bold text-stone-300 block uppercase tracking-wide">
-                            Falta por Liquidar:
+                          <span className={`text-xs font-black block uppercase tracking-wide ${
+                            remainingBalance === 0 ? "text-emerald-400" : "text-stone-300"
+                          }`}>
+                            {remainingBalance === 0 ? "✓ Pedido 100% Pagado" : "Falta por Liquidar:"}
                           </span>
                           <span className="text-[11px] text-stone-400">
                             {remainingBalance === 0
@@ -1169,9 +1283,9 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
                         </div>
                         <div className="text-right">
                           <span
-                            className={`text-xl font-black px-3 py-1 rounded-xl block font-mono ${
+                            className={`text-xl font-black px-3 py-1.5 rounded-xl block font-mono ${
                               remainingBalance === 0
-                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                                 : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
                             }`}
                           >
