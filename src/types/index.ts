@@ -135,6 +135,34 @@ export interface CashMovement {
   timestamp: string;
 }
 
+export interface ShiftCutRecord {
+  id: string;
+  date: string;
+  timestamp: number;
+  shiftRange: string;
+  outgoingCashier: string;
+  incomingCashier: string;
+  responsible?: string; // Responsable directo del turno
+  branchName?: string;
+  previousShift: string;
+  nextShift: string;
+  initialFund: number;
+  cashSales: number;
+  cardSales: number;
+  transferSales: number;
+  totalSales: number;
+  totalSalesAll: number;
+  totalExpenses: number;
+  expectedCash: number;
+  countedCash: number;
+  difference: number;
+  nextFund: number;
+  notes: string;
+  expensesList?: CashExpense[];
+  stockPieces?: number;
+  stockValue?: number;
+}
+
 export interface CashExpense {
   id: string;
   amount: number;
@@ -275,4 +303,24 @@ export interface BreadDeliveryRecord {
   totalPieces: number;
   totalEstimatedValue: number;
   notes?: string;
+}
+
+export interface ExpenseRecord {
+  id: string; // GST-000101
+  date: string; // YYYY-MM-DD
+  displayDate?: string;
+  category: string;
+  categoryLabel: string;
+  branchId: string;
+  branchName: string;
+  description: string;
+  amount: number;
+  paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  accountOrigin: string; // "Caja Mostrador", "BBVA Don Toño", "Caja Chica", etc.
+  cashier: string;
+  status: "activo" | "anulado";
+  cancelReason?: string;
+  notes?: string;
+  supplier?: string;
+  timestamp: string;
 }

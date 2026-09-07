@@ -31,36 +31,10 @@ import {
   ArrowLeft,
   FileText
 } from "lucide-react";
-import { Product, Sale, CashExpense } from "@/types";
+import { Product, Sale, CashExpense, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useNotifications } from "@/context/NotificationContext";
 import { playCashRegisterSound } from "@/lib/sound";
-
-export interface ShiftCutRecord {
-  id: string;
-  date: string;
-  timestamp: number;
-  shiftRange: string;
-  outgoingCashier: string;
-  incomingCashier: string;
-  previousShift: string;
-  nextShift: string;
-  initialFund: number;
-  cashSales: number;
-  cardSales: number;
-  transferSales: number;
-  totalSales: number;
-  totalSalesAll: number;
-  totalExpenses: number;
-  expectedCash: number;
-  countedCash: number;
-  difference: number;
-  nextFund: number;
-  notes: string;
-  expensesList?: CashExpense[];
-  stockPieces?: number;
-  stockValue?: number;
-}
 
 interface CashDrawerShiftModalProps {
   isOpen: boolean;
@@ -292,6 +266,8 @@ export default function CashDrawerShiftModal({
       shiftRange: `${shiftStartTime} — ${currentTime || "Ahora"}`,
       outgoingCashier,
       incomingCashier,
+      responsible: outgoingCashier,
+      branchName: "Sucursal Matriz Centro",
       previousShift: shiftName,
       nextShift: nextShiftName,
       initialFund,
