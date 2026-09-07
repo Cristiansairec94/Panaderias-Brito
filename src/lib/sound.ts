@@ -4,8 +4,11 @@
  * señalando que la venta se cerró y el cliente fue atendido con excelencia.
  */
 
+import { CASH_REGISTER_AUDIO_DATA } from "./cashRegisterSoundData";
+
 let sharedAudioContext: AudioContext | null = null;
 let cachedAudioBuffer: AudioBuffer | null = null;
+let htmlAudioInstance: HTMLAudioElement | null = null;
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -29,31 +32,40 @@ function getAudioContext(): AudioContext | null {
 
 // Pre-cargar el audio físico en memoria nada más cargar el módulo en el navegador
 if (typeof window !== "undefined") {
-  const preloadAudio = () => {
-    fetch("/sounds/cash-register.wav")
-      .then((res) => {
-        if (!res.ok) throw new Error("Audio not found");
-        return res.arrayBuffer();
-      })
-      .then((arrayBuf) => {
-        const ctx = getAudioContext();
-        if (ctx) {
-          ctx.decodeAudioData(
-            arrayBuf,
-            (decoded) => {
-              cachedAudioBuffer = decoded;
-            },
-            () => {}
-          );
+  const initAudio = () => {
+    try {
+      if (!htmlAudioInstance) {
+        htmlAudioInstance = new Audio(CASH_REGISTER_AUDIO_DATA);
+        htmlAudioInstance.volume = 1.0;
+        htmlAudioInstance.load();
+      }
+    } catch {}
+
+    try {
+      const ctx = getAudioContext();
+      if (ctx && !cachedAudioBuffer) {
+        const base64Data = CASH_REGISTER_AUDIO_DATA.split(",")[1];
+        const binaryStr = atob(base64Data);
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
         }
-      })
-      .catch(() => {});
+        ctx.decodeAudioData(
+          bytes.buffer.slice(0),
+          (decoded) => {
+            cachedAudioBuffer = decoded;
+          },
+          () => {}
+        );
+      }
+    } catch {}
   };
 
   if (document.readyState === "complete") {
-    preloadAudio();
+    initAudio();
   } else {
-    window.addEventListener("load", preloadAudio, { once: true });
+    window.addEventListener("load", initAudio, { once: true });
   }
 }
 
@@ -182,34 +194,49 @@ export function playCashRegisterWebAudio(customCtx?: AudioContext) {
 
 /**
  * Función principal para disparar el sonido de caja registradora.
- * 1. Reproduce inmediatamente vía Web Audio el buffer decodificado de la grabación real WAV.
- * 2. Si el buffer no estuviese listo, sintetiza el sonido acústico con cero latencia.
- * 3. También reproduce vía elemento HTML5 Audio como refuerzo sonoro.
+ * Utiliza como sonido principal el archivo MP3 del usuario (16446_1460642689.mp3)
+ * tanto por Web Audio Buffer como por HTML5 Audio para máxima fidelidad y volumen.
  */
 export function playCashRegisterSound() {
   if (typeof window === "undefined") return;
 
+  let audioPlayed = false;
+
+  // 1. Reproducir el archivo MP3 del usuario mediante Web Audio Buffer (latencia cero)
   try {
     const ctx = getAudioContext();
-    if (ctx) {
-      if (cachedAudioBuffer) {
-        const source = ctx.createBufferSource();
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(1.0, ctx.currentTime);
-        source.buffer = cachedAudioBuffer;
-        source.connect(gain);
-        gain.connect(ctx.destination);
-        source.start(0);
-      } else {
-        playCashRegisterWebAudio(ctx);
-      }
+    if (ctx && cachedAudioBuffer) {
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(1.0, ctx.currentTime);
+      source.buffer = cachedAudioBuffer;
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.start(0);
+      audioPlayed = true;
     }
-
-    // Refuerzo vía HTML5 Audio
-    const audio = new Audio("/sounds/cash-register.wav");
-    audio.volume = 1.0;
-    audio.play().catch(() => {});
   } catch (err) {
-    console.warn("No se pudo reproducir sonido de caja registradora:", err);
+    console.warn("WebAudio buffer play error:", err);
+  }
+
+  // 2. Si no se reprodujo por Web Audio, reproducir inmediatamente el MP3 vía HTML5 Audio
+  if (!audioPlayed) {
+    try {
+      if (!htmlAudioInstance) {
+        htmlAudioInstance = new Audio(CASH_REGISTER_AUDIO_DATA);
+      }
+      htmlAudioInstance.currentTime = 0;
+      htmlAudioInstance.volume = 1.0;
+      const p = htmlAudioInstance.play();
+      if (p) {
+        p.then(() => {
+          audioPlayed = true;
+        }).catch(() => {
+          playCashRegisterWebAudio();
+        });
+      }
+    } catch {
+      playCashRegisterWebAudio();
+    }
   }
 }
