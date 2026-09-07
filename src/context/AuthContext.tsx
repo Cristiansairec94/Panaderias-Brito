@@ -281,8 +281,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Admin has blanket access
       if (user.role === "admin") return true;
 
-      // Extract base route e.g. /pos/ticket -> /pos
-      const baseRoute = "/" + pathname.split("/").filter(Boolean)[0] || "/";
+      // Extract base route e.g. /pos/ticket -> /pos, or / -> /
+      const firstSegment = pathname.split("/").filter(Boolean)[0];
+      const baseRoute = firstSegment ? `/${firstSegment}` : "/";
       const requiredPerm = ROUTE_PERMISSION_MAP[baseRoute] || ROUTE_PERMISSION_MAP[pathname];
 
       if (!requiredPerm) {
