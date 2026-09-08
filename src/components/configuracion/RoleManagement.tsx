@@ -29,7 +29,8 @@ import {
   X,
   Palette,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Smile
 } from "lucide-react";
 import { useAuth, ROLE_PERMISSIONS } from "@/context/AuthContext";
 import { UserRole, RolePermissions } from "@/types";
@@ -158,6 +159,56 @@ const COLOR_THEMES: Record<string, { label: string; preview: string; colors: The
     },
   },
 };
+
+export const ROLE_ICON_CATEGORIES = [
+  {
+    name: "Panadería & Elaboración",
+    icons: [
+      { emoji: "🥖", label: "Baguette / Pan Rústico" },
+      { emoji: "🥐", label: "Croissant / Hojaldre" },
+      { emoji: "🍞", label: "Pan de Molde" },
+      { emoji: "🎂", label: "Pasteles & Tortas" },
+      { emoji: "🧁", label: "Cupcakes & Repostería" },
+      { emoji: "👨‍🍳", label: "Chef Panadero" },
+      { emoji: "👩‍🍳", label: "Chef Panadera" },
+      { emoji: "🥣", label: "Mezclado & Masas" },
+      { emoji: "🍪", label: "Galletas & Secos" },
+      { emoji: "🥨", label: "Pretzel & Especiales" },
+      { emoji: "🍕", label: "Pizzas & Salados" },
+      { emoji: "🍰", label: "Rebanadas & Postres" },
+    ],
+  },
+  {
+    name: "Ventas & Mostrador",
+    icons: [
+      { emoji: "🛒", label: "Cajero / Carrito" },
+      { emoji: "💳", label: "Terminal / Cobros" },
+      { emoji: "💰", label: "Caja Fuerte / Turnos" },
+      { emoji: "🏷️", label: "Precios & Ofertas" },
+      { emoji: "🛍️", label: "Despacho Mostrador" },
+      { emoji: "🏪", label: "Encargado de Sucursal" },
+      { emoji: "☕", label: "Cafetería & Barista" },
+      { emoji: "🧾", label: "Facturación & Tickets" },
+      { emoji: "🪙", label: "Manejo de Monedas" },
+      { emoji: "🤝", label: "Servicio al Cliente" },
+    ],
+  },
+  {
+    name: "Supervisión & Logística",
+    icons: [
+      { emoji: "🛡️", label: "Supervisor de Turno" },
+      { emoji: "👑", label: "Líder / Gerente" },
+      { emoji: "💼", label: "Auxiliar Administrativo" },
+      { emoji: "📊", label: "Auditor / Finanzas" },
+      { emoji: "🔍", label: "Control de Calidad" },
+      { emoji: "⭐", label: "Colaborador Destacado" },
+      { emoji: "🧑‍💼", label: "Gestión Operativa" },
+      { emoji: "📋", label: "Inventarios & Conteo" },
+      { emoji: "🚚", label: "Reparto & Rutas" },
+      { emoji: "📦", label: "Almacén & Insumos" },
+    ],
+  },
+];
 
 const DEFAULT_SYSTEM_ROLES: RoleConfig[] = [
   {
@@ -362,6 +413,9 @@ export default function RoleManagement() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<RoleConfig | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isEditIconModalOpen, setIsEditIconModalOpen] = useState(false);
+  const [tempEditIcon, setTempEditIcon] = useState("🥖");
+  const [iconCategoryTab, setIconCategoryTab] = useState(0);
 
   const isDeleteConfirmed = useMemo(() => {
     const cleaned = deleteConfirmText.trim().toUpperCase();
@@ -377,6 +431,7 @@ export default function RoleManagement() {
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleBadge, setNewRoleBadge] = useState("Personalizado");
   const [newRoleDescription, setNewRoleDescription] = useState("");
+  const [newRoleIcon, setNewRoleIcon] = useState("🥖");
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -392,8 +447,18 @@ export default function RoleManagement() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge ensuring default roles always exist
-          const merged = [...DEFAULT_SYSTEM_ROLES];
+          // Merge ensuring default roles always exist while allowing icon/title customizations
+          const merged = DEFAULT_SYSTEM_ROLES.map((def) => {
+            const override = parsed.find((p: RoleConfig) => p.id === def.id);
+            if (override) {
+              return {
+                ...def,
+                icon: def.id === "admin" ? def.icon : override.icon || def.icon,
+                defaultTitle: def.id === "admin" ? def.defaultTitle : override.defaultTitle || def.defaultTitle,
+              };
+            }
+            return def;
+          });
           parsed.forEach((customRole: RoleConfig) => {
             if (!merged.some((r) => r.id === customRole.id)) {
               merged.push(customRole);
@@ -407,12 +472,11 @@ export default function RoleManagement() {
     }
   }, []);
 
-  // Save custom roles to localStorage
+  // Save custom roles and icon customizations to localStorage
   const persistRolesList = (newList: RoleConfig[]) => {
     setRolesList(newList);
     try {
-      const customOnly = newList.filter((r) => !r.isSystemRole);
-      localStorage.setItem("brito_custom_system_roles", JSON.stringify(customOnly));
+      localStorage.setItem("brito_custom_system_roles", JSON.stringify(newList));
     } catch (e) {
       console.error("Error persisting custom roles:", e);
     }
@@ -571,7 +635,33 @@ export default function RoleManagement() {
     setNewRoleName("");
     setNewRoleBadge("Personalizado");
     setNewRoleDescription("");
+    setNewRoleIcon("🥖");
     setIsCreateModalOpen(true);
+  };
+
+  // Open Edit Icon Modal for selected role
+  const handleOpenEditIconModal = () => {
+    if (selectedRole === "admin") return;
+    setTempEditIcon(activeRoleConfig.icon || "🥖");
+    setIsEditIconModalOpen(true);
+  };
+
+  // Save new icon for selected role
+  const handleSaveEditIcon = () => {
+    if (selectedRole === "admin") return;
+    const finalIcon = tempEditIcon.trim() || activeRoleConfig.icon;
+    const updatedRolesList = rolesList.map((r) => {
+      if (r.id === selectedRole) {
+        return {
+          ...r,
+          icon: finalIcon,
+        };
+      }
+      return r;
+    });
+    persistRolesList(updatedRolesList);
+    setIsEditIconModalOpen(false);
+    showToast(`¡Icono de "${activeRoleConfig.name}" actualizado a ${finalIcon}!`);
   };
 
   // Submit Create Role Form
@@ -595,7 +685,7 @@ export default function RoleManagement() {
       defaultTitle: newRoleName.trim(),
       subtitle: "Rol personalizado del sistema",
       badge: newRoleBadge.trim() || "Personalizado",
-      icon: "🛡️",
+      icon: newRoleIcon.trim() || "🥖",
       description: newRoleDescription.trim() || `Funciones y responsabilidades de ${newRoleName.trim()} en Panaderías Brito.`,
       isSystemRole: false,
       colorTheme: "amber",
@@ -860,8 +950,28 @@ export default function RoleManagement() {
             {/* Header: Active Role Details */}
             <div className="p-5 sm:p-6 bg-gradient-to-r from-stone-50 via-amber-50/30 to-stone-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white border-2 border-amber-400 shadow-sm flex items-center justify-center text-3xl shrink-0">
-                  {activeRoleConfig.icon}
+                <div className="relative group shrink-0">
+                  <div
+                    onClick={!isAdmin ? handleOpenEditIconModal : undefined}
+                    className={`w-14 h-14 rounded-2xl bg-white border-2 border-amber-400 shadow-sm flex items-center justify-center text-3xl shrink-0 transition-all ${
+                      !isAdmin
+                        ? "cursor-pointer hover:scale-105 hover:border-amber-500 hover:shadow-md"
+                        : ""
+                    }`}
+                    title={!isAdmin ? "Clic para cambiar el icono de este rol" : "Icono protegido de Administrador"}
+                  >
+                    {activeRoleConfig.icon}
+                  </div>
+                  {!isAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleOpenEditIconModal}
+                      className="absolute -bottom-1 -right-1 w-6 h-6 bg-stone-900 hover:bg-amber-500 text-amber-400 hover:text-stone-950 rounded-full flex items-center justify-center shadow-md border-2 border-white transition-all cursor-pointer hover:scale-110"
+                      title="Cambiar icono de este rol"
+                    >
+                      <Palette className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -871,6 +981,17 @@ export default function RoleManagement() {
                     <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase border ${activeRoleConfig.colorClass.badgeBg}`}>
                       {activeRoleConfig.badge}
                     </span>
+                    {!isAdmin && (
+                      <button
+                        type="button"
+                        onClick={handleOpenEditIconModal}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-950 rounded-full font-bold text-[10px] border border-amber-300 transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+                        title="Personalizar el icono de este rol"
+                      >
+                        <Palette className="w-3 h-3 text-amber-700" />
+                        <span>Cambiar Icono</span>
+                      </button>
+                    )}
                     {activeRoleConfig.isSystemRole ? (
                       <span className="px-2 py-0.5 bg-stone-100 text-stone-600 rounded-md font-bold text-[9px] uppercase border border-stone-200">
                         Rol del Sistema
@@ -1220,7 +1341,7 @@ export default function RoleManagement() {
       {/* ========================================================================= */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-5 sm:p-6 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border-b border-amber-200/80 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
@@ -1252,7 +1373,7 @@ export default function RoleManagement() {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleCreateRoleSubmit} className="p-5 sm:p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateRoleSubmit} className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto">
               {/* Name */}
               <div className="space-y-1">
                 <label className="font-bold text-stone-700">Nombre del Rol *</label>
@@ -1264,6 +1385,86 @@ export default function RoleManagement() {
                   onChange={(e) => setNewRoleName(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-bold text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
+              </div>
+
+              {/* Icon Selector Section */}
+              <div className="space-y-2.5 p-3.5 bg-stone-50/90 rounded-2xl border border-stone-200">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-stone-800 flex items-center gap-1.5 text-xs">
+                    <Smile className="w-4 h-4 text-amber-600" />
+                    <span>Icono del Rol (Perfil & Personalización)</span>
+                  </label>
+                  <span className="text-[10px] text-stone-500 font-medium">
+                    Elige del catálogo o escribe tu propio emoji
+                  </span>
+                </div>
+
+                {/* Preview and custom input */}
+                <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-400 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                    {newRoleIcon || "🥖"}
+                  </div>
+                  <div className="flex-1 space-y-0.5">
+                    <span className="text-[10px] font-bold text-stone-600 block">
+                      Icono seleccionado / Emoji libre:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={newRoleIcon}
+                        onChange={(e) => setNewRoleIcon(e.target.value)}
+                        placeholder="🥖"
+                        className="w-16 px-2 py-1 bg-stone-50 border border-stone-300 rounded-lg text-center text-lg font-black text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                      <span className="text-[11px] text-stone-500 truncate">
+                        {ROLE_ICON_CATEGORIES.flatMap((c) => c.icons).find((i) => i.emoji === newRoleIcon)?.label || "Icono libre personalizado"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Categories Tabs */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex gap-1 p-1 bg-stone-200/60 rounded-xl">
+                    {ROLE_ICON_CATEGORIES.map((cat, idx) => (
+                      <button
+                        key={cat.name}
+                        type="button"
+                        onClick={() => setIconCategoryTab(idx)}
+                        className={`flex-1 py-1 px-2 text-[10px] sm:text-[11px] font-bold rounded-lg transition-all cursor-pointer truncate ${
+                          iconCategoryTab === idx
+                            ? "bg-white text-stone-950 shadow-xs"
+                            : "text-stone-600 hover:text-stone-950"
+                        }`}
+                      >
+                        {cat.name.split(" ")[0]} {cat.name.split(" ")[1] || ""}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Category Grid */}
+                  <div className="grid grid-cols-6 gap-1.5 max-h-32 overflow-y-auto p-1.5 bg-white rounded-xl border border-stone-200">
+                    {ROLE_ICON_CATEGORIES[iconCategoryTab]?.icons.map((item) => {
+                      const isSelected = newRoleIcon === item.emoji;
+                      return (
+                        <button
+                          key={item.emoji}
+                          type="button"
+                          onClick={() => setNewRoleIcon(item.emoji)}
+                          title={item.label}
+                          className={`h-9 flex items-center justify-center text-xl rounded-lg transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-amber-100 border-2 border-amber-500 scale-105 shadow-xs"
+                              : "hover:bg-stone-100 border border-transparent hover:border-stone-200 hover:scale-105"
+                          }`}
+                        >
+                          {item.emoji}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Badge */}
@@ -1447,6 +1648,136 @@ export default function RoleManagement() {
                 <Trash2 className="w-4 h-4" />
                 <span>Confirmar y Eliminar</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+      {/* MODAL 3: CAMBIAR ICONO DEL ROL                                           */}
+      {/* ========================================================================= */}
+      {isEditIconModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border-b border-amber-200/80 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-stone-950 flex items-center justify-center text-2xl shadow-md font-bold shrink-0">
+                  {tempEditIcon || "🥖"}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-stone-900 tracking-tight">
+                      Cambiar Icono del Rol
+                    </h3>
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-900 font-black text-[9px] rounded-full uppercase border border-amber-300">
+                      Personalización
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-500">
+                    Rol: <strong className="text-stone-800">{activeRoleConfig.name}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEditIconModalOpen(false)}
+                className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-white/80 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 text-xs overflow-y-auto">
+              {/* Selected Preview and Custom Emoji input */}
+              <div className="flex items-center gap-3 bg-stone-50 p-3 rounded-2xl border border-stone-200 shadow-2xs">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-400 flex items-center justify-center text-3xl shadow-inner shrink-0">
+                  {tempEditIcon || "🥖"}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <label className="font-bold text-stone-700 block text-xs">
+                    Emoji / Icono Personalizado:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={tempEditIcon}
+                      onChange={(e) => setTempEditIcon(e.target.value)}
+                      placeholder="🥖"
+                      className="w-16 px-2 py-1.5 bg-white border border-stone-300 rounded-xl text-center text-xl font-black text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none shadow-2xs"
+                    />
+                    <span className="text-[11px] text-stone-500 truncate font-medium">
+                      {ROLE_ICON_CATEGORIES.flatMap((c) => c.icons).find((i) => i.emoji === tempEditIcon)?.label || "Icono libre personalizado"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category tabs */}
+              <div className="space-y-2">
+                <label className="font-bold text-stone-700 block text-xs">
+                  Seleccionar del Catálogo por Perfil:
+                </label>
+                <div className="flex gap-1 p-1 bg-stone-100 rounded-xl border border-stone-200">
+                  {ROLE_ICON_CATEGORIES.map((cat, idx) => (
+                    <button
+                      key={cat.name}
+                      type="button"
+                      onClick={() => setIconCategoryTab(idx)}
+                      className={`flex-1 py-1.5 px-2 text-[10px] sm:text-[11px] font-bold rounded-lg transition-all cursor-pointer truncate ${
+                        iconCategoryTab === idx
+                          ? "bg-white text-stone-950 shadow-xs border border-stone-200"
+                          : "text-stone-600 hover:text-stone-950"
+                      }`}
+                    >
+                      {cat.name.split(" ")[0]} {cat.name.split(" ")[1] || ""}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Grid */}
+                <div className="grid grid-cols-6 gap-2 p-2.5 bg-stone-50 rounded-2xl border border-stone-200 max-h-48 overflow-y-auto">
+                  {ROLE_ICON_CATEGORIES[iconCategoryTab]?.icons.map((item) => {
+                    const isSelected = tempEditIcon === item.emoji;
+                    return (
+                      <button
+                        key={item.emoji}
+                        type="button"
+                        onClick={() => setTempEditIcon(item.emoji)}
+                        title={item.label}
+                        className={`h-11 flex items-center justify-center text-2xl rounded-xl transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-amber-100 border-2 border-amber-500 scale-105 shadow-sm"
+                            : "bg-white hover:bg-amber-50/50 border border-stone-200 hover:border-amber-300 hover:scale-105"
+                        }`}
+                      >
+                        {item.emoji}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="pt-3 border-t border-stone-100 flex items-center justify-between shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsEditIconModalOpen(false)}
+                  className="px-4 py-2.5 text-stone-600 font-bold hover:bg-stone-100 rounded-xl transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditIcon}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>Guardar Icono</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
