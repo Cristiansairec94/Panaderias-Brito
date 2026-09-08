@@ -544,57 +544,67 @@ export default function ExpensesModal({
                 </div>
               </div>
 
-              {/* Botones de Categorías Rápidas según Tipo (OPCIONES GRANDES Y CLARAS) */}
-              <div className="space-y-2">
-                <label className="text-xs sm:text-sm font-black text-stone-800 block">
-                  {movementType === "salida" 
-                    ? "2. ¿Qué tipo de salida es?" 
-                    : "2. ¿Por qué motivo entra dinero a caja?"}
-                </label>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                  {(movementType === "salida" ? SALIDA_PRESETS : ENTRADA_PRESETS).map((preset) => {
-                    const isSelected = selectedPresetId === preset.id;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => handleSelectPreset(preset)}
-                        className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all flex items-center gap-3.5 cursor-pointer select-none active:scale-98 ${
-                          isSelected
-                            ? movementType === "salida"
+              {/* Botones de Categorías Rápidas sólo para Salidas (Gastos / Retiros) */}
+              {movementType === "salida" ? (
+                <div className="space-y-2">
+                  <label className="text-xs sm:text-sm font-black text-stone-800 block">
+                    2. ¿Qué tipo de salida es?
+                  </label>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+                    {SALIDA_PRESETS.map((preset) => {
+                      const isSelected = selectedPresetId === preset.id;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => handleSelectPreset(preset)}
+                          className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all flex items-center gap-3.5 cursor-pointer select-none active:scale-98 ${
+                            isSelected
                               ? "border-rose-500 bg-rose-50 text-rose-950 ring-4 ring-rose-500/20 shadow-md scale-[1.01]"
-                              : "border-emerald-500 bg-emerald-50 text-emerald-950 ring-4 ring-emerald-500/20 shadow-md scale-[1.01]"
-                            : "border-stone-200 bg-white hover:bg-stone-50 hover:border-stone-300 shadow-2xs"
-                        }`}
-                      >
-                        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shrink-0 shadow-2xs ${
-                          isSelected
-                            ? movementType === "salida" ? "bg-rose-100 border border-rose-300" : "bg-emerald-100 border border-emerald-300"
-                            : "bg-stone-100 border border-stone-200"
-                        }`}>
-                          {preset.icon}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-sm sm:text-base font-black block leading-tight truncate">
-                            {preset.title}
-                          </span>
-                          <span className="text-xs sm:text-sm text-stone-500 font-bold block mt-0.5 truncate">
-                            {preset.subtitle}
-                          </span>
-                        </div>
-                        {isSelected && (
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0 ${
-                            movementType === "salida" ? "bg-rose-600" : "bg-emerald-600"
+                              : "border-stone-200 bg-white hover:bg-stone-50 hover:border-stone-300 shadow-2xs"
+                          }`}
+                        >
+                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shrink-0 shadow-2xs ${
+                            isSelected
+                              ? "bg-rose-100 border border-rose-300"
+                              : "bg-stone-100 border border-stone-200"
                           }`}>
-                            ✓
+                            {preset.icon}
                           </div>
-                        )}
-                      </button>
-                    );
-                  })}
+                          <div className="min-w-0 flex-1">
+                            <span className="text-sm sm:text-base font-black block leading-tight truncate">
+                              {preset.title}
+                            </span>
+                            <span className="text-xs sm:text-sm text-stone-500 font-bold block mt-0.5 truncate">
+                              {preset.subtitle}
+                            </span>
+                          </div>
+                          {isSelected && (
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0 bg-rose-600">
+                              ✓
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-3.5 sm:p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-200 flex items-center gap-3 text-emerald-950 shadow-2xs">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-2xl shrink-0 shadow-xs">
+                    🪙
+                  </div>
+                  <div>
+                    <span className="font-black text-xs sm:text-sm block">
+                      Entrada Directa de Efectivo
+                    </span>
+                    <span className="text-xs text-emerald-800 font-medium block mt-0.5">
+                      Ingresa el monto que entra al cajón y especifica el motivo en el campo inferior.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Campo para nombre del dueño si es Retiro de Dueño */}
               {movementType === "salida" && selectedPresetId === "retiro_dueno" && (
@@ -620,7 +630,7 @@ export default function ExpensesModal({
               {/* Monto de Dinero */}
               <div className="space-y-2">
                 <label className="text-xs sm:text-sm font-black text-stone-900 block">
-                  3. Monto en Efectivo ($ MXN):
+                  {movementType === "salida" ? "3. Monto en Efectivo ($ MXN):" : "2. Monto en Efectivo ($ MXN):"}
                 </label>
                 <div className="relative">
                   <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-black text-2xl sm:text-3xl ${
@@ -673,7 +683,7 @@ export default function ExpensesModal({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs sm:text-sm font-black text-stone-900 block">
-                    4. Detalle / Motivo del movimiento:
+                    {movementType === "salida" ? "4. Detalle / Motivo del movimiento:" : "3. Detalle / Motivo de la entrada de efectivo:"}
                   </label>
                   <span className="text-[11px] text-stone-500 font-bold">
                     {description.trim().length > 0 ? `${description.trim().length} caracteres` : "Obligatorio"}
