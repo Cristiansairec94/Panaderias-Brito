@@ -412,8 +412,17 @@ export default function RoleManagement() {
     return rolesList.find((r) => r.id === selectedRole) || rolesList[0] || DEFAULT_SYSTEM_ROLES[0];
   }, [rolesList, selectedRole]);
 
+  // Is selected role the protected master admin?
+  const isAdmin = selectedRole === "admin";
+
   // Synchronize local permissions when the selected role changes
   useEffect(() => {
+    if (selectedRole === "admin") {
+      setCurrentPermissions({ ...ROLE_PERMISSIONS.admin });
+      setCustomRoleTitle("Administrador");
+      setHasChanges(false);
+      return;
+    }
     const base = rolePermissionsMap?.[selectedRole] || ROLE_PERMISSIONS[selectedRole] || ROLE_PERMISSIONS.cajero;
     setCurrentPermissions({ ...base });
     setCustomRoleTitle(activeRoleConfig.defaultTitle || activeRoleConfig.name);
@@ -433,6 +442,10 @@ export default function RoleManagement() {
 
   // Toggle single permission switch
   const handleTogglePermission = (permKey: keyof RolePermissions) => {
+    if (isAdmin) {
+      showToast("El rol de Administrador cuenta con acceso total y no puede ser modificado.");
+      return;
+    }
     setCurrentPermissions((prev) => ({
       ...prev,
       [permKey]: !prev[permKey],
@@ -442,6 +455,7 @@ export default function RoleManagement() {
 
   // Reset to original preset defaults
   const handleResetToDefault = () => {
+    if (isAdmin) return;
     const defaultPreset = ROLE_PERMISSIONS[selectedRole] || ROLE_PERMISSIONS.cajero;
     setCurrentPermissions({ ...defaultPreset });
     setHasChanges(true);
@@ -450,6 +464,7 @@ export default function RoleManagement() {
 
   // Grant all permissions
   const handleGrantAll = () => {
+    if (isAdmin) return;
     const allTrue: RolePermissions = {
       canAccessDashboard: true,
       canAccessPos: true,
@@ -471,6 +486,10 @@ export default function RoleManagement() {
 
   // Revoke all permissions
   const handleRevokeAll = () => {
+    if (isAdmin) {
+      showToast("No se pueden revocar los accesos del Administrador.");
+      return;
+    }
     const allFalse: RolePermissions = {
       canAccessDashboard: false,
       canAccessPos: false,
@@ -492,6 +511,10 @@ export default function RoleManagement() {
 
   // Toggle all items in a single category
   const handleToggleCategory = (group: PermissionGroup, enable: boolean) => {
+    if (isAdmin) {
+      showToast("El rol de Administrador tiene todos los accesos permanentemente activos.");
+      return;
+    }
     setCurrentPermissions((prev) => {
       const next = { ...prev };
       group.items.forEach((item) => {
@@ -509,6 +532,10 @@ export default function RoleManagement() {
 
   // Save changes
   const handleSaveRole = () => {
+    if (isAdmin) {
+      showToast("El rol de Administrador es el rol maestro del sistema y no requiere guardar cambios.");
+      return;
+    }
     const newTitle = customRoleTitle.trim() || activeRoleConfig.defaultTitle || activeRoleConfig.name;
     updateRolePermissions(selectedRole, currentPermissions, newTitle);
     
@@ -739,7 +766,7 @@ export default function RoleManagement() {
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
-                        {role.id !== "admin" && (
+                        {role.id !== "admin" ? (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -751,6 +778,10 @@ export default function RoleManagement() {
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
+                        ) : (
+                          <span title="Rol maestro de sistema protegido e inmutable" className="p-1 text-amber-600">
+                            <Lock className="w-3.5 h-3.5" />
+                          </span>
                         )}
                         {isSelected && (
                           <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
@@ -793,6 +824,26 @@ export default function RoleManagement() {
         <div className="lg:col-span-8 xl:col-span-8 space-y-6">
           <div className="bg-white rounded-3xl border border-stone-200/90 shadow-sm overflow-hidden divide-y divide-stone-100">
             
+            {/* Banner de protección para el rol Administrador */}
+            {isAdmin && (
+              <div className="px-5 py-3 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border-b border-amber-200 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 text-amber-950 font-bold text-xs">
+                  <div className="w-7 h-7 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center shrink-0 shadow-2xs font-black">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="font-black">Rol de Administrador Blindado:</span>
+                    <span className="text-amber-900 font-medium ml-1">
+                      Este rol posee privilegios totales e inmutables para garantizar el control integral del sistema. No se puede modificar ni revocar ningún acceso.
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-0.5 bg-amber-200/90 text-amber-950 rounded-full font-black text-[10px] uppercase border border-amber-300 shrink-0">
+                  Acceso Total Fijo
+                </span>
+              </div>
+            )}
+
             {/* Header: Active Role Details */}
             <div className="p-5 sm:p-6 bg-gradient-to-r from-stone-50 via-amber-50/30 to-stone-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -816,7 +867,7 @@ export default function RoleManagement() {
                         Rol Personalizado
                       </span>
                     )}
-                    {hasChanges && (
+                    {hasChanges && !isAdmin && (
                       <span className="px-2 py-0.5 bg-amber-500 text-stone-950 font-black text-[9px] rounded-md animate-pulse uppercase">
                         Cambios sin guardar
                       </span>
@@ -849,33 +900,35 @@ export default function RoleManagement() {
               {/* Action Buttons: Delete + Save */}
               <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center flex-wrap">
                 {activeRoleConfig.id !== "admin" ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteRoleClick(activeRoleConfig)}
-                    className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-bold text-xs transition-all active:scale-95 cursor-pointer"
-                    title={`Eliminar el rol ${activeRoleConfig.name}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    <span>Eliminar</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRoleClick(activeRoleConfig)}
+                      className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                      title={`Eliminar el rol ${activeRoleConfig.name}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Eliminar</span>
+                    </button>
+
+                    <button
+                      onClick={handleSaveRole}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer ${
+                        hasChanges
+                          ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/25 ring-2 ring-amber-400"
+                          : "bg-stone-900 hover:bg-black text-white"
+                      }`}
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Guardar Permisos</span>
+                    </button>
+                  </>
                 ) : (
-                  <div className="flex items-center gap-1.5 px-3 py-2 bg-stone-100 text-stone-500 rounded-xl text-xs font-bold border border-stone-200">
-                    <Lock className="w-3.5 h-3.5 text-stone-400" />
-                    <span>Protegido</span>
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-stone-100 text-stone-600 rounded-xl text-xs font-black border border-stone-200 shadow-2xs">
+                    <Lock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Rol Maestro Inmutable</span>
                   </div>
                 )}
-
-                <button
-                  onClick={handleSaveRole}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer ${
-                    hasChanges
-                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/25 ring-2 ring-amber-400"
-                      : "bg-stone-900 hover:bg-black text-white"
-                  }`}
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Guardar Permisos</span>
-                </button>
               </div>
             </div>
 
@@ -884,47 +937,67 @@ export default function RoleManagement() {
               <div className="flex-1 max-w-md space-y-1">
                 <label className="font-bold text-xs text-stone-700 flex items-center gap-1.5">
                   <span>Título Descriptivo del Rol</span>
-                  <span className="text-stone-400 font-normal">(Nombre visible)</span>
+                  <span className="text-stone-400 font-normal">
+                    {isAdmin ? "(Nombre de sistema protegido)" : "(Nombre visible)"}
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  value={customRoleTitle}
-                  onChange={(e) => {
-                    setCustomRoleTitle(e.target.value);
-                    setHasChanges(true);
-                  }}
-                  placeholder={activeRoleConfig.defaultTitle || activeRoleConfig.name}
-                  className="w-full px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    disabled={isAdmin}
+                    value={isAdmin ? (activeRoleConfig.defaultTitle || activeRoleConfig.name) : customRoleTitle}
+                    onChange={(e) => {
+                      if (isAdmin) return;
+                      setCustomRoleTitle(e.target.value);
+                      setHasChanges(true);
+                    }}
+                    placeholder={activeRoleConfig.defaultTitle || activeRoleConfig.name}
+                    className={`w-full px-3 py-2 border rounded-xl text-xs font-bold ${
+                      isAdmin
+                        ? "bg-stone-100 text-stone-500 border-stone-200 cursor-not-allowed pr-8 select-none"
+                        : "bg-white border-stone-200 text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    }`}
+                  />
+                  {isAdmin && (
+                    <Lock className="w-3.5 h-3.5 text-stone-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                  )}
+                </div>
               </div>
 
               {/* Quick Actions */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleResetToDefault}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-stone-100 border border-stone-200 rounded-xl text-xs font-bold text-stone-700 transition-all cursor-pointer"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-stone-500" />
-                  <span>Predeterminados</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGrantAll}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Activar Todos</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRevokeAll}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5 text-rose-600" />
-                  <span>Desactivar Todos</span>
-                </button>
-              </div>
+              {isAdmin ? (
+                <div className="flex items-center gap-2 px-3.5 py-2 bg-stone-100 border border-stone-200 rounded-xl text-xs font-bold text-stone-500">
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Accesos Totales Permanentes (13 de 13)</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleResetToDefault}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-stone-100 border border-stone-200 rounded-xl text-xs font-bold text-stone-700 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-stone-500" />
+                    <span>Predeterminados</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGrantAll}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Activar Todos</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRevokeAll}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Desactivar Todos</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* MATRIZ DE 13 ACCESOS (ELEGANTE, INTUITIVA Y AGRUPADA) */}
@@ -989,53 +1062,66 @@ export default function RoleManagement() {
 
                         {/* Quick Category Action Toggles */}
                         <div className="flex items-center gap-1.5 self-end sm:self-center">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCategory(group, true)}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                              isAllEnabled
-                                ? "bg-emerald-600 text-white shadow-xs"
-                                : "bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200"
-                            }`}
-                          >
-                            Activar Todos ({categoryTotal})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCategory(group, false)}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                              categoryEnabled === 0
-                                ? "bg-stone-300 text-stone-700"
-                                : "bg-white hover:bg-rose-50 text-stone-600 hover:text-rose-700 border border-stone-200"
-                            }`}
-                          >
-                            Desactivar
-                          </button>
+                          {isAdmin ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black bg-stone-100 text-stone-500 border border-stone-200">
+                              <Lock className="w-3 h-3 text-amber-600" /> Siempre Habilitado
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleCategory(group, true)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                  isAllEnabled
+                                    ? "bg-emerald-600 text-white shadow-xs"
+                                    : "bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                }`}
+                              >
+                                Activar Todos ({categoryTotal})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleCategory(group, false)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                  categoryEnabled === 0
+                                    ? "bg-stone-300 text-stone-700"
+                                    : "bg-white hover:bg-rose-50 text-stone-600 hover:text-rose-700 border border-stone-200"
+                                }`}
+                              >
+                                Desactivar
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
 
                       {/* Switches Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 p-3.5 bg-white">
                         {group.items.map((item) => {
-                          const isEnabled = Boolean(currentPermissions[item.key]);
+                          const isEnabled = isAdmin ? true : Boolean(currentPermissions[item.key]);
                           const IconComponent = item.icon;
 
                           return (
                             <div
                               key={item.key}
-                              onClick={() => handleTogglePermission(item.key)}
-                              className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 select-none group/item ${
-                                isEnabled
-                                  ? "bg-emerald-50/40 border-emerald-300/80 shadow-2xs hover:border-emerald-400"
-                                  : "bg-stone-50/50 border-stone-200 hover:border-stone-300 hover:bg-white"
+                              onClick={() => {
+                                if (isAdmin) return;
+                                handleTogglePermission(item.key);
+                              }}
+                              className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 select-none ${
+                                isAdmin
+                                  ? "bg-emerald-50/20 border-emerald-200/60 cursor-default"
+                                  : isEnabled
+                                  ? "bg-emerald-50/40 border-emerald-300/80 shadow-2xs hover:border-emerald-400 cursor-pointer group/item"
+                                  : "bg-stone-50/50 border-stone-200 hover:border-stone-300 hover:bg-white cursor-pointer group/item"
                               }`}
                             >
                               <div className="flex items-start gap-2.5 min-w-0">
                                 <div
                                   className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs shrink-0 transition-all ${
                                     isEnabled
-                                      ? "bg-emerald-600 text-white shadow-xs scale-105"
-                                      : "bg-stone-200 text-stone-500 group-hover/item:bg-stone-300"
+                                      ? "bg-emerald-600 text-white shadow-xs"
+                                      : "bg-stone-200 text-stone-500"
                                   }`}
                                 >
                                   <IconComponent className="w-3.5 h-3.5" />
@@ -1062,13 +1148,20 @@ export default function RoleManagement() {
                               <div className="flex flex-col items-end gap-1 shrink-0">
                                 <button
                                   type="button"
+                                  disabled={isAdmin}
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    if (isAdmin) return;
                                     handleTogglePermission(item.key);
                                   }}
-                                  className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer ${
-                                    isEnabled ? "bg-emerald-600 shadow-xs" : "bg-stone-300"
+                                  className={`w-11 h-6 flex items-center rounded-full p-0.5 transition-colors duration-200 focus:outline-none ${
+                                    isAdmin
+                                      ? "bg-emerald-600/75 cursor-not-allowed opacity-90"
+                                      : isEnabled
+                                      ? "bg-emerald-600 shadow-xs cursor-pointer"
+                                      : "bg-stone-300 cursor-pointer"
                                   }`}
+                                  title={isAdmin ? "El Administrador tiene este acceso de forma permanente" : undefined}
                                 >
                                   <div
                                     className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-200 flex items-center justify-center text-[8px] font-black ${
@@ -1078,9 +1171,10 @@ export default function RoleManagement() {
                                     {isEnabled ? "✓" : "✕"}
                                   </div>
                                 </button>
-                                <span className={`text-[8px] font-black uppercase tracking-wider ${
+                                <span className={`text-[8px] font-black uppercase tracking-wider flex items-center gap-1 ${
                                   isEnabled ? "text-emerald-700" : "text-stone-400"
                                 }`}>
+                                  {isAdmin && <Lock className="w-2.5 h-2.5 text-stone-400" />}
                                   {isEnabled ? "Permitido" : "Bloqueado"}
                                 </span>
                               </div>
@@ -1097,23 +1191,32 @@ export default function RoleManagement() {
             {/* Footer with Save Button */}
             <div className="p-4 sm:p-5 bg-stone-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <span className="text-xl">💡</span>
+                <span className="text-xl">{isAdmin ? "🛡️" : "💡"}</span>
                 <p className="text-xs font-bold text-stone-700">
-                  Los cambios de permisos se guardan y aplican al instante para todos los colaboradores con el rol {activeRoleConfig.name}.
+                  {isAdmin
+                    ? "El rol de Administrador está blindado por el sistema. Posee acceso total a todos los módulos y configuraciones sin posibilidad de modificación."
+                    : `Los cambios de permisos se guardan y aplican al instante para todos los colaboradores con el rol ${activeRoleConfig.name}.`}
                 </p>
               </div>
 
-              <button
-                onClick={handleSaveRole}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer shrink-0 ${
-                  hasChanges
-                    ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/25 ring-2 ring-amber-400"
-                    : "bg-stone-900 hover:bg-black text-white"
-                }`}
-              >
-                <Save className="w-4 h-4" />
-                <span>Guardar Permisos de {activeRoleConfig.name}</span>
-              </button>
+              {!isAdmin ? (
+                <button
+                  onClick={handleSaveRole}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer shrink-0 ${
+                    hasChanges
+                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/25 ring-2 ring-amber-400"
+                      : "bg-stone-900 hover:bg-black text-white"
+                  }`}
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Guardar Permisos de {activeRoleConfig.name}</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 px-5 py-2.5 bg-stone-100 text-stone-500 border border-stone-200 rounded-xl font-black text-xs shrink-0">
+                  <Lock className="w-4 h-4 text-amber-600" />
+                  <span>Rol de Administrador Inmutable</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

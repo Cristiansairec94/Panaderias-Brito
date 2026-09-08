@@ -505,6 +505,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Dynamically update permissions and labels for a role in the system
   const updateRolePermissions = useCallback((role: UserRole, newPermissions: RolePermissions, roleLabel?: string) => {
+    // El rol de administrador está blindado y no puede ser modificado
+    if (role === "admin") {
+      console.warn("El rol de administrador está protegido y no puede ser modificado.");
+      return;
+    }
+
     setRolePermissionsMap((prev) => {
       const updated = {
         ...prev,
