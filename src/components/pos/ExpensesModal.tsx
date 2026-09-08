@@ -606,26 +606,6 @@ export default function ExpensesModal({
                 </div>
               )}
 
-              {/* Campo para nombre del dueño si es Retiro de Dueño */}
-              {movementType === "salida" && selectedPresetId === "retiro_dueno" && (
-                <div className="p-4 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-1.5 animate-in fade-in">
-                  <label className="text-xs sm:text-sm font-black text-amber-950 flex items-center gap-2">
-                    <Crown className="w-4 h-4 text-amber-700 shrink-0" />
-                    Dueño o Socio que retira el dinero:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={authorizedBy}
-                    onChange={(e) => setAuthorizedBy(e.target.value)}
-                    placeholder="Ej. Don Toño Brito / Propietario"
-                    className="w-full px-4 py-2.5 text-sm font-bold text-stone-900 bg-white border-2 border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  <p className="text-xs text-amber-800 font-medium">
-                    Se notificará este retiro por separado para resguardo y auditoría contable.
-                  </p>
-                </div>
-              )}
 
               {/* Monto de Dinero */}
               <div className="space-y-2">
@@ -688,25 +668,6 @@ export default function ExpensesModal({
                   <span className="text-[11px] text-stone-500 font-bold">
                     {description.trim().length > 0 ? `${description.trim().length} caracteres` : "Obligatorio"}
                   </span>
-                </div>
-
-                {/* Breve leyenda como ejemplo de lo que deberían poner las personas */}
-                <div className={`p-2.5 sm:p-3 rounded-2xl border text-xs leading-relaxed transition-all ${
-                  movementType === "salida"
-                    ? "bg-rose-50/90 border-rose-200 text-rose-950"
-                    : "bg-emerald-50/90 border-emerald-200 text-emerald-950"
-                }`}>
-                  <p className="font-medium flex items-start gap-1.5">
-                    <span className="text-sm shrink-0 leading-none">💡</span>
-                    <span>
-                      <strong className="font-black mr-1">
-                        Ejemplo de lo que debes poner:
-                      </strong>
-                      {movementType === "salida"
-                        ? "Escribe en qué se utilizó el dinero o quién lo retiró (ej. Pago de recarga de gas LP, bolsas para pan, compra de levadura o retiro del dueño)."
-                        : "Escribe por qué entra dinero a caja (ej. Dejaron morralla para dar cambio en caja, abono de cliente o apartado de pastel)."}
-                    </span>
-                  </p>
                 </div>
 
                 <textarea

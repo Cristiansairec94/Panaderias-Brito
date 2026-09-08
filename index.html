@@ -2370,18 +2370,8 @@
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="font-black text-stone-900 block">2. Motivo o detalle del movimiento:</label>
-                      <div className={`p-2 rounded-xl border text-[11px] leading-relaxed ${
-                        movementModalType === "salida"
-                          ? "bg-rose-50 border-rose-200 text-rose-950"
-                          : "bg-emerald-50 border-emerald-200 text-emerald-950"
-                      }`}>
-                        <span className="font-black">💡 Ejemplo de lo que debes poner: </span>
-                        {movementModalType === "salida"
-                          ? "Escribe en qué se utilizó o quién lo retiró (ej. Pago de gas LP, bolsas para pan, compra de levadura o retiro del dueño)."
-                          : "Escribe por qué entra dinero a caja (ej. Dejaron morralla para dar cambio en caja, abono de cliente o apartado de pastel)."}
-                      </div>
                       <textarea
                         id="idx_mov_desc"
                         name="desc"
