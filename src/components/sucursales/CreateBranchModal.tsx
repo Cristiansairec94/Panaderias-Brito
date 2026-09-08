@@ -7,9 +7,6 @@ import {
   UserCheck, 
   MapPin, 
   Phone, 
-  DollarSign, 
-  Wallet, 
-  Target, 
   Palette, 
   X, 
   CheckCircle2, 
@@ -50,8 +47,6 @@ export default function CreateBranchModal({
   const [code, setCode] = useState(`SUC-0${existingCount + 1}`);
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("55 ");
-  const [dailyGoal, setDailyGoal] = useState("8500");
-  const [initialFund, setInitialFund] = useState("1000");
   const [color, setColor] = useState("emerald");
   const [shiftName, setShiftName] = useState("Turno Matutino (06:00 - 14:00)");
 
@@ -110,17 +105,17 @@ export default function CreateBranchModal({
       assignedUserName: finalUserName,
       assignedUserEmail: finalUserEmail,
       status: "abierta",
-      dailyGoal: Number(dailyGoal) || 8500,
+      dailyGoal: 0,
       todaySales: 0,
       todayTickets: 0,
-      cashInDrawer: Number(initialFund) || 1000,
+      cashInDrawer: 0,
       color,
       currentShift: {
         id: `shift-${branchCode.toLowerCase()}-${Date.now()}`,
         name: shiftName,
         cashier: finalManager,
         openedAt: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
-        initialFund: Number(initialFund) || 1000,
+        initialFund: 0,
         cashSales: 0,
         cardSales: 0,
         transferSales: 0,
@@ -349,48 +344,6 @@ export default function CreateBranchModal({
                 />
               </div>
             )}
-          </div>
-
-          {/* Section 3: Daily Goal & Opening Cash Fund */}
-          <div className="space-y-3">
-            <h4 className="font-black text-stone-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b border-stone-100 pb-1.5">
-              <DollarSign className="w-4 h-4 text-amber-600" />
-              3. Metas y Fondo de Caja Inicial
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="font-bold text-stone-700 block mb-1 flex items-center gap-1">
-                  <Target className="w-3.5 h-3.5 text-orange-600" />
-                  Meta Diaria de Ventas ($ MXN)
-                </label>
-                <input
-                  type="number"
-                  step="100"
-                  min="1000"
-                  required
-                  value={dailyGoal}
-                  onChange={(e) => setDailyGoal(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 font-mono font-bold text-stone-900 focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-stone-700 block mb-1 flex items-center gap-1">
-                  <Wallet className="w-3.5 h-3.5 text-emerald-600" />
-                  Fondo Inicial de Caja / Gaveta ($ MXN)
-                </label>
-                <input
-                  type="number"
-                  step="100"
-                  min="0"
-                  required
-                  value={initialFund}
-                  onChange={(e) => setInitialFund(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 font-mono font-bold text-stone-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-            </div>
           </div>
 
           {/* Modal Footer Buttons */}
