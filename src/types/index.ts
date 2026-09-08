@@ -186,12 +186,14 @@ export interface ShiftCutRecord {
   totalSales: number;
   totalSalesAll: number;
   totalExpenses: number;
+  totalIncomes?: number;
   expectedCash: number;
   countedCash: number;
   difference: number;
   nextFund: number;
   notes: string;
   expensesList?: CashExpense[];
+  incomesList?: CashIncome[];
   stockPieces?: number;
   stockValue?: number;
 }

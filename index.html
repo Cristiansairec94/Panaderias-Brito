@@ -590,6 +590,11 @@
         const saved = localStorage.getItem("brito_expenses");
         return saved ? JSON.parse(saved) : [];
       });
+      const [incomesList, setIncomesList] = useState(() => {
+        const saved = localStorage.getItem("brito_incomes");
+        return saved ? JSON.parse(saved) : [];
+      });
+      const [movementModalType, setMovementModalType] = useState("salida");
 
       const [salesList, setSalesList] = useState(() => {
         const saved = localStorage.getItem("brito_sales");
@@ -829,11 +834,21 @@
           return expCashier === cName || cName.includes(expCashier) || expCashier.includes(cName);
         });
       }, [expensesList, cashierName]);
+ 
+      const currentShiftIncomes = useMemo(() => {
+        return (incomesList || []).filter((inc) => {
+          if (!inc.cashier) return true;
+          const cName = cashierName.toLowerCase().trim();
+          const incCashier = inc.cashier.toLowerCase().trim();
+          return incCashier === cName || cName.includes(incCashier) || incCashier.includes(cName);
+        });
+      }, [incomesList, cashierName]);
 
       // Balances
       const totalCashSales = salesList.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
       const totalExpenses = currentShiftExpenses.reduce((sum, e) => sum + e.amount, 0);
-      const cashInDrawer = initialCashFund + totalCashSales - totalExpenses;
+      const totalIncomesInCash = currentShiftIncomes.reduce((sum, i) => sum + i.amount, 0);
+      const cashInDrawer = initialCashFund + totalCashSales + totalIncomesInCash - totalExpenses;
       const totalStockVal = products.reduce((sum, p) => sum + p.stock * p.price, 0);
       const totalPiecesInStock = products.reduce((sum, p) => sum + p.stock, 0);
 
@@ -1111,7 +1126,7 @@
                   </button>
                 </div>
 
-                {/* Botón Gasto Rápido */}
+                {/* Botón Movimientos de Caja ($) */}
                 <div className="relative shrink-0">
                   <button
                     type="button"
@@ -1122,15 +1137,17 @@
                       }
                       setShowExpenses(true);
                     }}
-                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                    className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
                       isShiftLocked
                         ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                        : "border-rose-200 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/80 text-rose-900 text-sm sm:text-base font-black"
+                        : "border-amber-300 hover:border-amber-400 bg-amber-50 hover:bg-amber-100/90 text-stone-900 text-sm sm:text-base font-black"
                     }`}
-                    title={isShiftLocked ? "Terminal bloqueada" : "Registrar salida o gasto de dinero"}
+                    title={isShiftLocked ? "Terminal bloqueada" : "Registrar gastos, retiros de dueños y entradas para cambio de billetes"}
                   >
-                    <span className="text-lg">💸</span>
-                    <span>Gasto</span>
+                    <span className="w-6 h-6 rounded-xl bg-amber-500 text-stone-950 font-black flex items-center justify-center text-xs shadow-xs border border-amber-400 shrink-0">
+                      $
+                    </span>
+                    <span>Movimientos de Caja</span>
                   </button>
                 </div>
 
@@ -2206,97 +2223,324 @@
             </div>
           )}
 
-          {/* GASTOS MODAL (Simple 2-Field Free-Text) */}
+          {/* MODAL MOVIMIENTOS DE CAJA ($) (Salidas/Gastos/Retiros y Entradas/Cambio) */}
           {showExpenses && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="bg-amber-950 text-white p-4 px-6 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm block">💸 Salida de Efectivo / Gastos</span>
-                      <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
-                        👤 {cashierName}
-                      </span>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-3 sm:p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200">
+                
+                {/* Header */}
+                <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-4 sm:p-5 px-5 sm:px-6 flex items-center justify-between border-b border-amber-900/50 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black text-xl shadow-md border border-amber-300 shrink-0">
+                      $
                     </div>
-                    <span className="text-[10px] text-amber-300">Historial exclusivo del turno en operación</span>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-base sm:text-lg block leading-tight">Movimientos de Caja</span>
+                        <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                          👤 {cashierName}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-amber-200/80">Retiros de dueños, gastos y cambio de billetes</span>
+                    </div>
                   </div>
-                  <button onClick={() => setShowExpenses(false)} className="text-xl font-bold hover:text-white">✕</button>
+                  <button onClick={() => setShowExpenses(false)} className="text-xl font-bold hover:text-white text-stone-400 p-1">✕</button>
                 </div>
 
-                <div className="p-5 overflow-y-auto space-y-4">
-                  {/* Summary bar */}
-                  <div className="grid grid-cols-3 bg-stone-50 border p-3 rounded-2xl text-center text-xs">
+                <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+                  {/* Summary bar de 4 columnas */}
+                  <div className="grid grid-cols-4 bg-stone-50 border p-2.5 sm:p-3 rounded-2xl text-center text-xs gap-1">
                     <div>
-                      <span className="text-[10px] text-stone-500 font-bold block">Ventas Efectivo</span>
-                      <span className="font-black text-emerald-700 text-sm">{formatCurrency(totalCashSales)}</span>
+                      <span className="text-[9px] text-stone-500 font-bold block leading-tight">Ventas Efectivo</span>
+                      <span className="font-black text-emerald-700 text-xs sm:text-sm">{formatCurrency(totalCashSales)}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-rose-700 font-bold block">Total Salidas</span>
-                      <span className="font-black text-rose-700 text-sm">-{formatCurrency(totalExpenses)}</span>
+                      <span className="text-[9px] text-emerald-700 font-bold block leading-tight">Entradas/Cambio</span>
+                      <span className="font-black text-emerald-700 text-xs sm:text-sm">+{formatCurrency(totalIncomesInCash)}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-amber-900 font-black block">Efectivo en Caja</span>
-                      <span className="font-black text-stone-900 text-sm">{formatCurrency(cashInDrawer)}</span>
+                      <span className="text-[9px] text-rose-700 font-bold block leading-tight">Gastos/Retiros</span>
+                      <span className="font-black text-rose-700 text-xs sm:text-sm">-{formatCurrency(totalExpenses)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-amber-900 font-black block leading-tight">En Cajón Ahora</span>
+                      <span className="font-black text-stone-900 text-xs sm:text-sm">{formatCurrency(cashInDrawer)}</span>
                     </div>
                   </div>
 
-                  {/* Super Simple Form */}
+                  {/* Switch Salida (-) vs Entrada (+) */}
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100 rounded-2xl border border-stone-200 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setMovementModalType("salida")}
+                      className={`py-2.5 px-2 rounded-xl font-black transition-all flex items-center justify-center gap-1.5 ${
+                        movementModalType === "salida"
+                          ? "bg-rose-600 text-white shadow-md"
+                          : "text-stone-600 hover:bg-stone-200/60"
+                      }`}
+                    >
+                      <span>Salida: Gasto o Retiro (-)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMovementModalType("entrada")}
+                      className={`py-2.5 px-2 rounded-xl font-black transition-all flex items-center justify-center gap-1.5 ${
+                        movementModalType === "entrada"
+                          ? "bg-emerald-600 text-white shadow-md"
+                          : "text-stone-600 hover:bg-stone-200/60"
+                      }`}
+                    >
+                      <span>Entrada: Cambio / Abono (+)</span>
+                    </button>
+                  </div>
+
+                  {/* Atajos rápidos de categorías */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-black text-stone-700 block">
+                      {movementModalType === "salida" ? "Atajos rápidos de Salida:" : "Atajos rápidos de Entrada:"}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {movementModalType === "salida" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const descEl = document.getElementById("idx_mov_desc");
+                              if (descEl) descEl.value = "Retiro de efectivo por dueño (Don Toño / Socios)";
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px]"
+                          >
+                            👑 Retiro de Dueño
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const descEl = document.getElementById("idx_mov_desc");
+                              if (descEl) descEl.value = "Pago de Gas LP para hornos";
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-950 font-bold text-[11px]"
+                          >
+                            ⛽ Pago Gas LP
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const descEl = document.getElementById("idx_mov_desc");
+                              if (descEl) descEl.value = "Compra de insumos menores (levadura/bolsas)";
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl border border-orange-300 bg-orange-50 hover:bg-orange-100 text-orange-950 font-bold text-[11px]"
+                          >
+                            🥖 Insumos Menores
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const descEl = document.getElementById("idx_mov_desc");
+                              if (descEl) descEl.value = "Pago a proveedor en efectivo";
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 font-bold text-[11px]"
+                          >
+                            🚚 Proveedor
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const descEl = document.getElementById("idx_mov_desc");
+                              if (descEl) descEl.value = "Dejaron dinero para cambio de billetes / feria en caja";
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-bold text-[11px]"
+                          >
+                            🪙 Cambio de Billetes (Feria)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const descEl = document.getElementById("idx_mov_desc");
+                              if (descEl) descEl.value = "Abono de pedido especial de pastelería";
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-950 font-bold text-[11px]"
+                          >
+                            🎂 Abono de Pedido
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const descEl = document.getElementById("idx_mov_desc");
+                              if (descEl) descEl.value = "Cobro a cliente mayorista / tiendita";
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-950 font-bold text-[11px]"
+                          >
+                            🏪 Cobro Mayorista
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const descEl = document.getElementById("idx_mov_desc");
+                              if (descEl) descEl.value = "Aportación extraordinaria a caja";
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px]"
+                          >
+                            💵 Aportación Extra
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Formulario de registro */}
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       const form = e.target;
                       const amt = Number(form.amount.value);
                       const desc = form.desc.value;
-                      if (!amt || !desc) return;
+                      if (!amt || !desc.trim()) return;
 
-                      setExpensesList((prev) => [
-                        {
+                      const nowStr = new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+
+                      if (movementModalType === "salida") {
+                        const newExp = {
                           id: `EXP-${Math.floor(1000 + Math.random() * 9000)}`,
                           amount: amt,
-                          category: "otro",
+                          category: desc.toLowerCase().includes("dueño") || desc.toLowerCase().includes("toño") ? "retiro_dueno" : "otro",
                           description: desc.trim(),
                           cashier: cashierName,
-                          date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
-                        },
-                        ...prev
-                      ]);
+                          date: nowStr
+                        };
+                        setExpensesList((prev) => [newExp, ...prev]);
+                      } else {
+                        const newInc = {
+                          id: `ING-${Math.floor(1000 + Math.random() * 9000)}`,
+                          amount: amt,
+                          category: desc.toLowerCase().includes("cambio") ? "fondo_cambio" : "otro",
+                          concept: desc.trim(),
+                          paymentMethod: "efectivo",
+                          cashier: cashierName,
+                          date: nowStr
+                        };
+                        setIncomesList((prev) => [newInc, ...prev]);
+                      }
                       form.reset();
                     }}
                     className="p-4 bg-stone-50 rounded-2xl border space-y-3.5 text-xs"
                   >
                     <div>
-                      <label className="font-black text-stone-900 block mb-1">1. ¿Cuánto dinero se sacó de caja?</label>
-                      <input name="amount" type="number" step="any" required placeholder="$ Monto en pesos (ej. 150, 300, 500)" className="w-full p-3 text-base font-black text-stone-900 bg-white border-2 border-stone-200 rounded-xl focus:border-rose-500 focus:outline-none" />
+                      <label className="font-black text-stone-900 block mb-1">
+                        {movementModalType === "salida" ? "1. ¿Cuánto dinero salió de caja?" : "1. ¿Cuánto dinero ingresó a caja?"}
+                      </label>
+                      <div className="relative">
+                        <span className={`absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-xl ${
+                          movementModalType === "salida" ? "text-rose-600" : "text-emerald-600"
+                        }`}>
+                          $
+                        </span>
+                        <input
+                          id="idx_mov_amt"
+                          name="amount"
+                          type="number"
+                          step="any"
+                          required
+                          placeholder="0.00"
+                          className="w-full pl-9 pr-3 py-3 text-xl font-black text-stone-900 bg-white border-2 border-stone-200 rounded-xl focus:border-amber-500 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Botones de monto rápido */}
+                      <div className="grid grid-cols-6 gap-1 pt-1.5">
+                        {[50, 100, 200, 300, 500, 1000].map((quickAmt) => (
+                          <button
+                            key={quickAmt}
+                            type="button"
+                            onClick={() => {
+                              const el = document.getElementById("idx_mov_amt");
+                              if (el) el.value = quickAmt;
+                            }}
+                            className="py-1 bg-white hover:bg-stone-800 hover:text-white text-stone-800 font-extrabold text-[10px] rounded-lg border border-stone-200 transition-colors"
+                          >
+                            ${quickAmt}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div>
-                      <label className="font-black text-stone-900 block mb-1">2. ¿Para qué se usó el dinero?</label>
-                      <textarea name="desc" rows="3" required placeholder="" className="w-full p-3 text-xs bg-white border-2 border-stone-200 rounded-xl focus:border-rose-500 focus:outline-none font-medium leading-relaxed" />
+                      <label className="font-black text-stone-900 block mb-1">2. Motivo o detalle:</label>
+                      <textarea
+                        id="idx_mov_desc"
+                        name="desc"
+                        rows="2"
+                        required
+                        placeholder={
+                          movementModalType === "salida"
+                            ? "Ej. Retiro de Don Toño, recarga de gas LP, compra de levadura..."
+                            : "Ej. Dejaron $200 en monedas para cambio de billetes..."
+                        }
+                        className="w-full p-2.5 text-xs bg-white border-2 border-stone-200 rounded-xl focus:border-amber-500 focus:outline-none font-medium leading-relaxed"
+                      />
                     </div>
 
-                    <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-black rounded-xl text-xs shadow-lg shadow-rose-600/30 active:scale-95">
-                      💸 Registrar Salida de Dinero
+                    <button
+                      type="submit"
+                      className={`w-full py-3.5 text-white font-black rounded-xl text-xs shadow-lg active:scale-95 transition-all cursor-pointer ${
+                        movementModalType === "salida"
+                          ? "bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-rose-600/30"
+                          : "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-emerald-600/30"
+                      }`}
+                    >
+                      {movementModalType === "salida" ? "💸 Registrar Salida de Efectivo" : "🪙 Registrar Entrada a Caja"}
                     </button>
                   </form>
 
-                  {/* List */}
-                  <div className="space-y-2 pt-2">
-                    <span className="text-xs font-bold text-stone-600 block">Historial de Salidas del Turno ({currentShiftExpenses.length}):</span>
-                    {currentShiftExpenses.length === 0 ? (
+                  {/* Historial Combinado del Turno */}
+                  <div className="space-y-2 pt-1">
+                    <span className="text-xs font-bold text-stone-700 block">
+                      Historial de Movimientos del Turno ({currentShiftExpenses.length + currentShiftIncomes.length}):
+                    </span>
+                    {currentShiftExpenses.length === 0 && currentShiftIncomes.length === 0 ? (
                       <div className="text-stone-400 text-center py-4 text-xs space-y-1">
-                        <p className="font-bold text-stone-600">No hay salidas registradas en el turno de {cashierName}.</p>
+                        <p className="font-bold text-stone-600">No hay movimientos registrados en el turno de {cashierName}.</p>
                         <p className="text-[10px]">Todo el dinero permanece íntegro en caja.</p>
                       </div>
                     ) : (
-                      currentShiftExpenses.map((exp) => (
-                        <div key={exp.id} className="p-3 bg-stone-50 rounded-xl border flex justify-between items-center text-xs">
-                          <div>
-                            <p className="font-bold text-stone-800">{exp.description}</p>
-                            <p className="text-[10px] text-stone-400">{exp.date} • <span className="text-amber-900 font-bold">{exp.cashier}</span></p>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {/* Entradas */}
+                        {currentShiftIncomes.map((inc) => (
+                          <div key={inc.id} className="p-2.5 bg-emerald-50/70 rounded-xl border border-emerald-200 flex justify-between items-center text-xs">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] bg-emerald-600 text-white font-black px-1.5 py-0.5 rounded">ENTRADA / CAMBIO</span>
+                                <p className="font-bold text-stone-900">{inc.concept || "Entrada de dinero"}</p>
+                              </div>
+                              <p className="text-[10px] text-stone-500 mt-0.5">{inc.date} • {inc.cashier}</p>
+                            </div>
+                            <span className="font-black text-emerald-700 text-sm">+{formatCurrency(inc.amount)}</span>
                           </div>
-                          <span className="font-black text-rose-600 text-sm">-{formatCurrency(exp.amount)}</span>
-                        </div>
-                      ))
+                        ))}
+
+                        {/* Salidas */}
+                        {currentShiftExpenses.map((exp) => {
+                          const isOwner = exp.category === "retiro_dueno" || (exp.description || "").toLowerCase().includes("dueño") || (exp.description || "").toLowerCase().includes("toño");
+                          return (
+                            <div key={exp.id} className="p-2.5 bg-stone-50 rounded-xl border flex justify-between items-center text-xs">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                                    isOwner ? "bg-amber-500 text-stone-950" : "bg-rose-600 text-white"
+                                  }`}>
+                                    {isOwner ? "RETIRO DUEÑO" : "SALIDA / GASTO"}
+                                  </span>
+                                  <p className="font-bold text-stone-800">{exp.description}</p>
+                                </div>
+                                <p className="text-[10px] text-stone-400 mt-0.5">{exp.date} • {exp.cashier}</p>
+                              </div>
+                              <span className="font-black text-rose-600 text-sm">-{formatCurrency(exp.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2518,7 +2762,6 @@
                           <button
                             type="button"
                             onClick={() => {
-                              playCashRegisterSound();
                               setShowCutSuccessModal(false);
                               setShowDrawerModal(false);
                               setIsShiftLocked(true);

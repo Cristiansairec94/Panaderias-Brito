@@ -31,10 +31,9 @@ import {
   ArrowLeft,
   FileText
 } from "lucide-react";
-import { Product, Sale, CashExpense, ShiftCutRecord } from "@/types";
+import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useNotifications } from "@/context/NotificationContext";
-import { playCashRegisterSound } from "@/lib/sound";
 
 interface CashDrawerShiftModalProps {
   isOpen: boolean;
@@ -47,6 +46,7 @@ interface CashDrawerShiftModalProps {
   onChangeInitialFund: (fund: number) => void;
   sales: Sale[];
   expenses: CashExpense[];
+  incomes?: CashIncome[];
   products: Product[];
   onCompleteShiftCut?: () => void;
   initialTab?: "cuentas" | "cambio" | "corte" | "historial";
@@ -114,6 +114,7 @@ export default function CashDrawerShiftModal({
   onChangeInitialFund,
   sales,
   expenses,
+  incomes = [],
   products,
   onCompleteShiftCut,
   initialTab = "cambio",
@@ -224,11 +225,14 @@ export default function CashDrawerShiftModal({
   const transferSales = sales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
   const totalSalesAll = sales.reduce((sum, s) => sum + s.total, 0) || (cashSales + cardSales + transferSales) || 0;
 
-  // 2. Cálculos de Gastos del Turno
+  // 2. Cálculos de Gastos y Entradas del Turno
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalIncomesInCash = incomes
+    .filter((i) => i.paymentMethod === "efectivo" || !i.paymentMethod)
+    .reduce((sum, i) => sum + i.amount, 0);
 
   // 3. Dinero esperado en caja (Cajón)
-  const expectedCashInDrawer = initialFund + cashSales - totalExpenses;
+  const expectedCashInDrawer = initialFund + cashSales + totalIncomesInCash - totalExpenses;
 
   // 4. Conteo y Diferencia (Arqueo)
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;
@@ -237,6 +241,7 @@ export default function CashDrawerShiftModal({
   // 5. Fondo Siguiente y Retiro a Administración (No puede exceder el dinero disponible en caja)
   const maxAllowedFund = Math.max(0, parsedCountedCash);
   const parsedNextFund = nextInitialFund === "" ? 0 : Math.min(maxAllowedFund, Math.max(0, Number(nextInitialFund) || 0));
+  const isNextFundValid = nextInitialFund.trim() !== "" && !isNaN(Number(nextInitialFund)) && Number(nextInitialFund) >= 0;
   const cashToWithdraw = Math.max(0, parsedCountedCash - parsedNextFund);
 
   useEffect(() => {
@@ -250,6 +255,7 @@ export default function CashDrawerShiftModal({
   const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
 
   const handleExecuteShiftCut = () => {
+    if (!isNextFundValid) return;
     setIsFinalizing(true);
 
     const nowDateTime = new Date().toLocaleString("es-MX", {
@@ -277,12 +283,14 @@ export default function CashDrawerShiftModal({
       totalSales: totalSalesAll,
       totalSalesAll: totalSalesAll,
       totalExpenses,
+      totalIncomes: totalIncomesInCash,
       expectedCash: expectedCashInDrawer,
       countedCash: parsedCountedCash,
       difference: cashDifference,
       nextFund: parsedNextFund,
       notes: shiftNotes.trim() || "Cierre de turno completado conforme y sin anomalías.",
       expensesList: [...expenses],
+      incomesList: [...incomes],
       stockPieces: totalPiecesInStock,
       stockValue: totalStockValue,
     };
@@ -446,6 +454,12 @@ export default function CashDrawerShiftModal({
               <span>(+) Ventas en Efectivo:</span>
               <span>+{formatCurrency(cut.cashSales)}</span>
             </div>
+            {Boolean(cut.totalIncomes && cut.totalIncomes > 0) && (
+              <div className="flex justify-between text-teal-700 font-bold">
+                <span>(+) Entradas / Cambio de Billetes:</span>
+                <span>+{formatCurrency(cut.totalIncomes || 0)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-rose-700 font-bold">
               <span>(-) Gastos / Retiros:</span>
               <span>-{formatCurrency(cut.totalExpenses)}</span>
@@ -650,7 +664,6 @@ export default function CashDrawerShiftModal({
                     <button
                       type="button"
                       onClick={() => {
-                        playCashRegisterSound();
                         onClose();
                         if (onCompleteShiftCut) onCompleteShiftCut();
                       }}
@@ -696,7 +709,7 @@ export default function CashDrawerShiftModal({
                       <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(cashSales)}</span>
                     </div>
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
-                      <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos</span>
+                      <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos / Retiros</span>
                       <span className="text-xl sm:text-2xl font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
                     </div>
                     <div className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20">
@@ -736,7 +749,7 @@ export default function CashDrawerShiftModal({
                           <span className="text-xl">💵</span> Dinero que debe haber en caja:
                         </span>
                         <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
-                          Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)} • Gastos: -{formatCurrency(totalExpenses)}
+                          Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)}{totalIncomesInCash > 0 ? ` • Entradas/Cambio: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos/Retiros: -{formatCurrency(totalExpenses)}
                         </span>
                       </div>
                       <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">
@@ -825,8 +838,15 @@ export default function CashDrawerShiftModal({
                   <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/70 rounded-3xl border-2 border-amber-300 shadow-sm space-y-3.5">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2 border-b border-amber-200/70">
                       <div>
-                        <span className="text-sm sm:text-base font-black text-stone-900 uppercase flex items-center gap-2">
+                        <span className="text-sm sm:text-base font-black text-stone-900 uppercase flex items-center gap-2 flex-wrap">
                           <span className="text-xl">🪙</span> ¿Cuánto dinero se dejará en caja para el siguiente turno?
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                            !isNextFundValid
+                              ? "bg-rose-100 text-rose-700 border border-rose-300 animate-pulse"
+                              : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          }`}>
+                            {!isNextFundValid ? "* Escribe un número obligatorio" : "✓ Listo"}
+                          </span>
                         </span>
                         <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
                           Fondo inicial con el que <strong className="text-stone-800">{incomingCashier}</strong> comenzará nuevamente a operar
@@ -835,7 +855,7 @@ export default function CashDrawerShiftModal({
                       <div className="text-right shrink-0 bg-amber-100/90 px-3.5 py-1.5 rounded-2xl border border-amber-300 shadow-2xs">
                         <span className="text-[10px] font-black uppercase text-amber-800 block">Fondo Siguiente Turno</span>
                         <span className="text-xl sm:text-2xl font-black text-amber-950">
-                          {formatCurrency(parsedNextFund)}
+                          {isNextFundValid ? formatCurrency(parsedNextFund) : "$0.00"}
                         </span>
                       </div>
                     </div>
@@ -847,7 +867,7 @@ export default function CashDrawerShiftModal({
                         <input
                           type="text"
                           inputMode="decimal"
-                          placeholder="0.00 (Escribe el monto para el nuevo turno)"
+                          placeholder="0.00 (Escribe obligatoriamente el monto para el nuevo turno)"
                           value={nextInitialFund}
                           onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                           onChange={(e) => {
@@ -865,7 +885,11 @@ export default function CashDrawerShiftModal({
                             }
                             setNextInitialFund(raw);
                           }}
-                          className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
+                          className={`w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400 ${
+                            !isNextFundValid
+                              ? "border-amber-400 focus:border-amber-600 ring-2 ring-amber-400/20"
+                              : "border-stone-300 focus:border-amber-600"
+                          }`}
                         />
                       </div>
 
@@ -873,9 +897,17 @@ export default function CashDrawerShiftModal({
                         <span>
                           Máximo permitido a dejar: <strong className="text-stone-800">{formatCurrency(maxAllowedFund)}</strong>
                         </span>
-                        {Number(nextInitialFund) >= maxAllowedFund && maxAllowedFund > 0 && (
+                        {!isNextFundValid ? (
+                          <span className="text-rose-600 font-bold flex items-center gap-1">
+                            ⚠️ Campo obligatorio para poder cerrar turno
+                          </span>
+                        ) : Number(nextInitialFund) >= maxAllowedFund && maxAllowedFund > 0 ? (
                           <span className="text-amber-700 font-bold">
                             ⚠️ Límite total en caja alcanzado
+                          </span>
+                        ) : (
+                          <span className="text-emerald-700 font-bold">
+                            ✓ Monto válido
                           </span>
                         )}
                       </div>
@@ -912,23 +944,31 @@ export default function CashDrawerShiftModal({
                         className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg accent-emerald-600 cursor-pointer shrink-0 transition-transform active:scale-90"
                       />
                       <span className="text-sm sm:text-base font-black text-stone-900 leading-snug">
-                        Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}), se dejan <strong className="text-amber-950">{formatCurrency(parsedNextFund)}</strong> de fondo en caja para comenzar con {incomingCashier}, y se entregan <strong className="text-emerald-900">{formatCurrency(cashToWithdraw)}</strong> a administración.
+                        Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}), se dejan <strong className="text-amber-950">{isNextFundValid ? formatCurrency(parsedNextFund) : "$0.00 (pendiente escribir número)"}</strong> de fondo en caja para comenzar con {incomingCashier}, y se entregan <strong className="text-emerald-900">{formatCurrency(cashToWithdraw)}</strong> a administración.
                       </span>
                     </label>
 
                     <button
                       type="button"
                       onClick={handleExecuteShiftCut}
-                      disabled={!countedCash || !hasAcceptedCash || isFinalizing}
+                      disabled={!countedCash || !isNextFundValid || !hasAcceptedCash || isFinalizing}
                       className={`w-full py-5 px-6 rounded-2xl sm:rounded-3xl font-black text-base sm:text-lg tracking-wide shadow-xl transition-all duration-300 flex items-center justify-center gap-3 group active:scale-98 ${
-                        !countedCash || !hasAcceptedCash || isFinalizing
+                        !countedCash || !isNextFundValid || !hasAcceptedCash || isFinalizing
                           ? "bg-stone-300 text-stone-500 cursor-not-allowed opacity-60"
                           : "bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white shadow-emerald-700/30 hover:shadow-2xl hover:scale-[1.01] animate-pulse"
                       }`}
                     >
                       <CheckCircle2 className="w-6 h-6 text-emerald-200 shrink-0 group-hover:scale-125 transition-transform duration-300" />
                       <span>
-                        {isFinalizing ? "Cerrando Turno..." : `🔒 CERRAR TURNO Y GENERAR COMPROBANTE (${incomingCashier}) ➔`}
+                        {isFinalizing
+                          ? "Cerrando Turno..."
+                          : !countedCash
+                          ? "⚠️ Ingresa el Efectivo Físico Contado"
+                          : !isNextFundValid
+                          ? "⚠️ Escribe el Fondo para el Siguiente Turno (Obligatorio)"
+                          : !hasAcceptedCash
+                          ? "⚠️ Marca la Casilla de Confirmación para Continuar"
+                          : `🔒 CERRAR TURNO Y GENERAR COMPROBANTE (${incomingCashier}) ➔`}
                       </span>
                     </button>
                   </div>

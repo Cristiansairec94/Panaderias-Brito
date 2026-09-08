@@ -1316,7 +1316,7 @@ export default function POSPage() {
               </div>
             )}
 
-            {/* Botón Gasto Rápido (Colores, texto y tamaño estables) */}
+            {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
             <div className="relative shrink-0">
               <button
                 type="button"
@@ -1328,22 +1328,24 @@ export default function POSPage() {
                       badgeIcon: "alerta",
                       title: "Terminal Bloqueada",
                       highlightText: "Turno cerrado por seguridad",
-                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar gastos.",
+                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar movimientos de caja.",
                       category: "caja",
                     });
                     return;
                   }
                   setShowExpensesModal(true);
                 }}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
                   isShiftLocked
                     ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                    : "border-rose-200 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/80 text-rose-900 text-sm sm:text-base font-black"
+                    : "border-amber-300 hover:border-amber-400 bg-amber-50 hover:bg-amber-100/90 text-stone-900 text-sm sm:text-base font-black"
                 }`}
-                title={isShiftLocked ? "Terminal bloqueada" : "Registrar salida o gasto de dinero"}
+                title={isShiftLocked ? "Terminal bloqueada" : "Registrar gastos, retiros de dueños y entradas para cambio de billetes"}
               >
-                <span className="text-lg">💸</span>
-                <span>Gasto</span>
+                <span className="w-6 h-6 rounded-xl bg-amber-500 text-stone-950 font-black flex items-center justify-center text-xs shadow-xs border border-amber-400 shrink-0">
+                  $
+                </span>
+                <span>Movimientos de Caja</span>
               </button>
             </div>
 
@@ -2369,13 +2371,18 @@ export default function POSPage() {
         onSelectSaleForReprint={handleReprintSale}
       />
 
-      {/* Expenses & Cash Out Modal */}
+      {/* Movimientos de Dinero en Caja Modal (Salidas/Gastos/Retiros y Entradas/Cambio) */}
       <ExpensesModal
         isOpen={showExpensesModal}
         onClose={() => setShowExpensesModal(false)}
         expenses={expensesList}
         onAddExpense={handleAddExpense}
+        onDeleteExpense={(id) => setExpensesList((prev) => prev.filter((e) => e.id !== id))}
+        incomes={incomesList}
+        onAddIncome={handleAddIncome}
+        onDeleteIncome={handleDeleteIncome}
         cashSalesTotal={totalCashSales}
+        initialFund={initialCashFund}
         cashierName={cashierName}
       />
 
@@ -2416,6 +2423,7 @@ export default function POSPage() {
           onChangeInitialFund={setInitialCashFund}
           sales={recentSalesList}
           expenses={expensesList}
+          incomes={incomesList}
           products={products}
           initialTab={shiftModalTab}
           onCompleteShiftCut={handleCompleteShiftCut}

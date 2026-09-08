@@ -362,6 +362,7 @@ export default function ExpensesModal({
       cashier: exp.cashier,
       date: exp.date,
       isOwner: exp.category === "retiro_dueno" || exp.description.toLowerCase().includes("dueño") || exp.description.toLowerCase().includes("toño"),
+      isChange: false,
     })),
     ...shiftIncomes.map((inc) => ({
       id: inc.id,
@@ -371,7 +372,8 @@ export default function ExpensesModal({
       description: inc.concept || inc.categoryLabel,
       cashier: inc.cashier,
       date: inc.date,
-      isChange: inc.category === "fondo_cambio" || inc.concept?.toLowerCase().includes("cambio") || inc.concept?.toLowerCase().includes("feria"),
+      isOwner: false,
+      isChange: inc.category === "fondo_cambio" || (inc.concept || "").toLowerCase().includes("cambio") || (inc.concept || "").toLowerCase().includes("feria"),
     })),
   ];
 
