@@ -361,6 +361,17 @@ export default function RoleManagement() {
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<RoleConfig | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  const isDeleteConfirmed = useMemo(() => {
+    const cleaned = deleteConfirmText.trim().toUpperCase();
+    return cleaned === "SI" || cleaned === "SÍ";
+  }, [deleteConfirmText]);
+
+  const isDeleteCancelled = useMemo(() => {
+    const cleaned = deleteConfirmText.trim().toUpperCase();
+    return cleaned === "NO";
+  }, [deleteConfirmText]);
 
   // Form states for creating a new role
   const [newRoleName, setNewRoleName] = useState("");
@@ -610,12 +621,13 @@ export default function RoleManagement() {
       alert("El rol 'Administrador' es el rol maestro del ERP y está protegido contra eliminación.");
       return;
     }
+    setDeleteConfirmText("");
     setRoleToDelete(role);
   };
 
   // Confirm Delete Role
   const handleConfirmDeleteRole = () => {
-    if (!roleToDelete) return;
+    if (!roleToDelete || !isDeleteConfirmed) return;
 
     const deletingId = roleToDelete.id;
     const deletingName = roleToDelete.name;
@@ -638,6 +650,7 @@ export default function RoleManagement() {
     // Reset selection to admin
     setSelectedRole("admin");
     setRoleToDelete(null);
+    setDeleteConfirmText("");
 
     const reassignMsg = assignedUsersForRoleToDelete.length > 0 
       ? ` y ${assignedUsersForRoleToDelete.length} colaborador(es) fueron reasignados a Cajero.`
@@ -1355,19 +1368,81 @@ export default function RoleManagement() {
               </div>
             )}
 
+            {/* Written confirmation section: SI o NO */}
+            <div className="bg-stone-50 border-2 border-stone-200/90 rounded-2xl p-3.5 space-y-2">
+              <label className="block text-xs font-black text-stone-800">
+                Confirmación por escrito requerida:
+              </label>
+              <p className="text-[11px] text-stone-600 leading-snug">
+                Escribe <span className="font-black text-rose-700 bg-rose-100/80 px-1.5 py-0.5 rounded border border-rose-200">SI</span> para autorizar la eliminación del rol, o <span className="font-black text-stone-700 bg-stone-200/80 px-1.5 py-0.5 rounded border border-stone-300">NO</span> para cancelar:
+              </p>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (isDeleteConfirmed) {
+                        handleConfirmDeleteRole();
+                      } else if (isDeleteCancelled) {
+                        setRoleToDelete(null);
+                        setDeleteConfirmText("");
+                      }
+                    }
+                  }}
+                  placeholder='Escribe "SI" o "NO"'
+                  className={`w-full px-3.5 py-2.5 bg-white border-2 rounded-xl text-xs font-black uppercase tracking-wider focus:outline-none transition-all ${
+                    isDeleteConfirmed
+                      ? "border-rose-500 text-rose-700 ring-2 ring-rose-200"
+                      : isDeleteCancelled
+                      ? "border-stone-400 text-stone-600 bg-stone-100"
+                      : "border-stone-300 text-stone-900 focus:border-stone-500"
+                  }`}
+                  autoFocus
+                />
+                {isDeleteConfirmed && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                    ✓ Autorizado
+                  </span>
+                )}
+                {isDeleteCancelled && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-black text-stone-600 bg-stone-200 px-2 py-0.5 rounded-md border border-stone-300">
+                    ✕ Cancelación
+                  </span>
+                )}
+              </div>
+
+              {deleteConfirmText && !isDeleteConfirmed && !isDeleteCancelled && (
+                <p className="text-[10px] text-amber-700 font-bold flex items-center gap-1">
+                  <span>⚠️</span>
+                  <span>Debes escribir exactamente &quot;SI&quot; para proceder o &quot;NO&quot; para cancelar.</span>
+                </p>
+              )}
+            </div>
+
             {/* Buttons */}
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setRoleToDelete(null)}
+                onClick={() => {
+                  setRoleToDelete(null);
+                  setDeleteConfirmText("");
+                }}
                 className="flex-1 py-2.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl text-xs transition-all cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="button"
+                disabled={!isDeleteConfirmed}
                 onClick={handleConfirmDeleteRole}
-                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-md shadow-rose-600/20 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                className={`flex-1 py-2.5 px-4 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 ${
+                  isDeleteConfirmed
+                    ? "bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 active:scale-95 cursor-pointer ring-2 ring-rose-400"
+                    : "bg-stone-200 text-stone-400 cursor-not-allowed opacity-60"
+                }`}
+                title={!isDeleteConfirmed ? 'Escribe "SI" en el campo para activar la eliminación' : undefined}
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Confirmar y Eliminar</span>
