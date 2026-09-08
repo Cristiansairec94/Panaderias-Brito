@@ -1188,35 +1188,14 @@ export default function RoleManagement() {
               </div>
             </div>
 
-            {/* Footer with Save Button */}
-            <div className="p-4 sm:p-5 bg-stone-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <span className="text-xl">{isAdmin ? "🛡️" : "💡"}</span>
-                <p className="text-xs font-bold text-stone-700">
-                  {isAdmin
-                    ? "El rol de Administrador está blindado por el sistema. Posee acceso total a todos los módulos y configuraciones sin posibilidad de modificación."
-                    : `Los cambios de permisos se guardan y aplican al instante para todos los colaboradores con el rol ${activeRoleConfig.name}.`}
-                </p>
-              </div>
-
-              {!isAdmin ? (
-                <button
-                  onClick={handleSaveRole}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer shrink-0 ${
-                    hasChanges
-                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/25 ring-2 ring-amber-400"
-                      : "bg-stone-900 hover:bg-black text-white"
-                  }`}
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Guardar Permisos de {activeRoleConfig.name}</span>
-                </button>
-              ) : (
-                <div className="flex items-center gap-2 px-5 py-2.5 bg-stone-100 text-stone-500 border border-stone-200 rounded-xl font-black text-xs shrink-0">
-                  <Lock className="w-4 h-4 text-amber-600" />
-                  <span>Rol de Administrador Inmutable</span>
-                </div>
-              )}
+            {/* Footer with Info Tip */}
+            <div className="p-4 sm:p-5 bg-stone-50/70 flex items-center gap-2.5">
+              <span className="text-xl">{isAdmin ? "🛡️" : "💡"}</span>
+              <p className="text-xs font-bold text-stone-700">
+                {isAdmin
+                  ? "El rol de Administrador está blindado por el sistema con acceso total a todos los módulos y configuraciones sin posibilidad de modificación."
+                  : `Los cambios de permisos se guardan y aplican para todos los colaboradores con el rol ${activeRoleConfig.name} desde el botón superior "Guardar Permisos".`}
+              </p>
             </div>
           </div>
         </div>
