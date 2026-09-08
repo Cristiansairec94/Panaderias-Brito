@@ -301,18 +301,8 @@ export default function SucursalesPage() {
             </p>
           </div>
 
-          {/* Action Buttons: Ver Toda la Red & Create Branch */}
+          {/* Action Buttons: Create Branch */}
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={() => switchBranch("all")}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
-                isAllBranches
-                  ? "bg-white/20 text-white border-white/30 shadow-md"
-                  : "bg-white/10 hover:bg-white/15 text-stone-200 border-white/10"
-              }`}
-            >
-              {isAllBranches ? "✓ Toda la Red" : "Ver Toda la Red"}
-            </button>
             <button
               onClick={() => setIsCreateBranchOpen(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
