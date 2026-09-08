@@ -199,19 +199,21 @@ export interface ShiftCutRecord {
 export interface CashExpense {
   id: string;
   amount: number;
-  category: "limpieza" | "retiro_personal" | "insumos_menores" | "proveedor" | "otro";
+  category: "retiro_dueno" | "gasto_gas" | "compra_insumos" | "pago_proveedor" | "limpieza" | "retiro_personal" | "insumos_menores" | "proveedor" | "otro" | string;
   description: string;
   cashier: string;
   date: string;
 }
 
 export type CashIncomeCategory =
+  | "cambio_billetes"
   | "abono_pedido"
   | "abono_cliente"
   | "fondo_cambio"
   | "venta_costales"
   | "ingreso_extraordinario"
-  | "otro";
+  | "otro"
+  | string;
 
 export interface CashIncome {
   id: string;
