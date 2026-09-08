@@ -2294,102 +2294,6 @@
                     </button>
                   </div>
 
-                  {/* Atajos rápidos de categorías */}
-                  <div className="space-y-1">
-                    <span className="text-[11px] font-black text-stone-700 block">
-                      {movementModalType === "salida" ? "Atajos rápidos de Salida:" : "Atajos rápidos de Entrada:"}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {movementModalType === "salida" ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const descEl = document.getElementById("idx_mov_desc");
-                              if (descEl) descEl.value = "Retiro de efectivo por dueño (Don Toño / Socios)";
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px]"
-                          >
-                            👑 Retiro de Dueño
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const descEl = document.getElementById("idx_mov_desc");
-                              if (descEl) descEl.value = "Pago de Gas LP para hornos";
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-950 font-bold text-[11px]"
-                          >
-                            ⛽ Pago Gas LP
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const descEl = document.getElementById("idx_mov_desc");
-                              if (descEl) descEl.value = "Compra de insumos menores (levadura/bolsas)";
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl border border-orange-300 bg-orange-50 hover:bg-orange-100 text-orange-950 font-bold text-[11px]"
-                          >
-                            🥖 Insumos Menores
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const descEl = document.getElementById("idx_mov_desc");
-                              if (descEl) descEl.value = "Pago a proveedor en efectivo";
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-800 font-bold text-[11px]"
-                          >
-                            🚚 Proveedor
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const descEl = document.getElementById("idx_mov_desc");
-                              if (descEl) descEl.value = "Dejaron dinero para cambio de billetes / feria en caja";
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-bold text-[11px]"
-                          >
-                            🪙 Cambio de Billetes (Feria)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const descEl = document.getElementById("idx_mov_desc");
-                              if (descEl) descEl.value = "Abono de pedido especial de pastelería";
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-950 font-bold text-[11px]"
-                          >
-                            🎂 Abono de Pedido
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const descEl = document.getElementById("idx_mov_desc");
-                              if (descEl) descEl.value = "Cobro a cliente mayorista / tiendita";
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-950 font-bold text-[11px]"
-                          >
-                            🏪 Cobro Mayorista
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const descEl = document.getElementById("idx_mov_desc");
-                              if (descEl) descEl.value = "Aportación extraordinaria a caja";
-                            }}
-                            className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[11px]"
-                          >
-                            💵 Aportación Extra
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
                   {/* Formulario de registro */}
                   <form
                     onSubmit={(e) => {
@@ -2466,8 +2370,18 @@
                       </div>
                     </div>
 
-                    <div>
-                      <label className="font-black text-stone-900 block mb-1">2. Motivo o detalle:</label>
+                    <div className="space-y-1.5">
+                      <label className="font-black text-stone-900 block">2. Motivo o detalle del movimiento:</label>
+                      <div className={`p-2 rounded-xl border text-[11px] leading-relaxed ${
+                        movementModalType === "salida"
+                          ? "bg-rose-50 border-rose-200 text-rose-950"
+                          : "bg-emerald-50 border-emerald-200 text-emerald-950"
+                      }`}>
+                        <span className="font-black">💡 Ejemplo de lo que debes poner: </span>
+                        {movementModalType === "salida"
+                          ? "Escribe en qué se utilizó o quién lo retiró (ej. Pago de gas LP, bolsas para pan, compra de levadura o retiro del dueño)."
+                          : "Escribe por qué entra dinero a caja (ej. Dejaron morralla para dar cambio en caja, abono de cliente o apartado de pastel)."}
+                      </div>
                       <textarea
                         id="idx_mov_desc"
                         name="desc"
@@ -2475,8 +2389,8 @@
                         required
                         placeholder={
                           movementModalType === "salida"
-                            ? "Ej. Retiro de Don Toño, recarga de gas LP, compra de levadura..."
-                            : "Ej. Dejaron $200 en monedas para cambio de billetes..."
+                            ? "Ej. Pago de gas LP para hornos, bolsas para panadería, retiro de Don Toño..."
+                            : "Ej. Dejaron $200 en monedas para cambio en caja, abono de cliente..."
                         }
                         className="w-full p-2.5 text-xs bg-white border-2 border-stone-200 rounded-xl focus:border-amber-500 focus:outline-none font-medium leading-relaxed"
                       />

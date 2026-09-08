@@ -44,6 +44,9 @@ const QUICK_AMOUNTS = [50, 100, 200, 300, 500, 1000];
 const SALIDA_PRESETS = [
   {
     id: "retiro_dueno",
+    icon: "👑",
+    title: "Retiro de Dueño",
+    subtitle: "Don Toño Brito / Socios",
     label: "👑 Retiro de Dueño (Don Toño)",
     badge: "Retiro Dueño",
     defaultReason: "Retiro de efectivo por dueño (Don Toño / Socios)",
@@ -51,6 +54,9 @@ const SALIDA_PRESETS = [
   },
   {
     id: "gasto_gas",
+    icon: "⛽",
+    title: "Pago de Gas LP",
+    subtitle: "Recarga de hornos de pan",
     label: "⛽ Pago de Gas LP",
     badge: "Gas LP",
     defaultReason: "Pago de recarga de gas LP para hornos",
@@ -58,6 +64,9 @@ const SALIDA_PRESETS = [
   },
   {
     id: "compra_insumos",
+    icon: "🥖",
+    title: "Insumos y Harinas",
+    subtitle: "Levadura, bolsas, empaques",
     label: "🥖 Insumos / Materia Prima",
     badge: "Insumos",
     defaultReason: "Compra de insumos menores (levadura, bolsas, empaque)",
@@ -65,6 +74,9 @@ const SALIDA_PRESETS = [
   },
   {
     id: "pago_proveedor",
+    icon: "🚚",
+    title: "Pago a Proveedor",
+    subtitle: "Pago en efectivo en tienda",
     label: "🚚 Pago a Proveedor",
     badge: "Proveedor",
     defaultReason: "Pago en efectivo a proveedor en sucursal",
@@ -72,6 +84,9 @@ const SALIDA_PRESETS = [
   },
   {
     id: "limpieza",
+    icon: "🧹",
+    title: "Limpieza y Tienda",
+    subtitle: "Artículos de aseo y tienda",
     label: "🧹 Limpieza / Tienda",
     badge: "Limpieza",
     defaultReason: "Artículos de limpieza y consumibles para tienda",
@@ -79,6 +94,9 @@ const SALIDA_PRESETS = [
   },
   {
     id: "otro",
+    icon: "📝",
+    title: "Otro Gasto Menor",
+    subtitle: "Detallar motivo en texto",
     label: "📝 Otro Gasto Menor",
     badge: "Otro",
     defaultReason: "",
@@ -90,6 +108,9 @@ const SALIDA_PRESETS = [
 const ENTRADA_PRESETS = [
   {
     id: "fondo_cambio",
+    icon: "🪙",
+    title: "Dinero para Cambio",
+    subtitle: "Feria / cambio de billetes",
     label: "🪙 Dejaron Dinero para Cambio (Feria)",
     badge: "Cambio / Feria",
     defaultReason: "Dejaron dinero para cambio de billetes / feria en caja",
@@ -97,6 +118,9 @@ const ENTRADA_PRESETS = [
   },
   {
     id: "abono_pedido",
+    icon: "🎂",
+    title: "Abono de Pedido Especial",
+    subtitle: "Anticipo de encargo de pastelería",
     label: "🎂 Abono de Pedido Especial",
     badge: "Abono Pedido",
     defaultReason: "Abono de cliente para encargo especial de pastelería",
@@ -104,6 +128,9 @@ const ENTRADA_PRESETS = [
   },
   {
     id: "abono_cliente",
+    icon: "🏪",
+    title: "Cobro a Mayorista / Tienda",
+    subtitle: "Pan a cliente mayorista o tiendita",
     label: "🏪 Cobro a Mayorista / Tiendita",
     badge: "Cobro Cliente",
     defaultReason: "Cobro de pan a cliente mayorista o tiendita",
@@ -111,6 +138,9 @@ const ENTRADA_PRESETS = [
   },
   {
     id: "ingreso_extraordinario",
+    icon: "💵",
+    title: "Aportación Extraordinaria",
+    subtitle: "Efectivo extra al cajón",
     label: "💵 Aportación Extraordinaria",
     badge: "Aportación",
     defaultReason: "Aportación de efectivo extraordinario al cajón",
@@ -118,6 +148,9 @@ const ENTRADA_PRESETS = [
   },
   {
     id: "otro",
+    icon: "✨",
+    title: "Otra Entrada de Dinero",
+    subtitle: "Detallar motivo en texto",
     label: "✨ Otra Entrada de Dinero",
     badge: "Otro",
     defaultReason: "",
@@ -145,13 +178,18 @@ export default function ExpensesModal({
   // Form fields
   const [amount, setAmount] = useState("");
   const [selectedPresetId, setSelectedPresetId] = useState<string>("retiro_dueno");
-  const [description, setDescription] = useState(SALIDA_PRESETS[0].defaultReason);
+  const [description, setDescription] = useState("");
   const [authorizedBy, setAuthorizedBy] = useState("Don Toño Brito");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [lastSubmittedText, setLastSubmittedText] = useState("");
 
   if (!isOpen) return null;
+
+  // Preset activo seleccionado actualmente
+  const selectedPreset = (movementType === "salida" ? SALIDA_PRESETS : ENTRADA_PRESETS).find(
+    (p) => p.id === selectedPresetId
+  );
 
   // Filtrar exclusivamente las salidas correspondientes a la cajera y turno en operación
   const shiftExpenses = expenses.filter((e) => {
@@ -178,28 +216,25 @@ export default function ExpensesModal({
   // Cambiar de Salida a Entrada o viceversa
   const handleToggleMovementType = (type: "salida" | "entrada") => {
     setMovementType(type);
+    setDescription("");
     if (type === "salida") {
       setSelectedPresetId("retiro_dueno");
-      setDescription(SALIDA_PRESETS[0].defaultReason);
       setAuthorizedBy("Don Toño Brito");
     } else {
       setSelectedPresetId("fondo_cambio");
-      setDescription(ENTRADA_PRESETS[0].defaultReason);
       setAuthorizedBy(cashierName);
     }
   };
 
   const handleSelectPreset = (preset: { id: string; defaultReason: string }) => {
     setSelectedPresetId(preset.id);
-    if (preset.defaultReason) {
-      setDescription(preset.defaultReason);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = Number(amount);
-    if (!parsedAmount || parsedAmount <= 0 || !description.trim()) return;
+    const finalDescription = description.trim() || selectedPreset?.defaultReason || "";
+    if (!parsedAmount || parsedAmount <= 0 || !finalDescription) return;
 
     setIsSubmitting(true);
     const nowDateTime = new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
@@ -211,7 +246,7 @@ export default function ExpensesModal({
         id: `EXP-${Date.now().toString().slice(-6)}`,
         amount: parsedAmount,
         category: selectedPresetId,
-        description: description.trim(),
+        description: finalDescription,
         cashier: cashierName,
         date: nowDateTime,
       };
@@ -283,7 +318,7 @@ export default function ExpensesModal({
         category: selectedPresetId,
         categoryLabel: presetObj ? presetObj.badge : "Entrada Dinero",
         paymentMethod: "efectivo",
-        concept: description.trim(),
+        concept: finalDescription,
         cashier: cashierName,
         date: nowDateTime,
         timestamp: new Date().toISOString(),
@@ -379,32 +414,32 @@ export default function ExpensesModal({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/65 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-2xl sm:max-w-3xl w-full overflow-hidden flex flex-col max-h-[94vh] border-2 border-stone-200">
         
         {/* Header Principal con $ destacado */}
-        <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-4 sm:p-5 px-5 sm:px-6 flex items-center justify-between border-b border-amber-900/50 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black text-xl shadow-md border border-amber-300 shrink-0">
+        <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-4 sm:p-5 px-5 sm:px-7 flex items-center justify-between border-b border-amber-900/50 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black text-2xl shadow-md border-2 border-amber-300 shrink-0">
               $
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-black text-base sm:text-lg leading-tight">Movimientos de Dinero en Caja</h3>
-                <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                <h3 className="font-black text-lg sm:text-xl leading-tight">Movimientos de Dinero en Caja</h3>
+                <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-xs font-black px-2.5 py-0.5 rounded-full">
                   👤 {cashierName}
                 </span>
               </div>
-              <p className="text-[11px] text-amber-200/80 font-medium">
+              <p className="text-xs sm:text-sm text-amber-200/80 font-medium mt-0.5">
                 Retiros de dueños, gastos operativos y entradas para cambio de billetes
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             title="Cerrar ventana"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
@@ -477,47 +512,47 @@ export default function ExpensesModal({
               
               {/* SWITCH PROMINENTE: Salida (-) vs Entrada (+) */}
               <div>
-                <label className="text-xs font-black text-stone-700 block mb-1.5">
+                <label className="text-xs sm:text-sm font-black text-stone-800 block mb-2">
                   1. Selecciona el tipo de movimiento:
                 </label>
-                <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100 rounded-2xl border border-stone-200">
+                <div className="grid grid-cols-2 gap-2.5 p-1.5 bg-stone-100 rounded-2xl border-2 border-stone-200 shadow-inner">
                   <button
                     type="button"
                     onClick={() => handleToggleMovementType("salida")}
-                    className={`py-3 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+                    className={`py-3.5 sm:py-4 px-3 sm:px-4 rounded-xl font-black text-sm sm:text-base flex items-center justify-center gap-2 sm:gap-3 transition-all cursor-pointer ${
                       movementType === "salida"
-                        ? "bg-rose-600 text-white shadow-md shadow-rose-600/30 scale-[1.01]"
-                        : "text-stone-600 hover:bg-stone-200/70"
+                        ? "bg-rose-600 text-white shadow-lg shadow-rose-600/30 scale-[1.01] ring-2 ring-rose-400/40"
+                        : "text-stone-700 hover:bg-stone-200/80 hover:text-stone-900"
                     }`}
                   >
-                    <ArrowDownRight className="w-4 h-4" />
-                    <span>Salida: Gasto o Retiro (-)</span>
+                    <ArrowDownRight className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+                    <span className="truncate">Salida: Gasto o Retiro (-)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleToggleMovementType("entrada")}
-                    className={`py-3 px-3 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+                    className={`py-3.5 sm:py-4 px-3 sm:px-4 rounded-xl font-black text-sm sm:text-base flex items-center justify-center gap-2 sm:gap-3 transition-all cursor-pointer ${
                       movementType === "entrada"
-                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-[1.01]"
-                        : "text-stone-600 hover:bg-stone-200/70"
+                        ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 scale-[1.01] ring-2 ring-emerald-400/40"
+                        : "text-stone-700 hover:bg-stone-200/80 hover:text-stone-900"
                     }`}
                   >
-                    <ArrowUpRight className="w-4 h-4" />
-                    <span>Entrada: Cambio / Abono (+)</span>
+                    <ArrowUpRight className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+                    <span className="truncate">Entrada: Cambio / Abono (+)</span>
                   </button>
                 </div>
               </div>
 
-              {/* Botones de Categorías Rápidas según Tipo */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-stone-700 block">
+              {/* Botones de Categorías Rápidas según Tipo (OPCIONES GRANDES Y CLARAS) */}
+              <div className="space-y-2">
+                <label className="text-xs sm:text-sm font-black text-stone-800 block">
                   {movementType === "salida" 
                     ? "2. ¿Qué tipo de salida es?" 
                     : "2. ¿Por qué motivo entra dinero a caja?"}
                 </label>
                 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   {(movementType === "salida" ? SALIDA_PRESETS : ENTRADA_PRESETS).map((preset) => {
                     const isSelected = selectedPresetId === preset.id;
                     return (
@@ -525,15 +560,36 @@ export default function ExpensesModal({
                         key={preset.id}
                         type="button"
                         onClick={() => handleSelectPreset(preset)}
-                        className={`p-2 sm:p-2.5 rounded-xl border text-left text-xs font-extrabold transition-all flex flex-col justify-between ${
+                        className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all flex items-center gap-3.5 cursor-pointer select-none active:scale-98 ${
                           isSelected
                             ? movementType === "salida"
-                              ? "border-rose-500 bg-rose-50/90 text-rose-950 ring-2 ring-rose-500 shadow-xs"
-                              : "border-emerald-500 bg-emerald-50/90 text-emerald-950 ring-2 ring-emerald-500 shadow-xs"
-                            : `${preset.color} opacity-80 hover:opacity-100`
+                              ? "border-rose-500 bg-rose-50 text-rose-950 ring-4 ring-rose-500/20 shadow-md scale-[1.01]"
+                              : "border-emerald-500 bg-emerald-50 text-emerald-950 ring-4 ring-emerald-500/20 shadow-md scale-[1.01]"
+                            : "border-stone-200 bg-white hover:bg-stone-50 hover:border-stone-300 shadow-2xs"
                         }`}
                       >
-                        <span className="leading-tight block">{preset.label}</span>
+                        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shrink-0 shadow-2xs ${
+                          isSelected
+                            ? movementType === "salida" ? "bg-rose-100 border border-rose-300" : "bg-emerald-100 border border-emerald-300"
+                            : "bg-stone-100 border border-stone-200"
+                        }`}>
+                          {preset.icon}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="text-sm sm:text-base font-black block leading-tight truncate">
+                            {preset.title}
+                          </span>
+                          <span className="text-xs sm:text-sm text-stone-500 font-bold block mt-0.5 truncate">
+                            {preset.subtitle}
+                          </span>
+                        </div>
+                        {isSelected && (
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0 ${
+                            movementType === "salida" ? "bg-rose-600" : "bg-emerald-600"
+                          }`}>
+                            ✓
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -542,9 +598,9 @@ export default function ExpensesModal({
 
               {/* Campo para nombre del dueño si es Retiro de Dueño */}
               {movementType === "salida" && selectedPresetId === "retiro_dueno" && (
-                <div className="p-3 bg-amber-50/80 rounded-2xl border border-amber-200 space-y-1 animate-in fade-in">
-                  <label className="text-[11px] font-black text-amber-950 flex items-center gap-1.5">
-                    <Crown className="w-3.5 h-3.5 text-amber-700" />
+                <div className="p-4 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-1.5 animate-in fade-in">
+                  <label className="text-xs sm:text-sm font-black text-amber-950 flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-amber-700 shrink-0" />
                     Dueño o Socio que retira el dinero:
                   </label>
                   <input
@@ -553,9 +609,9 @@ export default function ExpensesModal({
                     value={authorizedBy}
                     onChange={(e) => setAuthorizedBy(e.target.value)}
                     placeholder="Ej. Don Toño Brito / Propietario"
-                    className="w-full px-3 py-2 text-xs font-bold text-stone-900 bg-white border border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full px-4 py-2.5 text-sm font-bold text-stone-900 bg-white border-2 border-amber-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
-                  <p className="text-[10px] text-amber-800">
+                  <p className="text-xs text-amber-800 font-medium">
                     Se notificará este retiro por separado para resguardo y auditoría contable.
                   </p>
                 </div>
@@ -563,11 +619,11 @@ export default function ExpensesModal({
 
               {/* Monto de Dinero */}
               <div className="space-y-2">
-                <label className="text-xs font-black text-stone-900 block">
+                <label className="text-xs sm:text-sm font-black text-stone-900 block">
                   3. Monto en Efectivo ($ MXN):
                 </label>
                 <div className="relative">
-                  <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-black text-2xl ${
+                  <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-black text-2xl sm:text-3xl ${
                     movementType === "salida" ? "text-rose-600" : "text-emerald-600"
                   }`}>
                     $
@@ -581,7 +637,7 @@ export default function ExpensesModal({
                     value={amount}
                     onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                     onChange={(e) => setAmount(cleanDecimalNumbers(e.target.value))}
-                    className={`w-full pl-10 pr-4 py-3 bg-stone-50 rounded-2xl border-2 text-2xl font-black text-stone-900 transition-all shadow-inner focus:bg-white focus:outline-none ${
+                    className={`w-full pl-12 pr-4 py-3.5 sm:py-4 bg-stone-50 rounded-2xl border-2 text-2xl sm:text-3xl font-black text-stone-900 transition-all shadow-inner focus:bg-white focus:outline-none ${
                       movementType === "salida"
                         ? "border-stone-200 focus:border-rose-500"
                         : "border-stone-200 focus:border-emerald-500"
@@ -590,51 +646,91 @@ export default function ExpensesModal({
                 </div>
 
                 {/* Botones rápidos de monto */}
-                <div className="grid grid-cols-6 gap-1.5 pt-0.5">
-                  {QUICK_AMOUNTS.map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setAmount(amt.toString())}
-                      className="py-1.5 bg-stone-100 hover:bg-stone-800 hover:text-white text-stone-800 font-extrabold text-xs rounded-xl border border-stone-200 transition-all active:scale-95"
-                    >
-                      ${amt}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                  {QUICK_AMOUNTS.map((amt) => {
+                    const isSelectedAmt = amount === amt.toString();
+                    return (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setAmount(amt.toString())}
+                        className={`py-2.5 sm:py-3 rounded-2xl border-2 font-black text-sm sm:text-base transition-all active:scale-95 shadow-2xs cursor-pointer ${
+                          isSelectedAmt
+                            ? movementType === "salida"
+                              ? "bg-rose-600 text-white border-rose-600 shadow-md scale-102"
+                              : "bg-emerald-600 text-white border-emerald-600 shadow-md scale-102"
+                            : "bg-stone-100 hover:bg-stone-200/90 text-stone-800 border-stone-300"
+                        }`}
+                      >
+                        ${amt}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Motivo o Descripción editable */}
-              <div className="space-y-1">
-                <label className="text-xs font-black text-stone-900 block">
-                  4. Detalle / Motivo del movimiento:
-                </label>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs sm:text-sm font-black text-stone-900 block">
+                    4. Detalle / Motivo del movimiento:
+                  </label>
+                  <span className="text-[11px] text-stone-500 font-bold">
+                    {description.trim().length > 0 ? `${description.trim().length} caracteres` : "Obligatorio"}
+                  </span>
+                </div>
+
+                {/* Breve leyenda como ejemplo de lo que deberían poner las personas */}
+                <div className={`p-2.5 sm:p-3 rounded-2xl border text-xs leading-relaxed transition-all ${
+                  movementType === "salida"
+                    ? "bg-rose-50/90 border-rose-200 text-rose-950"
+                    : "bg-emerald-50/90 border-emerald-200 text-emerald-950"
+                }`}>
+                  <p className="font-medium flex items-start gap-1.5">
+                    <span className="text-sm shrink-0 leading-none">💡</span>
+                    <span>
+                      <strong className="font-black mr-1">
+                        Ejemplo de lo que debes poner:
+                      </strong>
+                      {movementType === "salida"
+                        ? "Escribe en qué se utilizó el dinero o quién lo retiró (ej. Pago de recarga de gas LP, bolsas para pan, compra de levadura o retiro del dueño)."
+                        : "Escribe por qué entra dinero a caja (ej. Dejaron morralla para dar cambio en caja, abono de cliente o apartado de pastel)."}
+                    </span>
+                  </p>
+                </div>
+
                 <textarea
                   required
                   rows={2}
                   placeholder={
-                    movementType === "salida"
-                      ? "Ej. Retiro de Don Toño para depósito bancario, pago de gas, insumos..."
-                      : "Ej. Dejaron $200 en morralla de a $10 para cambio de billetes a clientes..."
+                    selectedPreset?.defaultReason
+                      ? `Ej. ${selectedPreset.defaultReason}...`
+                      : movementType === "salida"
+                      ? "Ej. Pago de gas LP para hornos, bolsas para panadería, retiro de Don Toño..."
+                      : "Ej. Dejaron dinero para cambio de billetes en caja, abono de cliente..."
                   }
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full p-3 bg-stone-50 rounded-2xl border-2 border-stone-200 focus:border-amber-500 focus:bg-white focus:outline-none text-xs font-medium text-stone-900 transition-all leading-relaxed"
+                  className={`w-full p-3.5 bg-stone-50 rounded-2xl border-2 text-xs sm:text-sm font-medium text-stone-900 transition-all leading-relaxed focus:bg-white focus:outline-none placeholder:text-stone-400 ${
+                    movementType === "salida"
+                      ? "border-stone-200 focus:border-rose-500"
+                      : "border-stone-200 focus:border-emerald-500"
+                  }`}
                 />
               </div>
 
               {/* Botón de envío */}
-              <div className="pt-1">
+              <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={isSubmitting || !amount || Number(amount) <= 0 || !description.trim()}
-                  className={`w-full py-3.5 text-white font-black rounded-2xl text-sm shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 ${
+                  disabled={isSubmitting || !amount || Number(amount) <= 0 || (!description.trim() && !selectedPreset?.defaultReason)}
+                  className={`w-full py-4 text-white font-black rounded-2xl text-base sm:text-lg shadow-xl transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed ${
                     movementType === "salida"
                       ? "bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-rose-600/30"
                       : "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-emerald-600/30"
                   }`}
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-5 h-5 sm:w-6 sm:h-6" />
                   <span>
                     {isSubmitting
                       ? "Guardando..."
@@ -644,8 +740,8 @@ export default function ExpensesModal({
                   </span>
                 </button>
 
-                <p className="text-[10px] text-center text-stone-400 mt-2 flex items-center justify-center gap-1">
-                  <BellRing className="w-3 h-3 text-amber-500" />
+                <p className="text-xs text-center text-stone-500 mt-2 flex items-center justify-center gap-1.5 font-medium">
+                  <BellRing className="w-4 h-4 text-amber-500 shrink-0" />
                   Se notificará inmediatamente al panel del administrador y se reflejará en el corte
                 </p>
               </div>
