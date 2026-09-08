@@ -343,38 +343,47 @@ export default function ClientesPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:gap-3 shrink-0">
           {/* Selector de ordenamiento: Más recientes (predeterminado) o A - Z */}
-          <div className="inline-flex items-center bg-stone-100 p-1 rounded-2xl border border-stone-200 shadow-2xs">
+          <div className="inline-flex items-center bg-stone-100 p-1.5 rounded-2xl border-2 border-stone-200 shadow-sm">
             <button
               type="button"
-              onClick={() => setSortOrder("recent")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              onClick={() => {
+                setSortOrder("recent");
+                setCurrentPage(1);
+              }}
+              className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-black transition-all cursor-pointer flex items-center gap-2 ${
                 sortOrder === "recent"
-                  ? "bg-amber-600 text-white shadow-xs"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-102"
+                  : "text-stone-700 hover:text-stone-950 hover:bg-stone-200/70"
               }`}
               title="Mostrar primero los clientes registrados más recientemente"
             >
-              ⏱️ Más Recientes
+              <span className="text-base sm:text-lg">⏱️</span>
+              <span>Más Recientes</span>
             </button>
             <button
               type="button"
-              onClick={() => setSortOrder("alpha")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              onClick={() => {
+                setSortOrder("alpha");
+                setCurrentPage(1);
+              }}
+              className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-black transition-all cursor-pointer flex items-center gap-2 ${
                 sortOrder === "alpha"
-                  ? "bg-amber-600 text-white shadow-xs"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-102"
+                  : "text-stone-700 hover:text-stone-950 hover:bg-stone-200/70"
               }`}
               title="Ordenar alfabéticamente por nombre (A - Z)"
             >
-              🔤 A - Z
+              <span className="text-base sm:text-lg">🔤</span>
+              <span>A - Z</span>
             </button>
           </div>
 
-          <div className="px-4 py-2 bg-stone-100 rounded-2xl border border-stone-200 shrink-0 text-center">
-            <span className="text-xs text-stone-500 font-bold block uppercase tracking-wider">Total</span>
-            <span className="text-base sm:text-lg font-black text-stone-900">
+          {/* Contador de Total de Clientes */}
+          <div className="px-5 py-2 sm:py-2.5 bg-stone-100 rounded-2xl border-2 border-stone-200 shrink-0 text-center flex flex-col justify-center shadow-sm min-w-[130px]">
+            <span className="text-xs sm:text-sm text-stone-500 font-extrabold block uppercase tracking-wider">Total</span>
+            <span className="text-lg sm:text-xl font-black text-stone-900 leading-tight">
               {filteredCustomers.length} {filteredCustomers.length === 1 ? "Cliente" : "Clientes"}
             </span>
           </div>

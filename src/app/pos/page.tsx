@@ -2178,32 +2178,37 @@ export default function POSPage() {
           )}
 
           {/* Botones de Acción */}
-          <div className="grid grid-cols-4 gap-2 pt-0.5">
+          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">
             <button
               type="button"
               onClick={() => {
                 setCart([]);
+                setCashGiven("");
                 selectCustomer(DEFAULT_GENERAL_CUSTOMER);
               }}
               disabled={cart.length === 0}
-              className="col-span-1 py-3 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-stone-200 transition-all active:scale-95 shadow-xs"
-              title="Limpiar charola"
+              className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
+                cart.length > 0
+                  ? "bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-700 hover:to-rose-800 text-white shadow-red-600/30 hover:shadow-red-600/50 hover:scale-[1.01] active:scale-95 border border-red-400/80 ring-2 ring-red-400/30 cursor-pointer"
+                  : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
+              }`}
+              title="Cancelar compra y vaciar charola"
             >
-              <Trash2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Limpiar</span>
+              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+              <span className="truncate">Cancelar Compra</span>
             </button>
             <button
               type="button"
               onClick={handleCheckout}
               disabled={cart.length === 0 || !isPaymentValid || isSubmitting}
-              className={`col-span-3 py-3 sm:py-3.5 rounded-xl text-sm sm:text-base font-black flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
+              className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
                 cart.length > 0 && isPaymentValid && !isSubmitting
-                  ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-2 ring-amber-400/40"
-                  : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed"
+                  ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-2 ring-amber-400/40 cursor-pointer"
+                  : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
               }`}
             >
-              <CheckCircle className={`w-5 h-5 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
-              <span>{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
+              <CheckCircle className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
+              <span className="truncate">{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
             </button>
           </div>
         </div>

@@ -30,12 +30,22 @@ function getAudioContext(): AudioContext | null {
   }
 }
 
+// Lista priorizada de rutas para el sonido oficial de la carpeta "Nueva carpeta"
+export const CANDIDATE_AUDIO_URLS = [
+  "/Nueva carpeta/16446_1460642689.mp3",
+  "Nueva carpeta/16446_1460642689.mp3",
+  "./Nueva carpeta/16446_1460642689.mp3",
+  "/sounds/16446_1460642689.mp3",
+  "/16446_1460642689.mp3",
+  CASH_REGISTER_AUDIO_DATA,
+];
+
 // Pre-cargar el audio físico en memoria nada más cargar el módulo en el navegador
 if (typeof window !== "undefined") {
   const initAudio = () => {
     try {
       if (!htmlAudioInstance) {
-        htmlAudioInstance = new Audio(CASH_REGISTER_AUDIO_DATA);
+        htmlAudioInstance = new Audio(CANDIDATE_AUDIO_URLS[0]);
         htmlAudioInstance.volume = 1.0;
         htmlAudioInstance.load();
       }
@@ -200,8 +210,6 @@ export function playCashRegisterWebAudio(customCtx?: AudioContext) {
 export function playCashRegisterSound() {
   if (typeof window === "undefined") return;
 
-  let audioPlayed = false;
-
   // 1. Reproducir el archivo MP3 del usuario mediante Web Audio Buffer (latencia cero)
   try {
     const ctx = getAudioContext();
@@ -213,30 +221,34 @@ export function playCashRegisterSound() {
       source.connect(gain);
       gain.connect(ctx.destination);
       source.start(0);
-      audioPlayed = true;
+      return;
     }
   } catch (err) {
     console.warn("WebAudio buffer play error:", err);
   }
 
-  // 2. Si no se reprodujo por Web Audio, reproducir inmediatamente el MP3 vía HTML5 Audio
-  if (!audioPlayed) {
+  // 2. Si no se reprodujo por Web Audio, reproducir inmediatamente el MP3 desde "Nueva carpeta" con cascada de respaldo
+  let idx = 0;
+  const tryNext = () => {
+    if (idx >= CANDIDATE_AUDIO_URLS.length) {
+      playCashRegisterWebAudio();
+      return;
+    }
+    const src = CANDIDATE_AUDIO_URLS[idx++];
     try {
-      if (!htmlAudioInstance) {
-        htmlAudioInstance = new Audio(CASH_REGISTER_AUDIO_DATA);
-      }
-      htmlAudioInstance.currentTime = 0;
-      htmlAudioInstance.volume = 1.0;
-      const p = htmlAudioInstance.play();
-      if (p) {
-        p.then(() => {
-          audioPlayed = true;
-        }).catch(() => {
-          playCashRegisterWebAudio();
+      const audio = new Audio(src);
+      audio.volume = 1.0;
+      const p = audio.play();
+      if (p !== undefined) {
+        p.catch((err) => {
+          console.warn(`Error al reproducir audio desde ${src}:`, err);
+          tryNext();
         });
       }
     } catch {
-      playCashRegisterWebAudio();
+      tryNext();
     }
-  }
+  };
+
+  tryNext();
 }
