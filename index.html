@@ -1953,7 +1953,7 @@
                       <div className="flex justify-between items-center">
                         <span className="font-semibold text-neutral-800">CLIENTE:</span>
                         <span className="font-bold text-black text-right max-w-[200px] truncate">
-                          {completedSale.customerName || "Clientes Generales"}
+                          {completedSale.customerName || "Público en General"}
                           {completedSale.customerType && completedSale.customerType !== "general" && (
                             <span className="ml-1 text-[9px] font-black uppercase border border-black px-1.5 py-0.5 rounded">
                               {completedSale.customerType}
@@ -2318,11 +2318,6 @@
                       <div>
                         <span className="font-black text-lg sm:text-2xl leading-tight block text-white tracking-wide">
                           {drawerModalView === "cut" ? "Cierre de Turno & Entrega de Caja" : "Historial de Tickets de Corte"}
-                        </span>
-                        <span className="text-xs sm:text-sm text-amber-300 font-bold mt-0.5 block">
-                          {drawerModalView === "cut"
-                            ? "Arqueo digital sin detalles y entrega conforme al relevo"
-                            : "Consulta comprobantes anteriores para cualquier duda o aclaración"}
                         </span>
                       </div>
                     </div>

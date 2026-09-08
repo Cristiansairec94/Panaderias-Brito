@@ -38,7 +38,7 @@ export default function TicketModal({
   cashGiven,
   change,
   cashierName = "Caja Principal - Don Toño",
-  customerName = "Clientes Generales",
+  customerName = "Público en General",
   customerType,
   branchName = "Sucursal Matriz",
   branchAddress,
@@ -128,7 +128,7 @@ export default function TicketModal({
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-neutral-800">CLIENTE:</span>
                 <span className="font-bold text-black text-right max-w-[200px] truncate">
-                  {customerName || "Clientes Generales"}
+                  {customerName || "Público en General"}
                   {customerType && customerType !== "general" && (
                     <span className="ml-1 text-[9px] font-black uppercase border border-black px-1.5 py-0.5 rounded">
                       {customerType}

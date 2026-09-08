@@ -559,11 +559,6 @@ export default function CashDrawerShiftModal({
                     <span>Cajero(a) en turno: <strong className="text-white font-black">{cashierName}</strong></span>
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-amber-300 font-bold mt-1">
-                  {modalView === "cut" 
-                    ? `Arqueo digital sin detalles y entrega conforme al relevo • Turno actual: ${cashierName}` 
-                    : `Consulta comprobantes anteriores para cualquier duda o aclaración • Turno operado por: ${cashierName}`}
-                </p>
               </div>
             </div>
 

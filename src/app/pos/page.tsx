@@ -937,7 +937,7 @@ export default function POSPage() {
       setIsSubmitting(false);
       setShowReceiptModal(true);
 
-      // Al completar la compra, la charola se limpia y vuelve automáticamente a Clientes Generales con efectivo
+      // Al completar la compra, la charola se limpia y vuelve automáticamente a Público en General con efectivo
       setCart([]);
       setCashGiven("");
       setPaymentMethod("efectivo");
@@ -1638,23 +1638,23 @@ export default function POSPage() {
 
         {/* CUSTOMER SELECTION / SMART SEARCH QUICK BAR: TODO EN EL MISMO CUADRO */}
         <div ref={customerPickerRef} className="p-2 sm:px-3 bg-gradient-to-r from-amber-50/90 via-stone-50 to-orange-50/70 border-b border-amber-200/80 shrink-0 relative">
-          {/* Cuadro unificado: Badge del cliente (Clientes Generales o Cliente Específico) + Buscador Integrado */}
+          {/* Cuadro unificado: Badge del cliente (Público en General o Cliente Específico) + Buscador Integrado */}
           <div className="flex items-center gap-2 w-full">
             <div className="flex-1 flex items-center bg-white rounded-2xl border-2 border-amber-300/90 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-400/20 px-2 sm:px-2.5 py-1.5 gap-2 shadow-2xs transition-all">
               
-              {/* 1. Badge / Indicador: Clientes Generales o Cliente Específico */}
+              {/* 1. Badge / Indicador: Público en General o Cliente Específico */}
               {selectedCustomer.id === "cli-0" ? (
                 <div 
                   className="flex items-center gap-1.5 bg-amber-100 text-amber-950 border border-amber-300/90 px-2.5 py-1 rounded-xl text-xs font-black shrink-0 select-none shadow-2xs"
-                  title="Cliente actual: Clientes Generales"
+                  title="Cliente actual: Público en General"
                 >
                   <span className="text-sm">👤</span>
-                  <span className="whitespace-nowrap">Clientes Generales</span>
+                  <span className="whitespace-nowrap">Público en General</span>
                 </div>
               ) : (
                 <div 
                   className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2.5 py-1 rounded-xl text-xs font-black shrink-0 shadow-xs max-w-[190px]"
-                  title={`Cliente asignado: ${selectedCustomer.name}. Clic en ✕ para volver a Clientes Generales`}
+                  title={`Cliente asignado: ${selectedCustomer.name}. Clic en ✕ para volver a Público en General`}
                 >
                   <span className="text-xs shrink-0">👤</span>
                   <span className="truncate max-w-[110px]">{selectedCustomer.name}</span>
@@ -1662,7 +1662,7 @@ export default function POSPage() {
                     type="button"
                     onClick={() => selectCustomer(DEFAULT_GENERAL_CUSTOMER)}
                     className="p-0.5 hover:bg-black/25 rounded-full transition-colors cursor-pointer shrink-0 ml-0.5"
-                    title="Terminar y volver a Clientes Generales"
+                    title="Terminar y volver a Público en General"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1731,7 +1731,7 @@ export default function POSPage() {
                   <Users className="w-3.5 h-3.5 text-amber-600" />
                   {customerSearchQuery.trim().length > 0 
                     ? `Clientes encontrados para "${customerSearchQuery}"` 
-                    : "Selecciona un cliente o vuelve a Clientes Generales"}
+                    : "Selecciona un cliente o vuelve a Público en General"}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -1749,7 +1749,7 @@ export default function POSPage() {
 
               {/* Options List */}
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[240px]">
-                {/* 1. Opción fija: Volver a Clientes Generales */}
+                {/* 1. Opción fija: Volver a Público en General */}
                 <button
                   type="button"
                   onClick={() => selectCustomer(DEFAULT_GENERAL_CUSTOMER)}
@@ -1765,7 +1765,7 @@ export default function POSPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className="font-black text-xs text-amber-950 truncate block">
-                        Clientes Generales
+                        Público en General
                       </span>
                       <span className="text-[10px] text-amber-800 font-medium">
                         Venta de mostrador al contado (predeterminado)
@@ -2255,7 +2255,7 @@ export default function POSPage() {
           cashGiven={completedSale.cashGiven}
           change={completedSale.change}
           cashierName={completedSale.cashier}
-          customerName={completedSale.customerName || "Clientes Generales"}
+          customerName={completedSale.customerName || "Público en General"}
           customerType={completedSale.customerType}
           branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
           branchAddress={activeBranch ? activeBranch.address : undefined}
