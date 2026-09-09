@@ -340,6 +340,8 @@ export default function POSPage() {
 
   // Estados para Cobro y Escaneo por Código de Barras
   const [barcodeInput, setBarcodeInput] = useState("");
+  const [cartBarcodeInput, setCartBarcodeInput] = useState("");
+  const [justScannedId, setJustScannedId] = useState<string | null>(null);
   const [lastScannedItem, setLastScannedItem] = useState<{
     success: boolean;
     productName?: string;
@@ -347,6 +349,8 @@ export default function POSPage() {
     timestamp: number;
   } | null>(null);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const cartBarcodeInputRef = useRef<HTMLInputElement>(null);
+  const cartContainerRef = useRef<HTMLDivElement>(null);
   const keyStrokeBufferRef = useRef<{ buffer: string; lastStrokeTime: number }>({ buffer: "", lastStrokeTime: 0 });
 
   // Cuentas bancarias para cobro por transferencia
@@ -577,19 +581,22 @@ export default function POSPage() {
     } catch (e) {}
   };
 
-  // Load and synchronize products with catalog
+  // Carga y sincronización directa con el catálogo del apartado de productos (/productos)
   useEffect(() => {
-    setProducts(getStoredProducts());
-
-    const handleSync = () => {
+    const loadCatalog = () => {
       setProducts(getStoredProducts());
     };
+    loadCatalog();
 
-    window.addEventListener("brito_products_updated", handleSync);
-    return () => window.removeEventListener("brito_products_updated", handleSync);
+    window.addEventListener("brito_products_updated", loadCatalog);
+    window.addEventListener("storage", loadCatalog);
+    return () => {
+      window.removeEventListener("brito_products_updated", loadCatalog);
+      window.removeEventListener("storage", loadCatalog);
+    };
   }, []);
 
-  // Load products, recent sales & expenses from Supabase
+  // Load products, recent sales & expenses from Supabase (respetando códigos de barra y catálogo de productos)
   useEffect(() => {
     async function loadInitialData() {
       try {
@@ -603,20 +610,34 @@ export default function POSPage() {
           .order("name");
 
         if (prodData && prodData.length > 0 && !prodErr) {
+          const stored = getStoredProducts();
           const mapped: Product[] = prodData.map((p: any) => {
-            const fallbackMatch = DEFAULT_PRODUCTS.find((fb) => fb.name.toLowerCase() === p.name.toLowerCase());
+            const storedMatch = stored.find((s) => s.id === p.id || s.name.toLowerCase() === p.name.toLowerCase());
+            const fallbackMatch = DEFAULT_PRODUCTS.find((fb) => fb.id === p.id || fb.name.toLowerCase() === p.name.toLowerCase());
             return {
               id: p.id,
+              code: p.code || storedMatch?.code || fallbackMatch?.code || `PRD-${p.id}`,
+              barcode: p.barcode || storedMatch?.barcode || fallbackMatch?.barcode,
               name: p.name,
               price: Number(p.price),
-              category: p.category_id || "dulce_10",
-              icon: p.icon || "🥐",
-              stock: p.stock || 0,
-              image: p.image || fallbackMatch?.image,
-              description: fallbackMatch?.description,
-              tag: fallbackMatch?.tag || `Pan $${p.price}`,
+              category: p.category_id || storedMatch?.category || "dulce_10",
+              icon: p.icon || storedMatch?.icon || "🥐",
+              stock: typeof p.stock === "number" ? p.stock : (storedMatch?.stock || 0),
+              image: p.image || storedMatch?.image || fallbackMatch?.image,
+              description: p.description || storedMatch?.description || fallbackMatch?.description,
+              tag: p.tag || storedMatch?.tag || fallbackMatch?.tag,
+              unit: p.unit || storedMatch?.unit || "pieza",
             };
           });
+
+          // Integrar productos locales creados en el apartado de productos
+          const mappedIds = new Set(mapped.map((m) => m.id));
+          for (const sp of stored) {
+            if (!mappedIds.has(sp.id)) {
+              mapped.push(sp);
+            }
+          }
+
           setProducts(mapped);
           setIsDbConnected(true);
         }
@@ -742,7 +763,16 @@ export default function POSPage() {
     return () => clearTimeout(timer);
   }, [lastScannedItem]);
 
-  // Manejador central de cobro por código de barras
+  // Auto disolver el resaltado de producto recién escaneado en la charola tras 2.8s
+  useEffect(() => {
+    if (!justScannedId) return;
+    const timer = setTimeout(() => {
+      setJustScannedId(null);
+    }, 2800);
+    return () => clearTimeout(timer);
+  }, [justScannedId]);
+
+  // Manejador central de cobro por código de barras conectado directamente al catálogo de productos
   const handleBarcodeScan = (rawCode: string) => {
     const code = rawCode.trim();
     if (!code) return;
@@ -761,24 +791,42 @@ export default function POSPage() {
       return;
     }
 
-    const matched = findProductByBarcodeOrCode(code, products);
+    // Consulta en tiempo real al catálogo guardado en productos y en memoria
+    const currentStored = getStoredProducts();
+    const matched = findProductByBarcodeOrCode(code, products) || findProductByBarcodeOrCode(code, currentStored);
+
     if (matched) {
       addToCart(matched);
       playScanBeep(true);
+      setJustScannedId(matched.id);
+      setIsMobileCartOpen(true); // Se visualiza de inmediato en la charola de cobro
+
+      // Auto-desplazar la charola hacia el producto escaneado
+      setTimeout(() => {
+        if (cartContainerRef.current) {
+          const elem = cartContainerRef.current.querySelector(`[data-product-id="${matched.id}"]`);
+          if (elem) {
+            elem.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }
+      }, 50);
+
       setLastScannedItem({
         success: true,
         productName: matched.name,
-        code,
+        code: matched.barcode || code,
         timestamp: Date.now(),
       });
       setBarcodeInput("");
+      setCartBarcodeInput("");
+
       addNotification({
         senderName: "🏷️ Código de Barras",
         senderAvatar: "🥖",
         badgeIcon: "harina",
         title: "Producto Escaneado",
         highlightText: matched.name,
-        description: `+1 pieza agregada a la charola de cobro (Código: ${code})`,
+        description: `+1 pieza agregada a la charola de cobro (Código: ${matched.barcode || code})`,
         category: "inventario",
       });
     } else {
@@ -788,13 +836,14 @@ export default function POSPage() {
         code,
         timestamp: Date.now(),
       });
+      setIsMobileCartOpen(true);
       addNotification({
         senderName: "⚠️ Código No Registrado",
         senderAvatar: "🔍",
         badgeIcon: "alerta",
         title: "Código Desconocido",
         highlightText: code,
-        description: `No se encontró ningún producto con el código "${code}" en el catálogo de la panadería.`,
+        description: `No se encontró ningún producto con el código "${code}" en el catálogo de productos.`,
         category: "inventario",
       });
     }
@@ -810,7 +859,7 @@ export default function POSPage() {
       const activeElem = document.activeElement;
       const isInput = activeElem instanceof HTMLInputElement || activeElem instanceof HTMLTextAreaElement;
 
-      // Si el foco está en el input dedicado de código de barras y presiona Enter
+      // Si el foco está en el input superior de código de barras y presiona Enter
       if (activeElem === barcodeInputRef.current) {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -819,10 +868,19 @@ export default function POSPage() {
         return;
       }
 
-      // Si el foco está en otros inputs
-      if (isInput && activeElem !== barcodeInputRef.current) {
+      // Si el foco está en el input de escaneo de la Charola de Cobro y presiona Enter
+      if (activeElem === cartBarcodeInputRef.current) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleBarcodeScan(cartBarcodeInput);
+        }
+        return;
+      }
+
+      // Si el foco está en otros inputs (ej. buscador general de productos)
+      if (isInput && activeElem !== barcodeInputRef.current && activeElem !== cartBarcodeInputRef.current) {
         if (e.key === "Enter" && search.trim()) {
-          const matched = findProductByBarcodeOrCode(search.trim(), products);
+          const matched = findProductByBarcodeOrCode(search.trim(), products) || findProductByBarcodeOrCode(search.trim(), getStoredProducts());
           if (matched) {
             e.preventDefault();
             handleBarcodeScan(search.trim());
@@ -835,7 +893,7 @@ export default function POSPage() {
       const now = Date.now();
       const timeDiff = now - keyStrokeBufferRef.current.lastStrokeTime;
 
-      // Cuando la pistola de código de barras termina de escanear envía Enter
+      // Cuando la pistola física de código de barras termina de escanear envía Enter
       if (e.key === "Enter") {
         if (keyStrokeBufferRef.current.buffer.length >= 2) {
           e.preventDefault();
@@ -857,7 +915,7 @@ export default function POSPage() {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [products, barcodeInput, search, isShiftLocked, showReceiptModal, showExpensesModal, showIncomesModal, showCashDrawerModal, showBreadDeliveryModal]);
+  }, [products, barcodeInput, cartBarcodeInput, search, isShiftLocked, showReceiptModal, showExpensesModal, showIncomesModal, showCashDrawerModal, showBreadDeliveryModal]);
 
   const addMultipleToCart = (product: Product, count: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -2119,8 +2177,82 @@ export default function POSPage() {
           )}
         </div>
 
+        {/* BARRA DE ESCÁNER DIRECTA EN LA CHAROLA DE COBRO */}
+        <div className="p-2 sm:px-3 bg-gradient-to-r from-amber-100/90 via-amber-50 to-orange-100/80 border-b border-amber-200/90 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 flex items-center">
+              <Barcode className="w-4 h-4 absolute left-2.5 text-amber-800 pointer-events-none" />
+              <input
+                ref={cartBarcodeInputRef}
+                type="text"
+                placeholder="Escanear código de barras..."
+                value={cartBarcodeInput}
+                onChange={(e) => setCartBarcodeInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleBarcodeScan(cartBarcodeInput);
+                  }
+                }}
+                className="w-full pl-8 pr-16 py-1.5 bg-white border-2 border-amber-300 focus:border-amber-600 rounded-xl text-xs font-mono font-black text-amber-950 placeholder:text-amber-700/60 focus:outline-none shadow-2xs transition-all"
+                title="Escanea con la pistola o teclea el código y presiona Enter para agregar a la charola"
+              />
+              <button
+                type="button"
+                onClick={() => handleBarcodeScan(cartBarcodeInput)}
+                disabled={!cartBarcodeInput.trim()}
+                className="absolute right-1 px-2 py-0.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-2xs"
+                title="Cobrar producto con este código de barras"
+              >
+                + Cobrar
+              </button>
+            </div>
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-1 rounded-xl shadow-2xs whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Lector Activo
+            </span>
+          </div>
+        </div>
+
+        {/* ALERTA VISUAL DE ESCANEO DENTRO DE LA CHAROLA */}
+        {lastScannedItem && (
+          <div className={`mx-2 sm:mx-3 mt-2 p-2 rounded-xl border-2 flex items-center justify-between gap-2 text-xs font-bold transition-all shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 shrink-0 ${
+            lastScannedItem.success
+              ? "bg-emerald-50 border-emerald-400 text-emerald-950 ring-2 ring-emerald-400/20"
+              : "bg-rose-50 border-rose-400 text-rose-950 ring-2 ring-rose-400/20"
+          }`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black shrink-0 shadow-2xs ${
+                lastScannedItem.success ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+              }`}>
+                {lastScannedItem.success ? "✓" : "✕"}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-black text-xs leading-tight">
+                  {lastScannedItem.success
+                    ? `¡Escaneado! ${lastScannedItem.productName} (+1)`
+                    : `Código no registrado: ${lastScannedItem.code}`}
+                </p>
+                <p className="text-[10px] opacity-80 font-mono truncate">
+                  {lastScannedItem.success
+                    ? `Código: ${lastScannedItem.code} • Sumado a la charola`
+                    : "Verifica que el producto esté registrado en el Catálogo de Productos"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLastScannedItem(null)}
+              className="p-1 text-stone-400 hover:text-stone-700 rounded-lg hover:bg-black/5 shrink-0"
+              title="Cerrar aviso"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Cart Items List - Optimizado para ver al menos 5 productos simultáneamente */}
-        <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-1.5">
+        <div ref={cartContainerRef} className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-1.5 scroll-smooth">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-2 animate-in fade-in zoom-in-95 duration-200">
               <div className="relative">
@@ -2134,15 +2266,22 @@ export default function POSPage() {
                 </span>
                 <p className="text-sm font-black text-stone-900">Charola vacía</p>
                 <p className="text-[11px] text-stone-500 max-w-[220px] leading-relaxed mx-auto font-medium">
-                  Toca cualquier pan del mostrador para agregarlo al pedido.
+                  Escanea el código de barras o toca cualquier pan del mostrador para agregarlo al cobro.
                 </p>
               </div>
             </div>
           ) : (
-            cart.map((item) => (
+            cart.map((item) => {
+              const isJustScanned = justScannedId === item.product.id;
+              return (
               <div
                 key={item.product.id}
-                className="p-2 sm:p-2.5 bg-white hover:bg-amber-50/30 rounded-2xl border border-stone-200 hover:border-amber-300 transition-all shadow-2xs hover:shadow-xs space-y-1.5"
+                data-product-id={item.product.id}
+                className={`p-2 sm:p-2.5 rounded-2xl border transition-all duration-300 space-y-1.5 relative ${
+                  isJustScanned
+                    ? "bg-emerald-50/80 border-emerald-400 ring-2 ring-emerald-500 shadow-md scale-[1.01]"
+                    : "bg-white hover:bg-amber-50/30 border-stone-200 hover:border-amber-300 shadow-2xs hover:shadow-xs"
+                }`}
               >
                 <div className="flex items-center gap-2 sm:gap-2.5">
                   {/* Foto del Pan */}
@@ -2158,12 +2297,38 @@ export default function POSPage() {
                     </div>
                   )}
 
-                  {/* Nombre y Precio Unitario */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-black text-xs sm:text-sm text-stone-900 leading-tight truncate" title={item.product.name}>
-                      {item.product.name}
-                    </p>
-                    <div className="flex items-center gap-1 mt-0.5">
+                  {/* Nombre, Código de barras y Precio Unitario */}
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-black text-xs sm:text-sm text-stone-900 leading-tight truncate max-w-[170px]" title={item.product.name}>
+                        {item.product.name}
+                      </p>
+                      {isJustScanned && (
+                        <span className="px-1.5 py-0.2 rounded-md bg-emerald-600 text-white font-black text-[9px] uppercase tracking-wider animate-bounce inline-flex items-center gap-0.5 shadow-2xs">
+                          ⚡ ¡Escaneado!
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Chips de Código de Barras y Clave */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {item.product.barcode && (
+                        <span 
+                          className="inline-flex items-center gap-1 font-mono text-[9px] sm:text-[10px] font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300/80 shadow-2xs"
+                          title={`Código de barras: ${item.product.barcode}`}
+                        >
+                          <Barcode className="w-3 h-3 text-amber-700 shrink-0" />
+                          <span>{item.product.barcode}</span>
+                        </span>
+                      )}
+                      {item.product.code && (
+                        <span className="text-[9px] font-mono font-bold text-stone-500 bg-stone-100 px-1 rounded border border-stone-200">
+                          #{item.product.code}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 pt-0.5">
                       <CartPriceInput
                         value={item.product.price}
                         onChange={(newPrice) => updateCartItemPrice(item.product.id, newPrice)}
@@ -2237,7 +2402,8 @@ export default function POSPage() {
                   ))}
                 </div>
               </div>
-            ))
+            );
+          })
           )}
         </div>
 

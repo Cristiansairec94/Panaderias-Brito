@@ -1,10 +1,21 @@
 import { Product } from "@/types";
 
+export function calculateEan13CheckDigit(digits12: string): number {
+  const d = digits12.replace(/\D/g, "").slice(0, 12);
+  if (d.length < 12) return 0;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const num = parseInt(d[i], 10);
+    sum += i % 2 === 0 ? num : num * 3;
+  }
+  return (10 - (sum % 10)) % 10;
+}
+
 export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-1",
     code: "PAN-001",
-    barcode: "750100010001",
+    barcode: "7501000100019",
     name: "Concha de Vainilla",
     price: 12,
     category: "pan_dulce",
@@ -17,7 +28,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-2",
     code: "PAN-002",
-    barcode: "750100010002",
+    barcode: "7501000100026",
     name: "Concha de Chocolate",
     price: 12,
     category: "pan_dulce",
@@ -30,7 +41,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-3",
     code: "PAN-003",
-    barcode: "750100010003",
+    barcode: "7501000100033",
     name: "Cuerno de Mantequilla",
     price: 15,
     category: "pan_dulce",
@@ -43,7 +54,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-4",
     code: "BLA-001",
-    barcode: "750100010004",
+    barcode: "7501000100040",
     name: "Bolillo Tradicional",
     price: 5,
     category: "pan_blanco",
@@ -56,7 +67,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-5",
     code: "BLA-002",
-    barcode: "750100010005",
+    barcode: "7501000100057",
     name: "Telera para Torta",
     price: 6,
     category: "pan_blanco",
@@ -69,7 +80,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-6",
     code: "PAN-004",
-    barcode: "750100010006",
+    barcode: "7501000100064",
     name: "Oreja Hojaldrada",
     price: 14,
     category: "pan_dulce",
@@ -82,7 +93,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-7",
     code: "PAN-005",
-    barcode: "750100010007",
+    barcode: "7501000100071",
     name: "Dona Glaseada",
     price: 13,
     category: "pan_dulce",
@@ -95,7 +106,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-8",
     code: "PAS-001",
-    barcode: "750100010008",
+    barcode: "7501000100088",
     name: "Rebanada Pastel 3 Leches",
     price: 45,
     category: "pasteleria",
@@ -108,7 +119,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-9",
     code: "PAS-002",
-    barcode: "750100010009",
+    barcode: "7501000100095",
     name: "Pay de Queso con Zarzamora",
     price: 40,
     category: "pasteleria",
@@ -121,7 +132,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-10",
     code: "BEB-001",
-    barcode: "750100010010",
+    barcode: "7501000100101",
     name: "Café de Olla Caliente",
     price: 25,
     category: "bebidas",
@@ -134,7 +145,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-11",
     code: "BEB-002",
-    barcode: "750100010011",
+    barcode: "7501000100118",
     name: "Chocolate Caliente con Leche",
     price: 30,
     category: "bebidas",
@@ -147,7 +158,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-12",
     code: "TEM-001",
-    barcode: "750100010012",
+    barcode: "7501000100125",
     name: "Empanada de Calabaza",
     price: 18,
     category: "temporada",
@@ -160,7 +171,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-13",
     code: "AB-001",
-    barcode: "750100010013",
+    barcode: "7501000100132",
     name: "Leche Entera 1L",
     price: 28,
     category: "abarrotes",
@@ -174,7 +185,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-14",
     code: "MP-001",
-    barcode: "750100010014",
+    barcode: "7501000100149",
     name: "Harina de Trigo San Antonio 1kg",
     price: 22,
     category: "materia_prima",
@@ -202,38 +213,89 @@ const STORAGE_KEY = "brito_products_v6";
 
 export function generateProductBarcode(): string {
   const current = getStoredProducts();
-  let candidate = `75010001${String(current.length + 1).padStart(4, "0")}`;
+  let base = `75010001${String(current.length + 1).padStart(4, "0")}`;
+  let candidate = `${base}${calculateEan13CheckDigit(base)}`;
   let attempt = 1;
   while (current.some((p) => p.barcode === candidate)) {
-    candidate = `75010001${String(current.length + 1 + attempt).padStart(4, "0")}`;
+    base = `75010001${String(current.length + 1 + attempt).padStart(4, "0")}`;
+    candidate = `${base}${calculateEan13CheckDigit(base)}`;
     attempt++;
   }
   return candidate;
 }
 
 export function findProductByBarcodeOrCode(query: string, productsList?: Product[]): Product | undefined {
-  const list = productsList || getStoredProducts();
+  const rawList = productsList && productsList.length > 0 ? productsList : getStoredProducts();
+  // Ensure we also consult stored products in case productsList in memory was stale or missing barcodes
+  const storedList = getStoredProducts();
+  const seenIds = new Set<string>();
+  const list: Product[] = [];
+  for (const item of [...rawList, ...storedList]) {
+    if (item && item.id && !seenIds.has(item.id)) {
+      seenIds.add(item.id);
+      list.push(item);
+    }
+  }
+
   const clean = query.trim().toUpperCase();
   if (!clean) return undefined;
 
   // 1. Coincidencia exacta por código de barras
-  const byBarcode = list.find((p) => p.barcode && p.barcode.trim() === query.trim());
+  const byBarcode = list.find((p) => p.barcode && p.barcode.trim().toUpperCase() === clean);
   if (byBarcode) return byBarcode;
 
-  // 2. Coincidencia exacta por código corto (ej. PAN-001, BLA-001)
+  // 2. Coincidencia numérica flexible (EAN-13, UPC-A, 12 vs 13 dígitos)
+  const queryDigits = query.replace(/\D/g, "");
+  if (queryDigits.length >= 3) {
+    // 2a. Comparación exacta de solo dígitos
+    const byExactDigits = list.find((p) => {
+      if (!p.barcode) return false;
+      const pDigits = p.barcode.replace(/\D/g, "");
+      return pDigits === queryDigits;
+    });
+    if (byExactDigits) return byExactDigits;
+
+    // 2b. Query tiene 13 dígitos y producto tiene 12 dígitos (falta dígito verificador en producto)
+    if (queryDigits.length === 13) {
+      const query12 = queryDigits.slice(0, 12);
+      const by12 = list.find((p) => {
+        if (!p.barcode) return false;
+        const pDigits = p.barcode.replace(/\D/g, "");
+        return pDigits === query12;
+      });
+      if (by12) return by12;
+    }
+
+    // 2c. Query tiene 12 dígitos y producto tiene 13 dígitos (escáner sin dígito verificador o UPC)
+    if (queryDigits.length === 12) {
+      const by13 = list.find((p) => {
+        if (!p.barcode) return false;
+        const pDigits = p.barcode.replace(/\D/g, "");
+        return pDigits.length === 13 && pDigits.slice(0, 12) === queryDigits;
+      });
+      if (by13) return by13;
+    }
+
+    // 2d. Compatibilidad con ceros a la izquierda (UPC-A vs EAN-13)
+    const strippedQuery = queryDigits.replace(/^0+/, "");
+    if (strippedQuery.length >= 4) {
+      const byStripped = list.find((p) => {
+        if (!p.barcode) return false;
+        const pDigits = p.barcode.replace(/\D/g, "").replace(/^0+/, "");
+        return pDigits === strippedQuery || 
+               (pDigits.length > 4 && (pDigits.startsWith(strippedQuery) || strippedQuery.startsWith(pDigits)));
+      });
+      if (byStripped) return byStripped;
+    }
+  }
+
+  // 3. Coincidencia exacta por código corto (ej. PAN-001, BLA-001)
   const byCode = list.find((p) => p.code && p.code.trim().toUpperCase() === clean);
   if (byCode) return byCode;
 
-  // 3. Coincidencia exacta por ID de producto
+  // 4. Coincidencia exacta por ID de producto
   const byId = list.find((p) => p.id && p.id.trim().toUpperCase() === clean);
   if (byId) return byId;
-
-  // 4. Coincidencia solo dígitos (para lectores numéricos estándar)
-  const digitsOnly = query.replace(/\D/g, "");
-  if (digitsOnly.length >= 4) {
-    const byDigits = list.find((p) => p.barcode && p.barcode.replace(/\D/g, "") === digitsOnly);
-    if (byDigits) return byDigits;
-  }
 
   return undefined;
 }
@@ -273,18 +335,48 @@ export function getStoredProducts(): Product[] {
       return DEFAULT_PRODUCTS;
     }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.some(p => p.id === "prod-1")) {
+    if (!Array.isArray(parsed) || parsed.length === 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
       return DEFAULT_PRODUCTS;
     }
-    return parsed.map((p: Product, idx: number) => {
+
+    let needsResave = false;
+    const normalized = parsed.map((p: Product, idx: number) => {
       const defaultMatch = DEFAULT_PRODUCTS.find(dp => dp.id === p.id);
+      let barcode = p.barcode || defaultMatch?.barcode;
+
+      if (barcode) {
+        const digits = barcode.replace(/\D/g, "");
+        // Si tiene 12 dígitos, migrar a 13 dígitos con su dígito verificador EAN-13
+        if (digits.length === 12) {
+          barcode = `${digits}${calculateEan13CheckDigit(digits)}`;
+          needsResave = true;
+        }
+      } else {
+        const base = `75010001${String(idx + 1).padStart(4, "0")}`;
+        barcode = `${base}${calculateEan13CheckDigit(base)}`;
+        needsResave = true;
+      }
+
+      const code = p.code || defaultMatch?.code || `PRD-${String(idx + 1).padStart(3, "0")}`;
+      if (code !== p.code || barcode !== p.barcode) {
+        needsResave = true;
+      }
+
       return {
         ...p,
-        code: p.code || defaultMatch?.code || `PRD-${String(idx + 1).padStart(3, "0")}`,
-        barcode: p.barcode || defaultMatch?.barcode || `75010001${String(idx + 1).padStart(4, "0")}`,
+        code,
+        barcode,
       };
     });
+
+    if (needsResave) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      } catch (e) {}
+    }
+
+    return normalized;
   } catch {
     return DEFAULT_PRODUCTS;
   }

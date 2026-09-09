@@ -529,13 +529,20 @@ export default function ProductosPage() {
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
                   <div className="space-y-1">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-0.5 min-w-0">
-                        {(product.barcode || product.code) && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-mono font-black text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                            <Barcode className="w-3 h-3 text-amber-700" />
-                            <span>{product.barcode || product.code}</span>
-                          </span>
-                        )}
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {product.code && (
+                            <span className="inline-block text-[10px] font-mono font-black text-stone-700 bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200">
+                              #{product.code}
+                            </span>
+                          )}
+                          {product.barcode && (
+                            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-black text-amber-950 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-300 shadow-2xs" title={`Código de barras EAN-13: ${product.barcode}`}>
+                              <Barcode className="w-3.5 h-3.5 text-amber-700" />
+                              <span>{product.barcode}</span>
+                            </span>
+                          )}
+                        </div>
                         <h3 className="text-base font-black text-stone-900 leading-snug">
                           {product.name}
                         </h3>
@@ -600,7 +607,7 @@ export default function ProductosPage() {
                   return (
                     <tr key={product.id} className="hover:bg-stone-50/70 transition-colors">
                       <td className="py-3 px-4 font-mono font-black text-xs whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-stone-100 border border-stone-200 text-stone-900 tracking-wider">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-50 border border-amber-300 text-amber-950 font-black tracking-wider shadow-2xs">
                           <Barcode className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                           <span>{product.barcode || product.code || "—"}</span>
                         </span>
