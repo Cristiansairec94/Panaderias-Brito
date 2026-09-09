@@ -24,11 +24,13 @@ import {
   Tag as TagIcon,
   CheckCircle2,
   Scale,
-  Barcode
+  Barcode,
+  Printer
 } from "lucide-react";
 import { Product } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { BarcodeCard } from "@/components/productos/BarcodeCard";
+import { PrintBarcodesModal } from "@/components/productos/PrintBarcodesModal";
 import { 
   getStoredProducts, 
   createProduct, 
@@ -43,6 +45,7 @@ export default function ProductosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // Modal state
@@ -300,7 +303,16 @@ export default function ProductosPage() {
         </div>
 
         {/* Action Button */}
-        <div className="relative z-10 flex items-center gap-3 w-full sm:w-auto">
+        <div className="relative z-10 flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setIsPrintModalOpen(true)}
+            className="w-full sm:w-auto justify-center px-4 py-3.5 bg-white/10 hover:bg-white/20 text-white font-black text-xs rounded-2xl border border-white/25 hover:border-amber-400/60 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider backdrop-blur-sm cursor-pointer shadow-lg hover:shadow-amber-500/10"
+            title="Imprimir todos los códigos de barra o por categoría"
+          >
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>Imprimir Códigos</span>
+          </button>
           <button
             onClick={handleOpenCreate}
             className="w-full sm:w-auto justify-center px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-xl shadow-orange-500/25 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider"
@@ -1002,6 +1014,13 @@ export default function ProductosPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Impresión Masiva de Códigos de Barra */}
+      <PrintBarcodesModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        products={products}
+      />
     </div>
   );
 }

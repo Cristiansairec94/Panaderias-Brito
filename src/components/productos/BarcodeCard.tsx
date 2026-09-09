@@ -52,6 +52,97 @@ export function buildEAN13(raw: string): string {
   return `${padded12}${calculateEAN13Checksum(padded12)}`;
 }
 
+export function renderBarcodeSvgString(barcode: string): string {
+  const cleanDigits = barcode.replace(/\D/g, "");
+  const isEanEligible = cleanDigits.length >= 10;
+
+  if (isEanEligible) {
+    const full13 = buildEAN13(cleanDigits);
+    const firstDigit = parseInt(full13[0], 10);
+    const parity = PARITY_PATTERNS[firstDigit] || "LLLLLL";
+
+    let leftModules = "";
+    for (let i = 1; i <= 6; i++) {
+      const d = parseInt(full13[i], 10);
+      const isL = parity[i - 1] === "L";
+      leftModules += isL ? L_PATTERNS[d] : G_PATTERNS[d];
+    }
+
+    let rightModules = "";
+    for (let i = 7; i <= 12; i++) {
+      const d = parseInt(full13[i], 10);
+      rightModules += R_PATTERNS[d];
+    }
+
+    const moduleWidth = 2.2;
+    const startX = 22;
+    const barHeight = 46;
+    const guardHeight = 54;
+
+    let rects = "";
+    let currentX = startX;
+
+    // Start Guard: 101
+    for (const bit of "101") {
+      if (bit === "1") {
+        rects += `<rect x="${currentX}" y="5" width="${moduleWidth}" height="${guardHeight}" fill="#000000" />`;
+      }
+      currentX += moduleWidth;
+    }
+
+    // Left 6 digits
+    for (const bit of leftModules) {
+      if (bit === "1") {
+        rects += `<rect x="${currentX}" y="5" width="${moduleWidth}" height="${barHeight}" fill="#000000" />`;
+      }
+      currentX += moduleWidth;
+    }
+
+    // Center Guard: 01010
+    for (const bit of "01010") {
+      if (bit === "1") {
+        rects += `<rect x="${currentX}" y="5" width="${moduleWidth}" height="${guardHeight}" fill="#000000" />`;
+      }
+      currentX += moduleWidth;
+    }
+
+    // Right 6 digits
+    for (const bit of rightModules) {
+      if (bit === "1") {
+        rects += `<rect x="${currentX}" y="5" width="${moduleWidth}" height="${barHeight}" fill="#000000" />`;
+      }
+      currentX += moduleWidth;
+    }
+
+    // End Guard: 101
+    for (const bit of "101") {
+      if (bit === "1") {
+        rects += `<rect x="${currentX}" y="5" width="${moduleWidth}" height="${guardHeight}" fill="#000000" />`;
+      }
+      currentX += moduleWidth;
+    }
+
+    const totalWidth = currentX + 22;
+
+    return `
+      <svg viewBox="0 0 ${totalWidth} 72" style="width:100%; max-width:230px; height:auto; display:block; margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
+        <rect width="${totalWidth}" height="72" fill="#ffffff" />
+        ${rects}
+        <text x="${startX - 10}" y="64" font-family="monospace" font-size="13" font-weight="bold" fill="#000" text-anchor="middle">${full13[0]}</text>
+        <text x="${startX + 3 + (42 * moduleWidth) / 2}" y="64" font-family="monospace" font-size="13" font-weight="bold" letter-spacing="1.8" fill="#000" text-anchor="middle">${full13.slice(1, 7)}</text>
+        <text x="${startX + 3 + 42 * moduleWidth + 5 * moduleWidth + (42 * moduleWidth) / 2}" y="64" font-family="monospace" font-size="13" font-weight="bold" letter-spacing="1.8" fill="#000" text-anchor="middle">${full13.slice(7, 13)}</text>
+      </svg>
+    `;
+  }
+
+  return `
+    <svg viewBox="0 0 220 72" style="width:100%; max-width:220px; height:auto; display:block; margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
+      <rect width="220" height="72" fill="#ffffff" />
+      <text x="110" y="45" font-family="monospace" font-size="14" font-weight="bold" text-anchor="middle" fill="#000">${barcode}</text>
+    </svg>
+  `;
+}
+
 interface BarcodeSvgProps {
   barcode: string;
 }
