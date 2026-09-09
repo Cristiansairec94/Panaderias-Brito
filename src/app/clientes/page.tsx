@@ -21,11 +21,19 @@ import {
   Calendar,
   BarChart3,
   Clock,
-  ShoppingBag
+  ShoppingBag,
+  RefreshCw
 } from "lucide-react";
 import { Customer } from "@/types";
 import { onlyNumbersKeyDown, cleanOnlyNumbers, formatCurrency } from "@/lib/utils";
-import { getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
+import { 
+  getStoredCustomers, 
+  saveStoredCustomers, 
+  fetchCustomersFromDb, 
+  createCustomerInDb, 
+  updateCustomerInDb, 
+  deleteCustomerInDb 
+} from "@/lib/customers";
 
 // Ícono SVG oficial y ordenado de WhatsApp
 function WhatsAppIcon({ className = "w-4 h-4" }: { className?: string }) {
@@ -100,6 +108,10 @@ export default function ClientesPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
+  // Estado del Servidor Directo
+  const [isDbConnected, setIsDbConnected] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Form State: Nuevo Cliente
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -110,13 +122,33 @@ export default function ClientesPage() {
   const [editPhone, setEditPhone] = useState("");
   const [editNotes, setEditNotes] = useState("");
 
+  // Sincronización directa con el servidor
+  const syncWithServer = async () => {
+    setIsSyncing(true);
+    try {
+      const { customers: dbCustomers, fromDb } = await fetchCustomersFromDb();
+      const valid = dbCustomers.filter((c) => c.id !== "cli-0" && c.type !== "general");
+      setCustomers(valid);
+      setIsDbConnected(fromDb);
+    } catch (err) {
+      console.warn("Error al sincronizar con el servidor directo:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   useEffect(() => {
+    // 1. Carga inmediata de caché local para respuesta instantánea
     const loaded = getStoredCustomers();
     const cleaned = loaded.filter((c) => c.id !== "cli-0" && c.type !== "general");
     setCustomers(cleaned);
     if (cleaned.length !== loaded.length) {
       saveStoredCustomers(cleaned);
     }
+
+    // 2. Consulta y sincronización en segundo plano con el servidor directo
+    syncWithServer();
+
     const handleSync = () => {
       const syncLoaded = getStoredCustomers();
       const syncCleaned = syncLoaded.filter((c) => c.id !== "cli-0" && c.type !== "general");
@@ -214,30 +246,25 @@ export default function ClientesPage() {
     setIsModalOpen(true);
   };
 
-  // Guardar nuevo cliente (se agrega al inicio como el más reciente)
-  const handleCreateCustomer = (e: React.FormEvent) => {
+  // Guardar nuevo cliente (se agrega al inicio y se sincroniza en el servidor)
+  const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const newCustomer: Customer = {
-      id: `cli-${Date.now()}`,
+    const newCustomerData = {
       name: name.trim(),
       phone: phone.trim() ? formatPhoneNumber(phone.trim()) : "N/A",
-      type: "frecuente",
+      type: "frecuente" as const,
       creditLimit: 0,
-      currentDebt: 0,
-      totalPurchases: 0,
       notes: notes.trim() || undefined,
-      registeredAt: new Date().toISOString(),
-      createdAt: Date.now(),
     };
 
-    const updated = [newCustomer, ...customers];
+    const created = await createCustomerInDb(newCustomerData);
+    const updated = [created, ...customers.filter((c) => c.id !== created.id)];
     setCustomers(updated);
-    saveStoredCustomers(updated);
     setCurrentPage(1); // Muestra la primera página donde aparece el nuevo cliente recién creado
     setIsModalOpen(false);
-    showNotification(`¡Cliente "${newCustomer.name}" registrado correctamente!`);
+    showNotification(`¡Cliente "${created.name}" registrado en el servidor correctamente!`);
   };
 
   // Apertura modal editar
@@ -249,38 +276,44 @@ export default function ClientesPage() {
   };
 
   // Guardar edición
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCustomer || !editName.trim()) return;
 
+    const updates = {
+      name: editName.trim(),
+      phone: editPhone.trim() ? formatPhoneNumber(editPhone.trim()) : "N/A",
+      notes: editNotes.trim() || undefined,
+    };
+
+    await updateCustomerInDb(editingCustomer.id, updates);
     const updated = customers.map((c) => {
       if (c.id === editingCustomer.id) {
         return {
           ...c,
-          name: editName.trim(),
-          phone: editPhone.trim() ? formatPhoneNumber(editPhone.trim()) : "N/A",
-          notes: editNotes.trim() || undefined,
+          ...updates,
         };
       }
       return c;
     });
 
     setCustomers(updated);
-    saveStoredCustomers(updated);
     setEditingCustomer(null);
-    showNotification(`¡Cliente "${editName.trim()}" actualizado con éxito!`);
+    showNotification(`¡Cliente "${editName.trim()}" actualizado en el servidor con éxito!`);
   };
 
   // Confirmar eliminación
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteConfirm) return;
 
-    const updated = customers.filter((c) => c.id !== deleteConfirm.id);
-    setCustomers(updated);
-    saveStoredCustomers(updated);
+    const deletedId = deleteConfirm.id;
     const deletedName = deleteConfirm.name;
     setDeleteConfirm(null);
-    showNotification(`Cliente "${deletedName}" eliminado.`);
+
+    await deleteCustomerInDb(deletedId, deletedName);
+    const updated = customers.filter((c) => c.id !== deletedId);
+    setCustomers(updated);
+    showNotification(`Cliente "${deletedName}" eliminado del servidor.`);
   };
 
   return (
@@ -311,14 +344,31 @@ export default function ClientesPage() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenCreate}
-          className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-6 py-3.5 rounded-2xl shadow-lg shadow-amber-600/25 text-base sm:text-lg transition-all active:scale-95 cursor-pointer"
-        >
-          <Plus className="w-6 h-6" />
-          <span>Registrar Nuevo Cliente</span>
-        </button>
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full sm:w-auto">
+          {/* Indicador de Estado del Servidor Directo */}
+          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border-2 border-stone-200 bg-stone-50 text-xs sm:text-sm font-black text-stone-700 shadow-2xs">
+            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isDbConnected ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse" : "bg-amber-500"}`} />
+            <span className="whitespace-nowrap">{isDbConnected ? "Servidor Directo Conectado" : "Servidor Local Sincronizado"}</span>
+            <button
+              type="button"
+              onClick={syncWithServer}
+              disabled={isSyncing}
+              title="Sincronizar clientes con el servidor ahora"
+              className="p-1 hover:bg-stone-200 rounded-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer ml-1"
+            >
+              <RefreshCw className={`w-4 h-4 text-stone-600 ${isSyncing ? "animate-spin text-amber-700" : ""}`} />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleOpenCreate}
+            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-6 py-3.5 rounded-2xl shadow-lg shadow-amber-600/25 text-base sm:text-lg transition-all active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-6 h-6" />
+            <span>Registrar Nuevo Cliente</span>
+          </button>
+        </div>
       </div>
 
       {/* BUSCADOR SIMPLE */}

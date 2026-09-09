@@ -54,7 +54,9 @@ import {
   getStoredCustomers, 
   saveStoredCustomers, 
   addQuickCustomer,
-  recordCustomerSale
+  createCustomerInDb,
+  recordCustomerSale,
+  fetchCustomersFromDb
 } from "@/lib/customers";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
@@ -522,9 +524,16 @@ export default function POSPage() {
     } catch (e) {}
   }, []);
 
-  // Load and synchronize customers
+  // Load and synchronize customers from local and direct server
   useEffect(() => {
     setCustomers(getStoredCustomers());
+
+    fetchCustomersFromDb().then(({ customers: dbCusts }) => {
+      if (dbCusts && dbCusts.length > 0) {
+        setCustomers(dbCusts);
+      }
+    });
+
     const handleCustomerSync = () => {
       setCustomers(getStoredCustomers());
     };
@@ -545,11 +554,11 @@ export default function POSPage() {
     }
   }, [isCustomerPickerOpen]);
 
-  const handleCreateQuickCustomer = (e: React.FormEvent) => {
+  const handleCreateQuickCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName.trim()) return;
 
-    const created = addQuickCustomer({
+    const created = await createCustomerInDb({
       name: newCustName.trim(),
       phone: newCustPhone.trim() || "Sin teléfono",
       type: "frecuente",
@@ -1039,13 +1048,18 @@ export default function POSPage() {
     try {
       const supabase = createClient();
       
+      const saleInsertPayload: any = {
+        total: currentTotal,
+        payment_method: currentPaymentMethod,
+        cashier: cashierName,
+      };
+      if (selectedCustomer.id && !selectedCustomer.id.startsWith("cli-")) {
+        saleInsertPayload.customer_id = selectedCustomer.id;
+      }
+
       const { data: saleData, error: saleErr } = await supabase
         .from("sales")
-        .insert({
-          total: currentTotal,
-          payment_method: currentPaymentMethod,
-          cashier: cashierName,
-        })
+        .insert(saleInsertPayload)
         .select()
         .single();
 
@@ -1113,8 +1127,16 @@ export default function POSPage() {
       if (selectedCustomer.id && selectedCustomer.id !== "cli-0") {
         recordCustomerSale(
           selectedCustomer.id,
-          currentItems.map((ci) => ({ name: ci.product.name, quantity: ci.quantity })),
-          currentTotal
+          currentItems.map((ci) => ({
+            name: ci.product.name,
+            quantity: ci.quantity,
+            unitPrice: ci.product.price,
+            subtotal: ci.product.price * ci.quantity,
+          })),
+          currentTotal,
+          activeBranch?.name,
+          cashierName,
+          currentPaymentMethod
         );
       }
 

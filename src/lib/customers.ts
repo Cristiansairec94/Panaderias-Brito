@@ -1,4 +1,5 @@
 import { Customer, CustomerPurchase } from "@/types";
+import { createClient } from "@/lib/supabase/client";
 
 export const STORAGE_CUSTOMERS_KEY = "brito_customers";
 
@@ -383,7 +384,193 @@ export function recordCustomerSale(
 
     customers[idx] = customer;
     saveStoredCustomers(customers);
+
+    // Sincronizar actualización de compra acumulada en el servidor directo
+    if (!customerId.startsWith("cli-")) {
+      try {
+        const supabase = createClient();
+        supabase
+          .from("customers")
+          .update({ total_purchases: customer.totalPurchases })
+          .eq("id", customerId)
+          .then();
+      } catch (err) {
+        console.warn("Error updating customer total_purchases on server:", err);
+      }
+    }
   } catch (e) {
     console.error("Error recording customer purchase mode", e);
+  }
+}
+
+/**
+ * Consulta clientes en tiempo real desde la base de datos de Supabase.
+ * Si la consulta es exitosa, fusiona y sincroniza con localStorage.
+ */
+export async function fetchCustomersFromDb(): Promise<{ customers: Customer[]; fromDb: boolean }> {
+  const local = getStoredCustomers();
+  if (typeof window === "undefined") {
+    return { customers: local, fromDb: false };
+  }
+
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data && Array.isArray(data) && data.length > 0) {
+      const dbMapped: Customer[] = data
+        .filter((row: any) => row.id !== "cli-0" && row.type !== "general")
+        .map((row: any) => {
+          const localMatch = local.find(
+            (c) => c.id === row.id || (c.name.trim().toLowerCase() === row.name.trim().toLowerCase())
+          );
+          return {
+            id: row.id,
+            name: row.name,
+            phone: row.phone || "N/A",
+            email: row.email || undefined,
+            address: row.address || undefined,
+            type: (row.type as Customer["type"]) || "frecuente",
+            creditLimit: Number(row.credit_limit || 0),
+            currentDebt: Number(row.current_debt || 0),
+            totalPurchases: Number(row.total_purchases || localMatch?.totalPurchases || 0),
+            notes: row.notes || undefined,
+            registeredAt: row.created_at || localMatch?.registeredAt || new Date().toISOString(),
+            createdAt: row.created_at ? new Date(row.created_at).getTime() : localMatch?.createdAt || Date.now(),
+            favoriteProduct: localMatch?.favoriteProduct,
+            purchaseCounts: localMatch?.purchaseCounts || {},
+            purchaseHistory: localMatch?.purchaseHistory || [],
+          };
+        });
+
+      // Conservar clientes locales que aún no se hayan sincronizado
+      const dbIds = new Set(dbMapped.map((c) => c.id));
+      const dbNames = new Set(dbMapped.map((c) => c.name.trim().toLowerCase()));
+      for (const loc of local) {
+        if (!dbIds.has(loc.id) && !dbNames.has(loc.name.trim().toLowerCase())) {
+          dbMapped.push(loc);
+        }
+      }
+
+      saveStoredCustomers(dbMapped);
+      return { customers: dbMapped, fromDb: true };
+    }
+  } catch (err) {
+    console.warn("Supabase fetchCustomers error, using local data:", err);
+  }
+
+  return { customers: local, fromDb: false };
+}
+
+/**
+ * Inserta un nuevo cliente directamente en Supabase y lo almacena localmente.
+ */
+export async function createCustomerInDb(customerData: {
+  name: string;
+  phone?: string;
+  type?: Customer["type"];
+  creditLimit?: number;
+  notes?: string;
+  address?: string;
+  email?: string;
+  favoriteProduct?: string;
+}): Promise<Customer> {
+  const localCustomer = addQuickCustomer(customerData);
+
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("customers")
+      .insert({
+        name: customerData.name.trim(),
+        phone: customerData.phone?.trim() || null,
+        type: customerData.type || "frecuente",
+        credit_limit: customerData.creditLimit || 0,
+        current_debt: 0,
+        total_purchases: 0,
+        notes: customerData.notes?.trim() || null,
+        address: customerData.address?.trim() || null,
+        email: customerData.email?.trim() || null,
+      })
+      .select()
+      .single();
+
+    if (data && !error) {
+      const current = getStoredCustomers();
+      const idx = current.findIndex((c) => c.id === localCustomer.id);
+      if (idx !== -1) {
+        current[idx] = { ...localCustomer, id: data.id };
+        saveStoredCustomers(current);
+        return current[idx];
+      }
+    }
+  } catch (err) {
+    console.warn("Supabase insert customer failed, saved in local cache:", err);
+  }
+
+  return localCustomer;
+}
+
+/**
+ * Actualiza los datos de un cliente en Supabase y localmente.
+ */
+export async function updateCustomerInDb(
+  id: string,
+  updates: Partial<Customer>
+): Promise<boolean> {
+  const current = getStoredCustomers();
+  const idx = current.findIndex((c) => c.id === id);
+  if (idx !== -1) {
+    current[idx] = { ...current[idx], ...updates };
+    saveStoredCustomers(current);
+  }
+
+  try {
+    const supabase = createClient();
+    const dbPayload: any = {};
+    if (updates.name !== undefined) dbPayload.name = updates.name.trim();
+    if (updates.phone !== undefined) dbPayload.phone = updates.phone.trim();
+    if (updates.notes !== undefined) dbPayload.notes = updates.notes.trim();
+    if (updates.type !== undefined) dbPayload.type = updates.type;
+    if (updates.address !== undefined) dbPayload.address = updates.address.trim();
+    if (updates.email !== undefined) dbPayload.email = updates.email.trim();
+    if (updates.totalPurchases !== undefined) dbPayload.total_purchases = updates.totalPurchases;
+    if (updates.creditLimit !== undefined) dbPayload.credit_limit = updates.creditLimit;
+    if (updates.currentDebt !== undefined) dbPayload.current_debt = updates.currentDebt;
+
+    if (!id.startsWith("cli-")) {
+      await supabase.from("customers").update(dbPayload).eq("id", id);
+    } else if (updates.name) {
+      await supabase.from("customers").update(dbPayload).eq("name", updates.name);
+    }
+    return true;
+  } catch (err) {
+    console.warn("Supabase update customer failed, updated local cache:", err);
+    return false;
+  }
+}
+
+/**
+ * Elimina un cliente en Supabase y localmente.
+ */
+export async function deleteCustomerInDb(id: string, name?: string): Promise<boolean> {
+  const current = getStoredCustomers();
+  const filtered = current.filter((c) => c.id !== id);
+  saveStoredCustomers(filtered);
+
+  try {
+    const supabase = createClient();
+    if (!id.startsWith("cli-")) {
+      await supabase.from("customers").delete().eq("id", id);
+    } else if (name) {
+      await supabase.from("customers").delete().eq("name", name);
+    }
+    return true;
+  } catch (err) {
+    console.warn("Supabase delete customer failed, removed from local cache:", err);
+    return false;
   }
 }
