@@ -607,10 +607,29 @@
       const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
       const customerPickerRef = useRef(null);
 
-      // New Customer Form State (Simplified to 3 fields: Phone, Name, Notes)
-      const [newCustName, setNewCustName] = useState("");
-      const [newCustPhone, setNewCustPhone] = useState("");
-      const [newCustNotes, setNewCustNotes] = useState("");
+      // Printer Configuration State
+      const [printerConfig, setPrinterConfig] = useState(() => {
+        try {
+          const saved = localStorage.getItem("brito_pos_printer_config");
+          return saved ? JSON.parse(saved) : {
+            selectedPrinterName: "POS-58",
+            port: "USB002",
+            paperWidth: "58mm",
+            directPrinting: true
+          };
+        } catch (e) {
+          return { selectedPrinterName: "POS-58", port: "USB002", paperWidth: "58mm", directPrinting: true };
+        }
+      });
+      const [showPrinterModal, setShowPrinterModal] = useState(false);
+      const [testPrintSuccess, setTestPrintSuccess] = useState(false);
+
+      const handleSavePrinter = (newCfg) => {
+        setPrinterConfig(newCfg);
+        try {
+          localStorage.setItem("brito_pos_printer_config", JSON.stringify(newCfg));
+        } catch (e) {}
+      };
 
       useEffect(() => {
         try {
@@ -1420,7 +1439,34 @@
                       <span className="text-lg">🚐</span>
                       <span>Entrada de Pan</span>
                     </button>
-                  )}
+                  {/* Botón Selector e Indicador de Impresora Directa */}
+                  <button
+                    type="button"
+                    onClick={() => setShowPrinterModal(true)}
+                    className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-stone-300 hover:border-amber-400 bg-white hover:bg-amber-50/80 text-stone-900 transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
+                    title={`Impresora de tickets conectada: ${printerConfig.selectedPrinterName} (${printerConfig.port}). Haz clic para elegir la impresora directa.`}
+                  >
+                    <div className="relative">
+                      <span className="text-lg">🖨️</span>
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"></span>
+                    </div>
+                    <div className="text-left hidden xl:block">
+                      <div className="flex items-center gap-1.5 leading-none">
+                        <span className="text-xs font-black text-stone-900 truncate max-w-[120px]">
+                          {printerConfig.selectedPrinterName}
+                        </span>
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 uppercase">
+                          {printerConfig.directPrinting ? "Directa" : "Diálogo"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-stone-400 font-bold block mt-0.5">
+                        {printerConfig.paperWidth} • {printerConfig.port}
+                      </span>
+                    </div>
+                    <div className="xl:hidden flex items-center gap-1 text-xs font-black">
+                      <span>{printerConfig.selectedPrinterName}</span>
+                    </div>
+                  </button>
                 </div>
 
                 {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
@@ -2234,7 +2280,18 @@
                 <div className="bg-neutral-900 text-white p-4 px-6 flex items-center justify-between">
                   <div>
                     <span className="font-bold text-sm block leading-tight">🧾 Comprobante de Venta</span>
-                    <span className="text-[10px] text-amber-300/90 font-normal">Optimizado para Térmica 58mm (POS-58)</span>
+                    <div className="flex items-center gap-1 text-[10px] text-amber-300/90 font-normal">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                      <span>Impresora: <strong>{printerConfig.selectedPrinterName}</strong> ({printerConfig.paperWidth})</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowPrinterModal(true)}
+                        className="underline hover:text-white ml-1 cursor-pointer font-bold text-amber-200"
+                        title="Cambiar impresora de tickets"
+                      >
+                        [Elegir]
+                      </button>
+                    </div>
                   </div>
                   <button
                     onClick={handleCancelTicket}
@@ -2431,7 +2488,7 @@
                     >
                       <span className="text-base">{ticketPrinted ? "✓" : "🖨️"}</span>
                       <span className="whitespace-nowrap font-bold">
-                        {ticketPrinted ? "✓ Imprimiendo en POS-58..." : "Imprimir Ticket"}
+                        {ticketPrinted ? `✓ Imprimiendo en ${printerConfig.selectedPrinterName}...` : `Imprimir en ${printerConfig.selectedPrinterName}`}
                       </span>
                     </button>
 
@@ -3720,6 +3777,124 @@
                       Cerrar Ventana
                     </button>
                   )}
+          {/* MODAL CONFIGURACIÓN DE IMPRESORA DIRECTA */}
+          {showPrinterModal && (
+            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[92vh] border-2 border-stone-200">
+                <div className="bg-neutral-900 text-white p-4 sm:p-5 flex items-center justify-between border-b border-neutral-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl">
+                      🖨️
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-black text-base sm:text-lg text-white leading-tight">
+                          Impresora de Tickets
+                        </h3>
+                        <span className="flex items-center gap-1 bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-2 py-0.5 rounded-full">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          Conectada
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-400">
+                        Selecciona la impresora directa para comprobantes de venta
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPrinterModal(false)}
+                    className="text-neutral-400 hover:text-white p-1 rounded-lg text-lg cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-4 sm:p-6 space-y-4 overflow-y-auto">
+                  {/* Tarjeta de Estado Activo */}
+                  <div className="bg-amber-50/80 border-2 border-amber-300 rounded-2xl p-3.5 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-black uppercase text-amber-900 font-bold">Impresora Seleccionada</span>
+                      <span className="text-[10px] font-black px-2 py-0.5 bg-stone-900 text-amber-300 rounded">
+                        {printerConfig.paperWidth}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-base font-black text-stone-900">{printerConfig.selectedPrinterName}</p>
+                        <p className="text-xs text-stone-600">Puerto: {printerConfig.port} • Modo Directo</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTestPrintSuccess(true);
+                          window.print();
+                          setTimeout(() => setTestPrintSuccess(false), 2000);
+                        }}
+                        className="px-3 py-2 bg-white hover:bg-amber-100 text-stone-900 font-bold text-xs rounded-xl border border-amber-300 shadow-xs cursor-pointer"
+                      >
+                        {testPrintSuccess ? "✔ Enviado" : "🖨️ Probar Impresión"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Lista de Impresoras Disponibles */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase text-stone-700 block">
+                      Elegir Impresora Directa:
+                    </label>
+                    {[
+                      { name: "POS-58", port: "USB002", desc: "Impresora Térmica 58mm Principal (Recomendada)", paper: "58mm" },
+                      { name: "POS-58(copy of 1)", port: "USB002", desc: "Copia Secundaria Térmica 58mm (Respaldo)", paper: "58mm" },
+                      { name: "Impresora Térmica 80mm", port: "USB001 / Red", desc: "Impresora Térmica Ancha (80mm)", paper: "80mm" },
+                      { name: "Microsoft Print to PDF", port: "PORTPROMPT:", desc: "Guardar Comprobante en Archivo PDF", paper: "80mm" },
+                    ].map((p) => {
+                      const isSel = printerConfig.selectedPrinterName === p.name;
+                      return (
+                        <div
+                          key={p.name}
+                          onClick={() => {
+                            const updated = {
+                              ...printerConfig,
+                              selectedPrinterName: p.name,
+                              port: p.port,
+                              paperWidth: p.paper
+                            };
+                            handleSavePrinter(updated);
+                          }}
+                          className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-between cursor-pointer ${
+                            isSel ? "border-amber-600 bg-amber-50/70 shadow-sm" : "border-stone-200 hover:border-stone-300 bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center text-xs ${
+                              isSel ? "border-amber-600 bg-amber-600 text-white" : "border-stone-400"
+                            }`}>
+                              {isSel ? "✓" : ""}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-xs sm:text-sm text-stone-900">{p.name}</span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-stone-100 text-stone-700">{p.port}</span>
+                              </div>
+                              <p className="text-[11px] text-stone-500">{p.desc}</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-stone-100 text-stone-800">{p.paper}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white border-t border-stone-200 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrinterModal(false)}
+                    className="px-6 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs rounded-xl shadow-md cursor-pointer"
+                  >
+                    Aceptar
+                  </button>
                 </div>
               </div>
             </div>
