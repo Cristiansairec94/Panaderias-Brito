@@ -2417,7 +2417,11 @@
                       onClick={() => {
                         setTicketPrinted(true);
                         window.print();
-                        setTimeout(() => setTicketPrinted(false), 2500);
+                        setTimeout(() => {
+                          setTicketPrinted(false);
+                          try { playCashRegisterSound(); } catch(e) {}
+                          resetSale();
+                        }, 1200);
                       }}
                       className={`flex items-center justify-center gap-2 py-3.5 px-3 font-bold rounded-2xl text-xs sm:text-sm shadow-md border transition-all active:scale-95 cursor-pointer ${
                         ticketPrinted

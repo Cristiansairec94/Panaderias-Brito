@@ -63,7 +63,11 @@ export default function TicketModal({
     window.print();
     setTimeout(() => {
       setPrinted(false);
-    }, 2500);
+      try {
+        playCashRegisterSound();
+      } catch (e) {}
+      onClose();
+    }, 1200);
   };
 
   return (
