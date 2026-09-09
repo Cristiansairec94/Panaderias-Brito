@@ -1391,26 +1391,28 @@
                     <span className="text-sm text-stone-400">▾</span>
                   </button>
 
-                  {/* Botón Surtir / Entrada de Pan (Camionetas) - Directamente a lado */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isShiftLocked) {
-                        alert("🔒 Terminal Bloqueada: Debes ingresar las credenciales de la encargada en la terminal de cobro para habilitar operaciones.");
-                        return;
-                      }
-                      setShowBreadDelivery(true);
-                    }}
-                    className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
-                      isShiftLocked
-                        ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                        : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black"
-                    }`}
-                    title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
-                  >
-                    <span className="text-lg">🚐</span>
-                    <span>Entrada de Pan</span>
-                  </button>
+                  {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
+                  {false && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isShiftLocked) {
+                          alert("🔒 Terminal Bloqueada: Debes ingresar las credenciales de la encargada en la terminal de cobro para habilitar operaciones.");
+                          return;
+                        }
+                        setShowBreadDelivery(true);
+                      }}
+                      className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
+                        isShiftLocked
+                          ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
+                          : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black"
+                      }`}
+                      title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
+                    >
+                      <span className="text-lg">🚐</span>
+                      <span>Entrada de Pan</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}

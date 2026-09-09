@@ -339,7 +339,6 @@ export default function POSPage() {
   const [cashGiven, setCashGiven] = useState<string>("");
 
   // Estados para Cobro y Escaneo por Código de Barras
-  const [barcodeInput, setBarcodeInput] = useState("");
   const [cartBarcodeInput, setCartBarcodeInput] = useState("");
   const [justScannedId, setJustScannedId] = useState<string | null>(null);
   const [lastScannedItem, setLastScannedItem] = useState<{
@@ -348,7 +347,6 @@ export default function POSPage() {
     code: string;
     timestamp: number;
   } | null>(null);
-  const barcodeInputRef = useRef<HTMLInputElement>(null);
   const cartBarcodeInputRef = useRef<HTMLInputElement>(null);
   const cartContainerRef = useRef<HTMLDivElement>(null);
   const keyStrokeBufferRef = useRef<{ buffer: string; lastStrokeTime: number }>({ buffer: "", lastStrokeTime: 0 });
@@ -817,7 +815,6 @@ export default function POSPage() {
         code: matched.barcode || code,
         timestamp: Date.now(),
       });
-      setBarcodeInput("");
       setCartBarcodeInput("");
 
       addNotification({
@@ -859,15 +856,6 @@ export default function POSPage() {
       const activeElem = document.activeElement;
       const isInput = activeElem instanceof HTMLInputElement || activeElem instanceof HTMLTextAreaElement;
 
-      // Si el foco está en el input superior de código de barras y presiona Enter
-      if (activeElem === barcodeInputRef.current) {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          handleBarcodeScan(barcodeInput);
-        }
-        return;
-      }
-
       // Si el foco está en el input de escaneo de la Charola de Cobro y presiona Enter
       if (activeElem === cartBarcodeInputRef.current) {
         if (e.key === "Enter") {
@@ -878,7 +866,7 @@ export default function POSPage() {
       }
 
       // Si el foco está en otros inputs (ej. buscador general de productos)
-      if (isInput && activeElem !== barcodeInputRef.current && activeElem !== cartBarcodeInputRef.current) {
+      if (isInput && activeElem !== cartBarcodeInputRef.current) {
         if (e.key === "Enter" && search.trim()) {
           const matched = findProductByBarcodeOrCode(search.trim(), products) || findProductByBarcodeOrCode(search.trim(), getStoredProducts());
           if (matched) {
@@ -915,7 +903,7 @@ export default function POSPage() {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [products, barcodeInput, cartBarcodeInput, search, isShiftLocked, showReceiptModal, showExpensesModal, showIncomesModal, showCashDrawerModal, showBreadDeliveryModal]);
+  }, [products, cartBarcodeInput, search, isShiftLocked, showReceiptModal, showExpensesModal, showIncomesModal, showCashDrawerModal, showBreadDeliveryModal]);
 
   const addMultipleToCart = (product: Product, count: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -1518,50 +1506,6 @@ export default function POSPage() {
                   </button>
                 )}
               </div>
-
-              {/* Lector / Entrada Directa de Código de Barras */}
-              <div className="relative shrink-0 hidden sm:block">
-                <div className="relative flex items-center">
-                  <Barcode className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
-                  <input
-                    ref={barcodeInputRef}
-                    type="text"
-                    placeholder="Código de barras..."
-                    value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleBarcodeScan(barcodeInput);
-                      }
-                    }}
-                    className="w-48 lg:w-56 pl-10 pr-20 py-3.5 bg-amber-50/90 hover:bg-amber-100/60 focus:bg-white border-2 border-amber-400 focus:border-amber-600 rounded-2xl text-xs sm:text-sm font-black text-amber-950 placeholder:text-amber-700/60 shadow-xs focus:outline-none transition-all font-mono"
-                    title="Escanea con la pistola de código de barras o teclea el código y presiona Enter"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleBarcodeScan(barcodeInput)}
-                    disabled={!barcodeInput.trim()}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:hover:bg-amber-600 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-2xs"
-                    title="Cobrar producto con este código de barras"
-                  >
-                    + Cobrar
-                  </button>
-                </div>
-              </div>
-
-              {/* Botón Escáner Móvil */}
-              <button
-                type="button"
-                onClick={() => {
-                  const code = window.prompt("🏷️ Ingresa o escanea el código de barras del producto:");
-                  if (code) handleBarcodeScan(code);
-                }}
-                className="sm:hidden p-3.5 rounded-2xl bg-amber-100 text-amber-900 border-2 border-amber-300 font-bold shrink-0 shadow-xs active:scale-95 transition-all"
-                title="Escanear o teclear código de barras"
-              >
-                <Barcode className="w-5 h-5" />
-              </button>
             </div>
 
             {/* Grupo Catálogo y Pan: Categorías y Precios + Entrada de Pan directamente a lado */}
@@ -1591,34 +1535,36 @@ export default function POSPage() {
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
               </button>
 
-              {/* Botón Surtir / Entrada de Pan (Camionetas) - Directamente a lado */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (isShiftLocked) {
-                    addNotification({
-                      senderName: "🔒 Terminal Bloqueada",
-                      senderAvatar: "⚠️",
-                      badgeIcon: "alerta",
-                      title: "Terminal Bloqueada",
-                      highlightText: "Turno cerrado por seguridad",
-                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar entrada de pan.",
-                      category: "inventario",
-                    });
-                    return;
-                  }
-                  setShowBreadDeliveryModal(true);
-                }}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
-                  isShiftLocked
-                    ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                    : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black"
-                }`}
-                title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
-              >
-                <span className="text-lg">🚐</span>
-                <span>Entrada de Pan</span>
-              </button>
+              {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
+              {false && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isShiftLocked) {
+                      addNotification({
+                        senderName: "🔒 Terminal Bloqueada",
+                        senderAvatar: "⚠️",
+                        badgeIcon: "alerta",
+                        title: "Terminal Bloqueada",
+                        highlightText: "Turno cerrado por seguridad",
+                        description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar entrada de pan.",
+                        category: "inventario",
+                      });
+                      return;
+                    }
+                    setShowBreadDeliveryModal(true);
+                  }}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
+                    isShiftLocked
+                      ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
+                      : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black"
+                  }`}
+                  title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
+                >
+                  <span className="text-lg">🚐</span>
+                  <span>Entrada de Pan</span>
+                </button>
+              )}
             </div>
 
             {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
