@@ -23,7 +23,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 50,
     tag: "Tradicional",
     description: "Esponjosa y suave con costra crujiente de azúcar y vainilla natural.",
-    image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-2",
@@ -36,7 +41,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 40,
     tag: "Favorito",
     description: "Masa fina aromatizada con cacao selecto y cubierta crujiente chocolatosa.",
-    image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-3",
@@ -49,7 +59,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 30,
     tag: "Artesanal",
     description: "Hojaldre 100% mantequilla pura de vaca, dorado y crujiente por capas.",
-    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-4",
@@ -62,7 +77,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 150,
     tag: "Recién Salido",
     description: "Corteza dorada crujiente y migajón esponjoso, horneado en piso de piedra.",
-    image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-5",
@@ -75,7 +95,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 100,
     tag: "De la Casa",
     description: "Pan suave y dorado en tres secciones, el clásico para tortas mexicanas.",
-    image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-6",
@@ -88,7 +113,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 35,
     tag: "Crujiente",
     description: "Hojaldre finamente caramelizado al horno con mantequilla y azúcar.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-7",
@@ -101,7 +131,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 30,
     tag: "Más Vendido",
     description: "Masa esponjada frita a punto exacto con glaseado clásico brillante.",
-    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-8",
@@ -114,7 +149,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 20,
     tag: "Gourmet",
     description: "Bizcocho húmedo bañado en infusión de tres leches y fresa fresca.",
-    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-9",
@@ -127,7 +167,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 15,
     tag: "Especialidad",
     description: "Base crujiente de galleta con suave crema de queso y zarzamora silvestre.",
-    image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-10",
@@ -140,7 +185,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 60,
     tag: "Calientito",
     description: "Café de grano selecto colado con canela criolla y toque de piloncillo.",
-    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80",
+    hasIva: true,
+    ivaRate: 16,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-11",
@@ -153,7 +203,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 40,
     tag: "Tradición",
     description: "Tablelilla artesanal espumada en jarra con leche entera caliente.",
-    image: "https://images.unsplash.com/photo-1542990253-0d0f5be5f0ed?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1542990253-0d0f5be5f0ed?w=800&auto=format&fit=crop&q=80",
+    hasIva: true,
+    ivaRate: 16,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-12",
@@ -166,7 +221,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 25,
     tag: "Rellena",
     description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-13",
@@ -180,7 +240,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     unit: "pieza",
     tag: "Abarrote",
     description: "Leche pasteurizada entera fresca de primera calidad.",
-    image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-14",
@@ -194,7 +259,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     unit: "kg",
     tag: "Insumo",
     description: "Harina de trigo de alta fuerza ideal para panificación tradicional.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   }
 ];
 
@@ -323,6 +393,45 @@ export function generateProductCode(category?: string): string {
   return codeCandidate;
 }
 
+export function calculateProductTaxes(
+  price: number,
+  hasIva: boolean = false,
+  ivaRate: number = 0,
+  hasIeps: boolean = false,
+  iepsRate: number = 0,
+  taxIncluded: boolean = true
+) {
+  const safePrice = Math.max(0, price || 0);
+  const safeIvaRate = hasIva ? Math.max(0, ivaRate || 0) : 0;
+  const safeIepsRate = hasIeps ? Math.max(0, iepsRate || 0) : 0;
+
+  if (taxIncluded) {
+    const totalTaxPercent = (safeIvaRate + safeIepsRate) / 100;
+    const basePrice = totalTaxPercent > 0 ? safePrice / (1 + totalTaxPercent) : safePrice;
+    const ivaAmount = basePrice * (safeIvaRate / 100);
+    const iepsAmount = basePrice * (safeIepsRate / 100);
+    return {
+      basePrice: Number(basePrice.toFixed(2)),
+      ivaAmount: Number(ivaAmount.toFixed(2)),
+      iepsAmount: Number(iepsAmount.toFixed(2)),
+      totalPrice: Number(safePrice.toFixed(2)),
+      totalTaxes: Number((ivaAmount + iepsAmount).toFixed(2)),
+    };
+  } else {
+    const basePrice = safePrice;
+    const ivaAmount = basePrice * (safeIvaRate / 100);
+    const iepsAmount = basePrice * (safeIepsRate / 100);
+    const totalPrice = basePrice + ivaAmount + iepsAmount;
+    return {
+      basePrice: Number(basePrice.toFixed(2)),
+      ivaAmount: Number(ivaAmount.toFixed(2)),
+      iepsAmount: Number(iepsAmount.toFixed(2)),
+      totalPrice: Number(totalPrice.toFixed(2)),
+      totalTaxes: Number((ivaAmount + iepsAmount).toFixed(2)),
+    };
+  }
+}
+
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") {
     return DEFAULT_PRODUCTS;
@@ -367,6 +476,11 @@ export function getStoredProducts(): Product[] {
         ...p,
         code,
         barcode,
+        hasIva: p.hasIva !== undefined ? p.hasIva : (defaultMatch?.hasIva ?? false),
+        ivaRate: p.ivaRate !== undefined ? p.ivaRate : (defaultMatch?.ivaRate ?? (p.hasIva ? 16 : 0)),
+        hasIeps: p.hasIeps !== undefined ? p.hasIeps : (defaultMatch?.hasIeps ?? false),
+        iepsRate: p.iepsRate !== undefined ? p.iepsRate : (defaultMatch?.iepsRate ?? (p.hasIeps ? 8 : 0)),
+        taxIncluded: p.taxIncluded !== undefined ? p.taxIncluded : true,
       };
     });
 

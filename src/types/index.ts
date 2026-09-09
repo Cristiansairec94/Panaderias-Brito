@@ -11,6 +11,12 @@ export interface Product {
   description?: string;
   tag?: string;
   unit?: "pieza" | "kg" | "g" | string;
+  // Configuración Fiscal e Impuestos
+  hasIva?: boolean;
+  ivaRate?: number;       // Porcentaje de IVA, ej: 16 (16%), 8 (8%), 0 (0%)
+  hasIeps?: boolean;
+  iepsRate?: number;     // Porcentaje de IEPS, ej: 8 (8% pan dulce alta densidad calórica)
+  taxIncluded?: boolean; // Si el precio de venta al público ya incluye impuestos
 }
 
 export interface CartItem {
