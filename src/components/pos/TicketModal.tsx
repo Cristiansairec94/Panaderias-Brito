@@ -56,8 +56,14 @@ export default function TicketModal({
   });
   const folio = saleId ? saleId.slice(-6).toUpperCase() : `POS-${Math.floor(1000 + Math.random() * 9000)}`;
 
+  const [printed, setPrinted] = React.useState(false);
+
   const handlePrint = () => {
+    setPrinted(true);
     window.print();
+    setTimeout(() => {
+      setPrinted(false);
+    }, 2500);
   };
 
   return (
@@ -66,10 +72,10 @@ export default function TicketModal({
         {/* Header bar del modal */}
         <div className="bg-neutral-900 text-white p-4 px-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-neutral-300" />
+            <Receipt className="w-5 h-5 text-amber-400" />
             <div>
               <span className="font-bold text-sm block leading-tight">Comprobante de Venta</span>
-              <span className="text-[10px] text-neutral-400 font-normal">Optimizado para Impresión Láser B&N</span>
+              <span className="text-[10px] text-amber-300/90 font-normal">Optimizado para Térmica 58mm (POS-58)</span>
             </div>
           </div>
           <button
@@ -86,19 +92,19 @@ export default function TicketModal({
           <div
             ref={ticketRef}
             id="thermal-receipt"
-            className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3.5 max-w-sm mx-auto"
+            className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3 max-w-sm mx-auto"
           >
             {/* Business Header con Logotipo Oficial en escala de grises de alto contraste */}
-            <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3.5">
-              {/* Logotipo Oficial Panaderías Brito (Filtrado para Láser B&N) */}
+            <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3">
+              {/* Logotipo Oficial Panaderías Brito (Filtrado para B&N térmico) */}
               <div className="flex justify-center mb-1">
                 <img
                   src="/logo.svg"
                   alt="Panadería Brito Logo"
-                  className="w-20 h-20 object-contain filter grayscale contrast-200"
+                  className="w-16 h-16 object-contain filter grayscale contrast-200"
                 />
               </div>
-              <h1 className="font-black text-lg tracking-wider uppercase text-black font-mono leading-none">
+              <h1 className="font-black text-base sm:text-lg tracking-wider uppercase text-black font-mono leading-none">
                 PANADERÍAS BRITO
               </h1>
               <div className="inline-block border border-black px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-black">
@@ -231,13 +237,19 @@ export default function TicketModal({
 
             {/* Pedidos Especiales y Agradecimiento (Encuadre B&N limpio) */}
             <div className="text-center pt-2 space-y-2.5 font-sans border-t-2 border-dashed border-black">
-              <div className="space-y-1 border border-black rounded-lg p-2 bg-neutral-50">
-                <p className="text-[11px] font-black text-black uppercase">
-                  ¿Tienes fiesta o evento? Pedidos Especiales:
+              <div className="space-y-1.5 border-2 border-black rounded-xl p-2.5 bg-neutral-50">
+                <p className="text-[11px] font-black text-black uppercase tracking-wider flex items-center justify-center gap-1">
+                  <span>🎉</span>
+                  <span>¿TIENES FIESTA, REUNIÓN O EVENTO?</span>
+                  <span>🎂</span>
                 </p>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-black font-black text-xs rounded-md border border-black">
-                  <span>📲 WhatsApp:</span>
-                  <span className="tracking-wider">{branchPhone || "55 1234 5678"}</span>
+                <p className="text-[10px] sm:text-[11px] font-bold text-black leading-snug">
+                  ¡Endulzamos tus mejores momentos! Horneamos pedidos especiales para consentir a tus invitados con el auténtico sabor tradicional.
+                </p>
+                <div className="pt-0.5">
+                  <span className="inline-block px-2.5 py-1 bg-white text-black font-black text-[10px] sm:text-[11px] rounded-lg border border-black uppercase tracking-wide shadow-2xs">
+                    ✨ Pedidos especiales con 50% de anticipo en mostrador ✨
+                  </span>
                 </div>
               </div>
 
@@ -263,10 +275,16 @@ export default function TicketModal({
             <button
               type="button"
               onClick={handlePrint}
-              className="flex items-center justify-center gap-2 py-3.5 px-3 bg-gradient-to-r from-[#24130c] to-[#3a1d12] hover:from-[#1b0d08] hover:to-[#2e160e] text-amber-200 hover:text-amber-100 font-bold rounded-2xl text-xs sm:text-sm shadow-md border border-amber-900/40 transition-all active:scale-95 cursor-pointer"
+              className={`flex items-center justify-center gap-2 py-3.5 px-3 font-bold rounded-2xl text-xs sm:text-sm shadow-md border transition-all active:scale-95 cursor-pointer ${
+                printed
+                  ? "bg-emerald-700 text-white border-emerald-600 animate-pulse"
+                  : "bg-gradient-to-r from-[#24130c] to-[#3a1d12] hover:from-[#1b0d08] hover:to-[#2e160e] text-amber-200 hover:text-amber-100 border-amber-900/40"
+              }`}
             >
-              <Printer className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="whitespace-nowrap font-bold">Imprimir Ticket</span>
+              <Printer className={`w-4 h-4 shrink-0 ${printed ? "text-white" : "text-amber-400"}`} />
+              <span className="whitespace-nowrap font-bold">
+                {printed ? "✓ Imprimiendo en POS-58..." : "Imprimir Ticket"}
+              </span>
             </button>
 
             <button

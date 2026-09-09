@@ -98,38 +98,45 @@
     
     @media print {
       @page {
-        size: auto;
-        margin: 0;
+        size: 58mm auto;
+        margin: 0mm !important;
       }
       *, *::before, *::after {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
-      body {
-        background: white !important;
-        color: black !important;
+      html, body {
+        width: 58mm !important;
+        max-width: 58mm !important;
         margin: 0 !important;
         padding: 0 !important;
+        background: white !important;
+        color: black !important;
       }
       body * {
         visibility: hidden !important;
       }
-      #printable-ticket, #printable-ticket * {
+      #printable-ticket, #printable-ticket *,
+      #thermal-receipt, #thermal-receipt * {
         visibility: visible !important;
       }
-      #printable-ticket {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 80mm !important;
-        max-width: 80mm !important;
-        margin: 0 !important;
-        padding: 5mm 4mm !important;
+      #printable-ticket,
+      #thermal-receipt {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 54mm !important;
+        max-width: 54mm !important;
+        box-sizing: border-box !important;
+        margin: 0 auto !important;
+        padding: 1.5mm 1mm 8mm 1mm !important;
         background: white !important;
         color: black !important;
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
+        font-size: 10.5px !important;
+        line-height: 1.25 !important;
       }
     }
   </style>
@@ -677,6 +684,7 @@
 
       // Modals
       const [showTicket, setShowTicket] = useState(false);
+      const [ticketPrinted, setTicketPrinted] = useState(false);
       const [showExpenses, setShowExpenses] = useState(false);
       const [showBreadDelivery, setShowBreadDelivery] = useState(false);
       const [showDrawerModal, setShowDrawerModal] = useState(false);
@@ -2223,11 +2231,14 @@
           {showTicket && completedSale && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
               <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="bg-amber-950 text-amber-100 p-4 px-6 flex items-center justify-between">
-                  <span className="font-bold text-sm">🧾 Comprobante de Venta</span>
+                <div className="bg-neutral-900 text-white p-4 px-6 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-sm block leading-tight">🧾 Comprobante de Venta</span>
+                    <span className="text-[10px] text-amber-300/90 font-normal">Optimizado para Térmica 58mm (POS-58)</span>
+                  </div>
                   <button
                     onClick={handleCancelTicket}
-                    className="text-xl font-bold hover:text-rose-400 p-1 rounded-lg hover:bg-amber-900/60 transition-colors cursor-pointer"
+                    className="text-xl font-bold hover:text-rose-400 p-1 rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
                     title="Cancelar ticket y anular compra (no cobrar panes)"
                   >
                     ✕
@@ -2235,17 +2246,17 @@
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-neutral-100">
-                  <div id="printable-ticket" className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3.5 max-w-sm mx-auto">
+                  <div id="printable-ticket" className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3 max-w-sm mx-auto">
                     {/* Header con Logotipo Oficial en escala de grises */}
-                    <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3.5">
+                    <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3">
                       <div className="flex justify-center mb-1">
                         <img
                           src="/logo.svg"
                           alt="Panaderías Brito"
-                          className="w-20 h-20 object-contain filter grayscale contrast-200"
+                          className="w-16 h-16 object-contain filter grayscale contrast-200"
                         />
                       </div>
-                      <h1 className="font-black text-lg tracking-wider uppercase text-black font-mono leading-none">
+                      <h1 className="font-black text-base sm:text-lg tracking-wider uppercase text-black font-mono leading-none">
                         PANADERÍAS BRITO
                       </h1>
                       <div className="inline-block border border-black px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-black">
@@ -2367,13 +2378,19 @@
 
                     {/* Pedidos Especiales y Agradecimiento */}
                     <div className="text-center pt-2 space-y-2.5 font-sans border-t-2 border-dashed border-black">
-                      <div className="space-y-1 border border-black rounded-lg p-2 bg-neutral-50">
-                        <p className="text-[11px] font-black text-black uppercase">
-                          ¿Tienes fiesta o evento? Pedidos Especiales:
+                      <div className="space-y-1.5 border-2 border-black rounded-xl p-2.5 bg-neutral-50">
+                        <p className="text-[11px] font-black text-black uppercase tracking-wider flex items-center justify-center gap-1">
+                          <span>🎉</span>
+                          <span>¿TIENES FIESTA, REUNIÓN O EVENTO?</span>
+                          <span>🎂</span>
                         </p>
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-black font-black text-xs rounded-md border border-black">
-                          <span>📲 WhatsApp:</span>
-                          <span className="tracking-wider">55 1234 5678</span>
+                        <p className="text-[10px] sm:text-[11px] font-bold text-black leading-snug">
+                          ¡Endulzamos tus mejores momentos! Horneamos pedidos especiales para consentir a tus invitados con el auténtico sabor tradicional.
+                        </p>
+                        <div className="pt-0.5">
+                          <span className="inline-block px-2.5 py-1 bg-white text-black font-black text-[10px] sm:text-[11px] rounded-lg border border-black uppercase tracking-wide shadow-2xs">
+                            ✨ Pedidos especiales con 50% de anticipo en mostrador ✨
+                          </span>
                         </div>
                       </div>
 
@@ -2397,11 +2414,21 @@
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
-                      onClick={() => window.print()}
-                      className="flex items-center justify-center gap-2 py-3.5 px-3 bg-gradient-to-r from-[#24130c] to-[#3a1d12] hover:from-[#1b0d08] hover:to-[#2e160e] text-amber-200 hover:text-amber-100 font-bold rounded-2xl text-xs sm:text-sm shadow-md border border-amber-900/40 transition-all active:scale-95 cursor-pointer"
+                      onClick={() => {
+                        setTicketPrinted(true);
+                        window.print();
+                        setTimeout(() => setTicketPrinted(false), 2500);
+                      }}
+                      className={`flex items-center justify-center gap-2 py-3.5 px-3 font-bold rounded-2xl text-xs sm:text-sm shadow-md border transition-all active:scale-95 cursor-pointer ${
+                        ticketPrinted
+                          ? "bg-emerald-700 text-white border-emerald-600 animate-pulse"
+                          : "bg-gradient-to-r from-[#24130c] to-[#3a1d12] hover:from-[#1b0d08] hover:to-[#2e160e] text-amber-200 hover:text-amber-100 border-amber-900/40"
+                      }`}
                     >
-                      <span className="text-base">🖨️</span>
-                      <span className="whitespace-nowrap font-bold">Imprimir Ticket</span>
+                      <span className="text-base">{ticketPrinted ? "✓" : "🖨️"}</span>
+                      <span className="whitespace-nowrap font-bold">
+                        {ticketPrinted ? "✓ Imprimiendo en POS-58..." : "Imprimir Ticket"}
+                      </span>
                     </button>
 
                     <button
