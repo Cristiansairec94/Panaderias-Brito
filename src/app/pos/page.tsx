@@ -43,7 +43,8 @@ import {
   Menu,
   Pencil,
   TrendingUp,
-  Barcode
+  Barcode,
+  Printer
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CashIncome } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep } from "@/lib/utils";
@@ -69,6 +70,8 @@ import IncomesModal from "@/components/pos/IncomesModal";
 import IncomeReceiptModal from "@/components/ingresos/IncomeReceiptModal";
 import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
 import BreadDeliveryModal from "@/components/pos/BreadDeliveryModal";
+import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
+import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
 
@@ -384,6 +387,22 @@ export default function POSPage() {
     }
     return activeBranch ? activeBranch.currentShift.initialFund : 500;
   });
+
+  // Configuración de Impresora Directa para Tickets
+  const [showPrinterModal, setShowPrinterModal] = useState(false);
+  const [printerConfig, setPrinterConfig] = useState<PrinterConfig>(() => getStoredPrinterConfig());
+
+  useEffect(() => {
+    const handlePrinterUpdate = (e: any) => {
+      if (e.detail) {
+        setPrinterConfig(e.detail);
+      } else {
+        setPrinterConfig(getStoredPrinterConfig());
+      }
+    };
+    window.addEventListener("brito_printer_config_updated", handlePrinterUpdate);
+    return () => window.removeEventListener("brito_printer_config_updated", handlePrinterUpdate);
+  }, []);
 
   // Auto-sync user and branch
   useEffect(() => {

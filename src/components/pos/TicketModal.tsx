@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useRef } from "react";
-import { Printer, CheckCircle, X, Receipt } from "lucide-react";
+import React, { useRef, useState, useEffect } from "react";
+import { Printer, CheckCircle, X, Receipt, Settings2 } from "lucide-react";
 import { CartItem } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { playCashRegisterSound } from "@/lib/sound";
+import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
 interface TicketModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCancelTicket?: () => void;
+  onConfigurePrinter?: () => void;
   saleId?: string;
   items: CartItem[];
   total: number;
@@ -30,6 +32,7 @@ export default function TicketModal({
   isOpen,
   onClose,
   onCancelTicket,
+  onConfigurePrinter,
   saleId,
   items,
   total,
@@ -46,12 +49,25 @@ export default function TicketModal({
   date,
 }: TicketModalProps) {
   const ticketRef = useRef<HTMLDivElement>(null);
+  const [printerConfig, setPrinterConfig] = useState<PrinterConfig>(() => getStoredPrinterConfig());
+
+  useEffect(() => {
+    const handleUpdate = (e: any) => {
+      if (e.detail) {
+        setPrinterConfig(e.detail);
+      } else {
+        setPrinterConfig(getStoredPrinterConfig());
+      }
+    };
+    window.addEventListener("brito_printer_config_updated", handleUpdate);
+    return () => window.removeEventListener("brito_printer_config_updated", handleUpdate);
+  }, []);
 
   if (!isOpen) return null;
 
   const totalPieces = items.reduce((sum, item) => sum + item.quantity, 0);
   const formattedDate = date || new Date().toLocaleString("es-MX", {
-    dateStyle: "short",
+    dateStyle: "medium",
     timeStyle: "short",
   });
   const folio = saleId ? saleId.slice(-6).toUpperCase() : `POS-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -75,11 +91,24 @@ export default function TicketModal({
       <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header bar del modal */}
         <div className="bg-neutral-900 text-white p-4 px-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-amber-400" />
+          <div className="flex items-center gap-2.5">
+            <Receipt className="w-5 h-5 text-amber-400 shrink-0" />
             <div>
               <span className="font-bold text-sm block leading-tight">Comprobante de Venta</span>
-              <span className="text-[10px] text-amber-300/90 font-normal">Optimizado para Térmica 58mm (POS-58)</span>
+              <div className="flex items-center gap-1 text-[10px] text-amber-300/90 font-normal">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                <span>Impresora: <strong>{printerConfig.selectedPrinterName}</strong> ({printerConfig.paperWidth})</span>
+                {onConfigurePrinter && (
+                  <button
+                    type="button"
+                    onClick={onConfigurePrinter}
+                    className="underline hover:text-white ml-1 cursor-pointer font-bold text-amber-200"
+                    title="Cambiar impresora de tickets"
+                  >
+                    [Elegir]
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <button
@@ -96,7 +125,9 @@ export default function TicketModal({
           <div
             ref={ticketRef}
             id="thermal-receipt"
-            className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3 max-w-sm mx-auto"
+            className={`bg-white p-4 sm:p-5 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3 mx-auto ${
+              printerConfig.paperWidth === "80mm" ? "max-w-md" : "max-w-sm"
+            }`}
           >
             {/* Business Header con Logotipo Oficial en escala de grises de alto contraste */}
             <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3">
@@ -287,7 +318,7 @@ export default function TicketModal({
             >
               <Printer className={`w-4 h-4 shrink-0 ${printed ? "text-white" : "text-amber-400"}`} />
               <span className="whitespace-nowrap font-bold">
-                {printed ? "✓ Imprimiendo en POS-58..." : "Imprimir Ticket"}
+                {printed ? `✓ Imprimiendo en ${printerConfig.selectedPrinterName}...` : `Imprimir en ${printerConfig.selectedPrinterName}`}
               </span>
             </button>
 
