@@ -4,6 +4,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-1",
     code: "PAN-001",
+    barcode: "750100010001",
     name: "Concha de Vainilla",
     price: 12,
     category: "pan_dulce",
@@ -16,6 +17,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-2",
     code: "PAN-002",
+    barcode: "750100010002",
     name: "Concha de Chocolate",
     price: 12,
     category: "pan_dulce",
@@ -28,6 +30,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-3",
     code: "PAN-003",
+    barcode: "750100010003",
     name: "Cuerno de Mantequilla",
     price: 15,
     category: "pan_dulce",
@@ -40,6 +43,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-4",
     code: "BLA-001",
+    barcode: "750100010004",
     name: "Bolillo Tradicional",
     price: 5,
     category: "pan_blanco",
@@ -52,6 +56,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-5",
     code: "BLA-002",
+    barcode: "750100010005",
     name: "Telera para Torta",
     price: 6,
     category: "pan_blanco",
@@ -64,6 +69,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-6",
     code: "PAN-004",
+    barcode: "750100010006",
     name: "Oreja Hojaldrada",
     price: 14,
     category: "pan_dulce",
@@ -76,6 +82,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-7",
     code: "PAN-005",
+    barcode: "750100010007",
     name: "Dona Glaseada",
     price: 13,
     category: "pan_dulce",
@@ -88,6 +95,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-8",
     code: "PAS-001",
+    barcode: "750100010008",
     name: "Rebanada Pastel 3 Leches",
     price: 45,
     category: "pasteleria",
@@ -100,6 +108,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-9",
     code: "PAS-002",
+    barcode: "750100010009",
     name: "Pay de Queso con Zarzamora",
     price: 40,
     category: "pasteleria",
@@ -112,6 +121,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-10",
     code: "BEB-001",
+    barcode: "750100010010",
     name: "Café de Olla Caliente",
     price: 25,
     category: "bebidas",
@@ -124,6 +134,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-11",
     code: "BEB-002",
+    barcode: "750100010011",
     name: "Chocolate Caliente con Leche",
     price: 30,
     category: "bebidas",
@@ -136,6 +147,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-12",
     code: "TEM-001",
+    barcode: "750100010012",
     name: "Empanada de Calabaza",
     price: 18,
     category: "temporada",
@@ -148,6 +160,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-13",
     code: "AB-001",
+    barcode: "750100010013",
     name: "Leche Entera 1L",
     price: 28,
     category: "abarrotes",
@@ -161,6 +174,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-14",
     code: "MP-001",
+    barcode: "750100010014",
     name: "Harina de Trigo San Antonio 1kg",
     price: 22,
     category: "materia_prima",
@@ -185,6 +199,44 @@ export const PRODUCT_CATEGORIES = [
 ];
 
 const STORAGE_KEY = "brito_products_v6";
+
+export function generateProductBarcode(): string {
+  const current = getStoredProducts();
+  let candidate = `75010001${String(current.length + 1).padStart(4, "0")}`;
+  let attempt = 1;
+  while (current.some((p) => p.barcode === candidate)) {
+    candidate = `75010001${String(current.length + 1 + attempt).padStart(4, "0")}`;
+    attempt++;
+  }
+  return candidate;
+}
+
+export function findProductByBarcodeOrCode(query: string, productsList?: Product[]): Product | undefined {
+  const list = productsList || getStoredProducts();
+  const clean = query.trim().toUpperCase();
+  if (!clean) return undefined;
+
+  // 1. Coincidencia exacta por código de barras
+  const byBarcode = list.find((p) => p.barcode && p.barcode.trim() === query.trim());
+  if (byBarcode) return byBarcode;
+
+  // 2. Coincidencia exacta por código corto (ej. PAN-001, BLA-001)
+  const byCode = list.find((p) => p.code && p.code.trim().toUpperCase() === clean);
+  if (byCode) return byCode;
+
+  // 3. Coincidencia exacta por ID de producto
+  const byId = list.find((p) => p.id && p.id.trim().toUpperCase() === clean);
+  if (byId) return byId;
+
+  // 4. Coincidencia solo dígitos (para lectores numéricos estándar)
+  const digitsOnly = query.replace(/\D/g, "");
+  if (digitsOnly.length >= 4) {
+    const byDigits = list.find((p) => p.barcode && p.barcode.replace(/\D/g, "") === digitsOnly);
+    if (byDigits) return byDigits;
+  }
+
+  return undefined;
+}
 
 export function generateProductCode(category?: string): string {
   const current = getStoredProducts();
@@ -225,10 +277,14 @@ export function getStoredProducts(): Product[] {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
       return DEFAULT_PRODUCTS;
     }
-    return parsed.map((p: Product, idx: number) => ({
-      ...p,
-      code: p.code || `PRD-${String(idx + 1).padStart(3, "0")}`,
-    }));
+    return parsed.map((p: Product, idx: number) => {
+      const defaultMatch = DEFAULT_PRODUCTS.find(dp => dp.id === p.id);
+      return {
+        ...p,
+        code: p.code || defaultMatch?.code || `PRD-${String(idx + 1).padStart(3, "0")}`,
+        barcode: p.barcode || defaultMatch?.barcode || `75010001${String(idx + 1).padStart(4, "0")}`,
+      };
+    });
   } catch {
     return DEFAULT_PRODUCTS;
   }
@@ -259,9 +315,11 @@ export function updateProductPrice(id: string, newPrice: number): void {
 export function addProduct(product: Omit<Product, "id">): Product {
   const current = getStoredProducts();
   const assignedCode = product.code?.trim() || generateProductCode(product.category);
+  const assignedBarcode = product.barcode?.trim() || generateProductBarcode();
   const newProduct: Product = {
     ...product,
     code: assignedCode.toUpperCase(),
+    barcode: assignedBarcode,
     id: `prod-${Date.now()}`,
   };
   saveStoredProducts([...current, newProduct]);

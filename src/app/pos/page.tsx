@@ -42,12 +42,13 @@ import {
   ShieldCheck,
   Menu,
   Pencil,
-  TrendingUp
+  TrendingUp,
+  Barcode
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CashIncome } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
+import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
 import { 
   DEFAULT_GENERAL_CUSTOMER, 
   getStoredCustomers, 
@@ -336,6 +337,17 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [cashGiven, setCashGiven] = useState<string>("");
+
+  // Estados para Cobro y Escaneo por Código de Barras
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [lastScannedItem, setLastScannedItem] = useState<{
+    success: boolean;
+    productName?: string;
+    code: string;
+    timestamp: number;
+  } | null>(null);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const keyStrokeBufferRef = useRef<{ buffer: string; lastStrokeTime: number }>({ buffer: "", lastStrokeTime: 0 });
 
   // Cuentas bancarias para cobro por transferencia
   const [transferAccounts] = useState<TransferAccount[]>(() => {
@@ -694,10 +706,12 @@ export default function POSPage() {
 
   const filteredProducts = products.filter((prod) => {
     const matchesCat = matchesPosCategory(prod, selectedCategory);
+    const searchLower = search.toLowerCase();
     const matchesSearch = 
-      (prod.code && prod.code.toLowerCase().includes(search.toLowerCase())) ||
-      prod.name.toLowerCase().includes(search.toLowerCase()) || 
-      (prod.description && prod.description.toLowerCase().includes(search.toLowerCase()));
+      (prod.barcode && prod.barcode.toLowerCase().includes(searchLower)) ||
+      (prod.code && prod.code.toLowerCase().includes(searchLower)) ||
+      prod.name.toLowerCase().includes(searchLower) || 
+      (prod.description && prod.description.toLowerCase().includes(searchLower));
     return matchesCat && matchesSearch;
   });
 
@@ -718,6 +732,132 @@ export default function POSPage() {
       return [...prev, { product, quantity: 1 }];
     });
   };
+
+  // Auto disolver la alerta flotante de escaneo de código de barras tras 3.8s
+  useEffect(() => {
+    if (!lastScannedItem) return;
+    const timer = setTimeout(() => {
+      setLastScannedItem(null);
+    }, 3800);
+    return () => clearTimeout(timer);
+  }, [lastScannedItem]);
+
+  // Manejador central de cobro por código de barras
+  const handleBarcodeScan = (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+
+    if (isShiftLocked) {
+      addNotification({
+        senderName: "🔒 Terminal Bloqueada",
+        senderAvatar: "⚠️",
+        badgeIcon: "alerta",
+        title: "Escaneo Deshabilitado",
+        highlightText: "Turno cerrado",
+        description: "Desbloquea la terminal con la encargada para comenzar a cobrar productos por código de barras.",
+        category: "caja",
+      });
+      setIsMobileCartOpen(true);
+      return;
+    }
+
+    const matched = findProductByBarcodeOrCode(code, products);
+    if (matched) {
+      addToCart(matched);
+      playScanBeep(true);
+      setLastScannedItem({
+        success: true,
+        productName: matched.name,
+        code,
+        timestamp: Date.now(),
+      });
+      setBarcodeInput("");
+      addNotification({
+        senderName: "🏷️ Código de Barras",
+        senderAvatar: "🥖",
+        badgeIcon: "harina",
+        title: "Producto Escaneado",
+        highlightText: matched.name,
+        description: `+1 pieza agregada a la charola de cobro (Código: ${code})`,
+        category: "inventario",
+      });
+    } else {
+      playScanBeep(false);
+      setLastScannedItem({
+        success: false,
+        code,
+        timestamp: Date.now(),
+      });
+      addNotification({
+        senderName: "⚠️ Código No Registrado",
+        senderAvatar: "🔍",
+        badgeIcon: "alerta",
+        title: "Código Desconocido",
+        highlightText: code,
+        description: `No se encontró ningún producto con el código "${code}" en el catálogo de la panadería.`,
+        category: "inventario",
+      });
+    }
+  };
+
+  // Listener global de teclado para lectores de código de barras USB / Bluetooth (Keyboard Wedge)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (showReceiptModal || showExpensesModal || showIncomesModal || showCashDrawerModal || showBreadDeliveryModal) {
+        return;
+      }
+
+      const activeElem = document.activeElement;
+      const isInput = activeElem instanceof HTMLInputElement || activeElem instanceof HTMLTextAreaElement;
+
+      // Si el foco está en el input dedicado de código de barras y presiona Enter
+      if (activeElem === barcodeInputRef.current) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleBarcodeScan(barcodeInput);
+        }
+        return;
+      }
+
+      // Si el foco está en otros inputs
+      if (isInput && activeElem !== barcodeInputRef.current) {
+        if (e.key === "Enter" && search.trim()) {
+          const matched = findProductByBarcodeOrCode(search.trim(), products);
+          if (matched) {
+            e.preventDefault();
+            handleBarcodeScan(search.trim());
+            setSearch("");
+          }
+        }
+        return;
+      }
+
+      const now = Date.now();
+      const timeDiff = now - keyStrokeBufferRef.current.lastStrokeTime;
+
+      // Cuando la pistola de código de barras termina de escanear envía Enter
+      if (e.key === "Enter") {
+        if (keyStrokeBufferRef.current.buffer.length >= 2) {
+          e.preventDefault();
+          handleBarcodeScan(keyStrokeBufferRef.current.buffer);
+        }
+        keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
+        return;
+      }
+
+      if (e.key.length === 1) {
+        if (timeDiff > 220) {
+          keyStrokeBufferRef.current = { buffer: e.key, lastStrokeTime: now };
+        } else {
+          keyStrokeBufferRef.current.buffer += e.key;
+          keyStrokeBufferRef.current.lastStrokeTime = now;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [products, barcodeInput, search, isShiftLocked, showReceiptModal, showExpensesModal, showIncomesModal, showCashDrawerModal, showBreadDeliveryModal]);
 
   const addMultipleToCart = (product: Product, count: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -1240,6 +1380,41 @@ export default function POSPage() {
         ref={catalogScrollRef}
         className="flex-1 flex flex-col min-w-0 px-4 lg:px-5 pb-6 pt-0 pr-3 sm:pr-4 overflow-y-auto scroll-smooth relative"
       >
+        {/* Alerta flotante de escaneo de código de barras */}
+        {lastScannedItem && (
+          <div className={`fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border-2 animate-in fade-in slide-in-from-top-3 duration-200 max-w-md w-[92vw] sm:w-auto ${
+            lastScannedItem.success
+              ? "bg-emerald-950/95 border-emerald-400 text-emerald-100 ring-4 ring-emerald-500/20"
+              : "bg-rose-950/95 border-rose-400 text-rose-100 ring-4 ring-rose-500/20"
+          }`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg font-black shrink-0 ${
+              lastScannedItem.success ? "bg-emerald-500 text-stone-950" : "bg-rose-500 text-white"
+            }`}>
+              {lastScannedItem.success ? "✓" : "✕"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm font-black truncate">
+                {lastScannedItem.success
+                  ? `${lastScannedItem.productName} (+1 pieza)`
+                  : `Código no registrado: ${lastScannedItem.code}`}
+              </p>
+              <p className="text-[11px] opacity-85 truncate font-medium">
+                {lastScannedItem.success
+                  ? `Código: ${lastScannedItem.code} • Sumado a la charola de cobro`
+                  : "Verifica que el producto tenga asignado este código en el Catálogo"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLastScannedItem(null)}
+              className="p-1 rounded-lg text-stone-300 hover:text-white hover:bg-white/10 shrink-0"
+              title="Cerrar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
         <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
           <div className="flex items-center justify-between gap-3 w-full">
@@ -1253,29 +1428,87 @@ export default function POSPage() {
               <Menu className="w-5 h-5" />
             </button>
 
-            {/* Buscador de Productos (Grande, Claro y Cómodo) */}
-            <div className="relative flex-1 max-w-xl">
-              <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-              <input
-                type="text"
-                placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-10 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+            {/* Buscador de Productos & Escáner de Código de Barras */}
+            <div className="flex items-center gap-2 flex-1 max-w-2xl min-w-0">
+              {/* Buscador General con Soporte de Enter para Código */}
+              <div className="relative flex-1 min-w-0">
+                <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && search.trim()) {
+                      const matched = findProductByBarcodeOrCode(search.trim(), products);
+                      if (matched) {
+                        e.preventDefault();
+                        handleBarcodeScan(search.trim());
+                        setSearch("");
+                      }
+                    }
+                  }}
+                  className="w-full pl-12 pr-10 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Lector / Entrada Directa de Código de Barras */}
+              <div className="relative shrink-0 hidden sm:block">
+                <div className="relative flex items-center">
+                  <Barcode className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
+                  <input
+                    ref={barcodeInputRef}
+                    type="text"
+                    placeholder="Código de barras..."
+                    value={barcodeInput}
+                    onChange={(e) => setBarcodeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleBarcodeScan(barcodeInput);
+                      }
+                    }}
+                    className="w-48 lg:w-56 pl-10 pr-20 py-3.5 bg-amber-50/90 hover:bg-amber-100/60 focus:bg-white border-2 border-amber-400 focus:border-amber-600 rounded-2xl text-xs sm:text-sm font-black text-amber-950 placeholder:text-amber-700/60 shadow-xs focus:outline-none transition-all font-mono"
+                    title="Escanea con la pistola de código de barras o teclea el código y presiona Enter"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleBarcodeScan(barcodeInput)}
+                    disabled={!barcodeInput.trim()}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:hover:bg-amber-600 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-2xs"
+                    title="Cobrar producto con este código de barras"
+                  >
+                    + Cobrar
+                  </button>
+                </div>
+              </div>
+
+              {/* Botón Escáner Móvil */}
+              <button
+                type="button"
+                onClick={() => {
+                  const code = window.prompt("🏷️ Ingresa o escanea el código de barras del producto:");
+                  if (code) handleBarcodeScan(code);
+                }}
+                className="sm:hidden p-3.5 rounded-2xl bg-amber-100 text-amber-900 border-2 border-amber-300 font-bold shrink-0 shadow-xs active:scale-95 transition-all"
+                title="Escanear o teclear código de barras"
+              >
+                <Barcode className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Botón Grande: Categorías y Precios (Fijo con colores oficiales, texto y tamaño estables) */}
-            <div className="relative shrink-0">
+            {/* Grupo Catálogo y Pan: Categorías y Precios + Entrada de Pan directamente a lado */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Botón Grande: Categorías y Precios */}
               <button
                 type="button"
                 onClick={() => setShowCategoryPanel(!showCategoryPanel)}
@@ -1299,25 +1532,40 @@ export default function POSPage() {
                 )}
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
               </button>
+
+              {/* Botón Surtir / Entrada de Pan (Camionetas) - Directamente a lado */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (isShiftLocked) {
+                    addNotification({
+                      senderName: "🔒 Terminal Bloqueada",
+                      senderAvatar: "⚠️",
+                      badgeIcon: "alerta",
+                      title: "Terminal Bloqueada",
+                      highlightText: "Turno cerrado por seguridad",
+                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar entrada de pan.",
+                      category: "inventario",
+                    });
+                    return;
+                  }
+                  setShowBreadDeliveryModal(true);
+                }}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
+                  isShiftLocked
+                    ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
+                    : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black"
+                }`}
+                title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
+              >
+                <span className="text-lg">🚐</span>
+                <span>Entrada de Pan</span>
+              </button>
             </div>
 
-            {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto hasta indicación del usuario */}
-            {false && (
-              <div className="relative shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowBreadDeliveryModal(true)}
-                  className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black shadow-sm transition-all active:scale-95 whitespace-nowrap cursor-pointer"
-                  title="Registrar pan recibido de las camionetas o taller"
-                >
-                  <span className="text-lg">🚐</span>
-                  <span>Entrada de Pan</span>
-                </button>
-              </div>
-            )}
-
-            {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
-            <div className="relative shrink-0">
+            {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
               <button
                 type="button"
                 onClick={() => {
@@ -1347,10 +1595,8 @@ export default function POSPage() {
                 </span>
                 <span>Movimientos de Caja</span>
               </button>
-            </div>
 
-            {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
-            <div className="relative shrink-0">
+              {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
               <button
                 type="button"
                 onClick={() => {
@@ -1376,7 +1622,7 @@ export default function POSPage() {
                 }`}
                 title={isShiftLocked ? "Turno ya cerrado y bloqueado" : "Cerrar turno de la cajera y bloquear la terminal con candado"}
               >
-                <Lock className="w-4 h-4 text-amber-200" />
+                <span>🔒</span>
                 <span>{isShiftLocked ? "Turno Cerrado 🔒" : "Cerrar Turno"}</span>
               </button>
             </div>
@@ -1575,6 +1821,21 @@ export default function POSPage() {
                     <p className="text-xs text-stone-500 mt-0.5 line-clamp-1 font-sans">
                       {product.description || "Panadería artesanal horneada diariamente."}
                     </p>
+
+                    {/* Código / Código de barras */}
+                    {(product.barcode || product.code) && (
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-50/90 text-amber-900 border border-amber-200/90 shadow-2xs">
+                          <Barcode className="w-3 h-3 text-amber-700 shrink-0" />
+                          <span>{product.barcode || product.code}</span>
+                        </span>
+                        {product.code && product.barcode && (
+                          <span className="text-[10px] font-bold text-stone-400 font-mono">
+                            [{product.code}]
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

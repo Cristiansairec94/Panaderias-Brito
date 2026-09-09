@@ -1,6 +1,7 @@
 export interface Product {
   id: string;
   code?: string;
+  barcode?: string;
   name: string;
   price: number;
   category: string;

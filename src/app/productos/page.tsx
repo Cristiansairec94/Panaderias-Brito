@@ -34,7 +34,8 @@ import {
   updateProduct, 
   deleteProduct, 
   PRODUCT_CATEGORIES,
-  generateProductCode
+  generateProductCode,
+  generateProductBarcode
 } from "@/lib/products";
 
 export default function ProductosPage() {
@@ -61,6 +62,7 @@ export default function ProductosPage() {
   // Form state
   const [formData, setFormData] = useState({
     code: "",
+    barcode: "",
     name: "",
     price: "",
     category: "pan_dulce" as Product["category"],
@@ -98,14 +100,14 @@ export default function ProductosPage() {
       const matchesCat = selectedCategory === "all" || p.category === selectedCategory;
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch = 
-        !q ||
-        (p.code && p.code.toLowerCase().includes(q)) ||
-        p.name.toLowerCase().includes(q) ||
-        (p.description && p.description.toLowerCase().includes(q)) ||
-        (p.tag && p.tag.toLowerCase().includes(q));
+        !q || 
+        (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+        (p.code && p.code.toLowerCase().includes(q)) || 
+        p.name.toLowerCase().includes(q) || 
+        (p.description && p.description.toLowerCase().includes(q));
       return matchesCat && matchesSearch;
     });
-  }, [products, selectedCategory, searchQuery]);
+  }, [products, searchQuery, selectedCategory]);
 
   // Open Create Modal
   const handleOpenCreate = () => {
@@ -114,6 +116,7 @@ export default function ProductosPage() {
     const initialCat = (selectedCategory !== "all" ? selectedCategory : "pan_dulce") as Product["category"];
     setFormData({
       code: generateProductCode(initialCat),
+      barcode: generateProductBarcode(),
       name: "",
       price: "",
       category: initialCat,
@@ -131,6 +134,7 @@ export default function ProductosPage() {
     setEditingId(product.id);
     setFormData({
       code: product.code || generateProductCode(product.category),
+      barcode: product.barcode || "",
       name: product.name,
       price: product.price.toString(),
       category: product.category,
@@ -179,10 +183,12 @@ export default function ProductosPage() {
     const isUnitApplicable = formData.category === "abarrotes" || formData.category === "materia_prima";
     const selectedUnit = isUnitApplicable ? (formData.unit || "pieza") : undefined;
     const assignedCode = formData.code.trim().toUpperCase() || generateProductCode(formData.category);
+    const assignedBarcode = formData.barcode.trim() || generateProductBarcode();
 
     if (modalMode === "create") {
       const created = createProduct({
         code: assignedCode,
+        barcode: assignedBarcode,
         name: formData.name.trim(),
         price: priceNum,
         category: formData.category,
@@ -198,6 +204,7 @@ export default function ProductosPage() {
     } else if (modalMode === "edit" && editingId) {
       const updated = updateProduct(editingId, {
         code: assignedCode,
+        barcode: assignedBarcode,
         name: formData.name.trim(),
         price: priceNum,
         category: formData.category,
@@ -746,13 +753,25 @@ export default function ProductosPage() {
                 </div>
               </div>
 
-              {/* Código & Nombre */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Nombre del Producto */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-stone-700">Nombre del Producto *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="ej. Concha de Vainilla, Bolillo, Pastel 3 Leches"
+                  className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Código Corto & Código de Barras */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-stone-700 flex items-center gap-1">
-                      <Barcode className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Código *</span>
+                      <span>Clave / Código</span>
                     </label>
                     <button
                       type="button"
@@ -765,7 +784,6 @@ export default function ProductosPage() {
                   </div>
                   <input
                     type="text"
-                    required
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                     placeholder="PAN-001"
@@ -773,15 +791,27 @@ export default function ProductosPage() {
                   />
                 </div>
 
-                <div className="sm:col-span-2 space-y-1">
-                  <label className="text-xs font-bold text-stone-700">Nombre del Producto *</label>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-stone-700 flex items-center gap-1">
+                      <Barcode className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Código de Barras</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, barcode: generateProductBarcode() })}
+                      className="text-[10px] text-amber-700 hover:underline font-bold"
+                      title="Generar código de barras"
+                    >
+                      Auto
+                    </button>
+                  </div>
                   <input
                     type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="ej. Concha de Vainilla, Bolillo, Pastel 3 Leches"
-                    className="w-full px-3.5 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    value={formData.barcode}
+                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                    placeholder="750100010001"
+                    className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold text-amber-950 font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   />
                 </div>
               </div>

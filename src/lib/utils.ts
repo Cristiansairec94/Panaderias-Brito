@@ -65,3 +65,40 @@ export function cleanDecimalNumbers(value: string): string {
   return parts.join(".");
 }
 
+/**
+ * Emite un sonido tipo pitido (beep) de confirmación o error para escáneres de código de barras
+ */
+export function playScanBeep(success: boolean = true) {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (success) {
+      // Pitido positivo nítido de terminal punto de venta (1400Hz a 1800Hz)
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(1400, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1800, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.12);
+    } else {
+      // Zumbido grave de alerta para código no registrado (320Hz)
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(320, ctx.currentTime);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    }
+  } catch (e) {
+    // Ignorar si el navegador bloquea audio antes de interacción
+  }
+}
+
