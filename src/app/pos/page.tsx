@@ -337,7 +337,7 @@ export default function POSPage() {
   const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
   const { addNotification } = useNotifications();
   const { toggleMobile } = useSidebar();
-  const { isOnline, enqueueOfflineItem, pendingCount } = useSync();
+  const { isOnline, isSyncing, isSynced, enqueueOfflineItem, pendingCount } = useSync();
   const activeBranch = currentBranch || branches[0];
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -1535,8 +1535,19 @@ export default function POSPage() {
 
         {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
         <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
+          {isSyncing && (
+            <div className="bg-amber-500/15 border border-amber-500/30 text-amber-950 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
+                <span>
+                  <strong>Sincronizando con la nube:</strong> Subiendo ventas acumuladas a la base de datos central...
+                </span>
+              </div>
+            </div>
+          )}
+
           {!isOnline && (
-            <div className="bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 border border-amber-500/30 text-amber-950 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
+            <div className="bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 border border-amber-500/30 text-amber-950 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
               <div className="flex items-center gap-2">
                 <WifiOff className="w-4 h-4 text-rose-600 shrink-0" />
                 <span>

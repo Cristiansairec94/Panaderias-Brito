@@ -21,7 +21,12 @@ import {
   Check,
   AlertTriangle,
   Send,
-  Zap
+  Zap,
+  Pin,
+  PackageCheck,
+  Server,
+  Layers,
+  Copy
 } from "lucide-react";
 import { useSync } from "@/context/SyncContext";
 import { formatCurrency } from "@/lib/utils";
@@ -30,6 +35,7 @@ export default function OfflineManagement() {
   const {
     isOnline,
     isSyncing,
+    isSynced,
     pendingCount,
     queue,
     lastSyncTime,
@@ -38,34 +44,36 @@ export default function OfflineManagement() {
     latencyMs,
     canInstallPwa,
     isInstalledPwa,
+    localStats,
     promptInstallPwa,
     syncNow,
     removeQueueItem,
     clearQueue,
     toggleSimulateOffline,
     refreshConnection,
+    downloadLocalData,
+    downloadPinScript,
     exportBackup,
-    preloadCatalog,
   } = useSync();
 
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
-  const [isPreloading, setIsPreloading] = useState(false);
-  const [selectedQueueItem, setSelectedQueueItem] = useState<any | null>(null);
+  const [isDownloadingData, setIsDownloadingData] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   const showToast = (text: string, type: "success" | "error" | "info" = "success") => {
     setFeedbackMsg({ text, type });
-    setTimeout(() => setFeedbackMsg(null), 4000);
+    setTimeout(() => setFeedbackMsg(null), 5000);
   };
 
   const handleSyncNow = async () => {
     try {
       const res = await syncNow();
       if (res.synced > 0) {
-        showToast(`¡Sincronización exitosa! Se subieron ${res.synced} registros a la nube.`, "success");
+        showToast(`¡Sincronización completada! Se subieron ${res.synced} registro(s) a la nube.`, "success");
       } else if (res.failed > 0) {
-        showToast(`Se encontraron errores al subir ${res.failed} registros. Revisa el detalle.`, "error");
+        showToast(`Hubo inconvenientes con ${res.failed} registro(s). Se mantienen guardados en tu PC.`, "error");
       } else {
-        showToast("Todo está al día. No hay registros pendientes por subir.", "info");
+        showToast("Todo está al día. Todos tus datos están sincronizados.", "info");
       }
     } catch (err: any) {
       showToast(err?.message || "Error al sincronizar con la nube", "error");
@@ -75,37 +83,24 @@ export default function OfflineManagement() {
   const handleInstallClick = async () => {
     const success = await promptInstallPwa();
     if (success) {
-      showToast("¡Panadería Brito se instaló como aplicación de escritorio!", "success");
+      showToast("¡Panadería Brito se instaló en tu computadora! Ya puedes anclarlo a la barra de tareas.", "success");
     } else {
-      showToast("Abre el menú de tu navegador (Edge/Chrome) y selecciona 'Instalar Panadería Brito'", "info");
+      showToast("Se descargó el instalador para tu Escritorio de Windows.", "info");
     }
   };
 
-  const handlePreloadCatalog = async () => {
-    setIsPreloading(true);
+  const handleDownloadAllData = async () => {
+    setIsDownloadingData(true);
     try {
-      const res = await preloadCatalog();
+      const res = await downloadLocalData();
       if (res.success) {
         showToast(res.message, "success");
       } else {
         showToast(res.message, "error");
       }
     } finally {
-      setIsPreloading(false);
+      setIsDownloadingData(false);
     }
-  };
-
-  // Crear archivo de acceso directo .url para descargar
-  const handleDownloadDesktopShortcut = () => {
-    const urlContent = `[InternetShortcut]\nURL=${window.location.origin}/pos\nIconIndex=0\nIconFile=${window.location.origin}/logo.png\n`;
-    const blob = new Blob([urlContent], { type: "application/internet-shortcut" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "Panaderia_Brito_POS.url";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast("Acceso directo de escritorio generado con éxito.", "success");
   };
 
   const formattedLastSync = lastSyncTime
@@ -114,77 +109,97 @@ export default function OfflineManagement() {
         minute: "2-digit",
         second: "2-digit",
       })
-    : "Sin sincronizar aún";
+    : "Al iniciar el sistema";
 
   return (
     <div className="space-y-6 animate-in fade-in max-w-5xl">
       {/* Toast Feedback */}
       {feedbackMsg && (
         <div
-          className={`p-3 rounded-2xl text-xs font-bold flex items-center justify-between shadow-lg transition-all ${
+          className={`p-3.5 rounded-2xl text-xs font-bold flex items-center justify-between shadow-xl transition-all ${
             feedbackMsg.type === "success"
               ? "bg-emerald-600 text-white"
               : feedbackMsg.type === "error"
               ? "bg-rose-600 text-white"
-              : "bg-stone-900 text-stone-100"
+              : "bg-stone-900 text-stone-100 border border-stone-700"
           }`}
         >
           <div className="flex items-center gap-2">
-            {feedbackMsg.type === "success" && <CheckCircle2 className="w-4 h-4 shrink-0" />}
-            {feedbackMsg.type === "error" && <AlertCircle className="w-4 h-4 shrink-0" />}
-            {feedbackMsg.type === "info" && <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />}
-            <span>{feedbackMsg.text}</span>
+            {feedbackMsg.type === "success" && <CheckCircle2 className="w-5 h-5 shrink-0 text-white" />}
+            {feedbackMsg.type === "error" && <AlertCircle className="w-5 h-5 shrink-0 text-white" />}
+            {feedbackMsg.type === "info" && <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />}
+            <span className="leading-relaxed">{feedbackMsg.text}</span>
           </div>
-          <button onClick={() => setFeedbackMsg(null)} className="text-white/80 hover:text-white ml-2 text-xs">
+          <button onClick={() => setFeedbackMsg(null)} className="text-white/80 hover:text-white ml-3 text-xs font-black">
             ✕
           </button>
         </div>
       )}
 
-      {/* ─── 1. TARJETA PRINCIPAL DE ESTADO DE CONEXIÓN ──────────────────── */}
+      {/* ─── 1. SEMÁFORO Y ESTADO EN VIVO (EN LÍNEA / SINCRONIZADO / OFFLINE) ── */}
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3.5">
             <div
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md ${
-                isOnline ? "bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20" : "bg-gradient-to-br from-rose-500 to-amber-600 shadow-rose-500/20"
+              className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg transition-all ${
+                !isOnline
+                  ? "bg-gradient-to-br from-rose-500 to-red-600 shadow-rose-500/30"
+                  : isSyncing
+                  ? "bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-500/30 animate-pulse"
+                  : "bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/30"
               }`}
             >
-              {isOnline ? <Wifi className="w-6 h-6" /> : <WifiOff className="w-6 h-6" />}
+              {!isOnline ? (
+                <WifiOff className="w-7 h-7" />
+              ) : isSyncing ? (
+                <RefreshCw className="w-7 h-7 animate-spin" />
+              ) : (
+                <Wifi className="w-7 h-7" />
+              )}
             </div>
+
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-black text-lg text-stone-900">
-                  {isOnline ? "Modo En Línea (Conectado a la Nube)" : "Modo Fuera de Línea Seguro (Offline)"}
+                <h3 className="font-black text-xl text-stone-900 tracking-tight">
+                  {!isOnline
+                    ? "Modo Fuera de Línea (Sin Internet)"
+                    : isSyncing
+                    ? "Sincronizando con la Nube..."
+                    : "En Línea y Conectado"}
                 </h3>
                 <span
-                  className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                    isOnline ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800 animate-pulse"
+                  className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 ${
+                    !isOnline
+                      ? "bg-rose-100 text-rose-800 animate-pulse"
+                      : isSyncing
+                      ? "bg-amber-100 text-amber-900"
+                      : "bg-emerald-100 text-emerald-800"
                   }`}
                 >
-                  {isOnline ? "En Línea" : "Sin Internet"}
+                  <span className={`w-2 h-2 rounded-full ${!isOnline ? "bg-rose-500" : isSyncing ? "bg-amber-500 animate-ping" : "bg-emerald-500"}`} />
+                  {!isOnline ? "Desconectado" : isSyncing ? "Sincronizando" : "Sincronizado"}
                 </span>
               </div>
-              <p className="text-xs text-stone-500 mt-0.5">{connectionDetail}</p>
+              <p className="text-xs text-stone-500 mt-1">{connectionDetail}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={refreshConnection}
-              className="px-3 py-2 rounded-xl border border-stone-200 text-stone-700 hover:bg-stone-50 text-xs font-bold flex items-center gap-1.5 transition-all"
-              title="Verificar conexión a internet ahora"
+              className="px-3.5 py-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+              title="Volver a verificar la señal de internet"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
-              <span>Verificar Red</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-amber-500" : ""}`} />
+              <span>Verificar Conexión</span>
             </button>
 
             <button
               onClick={handleSyncNow}
               disabled={isSyncing || !isOnline}
-              className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all ${
+              className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center gap-2 shadow-md transition-all ${
                 isOnline
-                  ? "bg-stone-900 hover:bg-stone-800 text-white active:scale-95"
+                  ? "bg-stone-900 hover:bg-black text-white active:scale-95 cursor-pointer"
                   : "bg-stone-200 text-stone-400 cursor-not-allowed"
               }`}
             >
@@ -194,164 +209,215 @@ export default function OfflineManagement() {
           </div>
         </div>
 
-        {/* Datos clave de métricas */}
+        {/* 3 Tarjetas de Métricas de Conexión */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80">
+          <div className="p-4 bg-stone-50/80 rounded-2xl border border-stone-200/80">
             <span className="text-[10px] font-black text-stone-400 uppercase tracking-wider block">
-              Registros Pendientes de Subir
+              Ventas / Movimientos en Espera
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span
                 className={`text-2xl font-black ${
-                  pendingCount > 0 ? "text-amber-600 animate-pulse" : "text-stone-900"
+                  pendingCount > 0 ? "text-amber-600 animate-pulse" : "text-emerald-700"
                 }`}
               >
                 {pendingCount}
               </span>
-              <span className="text-xs text-stone-500 font-medium">
-                {pendingCount === 1 ? "registro local" : "registros locales"}
+              <span className="text-xs text-stone-600 font-bold">
+                {pendingCount === 0 ? "al día en la nube" : pendingCount === 1 ? "registro pendiente" : "registros pendientes"}
               </span>
             </div>
             <p className="text-[11px] text-stone-400 mt-1">
               {pendingCount > 0
-                ? "Se sincronizarán automáticamente al haber internet."
-                : "Todos los datos están sincronizados en la nube."}
+                ? "Se subirán automáticamente en cuanto haya señal."
+                : "Toda la información está resguardada en Supabase."}
             </p>
           </div>
 
-          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80">
+          <div className="p-4 bg-stone-50/80 rounded-2xl border border-stone-200/80">
             <span className="text-[10px] font-black text-stone-400 uppercase tracking-wider block">
-              Última Sincronización Exitosa
+              Última Sincronización
             </span>
             <div className="flex items-center gap-2 mt-1">
               <Clock className="w-5 h-5 text-emerald-600" />
               <span className="text-base font-black text-stone-900">{formattedLastSync}</span>
             </div>
             <p className="text-[11px] text-stone-400 mt-1">
-              {latencyMs !== undefined ? `Latencia a base de datos: ${latencyMs} ms` : "Monitoreo activo"}
+              {latencyMs !== undefined ? `Respuesta del servidor: ${latencyMs} ms` : "Monitoreo en vivo"}
             </p>
           </div>
 
-          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 flex flex-col justify-between">
+          <div className="p-4 bg-stone-50/80 rounded-2xl border border-stone-200/80 flex flex-col justify-between">
             <div>
               <span className="text-[10px] font-black text-stone-400 uppercase tracking-wider block">
-                Simulación de Corte de Red
+                Prueba de Desconexión
               </span>
-              <p className="text-[11px] text-stone-500 mt-1">
-                Prueba el funcionamiento del POS sin desconectar cables de la computadora.
+              <p className="text-[11px] text-stone-500 mt-0.5">
+                Simula un corte de internet para probar que la caja sigue cobrando.
               </p>
             </div>
             <div className="mt-2 flex items-center justify-between pt-2 border-t border-stone-200">
-              <span className="text-xs font-bold text-stone-700">Modo Offline Forzado:</span>
+              <span className="text-xs font-bold text-stone-700">Simulación:</span>
               <button
                 onClick={toggleSimulateOffline}
-                className={`px-3 py-1 rounded-xl text-xs font-black transition-all ${
+                className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
                   isSimulatedOffline
                     ? "bg-rose-500 text-white shadow-sm"
                     : "bg-stone-200 text-stone-700 hover:bg-stone-300"
                 }`}
               >
-                {isSimulatedOffline ? "Activado (Offline)" : "Desactivado (Normal)"}
+                {isSimulatedOffline ? "🔴 Modo Sin Red" : "🟢 Modo Normal"}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ─── 2. INSTALACIÓN Y DESCARGA EN LA PC ───────────────────────────── */}
+      {/* ─── 2. DESCARGA DE DATOS EN LA COMPUTADORA (RESPUESTA DIRECTA AL USUARIO) */}
+      <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <PackageCheck className="w-5 h-5 text-brito-orange-500" />
+              <h3 className="font-black text-base text-stone-900">
+                Datos Descargados en esta Computadora (Caché Local)
+              </h3>
+            </div>
+            <p className="text-xs text-stone-500 mt-0.5">
+              El sistema guarda automáticamente el catálogo de panes, clientes y precios en el disco de tu PC para que funcione 100% sin internet.
+            </p>
+          </div>
+
+          <button
+            onClick={handleDownloadAllData}
+            disabled={isDownloadingData}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 text-white font-black text-xs shadow-md shadow-orange-500/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <Download className={`w-4 h-4 ${isDownloadingData ? "animate-bounce" : ""}`} />
+            <span>{isDownloadingData ? "Descargando datos..." : "Descargar / Actualizar Datos en PC"}</span>
+          </button>
+        </div>
+
+        {/* Resumen del Almacenamiento en esta Computadora */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/70 text-center">
+            <span className="text-[10px] font-bold text-amber-800 uppercase block">Catálogo de Panes</span>
+            <span className="text-xl font-black text-amber-950 mt-0.5 block">{localStats.productsCount}</span>
+            <span className="text-[10px] text-amber-700 font-medium">productos en disco</span>
+          </div>
+
+          <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/70 text-center">
+            <span className="text-[10px] font-bold text-blue-800 uppercase block">Directorio Clientes</span>
+            <span className="text-xl font-black text-blue-950 mt-0.5 block">{localStats.customersCount}</span>
+            <span className="text-[10px] text-blue-700 font-medium">clientes en memoria</span>
+          </div>
+
+          <div className="p-3 bg-purple-50/60 rounded-xl border border-purple-200/70 text-center">
+            <span className="text-[10px] font-bold text-purple-800 uppercase block">Sucursales Activas</span>
+            <span className="text-xl font-black text-purple-950 mt-0.5 block">{localStats.branchesCount}</span>
+            <span className="text-[10px] text-purple-700 font-medium">tiendas enlazadas</span>
+          </div>
+
+          <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/70 text-center">
+            <span className="text-[10px] font-bold text-emerald-800 uppercase block">Espacio en Disco</span>
+            <span className="text-xl font-black text-emerald-950 mt-0.5 block">~{localStats.totalSizeKb} KB</span>
+            <span className="text-[10px] text-emerald-700 font-medium">almacenamiento seguro</span>
+          </div>
+        </div>
+
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="text-xs text-emerald-900 leading-relaxed">
+            <strong>Tu computadora ya tiene todos los datos necesarios:</strong> Aunque se corte la energía del módem o no haya señal de internet, el Punto de Venta seguirá permitiéndote cobrar bolillos, conchas, pasteles, abrir turnos y dar tickets sin interrupción.
+          </div>
+        </div>
+      </div>
+
+      {/* ─── 3. FIJAR COMO PROGRAMA INSTALADO EN LA BARRA DE TAREAS ──────── */}
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-5">
         <div className="border-b border-stone-100 pb-3">
           <div className="flex items-center gap-2">
-            <Laptop className="w-5 h-5 text-brito-orange-500" />
-            <h3 className="font-black text-base text-stone-900">Descargar e Instalar en la Computadora (PC)</h3>
+            <Pin className="w-5 h-5 text-brito-orange-500" />
+            <h3 className="font-black text-base text-stone-900">
+              Fijar como Programa Instalado en la Barra de Tareas de Windows
+            </h3>
           </div>
           <p className="text-xs text-stone-500 mt-0.5">
-            Convierte el sistema en una aplicación de escritorio independiente con su propio icono de Windows para operar sin navegador visible.
+            Convierte Panadería Brito en un programa de escritorio independiente con su propio icono en la barra de tareas de Windows.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Opción 1: Instalación PWA (Recomendada) */}
-          <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-50/50 to-orange-50/30 border border-amber-200/60 flex flex-col justify-between space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Opción 1: Instalar Aplicación de Escritorio */}
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-stone-900 to-stone-950 text-white flex flex-col justify-between space-y-4 shadow-xl">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-200/60 text-amber-900 text-[10px] font-black uppercase">
-                  Recomendada
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-stone-950 text-[10px] font-black uppercase">
+                  Acceso con 1 Clic
                 </span>
-                {isInstalledPwa ? (
-                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
-                    <Check className="w-3.5 h-3.5" /> Instalada en esta PC
+                {isInstalledPwa && (
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                    <Check className="w-3.5 h-3.5" /> Instalada
                   </span>
-                ) : (
-                  <span className="text-[11px] font-bold text-stone-500">App de Escritorio</span>
                 )}
               </div>
-              <h4 className="font-black text-sm text-stone-900">Instalar como Aplicación Nativa (PWA)</h4>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                Crea un acceso directo en el <strong>Escritorio y Menú Inicio de Windows</strong>. Se abre en una ventana limpia sin barras de navegación, arranca al instante y almacena los datos de forma local.
+              <h4 className="font-black text-base text-white">Instalar en esta Computadora</h4>
+              <p className="text-xs text-stone-300 leading-relaxed">
+                Abre Panadería Brito en su propia ventana de aplicación (sin barras de navegador ni pestañas) para dar apariencia 100% profesional de caja registradora.
               </p>
             </div>
 
-            <button
-              onClick={handleInstallClick}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 text-white font-black text-xs shadow-md shadow-orange-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-            >
-              <Monitor className="w-4 h-4" />
-              <span>{isInstalledPwa ? "Volver a Abrir Aplicación" : "Instalar en esta PC (1 Clic)"}</span>
-            </button>
-          </div>
-
-          {/* Opción 2: Acceso Directo y Lanzador Local */}
-          <div className="p-5 rounded-2xl bg-stone-50 border border-stone-200 flex flex-col justify-between space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 rounded-full bg-stone-200 text-stone-800 text-[10px] font-black uppercase">
-                  Acceso Rápido
-                </span>
-                <span className="text-[11px] font-bold text-stone-500">Windows (.URL)</span>
-              </div>
-              <h4 className="font-black text-sm text-stone-900">Acceso Directo al Punto de Venta</h4>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                Descarga un acceso directo preconfigurado para colocar en el escritorio de la caja registradora o utiliza el lanzador <code>PanaderiaBrito.exe</code> incluido en la carpeta del sistema.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
+            <div className="space-y-2 pt-2">
               <button
-                onClick={handleDownloadDesktopShortcut}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-white border border-stone-300 hover:bg-stone-100 text-stone-800 font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center justify-center gap-2"
+                onClick={handleInstallClick}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-stone-950 font-black text-xs shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Download className="w-4 h-4 text-stone-600" />
-                <span>Descargar Acceso Directo</span>
+                <Monitor className="w-4 h-4" />
+                <span>{isInstalledPwa ? "Volver a Abrir como Programa" : "Instalar Programa en Windows"}</span>
+              </button>
+
+              <button
+                onClick={downloadPinScript}
+                className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Descargar Acceso Directo de Escritorio (.bat)</span>
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Guía de instalación rápida */}
-        <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200/80 text-xs text-stone-600 space-y-2">
-          <div className="flex items-center gap-2 font-black text-stone-900">
-            <HelpCircle className="w-4 h-4 text-amber-500" />
-            <span>¿Cómo funciona el sistema cuando se va el internet?</span>
+          {/* Guía Paso a Paso para Anclar a la Barra de Tareas */}
+          <div className="p-5 rounded-2xl bg-stone-50 border border-stone-200 flex flex-col justify-between space-y-3">
+            <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📌</span> ¿Cómo anclarlo a la barra de tareas de Windows?
+            </h4>
+
+            <ol className="space-y-2 text-xs text-stone-700 list-decimal list-inside font-medium leading-relaxed">
+              <li>
+                Haz clic en el botón <strong>"Instalar Programa en Windows"</strong> (o abre el acceso directo).
+              </li>
+              <li>
+                Se abrirá la ventana dedicada de <strong>Panadería Brito</strong>.
+              </li>
+              <li>
+                En la barra inferior de Windows, haz <strong>CLIC DERECHO</strong> sobre el icono de Panadería Brito.
+              </li>
+              <li>
+                Selecciona la opción con tachuela: <strong>"Anclar a la barra de tareas" (Pin to taskbar)</strong>.
+              </li>
+              <li>
+                <strong>¡Listo!</strong> El sistema quedará fijado para siempre junto a tus programas principales.
+              </li>
+            </ol>
+
+            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 font-bold">
+              💡 Podrás iniciarlo todos los días directamente desde la barra inferior, aun si no hay internet en la panadería.
+            </div>
           </div>
-          <ol className="list-decimal list-inside space-y-1 text-stone-600 ml-1">
-            <li>
-              <strong>Cobro continuo sin interrupción:</strong> El cajero puede seguir cobrando panes, pasteles y registrando clientes aunque se desconecte el cable o el módem falle.
-            </li>
-            <li>
-              <strong>Impresión normal de tickets:</strong> La impresora térmica local sigue funcionando porque la comunicación es directa con la PC.
-            </li>
-            <li>
-              <strong>Cola de sincronización segura:</strong> Cada ticket se guarda en la memoria interna de la máquina con su fecha y monto exacto.
-            </li>
-            <li>
-              <strong>Sincronización automática:</strong> En cuanto la computadora detecta señal de internet, el sistema sube silenciosamente todas las ventas acumuladas a la base de datos central sin duplicar nada.
-            </li>
-          </ol>
         </div>
       </div>
 
-      {/* ─── 3. BANDEJA DE DATOS PENDIENTES DE SINCRONIZAR (COLA) ─────────── */}
+      {/* ─── 4. BANDEJA DE DATOS PENDIENTES DE SINCRONIZACIÓN (COLA) ──────── */}
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
           <div>
@@ -362,14 +428,14 @@ export default function OfflineManagement() {
               </h3>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Transacciones guardadas en el disco de esta computadora a la espera de ser transmitidas a la base de datos en la nube.
+              Transacciones guardadas de forma segura en esta computadora que se enviarán a la base de datos en la nube.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={exportBackup}
-              className="px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs flex items-center gap-1.5 transition-all"
+              className="px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
               title="Descargar copia de seguridad en archivo JSON por precaución"
             >
               <Download className="w-3.5 h-3.5" />
@@ -379,12 +445,12 @@ export default function OfflineManagement() {
             {queue.length > 0 && (
               <button
                 onClick={() => {
-                  if (confirm("¿Estás seguro de vaciar la cola local? Si no se han sincronizado, los registros podrían perderse.")) {
+                  if (confirm("¿Deseas vaciar la cola local?")) {
                     clearQueue();
                     showToast("Cola local vaciada.", "info");
                   }
                 }}
-                className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1.5 transition-all"
+                className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Vaciar Cola</span>
@@ -396,9 +462,9 @@ export default function OfflineManagement() {
         {queue.length === 0 ? (
           <div className="p-8 text-center bg-stone-50 rounded-2xl border border-dashed border-stone-200 space-y-2">
             <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
-            <h4 className="font-black text-sm text-stone-800">Cola de Sincronización Vacía</h4>
+            <h4 className="font-black text-sm text-stone-800">Todo Sincronizado</h4>
             <p className="text-xs text-stone-500 max-w-md mx-auto">
-              Excelente. Todas las ventas, cobros y movimientos de caja de esta sucursal están 100% sincronizados con el servidor en la nube.
+              Excelente. Todas las ventas, cobros y movimientos de caja están 100% resguardados en el servidor en la nube.
             </p>
           </div>
         ) : (
@@ -432,7 +498,7 @@ export default function OfflineManagement() {
                     </td>
                     <td className="p-3">
                       <div className="font-bold text-stone-900">{item.title}</div>
-                      {item.error && <span className="text-[10px] text-rose-600 font-normal">{item.error}</span>}
+                      {item.error && <span className="text-[10px] text-amber-700 font-normal">{item.error}</span>}
                     </td>
                     <td className="p-3 font-bold text-stone-900">
                       {item.amount !== undefined ? formatCurrency(item.amount) : "-"}
@@ -445,16 +511,16 @@ export default function OfflineManagement() {
                     </td>
                     <td className="p-3">
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
                           item.status === "failed"
-                            ? "bg-rose-100 text-rose-700"
+                            ? "bg-amber-100 text-amber-900"
                             : item.status === "syncing"
-                            ? "bg-amber-100 text-amber-800 animate-pulse"
+                            ? "bg-blue-100 text-blue-800 animate-pulse"
                             : "bg-amber-100 text-amber-800"
                         }`}
                       >
                         {item.status === "failed"
-                          ? `Falló (Intento ${item.attempts})`
+                          ? `En espera (Intento ${item.attempts})`
                           : item.status === "syncing"
                           ? "Sincronizando..."
                           : "Pendiente de envío"}
@@ -463,7 +529,7 @@ export default function OfflineManagement() {
                     <td className="p-3 text-right">
                       <button
                         onClick={() => removeQueueItem(item.id)}
-                        className="text-stone-400 hover:text-rose-600 p-1 transition-all"
+                        className="text-stone-400 hover:text-rose-600 p-1 transition-all cursor-pointer"
                         title="Eliminar registro de la cola"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -475,41 +541,6 @@ export default function OfflineManagement() {
             </table>
           </div>
         )}
-      </div>
-
-      {/* ─── 4. RESGUARDO Y PRECARGA DE DATOS LOCALES ─────────────────────── */}
-      <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-4">
-        <div className="border-b border-stone-100 pb-3">
-          <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-brito-orange-500" />
-            <h3 className="font-black text-base text-stone-900">Mantenimiento de Datos Locales</h3>
-          </div>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Optimiza la memoria de esta computadora para garantizar que todos los panes, pasteles y clientes estén disponibles cuando no haya señal.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-stone-50 rounded-2xl border border-stone-200">
-          <div>
-            <h4 className="font-black text-xs text-stone-900">Precargar Todo el Catálogo a Memoria Local</h4>
-            <p className="text-[11px] text-stone-500 mt-0.5">
-              Descarga la lista de panes, precios actualizados y existencias para que la caja no requiera consultar la nube al abrir turnos.
-            </p>
-          </div>
-
-          <button
-            onClick={handlePreloadCatalog}
-            disabled={isPreloading || !isOnline}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all whitespace-nowrap ${
-              isOnline
-                ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-sm active:scale-95"
-                : "bg-stone-200 text-stone-400 cursor-not-allowed"
-            }`}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isPreloading ? "animate-spin" : ""}`} />
-            <span>{isPreloading ? "Descargando..." : "Descargar Catálogo a PC"}</span>
-          </button>
-        </div>
       </div>
     </div>
   );

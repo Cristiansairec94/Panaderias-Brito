@@ -45,7 +45,7 @@ export default function Header() {
     toggleLiveSimulation,
     consolidatedMetrics
   } = useBranch();
-  const { isOnline, isSyncing, pendingCount } = useSync();
+  const { isOnline, isSyncing, isSynced, pendingCount } = useSync();
 
   const [time, setTime] = useState<string>("");
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -208,29 +208,29 @@ export default function Header() {
         {/* Offline / Cloud Status Pill */}
         <Link
           href="/configuracion?tab=offline"
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs ${
             !isOnline
-              ? "bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100 animate-pulse shadow-xs"
+              ? "bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100 animate-pulse"
               : isSyncing
-              ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100 shadow-xs"
+              ? "bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100"
               : pendingCount > 0
-              ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100 shadow-xs"
-              : "bg-stone-50/80 border-stone-200 text-stone-700 hover:bg-stone-100 shadow-xs"
+              ? "bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100"
+              : "bg-emerald-50/80 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
           }`}
           title={
             !isOnline
-              ? `Sin Internet (Modo Offline) - ${pendingCount} registro(s) pendiente(s) de subir a la nube`
+              ? `Modo Sin Internet (Offline) - ${pendingCount} venta(s) guardadas localmente en esta PC`
               : isSyncing
-              ? "Sincronizando con la nube..."
+              ? "Sincronizando transacciones con el servidor en la nube..."
               : pendingCount > 0
-              ? `${pendingCount} registro(s) pendientes de subir a la nube`
-              : "Conectado a la Nube (Supabase Sincronizado)"
+              ? `Conexión activa - ${pendingCount} registro(s) pendiente(s) de subir a la nube`
+              : "En Línea y Sincronizado: Toda la información está resguardada en la nube"
           }
         >
           {!isOnline ? (
             <>
-              <WifiOff className="w-3.5 h-3.5 text-rose-600" />
-              <span className="hidden sm:inline text-[11px] font-black">Offline</span>
+              <WifiOff className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+              <span className="text-[11px] font-black text-rose-700">Sin Red</span>
               {pendingCount > 0 && (
                 <span className="px-1.5 py-0.2 bg-rose-600 text-white text-[9px] font-black rounded-full">
                   {pendingCount}
@@ -239,18 +239,21 @@ export default function Header() {
             </>
           ) : isSyncing ? (
             <>
-              <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
-              <span className="hidden sm:inline text-[11px] font-black">Sincronizando</span>
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin shrink-0" />
+              <span className="text-[11px] font-black text-amber-800">Sincronizando...</span>
             </>
           ) : pendingCount > 0 ? (
             <>
-              <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden sm:inline text-[11px] font-black">{pendingCount} pend.</span>
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="text-[11px] font-black text-amber-800">{pendingCount} pend.</span>
             </>
           ) : (
             <>
-              <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline text-[11px] font-bold text-stone-700">En Línea</span>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-[11px] font-extrabold text-emerald-800">Sincronizado</span>
             </>
           )}
         </Link>

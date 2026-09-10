@@ -14,12 +14,16 @@ import {
   checkRealOnlineStatus,
   processSyncQueue,
   exportLocalEmergencyBackup,
-  preloadCatalogForOffline,
+  downloadAllDataToLocalPc,
+  getLocalDataStats,
+  LocalDataStats,
+  generateWindowsDesktopShortcutScript,
 } from "@/lib/sync/syncService";
 
 interface SyncContextType {
   isOnline: boolean;
   isSyncing: boolean;
+  isSynced: boolean;
   pendingCount: number;
   queue: SyncItem[];
   lastSyncTime: string | null;
@@ -28,6 +32,7 @@ interface SyncContextType {
   latencyMs?: number;
   canInstallPwa: boolean;
   isInstalledPwa: boolean;
+  localStats: LocalDataStats;
   promptInstallPwa: () => Promise<boolean>;
   syncNow: () => Promise<{ total: number; synced: number; failed: number; errors: string[] }>;
   enqueueOfflineItem: (params: {
@@ -41,8 +46,9 @@ interface SyncContextType {
   clearQueue: () => void;
   toggleSimulateOffline: () => void;
   refreshConnection: () => Promise<void>;
+  downloadLocalData: () => Promise<{ success: boolean; message: string; stats: LocalDataStats }>;
+  downloadPinScript: () => void;
   exportBackup: () => void;
-  preloadCatalog: () => Promise<{ success: boolean; count: number; message: string }>;
 }
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
@@ -56,13 +62,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [isSimulatedOfflineState, setIsSimulatedOfflineState] = useState<boolean>(false);
   const [connectionDetail, setConnectionDetail] = useState<string>("Verificando conexión...");
   const [latencyMs, setLatencyMs] = useState<number | undefined>(undefined);
+  const [localStats, setLocalStats] = useState<LocalDataStats>(() => getLocalDataStats());
 
   // PWA install prompt state
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [canInstallPwa, setCanInstallPwa] = useState<boolean>(false);
   const [isInstalledPwa, setIsInstalledPwa] = useState<boolean>(false);
 
-  // 1. Cargar datos locales de sincronización
+  // 1. Cargar datos locales de sincronización y métricas de almacenamiento
   const refreshQueueAndStats = useCallback(() => {
     if (typeof window === "undefined") return;
     const q = getSyncQueue();
@@ -70,9 +77,10 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setPendingCount(q.length);
     setLastSyncTimeState(getLastSyncTime());
     setIsSimulatedOfflineState(checkSimulatedOffline());
+    setLocalStats(getLocalDataStats());
   }, []);
 
-  // 2. Verificar estado de la conexión en vivo
+  // 2. Verificar estado de la conexión en vivo con respuesta inmediata
   const refreshConnection = useCallback(async () => {
     refreshQueueAndStats();
     const res = await checkRealOnlineStatus();
@@ -97,7 +105,14 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshQueueAndStats]);
 
-  // 4. Encolar nuevo ítem offline
+  // 4. Descargar / actualizar todo el catálogo local en la PC
+  const downloadLocalData = useCallback(async () => {
+    const res = await downloadAllDataToLocalPc();
+    setLocalStats(res.stats);
+    return res;
+  }, []);
+
+  // 5. Encolar nuevo ítem offline
   const enqueueOfflineItem = useCallback(
     (params: {
       type: SyncType;
@@ -133,9 +148,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     refreshConnection();
   }, [isSimulatedOfflineState, refreshConnection]);
 
-  // 5. Instalar PWA
+  // 6. Instalar PWA
   const promptInstallPwa = useCallback(async (): Promise<boolean> => {
-    if (!deferredPrompt) return false;
+    if (!deferredPrompt) {
+      // Si el navegador no disparó el evento (o ya está instalada), intentamos el instalador .bat
+      generateWindowsDesktopShortcutScript();
+      return false;
+    }
     try {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
@@ -148,33 +167,36 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       return false;
     } catch (err) {
       console.error("[PWA] Error al disparar prompt de instalación:", err);
+      generateWindowsDesktopShortcutScript();
       return false;
     }
   }, [deferredPrompt]);
 
-  // 6. Efecto inicial: Registrar Service Worker y eventos de red / PWA
+  // 7. Efecto inicial: Registrar Service Worker, precargar datos locales y escuchar eventos de red
   useEffect(() => {
+    // Asegurar que la PC tenga los datos del catálogo descargados desde el primer arranque
+    downloadAllDataToLocalPc().catch(() => {});
     refreshConnection();
 
-    // Registro de Service Worker
+    // Registro de Service Worker para funcionamiento 100% offline
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
         .then((reg) => {
-          console.log("[ServiceWorker] Registrado exitosamente:", reg.scope);
+          console.log("[ServiceWorker] Listo y protegiendo modo offline:", reg.scope);
         })
         .catch((err) => {
           console.warn("[ServiceWorker] No se pudo registrar:", err);
         });
     }
 
-    // Detectar si ya corre en modo standalone
+    // Detectar si ya corre en ventana de aplicación independiente
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
     setIsInstalledPwa(isStandalone);
 
-    // Capturar evento PWA
+    // Capturar evento de instalación PWA
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -190,17 +212,19 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
     window.addEventListener("appinstalled", handleAppInstalled);
 
-    // Eventos de conectividad del navegador
+    // Eventos inmediatos del sistema operativo al conectar o desconectar internet
     const handleOnlineEvent = async () => {
-      console.log("[SyncContext] Evento 'online' recibido. Reintentando sincronización automática...");
+      console.log("[SyncContext] Dispositivo en línea. Restaurando conexión y sincronizando...");
+      setIsOnline(true);
+      setConnectionDetail("Conexión a internet restablecida");
       await refreshConnection();
       await syncNow();
     };
 
     const handleOfflineEvent = () => {
-      console.log("[SyncContext] Evento 'offline' recibido.");
+      console.log("[SyncContext] Dispositivo desconectado de la red.");
       setIsOnline(false);
-      setConnectionDetail("Dispositivo desconectado de la red");
+      setConnectionDetail("Sin conexión a internet (Modo Offline Seguro)");
     };
 
     window.addEventListener("online", handleOnlineEvent);
@@ -208,13 +232,13 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("brito_sync_queue_updated", refreshQueueAndStats);
     window.addEventListener("brito_network_status_changed", refreshConnection);
 
-    // Heartbeat cada 30 segundos
+    // Heartbeat cada 25 segundos para mantener estado en vivo
     const interval = setInterval(async () => {
       await refreshConnection();
       if (getPendingSyncCount() > 0 && !checkSimulatedOffline()) {
         await syncNow();
       }
-    }, 30000);
+    }, 25000);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
@@ -225,13 +249,16 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("brito_network_status_changed", refreshConnection);
       clearInterval(interval);
     };
-  }, [refreshConnection, refreshQueueAndStats, syncNow]);
+  }, [downloadLocalData, refreshConnection, refreshQueueAndStats, syncNow]);
+
+  const isSynced = isOnline && !isSyncing && pendingCount === 0;
 
   return (
     <SyncContext.Provider
       value={{
         isOnline,
         isSyncing,
+        isSynced,
         pendingCount,
         queue,
         lastSyncTime,
@@ -240,6 +267,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         latencyMs,
         canInstallPwa,
         isInstalledPwa,
+        localStats,
         promptInstallPwa,
         syncNow,
         enqueueOfflineItem,
@@ -247,8 +275,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         clearQueue,
         toggleSimulateOffline,
         refreshConnection,
+        downloadLocalData,
+        downloadPinScript: generateWindowsDesktopShortcutScript,
         exportBackup: exportLocalEmergencyBackup,
-        preloadCatalog: preloadCatalogForOffline,
       }}
     >
       {children}
