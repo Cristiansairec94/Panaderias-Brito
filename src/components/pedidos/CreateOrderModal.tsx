@@ -39,11 +39,18 @@ interface CreateOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOrderCreated: (orderId: string) => void;
+  initialBranchId?: string;
 }
 
-export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: CreateOrderModalProps) {
+export default function CreateOrderModal({
+  isOpen,
+  onClose,
+  onOrderCreated,
+  initialBranchId,
+}: CreateOrderModalProps) {
   const { branches, currentBranch } = useBranch();
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   // Wizard active step: 1 (Cliente & Sucursal), 2 (Productos & Diseño), 3 (Entrega & Pago)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -52,17 +59,48 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
+  // Robust resolution of connected/active branch
+  const connectedBranchId = useMemo(() => {
+    // 1. Initial branch passed from parent page filter
+    if (initialBranchId && branches.some((b) => b.id === initialBranchId)) {
+      return initialBranchId;
+    }
+    // 2. Active branch from global BranchContext (connected in Header / POS)
+    if (currentBranch && currentBranch.id && branches.some((b) => b.id === currentBranch.id)) {
+      return currentBranch.id;
+    }
+    // 3. User assigned branch from AuthContext
+    if (user?.assignedBranchId && branches.some((b) => b.id === user.assignedBranchId)) {
+      return user.assignedBranchId;
+    }
+    // 4. Branch where user is manager/cashier
+    if (user?.id) {
+      const byAssignedUser = branches.find((b) => b.assignedUserId === user.id);
+      if (byAssignedUser) return byAssignedUser.id;
+    }
+    // 5. From localStorage saved active branch or last used order branch
+    if (typeof window !== "undefined") {
+      const savedCurrent = localStorage.getItem("brito_current_branch_id");
+      if (savedCurrent && savedCurrent !== "all" && branches.some((b) => b.id === savedCurrent)) {
+        return savedCurrent;
+      }
+      const lastOrderBranch = localStorage.getItem("brito_last_order_branch_id");
+      if (lastOrderBranch && branches.some((b) => b.id === lastOrderBranch)) {
+        return lastOrderBranch;
+      }
+    }
+    // 6. Fallback to first available branch
+    return branches[0]?.id || "branch-matriz";
+  }, [branches, currentBranch, initialBranchId, user]);
+
   // Step 1: Customer selection & Branch
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [isNewCustomer, setIsNewCustomer] = useState(false);
-  const isAdmin = user?.role === "admin";
-  const userActiveBranchId = user?.assignedBranchId || currentBranch?.id || "branch-matriz";
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(
-    !isAdmin ? userActiveBranchId : (currentBranch?.id || "branch-matriz")
-  );
+  const userActiveBranchId = connectedBranchId;
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(connectedBranchId);
 
   // Step 2: Order items & Dedication
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -97,13 +135,10 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
     if (isOpen) {
       setProducts(getStoredProducts());
       setCustomers(getStoredCustomers());
-      const defaultBranch = !isAdmin
-        ? userActiveBranchId
-        : currentBranch?.id || "branch-matriz";
-      setSelectedBranchId(defaultBranch);
+      setSelectedBranchId(connectedBranchId);
       setCurrentStep(1);
     }
-  }, [isOpen, currentBranch, user, isAdmin, userActiveBranchId]);
+  }, [isOpen, connectedBranchId]);
 
   // Total calculation
   const total = useMemo(() => {
@@ -613,35 +648,49 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {branches.map((b) => {
                     const isSelected = selectedBranchId === b.id;
-                    const isAllowed = isAdmin || b.id === userActiveBranchId;
+                    const isConnected = b.id === connectedBranchId;
+                    const isAllowed = isAdmin || isConnected;
                     return (
                       <button
                         key={b.id}
                         type="button"
                         disabled={!isAllowed}
                         onClick={() => {
-                          if (isAllowed) setSelectedBranchId(b.id);
+                          if (isAllowed) {
+                            setSelectedBranchId(b.id);
+                            try {
+                              localStorage.setItem("brito_last_order_branch_id", b.id);
+                            } catch {}
+                          }
                         }}
                         className={`p-4 rounded-2xl border-2 text-left transition-all flex flex-col justify-between ${
                           isSelected
-                            ? "border-amber-600 bg-amber-50/50 shadow-sm"
+                            ? "border-amber-600 bg-amber-50/50 shadow-sm ring-2 ring-amber-500/20"
                             : isAllowed
                             ? "border-stone-200 hover:border-stone-300 bg-white"
                             : "border-stone-200/60 bg-stone-100/60 opacity-60 cursor-not-allowed"
                         }`}
                       >
                         <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-extrabold text-xs text-stone-900">{b.shortName}</span>
-                            {isSelected ? (
-                              <CheckCircle2 className="w-4 h-4 text-amber-600" />
-                            ) : !isAllowed ? (
-                              <Lock className="w-3.5 h-3.5 text-stone-400" />
-                            ) : null}
+                          <div className="flex items-center justify-between mb-1 gap-2">
+                            <span className="font-extrabold text-xs text-stone-900 truncate">{b.shortName}</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isConnected && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  Conectada
+                                </span>
+                              )}
+                              {isSelected ? (
+                                <CheckCircle2 className="w-4 h-4 text-amber-600" />
+                              ) : !isAllowed ? (
+                                <Lock className="w-3.5 h-3.5 text-stone-400" />
+                              ) : null}
+                            </div>
                           </div>
                           <p className="text-[11px] text-stone-500 line-clamp-1">{b.name}</p>
                           <p className="text-[10px] text-stone-400 mt-1 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> {b.address.split(",")[0]}
+                            <MapPin className="w-3 h-3 shrink-0" /> {b.address.split(",")[0]}
                           </p>
                         </div>
                         {!isAllowed && (
@@ -649,9 +698,9 @@ export default function CreateOrderModal({ isOpen, onClose, onOrderCreated }: Cr
                             <span>Bloqueada para cajero</span>
                           </div>
                         )}
-                        {isSelected && !isAdmin && (
+                        {isSelected && (
                           <div className="mt-2 pt-2 border-t border-amber-200/70 flex items-center justify-between text-[10px] font-bold text-amber-700">
-                            <span>✓ Tu Sucursal Actual</span>
+                            <span>{isConnected ? "✓ Tu Sucursal Conectada" : "✓ Sucursal Seleccionada"}</span>
                           </div>
                         )}
                       </button>

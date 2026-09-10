@@ -76,6 +76,20 @@ export default function PedidosPage() {
     return () => window.removeEventListener("brito_orders_updated", handleUpdate);
   }, []);
 
+  // Auto-sync branch filter with active connected branch (or user assigned branch if not admin)
+  useEffect(() => {
+    if (user && user.role !== "admin") {
+      const userBranchId = user.assignedBranchId || currentBranch?.id;
+      if (userBranchId) {
+        setSelectedBranchFilter(userBranchId);
+        return;
+      }
+    }
+    if (currentBranch) {
+      setSelectedBranchFilter(currentBranch.id);
+    }
+  }, [currentBranch, user]);
+
   // Today and Tomorrow strings in YYYY-MM-DD
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const tomorrowStr = useMemo(() => {
@@ -340,9 +354,14 @@ export default function PedidosPage() {
             <select
               value={selectedBranchFilter}
               onChange={(e) => setSelectedBranchFilter(e.target.value)}
-              className="w-full text-xs px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:outline-none font-semibold text-stone-800"
+              disabled={user?.role !== "admin"}
+              className={`w-full text-xs px-3 py-2.5 rounded-xl border focus:outline-none font-semibold ${
+                user?.role !== "admin"
+                  ? "bg-stone-100 text-stone-500 border-stone-200 cursor-not-allowed"
+                  : "bg-stone-50 border-stone-200 focus:ring-2 focus:ring-amber-500 text-stone-800"
+              }`}
             >
-              <option value="all">🏬 Todas las Sucursales</option>
+              {user?.role === "admin" && <option value="all">🏬 Todas las Sucursales</option>}
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
@@ -801,6 +820,7 @@ export default function PedidosPage() {
       <CreateOrderModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
+        initialBranchId={selectedBranchFilter !== "all" ? selectedBranchFilter : currentBranch?.id}
         onOrderCreated={(orderId) => {
           loadOrders();
           const created = getStoredOrders().find((o) => o.id === orderId);
