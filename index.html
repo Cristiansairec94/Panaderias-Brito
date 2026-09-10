@@ -2471,14 +2471,50 @@
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setTicketPrinted(true);
-                        window.print();
+                        let directPrinted = false;
+                        try {
+                          const ctrl = new AbortController();
+                          const tId = setTimeout(() => ctrl.abort(), 1200);
+                          const res = await fetch("http://127.0.0.1:9191/print", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              folio: completedSale?.id ? completedSale.id.slice(-6).toUpperCase() : "000000",
+                              date: completedSale?.date,
+                              cashier: completedSale?.cashier || "Don Toño Brito",
+                              customerName: completedSale?.customerName || "Público en General",
+                              customerType: completedSale?.customerType,
+                              paymentMethod: completedSale?.paymentMethod,
+                              items: (completedSale?.items || []).map(it => ({
+                                name: it.product.name,
+                                quantity: it.quantity,
+                                price: it.product.price,
+                                subtotal: it.product.price * it.quantity
+                              })),
+                              total: completedSale?.total,
+                              cashGiven: completedSale?.cashGiven,
+                              change: completedSale?.change,
+                            }),
+                            signal: ctrl.signal
+                          });
+                          clearTimeout(tId);
+                          if (res.ok) {
+                            const js = await res.json();
+                            if (js && js.success) directPrinted = true;
+                          }
+                        } catch(e) {}
+
+                        if (!directPrinted) {
+                          window.print();
+                        }
+
                         setTimeout(() => {
                           setTicketPrinted(false);
                           try { playCashRegisterSound(); } catch(e) {}
                           resetSale();
-                        }, 1200);
+                        }, 1000);
                       }}
                       className={`flex items-center justify-center gap-2 py-3.5 px-3 font-bold rounded-2xl text-xs sm:text-sm shadow-md border transition-all active:scale-95 cursor-pointer ${
                         ticketPrinted

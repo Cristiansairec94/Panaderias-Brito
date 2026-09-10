@@ -74,16 +74,63 @@ export default function TicketModal({
 
   const [printed, setPrinted] = React.useState(false);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     setPrinted(true);
-    window.print();
+
+    let printedDirectly = false;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+      const res = await fetch("http://127.0.0.1:9191/print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folio,
+          date: formattedDate,
+          cashier: cashierName,
+          customerName: customerName || "Público en General",
+          customerType,
+          paymentMethod,
+          transferAccount,
+          branchName: branchName || "Panaderías Brito",
+          branchPhone: branchPhone || "Don Antonio Brito & Hijos",
+          branchAddress,
+          items: items.map((it) => ({
+            name: it.product.name,
+            quantity: it.quantity,
+            price: it.product.price,
+            subtotal: it.product.price * it.quantity,
+          })),
+          total,
+          cashGiven,
+          change,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.success) {
+          printedDirectly = true;
+        }
+      }
+    } catch (err) {
+      // Local print bridge not available
+    }
+
+    if (!printedDirectly) {
+      window.print();
+    }
+
     setTimeout(() => {
       setPrinted(false);
       try {
         playCashRegisterSound();
       } catch (e) {}
       onClose();
-    }, 1200);
+    }, 1000);
   };
 
   return (
