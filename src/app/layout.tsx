@@ -29,10 +29,14 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Panadería Bakery Brito - Sistema ERP & POS",
   description: "Sistema integral de punto de venta, inventario y gestión para Panadería Brito (Don Toño)",
+  manifest: "/manifest.json",
   icons: {
     icon: "/logo.png",
+    apple: "/logo.png",
   },
 };
+
+import { SyncProvider } from "@/context/SyncContext";
 
 export default function RootLayout({
   children,
@@ -41,13 +45,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${satisfy.variable} ${dancingScript.variable}`}>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      </head>
       <body className="antialiased font-sans">
         <AuthProvider>
-          <NotificationProvider>
-            <AppLayout>
-              {children}
-            </AppLayout>
-          </NotificationProvider>
+          <SyncProvider>
+            <NotificationProvider>
+              <AppLayout>
+                {children}
+              </AppLayout>
+            </NotificationProvider>
+          </SyncProvider>
         </AuthProvider>
       </body>
     </html>

@@ -30,7 +30,9 @@ import {
   ExternalLink,
   Wallet,
   AlertCircle,
-  UserCheck
+  UserCheck,
+  Wifi,
+  Laptop
 } from "lucide-react";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, cleanOnlyNumbers } from "@/lib/utils";
 import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
@@ -38,6 +40,7 @@ import { useBranch } from "@/context/BranchContext";
 import { UserRole, Branch } from "@/types";
 import RoleManagement from "@/components/configuracion/RoleManagement";
 import EmployeeManagement from "@/components/configuracion/EmployeeManagement";
+import OfflineManagement from "@/components/configuracion/OfflineManagement";
 
 function ConfiguracionContent() {
   const router = useRouter();
@@ -46,7 +49,7 @@ function ConfiguracionContent() {
   const { usersList, addUser } = useAuth();
   const { branches, addBranch, updateBranch, deleteBranch, switchBranch } = useBranch();
 
-  const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "roles" | "empleados" | "ticket" | "operaciones" | "database">(
+  const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "roles" | "empleados" | "ticket" | "operaciones" | "offline" | "database">(
     tabQuery === "usuarios" ? "roles" : (tabQuery as any) || "roles"
   );
 
@@ -80,7 +83,7 @@ function ConfiguracionContent() {
   useEffect(() => {
     if (tabQuery === "usuarios") {
       setActiveTab("roles");
-    } else if (tabQuery && ["general", "sucursales", "roles", "empleados", "ticket", "operaciones", "database"].includes(tabQuery)) {
+    } else if (tabQuery && ["general", "sucursales", "roles", "empleados", "ticket", "operaciones", "offline", "database"].includes(tabQuery)) {
       setActiveTab(tabQuery as any);
     }
   }, [tabQuery]);
@@ -310,6 +313,20 @@ function ConfiguracionContent() {
         >
           <Sliders className="w-4 h-4 text-purple-500" />
           <span>Parámetros de Caja</span>
+        </button>
+        <button
+          onClick={() => handleTabChange("offline")}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === "offline"
+              ? "bg-stone-900 text-white shadow-sm ring-2 ring-emerald-400/50"
+              : "bg-white text-stone-600 hover:bg-stone-100"
+          }`}
+        >
+          <Wifi className="w-4 h-4 text-emerald-400" />
+          <span>Modo Offline & PC</span>
+          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 font-black text-[9px] rounded-full uppercase shadow-xs">
+            Sin Internet
+          </span>
         </button>
         <button
           onClick={() => handleTabChange("database")}
@@ -1122,6 +1139,9 @@ function ConfiguracionContent() {
           </div>
         </form>
       )}
+
+      {/* Tab: Modo Offline & PC */}
+      {activeTab === "offline" && <OfflineManagement />}
 
       {/* Tab 5: Database & Cloud */}
       {activeTab === "database" && (

@@ -18,12 +18,16 @@ import {
   CheckCircle2,
   Building2,
   TrendingUp,
-  Radio
+  Radio,
+  Wifi,
+  WifiOff,
+  RefreshCw
 } from "lucide-react";
 import NotificationsDropdown from "./NotificationsDropdown";
 import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { useBranch } from "@/context/BranchContext";
+import { useSync } from "@/context/SyncContext";
 import { formatCurrency } from "@/lib/utils";
 
 export default function Header() {
@@ -41,6 +45,7 @@ export default function Header() {
     toggleLiveSimulation,
     consolidatedMetrics
   } = useBranch();
+  const { isOnline, isSyncing, pendingCount } = useSync();
 
   const [time, setTime] = useState<string>("");
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -200,6 +205,56 @@ export default function Header() {
 
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Offline / Cloud Status Pill */}
+        <Link
+          href="/configuracion?tab=offline"
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+            !isOnline
+              ? "bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100 animate-pulse shadow-xs"
+              : isSyncing
+              ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100 shadow-xs"
+              : pendingCount > 0
+              ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100 shadow-xs"
+              : "bg-stone-50/80 border-stone-200 text-stone-700 hover:bg-stone-100 shadow-xs"
+          }`}
+          title={
+            !isOnline
+              ? `Sin Internet (Modo Offline) - ${pendingCount} registro(s) pendiente(s) de subir a la nube`
+              : isSyncing
+              ? "Sincronizando con la nube..."
+              : pendingCount > 0
+              ? `${pendingCount} registro(s) pendientes de subir a la nube`
+              : "Conectado a la Nube (Supabase Sincronizado)"
+          }
+        >
+          {!isOnline ? (
+            <>
+              <WifiOff className="w-3.5 h-3.5 text-rose-600" />
+              <span className="hidden sm:inline text-[11px] font-black">Offline</span>
+              {pendingCount > 0 && (
+                <span className="px-1.5 py-0.2 bg-rose-600 text-white text-[9px] font-black rounded-full">
+                  {pendingCount}
+                </span>
+              )}
+            </>
+          ) : isSyncing ? (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+              <span className="hidden sm:inline text-[11px] font-black">Sincronizando</span>
+            </>
+          ) : pendingCount > 0 ? (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden sm:inline text-[11px] font-black">{pendingCount} pend.</span>
+            </>
+          ) : (
+            <>
+              <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline text-[11px] font-bold text-stone-700">En Línea</span>
+            </>
+          )}
+        </Link>
+
         {/* Quick Sale Simulator Button */}
         <div className="relative">
           <button

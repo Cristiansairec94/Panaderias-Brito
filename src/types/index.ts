@@ -368,3 +368,28 @@ export interface ExpenseRecord {
   supplier?: string;
   timestamp: string;
 }
+
+export type SyncType = "sale" | "expense" | "order" | "stock";
+
+export interface SyncItem {
+  id: string;
+  type: SyncType;
+  title: string;
+  amount?: number;
+  branchId?: string;
+  data: any;
+  createdAt: string;
+  status: "pending" | "syncing" | "failed" | "synced";
+  attempts: number;
+  lastAttempt?: string;
+  error?: string;
+}
+
+export interface SyncState {
+  isOnline: boolean;
+  isSyncing: boolean;
+  pendingCount: number;
+  lastSyncTime: string | null;
+  isSimulatedOffline: boolean;
+}
+

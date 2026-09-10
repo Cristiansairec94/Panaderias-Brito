@@ -1,0 +1,47 @@
+﻿{
+  "name": "Panadería Bakery Brito - Sistema ERP & POS",
+  "short_name": "Panadería Brito",
+  "description": "Sistema integral de punto de venta, inventario y gestión para Panadería Brito. Funciona 100% sin internet.",
+  "start_url": "/pos",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c0d12",
+  "theme_color": "#f97316",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Punto de Venta (Caja Rápida)",
+      "short_name": "Caja POS",
+      "description": "Abrir directamente el mostrador de ventas",
+      "url": "/pos",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Configuración & Modo Offline",
+      "short_name": "Modo Offline",
+      "description": "Monitoreo de sincronización y datos locales",
+      "url": "/configuracion?tab=offline",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -44,7 +44,9 @@ import {
   Pencil,
   TrendingUp,
   Barcode,
-  Printer
+  Printer,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CashIncome } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep } from "@/lib/utils";
@@ -63,6 +65,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { useNotifications } from "@/context/NotificationContext";
+import { useSync } from "@/context/SyncContext";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
@@ -334,6 +337,7 @@ export default function POSPage() {
   const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
   const { addNotification } = useNotifications();
   const { toggleMobile } = useSidebar();
+  const { isOnline, enqueueOfflineItem, pendingCount } = useSync();
   const activeBranch = currentBranch || branches[0];
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -1063,52 +1067,80 @@ export default function POSPage() {
     const currentChange = paymentMethod === "efectivo" ? change : undefined;
 
     let createdSaleId = `POS-${Date.now().toString().slice(-6)}`;
+    let savedToCloud = false;
 
-    try {
-      const supabase = createClient();
-      
-      const saleInsertPayload: any = {
-        total: currentTotal,
-        payment_method: currentPaymentMethod,
-        cashier: cashierName,
-      };
-      if (selectedCustomer.id && !selectedCustomer.id.startsWith("cli-")) {
-        saleInsertPayload.customer_id = selectedCustomer.id;
-      }
+    if (isOnline) {
+      try {
+        const supabase = createClient();
+        
+        const saleInsertPayload: any = {
+          total: currentTotal,
+          payment_method: currentPaymentMethod,
+          cashier: cashierName,
+        };
+        if (selectedCustomer.id && !selectedCustomer.id.startsWith("cli-")) {
+          saleInsertPayload.customer_id = selectedCustomer.id;
+        }
 
-      const { data: saleData, error: saleErr } = await supabase
-        .from("sales")
-        .insert(saleInsertPayload)
-        .select()
-        .single();
+        const { data: saleData, error: saleErr } = await supabase
+          .from("sales")
+          .insert(saleInsertPayload)
+          .select()
+          .single();
 
-      if (saleData && !saleErr) {
-        createdSaleId = saleData.id;
+        if (saleData && !saleErr) {
+          createdSaleId = saleData.id;
+          savedToCloud = true;
 
-        const saleItemsToInsert = currentItems.map((item) => ({
-          sale_id: saleData.id,
-          product_id: item.product.id.includes("-") ? item.product.id : null,
-          product_name: item.product.name,
-          quantity: item.quantity,
-          unit_price: item.product.price,
-          subtotal: item.product.price * item.quantity,
-        }));
-        await supabase.from("sale_items").insert(saleItemsToInsert);
+          const saleItemsToInsert = currentItems.map((item) => ({
+            sale_id: saleData.id,
+            product_id: item.product.id.includes("-") ? item.product.id : null,
+            product_name: item.product.name,
+            quantity: item.quantity,
+            unit_price: item.product.price,
+            subtotal: item.product.price * item.quantity,
+          }));
+          await supabase.from("sale_items").insert(saleItemsToInsert);
 
-        for (const item of currentItems) {
-          if (item.product.id.includes("-")) {
-            const newStock = Math.max(0, item.product.stock - item.quantity);
-            await supabase
-              .from("products")
-              .update({ stock: newStock })
-              .eq("id", item.product.id);
+          for (const item of currentItems) {
+            if (item.product.id.includes("-")) {
+              const newStock = Math.max(0, item.product.stock - item.quantity);
+              await supabase
+                .from("products")
+                .update({ stock: newStock })
+                .eq("id", item.product.id);
+            }
           }
         }
+      } catch (e) {
+        console.log("Offline sale or db pending", e);
       }
-    } catch (e) {
-      console.log("Offline sale or db pending", e);
-    } finally {
-      setProducts((prev) => {
+    }
+
+    // Si no se guardó en la nube (offline o falla de red), encolar de forma segura en la cola offline local
+    if (!savedToCloud) {
+      enqueueOfflineItem({
+        type: "sale",
+        title: `Venta POS #${createdSaleId} (${formatCurrency(currentTotal)})`,
+        amount: currentTotal,
+        branchId: activeBranch?.id,
+        data: {
+          saleId: createdSaleId,
+          total: currentTotal,
+          paymentMethod: currentPaymentMethod,
+          cashier: cashierName,
+          items: currentItems.map((item) => ({
+            productId: item.product.id,
+            name: item.product.name,
+            quantity: item.quantity,
+            price: item.product.price,
+            subtotal: item.product.price * item.quantity,
+          })),
+        },
+      });
+    }
+
+    setProducts((prev) => {
         const updated = prev.map((prod) => {
           const bought = currentItems.find((ci) => ci.product.id === prod.id);
           if (bought) {
@@ -1172,10 +1204,9 @@ export default function POSPage() {
       setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
       setCustomerSearchQuery("");
       setIsCustomerPickerOpen(false);
-    }
-  };
+    };
 
-  const handleReceiveBreadDelivery = async (delivery: BreadDeliveryRecord) => {
+    const handleReceiveBreadDelivery = async (delivery: BreadDeliveryRecord) => {
     // 1. Sumar existencias en el catálogo local y estado
     setProducts((prev) => {
       const updated = prev.map((prod) => {
@@ -1504,6 +1535,22 @@ export default function POSPage() {
 
         {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
         <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
+          {!isOnline && (
+            <div className="bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 border border-amber-500/30 text-amber-950 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <WifiOff className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>
+                  <strong>Modo Fuera de Línea Activo:</strong> Cobro local habilitado. Las ventas se guardan en la memoria de esta PC y se sincronizarán al detectar internet.
+                </span>
+              </div>
+              {pendingCount > 0 && (
+                <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
+                  {pendingCount} {pendingCount === 1 ? "venta pendiente" : "ventas pendientes"}
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-3 w-full">
             {/* Botón Menú Móvil */}
             <button
