@@ -322,11 +322,9 @@ export default function CreateOrderModal({
     }
     if (total > 0 && numericDeposit < minRequiredDeposit) {
       alert(
-        `Es obligatorio cubrir al menos el 50% de anticipo (${formatCurrency(
+        `Por favor pida el 50% para poder levantar el pedido correctamente.\n\nAnticipo mínimo requerido: ${formatCurrency(
           minRequiredDeposit
-        )}) para levantar el pedido. Actualmente se ingresó ${formatCurrency(
-          numericDeposit
-        )}.`
+        )}\nMonto ingresado: ${formatCurrency(numericDeposit)}`
       );
       setCurrentStep(3);
       return;
@@ -1238,6 +1236,14 @@ export default function CreateOrderModal({
                         </span>
                       </div>
 
+                      {/* Explicit reminder banner requested by user */}
+                      <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-center gap-2.5 text-amber-100 text-xs">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="font-bold">
+                          Por favor pida el <strong className="text-amber-300 font-extrabold underline decoration-amber-400">50%</strong> para poder levantar el pedido correctamente.
+                        </span>
+                      </div>
+
                       {/* Quick preset buttons with active states */}
                       <div className="grid grid-cols-3 gap-2">
                         {/* 50% preset (Obligatorio) */}
@@ -1385,15 +1391,15 @@ export default function CreateOrderModal({
 
                       {/* Deposit feedback banner */}
                       {!isDepositSufficient ? (
-                        <div className="p-3 rounded-2xl bg-rose-950/90 border border-rose-500/80 text-rose-200 flex items-center justify-between gap-3 text-xs shadow-md animate-in fade-in duration-150">
+                        <div className="p-3.5 rounded-2xl bg-rose-950/90 border-2 border-rose-500/80 text-rose-200 flex items-center justify-between gap-3 text-xs shadow-md animate-in fade-in duration-150">
                           <div className="flex items-center gap-2.5">
                             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
                             <div>
-                              <p className="font-extrabold text-rose-300">
-                                Anticipo insuficiente (Mínimo 50% Obligatorio)
+                              <p className="font-black text-rose-200 text-xs leading-snug">
+                                Por favor pida el 50% para poder levantar el pedido correctamente.
                               </p>
-                              <p className="text-[11px] text-rose-200/90">
-                                Debe cubrir al menos {formatCurrency(minRequiredDeposit)}. Faltan {formatCurrency(Math.max(0, minRequiredDeposit - numericDeposit))}.
+                              <p className="text-[11px] text-rose-300/90 mt-0.5 font-medium">
+                                Anticipo mínimo requerido: {formatCurrency(minRequiredDeposit)} (Faltan {formatCurrency(Math.max(0, minRequiredDeposit - numericDeposit))}).
                               </p>
                             </div>
                           </div>
@@ -1521,23 +1527,31 @@ export default function CreateOrderModal({
                 {currentStep === 2 && "Continuar a Entrega & Pago ➔"}
               </button>
             ) : (
-              <button
-                type="button"
-                disabled={isSubmitting || !isDepositSufficient}
-                onClick={handleSubmitOrder}
-                className={`px-7 py-2.5 rounded-xl font-black text-xs shadow-lg transition-all flex items-center gap-2 ${
-                  !isDepositSufficient
-                    ? "bg-stone-700 text-stone-400 cursor-not-allowed border border-stone-600 opacity-60"
-                    : "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white"
-                }`}
-              >
-                <Cake className="w-4 h-4" />
-                {isSubmitting
-                  ? "Guardando Pedido..."
-                  : !isDepositSufficient
-                  ? `Requiere Anticipo mín. 50% (${formatCurrency(minRequiredDeposit)})`
-                  : "✨ Guardar & Levantar Pedido"}
-              </button>
+              <div className="flex items-center gap-3">
+                {!isDepositSufficient && (
+                  <span className="hidden sm:inline-flex text-[11px] text-rose-700 font-extrabold items-center gap-1.5 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl shadow-2xs">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    Por favor pida el 50% para poder levantar el pedido correctamente
+                  </span>
+                )}
+                <button
+                  type="button"
+                  disabled={isSubmitting || !isDepositSufficient}
+                  onClick={handleSubmitOrder}
+                  className={`px-7 py-2.5 rounded-xl font-black text-xs shadow-lg transition-all flex items-center gap-2 ${
+                    !isDepositSufficient
+                      ? "bg-stone-700 text-stone-400 cursor-not-allowed border border-stone-600 opacity-60"
+                      : "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white"
+                  }`}
+                >
+                  <Cake className="w-4 h-4" />
+                  {isSubmitting
+                    ? "Guardando Pedido..."
+                    : !isDepositSufficient
+                    ? "⚠️ Pida el 50% para levantar pedido"
+                    : "✨ Guardar & Levantar Pedido"}
+                </button>
+              </div>
             )}
           </div>
         </div>
