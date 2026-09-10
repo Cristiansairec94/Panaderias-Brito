@@ -25,7 +25,8 @@ import {
   FileText,
   ChevronRight,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle
 } from "lucide-react";
 import { Product, Customer, OrderItem } from "@/types";
 import { getStoredProducts } from "@/lib/products";
@@ -144,6 +145,17 @@ export default function CreateOrderModal({
   const total = useMemo(() => {
     return items.reduce((acc, item) => acc + (item.unitPrice * item.quantity), 0);
   }, [items]);
+
+  // Mandatory 50% deposit policy
+  const minRequiredDeposit = useMemo(() => {
+    return total > 0 ? Math.round((total * 0.5) * 100) / 100 : 0;
+  }, [total]);
+
+  // Is deposit sufficient (must be at least 50% of total)
+  const isDepositSufficient = useMemo(() => {
+    if (total === 0) return true;
+    return numericDeposit >= minRequiredDeposit;
+  }, [total, numericDeposit, minRequiredDeposit]);
 
   // Remaining balance
   const remainingBalance = useMemo(() => {
@@ -283,9 +295,9 @@ export default function CreateOrderModal({
         alert("Por favor agrega al menos un producto o pastel al pedido.");
         return;
       }
-      // Pre-set 50% deposit recommendation if deposit is still 0
-      if (numericDeposit === 0 && total > 0) {
-        setDeposit(Math.round(total * 0.5));
+      // Initialize with mandatory minimum 50% deposit if current deposit is below 50%
+      if (numericDeposit < minRequiredDeposit && total > 0) {
+        setDeposit(minRequiredDeposit);
       }
       setCurrentStep(3);
     }
@@ -305,6 +317,17 @@ export default function CreateOrderModal({
     }
     if (!deliveryDate) {
       alert("Por favor selecciona la fecha de entrega.");
+      setCurrentStep(3);
+      return;
+    }
+    if (total > 0 && numericDeposit < minRequiredDeposit) {
+      alert(
+        `Es obligatorio cubrir al menos el 50% de anticipo (${formatCurrency(
+          minRequiredDeposit
+        )}) para levantar el pedido. Actualmente se ingresó ${formatCurrency(
+          numericDeposit
+        )}.`
+      );
       setCurrentStep(3);
       return;
     }
@@ -440,7 +463,12 @@ export default function CreateOrderModal({
 
             <button
               onClick={() => {
-                if (canProceedToStep2 && canProceedToStep3) setCurrentStep(3);
+                if (canProceedToStep2 && canProceedToStep3) {
+                  if (numericDeposit < minRequiredDeposit && total > 0) {
+                    setDeposit(minRequiredDeposit);
+                  }
+                  setCurrentStep(3);
+                }
               }}
               disabled={!canProceedToStep2 || !canProceedToStep3}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
@@ -1204,32 +1232,57 @@ export default function CreateOrderModal({
                         <label className="text-xs font-black text-stone-200 flex items-center gap-1.5">
                           <Banknote className="w-4 h-4 text-emerald-400" /> Adelanto / Anticipo Recibido:
                         </label>
-                        {numericDeposit > 0 && total > 0 && (
-                          <span className="text-[11px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/50 px-2 py-0.5 rounded-lg">
-                            {Math.round((numericDeposit / total) * 100)}% cubierto
-                          </span>
-                        )}
+                        <span className="text-[11px] font-extrabold text-amber-300 bg-amber-950/80 border border-amber-700/60 px-2.5 py-1 rounded-xl flex items-center gap-1.5 shadow-xs">
+                          <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                          Mínimo 50% Obligatorio
+                        </span>
                       </div>
 
                       {/* Quick preset buttons with active states */}
                       <div className="grid grid-cols-3 gap-2">
-                        {/* 50% preset */}
+                        {/* 50% preset (Obligatorio) */}
                         {(() => {
-                          const halfAmount = Math.round(total * 0.5);
-                          const isHalfActive = total > 0 && numericDeposit === halfAmount;
+                          const isHalfActive = total > 0 && numericDeposit === minRequiredDeposit;
                           return (
                             <button
                               type="button"
-                              onClick={() => setDeposit(halfAmount)}
+                              onClick={() => setDeposit(minRequiredDeposit)}
                               className={`py-2 px-1.5 rounded-xl transition-all text-center border flex flex-col items-center justify-center gap-0.5 ${
                                 isHalfActive
                                   ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-md shadow-amber-500/20 ring-2 ring-amber-400/50 scale-[1.02]"
                                   : "bg-stone-800/90 hover:bg-stone-800 text-stone-300 hover:text-white border-stone-700 font-bold"
                               }`}
                             >
-                              <span className="text-xs">50%</span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs">50%</span>
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-black ${
+                                  isHalfActive ? "bg-stone-950 text-amber-300" : "bg-amber-900/60 text-amber-300"
+                                }`}>Mínimo</span>
+                              </div>
                               <span className={`text-[10px] ${isHalfActive ? "text-stone-950 font-black" : "text-amber-400 font-bold"}`}>
-                                {formatCurrency(halfAmount)}
+                                {formatCurrency(minRequiredDeposit)}
+                              </span>
+                            </button>
+                          );
+                        })()}
+
+                        {/* 75% preset */}
+                        {(() => {
+                          const threeQuarterAmount = Math.round(total * 0.75 * 100) / 100;
+                          const isThreeQuarterActive = total > 0 && numericDeposit === threeQuarterAmount;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setDeposit(threeQuarterAmount)}
+                              className={`py-2 px-1.5 rounded-xl transition-all text-center border flex flex-col items-center justify-center gap-0.5 ${
+                                isThreeQuarterActive
+                                  ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-md shadow-amber-500/20 ring-2 ring-amber-400/50 scale-[1.02]"
+                                  : "bg-stone-800/90 hover:bg-stone-800 text-stone-300 hover:text-white border-stone-700 font-bold"
+                              }`}
+                            >
+                              <span className="text-xs">75%</span>
+                              <span className={`text-[10px] ${isThreeQuarterActive ? "text-stone-950 font-black" : "text-amber-400 font-bold"}`}>
+                                {formatCurrency(threeQuarterAmount)}
                               </span>
                             </button>
                           );
@@ -1248,29 +1301,15 @@ export default function CreateOrderModal({
                                   : "bg-stone-800/90 hover:bg-stone-800 text-stone-300 hover:text-white border-stone-700 font-bold"
                               }`}
                             >
-                              <span className="text-xs">100%</span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs">100%</span>
+                                <span className={`text-[9px] px-1 py-0.2 rounded font-black ${
+                                  isFullActive ? "bg-stone-950 text-emerald-300" : "bg-emerald-900/60 text-emerald-300"
+                                }`}>Liquidado</span>
+                              </div>
                               <span className={`text-[10px] ${isFullActive ? "text-stone-950 font-black" : "text-emerald-400 font-bold"}`}>
-                                Liquidado
+                                {formatCurrency(total)}
                               </span>
-                            </button>
-                          );
-                        })()}
-
-                        {/* Sin anticipo preset */}
-                        {(() => {
-                          const isZeroActive = numericDeposit === 0;
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => setDeposit(0)}
-                              className={`py-2 px-1.5 rounded-xl transition-all text-center border flex flex-col items-center justify-center gap-0.5 ${
-                                isZeroActive
-                                  ? "bg-stone-700 text-white border-stone-500 font-black shadow-sm ring-2 ring-stone-400/30 scale-[1.02]"
-                                  : "bg-stone-800/90 hover:bg-stone-800 text-stone-400 hover:text-stone-200 border-stone-700 font-bold"
-                              }`}
-                            >
-                              <span className="text-xs">Sin anticipo</span>
-                              <span className="text-[10px] font-bold text-stone-400">$0.00</span>
                             </button>
                           );
                         })()}
@@ -1282,10 +1321,10 @@ export default function CreateOrderModal({
                           <span className="absolute left-3.5 top-3 text-amber-400 text-base font-black pointer-events-none">$</span>
                           <input
                             type="number"
-                            min="0"
+                            min={minRequiredDeposit}
                             max={total}
                             step="any"
-                            placeholder="0"
+                            placeholder={minRequiredDeposit > 0 ? minRequiredDeposit.toString() : "0"}
                             value={deposit === 0 && isDepositFocused ? "" : deposit}
                             onFocus={(e) => {
                               setIsDepositFocused(true);
@@ -1298,7 +1337,7 @@ export default function CreateOrderModal({
                             onBlur={() => {
                               setIsDepositFocused(false);
                               if (deposit === "" || isNaN(Number(deposit))) {
-                                setDeposit(0);
+                                setDeposit(minRequiredDeposit);
                               } else {
                                 setDeposit(Number(deposit));
                               }
@@ -1313,13 +1352,17 @@ export default function CreateOrderModal({
                               const clean = val.replace(/^0+(?=\d)/, "");
                               setDeposit(clean === "" ? "" : Number(clean));
                             }}
-                            className="w-full pl-8 pr-8 py-2.5 bg-stone-950 border-2 border-stone-700 focus:border-amber-400 rounded-xl text-white font-black text-lg focus:ring-2 focus:ring-amber-500/30 focus:outline-none transition-all placeholder:text-stone-600"
+                            className={`w-full pl-8 pr-8 py-2.5 bg-stone-950 border-2 rounded-xl text-white font-black text-lg focus:outline-none transition-all placeholder:text-stone-600 ${
+                              !isDepositSufficient
+                                ? "border-rose-500 focus:border-rose-400 focus:ring-2 focus:ring-rose-500/30 text-rose-200"
+                                : "border-stone-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
+                            }`}
                           />
-                          {deposit !== "" && deposit !== 0 && (
+                          {deposit !== "" && deposit !== minRequiredDeposit && (
                             <button
                               type="button"
-                              onClick={() => setDeposit(0)}
-                              title="Borrar monto y poner en 0"
+                              onClick={() => setDeposit(minRequiredDeposit)}
+                              title="Restablecer al mínimo obligatorio del 50%"
                               className="absolute right-2.5 top-3.5 text-stone-400 hover:text-stone-200"
                             >
                               <span className="w-5 h-5 bg-stone-800 hover:bg-stone-700 rounded-full flex items-center justify-center text-[10px] font-bold text-stone-300">
@@ -1339,6 +1382,44 @@ export default function CreateOrderModal({
                           <option value="transferencia">📱 Transferencia SPEI</option>
                         </select>
                       </div>
+
+                      {/* Deposit feedback banner */}
+                      {!isDepositSufficient ? (
+                        <div className="p-3 rounded-2xl bg-rose-950/90 border border-rose-500/80 text-rose-200 flex items-center justify-between gap-3 text-xs shadow-md animate-in fade-in duration-150">
+                          <div className="flex items-center gap-2.5">
+                            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                            <div>
+                              <p className="font-extrabold text-rose-300">
+                                Anticipo insuficiente (Mínimo 50% Obligatorio)
+                              </p>
+                              <p className="text-[11px] text-rose-200/90">
+                                Debe cubrir al menos {formatCurrency(minRequiredDeposit)}. Faltan {formatCurrency(Math.max(0, minRequiredDeposit - numericDeposit))}.
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDeposit(minRequiredDeposit)}
+                            className="shrink-0 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black shadow-xs transition-colors"
+                          >
+                            Fijar 50%
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between px-1 text-[11px]">
+                          <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            {numericDeposit >= total
+                              ? "✓ Pago completo al 100% (Liquidado)"
+                              : `✓ Anticipo válido (${Math.round((numericDeposit / total) * 100)}% cubierto)`}
+                          </span>
+                          {numericDeposit < total && (
+                            <span className="text-stone-400">
+                              Resta por liquidar: <strong className="text-amber-400">{formatCurrency(remainingBalance)}</strong>
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Quick add chips */}
                       {total > 0 && remainingBalance > 0 && (
@@ -1442,12 +1523,20 @@ export default function CreateOrderModal({
             ) : (
               <button
                 type="button"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isDepositSufficient}
                 onClick={handleSubmitOrder}
-                className="px-7 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                className={`px-7 py-2.5 rounded-xl font-black text-xs shadow-lg transition-all flex items-center gap-2 ${
+                  !isDepositSufficient
+                    ? "bg-stone-700 text-stone-400 cursor-not-allowed border border-stone-600 opacity-60"
+                    : "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white"
+                }`}
               >
                 <Cake className="w-4 h-4" />
-                {isSubmitting ? "Guardando Pedido..." : "✨ Guardar & Levantar Pedido"}
+                {isSubmitting
+                  ? "Guardando Pedido..."
+                  : !isDepositSufficient
+                  ? `Requiere Anticipo mín. 50% (${formatCurrency(minRequiredDeposit)})`
+                  : "✨ Guardar & Levantar Pedido"}
               </button>
             )}
           </div>
