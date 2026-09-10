@@ -85,7 +85,7 @@ export default function OrderPaymentModal({
   const isFullPayment = amount === order.remainingBalance;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/80 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-stone-200 flex flex-col">
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-800 to-stone-900 text-white p-5 px-6 flex items-center justify-between">

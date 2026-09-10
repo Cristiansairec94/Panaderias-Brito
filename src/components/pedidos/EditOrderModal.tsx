@@ -99,7 +99,7 @@ export default function EditOrderModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/80 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden border border-stone-200 flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="bg-gradient-to-r from-stone-900 to-amber-950 text-white p-5 px-6 flex items-center justify-between border-b border-stone-800">
