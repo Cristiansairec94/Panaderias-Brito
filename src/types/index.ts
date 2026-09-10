@@ -369,7 +369,7 @@ export interface ExpenseRecord {
   timestamp: string;
 }
 
-export type SyncType = "sale" | "expense" | "order" | "stock";
+export type SyncType = "sale" | "expense" | "order" | "stock" | "cut" | "income";
 
 export interface SyncItem {
   id: string;

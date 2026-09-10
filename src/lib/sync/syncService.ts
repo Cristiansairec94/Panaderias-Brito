@@ -1,4 +1,4 @@
-﻿import { SyncItem, SyncType } from "@/types";
+import { SyncItem, SyncType } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_PRODUCTS, getStoredProducts, saveStoredProducts } from "@/lib/products";
 import { DEFAULT_GENERAL_CUSTOMER, getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
@@ -293,6 +293,27 @@ export async function processSyncQueue(): Promise<{
         }
 
         if (expErr) throw new Error(expErr.message);
+        syncedCount++;
+      } else if (item.type === "income") {
+        const { amount, category, concept, cashier } = item.data;
+        const { error: incErr } = await supabase.from("cash_movements").insert({
+          type: "entrada",
+          category: category || "general",
+          amount: Number(amount),
+          reason: concept || "Entrada de caja",
+          authorized_by: cashier || "Don Toño Brito",
+        });
+
+        if (incErr && (incErr.code === "PGRST205" || incErr.message?.includes("schema cache"))) {
+          archiveOfflineItem(item, "Entrada archivada en disco local");
+          syncedCount++;
+          continue;
+        }
+
+        if (incErr) throw new Error(incErr.message);
+        syncedCount++;
+      } else if (item.type === "cut") {
+        archiveOfflineItem(item, "Corte de turno archivado en disco local");
         syncedCount++;
       } else {
         syncedCount++;

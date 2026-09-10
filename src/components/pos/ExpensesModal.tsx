@@ -23,6 +23,7 @@ import { CashExpense, CashIncome } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
+import { useSync } from "@/context/SyncContext";
 
 interface ExpensesModalProps {
   isOpen: boolean;
@@ -172,6 +173,7 @@ export default function ExpensesModal({
   cashierName = "Don Toño Brito",
 }: ExpensesModalProps) {
   const { addNotification } = useNotifications();
+  const { enqueueOfflineItem, isOnline } = useSync();
   const [activeTab, setActiveTab] = useState<"register" | "list">("register");
   const [movementType, setMovementType] = useState<"salida" | "entrada">("salida");
   
@@ -254,9 +256,10 @@ export default function ExpensesModal({
         date: nowDateTime,
       };
 
+      let savedToDb = false;
       try {
         const supabase = createClient();
-        await supabase
+        const { error: expError } = await supabase
           .from("cash_expenses")
           .insert({
             amount: newExpense.amount,
@@ -265,16 +268,32 @@ export default function ExpensesModal({
             cashier: newExpense.cashier,
           });
 
-        await supabase.from("cash_movements").insert({
-          type: "salida",
-          category: newExpense.category,
-          amount: newExpense.amount,
-          reason: newExpense.description,
-          authorized_by: isOwnerWithdrawal ? (authorizedBy.trim() || "Don Toño Brito") : cashierName,
-        });
+        if (!expError) {
+          await supabase.from("cash_movements").insert({
+            type: "salida",
+            category: newExpense.category,
+            amount: newExpense.amount,
+            reason: newExpense.description,
+            authorized_by: isOwnerWithdrawal ? (authorizedBy.trim() || "Don Toño Brito") : cashierName,
+          });
+          savedToDb = true;
+        }
       } catch (err) {
         console.log("Offline mode, saved locally", err);
       } finally {
+        if (!savedToDb) {
+          enqueueOfflineItem({
+            type: "expense",
+            title: `${isOwnerWithdrawal ? "👑 Retiro Dueño" : "Salida Caja"}: ${newExpense.description} (${formatCurrency(newExpense.amount)})`,
+            amount: newExpense.amount,
+            data: {
+              amount: newExpense.amount,
+              category: newExpense.category,
+              description: newExpense.description,
+              cashier: newExpense.cashier,
+            },
+          });
+        }
         onAddExpense(newExpense);
 
         // Notificación para la administración y Don Toño
@@ -327,18 +346,35 @@ export default function ExpensesModal({
         timestamp: new Date().toISOString(),
       };
 
+      let savedIncomeToDb = false;
       try {
         const supabase = createClient();
-        await supabase.from("cash_movements").insert({
+        const { error: incError } = await supabase.from("cash_movements").insert({
           type: "entrada",
           category: newIncome.category,
           amount: newIncome.amount,
           reason: newIncome.concept,
           authorized_by: cashierName,
         });
+        if (!incError) {
+          savedIncomeToDb = true;
+        }
       } catch (err) {
         console.log("Offline mode, saved locally", err);
       } finally {
+        if (!savedIncomeToDb) {
+          enqueueOfflineItem({
+            type: "income",
+            title: `Entrada Caja: ${newIncome.concept} (+${formatCurrency(newIncome.amount)})`,
+            amount: newIncome.amount,
+            data: {
+              amount: newIncome.amount,
+              category: newIncome.category,
+              concept: newIncome.concept,
+              cashier: newIncome.cashier,
+            },
+          });
+        }
         if (onAddIncome) {
           onAddIncome(newIncome);
         }

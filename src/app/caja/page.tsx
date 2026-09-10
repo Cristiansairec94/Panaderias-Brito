@@ -32,13 +32,16 @@ import {
   Calendar,
   Layers,
   ArrowRight,
-  Clock
+  Clock,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
+import { useSync } from "@/context/SyncContext";
 import ShiftCutDetailModal from "@/components/caja/ShiftCutDetailModal";
 
 const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
@@ -185,6 +188,7 @@ export default function CajaPage() {
   const { user } = useAuth();
   const { currentBranch } = useBranch();
   const { addNotification } = useNotifications();
+  const { isOnline, isSyncing, pendingCount, enqueueOfflineItem } = useSync();
 
   // Active view tab: "historial" (Principal) or "turno" (Turno en vivo)
   const [activeTab, setActiveTab] = useState<"historial" | "turno">("historial");
@@ -496,6 +500,17 @@ export default function CajaPage() {
       console.error("Error guardando corte:", err);
     }
 
+    // Encolar corte de turno para sincronización en la nube
+    try {
+      enqueueOfflineItem({
+        type: "cut",
+        title: `Corte de Turno #${newFolio} (${formatCurrency(newCut.totalSales)})`,
+        amount: newCut.totalSales,
+        branchId: currentBranch?.id,
+        data: newCut,
+      });
+    } catch (e) {}
+
     // High priority notification
     addNotification({
       senderName: `🏁 Corte Guardado (${currentShiftResponsible})`,
@@ -520,6 +535,34 @@ export default function CajaPage() {
 
   return (
     <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Banner de Sincronización y Estado Offline */}
+      {isSyncing && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-900 px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
+            <span>
+              <strong>Sincronizando con la nube:</strong> Subiendo registros y cortes de caja a la base de datos central...
+            </span>
+          </div>
+        </div>
+      )}
+
+      {!isOnline && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 border border-amber-500/30 text-amber-950 px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <WifiOff className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>
+              <strong>Modo Fuera de Línea Activo:</strong> Puedes realizar arqueos, cortes de turno y comprobantes 100% sin internet. Todo se resguarda en esta PC y se sincroniza al volver la red.
+            </span>
+          </div>
+          {pendingCount > 0 && (
+            <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2.5 py-0.5 rounded-full whitespace-nowrap">
+              {pendingCount} {pendingCount === 1 ? "registro pendiente" : "registros pendientes"}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
