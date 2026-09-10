@@ -18,7 +18,12 @@ import {
   getLocalDataStats,
   LocalDataStats,
   generateWindowsDesktopShortcutScript,
+  runSystemHealthDiagnostic,
+  HealthCheckResult,
+  createDemoOfflineSale,
+  printEmergencyContingencySheet,
 } from "@/lib/sync/syncService";
+import { playCashRegisterSound } from "@/lib/sound";
 
 interface SyncContextType {
   isOnline: boolean;
@@ -47,8 +52,11 @@ interface SyncContextType {
   toggleSimulateOffline: () => void;
   refreshConnection: () => Promise<void>;
   downloadLocalData: () => Promise<{ success: boolean; message: string; stats: LocalDataStats }>;
-  downloadPinScript: () => void;
+  downloadPinScript: (branchName?: string) => void;
   exportBackup: () => void;
+  runHealthCheck: () => Promise<HealthCheckResult>;
+  simulateDemoSale: () => SyncItem;
+  printContingencySheet: () => void;
 }
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
@@ -112,7 +120,24 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     return res;
   }, []);
 
-  // 5. Encolar nuevo ítem offline
+  // 5. Simular venta demo con sonido de caja
+  const simulateDemoSale = useCallback(() => {
+    const item = createDemoOfflineSale();
+    try {
+      playCashRegisterSound();
+    } catch {}
+    refreshQueueAndStats();
+    return item;
+  }, [refreshQueueAndStats]);
+
+  // 6. Diagnóstico de salud
+  const runHealthCheck = useCallback(async () => {
+    const res = await runSystemHealthDiagnostic();
+    refreshConnection();
+    return res;
+  }, [refreshConnection]);
+
+  // 7. Encolar nuevo ítem offline
   const enqueueOfflineItem = useCallback(
     (params: {
       type: SyncType;
@@ -148,10 +173,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     refreshConnection();
   }, [isSimulatedOfflineState, refreshConnection]);
 
-  // 6. Instalar PWA
+  // 8. Instalar PWA
   const promptInstallPwa = useCallback(async (): Promise<boolean> => {
     if (!deferredPrompt) {
-      // Si el navegador no disparó el evento (o ya está instalada), intentamos el instalador .bat
       generateWindowsDesktopShortcutScript();
       return false;
     }
@@ -172,7 +196,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
   }, [deferredPrompt]);
 
-  // 7. Efecto inicial: Registrar Service Worker, precargar datos locales y escuchar eventos de red
+  // 9. Efecto inicial: Registrar Service Worker, precargar datos locales y escuchar eventos de red
   useEffect(() => {
     // Asegurar que la PC tenga los datos del catálogo descargados desde el primer arranque
     downloadAllDataToLocalPc().catch(() => {});
@@ -276,8 +300,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         toggleSimulateOffline,
         refreshConnection,
         downloadLocalData,
-        downloadPinScript: generateWindowsDesktopShortcutScript,
+        downloadPinScript: (bName?: string) => generateWindowsDesktopShortcutScript(bName),
         exportBackup: exportLocalEmergencyBackup,
+        runHealthCheck,
+        simulateDemoSale,
+        printContingencySheet: printEmergencyContingencySheet,
       }}
     >
       {children}

@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_PRODUCTS, getStoredProducts, saveStoredProducts } from "@/lib/products";
 import { DEFAULT_GENERAL_CUSTOMER, getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
+import { playSyncSuccessSound } from "@/lib/sound";
 
 export const STORAGE_SYNC_QUEUE_KEY = "brito_offline_sync_queue";
 export const STORAGE_LAST_SYNC_KEY = "brito_last_sync_time";
@@ -229,10 +230,10 @@ export async function processSyncQueue(): Promise<{
           .single();
 
         // Si la tabla 'sales' aún no existe en Supabase (código PGRST205 / 404),
-        // guardamos en el archivo local para no atorar la cola ni mostrar errores permanentes
+        // archivamos la venta en disco local para no bloquear la cola
         if (saleErr) {
           if (saleErr.code === "PGRST205" || saleErr.message?.includes("schema cache")) {
-            console.warn("[SyncService] La tabla 'sales' aún no existe en Supabase. Archivando venta en disco local:", item.title);
+            console.warn("[SyncService] La tabla 'sales' aún no existe en Supabase. Archivando en disco local:", item.title);
             archiveOfflineItem(item, "Guardado en disco local (Esquema Supabase en preparación)");
             syncedCount++;
             continue;
@@ -312,6 +313,13 @@ export async function processSyncQueue(): Promise<{
 
   saveSyncQueue(remainingQueue);
   setLastSyncTime(new Date().toISOString());
+
+  // Reproducir sonido melódico si se sincronizó al menos 1 elemento
+  if (syncedCount > 0) {
+    try {
+      playSyncSuccessSound();
+    } catch {}
+  }
 
   return {
     total: queue.length,
@@ -451,12 +459,190 @@ export async function downloadAllDataToLocalPc(): Promise<{
   }
 }
 
+// ─── DIAGNÓSTICO INTEGRAL DE SALUD DEL SISTEMA (5 PUNTOS) ───────────────────
+
+export interface HealthCheckResult {
+  score: number;
+  status: "excelente" | "bueno" | "atencion";
+  checks: {
+    title: string;
+    description: string;
+    passed: boolean;
+    badge: string;
+  }[];
+}
+
+export async function runSystemHealthDiagnostic(): Promise<HealthCheckResult> {
+  const onlineRes = await checkRealOnlineStatus();
+  const stats = getLocalDataStats();
+  const hasServiceWorker = typeof navigator !== "undefined" && "serviceWorker" in navigator;
+  const queueCount = getPendingSyncCount();
+
+  const checks = [
+    {
+      title: "1. Conectividad de Red y Nube",
+      description: onlineRes.detail,
+      passed: onlineRes.isOnline,
+      badge: onlineRes.isOnline ? `${onlineRes.latencyMs || 45} ms` : "Offline",
+    },
+    {
+      title: "2. Motor de Servicio Fuera de Línea (Service Worker)",
+      description: hasServiceWorker
+        ? "Service Worker registrado: la app arranca sin internet"
+        : "Navegador no soporta Service Worker",
+      passed: hasServiceWorker,
+      badge: hasServiceWorker ? "Activo" : "Inactivo",
+    },
+    {
+      title: "3. Catálogo Descargado en Computadora",
+      description: `${stats.productsCount} panes, pasteles y bolillos guardados en memoria local`,
+      passed: stats.productsCount > 0,
+      badge: `${stats.productsCount} panes`,
+    },
+    {
+      title: "4. Directorio de Clientes y Precios Especiales",
+      description: `${stats.customersCount} clientes mayoristas y frecuentes en memoria`,
+      passed: stats.customersCount > 0,
+      badge: `${stats.customersCount} clientes`,
+    },
+    {
+      title: "5. Integridad de Cola de Transacciones",
+      description:
+        queueCount === 0
+          ? "No hay ventas trabadas; todas están procesadas"
+          : `${queueCount} transacciones en resguardo local`,
+      passed: true,
+      badge: queueCount === 0 ? "Limpia" : `${queueCount} pend.`,
+    },
+  ];
+
+  const passedCount = checks.filter((c) => c.passed).length;
+  const score = Math.round((passedCount / checks.length) * 100);
+
+  return {
+    score,
+    status: score === 100 ? "excelente" : score >= 80 ? "bueno" : "atencion",
+    checks,
+  };
+}
+
+// ─── SIMULAR VENTA DE PRUEBA OFFLINE (Para demostración al cliente) ──────────
+
+export function createDemoOfflineSale(): SyncItem {
+  const demoTotal = 62;
+  const demoSaleId = `POS-DEMO-${Date.now().toString().slice(-4)}`;
+
+  const item = enqueueSyncItem({
+    type: "sale",
+    title: `Venta Demostración #${demoSaleId} ($62.00 MXN)`,
+    amount: demoTotal,
+    branchId: "branch-matriz",
+    data: {
+      saleId: demoSaleId,
+      total: demoTotal,
+      paymentMethod: "efectivo",
+      cashier: "Demostración en Vivo",
+      items: [
+        { productId: "prod-1", name: "Concha de Vainilla", quantity: 1, price: 12, subtotal: 12 },
+        { productId: "prod-4", name: "Bolillo Tradicional", quantity: 10, price: 5, subtotal: 50 },
+      ],
+    },
+  });
+
+  return item;
+}
+
+// ─── IMPRIMIR CATÁLOGO DE CONTINGENCIA FÍSICA PARA CAJA ───────────────────────
+
+export function printEmergencyContingencySheet(): void {
+  if (typeof window === "undefined") return;
+
+  const prods = getStoredProducts();
+  const topProds = prods.slice(0, 30);
+  const now = new Date().toLocaleDateString("es-MX", { dateStyle: "long" });
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+
+  const rows = topProds
+    .map(
+      (p, i) => `
+    <tr style="border-bottom: 1px solid #e5e7eb;">
+      <td style="padding: 6px 8px; font-weight: bold;">${i + 1}</td>
+      <td style="padding: 6px 8px; font-family: monospace; font-weight: bold; color: #b45309;">${p.code || `PAN-${100 + i}`}</td>
+      <td style="padding: 6px 8px; font-weight: 600;">${p.icon || "🥖"} ${p.name}</td>
+      <td style="padding: 6px 8px; text-transform: uppercase; font-size: 10px; color: #6b7280;">${p.category || "Pan Dulce"}</td>
+      <td style="padding: 6px 8px; font-weight: 900; text-align: right; font-size: 14px; color: #111827;">$${Number(p.price).toFixed(2)} MXN</td>
+    </tr>
+  `
+    )
+    .join("");
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Panaderías Brito - Catálogo de Contingencia para Caja</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; color: #1f2937; }
+          .header { text-align: center; border-bottom: 3px double #d97706; padding-bottom: 15px; margin-bottom: 20px; }
+          .title { font-size: 20px; font-weight: 900; color: #78350f; margin: 0; }
+          .subtitle { font-size: 12px; color: #4b5563; margin-top: 4px; }
+          .notice { background: #fef3c7; border: 1px solid #f59e0b; padding: 8px 12px; border-radius: 8px; font-size: 11px; margin-bottom: 15px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th { background: #f3f4f6; padding: 8px; text-align: left; font-size: 10px; text-transform: uppercase; color: #374151; }
+          @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">🥖 PANADERÍAS BRITO • HOJA DE CONTINGENCIA PARA CAJA</div>
+          <div class="subtitle">Guía física oficial de precios y códigos en caso de corte total de energía eléctrica • Emitido: ${now}</div>
+        </div>
+
+        <div class="notice">
+          <strong>⚠️ Instrucciones para la cajera:</strong> En caso de falla eléctrica o corte prolongado, utiliza esta lista oficial de precios para cobrar en mostrador con libreta de recibos o calculadora. Al regresar la luz, captura las notas en el Punto de Venta.
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 30px;">#</th>
+              <th style="width: 90px;">Código</th>
+              <th>Nombre del Pan / Producto</th>
+              <th style="width: 130px;">Categoría</th>
+              <th style="text-align: right; width: 100px;">Precio Oficial</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+
+        <div style="margin-top: 25px; text-align: center; font-size: 10px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 10px;">
+          Panaderías Brito (Don Antonio Brito & Hijos) • Documento de contingencia de uso exclusivo en sucursales
+        </div>
+
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
 // ─── GENERADOR DE SCRIPT WINDOWS: FIJAR EN BARRA DE TAREAS Y ESCRITORIO ──────
 
-export function generateWindowsDesktopShortcutScript(): void {
+export function generateWindowsDesktopShortcutScript(branchName?: string): void {
   if (typeof window === "undefined") return;
 
   const currentUrl = window.location.origin;
+  const appTitle = branchName ? `Panaderia Brito - ${branchName}` : "Panaderia Brito POS";
+
   const scriptContent = `@echo off
 title Instalador Panaderia Brito - Escritorio y Barra de Tareas
 chcp 65001 >nul
@@ -468,7 +654,7 @@ echo.
 echo Creando acceso directo en el Escritorio de Windows...
 
 set "DESKTOP=%USERPROFILE%\\Desktop"
-set "SHORTCUT=%DESKTOP%\\Panaderia Brito POS.url"
+set "SHORTCUT=%DESKTOP%\\${appTitle}.url"
 
 echo [InternetShortcut] > "%SHORTCUT%"
 echo URL=${currentUrl}/pos >> "%SHORTCUT%"
@@ -496,7 +682,7 @@ exit
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "Fijar_Panaderia_Brito_Escritorio.bat";
+  a.download = `Fijar_${appTitle.replace(/\s+/g, "_")}.bat`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

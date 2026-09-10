@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from "react";
 import { 
@@ -17,7 +17,6 @@ import {
   HardDrive, 
   Sparkles, 
   HelpCircle,
-  Laptop,
   Check,
   AlertTriangle,
   Send,
@@ -26,10 +25,22 @@ import {
   PackageCheck,
   Server,
   Layers,
-  Copy
+  Activity,
+  Printer,
+  Eye,
+  X,
+  ChevronRight,
+  Play,
+  ArrowRight,
+  CheckCircle,
+  Sliders,
+  Shield,
+  Receipt
 } from "lucide-react";
 import { useSync } from "@/context/SyncContext";
 import { formatCurrency } from "@/lib/utils";
+import { HealthCheckResult } from "@/lib/sync/syncService";
+import { SyncItem } from "@/types";
 
 export default function OfflineManagement() {
   const {
@@ -54,30 +65,67 @@ export default function OfflineManagement() {
     downloadLocalData,
     downloadPinScript,
     exportBackup,
+    runHealthCheck,
+    simulateDemoSale,
+    printContingencySheet,
   } = useSync();
 
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
   const [isDownloadingData, setIsDownloadingData] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
+  const [healthDiagnostic, setHealthDiagnostic] = useState<HealthCheckResult | null>(null);
+  const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
+  const [viewingQueueItem, setViewingQueueItem] = useState<SyncItem | null>(null);
 
   const showToast = (text: string, type: "success" | "error" | "info" = "success") => {
     setFeedbackMsg({ text, type });
     setTimeout(() => setFeedbackMsg(null), 5000);
   };
 
+  const handleRunHealthCheck = async () => {
+    setIsRunningDiagnostic(true);
+    try {
+      const res = await runHealthCheck();
+      setHealthDiagnostic(res);
+      showToast(`Diagnóstico completado: Salud del sistema al ${res.score}%.`, "success");
+    } catch {
+      showToast("No se pudo completar el diagnóstico.", "error");
+    } finally {
+      setIsRunningDiagnostic(false);
+    }
+  };
+
+  const handleSimulateSaleClick = () => {
+    simulateDemoSale();
+    showToast(`🔔 ¡Venta de prueba cobrada en memoria local! Total: $62.00 MXN. Ver registro en la cola abajo.`, "info");
+  };
+
   const handleSyncNow = async () => {
     try {
       const res = await syncNow();
       if (res.synced > 0) {
-        showToast(`¡Sincronización completada! Se subieron ${res.synced} registro(s) a la nube.`, "success");
+        showToast(`¡Sincronización completada! Se subieron ${res.synced} venta(s) a la nube de Supabase.`, "success");
       } else if (res.failed > 0) {
         showToast(`Hubo inconvenientes con ${res.failed} registro(s). Se mantienen guardados en tu PC.`, "error");
       } else {
-        showToast("Todo está al día. Todos tus datos están sincronizados.", "info");
+        showToast("Todo está al día. Todos tus datos están sincronizados en la nube.", "info");
       }
     } catch (err: any) {
       showToast(err?.message || "Error al sincronizar con la nube", "error");
     }
+  };
+
+  const handleToggleOfflineDemo = () => {
+    toggleSimulateOffline();
+    if (!isSimulatedOffline) {
+      showToast("Modo 'Sin Red' activado. El sistema ahora opera en modo desconectado.", "info");
+    } else {
+      showToast("Conexión restaurada a modo normal.", "success");
+    }
+  };
+
+  const handlePrintSheet = () => {
+    printContingencySheet();
+    showToast("Abriendo hoja de contingencia para mostrador de caja...", "info");
   };
 
   const handleInstallClick = async () => {
@@ -130,7 +178,7 @@ export default function OfflineManagement() {
             {feedbackMsg.type === "info" && <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />}
             <span className="leading-relaxed">{feedbackMsg.text}</span>
           </div>
-          <button onClick={() => setFeedbackMsg(null)} className="text-white/80 hover:text-white ml-3 text-xs font-black">
+          <button onClick={() => setFeedbackMsg(null)} className="text-white/80 hover:text-white ml-3 text-xs font-black cursor-pointer">
             ✕
           </button>
         </div>
@@ -187,7 +235,7 @@ export default function OfflineManagement() {
           <div className="flex items-center gap-2">
             <button
               onClick={refreshConnection}
-              className="px-3.5 py-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+              className="px-3.5 py-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
               title="Volver a verificar la señal de internet"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-amber-500" : ""}`} />
@@ -213,7 +261,7 @@ export default function OfflineManagement() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="p-4 bg-stone-50/80 rounded-2xl border border-stone-200/80">
             <span className="text-[10px] font-black text-stone-400 uppercase tracking-wider block">
-              Ventas / Movimientos en Espera
+              Ventas / Registros en Espera
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span
@@ -250,52 +298,297 @@ export default function OfflineManagement() {
           <div className="p-4 bg-stone-50/80 rounded-2xl border border-stone-200/80 flex flex-col justify-between">
             <div>
               <span className="text-[10px] font-black text-stone-400 uppercase tracking-wider block">
-                Prueba de Desconexión
+                Estado de Red en Caja
               </span>
               <p className="text-[11px] text-stone-500 mt-0.5">
-                Simula un corte de internet para probar que la caja sigue cobrando.
+                {isOnline ? "Conectado a la nube de Panaderías Brito" : "Trabajando con base de datos local en disco"}
               </p>
             </div>
             <div className="mt-2 flex items-center justify-between pt-2 border-t border-stone-200">
-              <span className="text-xs font-bold text-stone-700">Simulación:</span>
-              <button
-                onClick={toggleSimulateOffline}
-                className={`px-3 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  isSimulatedOffline
-                    ? "bg-rose-500 text-white shadow-sm"
-                    : "bg-stone-200 text-stone-700 hover:bg-stone-300"
+              <span className="text-xs font-bold text-stone-700">Modo:</span>
+              <span
+                className={`px-2.5 py-0.5 rounded-lg text-xs font-black ${
+                  isOnline
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-rose-100 text-rose-800"
                 }`}
               >
-                {isSimulatedOffline ? "🔴 Modo Sin Red" : "🟢 Modo Normal"}
-              </button>
+                {isOnline ? "🟢 Conectado" : "🔴 Fuera de Línea"}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ─── 2. DESCARGA DE DATOS EN LA COMPUTADORA (RESPUESTA DIRECTA AL USUARIO) */}
+      {/* ─── 2. 🎮 CONSOLA DE DEMOSTRACIÓN EN VIVO (PARA MOSTRAR AL CLIENTE) ── */}
+      <div className="bg-gradient-to-br from-stone-900 via-stone-950 to-amber-950 p-6 rounded-3xl border border-amber-900/30 text-white shadow-xl space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                <Sliders className="w-5 h-5" />
+              </div>
+              <h3 className="font-black text-lg text-white">
+                Consola Interactiva de Demostración Offline
+              </h3>
+            </div>
+            <p className="text-xs text-stone-300 mt-1">
+              Prueba en tiempo real cómo la panadería nunca se detiene ante una caída de internet. Sigue estos 3 pasos:
+            </p>
+          </div>
+
+          <span className="px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-black uppercase tracking-wider self-start sm:self-center">
+            Simulador en Vivo
+          </span>
+        </div>
+
+        {/* 3 Pasos Interactivos */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Paso 1: Cortar Internet */}
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between space-y-3 hover:bg-white/[0.07] transition-all">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                  Paso 1: Corte de Red
+                </span>
+                <span className={`w-2.5 h-2.5 rounded-full ${isSimulatedOffline ? "bg-rose-500 animate-ping" : "bg-emerald-500"}`} />
+              </div>
+              <h4 className="font-black text-sm text-white">Simular Corte de Internet</h4>
+              <p className="text-xs text-stone-300 leading-relaxed">
+                Desconecta virtualmente el sistema para comprobar que el POS sigue cobrando sin conexión.
+              </p>
+            </div>
+
+            <button
+              onClick={handleToggleOfflineDemo}
+              className={`w-full py-2.5 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                isSimulatedOffline
+                  ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40"
+                  : "bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/40"
+              }`}
+            >
+              {isSimulatedOffline ? (
+                <>
+                  <Wifi className="w-4 h-4" />
+                  <span>Restaurar Conexión</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-4 h-4" />
+                  <span>Simular Corte de Red</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Paso 2: Cobrar Venta Offline */}
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between space-y-3 hover:bg-white/[0.07] transition-all">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                  Paso 2: Cobro Local
+                </span>
+                <span className="text-[10px] font-mono text-amber-300 font-bold">$62.00 MXN</span>
+              </div>
+              <h4 className="font-black text-sm text-white">Cobrar Venta de Prueba</h4>
+              <p className="text-xs text-stone-300 leading-relaxed">
+                Simula el cobro de 1 Concha de Vainilla + 10 Bolillos con sonido real de caja registradora.
+              </p>
+            </div>
+
+            <button
+              onClick={handleSimulateSaleClick}
+              className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-900/40 cursor-pointer active:scale-95"
+            >
+              <Play className="w-4 h-4 fill-stone-950" />
+              <span>Cobrar Venta Offline ($62)</span>
+            </button>
+          </div>
+
+          {/* Paso 3: Reconectar y Sincronizar */}
+          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between space-y-3 hover:bg-white/[0.07] transition-all">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                  Paso 3: Auto-Sincronización
+                </span>
+                <span className="text-[10px] text-emerald-400 font-bold">{pendingCount} en cola</span>
+              </div>
+              <h4 className="font-black text-sm text-white">Reconectar y Sincronizar</h4>
+              <p className="text-xs text-stone-300 leading-relaxed">
+                Restaura el internet si estaba cortado y sube las ventas acumuladas a la base de datos central.
+              </p>
+            </div>
+
+            <button
+              onClick={async () => {
+                if (isSimulatedOffline) {
+                  toggleSimulateOffline();
+                }
+                await handleSyncNow();
+              }}
+              disabled={isSyncing}
+              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-900/40 cursor-pointer active:scale-95"
+            >
+              <Zap className="w-4 h-4" />
+              <span>{isSyncing ? "Subiendo ventas..." : "Reconectar y Subir Ventas"}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-3 bg-white/5 border border-white/10 rounded-2xl text-xs text-stone-300 flex items-start gap-2.5">
+          <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <strong>Experiencia para el cliente:</strong> La cajera nunca observa pantallas de error, congelamientos ni ruedas infinitas de carga. Cobra con total velocidad y el sistema despacha los tickets a la nube en segundo plano cuando la red regresa.
+          </p>
+        </div>
+      </div>
+
+      {/* ─── 3. 🩺 AUDITORÍA INTEGRAL DE SALUD DEL SISTEMA (5 PUNTOS) ─────── */}
+      <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-brito-orange-500" />
+              <h3 className="font-black text-base text-stone-900">
+                Auditoría y Diagnóstico de Salud de la Caja (5 Puntos)
+              </h3>
+            </div>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Verifica que todos los componentes de contingencia (memoria local, catálogo, motor de servicio y red) estén óptimos.
+            </p>
+          </div>
+
+          <button
+            onClick={handleRunHealthCheck}
+            disabled={isRunningDiagnostic}
+            className="px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-black text-white font-black text-xs shadow-md active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <Activity className={`w-4 h-4 text-amber-400 ${isRunningDiagnostic ? "animate-spin" : ""}`} />
+            <span>{isRunningDiagnostic ? "Analizando componentes..." : "Ejecutar Diagnóstico de Salud"}</span>
+          </button>
+        </div>
+
+        {/* Resultado del Diagnóstico */}
+        {healthDiagnostic ? (
+          <div className="space-y-4">
+            {/* Score Banner */}
+            <div
+              className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 ${
+                healthDiagnostic.status === "excelente"
+                  ? "bg-emerald-50/80 border-emerald-200 text-emerald-950"
+                  : healthDiagnostic.status === "bueno"
+                  ? "bg-amber-50/80 border-amber-200 text-amber-950"
+                  : "bg-rose-50/80 border-rose-200 text-rose-950"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg text-white shadow-md ${
+                    healthDiagnostic.status === "excelente"
+                      ? "bg-emerald-600 shadow-emerald-500/20"
+                      : healthDiagnostic.status === "bueno"
+                      ? "bg-amber-600 shadow-amber-500/20"
+                      : "bg-rose-600 shadow-rose-500/20"
+                  }`}
+                >
+                  {healthDiagnostic.score}%
+                </div>
+                <div>
+                  <h4 className="font-black text-sm capitalize">
+                    Salud del Sistema: {healthDiagnostic.status}
+                  </h4>
+                  <p className="text-xs text-stone-600 mt-0.5">
+                    {healthDiagnostic.score === 100
+                      ? "Tu computadora está 100% blindada contra caídas de red o fallas de módem."
+                      : "El sistema opera normalmente con precauciones locales activadas."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full bg-white/80 border border-stone-200">
+                  5/5 Pruebas Realizadas
+                </span>
+              </div>
+            </div>
+
+            {/* Lista de los 5 Chequeos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {healthDiagnostic.checks.map((check, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200/80 flex items-start justify-between gap-3"
+                >
+                  <div className="flex items-start gap-2.5">
+                    {check.passed ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <div className="text-xs font-black text-stone-900">{check.title}</div>
+                      <div className="text-[11px] text-stone-500 mt-0.5">{check.description}</div>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase shrink-0 ${
+                      check.passed
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-amber-100 text-amber-900"
+                    }`}
+                  >
+                    {check.badge}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 bg-stone-50 rounded-2xl border border-dashed border-stone-200 text-center space-y-2">
+            <ShieldCheck className="w-8 h-8 text-stone-400 mx-auto" />
+            <p className="text-xs text-stone-600 font-medium">
+              Haz clic en <strong>"Ejecutar Diagnóstico de Salud"</strong> para comprobar que tu catálogo de panes, clientes y servicio fuera de línea estén listos en esta computadora.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ─── 4. DATOS DESCARGADOS EN ESTA COMPUTADORA Y HOJA DE CONTINGENCIA ── */}
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
           <div>
             <div className="flex items-center gap-2">
               <PackageCheck className="w-5 h-5 text-brito-orange-500" />
               <h3 className="font-black text-base text-stone-900">
-                Datos Descargados en esta Computadora (Caché Local)
+                Catálogo Descargado en PC y Respaldo Físico
               </h3>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              El sistema guarda automáticamente el catálogo de panes, clientes y precios en el disco de tu PC para que funcione 100% sin internet.
+              El sistema guarda el catálogo de panes, clientes y precios en el disco de tu PC para cobrar 100% sin internet.
             </p>
           </div>
 
-          <button
-            onClick={handleDownloadAllData}
-            disabled={isDownloadingData}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 text-white font-black text-xs shadow-md shadow-orange-500/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-          >
-            <Download className={`w-4 h-4 ${isDownloadingData ? "animate-bounce" : ""}`} />
-            <span>{isDownloadingData ? "Descargando datos..." : "Descargar / Actualizar Datos en PC"}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrintSheet}
+              className="px-3.5 py-2.5 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              title="Imprimir lista física de precios para contingencia extrema de luz"
+            >
+              <Printer className="w-4 h-4 text-amber-700" />
+              <span>Hoja de Contingencia</span>
+            </button>
+
+            <button
+              onClick={handleDownloadAllData}
+              disabled={isDownloadingData}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 text-white font-black text-xs shadow-md shadow-orange-500/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Download className={`w-4 h-4 ${isDownloadingData ? "animate-bounce" : ""}`} />
+              <span>{isDownloadingData ? "Descargando..." : "Descargar / Actualizar en PC"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Resumen del Almacenamiento en esta Computadora */}
@@ -333,7 +626,7 @@ export default function OfflineManagement() {
         </div>
       </div>
 
-      {/* ─── 3. FIJAR COMO PROGRAMA INSTALADO EN LA BARRA DE TAREAS ──────── */}
+      {/* ─── 5. FIJAR COMO PROGRAMA INSTALADO EN LA BARRA DE TAREAS ──────── */}
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-5">
         <div className="border-b border-stone-100 pb-3">
           <div className="flex items-center gap-2">
@@ -377,7 +670,7 @@ export default function OfflineManagement() {
               </button>
 
               <button
-                onClick={downloadPinScript}
+                onClick={() => downloadPinScript()}
                 className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -417,7 +710,7 @@ export default function OfflineManagement() {
         </div>
       </div>
 
-      {/* ─── 4. BANDEJA DE DATOS PENDIENTES DE SINCRONIZACIÓN (COLA) ──────── */}
+      {/* ─── 6. BANDEJA DE DATOS PENDIENTES DE SINCRONIZACIÓN (COLA) ──────── */}
       <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
           <div>
@@ -428,7 +721,7 @@ export default function OfflineManagement() {
               </h3>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Transacciones guardadas de forma segura en esta computadora que se enviarán a la base de datos en la nube.
+              Transacciones resguardadas de forma segura en esta computadora que se enviarán a la base de datos en la nube.
             </p>
           </div>
 
@@ -439,7 +732,7 @@ export default function OfflineManagement() {
               title="Descargar copia de seguridad en archivo JSON por precaución"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Descargar Respaldo JSON</span>
+              <span>Respaldo JSON</span>
             </button>
 
             {queue.length > 0 && (
@@ -477,7 +770,7 @@ export default function OfflineManagement() {
                   <th className="p-3">Monto</th>
                   <th className="p-3">Hora Local</th>
                   <th className="p-3">Estado</th>
-                  <th className="p-3 rounded-r-xl text-right">Acción</th>
+                  <th className="p-3 rounded-r-xl text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 font-medium text-stone-700">
@@ -527,13 +820,23 @@ export default function OfflineManagement() {
                       </span>
                     </td>
                     <td className="p-3 text-right">
-                      <button
-                        onClick={() => removeQueueItem(item.id)}
-                        className="text-stone-400 hover:text-rose-600 p-1 transition-all cursor-pointer"
-                        title="Eliminar registro de la cola"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setViewingQueueItem(item)}
+                          className="text-stone-500 hover:text-stone-900 p-1.5 hover:bg-stone-100 rounded-lg transition-all cursor-pointer"
+                          title="Inspeccionar ticket y desglose de venta"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => removeQueueItem(item.id)}
+                          className="text-stone-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                          title="Eliminar registro de la cola"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -542,6 +845,136 @@ export default function OfflineManagement() {
           </div>
         )}
       </div>
+
+      {/* ─── 7. MODAL INSPECTOR DE TICKET OFFLINE ─────────────────────────── */}
+      {viewingQueueItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl border border-stone-200 shadow-2xl max-w-lg w-full overflow-hidden space-y-0">
+            {/* Header del Ticket */}
+            <div className="p-5 bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Receipt className="w-6 h-6" />
+                <div>
+                  <h4 className="font-black text-base">Inspector de Transacción</h4>
+                  <p className="text-[11px] text-amber-100 font-mono">
+                    ID: {viewingQueueItem.data?.saleId || viewingQueueItem.id}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setViewingQueueItem(null)}
+                className="w-8 h-8 rounded-full bg-black/20 hover:bg-black/30 flex items-center justify-center text-white transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Contenido del Ticket */}
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div className="flex justify-between items-baseline pb-3 border-b border-stone-100">
+                <div>
+                  <span className="text-[10px] font-bold text-stone-400 uppercase">Monto Total</span>
+                  <div className="text-2xl font-black text-stone-900">
+                    {viewingQueueItem.amount !== undefined ? formatCurrency(viewingQueueItem.amount) : "N/A"}
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[10px] font-bold text-stone-400 uppercase">Registrado Local</span>
+                  <div className="text-xs font-bold text-stone-700">
+                    {new Date(viewingQueueItem.createdAt).toLocaleString("es-MX")}
+                  </div>
+                </div>
+              </div>
+
+              {/* Datos Generales */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200">
+                  <span className="text-[10px] text-stone-400 font-bold block uppercase">Tipo</span>
+                  <span className="font-black text-stone-800 capitalize">{viewingQueueItem.type}</span>
+                </div>
+
+                <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200">
+                  <span className="text-[10px] text-stone-400 font-bold block uppercase">Cajera / Operador</span>
+                  <span className="font-black text-stone-800">
+                    {viewingQueueItem.data?.cashier || "Mostrador POS"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Detalle de Productos si es una Venta */}
+              {viewingQueueItem.data?.items && Array.isArray(viewingQueueItem.data.items) && (
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-stone-400 block">
+                    Productos del Ticket ({viewingQueueItem.data.items.length})
+                  </span>
+                  <div className="border border-stone-200 rounded-2xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-stone-50 text-stone-500 font-bold text-[10px] uppercase">
+                        <tr>
+                          <th className="p-2.5 text-left">Pan / Artículo</th>
+                          <th className="p-2.5 text-center">Cant.</th>
+                          <th className="p-2.5 text-right">P. Unit.</th>
+                          <th className="p-2.5 text-right">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100">
+                        {viewingQueueItem.data.items.map((prod: any, i: number) => (
+                          <tr key={i} className="hover:bg-stone-50/50">
+                            <td className="p-2.5 font-bold text-stone-900">{prod.name}</td>
+                            <td className="p-2.5 text-center font-bold text-stone-600">{prod.quantity}</td>
+                            <td className="p-2.5 text-right text-stone-500">{formatCurrency(prod.price)}</td>
+                            <td className="p-2.5 text-right font-black text-stone-900">
+                              {formatCurrency(prod.subtotal || prod.price * prod.quantity)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Payload Técnico Desplegable */}
+              <details className="text-xs text-stone-500 bg-stone-50 p-3 rounded-2xl border border-stone-200 cursor-pointer">
+                <summary className="font-bold text-stone-700 hover:text-stone-900">
+                  Ver Carga Útil Técnica (JSON)
+                </summary>
+                <pre className="mt-2 p-2 bg-stone-900 text-emerald-400 rounded-xl font-mono text-[10px] overflow-x-auto">
+                  {JSON.stringify(viewingQueueItem.data, null, 2)}
+                </pre>
+              </details>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-4 bg-stone-50 border-t border-stone-200 flex items-center justify-between">
+              <button
+                onClick={() => setViewingQueueItem(null)}
+                className="px-4 py-2 rounded-xl border border-stone-300 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all cursor-pointer"
+              >
+                Cerrar
+              </button>
+
+              <button
+                onClick={async () => {
+                  setViewingQueueItem(null);
+                  await handleSyncNow();
+                }}
+                disabled={!isOnline || isSyncing}
+                className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
+                  isOnline
+                    ? "bg-stone-900 hover:bg-black text-white cursor-pointer"
+                    : "bg-stone-200 text-stone-400 cursor-not-allowed"
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Sincronizar a la Nube Ahora</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
