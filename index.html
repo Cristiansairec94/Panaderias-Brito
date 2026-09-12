@@ -116,17 +116,20 @@
         visibility: visible !important;
       }
       #printable-ticket, #thermal-receipt {
-        position: absolute;
-        left: 0;
-        top: 0;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
         width: 80mm !important;
         max-width: 80mm !important;
         margin: 0 !important;
-        padding: 6px 8px !important;
+        padding: 4mm !important;
         background: white !important;
         color: black !important;
         border: none !important;
+        border-radius: 0 !important;
         box-shadow: none !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
       }
     }
   </style>
@@ -140,6 +143,8 @@
     const PRODUCTS_DATA = [
       {
         id: "prod-dulce-10",
+        code: "PAN-010",
+        barcode: "750100010001",
         name: "Dulce",
         price: 10,
         category: "dulce_10",
@@ -151,6 +156,8 @@
       },
       {
         id: "prod-bolillo-3",
+        code: "BLA-003",
+        barcode: "750100010002",
         name: "Bolillo",
         price: 3,
         category: "bolillo_3",
@@ -162,6 +169,8 @@
       },
       {
         id: "prod-telera-350",
+        code: "BLA-350",
+        barcode: "750100010003",
         name: "Telera",
         price: 3.50,
         category: "telera_350",
@@ -173,6 +182,8 @@
       },
       {
         id: "prod-dulce-12",
+        code: "PAN-012",
+        barcode: "750100010004",
         name: "Dulce",
         price: 12,
         category: "dulce_12",
@@ -184,6 +195,8 @@
       },
       {
         id: "prod-rollos-15",
+        code: "ROL-015",
+        barcode: "750100010005",
         name: "Rollos",
         price: 15,
         category: "rollos_15",
@@ -195,6 +208,8 @@
       },
       {
         id: "prod-strudel-18",
+        code: "STR-018",
+        barcode: "750100010006",
         name: "Strudel",
         price: 18,
         category: "strudel_18",
@@ -206,6 +221,8 @@
       },
       {
         id: "prod-pambazo-4",
+        code: "PAM-004",
+        barcode: "750100010007",
         name: "Pambazo",
         price: 4,
         category: "pambazo_4",
@@ -217,6 +234,8 @@
       },
       {
         id: "prod-pastes-20",
+        code: "PAS-020",
+        barcode: "750100010008",
         name: "Pastes",
         price: 20,
         category: "pastes_20",
@@ -228,6 +247,8 @@
       },
       {
         id: "prod-pizza-20",
+        code: "PIZ-020",
+        barcode: "750100010009",
         name: "Rebanada de pizza",
         price: 20,
         category: "pizza_20",
@@ -239,6 +260,8 @@
       },
       {
         id: "prod-pay-25",
+        code: "PAY-025",
+        barcode: "750100010010",
         name: "Rebanada de pay",
         price: 25,
         category: "pay_25",
@@ -250,6 +273,8 @@
       },
       {
         id: "prod-cuerno-65",
+        code: "CUE-065",
+        barcode: "750100010011",
         name: "Cuerno grande",
         price: 65,
         category: "cuerno_65",
@@ -260,6 +285,52 @@
         image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
       }
     ];
+
+    function playScanBeep(success = true) {
+      if (typeof window === "undefined") return;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const ctx = new AudioContextClass();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        if (success) {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(1400, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(1800, ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.25, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.12);
+        } else {
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(320, ctx.currentTime);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.25);
+        }
+      } catch (e) {}
+    }
+
+    function findProductByBarcodeOrCode(query, list) {
+      if (!query || !list) return null;
+      const clean = query.trim().toUpperCase();
+      const byBarcode = list.find(p => p.barcode && p.barcode.trim() === query.trim());
+      if (byBarcode) return byBarcode;
+      const byCode = list.find(p => p.code && p.code.trim().toUpperCase() === clean);
+      if (byCode) return byCode;
+      const byId = list.find(p => p.id && p.id.trim().toUpperCase() === clean);
+      if (byId) return byId;
+      const digitsOnly = query.replace(/\D/g, "");
+      if (digitsOnly.length >= 4) {
+        const byDigits = list.find(p => p.barcode && p.barcode.replace(/\D/g, "") === digitsOnly);
+        if (byDigits) return byDigits;
+      }
+      return null;
+    }
 
     const CATEGORIES = [
       { id: "all", label: "Todo el Pan", icon: "🧺" },
@@ -325,6 +396,129 @@
       }).format(amount || 0);
     }
 
+    function playCashRegisterWebAudio() {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const ctx = new AudioContextClass();
+        if (ctx.state === "suspended") {
+          ctx.resume();
+        }
+        const now = ctx.currentTime;
+
+        // Capa 1: Trinquete y apertura de gaveta (Ka-)
+        const noiseDuration = 0.07;
+        const bufferSize = Math.floor(ctx.sampleRate * noiseDuration);
+        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const channelData = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          channelData[i] = Math.random() * 2 - 1;
+        }
+        const noiseSource = ctx.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = "bandpass";
+        noiseFilter.frequency.setValueAtTime(1400, now);
+        noiseFilter.Q.setValueAtTime(2.5, now);
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.22, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + noiseDuration);
+        noiseSource.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noiseSource.start(now);
+        noiseSource.stop(now + noiseDuration);
+
+        // Golpe sordo de apertura mecánica
+        const thudOsc = ctx.createOscillator();
+        const thudGain = ctx.createGain();
+        thudOsc.type = "sine";
+        thudOsc.frequency.setValueAtTime(240, now + 0.01);
+        thudOsc.frequency.exponentialRampToValueAtTime(55, now + 0.08);
+        thudGain.gain.setValueAtTime(0.25, now + 0.01);
+        thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
+        thudOsc.connect(thudGain);
+        thudGain.connect(ctx.destination);
+        thudOsc.start(now + 0.01);
+        thudOsc.stop(now + 0.085);
+
+        // Capa 2: Campana principal de bronce (#1) a los 0.075s
+        const t1 = now + 0.075;
+        const bell1Tones = [
+          { freq: 1567.98, gain: 0.35, decay: 0.7 },
+          { freq: 2093.0, gain: 0.3, decay: 0.6 },
+          { freq: 2637.02, gain: 0.25, decay: 0.5 },
+          { freq: 3135.96, gain: 0.2, decay: 0.4 },
+          { freq: 4186.01, gain: 0.15, decay: 0.3 }
+        ];
+        bell1Tones.forEach(({ freq, gain, decay }) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, t1);
+          g.gain.setValueAtTime(gain, t1);
+          g.gain.exponentialRampToValueAtTime(0.0001, t1 + decay);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(t1);
+          osc.stop(t1 + decay);
+        });
+
+        // Capa 3: Campana de rebote y monedas (#2) a los 0.135s
+        const t2 = now + 0.135;
+        const bell2Tones = [
+          { freq: 2093.0, gain: 0.4, decay: 0.95 },
+          { freq: 2637.02, gain: 0.35, decay: 0.85 },
+          { freq: 3135.96, gain: 0.28, decay: 0.75 },
+          { freq: 4186.01, gain: 0.22, decay: 0.6 },
+          { freq: 5274.04, gain: 0.16, decay: 0.45 },
+          { freq: 6271.93, gain: 0.1, decay: 0.3 }
+        ];
+        bell2Tones.forEach(({ freq, gain, decay }) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, t2);
+          g.gain.setValueAtTime(gain, t2);
+          g.gain.exponentialRampToValueAtTime(0.0001, t2 + decay);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(t2);
+          osc.stop(t2 + decay);
+        });
+
+        // Capa 4: Tintineo brillante final a los 0.19s
+        const t3 = now + 0.19;
+        [3520, 4400].forEach((freq) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(freq, t3);
+          g.gain.setValueAtTime(0.12, t3);
+          g.gain.exponentialRampToValueAtTime(0.0001, t3 + 0.35);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(t3);
+          osc.stop(t3 + 0.35);
+        });
+      } catch (err) {
+        console.warn("Error reproduciendo audio:", err);
+      }
+    }
+
+    function playCashRegisterSound() {
+      try {
+        const audio = new Audio("public/sounds/cash-register.wav");
+        audio.volume = 0.9;
+        const p = audio.play();
+        if (p !== undefined) {
+          p.catch(() => playCashRegisterWebAudio());
+        }
+      } catch (e) {
+        playCashRegisterWebAudio();
+      }
+    }
+
     const DEFAULT_CUSTOMERS_DATA = [
       {
         id: "cli-0",
@@ -384,6 +578,12 @@
       const [search, setSearch] = useState("");
       const [paymentMethod, setPaymentMethod] = useState("efectivo");
       const [cashGiven, setCashGiven] = useState("");
+
+      // Barcode Scanner State
+      const [barcodeInput, setBarcodeInput] = useState("");
+      const [lastScannedItem, setLastScannedItem] = useState(null);
+      const barcodeInputRef = useRef(null);
+      const keyStrokeBufferRef = useRef({ buffer: "", lastStrokeTime: 0 });
       
       // Customers State
       const [customers, setCustomers] = useState(() => {
@@ -400,10 +600,29 @@
       const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
       const customerPickerRef = useRef(null);
 
-      // New Customer Form State (Simplified to 3 fields: Phone, Name, Notes)
-      const [newCustName, setNewCustName] = useState("");
-      const [newCustPhone, setNewCustPhone] = useState("");
-      const [newCustNotes, setNewCustNotes] = useState("");
+      // Printer Configuration State
+      const [printerConfig, setPrinterConfig] = useState(() => {
+        try {
+          const saved = localStorage.getItem("brito_pos_printer_config");
+          return saved ? JSON.parse(saved) : {
+            selectedPrinterName: "POS-58",
+            port: "USB002",
+            paperWidth: "58mm",
+            directPrinting: true
+          };
+        } catch (e) {
+          return { selectedPrinterName: "POS-58", port: "USB002", paperWidth: "58mm", directPrinting: true };
+        }
+      });
+      const [showPrinterModal, setShowPrinterModal] = useState(false);
+      const [testPrintSuccess, setTestPrintSuccess] = useState(false);
+
+      const handleSavePrinter = (newCfg) => {
+        setPrinterConfig(newCfg);
+        try {
+          localStorage.setItem("brito_pos_printer_config", JSON.stringify(newCfg));
+        } catch (e) {}
+      };
 
       useEffect(() => {
         try {
@@ -440,6 +659,8 @@
         const updated = [...customers, newCust];
         setCustomers(updated);
         setSelectedCustomer(newCust);
+        setPaymentMethod("efectivo");
+        setCashGiven("");
         setIsCustomerPickerOpen(false);
         setIsNewCustomerModalOpen(false);
 
@@ -462,6 +683,11 @@
         const saved = localStorage.getItem("brito_expenses");
         return saved ? JSON.parse(saved) : [];
       });
+      const [incomesList, setIncomesList] = useState(() => {
+        const saved = localStorage.getItem("brito_incomes");
+        return saved ? JSON.parse(saved) : [];
+      });
+      const [movementModalType, setMovementModalType] = useState("salida");
 
       const [salesList, setSalesList] = useState(() => {
         const saved = localStorage.getItem("brito_sales");
@@ -470,6 +696,7 @@
 
       // Modals
       const [showTicket, setShowTicket] = useState(false);
+      const [ticketPrinted, setTicketPrinted] = useState(false);
       const [autoPrintDirect, setAutoPrintDirect] = useState(() => {
         try {
           const saved = localStorage.getItem("brito_autoprint_direct");
@@ -495,13 +722,54 @@
       }, [showTicket, completedSale, autoPrintDirect]);
 
       const [showExpenses, setShowExpenses] = useState(false);
+      const [showBreadDelivery, setShowBreadDelivery] = useState(false);
+      const [showBreadOrdersDrawer, setShowBreadOrdersDrawer] = useState(false);
+      const [customOrders, setCustomOrders] = useState(() => {
+        try {
+          const raw = localStorage.getItem("brito_custom_orders");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          }
+        } catch(e) {}
+        return [
+          {
+            id: "PED-101",
+            orderNumber: "PED-101",
+            customerName: "Sra. María González",
+            phone: "55 1234 5678",
+            description: "50 Conchas de vainilla y 50 Bolillos para fiesta",
+            deliveryDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+            deliveryTime: "08:30",
+            status: "pendiente",
+            total: 650,
+            deposit: 350,
+            remainingBalance: 300,
+            notes: "Pan caliente recién salido a las 8:30 AM",
+          }
+        ];
+      });
+      const [orderCustomerName, setOrderCustomerName] = useState("");
+      const [orderCustomerPhone, setOrderCustomerPhone] = useState("");
+      const [orderDeliveryDate, setOrderDeliveryDate] = useState(() => {
+        const d = new Date(Date.now() + 86400000);
+        return d.toISOString().split("T")[0];
+      });
+      const [orderDeliveryTime, setOrderDeliveryTime] = useState("08:00");
+      const [orderItemsList, setOrderItemsList] = useState([]);
+      const [orderCustomDesc, setOrderCustomDesc] = useState("");
+      const [orderCustomTotal, setOrderCustomTotal] = useState("");
+      const [orderDepositInput, setOrderDepositInput] = useState("");
+      const [orderPaymentMethod, setOrderPaymentMethod] = useState("efectivo");
+      const [orderNotes, setOrderNotes] = useState("");
+      const [orderActiveTab, setOrderActiveTab] = useState("new");
       const [showDrawerModal, setShowDrawerModal] = useState(false);
       const [showCategoryPanel, setShowCategoryPanel] = useState(false);
       const [showOperationsMenu, setShowOperationsMenu] = useState(false);
       const [completedSale, setCompletedSale] = useState(null);
       const [shiftModalTab, setShiftModalTab] = useState("cambio");
       const [countedCashInput, setCountedCashInput] = useState("");
-      const [nextInitialFundInput, setNextInitialFundInput] = useState("500");
+      const [nextInitialFundInput, setNextInitialFundInput] = useState("");
       const [hasAcceptedShift, setHasAcceptedShift] = useState(false);
       const [nextCashier, setNextCashier] = useState("Cajera 2 - Turno Vespertino");
       const [nextShift, setNextShift] = useState("Turno Vespertino (14:00 - 22:00)");
@@ -656,8 +924,12 @@
       const filtered = useMemo(() => {
         return products.filter((p) => {
           const matchCat = matchesPosCategory(p, selectedCategory);
-          const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-                              (p.description && p.description.toLowerCase().includes(search.toLowerCase()));
+          const s = search.toLowerCase();
+          const matchSearch = 
+            (p.barcode && p.barcode.toLowerCase().includes(s)) ||
+            (p.code && p.code.toLowerCase().includes(s)) ||
+            p.name.toLowerCase().includes(s) ||
+            (p.description && p.description.toLowerCase().includes(s));
           return matchCat && matchSearch;
         });
       }, [products, selectedCategory, search]);
@@ -674,6 +946,100 @@
           return [...prev, { product, quantity: 1 }];
         });
       };
+
+      // Auto-disolver alerta de escaneo
+      useEffect(() => {
+        if (!lastScannedItem) return;
+        const timer = setTimeout(() => setLastScannedItem(null), 3800);
+        return () => clearTimeout(timer);
+      }, [lastScannedItem]);
+
+      // Manejador central de escaneo por código de barras
+      const handleBarcodeScan = (rawCode) => {
+        const code = (rawCode || "").trim();
+        if (!code) return;
+
+        if (isShiftLocked) {
+          alert("🔒 Terminal Bloqueada: Desbloquea la terminal antes de cobrar por código de barras.");
+          return;
+        }
+
+        const matched = findProductByBarcodeOrCode(code, products);
+        if (matched) {
+          addToCart(matched);
+          playScanBeep(true);
+          setLastScannedItem({
+            success: true,
+            productName: matched.name,
+            code,
+            timestamp: Date.now(),
+          });
+          setBarcodeInput("");
+        } else {
+          playScanBeep(false);
+          setLastScannedItem({
+            success: false,
+            code,
+            timestamp: Date.now(),
+          });
+        }
+      };
+
+      // Listener global de teclado para pistola / lector de códigos de barras (Keyboard Wedge)
+      useEffect(() => {
+        const handleGlobalKeyDown = (e) => {
+          if (showTicket || showExpenses || showDrawerModal || isNewCustomerModalOpen) {
+            return;
+          }
+
+          const activeElem = document.activeElement;
+          const isInput = activeElem && (activeElem.tagName === "INPUT" || activeElem.tagName === "TEXTAREA");
+
+          if (activeElem === barcodeInputRef.current) {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleBarcodeScan(barcodeInput);
+            }
+            return;
+          }
+
+          if (isInput && activeElem !== barcodeInputRef.current) {
+            if (e.key === "Enter" && search.trim()) {
+              const matched = findProductByBarcodeOrCode(search.trim(), products);
+              if (matched) {
+                e.preventDefault();
+                handleBarcodeScan(search.trim());
+                setSearch("");
+              }
+            }
+            return;
+          }
+
+          const now = Date.now();
+          const timeDiff = now - keyStrokeBufferRef.current.lastStrokeTime;
+
+          if (e.key === "Enter") {
+            if (keyStrokeBufferRef.current.buffer.length >= 2) {
+              e.preventDefault();
+              handleBarcodeScan(keyStrokeBufferRef.current.buffer);
+            }
+            keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
+            return;
+          }
+
+          if (e.key.length === 1) {
+            if (timeDiff > 220) {
+              keyStrokeBufferRef.current = { buffer: e.key, lastStrokeTime: now };
+            } else {
+              keyStrokeBufferRef.current.buffer += e.key;
+              keyStrokeBufferRef.current.lastStrokeTime = now;
+            }
+          }
+        };
+
+        window.addEventListener("keydown", handleGlobalKeyDown);
+        return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+      }, [products, barcodeInput, search, isShiftLocked, showTicket, showExpenses, showDrawerModal, isNewCustomerModalOpen]);
 
       const addMultipleToCart = (product, count, e) => {
         if (e) e.stopPropagation();
@@ -725,11 +1091,21 @@
           return expCashier === cName || cName.includes(expCashier) || expCashier.includes(cName);
         });
       }, [expensesList, cashierName]);
+ 
+      const currentShiftIncomes = useMemo(() => {
+        return (incomesList || []).filter((inc) => {
+          if (!inc.cashier) return true;
+          const cName = cashierName.toLowerCase().trim();
+          const incCashier = inc.cashier.toLowerCase().trim();
+          return incCashier === cName || cName.includes(incCashier) || incCashier.includes(cName);
+        });
+      }, [incomesList, cashierName]);
 
       // Balances
       const totalCashSales = salesList.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
       const totalExpenses = currentShiftExpenses.reduce((sum, e) => sum + e.amount, 0);
-      const cashInDrawer = initialCashFund + totalCashSales - totalExpenses;
+      const totalIncomesInCash = currentShiftIncomes.reduce((sum, i) => sum + i.amount, 0);
+      const cashInDrawer = initialCashFund + totalCashSales + totalIncomesInCash - totalExpenses;
       const totalStockVal = products.reduce((sum, p) => sum + p.stock * p.price, 0);
       const totalPiecesInStock = products.reduce((sum, p) => sum + p.stock, 0);
 
@@ -766,9 +1142,39 @@
       const resetSale = () => {
         setCart([]);
         setCashGiven("");
+        setPaymentMethod("efectivo");
         setSelectedCustomer(DEFAULT_CUSTOMERS_DATA[0]);
         setShowTicket(false);
         setCompletedSale(null);
+      };
+
+      const handleCancelTicket = () => {
+        if (!completedSale) {
+          setShowTicket(false);
+          return;
+        }
+
+        const sale = completedSale;
+
+        // 1. Reintegrar piezas de pan al inventario
+        if (sale.items && sale.items.length > 0) {
+          setProducts((prev) =>
+            prev.map((prod) => {
+              const returnedItem = sale.items.find((ci) => ci.product.id === prod.id);
+              return returnedItem
+                ? { ...prod, stock: prod.stock + returnedItem.quantity }
+                : prod;
+            })
+          );
+        }
+
+        // 2. Eliminar la venta para que no se cobre ni afecte el corte de caja
+        setSalesList((prev) => prev.filter((s) => s.id !== sale.id));
+
+        // 3. Cerrar ticket directamente y reiniciar venta
+        setShowTicket(false);
+        setCompletedSale(null);
+        resetSale();
       };
 
       const filteredCustomers = useMemo(() => {
@@ -926,32 +1332,125 @@
             ref={catalogScrollRef}
             className="flex-1 flex flex-col min-w-0 px-4 lg:px-5 pb-6 pt-0 pr-3 sm:pr-4 overflow-y-auto scroll-smooth relative"
           >
+            {/* Alerta flotante de escaneo de código de barras */}
+            {lastScannedItem && (
+              <div className={`fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border-2 animate-in fade-in slide-in-from-top-3 duration-200 max-w-md w-[92vw] sm:w-auto ${
+                lastScannedItem.success
+                  ? "bg-emerald-950/95 border-emerald-400 text-emerald-100 ring-4 ring-emerald-500/20"
+                  : "bg-rose-950/95 border-rose-400 text-rose-100 ring-4 ring-rose-500/20"
+              }`}>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg font-black shrink-0 ${
+                  lastScannedItem.success ? "bg-emerald-500 text-stone-950" : "bg-rose-500 text-white"
+                }`}>
+                  {lastScannedItem.success ? "✓" : "✕"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-black truncate">
+                    {lastScannedItem.success
+                      ? `${lastScannedItem.productName} (+1 pieza)`
+                      : `Código no registrado: ${lastScannedItem.code}`}
+                  </p>
+                  <p className="text-[11px] opacity-85 truncate font-medium">
+                    {lastScannedItem.success
+                      ? `Código: ${lastScannedItem.code} • Sumado a la charola de cobro`
+                      : "Verifica que el producto tenga asignado este código en el Catálogo"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLastScannedItem(null)}
+                  className="p-1 rounded-lg text-stone-300 hover:text-white hover:bg-white/10 shrink-0"
+                  title="Cerrar aviso"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
             <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
               <div className="flex items-center justify-between gap-3 w-full">
-                {/* Buscador de Productos (Grande y Cómodo) */}
-                <div className="relative flex-1 max-w-2xl">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 text-base">🔍</span>
-                  <input
-                    type="text"
-                    placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-12 pr-10 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
-                  />
-                  {search && (
-                    <button
-                      type="button"
-                      onClick={() => setSearch("")}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-sm p-1"
-                    >
-                      ✕
-                    </button>
-                  )}
+                {/* Buscador de Productos & Escáner de Código de Barras */}
+                <div className="flex items-center gap-2 flex-1 max-w-2xl min-w-0">
+                  {/* Buscador General con Soporte Enter */}
+                  <div className="relative flex-1 min-w-0">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400 text-base">🔍</span>
+                    <input
+                      type="text"
+                      placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && search.trim()) {
+                          const matched = findProductByBarcodeOrCode(search.trim(), products);
+                          if (matched) {
+                            e.preventDefault();
+                            handleBarcodeScan(search.trim());
+                            setSearch("");
+                          }
+                        }
+                      }}
+                      className="w-full pl-12 pr-10 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
+                    />
+                    {search && (
+                      <button
+                        type="button"
+                        onClick={() => setSearch("")}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-sm p-1"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Lector / Entrada Directa de Código de Barras */}
+                  <div className="relative shrink-0 hidden sm:block">
+                    <div className="relative flex items-center">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none text-base">🏷️</span>
+                      <input
+                        ref={barcodeInputRef}
+                        type="text"
+                        placeholder="Código de barras..."
+                        value={barcodeInput}
+                        onChange={(e) => setBarcodeInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleBarcodeScan(barcodeInput);
+                          }
+                        }}
+                        className="w-48 lg:w-56 pl-10 pr-20 py-3.5 bg-amber-50/90 hover:bg-amber-100/60 focus:bg-white border-2 border-amber-400 focus:border-amber-600 rounded-2xl text-xs sm:text-sm font-black text-amber-950 placeholder:text-amber-700/60 shadow-xs focus:outline-none transition-all font-mono"
+                        title="Escanea con la pistola de código de barras o teclea el código y presiona Enter"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleBarcodeScan(barcodeInput)}
+                        disabled={!barcodeInput.trim()}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:hover:bg-amber-600 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-2xs"
+                        title="Cobrar producto con este código de barras"
+                      >
+                        + Cobrar
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Botón Escáner Móvil */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const code = window.prompt("🏷️ Ingresa o escanea el código de barras del producto:");
+                      if (code) handleBarcodeScan(code);
+                    }}
+                    className="sm:hidden p-3.5 rounded-2xl bg-amber-100 text-amber-900 border-2 border-amber-300 font-bold shrink-0 shadow-xs active:scale-95 transition-all text-sm"
+                    title="Escanear o teclear código de barras"
+                  >
+                    🏷️
+                  </button>
                 </div>
 
-                {/* Botón Grande: Categorías y Precios */}
-                <div className="relative shrink-0">
+                {/* Grupo Catálogo y Pan: Categorías y Precios + Entrada de Pan directamente a lado */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Botón Grande: Categorías y Precios */}
                   <button
                     type="button"
                     onClick={() => setShowCategoryPanel(!showCategoryPanel)}
@@ -975,10 +1474,75 @@
                     )}
                     <span className="text-sm text-stone-400">▾</span>
                   </button>
+
+                  {/* Botón Pedidos de Pan (Mínimo 50% Anticipo) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowBreadOrdersDrawer(true)}
+                    className="flex items-center gap-2 px-4 sm:px-5 py-3.5 rounded-2xl border-2 border-amber-600/50 bg-[#3e2723] hover:bg-stone-900 text-amber-50 text-sm sm:text-base font-black transition-all active:scale-95 shadow-md shadow-amber-950/20 whitespace-nowrap cursor-pointer"
+                    title="Hacer o consultar pedidos y encargos de pan con anticipo mínimo del 50%"
+                  >
+                    <span className="text-xl">🥖</span>
+                    <span>Pedidos de Pan</span>
+                    <span className="text-[10px] bg-amber-500 text-stone-950 font-black px-2 py-0.5 rounded-full shadow-xs">
+                      50% Anticipo
+                    </span>
+                  </button>
+
+                  {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
+                  {false && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isShiftLocked) {
+                          alert("🔒 Terminal Bloqueada: Debes ingresar las credenciales de la encargada en la terminal de cobro para habilitar operaciones.");
+                          return;
+                        }
+                        setShowBreadDelivery(true);
+                      }}
+                      className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
+                        isShiftLocked
+                          ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
+                          : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black"
+                      }`}
+                      title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
+                    >
+                      <span className="text-lg">🚐</span>
+                      <span>Entrada de Pan</span>
+                    </button>
+                  {/* Botón Selector e Indicador de Impresora Directa */}
+                  <button
+                    type="button"
+                    onClick={() => setShowPrinterModal(true)}
+                    className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-stone-300 hover:border-amber-400 bg-white hover:bg-amber-50/80 text-stone-900 transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
+                    title={`Impresora de tickets conectada: ${printerConfig.selectedPrinterName} (${printerConfig.port}). Haz clic para elegir la impresora directa.`}
+                  >
+                    <div className="relative">
+                      <span className="text-lg">🖨️</span>
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"></span>
+                    </div>
+                    <div className="text-left hidden xl:block">
+                      <div className="flex items-center gap-1.5 leading-none">
+                        <span className="text-xs font-black text-stone-900 truncate max-w-[120px]">
+                          {printerConfig.selectedPrinterName}
+                        </span>
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 uppercase">
+                          {printerConfig.directPrinting ? "Directa" : "Diálogo"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-stone-400 font-bold block mt-0.5">
+                        {printerConfig.paperWidth} • {printerConfig.port}
+                      </span>
+                    </div>
+                    <div className="xl:hidden flex items-center gap-1 text-xs font-black">
+                      <span>{printerConfig.selectedPrinterName}</span>
+                    </div>
+                  </button>
                 </div>
 
-                {/* Botón Gasto Rápido */}
-                <div className="relative shrink-0">
+                {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Botón Movimientos de Caja ($) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -988,20 +1552,20 @@
                       }
                       setShowExpenses(true);
                     }}
-                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                    className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
                       isShiftLocked
                         ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                        : "border-rose-200 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/80 text-rose-900 text-sm sm:text-base font-black"
+                        : "border-amber-300 hover:border-amber-400 bg-amber-50 hover:bg-amber-100/90 text-stone-900 text-sm sm:text-base font-black"
                     }`}
-                    title={isShiftLocked ? "Terminal bloqueada" : "Registrar salida o gasto de dinero"}
+                    title={isShiftLocked ? "Terminal bloqueada" : "Registrar gastos, retiros de dueños y entradas para cambio de billetes"}
                   >
-                    <span className="text-lg">💸</span>
-                    <span>Gasto</span>
+                    <span className="w-6 h-6 rounded-xl bg-amber-500 text-stone-950 font-black flex items-center justify-center text-xs shadow-xs border border-amber-400 shrink-0">
+                      $
+                    </span>
+                    <span>Movimientos de Caja</span>
                   </button>
-                </div>
 
-                {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
-                <div className="relative shrink-0">
+                  {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1193,6 +1757,19 @@
                         <p className="text-xs text-stone-500 mt-0.5 line-clamp-1 font-sans">
                           {prod.description}
                         </p>
+                        {(prod.barcode || prod.code) && (
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 shadow-2xs">
+                              <span>🏷️</span>
+                              <span>{prod.barcode || prod.code}</span>
+                            </span>
+                            {prod.code && prod.barcode && (
+                              <span className="text-[10px] font-bold text-stone-400 font-mono">
+                                [{prod.code}]
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1321,6 +1898,8 @@
                   type="button"
                   onClick={() => {
                     setSelectedCustomer(DEFAULT_CUSTOMERS_DATA[0]);
+                    setPaymentMethod("efectivo");
+                    setCashGiven("");
                     setCustomerSearchQuery("");
                     setIsCustomerPickerOpen(false);
                   }}
@@ -1394,6 +1973,8 @@
                     type="button"
                     onClick={() => {
                       setSelectedCustomer(DEFAULT_CUSTOMERS_DATA[0]);
+                      setPaymentMethod("efectivo");
+                      setCashGiven("");
                       setIsCustomerPickerOpen(false);
                     }}
                     className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border ${
@@ -1427,6 +2008,8 @@
                         type="button"
                         onClick={() => {
                           setSelectedCustomer(c);
+                          setPaymentMethod("efectivo");
+                          setCashGiven("");
                           setIsCustomerPickerOpen(false);
                           setCustomerSearchQuery("");
                         }}
@@ -1729,29 +2312,33 @@
               )}
 
               {/* Botones de Acción */}
-              <div className="grid grid-cols-4 gap-2 pt-0.5">
+              <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">
                 <button
                   type="button"
                   onClick={() => { setCart([]); setCashGiven(""); }}
                   disabled={cart.length === 0}
-                  className="col-span-1 py-3 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-stone-200 transition-all active:scale-95 shadow-xs"
-                  title="Limpiar charola"
+                  className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
+                    cart.length > 0
+                      ? "bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-700 hover:to-rose-800 text-white shadow-red-600/30 hover:shadow-red-600/50 hover:scale-[1.01] active:scale-95 border border-red-400/80 ring-2 ring-red-400/30 cursor-pointer"
+                      : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
+                  }`}
+                  title="Cancelar compra y vaciar charola"
                 >
-                  <span className="text-sm">🗑️</span>
-                  <span className="hidden sm:inline">Limpiar</span>
+                  <span className="text-base sm:text-lg">🗑️</span>
+                  <span className="truncate">Cancelar Compra</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleCheckout}
                   disabled={cart.length === 0 || !isValid}
-                  className={`col-span-3 py-3 sm:py-3.5 rounded-xl text-sm sm:text-base font-black flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
+                  className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
                     cart.length > 0 && isValid
-                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-2 ring-amber-400/40"
-                      : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed"
+                      ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-2 ring-amber-400/40 cursor-pointer"
+                      : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
                   }`}
                 >
-                  <span className="text-sm">✓</span>
-                  <span>Cobrar & Ticket</span>
+                  <span className="text-base sm:text-lg">✓</span>
+                  <span className="truncate">Cobrar & Ticket</span>
                 </button>
               </div>
             </div>
@@ -1761,172 +2348,193 @@
           {showTicket && completedSale && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
               <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="bg-amber-950 text-amber-100 p-4 px-6 flex items-center justify-between">
-                  <span className="font-bold text-sm">🧾 Comprobante de Venta</span>
-                  <button onClick={resetSale} className="text-xl font-bold hover:text-white">✕</button>
+                <div className="bg-neutral-900 text-white p-4 px-6 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-sm block leading-tight">🧾 Comprobante de Venta</span>
+                    <div className="flex items-center gap-1 text-[10px] text-amber-300/90 font-normal">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                      <span>Impresora: <strong>{printerConfig.selectedPrinterName}</strong> ({printerConfig.paperWidth})</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowPrinterModal(true)}
+                        className="underline hover:text-white ml-1 cursor-pointer font-bold text-amber-200"
+                        title="Cambiar impresora de tickets"
+                      >
+                        [Elegir]
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCancelTicket}
+                    className="text-xl font-bold hover:text-rose-400 p-1 rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
+                    title="Cancelar ticket y anular compra (no cobrar panes)"
+                  >
+                    ✕
+                  </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-stone-100/70">
-                  <div id="printable-ticket" className="bg-white p-5 sm:p-6 rounded-3xl border-2 border-stone-200 shadow-md font-mono text-xs text-stone-800 space-y-3.5 max-w-sm mx-auto">
-                    {/* Header con Logotipo Oficial */}
-                    <div className="text-center space-y-1 border-b-2 border-dashed border-stone-300 pb-3.5">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-neutral-100">
+                  <div id="printable-ticket" className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3 max-w-sm mx-auto">
+                    {/* Header con Logotipo Oficial en escala de grises */}
+                    <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3">
                       <div className="flex justify-center mb-1">
-                        <svg viewBox="0 0 500 550" className="w-20 h-20 mx-auto drop-shadow-xs">
-                          <defs>
-                            <linearGradient id="ticketOrangeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor="#ff8c38"/>
-                              <stop offset="50%" stopColor="#f56e18"/>
-                              <stop offset="100%" stopColor="#d64906"/>
-                            </linearGradient>
-                            <linearGradient id="ticketCrimsonBase" x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor="#fb2576"/>
-                              <stop offset="40%" stopColor="#e0105d"/>
-                              <stop offset="100%" stopColor="#a80540"/>
-                            </linearGradient>
-                            <path id="ticketPanaderiaArc" d="M 60 145 A 200 135 0 0 1 440 145" fill="none" />
-                          </defs>
-                          <text fontFamily="'Impact', 'Arial Black', sans-serif" fontWeight="900" fontSize="52" fill="url(#ticketOrangeGrad)" stroke="#1a120b" strokeWidth="4.5" strokeLinejoin="round" letterSpacing="3">
-                            <textPath href="#ticketPanaderiaArc" startOffset="50%" textAnchor="middle">PANADERIA</textPath>
-                          </text>
-                          <path d="M 50 215 C 55 185, 75 160, 115 140 C 150 122, 175 130, 205 125 C 225 122, 235 115, 250 115 C 265 115, 275 122, 295 125 C 325 130, 350 122, 385 140 C 425 160, 445 185, 450 215 C 430 195, 395 175, 345 165 C 300 156, 275 162, 250 162 C 225 162, 200 156, 155 165 C 105 175, 70 195, 50 215 Z" fill="#141416" stroke="#000000" strokeWidth="2" />
-                          <text x="250" y="210" textAnchor="middle" fontFamily="'Trebuchet MS', 'Arial Black', sans-serif" fontWeight="800" fontSize="34" fill="#a44210" stroke="#1a120b" strokeWidth="2.5" letterSpacing="2">Bakery</text>
-                          <text x="250" y="325" textAnchor="middle" fontFamily="'Brush Script MT', 'Dancing Script', 'Segoe Script', cursive" fontWeight="bold" fontStyle="italic" fontSize="122" fill="#141416" stroke="#ffffff" strokeWidth="14" strokeLinejoin="round" opacity="0.95">Brito</text>
-                          <text x="250" y="325" textAnchor="middle" fontFamily="'Brush Script MT', 'Dancing Script', 'Segoe Script', cursive" fontWeight="bold" fontStyle="italic" fontSize="122" fill="#141416">Brito</text>
-                          <g>
-                            <path d="M 85 365 C 140 378, 360 378, 415 365 L 385 458 C 340 472, 160 472, 115 458 Z" fill="url(#ticketCrimsonBase)" stroke="#730328" strokeWidth="3" />
-                            <path d="M 250 377 L 250 464" stroke="#ffccd5" strokeWidth="4.5" strokeLinecap="round"/>
-                            <path d="M 230 376 L 227 463" stroke="#ffe3e8" strokeWidth="4.5" strokeLinecap="round"/>
-                            <path d="M 270 376 L 273 463" stroke="#ffe3e8" strokeWidth="4.5" strokeLinecap="round"/>
-                            <path d="M 210 375 L 204 461" stroke="#ffccd5" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 290 375 L 296 461" stroke="#ffccd5" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 190 374 L 182 458" stroke="#ffe3e8" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 310 374 L 318 458" stroke="#ffe3e8" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 170 373 L 160 455" stroke="#ffccd5" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 330 373 L 340 455" stroke="#ffccd5" strokeWidth="4" strokeLinecap="round"/>
-                            <path d="M 150 371 L 138 451" stroke="#ffe3e8" strokeWidth="3.5" strokeLinecap="round"/>
-                            <path d="M 350 371 L 362 451" stroke="#ffe3e8" strokeWidth="3.5" strokeLinecap="round"/>
-                            <path d="M 130 369 L 118 446" stroke="#ffccd5" strokeWidth="3.5" strokeLinecap="round"/>
-                            <path d="M 370 369 L 382 446" stroke="#ffccd5" strokeWidth="3.5" strokeLinecap="round"/>
-                            <path d="M 110 367 L 98 440" stroke="#ffe3e8" strokeWidth="3" strokeLinecap="round"/>
-                            <path d="M 390 367 L 402 440" stroke="#ffe3e8" strokeWidth="3" strokeLinecap="round"/>
-                          </g>
-                        </svg>
+                        <img
+                          src="/logo.svg"
+                          alt="Panaderías Brito"
+                          className="w-16 h-16 object-contain filter grayscale contrast-200"
+                        />
                       </div>
-                      <h2 className="font-black text-base tracking-wider uppercase text-stone-900">
+                      <h1 className="font-black text-base sm:text-lg tracking-wider uppercase text-black font-mono leading-none">
                         PANADERÍAS BRITO
-                      </h2>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-900 bg-amber-100/80 px-2.5 py-0.5 rounded-full inline-block">
+                      </h1>
+                      <div className="inline-block border border-black px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-black">
                         Tradición & Sabor Familiar
-                      </p>
-                      <p className="text-xs font-bold text-stone-800 font-sans mt-1">Sucursal Matriz (Centro)</p>
-                      <p className="text-[10px] text-stone-500 font-sans leading-tight px-3">Av. Principal #450, Centro Histórico</p>
-                      <p className="text-[10px] text-stone-500 font-sans font-medium">Tel / WhatsApp: 55 1234 5678</p>
+                      </div>
+                      <p className="text-xs font-bold text-black font-sans mt-1">Sucursal Matriz (Centro)</p>
+                      <p className="text-[10px] text-neutral-700 font-sans leading-tight px-3">Av. Principal #450, Centro Histórico</p>
+                      <p className="text-[10px] text-neutral-800 font-sans font-semibold">Tel / WhatsApp: 55 1234 5678</p>
                     </div>
 
                     {/* Ticket Metadata */}
-                    <div className="text-[11px] space-y-1 text-stone-600 border-b border-dashed border-stone-300 pb-3">
-                      <div className="flex justify-between"><span className="font-bold">FOLIO:</span><span className="font-black text-stone-900">#{completedSale.id}</span></div>
-                      <div className="flex justify-between"><span>FECHA:</span><span>{completedSale.date}</span></div>
+                    <div className="text-[11px] space-y-1.5 text-black border-b-2 border-dashed border-black pb-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold">FOLIO:</span>
+                        <span className="bg-black text-white font-mono font-black px-2 py-0.5 rounded text-[11px]">
+                          #{completedSale.id}
+                        </span>
+                      </div>
                       <div className="flex justify-between">
-                        <span>CLIENTE:</span>
-                        <span className="font-bold text-stone-900 text-right max-w-[200px] truncate">
-                          {completedSale.customerName || "Público General"}
+                        <span className="font-semibold text-neutral-800">FECHA:</span>
+                        <span className="font-mono font-bold">{completedSale.date}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-neutral-800">CLIENTE:</span>
+                        <span className="font-bold text-black text-right max-w-[200px] truncate">
+                          {completedSale.customerName || "Público en General"}
                           {completedSale.customerType && completedSale.customerType !== "general" && (
-                            <span className="ml-1 text-[9px] font-black uppercase text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">
+                            <span className="ml-1 text-[9px] font-black uppercase border border-black px-1.5 py-0.5 rounded">
                               {completedSale.customerType}
                             </span>
                           )}
                         </span>
                       </div>
-                      <div className="flex justify-between"><span>ATENDIÓ:</span><span className="font-bold text-stone-800">{completedSale.cashier}</span></div>
                       <div className="flex justify-between">
-                        <span>PAGO:</span>
-                        <span className="uppercase font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                          {completedSale.paymentMethod}
+                        <span className="font-semibold text-neutral-800">ATENDIÓ:</span>
+                        <span className="font-bold text-black">{completedSale.cashier}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-neutral-800">MÉTODO DE PAGO:</span>
+                        <span className="uppercase font-black border-1.5 border-black px-2 py-0.5 rounded text-[10px] text-black">
+                          [ {completedSale.paymentMethod} ]
                         </span>
                       </div>
                     </div>
 
                     {/* Detalle de Productos */}
-                    <div className="space-y-2 border-b border-dashed border-stone-300 pb-3">
-                      <div className="flex justify-between font-black text-[10px] text-stone-400 uppercase tracking-wider pb-1">
+                    <div className="space-y-2 border-b-2 border-dashed border-black pb-3">
+                      <div className="border-y border-black py-1 flex justify-between font-black text-[10px] text-black uppercase tracking-wider">
                         <span>CANT / PRODUCTO</span>
-                        <span>IMPORTE</span>
+                        <span className="text-right">IMPORTE</span>
                       </div>
-                      {completedSale.items.map((i, idx) => (
-                        <div key={idx} className="flex justify-between text-stone-800 text-[11px] leading-tight items-start">
-                          <span className="flex-1 pr-2">
-                            <span className="font-black text-stone-900">{i.quantity}x</span> {i.product.name}
-                            <span className="block text-[10px] text-stone-400 font-sans">
-                              @{formatCurrency(i.product.price)} c/u
-                            </span>
-                          </span>
-                          <span className="font-black text-stone-900 whitespace-nowrap">{formatCurrency(i.product.price * i.quantity)}</span>
-                        </div>
-                      ))}
+                      <div className="space-y-1.5 pt-1">
+                        {completedSale.items.map((i, idx) => (
+                          <div key={idx} className="flex justify-between text-black text-[11px] leading-tight items-start">
+                            <div className="flex-1 pr-2">
+                              <div className="font-bold text-black">
+                                <span className="font-black text-black border border-black px-1 py-0.2 rounded text-[10px] mr-1">
+                                  {i.quantity}x
+                                </span>
+                                {i.product.name}
+                              </div>
+                              <div className="text-[10px] text-neutral-600 font-sans pl-6">
+                                @{formatCurrency(i.product.price)} c/u
+                              </div>
+                            </div>
+                            <div className="font-black text-black whitespace-nowrap text-right pt-0.5">
+                              {formatCurrency(i.product.price * i.quantity)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Totales y Cambio */}
-                    <div className="space-y-1.5 pt-1 text-[11px]">
-                      <div className="flex justify-between text-stone-600">
+                    <div className="space-y-1.5 pt-1 text-[11px] text-black">
+                      <div className="flex justify-between text-neutral-800">
                         <span>Total de piezas:</span>
-                        <span className="font-bold text-stone-900">{completedSale.items.reduce((acc, i) => acc + i.quantity, 0)} pzas</span>
+                        <span className="font-bold text-black">{completedSale.items.reduce((acc, i) => acc + i.quantity, 0)} pzas</span>
                       </div>
-                      <div className="flex justify-between text-base font-black text-stone-900 border-t-2 border-dashed border-stone-300 pt-2">
-                        <span>TOTAL A PAGAR:</span>
-                        <span className="text-amber-800">{formatCurrency(completedSale.total)} MXN</span>
+                      <div className="flex justify-between text-neutral-800">
+                        <span>Subtotal:</span>
+                        <span className="font-semibold text-black">{formatCurrency(completedSale.total)}</span>
                       </div>
+
+                      {/* Total Destacado en Bloque Negro Sólido */}
+                      <div className="bg-black text-white p-2.5 rounded-lg flex justify-between items-center my-2">
+                        <span className="font-black text-xs tracking-wider uppercase">TOTAL A PAGAR:</span>
+                        <span className="font-black text-base tracking-wide">{formatCurrency(completedSale.total)} MXN</span>
+                      </div>
+
                       {completedSale.paymentMethod === "efectivo" && (
-                        <div className="space-y-1 pt-1">
-                          <div className="flex justify-between text-stone-600 text-[11px]">
+                        <div className="space-y-1 pt-0.5">
+                          <div className="flex justify-between text-neutral-800 text-[11px]">
                             <span>Efectivo recibido:</span>
-                            <span className="font-semibold">{formatCurrency(completedSale.cashGiven)}</span>
+                            <span className="font-semibold text-black">{formatCurrency(completedSale.cashGiven)}</span>
                           </div>
-                          <div className="flex justify-between text-emerald-800 font-black bg-emerald-100/80 p-2 rounded-xl border border-emerald-200 text-xs">
+                          <div className="flex justify-between items-center border-2 border-black p-2 rounded-lg font-black text-xs bg-white text-black">
                             <span>SU CAMBIO:</span>
-                            <span className="text-sm">{formatCurrency(completedSale.change)}</span>
+                            <span className="text-sm font-black">{formatCurrency(completedSale.change)}</span>
                           </div>
                         </div>
                       )}
                     </div>
 
-
-                    {/* Horarios de Pan Calientito (Llamativo y Letras Grandes) */}
-                    <div className="p-3.5 bg-gradient-to-br from-amber-100/90 to-orange-100/90 rounded-2xl text-center border-2 border-amber-400/90 space-y-1 font-sans shadow-xs">
-                      <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wide">
-                        <span className="text-base">🔥</span>
+                    {/* Horarios de Pan Calientito (B&N nítido) */}
+                    <div className="p-3 border-2 border-black rounded-xl text-center space-y-1 font-sans bg-white my-2">
+                      <div className="flex items-center justify-center gap-1 text-xs font-black text-black uppercase tracking-wider">
+                        <span>★</span>
                         <span>¡PAN CALIENTITO RECIÉN HORNEADO!</span>
+                        <span>★</span>
                       </div>
-                      <p className="text-xs sm:text-sm font-extrabold text-stone-800">
-                        🥐 Mañanas: <span className="text-amber-900 font-black underline decoration-amber-500">6:30 AM</span> &nbsp;•&nbsp; Tardes: <span className="text-amber-900 font-black underline decoration-amber-500">5:30 PM</span>
+                      <p className="text-xs sm:text-sm font-black text-black">
+                        🥐 De 6:00 AM a 10:00 PM 🥐
+                      </p>
+                      <p className="text-[9px] text-neutral-700 uppercase font-semibold">
+                        Horneado continuo todos los días
                       </p>
                     </div>
 
-                    {/* Pedidos Especiales y Agradecimiento (Grande, Claro y Muy Visible) */}
-                    <div className="text-center pt-2 space-y-2 font-sans border-t-2 border-dashed border-stone-300">
-                      <div className="space-y-0.5">
-                        <p className="text-xs sm:text-sm font-black text-stone-900 flex items-center justify-center gap-1">
+                    {/* Pedidos Especiales y Agradecimiento */}
+                    <div className="text-center pt-2 space-y-2.5 font-sans border-t-2 border-dashed border-black">
+                      <div className="space-y-2 border-2 border-black rounded-xl p-3.5 bg-neutral-50">
+                        <p className="text-sm sm:text-base font-black text-black uppercase tracking-wider flex items-center justify-center gap-1.5">
+                          <span>🎉</span>
+                          <span>¿TIENES FIESTA, REUNIÓN O EVENTO?</span>
                           <span>🎂</span>
-                          <span>¿Tienes fiesta o evento? Pedidos Especiales:</span>
                         </p>
-                        <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-100 text-emerald-900 font-black text-xs sm:text-sm rounded-xl border border-emerald-300 shadow-xs mt-1">
-                          <span>📲 WhatsApp:</span>
-                          <span className="tracking-wider">55 1234 5678</span>
+                        <p className="text-sm sm:text-[15px] font-extrabold text-black leading-snug px-1">
+                          ¡Endulzamos tus mejores momentos! Horneamos pedidos especiales para consentir a tus invitados con el auténtico sabor tradicional.
+                        </p>
+                        <div className="pt-1">
+                          <span className="inline-block px-3.5 py-2 bg-white text-black font-black text-xs sm:text-sm rounded-xl border-2 border-black uppercase tracking-wide shadow-2xs">
+                            ✨ PEDIDOS ESPECIALES CON 50% DE ANTICIPO EN MOSTRADOR ✨
+                          </span>
                         </div>
                       </div>
 
                       <div className="pt-1 space-y-0.5">
-                        <p className="font-black text-stone-950 text-sm sm:text-base tracking-wide">
-                          ¡GRACIAS POR SU PREFERENCIA! 🥐
+                        <p className="font-black text-black text-sm tracking-wide uppercase">
+                          ¡GRACIAS POR SU PREFERENCIA!
                         </p>
-                        <p className="text-[11px] font-bold text-stone-500">
+                        <p className="text-[10px] font-bold text-neutral-600">
                           Consérvese en un lugar fresco y seco • Panaderías Brito
+                        </p>
+                        <p className="text-[8px] text-neutral-500 uppercase tracking-widest pt-0.5">
+                          Comprobante simplificado de venta
                         </p>
                       </div>
                     </div>
                   </div>
-                </div>
-
                 {/* Barra de Impresión Directa en Segundo Plano */}
                 <div className="px-5 py-2.5 bg-amber-50/90 border-t border-amber-200/80 flex items-center justify-between text-xs">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1945,18 +2553,91 @@
                   </span>
                 </div>
 
-                <div className="p-4 bg-white border-t border-stone-200 flex gap-3">
+                <div className="p-4 bg-white border-t border-stone-200 space-y-2.5">
+                  {/* Fila principal: Imprimir y Siguiente Cliente */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setTicketPrinted(true);
+                        let directPrinted = false;
+                        try {
+                          const ctrl = new AbortController();
+                          const tId = setTimeout(() => ctrl.abort(), 1200);
+                          const res = await fetch("http://127.0.0.1:9191/print", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              folio: completedSale?.id ? completedSale.id.slice(-6).toUpperCase() : "000000",
+                              date: completedSale?.date,
+                              cashier: completedSale?.cashier || "Don Toño Brito",
+                              customerName: completedSale?.customerName || "Público en General",
+                              customerType: completedSale?.customerType,
+                              paymentMethod: completedSale?.paymentMethod,
+                              items: (completedSale?.items || []).map(it => ({
+                                name: it.product.name,
+                                quantity: it.quantity,
+                                price: it.product.price,
+                                subtotal: it.product.price * it.quantity
+                              })),
+                              total: completedSale?.total,
+                              cashGiven: completedSale?.cashGiven,
+                              change: completedSale?.change,
+                            }),
+                            signal: ctrl.signal
+                          });
+                          clearTimeout(tId);
+                          if (res.ok) {
+                            const js = await res.json();
+                            if (js && js.success) directPrinted = true;
+                          }
+                        } catch(e) {}
+
+                        if (!directPrinted) {
+                          window.print();
+                        }
+
+                        setTimeout(() => {
+                          setTicketPrinted(false);
+                          try { playCashRegisterSound(); } catch(e) {}
+                          resetSale();
+                        }, 1000);
+                      }}
+                      className={`flex items-center justify-center gap-2 py-3.5 px-3 font-bold rounded-2xl text-xs sm:text-sm shadow-md border transition-all active:scale-95 cursor-pointer ${
+                        ticketPrinted
+                          ? "bg-emerald-700 text-white border-emerald-600 animate-pulse"
+                          : "bg-gradient-to-r from-[#24130c] to-[#3a1d12] hover:from-[#1b0d08] hover:to-[#2e160e] text-amber-200 hover:text-amber-100 border-amber-900/40"
+                      }`}
+                    >
+                      <span className="text-base">{ticketPrinted ? "✓" : "🖨️"}</span>
+                      <span className="whitespace-nowrap font-bold">
+                        {ticketPrinted ? `✓ Imprimiendo en ${printerConfig.selectedPrinterName}...` : `Imprimir en ${printerConfig.selectedPrinterName}`}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playCashRegisterSound();
+                        resetSale();
+                      }}
+                      className="flex items-center justify-center gap-2 py-3.5 px-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-2xl text-xs sm:text-sm shadow-lg shadow-orange-500/25 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <span className="text-base">✓</span>
+                      <span className="whitespace-nowrap font-black">Siguiente Cliente</span>
+                    </button>
+                  </div>
+
+                  {/* Botón de Cancelar Ticket */}
                   <button
-                    onClick={() => window.print()}
-                    className="flex-1 py-3 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-2"
+                    type="button"
+                    onClick={handleCancelTicket}
+                    className="w-full py-2.5 px-3 bg-rose-50 hover:bg-rose-100/90 border-2 border-rose-200 hover:border-rose-300 text-rose-700 hover:text-rose-800 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer shadow-2xs"
+                    title="Cancelar compra y regresar panes al inventario"
                   >
-                    <span>🖨️</span> Re-Imprimir Ticket
-                  </button>
-                  <button
-                    onClick={resetSale}
-                    className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-2"
-                  >
-                    <span>✓</span> Siguiente Cliente
+                    <span className="text-sm font-bold text-rose-600">✕</span>
+                    <span>Cancelar Ticket (Anular compra y reponer panes)</span>
+>>>>>>> origin/main
                   </button>
                 </div>
               </div>
@@ -2055,97 +2736,809 @@
             </div>
           )}
 
-          {/* GASTOS MODAL (Simple 2-Field Free-Text) */}
-          {showExpenses && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="bg-amber-950 text-white p-4 px-6 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm block">💸 Salida de Efectivo / Gastos</span>
-                      <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
-                        👤 {cashierName}
-                      </span>
+          {/* MODAL ENTRADA DE PAN (CAMIONETAS & TALLER) */}
+          {showBreadDelivery && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-3 sm:p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-emerald-950 via-stone-900 to-emerald-950 text-white p-4 sm:p-5 px-5 sm:px-6 flex items-center justify-between border-b border-emerald-900/50 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center font-black text-xl shadow-md border border-emerald-300 shrink-0">
+                      🚐
                     </div>
-                    <span className="text-[10px] text-amber-300">Historial exclusivo del turno en operación</span>
+                    <div>
+                      <h3 className="font-black text-base sm:text-lg block leading-tight">Entrada de Pan a Mostrador</h3>
+                      <span className="text-[10px] text-emerald-200/80">Recepción de piezas surtidas por camionetas o taller</span>
+                    </div>
                   </div>
-                  <button onClick={() => setShowExpenses(false)} className="text-xl font-bold hover:text-white">✕</button>
+                  <button onClick={() => setShowBreadDelivery(false)} className="text-xl font-bold hover:text-white text-stone-400 p-1 cursor-pointer">✕</button>
                 </div>
 
-                <div className="p-5 overflow-y-auto space-y-4">
-                  {/* Summary bar */}
-                  <div className="grid grid-cols-3 bg-stone-50 border p-3 rounded-2xl text-center text-xs">
-                    <div>
-                      <span className="text-[10px] text-stone-500 font-bold block">Ventas Efectivo</span>
-                      <span className="font-black text-emerald-700 text-sm">{formatCurrency(totalCashSales)}</span>
+                {/* Formulario */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const form = e.target;
+                    const prodId = form.prodId.value;
+                    const qty = Number(form.quantity.value);
+                    const driver = form.driver.value.trim() || "Camioneta Matriz";
+                    if (!prodId || qty <= 0) return;
+
+                    setProducts((prev) => {
+                      const updated = prev.map((p) => p.id === prodId ? { ...p, stock: (p.stock || 0) + qty } : p);
+                      try {
+                        localStorage.setItem("brito_products_v2", JSON.stringify(updated));
+                      } catch(err) {}
+                      return updated;
+                    });
+
+                    const prodName = products.find((p) => p.id === prodId)?.name || "Pan";
+                    alert(`✅ ¡Entrada de Pan Exitosa!\nSe sumaron +${qty} piezas de "${prodName}" a la vitrina.\nEntregado por: ${driver}.`);
+                    setShowBreadDelivery(false);
+                  }}
+                  className="p-5 overflow-y-auto space-y-4 text-xs"
+                >
+                  <div>
+                    <label className="font-black text-stone-800 block mb-1">1. ¿De dónde o quién entrega el pan?</label>
+                    <input
+                      name="driver"
+                      type="text"
+                      defaultValue="Camioneta Matriz / Taller"
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border-2 border-stone-200 focus:border-emerald-500 rounded-xl font-bold text-stone-900 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-black text-stone-800 block mb-1">2. Selecciona el pan que llegó:</label>
+                    <select
+                      name="prodId"
+                      required
+                      className="w-full px-3.5 py-2.5 bg-stone-50 border-2 border-stone-200 focus:border-emerald-500 rounded-xl font-bold text-stone-900 focus:outline-none text-xs"
+                    >
+                      <option value="">-- Selecciona el producto --</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (Stock actual: {p.stock} piezas)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-black text-stone-800 block mb-1">3. ¿Cuántas piezas llegaron?</label>
+                    <input
+                      name="quantity"
+                      type="number"
+                      min="1"
+                      required
+                      placeholder="Ej. 50"
+                      className="w-full px-3.5 py-3 text-lg font-black bg-white border-2 border-stone-200 focus:border-emerald-500 rounded-xl text-stone-900 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-black rounded-xl text-sm shadow-md transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <span>✓</span>
+                      <span>Registrar Entrada y Sumar a Vitrina</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* DRAWER DESLIZABLE: PEDIDOS DE PAN CON MÍNIMO 50% DE ANTICIPO */}
+          {showBreadOrdersDrawer && (() => {
+            const orderTotal = orderItemsList.length > 0
+              ? orderItemsList.reduce((acc, it) => acc + it.subtotal, 0)
+              : (Number(orderCustomTotal) || 0);
+            const minDeposit = orderTotal > 0 ? Math.ceil(orderTotal * 0.5) : 0;
+            const numDeposit = Number(orderDepositInput) || 0;
+            const isDepositValid = orderTotal > 0 && numDeposit >= minDeposit;
+            const remainingBalance = Math.max(0, orderTotal - numDeposit);
+
+            const handleAddQuickBread = (prod) => {
+              setOrderItemsList((prev) => {
+                const ex = prev.find((it) => it.id === prod.id);
+                if (ex) {
+                  return prev.map((it) => it.id === prod.id ? { ...it, quantity: it.quantity + 5, subtotal: (it.quantity + 5) * it.price } : it);
+                }
+                return [...prev, { id: prod.id, name: prod.name, price: prod.price, quantity: 10, subtotal: 10 * prod.price }];
+              });
+            };
+
+            const handleUpdateQty = (id, delta) => {
+              setOrderItemsList((prev) =>
+                prev.map((it) => it.id === id ? { ...it, quantity: Math.max(1, it.quantity + delta), subtotal: Math.max(1, it.quantity + delta) * it.price } : it).filter((it) => it.quantity > 0)
+              );
+            };
+
+            const handleRemoveOrderItem = (id) => {
+              setOrderItemsList((prev) => prev.filter((it) => it.id !== id));
+            };
+
+            const handleSubmitOrder = (e) => {
+              e.preventDefault();
+              if (!orderCustomerName.trim() || !orderCustomerPhone.trim()) {
+                alert("Por favor completa el nombre y teléfono del cliente.");
+                return;
+              }
+              if (orderTotal <= 0) {
+                alert("Agrega panes al pedido o especifica el monto total acordado.");
+                return;
+              }
+              if (numDeposit < minDeposit) {
+                alert(`Regla obligatoria: Se requiere un anticipo mínimo del 50% (${formatCurrency(minDeposit)}) para confirmar y hornear su pedido sin detalles.`);
+                return;
+              }
+
+              const desc = orderItemsList.length > 0
+                ? orderItemsList.map((i) => `${i.quantity}x ${i.name}`).join(", ")
+                : orderCustomDesc.trim() || "Encargo especial de panadería";
+
+              const newOrd = {
+                id: `PED-${Math.floor(100 + Math.random() * 900)}`,
+                orderNumber: `PED-${Math.floor(100 + Math.random() * 900)}`,
+                customerName: orderCustomerName.trim(),
+                phone: orderCustomerPhone.trim(),
+                description: desc,
+                deliveryDate: orderDeliveryDate,
+                deliveryTime: orderDeliveryTime,
+                total: orderTotal,
+                deposit: numDeposit,
+                remainingBalance: remainingBalance,
+                paymentMethod: orderPaymentMethod,
+                notes: orderNotes.trim(),
+                status: "pendiente",
+                createdAt: new Date().toISOString(),
+              };
+
+              const updatedList = [newOrd, ...customOrders];
+              setCustomOrders(updatedList);
+              try {
+                localStorage.setItem("brito_custom_orders", JSON.stringify(updatedList));
+              } catch(err) {}
+
+              // Limpiar formulario
+              setOrderCustomerName("");
+              setOrderCustomerPhone("");
+              setOrderItemsList([]);
+              setOrderCustomDesc("");
+              setOrderCustomTotal("");
+              setOrderDepositInput("");
+              setOrderNotes("");
+              setOrderActiveTab("list");
+            };
+
+            const handleLiquidateOrder = (orderId) => {
+              const updated = customOrders.map((o) => {
+                if (o.id === orderId) {
+                  return { ...o, deposit: o.total, remainingBalance: 0, status: "entregado" };
+                }
+                return o;
+              });
+              setCustomOrders(updated);
+              try {
+                localStorage.setItem("brito_custom_orders", JSON.stringify(updated));
+              } catch(err) {}
+            };
+
+            const handleSendOrderWhatsApp = (ord) => {
+              const cleanPhone = ord.phone.replace(/\D/g, "");
+              const formattedPhone = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
+              const msg = `🥖 *PANADERÍA BRITO - PEDIDO DE PAN*\nHola *${ord.customerName}*,\n¡Tu pedido *${ord.orderNumber}* está programado en nuestro horno!\n📅 *Entrega:* ${ord.deliveryDate} a las ${ord.deliveryTime} hrs\n🥖 *Pan:* ${ord.description}\n💰 *Total:* ${formatCurrency(ord.total)}\n💵 *Anticipo Cubierto (50%+):* ${formatCurrency(ord.deposit)}\n⚠️ *Resta al entregar:* ${formatCurrency(ord.remainingBalance)}\n\n¡Muchas gracias por tu preferencia!`;
+              window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, "_blank");
+            };
+
+            const activeOrders = customOrders.filter((o) => o.status !== "entregado");
+
+            return (
+              <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+                <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col">
+                  
+                  {/* Header Café Panadería */}
+                  <div className="p-4 px-6 bg-[#3e2723] text-white flex items-center justify-between border-b-2 border-amber-600/40 shrink-0">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🥖</span>
+                      <div>
+                        <h3 className="font-black text-sm tracking-wide text-amber-50 flex items-center gap-2">
+                          <span>Pedidos & Encargos de Pan</span>
+                          <span className="text-[10px] bg-amber-500 text-stone-950 font-black px-2 py-0.5 rounded-full">
+                            Mínimo 50% Anticipo
+                          </span>
+                        </h3>
+                        <p className="text-[11px] text-amber-200/80">Don Antonio Brito & Hijos</p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] text-rose-700 font-bold block">Total Salidas</span>
-                      <span className="font-black text-rose-700 text-sm">-{formatCurrency(totalExpenses)}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-amber-900 font-black block">Efectivo en Caja</span>
-                      <span className="font-black text-stone-900 text-sm">{formatCurrency(cashInDrawer)}</span>
+                    <button
+                      onClick={() => setShowBreadOrdersDrawer(false)}
+                      className="p-1.5 hover:bg-white/10 rounded-xl text-amber-200 hover:text-white transition-colors text-lg cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Banner Informativo Política 50% */}
+                  <div className="bg-amber-500/15 border-b border-amber-500/30 p-3.5 px-6 flex items-start gap-2.5 text-amber-950 shrink-0">
+                    <span className="text-lg shrink-0">🛡️</span>
+                    <div className="text-xs leading-relaxed">
+                      <p className="font-black text-amber-900 uppercase text-[11px]">
+                        Regla Oficial para Encargos de Panadería
+                      </p>
+                      <p className="font-medium text-stone-800 text-[11px] mt-0.5">
+                        Para apartar producto y hornear <strong>sin detalles ni contratiempos</strong>, se requiere un <strong>anticipo mínimo del 50%</strong>. El 50% restante se liquida al entregar.
+                      </p>
                     </div>
                   </div>
 
-                  {/* Super Simple Form */}
+                  {/* Tabs */}
+                  <div className="flex border-b border-stone-200 bg-stone-100 p-2 gap-2 shrink-0">
+                    <button
+                      onClick={() => setOrderActiveTab("new")}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                        orderActiveTab === "new"
+                          ? "bg-[#3e2723] text-amber-50 shadow-md border border-amber-700/50"
+                          : "bg-white text-stone-600 border border-stone-200"
+                      }`}
+                    >
+                      + Nuevo Pedido de Pan
+                    </button>
+                    <button
+                      onClick={() => setOrderActiveTab("list")}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        orderActiveTab === "list"
+                          ? "bg-[#3e2723] text-amber-50 shadow-md border border-amber-700/50"
+                          : "bg-white text-stone-600 border border-stone-200"
+                      }`}
+                    >
+                      <span>Pedidos Activos</span>
+                      <span className="text-[10px] bg-amber-500 text-stone-950 px-1.5 py-0.5 rounded-full font-black">
+                        {activeOrders.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Drawer Content */}
+                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    {orderActiveTab === "new" ? (
+                      <form onSubmit={handleSubmitOrder} className="space-y-4">
+                        
+                        {/* Cliente */}
+                        <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-2.5">
+                          <p className="text-[11px] font-black text-stone-800 uppercase">👤 Datos del Cliente</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-stone-600 block mb-1">Nombre Completo *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Ej. Doña Carmen"
+                                value={orderCustomerName}
+                                onChange={(e) => setOrderCustomerName(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-stone-600 block mb-1">Teléfono / WhatsApp *</label>
+                              <input
+                                type="tel"
+                                required
+                                placeholder="Ej. 55 1234 5678"
+                                value={orderCustomerPhone}
+                                onChange={(e) => setOrderCustomerPhone(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Fecha y Hora de Entrega */}
+                        <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-2.5">
+                          <p className="text-[11px] font-black text-stone-800 uppercase">⏰ Fecha y Hora de Entrega</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-stone-600 block mb-1">Fecha de Entrega *</label>
+                              <input
+                                type="date"
+                                required
+                                value={orderDeliveryDate}
+                                onChange={(e) => setOrderDeliveryDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-stone-600 block mb-1">Hora Estimada *</label>
+                              <input
+                                type="time"
+                                required
+                                value={orderDeliveryTime}
+                                onChange={(e) => setOrderDeliveryTime(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Selección de Panes */}
+                        <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] font-black text-stone-800 uppercase">🥖 Selección de Pan</p>
+                            <span className="text-[10px] text-stone-500 font-bold">{orderItemsList.length} agregados</span>
+                          </div>
+
+                          {/* Chips de Panes Populares */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {products.slice(0, 8).map((prod) => (
+                              <button
+                                key={prod.id}
+                                type="button"
+                                onClick={() => handleAddQuickBread(prod)}
+                                className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-stone-800 rounded-xl border border-stone-200 text-xs font-bold transition-all active:scale-95 shadow-xs cursor-pointer"
+                              >
+                                <span>{prod.icon || "🥖"}</span> {prod.name} ({formatCurrency(prod.price)})
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Lista de Panes Agregados */}
+                          {orderItemsList.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-stone-200">
+                              {orderItemsList.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between bg-white p-2 px-3 rounded-xl border border-stone-200 text-xs">
+                                  <span className="font-bold text-stone-900 truncate max-w-[150px]">{item.name}</span>
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5">
+                                      <button type="button" onClick={() => handleUpdateQty(item.id, -5)} className="px-1.5 hover:bg-stone-200 rounded font-bold cursor-pointer">-</button>
+                                      <span className="font-black w-8 text-center">{item.quantity}</span>
+                                      <button type="button" onClick={() => handleUpdateQty(item.id, 5)} className="px-1.5 hover:bg-stone-200 rounded font-bold cursor-pointer">+</button>
+                                    </div>
+                                    <span className="font-black text-amber-900 w-14 text-right">{formatCurrency(item.subtotal)}</span>
+                                    <button type="button" onClick={() => handleRemoveOrderItem(item.id)} className="text-stone-400 hover:text-rose-600 font-bold cursor-pointer">✕</button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {orderItemsList.length === 0 && (
+                            <div className="space-y-2 pt-2 border-t border-stone-200">
+                              <label className="text-[10px] font-bold text-stone-600 block">O ingresa descripción y total acordado:</label>
+                              <input
+                                type="text"
+                                placeholder="Ej. 100 conchas surtidas y 40 mini cuernitos"
+                                value={orderCustomDesc}
+                                onChange={(e) => setOrderCustomDesc(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold text-stone-700">Total Acordado ($):</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  placeholder="Ej. 700"
+                                  value={orderCustomTotal}
+                                  onChange={(e) => setOrderCustomTotal(e.target.value)}
+                                  className="w-28 px-3 py-1.5 bg-white rounded-xl border border-stone-300 text-xs font-black text-right focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Tarjeta Café: 50% Anticipo y Liquidación */}
+                        <div className="bg-[#3e2723] text-white p-4 rounded-2xl shadow-lg space-y-3 border-2 border-amber-600/40">
+                          <div className="flex items-center justify-between pb-2 border-b border-amber-700/50">
+                            <div>
+                              <span className="text-[10px] font-black text-amber-200 uppercase block">Total del Pedido</span>
+                              <span className="text-xl font-black text-white">{formatCurrency(orderTotal)}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] font-extrabold text-amber-300 uppercase block">🛡️ Anticipo Mínimo (50%)</span>
+                              <span className="text-lg font-black text-amber-400">{formatCurrency(minDeposit)}</span>
+                            </div>
+                          </div>
+
+                          {/* Campo de Anticipo */}
+                          <div>
+                            <label className="text-xs font-black text-amber-100 block mb-1">
+                              Anticipo Abonado por el Cliente ($ MXN):
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              required
+                              placeholder={`Mínimo ${formatCurrency(minDeposit)}`}
+                              value={orderDepositInput}
+                              onChange={(e) => setOrderDepositInput(e.target.value)}
+                              className="w-full px-3 py-2.5 bg-white text-stone-900 rounded-xl text-base font-black focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            />
+                            
+                            {/* Botones de Atajo */}
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                type="button"
+                                onClick={() => setOrderDepositInput(minDeposit)}
+                                className="flex-1 py-1 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-lg text-[10px] font-black text-amber-200 transition-colors cursor-pointer"
+                              >
+                                50% ({formatCurrency(minDeposit)})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setOrderDepositInput(Math.round(orderTotal * 0.7))}
+                                className="flex-1 py-1 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-lg text-[10px] font-black text-amber-200 transition-colors cursor-pointer"
+                              >
+                                70% ({formatCurrency(orderTotal * 0.7)})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setOrderDepositInput(orderTotal)}
+                                className="flex-1 py-1 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-lg text-[10px] font-black text-amber-200 transition-colors cursor-pointer"
+                              >
+                                100% Total
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Mensaje de Validación del 50% */}
+                          {orderTotal > 0 && (
+                            <div className="pt-2 border-t border-amber-800/60">
+                              {!isDepositValid ? (
+                                <div className="p-2.5 bg-rose-500/25 border border-rose-400/60 rounded-xl text-xs font-bold text-rose-200 flex items-center gap-2">
+                                  <span>⚠️</span>
+                                  <span>Anticipo insuficiente: Faltan {formatCurrency(minDeposit - numDeposit)} para cumplir con el 50% mínimo.</span>
+                                </div>
+                              ) : (
+                                <div className="p-2.5 bg-emerald-500/25 border border-emerald-400/60 rounded-xl text-xs font-bold text-emerald-200 flex items-center gap-2">
+                                  <span>✓</span>
+                                  <span>Anticipo cubierto. Resta por liquidar al entregar: {formatCurrency(remainingBalance)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Forma de Pago */}
+                          <div className="pt-1 border-t border-amber-800/60">
+                            <label className="text-[10px] font-bold text-amber-200 block mb-1">Forma de pago del anticipo:</label>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {["efectivo", "tarjeta", "transferencia"].map((m) => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => setOrderPaymentMethod(m)}
+                                  className={`py-1.5 px-2 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
+                                    orderPaymentMethod === m
+                                      ? "bg-amber-500 text-stone-950 font-black shadow-sm"
+                                      : "bg-white/10 text-amber-100 hover:bg-white/20"
+                                  }`}
+                                >
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* Botón de Confirmación */}
+                        <button
+                          type="submit"
+                          disabled={!isDepositValid || !orderCustomerName.trim() || !orderCustomerPhone.trim()}
+                          className={`w-full py-3.5 rounded-xl text-xs font-black shadow-lg transition-all flex items-center justify-center gap-2 ${
+                            isDepositValid && orderCustomerName.trim() && orderCustomerPhone.trim()
+                              ? "bg-[#3e2723] hover:bg-black text-amber-50 border-2 border-amber-500 active:scale-98 shadow-amber-950/30 cursor-pointer"
+                              : "bg-stone-300 text-stone-500 border border-stone-400 cursor-not-allowed"
+                          }`}
+                        >
+                          <span>🥖</span>
+                          <span>
+                            {!isDepositValid
+                              ? `Mínimo 50% de Anticipo Requerido (${formatCurrency(minDeposit)})`
+                              : `Confirmar Pedido con Anticipo de ${formatCurrency(numDeposit)}`}
+                          </span>
+                        </button>
+
+                      </form>
+                    ) : (
+                      /* Lista de Pedidos Activos */
+                      <div className="space-y-3">
+                        {activeOrders.length === 0 ? (
+                          <div className="text-center py-10 bg-stone-50 rounded-2xl border border-dashed border-stone-300 space-y-2">
+                            <span className="text-3xl">🍞</span>
+                            <p className="font-bold text-xs text-stone-700">No hay pedidos pendientes</p>
+                            <button
+                              type="button"
+                              onClick={() => setOrderActiveTab("new")}
+                              className="px-3 py-1.5 bg-[#3e2723] text-amber-100 rounded-lg text-xs font-bold cursor-pointer"
+                            >
+                              Tomar Nuevo Pedido
+                            </button>
+                          </div>
+                        ) : (
+                          activeOrders.map((ord) => (
+                            <div key={ord.id} className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-xs space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono text-xs font-black text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                                  {ord.orderNumber || ord.id}
+                                </span>
+                                <span className="text-xs font-black text-stone-900">{formatCurrency(ord.total)}</span>
+                              </div>
+                              <div>
+                                <p className="font-extrabold text-xs text-stone-900">{ord.customerName}</p>
+                                <p className="text-[11px] text-stone-500">Tel: {ord.phone} • Entrega: {ord.deliveryDate} ({ord.deliveryTime})</p>
+                              </div>
+                              <div className="bg-stone-50 p-2 rounded-lg text-[11px] text-stone-700 font-medium">
+                                {ord.description}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-stone-100">
+                                <div className="bg-emerald-50 p-1.5 rounded-lg border border-emerald-200">
+                                  <span className="text-[10px] font-bold text-emerald-700 block">Anticipo (50%+):</span>
+                                  <span className="font-black text-emerald-900">{formatCurrency(ord.deposit)}</span>
+                                </div>
+                                <div className="bg-rose-50 p-1.5 rounded-lg border border-rose-200">
+                                  <span className="text-[10px] font-bold text-rose-700 block">Resta al Entregar:</span>
+                                  <span className="font-black text-rose-900">{formatCurrency(ord.remainingBalance)}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between pt-1 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendOrderWhatsApp(ord)}
+                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                  📲 WhatsApp
+                                </button>
+                                {ord.remainingBalance > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLiquidateOrder(ord.id)}
+                                    className="px-3 py-1.5 bg-[#3e2723] hover:bg-black text-amber-50 rounded-lg text-xs font-black flex items-center gap-1 cursor-pointer"
+                                  >
+                                    💰 Cobrar {formatCurrency(ord.remainingBalance)} y Entregar
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg">
+                                    ✓ Entregado
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* MODAL MOVIMIENTOS DE CAJA ($) (Salidas/Gastos/Retiros y Entradas/Cambio) */}
+          {showExpenses && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-3 sm:p-4">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200">
+                
+                {/* Header */}
+                <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-4 sm:p-5 px-5 sm:px-6 flex items-center justify-between border-b border-amber-900/50 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black text-xl shadow-md border border-amber-300 shrink-0">
+                      $
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-base sm:text-lg block leading-tight">Movimientos de Caja</span>
+                        <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                          👤 {cashierName}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-amber-200/80">Retiros de dueños, gastos y cambio de billetes</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowExpenses(false)} className="text-xl font-bold hover:text-white text-stone-400 p-1">✕</button>
+                </div>
+
+                <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+                  {/* Summary bar de 4 columnas */}
+                  <div className="grid grid-cols-4 bg-stone-50 border p-2.5 sm:p-3 rounded-2xl text-center text-xs gap-1">
+                    <div>
+                      <span className="text-[9px] text-stone-500 font-bold block leading-tight">Ventas Efectivo</span>
+                      <span className="font-black text-emerald-700 text-xs sm:text-sm">{formatCurrency(totalCashSales)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-emerald-700 font-bold block leading-tight">Entradas/Cambio</span>
+                      <span className="font-black text-emerald-700 text-xs sm:text-sm">+{formatCurrency(totalIncomesInCash)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-rose-700 font-bold block leading-tight">Gastos/Retiros</span>
+                      <span className="font-black text-rose-700 text-xs sm:text-sm">-{formatCurrency(totalExpenses)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-amber-900 font-black block leading-tight">En Cajón Ahora</span>
+                      <span className="font-black text-stone-900 text-xs sm:text-sm">{formatCurrency(cashInDrawer)}</span>
+                    </div>
+                  </div>
+
+                  {/* Switch Salida (-) vs Entrada (+) */}
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-stone-100 rounded-2xl border border-stone-200 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setMovementModalType("salida")}
+                      className={`py-2.5 px-2 rounded-xl font-black transition-all flex items-center justify-center gap-1.5 ${
+                        movementModalType === "salida"
+                          ? "bg-rose-600 text-white shadow-md"
+                          : "text-stone-600 hover:bg-stone-200/60"
+                      }`}
+                    >
+                      <span>Salida: Gasto o Retiro (-)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMovementModalType("entrada")}
+                      className={`py-2.5 px-2 rounded-xl font-black transition-all flex items-center justify-center gap-1.5 ${
+                        movementModalType === "entrada"
+                          ? "bg-emerald-600 text-white shadow-md"
+                          : "text-stone-600 hover:bg-stone-200/60"
+                      }`}
+                    >
+                      <span>Entrada: Cambio / Abono (+)</span>
+                    </button>
+                  </div>
+
+                  {/* Formulario de registro */}
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       const form = e.target;
                       const amt = Number(form.amount.value);
                       const desc = form.desc.value;
-                      if (!amt || !desc) return;
+                      if (!amt || !desc.trim()) return;
 
-                      setExpensesList((prev) => [
-                        {
+                      const nowStr = new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+
+                      if (movementModalType === "salida") {
+                        const newExp = {
                           id: `EXP-${Math.floor(1000 + Math.random() * 9000)}`,
                           amount: amt,
-                          category: "otro",
+                          category: desc.toLowerCase().includes("dueño") || desc.toLowerCase().includes("toño") ? "retiro_dueno" : "otro",
                           description: desc.trim(),
                           cashier: cashierName,
-                          date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })
-                        },
-                        ...prev
-                      ]);
+                          date: nowStr
+                        };
+                        setExpensesList((prev) => [newExp, ...prev]);
+                      } else {
+                        const newInc = {
+                          id: `ING-${Math.floor(1000 + Math.random() * 9000)}`,
+                          amount: amt,
+                          category: desc.toLowerCase().includes("cambio") ? "fondo_cambio" : "otro",
+                          concept: desc.trim(),
+                          paymentMethod: "efectivo",
+                          cashier: cashierName,
+                          date: nowStr
+                        };
+                        setIncomesList((prev) => [newInc, ...prev]);
+                      }
                       form.reset();
                     }}
                     className="p-4 bg-stone-50 rounded-2xl border space-y-3.5 text-xs"
                   >
                     <div>
-                      <label className="font-black text-stone-900 block mb-1">1. ¿Cuánto dinero se sacó de caja?</label>
-                      <input name="amount" type="number" step="any" required placeholder="$ Monto en pesos (ej. 150, 300, 500)" className="w-full p-3 text-base font-black text-stone-900 bg-white border-2 border-stone-200 rounded-xl focus:border-rose-500 focus:outline-none" />
+                      <label className="font-black text-stone-900 block mb-1">
+                        {movementModalType === "salida" ? "1. ¿Cuánto dinero salió de caja?" : "1. ¿Cuánto dinero ingresó a caja?"}
+                      </label>
+                      <div className="relative">
+                        <span className={`absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-xl ${
+                          movementModalType === "salida" ? "text-rose-600" : "text-emerald-600"
+                        }`}>
+                          $
+                        </span>
+                        <input
+                          id="idx_mov_amt"
+                          name="amount"
+                          type="number"
+                          step="any"
+                          required
+                          placeholder="0.00"
+                          className="w-full pl-9 pr-3 py-3 text-xl font-black text-stone-900 bg-white border-2 border-stone-200 rounded-xl focus:border-amber-500 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Botones de monto rápido */}
+                      <div className="grid grid-cols-6 gap-1 pt-1.5">
+                        {[50, 100, 200, 300, 500, 1000].map((quickAmt) => (
+                          <button
+                            key={quickAmt}
+                            type="button"
+                            onClick={() => {
+                              const el = document.getElementById("idx_mov_amt");
+                              if (el) el.value = quickAmt;
+                            }}
+                            className="py-1 bg-white hover:bg-stone-800 hover:text-white text-stone-800 font-extrabold text-[10px] rounded-lg border border-stone-200 transition-colors"
+                          >
+                            ${quickAmt}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="font-black text-stone-900 block mb-1">2. ¿Para qué se usó el dinero?</label>
-                      <textarea name="desc" rows="3" required placeholder="" className="w-full p-3 text-xs bg-white border-2 border-stone-200 rounded-xl focus:border-rose-500 focus:outline-none font-medium leading-relaxed" />
+                    <div className="space-y-1">
+                      <label className="font-black text-stone-900 block">2. Motivo o detalle del movimiento:</label>
+                      <textarea
+                        id="idx_mov_desc"
+                        name="desc"
+                        rows="2"
+                        required
+                        placeholder={
+                          movementModalType === "salida"
+                            ? "Ej. Pago de gas LP para hornos, bolsas para panadería, retiro de Don Toño..."
+                            : "Ej. Dejaron $200 en monedas para cambio en caja, abono de cliente..."
+                        }
+                        className="w-full p-2.5 text-xs bg-white border-2 border-stone-200 rounded-xl focus:border-amber-500 focus:outline-none font-medium leading-relaxed"
+                      />
                     </div>
 
-                    <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-black rounded-xl text-xs shadow-lg shadow-rose-600/30 active:scale-95">
-                      💸 Registrar Salida de Dinero
+                    <button
+                      type="submit"
+                      className={`w-full py-3.5 text-white font-black rounded-xl text-xs shadow-lg active:scale-95 transition-all cursor-pointer ${
+                        movementModalType === "salida"
+                          ? "bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-rose-600/30"
+                          : "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-emerald-600/30"
+                      }`}
+                    >
+                      {movementModalType === "salida" ? "💸 Registrar Salida de Efectivo" : "🪙 Registrar Entrada a Caja"}
                     </button>
                   </form>
 
-                  {/* List */}
-                  <div className="space-y-2 pt-2">
-                    <span className="text-xs font-bold text-stone-600 block">Historial de Salidas del Turno ({currentShiftExpenses.length}):</span>
-                    {currentShiftExpenses.length === 0 ? (
+                  {/* Historial Combinado del Turno */}
+                  <div className="space-y-2 pt-1">
+                    <span className="text-xs font-bold text-stone-700 block">
+                      Historial de Movimientos del Turno ({currentShiftExpenses.length + currentShiftIncomes.length}):
+                    </span>
+                    {currentShiftExpenses.length === 0 && currentShiftIncomes.length === 0 ? (
                       <div className="text-stone-400 text-center py-4 text-xs space-y-1">
-                        <p className="font-bold text-stone-600">No hay salidas registradas en el turno de {cashierName}.</p>
+                        <p className="font-bold text-stone-600">No hay movimientos registrados en el turno de {cashierName}.</p>
                         <p className="text-[10px]">Todo el dinero permanece íntegro en caja.</p>
                       </div>
                     ) : (
-                      currentShiftExpenses.map((exp) => (
-                        <div key={exp.id} className="p-3 bg-stone-50 rounded-xl border flex justify-between items-center text-xs">
-                          <div>
-                            <p className="font-bold text-stone-800">{exp.description}</p>
-                            <p className="text-[10px] text-stone-400">{exp.date} • <span className="text-amber-900 font-bold">{exp.cashier}</span></p>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {/* Entradas */}
+                        {currentShiftIncomes.map((inc) => (
+                          <div key={inc.id} className="p-2.5 bg-emerald-50/70 rounded-xl border border-emerald-200 flex justify-between items-center text-xs">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] bg-emerald-600 text-white font-black px-1.5 py-0.5 rounded">ENTRADA / CAMBIO</span>
+                                <p className="font-bold text-stone-900">{inc.concept || "Entrada de dinero"}</p>
+                              </div>
+                              <p className="text-[10px] text-stone-500 mt-0.5">{inc.date} • {inc.cashier}</p>
+                            </div>
+                            <span className="font-black text-emerald-700 text-sm">+{formatCurrency(inc.amount)}</span>
                           </div>
-                          <span className="font-black text-rose-600 text-sm">-{formatCurrency(exp.amount)}</span>
-                        </div>
-                      ))
+                        ))}
+
+                        {/* Salidas */}
+                        {currentShiftExpenses.map((exp) => {
+                          const isOwner = exp.category === "retiro_dueno" || (exp.description || "").toLowerCase().includes("dueño") || (exp.description || "").toLowerCase().includes("toño");
+                          return (
+                            <div key={exp.id} className="p-2.5 bg-stone-50 rounded-xl border flex justify-between items-center text-xs">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                                    isOwner ? "bg-amber-500 text-stone-950" : "bg-rose-600 text-white"
+                                  }`}>
+                                    {isOwner ? "RETIRO DUEÑO" : "SALIDA / GASTO"}
+                                  </span>
+                                  <p className="font-bold text-stone-800">{exp.description}</p>
+                                </div>
+                                <p className="text-[10px] text-stone-400 mt-0.5">{exp.date} • {exp.cashier}</p>
+                              </div>
+                              <span className="font-black text-rose-600 text-sm">-{formatCurrency(exp.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2167,11 +3560,6 @@
                       <div>
                         <span className="font-black text-lg sm:text-2xl leading-tight block text-white tracking-wide">
                           {drawerModalView === "cut" ? "Cierre de Turno & Entrega de Caja" : "Historial de Tickets de Corte"}
-                        </span>
-                        <span className="text-xs sm:text-sm text-amber-300 font-bold mt-0.5 block">
-                          {drawerModalView === "cut"
-                            ? "Arqueo digital sin detalles y entrega conforme al relevo"
-                            : "Consulta comprobantes anteriores para cualquier duda o aclaración"}
                         </span>
                       </div>
                     </div>
@@ -2367,7 +3755,8 @@
                           </div>
                         </div>
 
-                        <div className="max-w-md mx-auto pt-1">
+                        {/* Botón Principal Gigante de Conclusión de Turno e Información Clara */}
+                        <div className="max-w-xl mx-auto pt-2 pb-2">
                           <button
                             type="button"
                             onClick={() => {
@@ -2378,10 +3767,31 @@
                                 localStorage.setItem("brito_pos_shift_locked", "true");
                               } catch(e) {}
                             }}
-                            className="w-full py-4.5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white font-black rounded-2xl text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-xl shadow-orange-950/20 active:scale-95 transition-all animate-pulse"
+                            className="w-full py-5 sm:py-6 px-6 sm:px-8 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:via-orange-500 hover:to-amber-600 text-white font-black rounded-3xl shadow-2xl shadow-orange-950/30 border-2 border-amber-300/60 ring-4 ring-orange-500/25 hover:ring-orange-500/40 active:scale-[0.98] transition-all cursor-pointer group text-left sm:text-center"
                           >
-                            <span>🔒</span>
-                            <span>Finalizar y Bloquear Punto de Venta</span>
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform text-2xl">
+                                🔒
+                              </div>
+
+                              <div className="flex-1 text-center">
+                                <div className="flex items-center justify-center gap-2 mb-1.5">
+                                  <span className="bg-emerald-400 text-emerald-950 text-xs sm:text-sm font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
+                                    ✓ Turno Cerrado Sin Problemas
+                                  </span>
+                                </div>
+                                <h4 className="text-lg sm:text-2xl font-black tracking-wide leading-tight drop-shadow-xs">
+                                  Finalizar y Bloquear Punto de Venta
+                                </h4>
+                                <p className="text-xs sm:text-sm text-amber-100 font-bold mt-1.5 opacity-95">
+                                  Caja cuadrada correctamente • Toca aquí para salir y entregar turno
+                                </p>
+                              </div>
+
+                              <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform text-lg">
+                                ➔
+                              </div>
+                            </div>
                           </button>
                         </div>
                       </div>
@@ -2526,8 +3936,15 @@
                         <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/70 rounded-3xl border-2 border-amber-300 shadow-sm space-y-3.5">
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2 border-b border-amber-200/70">
                             <div>
-                              <span className="text-sm sm:text-base font-black text-stone-900 uppercase flex items-center gap-2">
+                              <span className="text-sm sm:text-base font-black text-stone-900 uppercase flex items-center gap-2 flex-wrap">
                                 <span className="text-xl">🪙</span> ¿Cuánto dinero se dejará en caja para el siguiente turno?
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                  nextInitialFundInput.trim() === ""
+                                    ? "bg-rose-100 text-rose-700 border border-rose-300 animate-pulse"
+                                    : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                }`}>
+                                  {nextInitialFundInput.trim() === "" ? "* Escribe un número obligatorio" : "✓ Listo"}
+                                </span>
                               </span>
                               <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
                                 Fondo inicial con el que <strong className="text-stone-800">{nextCashier}</strong> comenzará nuevamente a operar
@@ -2536,23 +3953,34 @@
                             <div className="text-right shrink-0 bg-amber-100/90 px-3.5 py-1.5 rounded-2xl border border-amber-300 shadow-2xs">
                               <span className="text-[10px] font-black uppercase text-amber-800 block">Fondo Siguiente Turno</span>
                               <span className="text-xl sm:text-2xl font-black text-amber-950">
-                                {formatCurrency(nextInitialFundInput === "" ? 500 : Math.max(0, Number(nextInitialFundInput) || 0))}
+                                {formatCurrency(nextInitialFundInput === "" ? 0 : Math.max(0, Number(nextInitialFundInput) || 0))}
                               </span>
                             </div>
                           </div>
 
                           {/* Input Manual de Fondo Siguiente */}
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
-                            <input
-                              type="number"
-                              step="any"
-                              min="0"
-                              placeholder="Monto de dinero que se quedará en caja para el nuevo turno"
-                              value={nextInitialFundInput}
-                              onChange={(e) => setNextInitialFundInput(e.target.value)}
-                              className="w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
-                            />
+                          <div className="space-y-1.5">
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                placeholder="0.00 (Escribe obligatoriamente el monto para el nuevo turno)"
+                                value={nextInitialFundInput}
+                                onChange={(e) => setNextInitialFundInput(e.target.value)}
+                                className={`w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400 ${
+                                  nextInitialFundInput.trim() === ""
+                                    ? "border-amber-400 focus:border-amber-600 ring-2 ring-amber-400/20"
+                                    : "border-stone-300 focus:border-amber-600"
+                                }`}
+                              />
+                            </div>
+                            {nextInitialFundInput.trim() === "" && (
+                              <div className="text-xs px-1 text-rose-600 font-bold">
+                                ⚠️ Campo obligatorio para poder cerrar turno
+                              </div>
+                            )}
                           </div>
 
                           {/* Resumen de Entrega */}
@@ -2566,13 +3994,13 @@
                             <div className="bg-amber-50 p-2.5 sm:p-3 rounded-2xl border border-amber-300 text-center shadow-2xs">
                               <span className="text-[10px] text-amber-900 font-black uppercase block">🪙 Se queda en Caja (Fondo)</span>
                               <span className="text-base sm:text-lg font-black text-amber-950 block mt-0.5">
-                                {formatCurrency(nextInitialFundInput === "" ? 500 : Math.max(0, Number(nextInitialFundInput) || 0))}
+                                {formatCurrency(nextInitialFundInput === "" ? 0 : Math.max(0, Number(nextInitialFundInput) || 0))}
                               </span>
                             </div>
                             <div className="bg-emerald-50 p-2.5 sm:p-3 rounded-2xl border border-emerald-300 text-center shadow-2xs">
                               <span className="text-[10px] text-emerald-800 font-black uppercase block">💰 Efectivo a Retirar / Entregar</span>
                               <span className="text-base sm:text-lg font-black text-emerald-950 block mt-0.5">
-                                {formatCurrency(Math.max(0, (countedCashInput === "" ? cashInDrawer : Number(countedCashInput) || 0) - (nextInitialFundInput === "" ? 500 : Math.max(0, Number(nextInitialFundInput) || 0))))}
+                                {formatCurrency(Math.max(0, (countedCashInput === "" ? cashInDrawer : Number(countedCashInput) || 0) - (nextInitialFundInput === "" ? 0 : Math.max(0, Number(nextInitialFundInput) || 0))))}
                               </span>
                             </div>
                           </div>
@@ -2592,17 +4020,17 @@
                               className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg accent-emerald-600 cursor-pointer shrink-0 transition-transform active:scale-90"
                             />
                             <span className="text-sm sm:text-base font-black text-stone-900 leading-snug">
-                              Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: conté el dinero ({countedCashInput ? formatCurrency(Number(countedCashInput)) : "$0.00"}), se dejan <strong className="text-amber-950">{formatCurrency(nextInitialFundInput === "" ? 500 : Math.max(0, Number(nextInitialFundInput) || 0))}</strong> de fondo en caja para comenzar con {nextCashier}, y se entregan <strong className="text-emerald-900">{formatCurrency(Math.max(0, (countedCashInput === "" ? cashInDrawer : Number(countedCashInput) || 0) - (nextInitialFundInput === "" ? 500 : Math.max(0, Number(nextInitialFundInput) || 0))))}</strong> a administración.
+                              Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: conté el dinero ({countedCashInput ? formatCurrency(Number(countedCashInput)) : "$0.00"}), se dejan <strong className="text-amber-950">{nextInitialFundInput.trim() !== "" ? formatCurrency(Math.max(0, Number(nextInitialFundInput) || 0)) : "$0.00 (pendiente)"}</strong> de fondo en caja para comenzar con {nextCashier}, y se entregan <strong className="text-emerald-900">{formatCurrency(Math.max(0, (countedCashInput === "" ? cashInDrawer : Number(countedCashInput) || 0) - (nextInitialFundInput === "" ? 0 : Math.max(0, Number(nextInitialFundInput) || 0))))}</strong> a administración.
                             </span>
                           </label>
 
                           <button
                             type="button"
-                            disabled={!countedCashInput || !hasAcceptedShift}
+                            disabled={!countedCashInput || !hasAcceptedShift || nextInitialFundInput.trim() === ""}
                             onClick={() => {
                               const newFolio = `CORTE-${Date.now().toString().slice(-6)}`;
                               const parsedCnt = Number(countedCashInput);
-                              const parsedNxt = nextInitialFundInput === "" ? 500 : Math.max(0, Number(nextInitialFundInput) || 0);
+                              const parsedNxt = Math.max(0, Number(nextInitialFundInput) || 0);
 
                               const cutData = {
                                 id: newFolio,
@@ -2951,19 +4379,132 @@
                   <span className="text-xs font-bold text-stone-500">
                     Panaderías Brito • Sucursal Matriz
                   </span>
+                  {!showCutSuccessModal && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDrawerModal(false)}
+                      className="px-6 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-xl text-xs sm:text-sm transition-colors cursor-pointer"
+                    >
+                      Cerrar Ventana
+                    </button>
+                  )}
+          {/* MODAL CONFIGURACIÓN DE IMPRESORA DIRECTA */}
+          {showPrinterModal && (
+            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col max-h-[92vh] border-2 border-stone-200">
+                <div className="bg-neutral-900 text-white p-4 sm:p-5 flex items-center justify-between border-b border-neutral-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-xl">
+                      🖨️
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-black text-base sm:text-lg text-white leading-tight">
+                          Impresora de Tickets
+                        </h3>
+                        <span className="flex items-center gap-1 bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-2 py-0.5 rounded-full">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          Conectada
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-400">
+                        Selecciona la impresora directa para comprobantes de venta
+                      </p>
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (showCutSuccessModal) {
-                        setShowCutSuccessModal(false);
-                        setIsShiftLocked(true);
-                        try { localStorage.setItem("brito_pos_shift_locked", "true"); } catch(e) {}
-                      }
-                      setShowDrawerModal(false);
-                    }}
-                    className="px-6 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-xl text-xs sm:text-sm transition-colors"
+                    onClick={() => setShowPrinterModal(false)}
+                    className="text-neutral-400 hover:text-white p-1 rounded-lg text-lg cursor-pointer"
                   >
-                    Cerrar Ventana
+                    ✕
+                  </button>
+                </div>
+
+                <div className="p-4 sm:p-6 space-y-4 overflow-y-auto">
+                  {/* Tarjeta de Estado Activo */}
+                  <div className="bg-amber-50/80 border-2 border-amber-300 rounded-2xl p-3.5 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-black uppercase text-amber-900 font-bold">Impresora Seleccionada</span>
+                      <span className="text-[10px] font-black px-2 py-0.5 bg-stone-900 text-amber-300 rounded">
+                        {printerConfig.paperWidth}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-base font-black text-stone-900">{printerConfig.selectedPrinterName}</p>
+                        <p className="text-xs text-stone-600">Puerto: {printerConfig.port} • Modo Directo</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTestPrintSuccess(true);
+                          window.print();
+                          setTimeout(() => setTestPrintSuccess(false), 2000);
+                        }}
+                        className="px-3 py-2 bg-white hover:bg-amber-100 text-stone-900 font-bold text-xs rounded-xl border border-amber-300 shadow-xs cursor-pointer"
+                      >
+                        {testPrintSuccess ? "✔ Enviado" : "🖨️ Probar Impresión"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Lista de Impresoras Disponibles */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase text-stone-700 block">
+                      Elegir Impresora Directa:
+                    </label>
+                    {[
+                      { name: "POS-58", port: "USB002", desc: "Impresora Térmica 58mm Principal (Recomendada)", paper: "58mm" },
+                      { name: "POS-58(copy of 1)", port: "USB002", desc: "Copia Secundaria Térmica 58mm (Respaldo)", paper: "58mm" },
+                      { name: "Impresora Térmica 80mm", port: "USB001 / Red", desc: "Impresora Térmica Ancha (80mm)", paper: "80mm" },
+                      { name: "Microsoft Print to PDF", port: "PORTPROMPT:", desc: "Guardar Comprobante en Archivo PDF", paper: "80mm" },
+                    ].map((p) => {
+                      const isSel = printerConfig.selectedPrinterName === p.name;
+                      return (
+                        <div
+                          key={p.name}
+                          onClick={() => {
+                            const updated = {
+                              ...printerConfig,
+                              selectedPrinterName: p.name,
+                              port: p.port,
+                              paperWidth: p.paper
+                            };
+                            handleSavePrinter(updated);
+                          }}
+                          className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-between cursor-pointer ${
+                            isSel ? "border-amber-600 bg-amber-50/70 shadow-sm" : "border-stone-200 hover:border-stone-300 bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center text-xs ${
+                              isSel ? "border-amber-600 bg-amber-600 text-white" : "border-stone-400"
+                            }`}>
+                              {isSel ? "✓" : ""}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-xs sm:text-sm text-stone-900">{p.name}</span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-stone-100 text-stone-700">{p.port}</span>
+                              </div>
+                              <p className="text-[11px] text-stone-500">{p.desc}</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-stone-100 text-stone-800">{p.paper}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white border-t border-stone-200 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrinterModal(false)}
+                    className="px-6 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black text-xs rounded-xl shadow-md cursor-pointer"
+                  >
+                    Aceptar
                   </button>
                 </div>
               </div>

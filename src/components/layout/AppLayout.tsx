@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { SidebarProvider } from "@/context/SidebarContext";
@@ -14,7 +15,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isLoading, canAccessRoute, getDefaultRouteForUser } = useAuth();
 
-  if (isLoading) {
+  useEffect(() => {
+    if (isLoading || !user) return;
+
+    try {
+      const sessionActive = sessionStorage.getItem("brito_session_active");
+      if (!sessionActive) {
+        // Al inicio en el sistema: marcar sesión como activa y empezar siempre en el Dashboard (/)
+        sessionStorage.setItem("brito_session_active", "true");
+        if (pathname !== "/") {
+          router.replace("/");
+        }
+      }
+    } catch (e) {
+      console.error("Error accessing sessionStorage:", e);
+    }
+  }, [user, isLoading, pathname, router]);
+
+  const isPendingInitialRedirect =
+    typeof window !== "undefined" &&
+    !sessionStorage.getItem("brito_session_active") &&
+    pathname !== "/";
+
+  if (isLoading || (user && isPendingInitialRedirect)) {
     return (
       <div className="min-h-screen bg-[#0c0d12] flex flex-col items-center justify-center text-white space-y-3">
         <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
@@ -103,7 +126,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     onClick={() => router.push(getDefaultRouteForUser ? getDefaultRouteForUser(user) : "/")}
                     className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-stone-950 font-black px-6 py-3 rounded-2xl shadow-lg shadow-amber-500/20 text-xs transition-all active:scale-95"
                   >
-                    <ArrowLeft className="w-4 h-4" /> Regresar a Mi Módulo Principal
+                    <ArrowLeft className="w-4 h-4" /> Regresar al Dashboard Principal
                   </button>
                 </div>
               </div>

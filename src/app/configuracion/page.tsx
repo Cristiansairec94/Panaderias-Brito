@@ -30,13 +30,17 @@ import {
   ExternalLink,
   Wallet,
   AlertCircle,
-  UserCheck
+  UserCheck,
+  Wifi,
+  Laptop
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, cleanOnlyNumbers } from "@/lib/utils";
 import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { UserRole, Branch } from "@/types";
-import UserRoleManagement from "@/components/configuracion/UserRoleManagement";
+import RoleManagement from "@/components/configuracion/RoleManagement";
+import EmployeeManagement from "@/components/configuracion/EmployeeManagement";
+import OfflineManagement from "@/components/configuracion/OfflineManagement";
 
 function ConfiguracionContent() {
   const router = useRouter();
@@ -45,8 +49,8 @@ function ConfiguracionContent() {
   const { usersList, addUser } = useAuth();
   const { branches, addBranch, updateBranch, deleteBranch, switchBranch } = useBranch();
 
-  const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "usuarios" | "ticket" | "operaciones" | "database">(
-    (tabQuery as any) || "usuarios"
+  const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "roles" | "empleados" | "ticket" | "operaciones" | "offline" | "database">(
+    tabQuery === "usuarios" ? "roles" : (tabQuery as any) || "roles"
   );
 
   const [savedAlert, setSavedAlert] = useState(false);
@@ -77,7 +81,9 @@ function ConfiguracionContent() {
 
   // Sync tab with URL query parameter changes
   useEffect(() => {
-    if (tabQuery && ["general", "sucursales", "usuarios", "ticket", "operaciones", "database"].includes(tabQuery)) {
+    if (tabQuery === "usuarios") {
+      setActiveTab("roles");
+    } else if (tabQuery && ["general", "sucursales", "roles", "empleados", "ticket", "operaciones", "offline", "database"].includes(tabQuery)) {
       setActiveTab(tabQuery as any);
     }
   }, [tabQuery]);
@@ -249,15 +255,27 @@ function ConfiguracionContent() {
       {/* Settings Navigation Tabs */}
       <div className="flex gap-2 border-b border-stone-200 pb-2 text-xs font-bold overflow-x-auto">
         <button
-          onClick={() => handleTabChange("usuarios")}
+          onClick={() => handleTabChange("roles")}
           className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === "usuarios" ? "bg-stone-900 text-white shadow-sm ring-2 ring-amber-400/50" : "bg-white text-stone-600 hover:bg-stone-100"
+            activeTab === "roles" ? "bg-stone-900 text-white shadow-sm ring-2 ring-amber-400/50" : "bg-white text-stone-600 hover:bg-stone-100"
           }`}
         >
-          <Users className="w-4 h-4 text-blue-500" />
-          <span>Usuarios & Empleados</span>
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
+          <span>Roles</span>
           <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 font-black text-[9px] rounded-full uppercase shadow-xs">
-            Roles & Accesos
+            Roles en Sistema
+          </span>
+        </button>
+        <button
+          onClick={() => handleTabChange("empleados")}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === "empleados" ? "bg-stone-900 text-white shadow-sm ring-2 ring-blue-400/50" : "bg-white text-stone-600 hover:bg-stone-100"
+          }`}
+        >
+          <Users className="w-4 h-4 text-blue-400" />
+          <span>Empleados</span>
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-900 font-black text-[9px] rounded-full uppercase shadow-xs">
+            Personal
           </span>
         </button>
         <button
@@ -295,6 +313,20 @@ function ConfiguracionContent() {
         >
           <Sliders className="w-4 h-4 text-purple-500" />
           <span>Parámetros de Caja</span>
+        </button>
+        <button
+          onClick={() => handleTabChange("offline")}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === "offline"
+              ? "bg-stone-900 text-white shadow-sm ring-2 ring-emerald-400/50"
+              : "bg-white text-stone-600 hover:bg-stone-100"
+          }`}
+        >
+          <Wifi className="w-4 h-4 text-emerald-400" />
+          <span>Modo Offline & PC</span>
+          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 font-black text-[9px] rounded-full uppercase shadow-xs">
+            Sin Internet
+          </span>
         </button>
         <button
           onClick={() => handleTabChange("database")}
@@ -339,9 +371,11 @@ function ConfiguracionContent() {
             <div className="space-y-1">
               <label className="font-bold text-stone-700">Teléfono / WhatsApp de Atención</label>
               <input
-                type="text"
+                type="tel"
+                inputMode="numeric"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                onChange={(e) => setPhone(cleanOnlyNumbers(e.target.value))}
                 className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
               />
             </div>
@@ -658,9 +692,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Teléfono / WhatsApp de la Tienda</label>
                       <input
-                        type="text"
+                        type="tel"
+                        inputMode="numeric"
                         value={bPhone}
-                        onChange={(e) => setBPhone(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                        onChange={(e) => setBPhone(cleanOnlyNumbers(e.target.value))}
                         placeholder="55 1234 5678"
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
                       />
@@ -742,9 +778,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Meta Diaria de Venta ($ MXN)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={bDailyGoal}
-                        onChange={(e) => setBDailyGoal(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                        onChange={(e) => setBDailyGoal(cleanDecimalNumbers(e.target.value))}
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold"
                       />
                     </div>
@@ -847,9 +885,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Teléfono / WhatsApp</label>
                       <input
-                        type="text"
+                        type="tel"
+                        inputMode="numeric"
                         value={bPhone}
-                        onChange={(e) => setBPhone(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                        onChange={(e) => setBPhone(cleanOnlyNumbers(e.target.value))}
                         placeholder="55 1234 5678"
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
                       />
@@ -916,9 +956,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Fondo Inicial de Caja ($ MXN)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={bInitialFund}
-                        onChange={(e) => setBInitialFund(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                        onChange={(e) => setBInitialFund(cleanDecimalNumbers(e.target.value))}
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold"
                       />
                     </div>
@@ -926,9 +968,11 @@ function ConfiguracionContent() {
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Meta Diaria ($ MXN)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         value={bDailyGoal}
-                        onChange={(e) => setBDailyGoal(e.target.value)}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                        onChange={(e) => setBDailyGoal(cleanDecimalNumbers(e.target.value))}
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold"
                       />
                     </div>
@@ -973,9 +1017,14 @@ function ConfiguracionContent() {
         </div>
       )}
 
-      {/* Tab 2: Users & Roles */}
-      {activeTab === "usuarios" && (
-        <UserRoleManagement />
+      {/* Tab: Roles in System */}
+      {activeTab === "roles" && (
+        <RoleManagement />
+      )}
+
+      {/* Tab: Employees & Staff */}
+      {activeTab === "empleados" && (
+        <EmployeeManagement onGoToUsersTab={() => handleTabChange("roles")} />
       )}
 
       {/* Tab 3: Tickets & Printing */}
@@ -1056,9 +1105,11 @@ function ConfiguracionContent() {
             <div className="space-y-1">
               <label className="font-bold text-stone-700">Fondo Inicial Predeterminado de Caja ($ MXN)</label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={defaultCashFund}
-                onChange={(e) => setDefaultCashFund(e.target.value)}
+                onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                onChange={(e) => setDefaultCashFund(cleanDecimalNumbers(e.target.value))}
                 className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-black text-stone-900 text-sm focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
               />
               <p className="text-[10px] text-stone-400">Dinero sugerido en monedas/billetes al abrir turno.</p>
@@ -1067,9 +1118,11 @@ function ConfiguracionContent() {
             <div className="space-y-1">
               <label className="font-bold text-stone-700">Límite Máximo de Merma Tolerable (%)</label>
               <input
-                type="number"
+                type="text"
+                inputMode="decimal"
                 value={minWasteAlertPercent}
-                onChange={(e) => setMinWasteAlertPercent(e.target.value)}
+                onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                onChange={(e) => setMinWasteAlertPercent(cleanDecimalNumbers(e.target.value))}
                 className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-rose-600 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
               />
               <p className="text-[10px] text-stone-400">Genera alerta si la merma supera este porcentaje de la producción.</p>
@@ -1086,6 +1139,9 @@ function ConfiguracionContent() {
           </div>
         </form>
       )}
+
+      {/* Tab: Modo Offline & PC */}
+      {activeTab === "offline" && <OfflineManagement />}
 
       {/* Tab 5: Database & Cloud */}
       {activeTab === "database" && (

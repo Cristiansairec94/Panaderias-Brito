@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { Branch, BranchShift } from "@/types";
+import { Branch, BranchShift, BranchCashMovement } from "@/types";
 
 export interface SimulatedSale {
   id: string;
@@ -123,6 +123,69 @@ const SAMPLE_PRODUCTS = [
   { name: "Café de Olla Caliente", price: 28 },
 ];
 
+const DEFAULT_CASH_MOVEMENTS: BranchCashMovement[] = [
+  {
+    id: "bmov-1",
+    branchId: "branch-matriz",
+    branchName: "Matriz",
+    type: "salida",
+    category: "gasto_gas",
+    categoryLabel: "Pago de Gas LP para Hornos",
+    amount: 550,
+    reason: "Carga urgente de tanque estacionario para horneada vespertina",
+    authorizedBy: "Don Toño Brito",
+    timestamp: "09:30 AM",
+  },
+  {
+    id: "bmov-2",
+    branchId: "branch-benito",
+    branchName: "San Benito",
+    type: "salida",
+    category: "compra_insumos",
+    categoryLabel: "Insumo Urgente Mostrador",
+    amount: 180,
+    reason: "10 paquetes de bolsas kraft y servilletas de mostrador",
+    authorizedBy: "Maestro Juan",
+    timestamp: "10:45 AM",
+  },
+  {
+    id: "bmov-3",
+    branchId: "branch-matriz",
+    branchName: "Matriz",
+    type: "entrada",
+    category: "abono_cliente",
+    categoryLabel: "Anticipo de Pastel de Bodas",
+    amount: 800,
+    reason: "Anticipo en efectivo cliente Martínez (PED-802)",
+    authorizedBy: "Lupita Brito",
+    timestamp: "11:15 AM",
+  },
+  {
+    id: "bmov-4",
+    branchId: "branch-flores",
+    branchName: "Las Flores",
+    type: "salida",
+    category: "retiro_seguridad",
+    categoryLabel: "Retiro Parcial por Seguridad",
+    amount: 1200,
+    reason: "Resguardo de efectivo acumulado en gaveta hacia caja fuerte",
+    authorizedBy: "Elena Brito",
+    timestamp: "12:00 PM",
+  },
+  {
+    id: "bmov-5",
+    branchId: "branch-matriz",
+    branchName: "Matriz",
+    type: "salida",
+    category: "compra_insumos",
+    categoryLabel: "Levadura & Manteca",
+    amount: 240,
+    reason: "Compra en tienda vecina de 4 bloques de levadura fresca",
+    authorizedBy: "Don Toño Brito",
+    timestamp: "01:20 PM",
+  },
+];
+
 interface BranchContextType {
   branches: Branch[];
   currentBranch: Branch | null; // null = Todas / Consolidado
@@ -144,6 +207,18 @@ interface BranchContextType {
   isLiveSimulating: boolean;
   toggleLiveSimulation: () => void;
   recentSimulatedSales: SimulatedSale[];
+  cashMovements: BranchCashMovement[];
+  addCashMovement: (
+    branchId: string,
+    movement: {
+      type: "entrada" | "salida";
+      category: BranchCashMovement["category"];
+      categoryLabel: string;
+      amount: number;
+      reason: string;
+      authorizedBy: string;
+    }
+  ) => void;
   consolidatedMetrics: {
     totalSales: number;
     totalTickets: number;
@@ -160,6 +235,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   const [currentBranchId, setCurrentBranchId] = useState<string>("branch-matriz");
   const [isLiveSimulating, setIsLiveSimulating] = useState(false);
   const [recentSimulatedSales, setRecentSimulatedSales] = useState<SimulatedSale[]>([]);
+  const [cashMovements, setCashMovements] = useState<BranchCashMovement[]>(DEFAULT_CASH_MOVEMENTS);
 
   // Load state from localStorage
   useEffect(() => {
@@ -188,6 +264,10 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       const savedSales = localStorage.getItem("brito_simulated_sales");
       if (savedSales) {
         setRecentSimulatedSales(JSON.parse(savedSales));
+      }
+      const savedMovements = localStorage.getItem("brito_branch_cash_movements");
+      if (savedMovements) {
+        setCashMovements(JSON.parse(savedMovements));
       }
     } catch {
       // Ignore localStorage error
@@ -452,6 +532,57 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addCashMovement = useCallback(
+    (
+      branchId: string,
+      movement: {
+        type: "entrada" | "salida";
+        category: BranchCashMovement["category"];
+        categoryLabel: string;
+        amount: number;
+        reason: string;
+        authorizedBy: string;
+      }
+    ) => {
+      const targetBranch = branches.find((b) => b.id === branchId);
+      const branchName = targetBranch ? targetBranch.shortName : "Sucursal";
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+
+      const newMovement: BranchCashMovement = {
+        id: `bmov-${Date.now()}`,
+        branchId,
+        branchName,
+        ...movement,
+        timestamp: timeStr,
+      };
+
+      setCashMovements((prev) => {
+        const next = [newMovement, ...prev];
+        try {
+          localStorage.setItem("brito_branch_cash_movements", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // Update cash in drawer for that branch
+      setBranches((prev) => {
+        const updated = prev.map((b) => {
+          if (b.id !== branchId) return b;
+          const delta = movement.type === "entrada" ? movement.amount : -movement.amount;
+          const updatedCashInDrawer = Math.max(0, b.cashInDrawer + delta);
+          return {
+            ...b,
+            cashInDrawer: updatedCashInDrawer,
+          };
+        });
+        persistBranches(updated);
+        return updated;
+      });
+    },
+    [branches]
+  );
+
   // Live simulation ticker (one sale every 8 seconds across random branches)
   useEffect(() => {
     if (!isLiveSimulating) return;
@@ -502,6 +633,8 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         isLiveSimulating,
         toggleLiveSimulation,
         recentSimulatedSales,
+        cashMovements,
+        addCashMovement,
         consolidatedMetrics,
       }}
     >

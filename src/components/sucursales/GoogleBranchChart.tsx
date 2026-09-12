@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Branch } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import PeriodSelectorButton from "./PeriodSelectorButton";
 
 export type PeriodType = "hoy" | "semana" | "mes" | "año" | "custom";
 export type MetricType = "dinero" | "piezas" | "tickets" | "meta";
@@ -394,29 +395,32 @@ export default function GoogleBranchChart({
 
   // Points for per-branch lines
   const branchLines = useMemo(() => {
-    const list = [
-      { id: "branch-matriz", name: "Matriz (Centro)", color: "#ea580c", bgGradient: "url(#matrizGrad)" },
-      { id: "branch-benito", name: "San Benito", color: "#e11d48", bgGradient: "url(#benitoGrad)" },
-      { id: "branch-flores", name: "Las Flores", color: "#d97706", bgGradient: "url(#floresGrad)" },
-    ];
-
-    return list.map((b) => {
+    const defaultPalette = ["#ea580c", "#e11d48", "#d97706", "#059669", "#2563eb", "#7c3aed"];
+    return branches.map((b, bIdx) => {
+      const color = defaultPalette[bIdx % defaultPalette.length];
       const points = dataPoints.map((p, idx) => {
-        const item = p.branchesData[b.id] || { money: 0, pieces: 0, tickets: 0 };
+        const item = p.branchesData[b.id] || {
+          money: Math.round(p.totalMoney / Math.max(1, branches.length)),
+          pieces: Math.round(p.totalPieces / Math.max(1, branches.length)),
+          tickets: Math.round(p.totalTickets / Math.max(1, branches.length)),
+        };
         let val = item.money;
         if (activeMetric === "piezas") val = item.pieces;
         if (activeMetric === "tickets") val = item.tickets;
-        if (activeMetric === "meta") val = Math.min(100, Math.round((item.money / 10000) * 100));
+        if (activeMetric === "meta") val = Math.min(100, Math.round((item.money / (b.dailyGoal || 10000)) * 100));
         return { x: getX(idx), y: getY(val), val };
       });
       return {
-        ...b,
+        id: b.id,
+        name: b.name,
+        color,
+        bgGradient: "none",
         points,
         linePath: buildSmoothPath(points),
         areaPath: buildAreaPath(points),
       };
     });
-  }, [dataPoints, activeMetric, maxValue]);
+  }, [dataPoints, activeMetric, maxValue, branches]);
 
   // Handle mouse move over SVG
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -489,64 +493,19 @@ export default function GoogleBranchChart({
           </div>
         </div>
 
-        {/* Period Selector Pills & Custom Date Trigger */}
+        {/* Period Selector Button & Custom Date Trigger */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex bg-stone-100/80 p-1 rounded-2xl border border-stone-200 text-xs font-bold">
-            <button
-              onClick={() => { onPeriodChange("hoy"); setShowDatePicker(false); }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "hoy"
-                  ? "bg-stone-900 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              Hoy
-            </button>
-            <button
-              onClick={() => { onPeriodChange("semana"); setShowDatePicker(false); }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "semana"
-                  ? "bg-stone-900 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              Esta Semana
-            </button>
-            <button
-              onClick={() => { onPeriodChange("mes"); setShowDatePicker(false); }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "mes"
-                  ? "bg-stone-900 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              Este Mes
-            </button>
-            <button
-              onClick={() => { onPeriodChange("año"); setShowDatePicker(false); }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "año"
-                  ? "bg-stone-900 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              Este Año
-            </button>
-            <button
-              onClick={() => { 
-                onPeriodChange("custom"); 
-                setShowDatePicker(true); 
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
-                selectedPeriod === "custom"
-                  ? "bg-orange-600 text-white shadow-sm"
-                  : "text-stone-600 hover:text-stone-900"
-              }`}
-            >
-              <CalendarRange className="w-3.5 h-3.5" />
-              <span>Entre Fechas</span>
-            </button>
-          </div>
+          <PeriodSelectorButton
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={(p) => {
+              onPeriodChange(p);
+              setShowDatePicker(p === "custom");
+            }}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
+            onCustomDateChange={onCustomDateChange}
+            size="sm"
+          />
 
           {onClose && (
             <button
@@ -767,19 +726,17 @@ export default function GoogleBranchChart({
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-orange-600" />
-                <span>Matriz (Centro)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-rose-600" />
-                <span>San Benito</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-amber-600" />
-                <span>Las Flores</span>
-              </div>
+            <div className="flex items-center gap-4 flex-wrap">
+              {branches.map((b, idx) => {
+                const defaultPalette = ["#ea580c", "#e11d48", "#d97706", "#059669", "#2563eb", "#7c3aed"];
+                const color = defaultPalette[idx % defaultPalette.length];
+                return (
+                  <div key={b.id} className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                    <span>{b.shortName}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -991,42 +948,30 @@ export default function GoogleBranchChart({
             </div>
 
             {/* Per-branch breakdown pills */}
-            <div className="border-t border-stone-800 pt-2 space-y-1.5 text-[11px]">
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5 text-stone-300">
-                  <span className="w-2 h-2 rounded-full bg-orange-500" />
-                  Matriz (Centro)
-                </span>
-                <span className="font-mono font-bold text-white">
-                  {activeMetric === "piezas" 
-                    ? `${activeHoverPoint.branchesData["branch-matriz"]?.pieces.toLocaleString()} pz`
-                    : formatCurrency(activeHoverPoint.branchesData["branch-matriz"]?.money || 0)}
-                </span>
-              </div>
+            <div className="border-t border-stone-800 pt-2 space-y-1.5 text-[11px] max-h-36 overflow-y-auto pr-1">
+              {branches.map((b, idx) => {
+                const defaultPalette = ["#ea580c", "#e11d48", "#d97706", "#059669", "#2563eb", "#7c3aed"];
+                const color = defaultPalette[idx % defaultPalette.length];
+                const bData = activeHoverPoint.branchesData[b.id] || {
+                  money: Math.round(activeHoverPoint.totalMoney / Math.max(1, branches.length)),
+                  pieces: Math.round(activeHoverPoint.totalPieces / Math.max(1, branches.length)),
+                  tickets: Math.round(activeHoverPoint.totalTickets / Math.max(1, branches.length)),
+                };
 
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5 text-stone-300">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  San Benito
-                </span>
-                <span className="font-mono font-bold text-white">
-                  {activeMetric === "piezas" 
-                    ? `${activeHoverPoint.branchesData["branch-benito"]?.pieces.toLocaleString()} pz`
-                    : formatCurrency(activeHoverPoint.branchesData["branch-benito"]?.money || 0)}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-1.5 text-stone-300">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  Las Flores
-                </span>
-                <span className="font-mono font-bold text-white">
-                  {activeMetric === "piezas" 
-                    ? `${activeHoverPoint.branchesData["branch-flores"]?.pieces.toLocaleString()} pz`
-                    : formatCurrency(activeHoverPoint.branchesData["branch-flores"]?.money || 0)}
-                </span>
-              </div>
+                return (
+                  <div key={b.id} className="flex justify-between items-center">
+                    <span className="flex items-center gap-1.5 text-stone-300">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                      <span className="truncate max-w-[120px]">{b.shortName}</span>
+                    </span>
+                    <span className="font-mono font-bold text-white">
+                      {activeMetric === "piezas" 
+                        ? `${bData.pieces.toLocaleString()} pz`
+                        : formatCurrency(bData.money)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

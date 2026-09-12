@@ -38,6 +38,7 @@ import {
 import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { UserRole, RolePermissions } from "@/types";
+import { onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
 
 // Role visual configurations matching user's requested 3 groups
 export const SYSTEM_ROLES: {
@@ -572,16 +573,16 @@ export default function UserRoleManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-black uppercase tracking-wider">
-              <ShieldCheck className="w-4 h-4 text-amber-600" /> Control de Personal & Roles ERP
+              <ShieldCheck className="w-4 h-4 text-amber-600" /> Cuentas de Usuario & Seguridad ERP
             </div>
             <h3 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
-              Gestión de Empleados, Roles & Accesos
+              Cuentas de Usuarios, Roles & Permisos
             </h3>
             <p className="text-xs text-stone-600 max-w-2xl leading-relaxed">
-              Administra al personal de Panaderías Brito: consulta contraseñas, asigna fotografías, define roles (
+              Administra las credenciales de acceso al sistema: consulta o genera contraseñas, asigna nombres de usuario (@), define el rol de trabajo (
               <strong className="text-stone-900 font-bold">Administrador</strong>, 
               <strong className="text-stone-900 font-bold"> Auxiliar Administrativo</strong> o 
-              <strong className="text-stone-900 font-bold"> Cajeros / Auxiliares de Tienda</strong>) y edita sus permisos del sistema.
+              <strong className="text-stone-900 font-bold"> Cajeros / Auxiliares de Tienda</strong>) y personaliza los 13 accesos del sistema.
             </p>
           </div>
 
@@ -590,7 +591,7 @@ export default function UserRoleManagement() {
             className="self-start sm:self-center flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs sm:text-sm rounded-2xl shadow-md shadow-orange-500/20 transition-all active:scale-95 cursor-pointer shrink-0"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Nuevo Empleado</span>
+            <span>Nueva Cuenta</span>
           </button>
         </div>
 
@@ -923,98 +924,6 @@ export default function UserRoleManagement() {
         </div>
       )}
 
-      {/* RBAC Reference Matrix Table */}
-      <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm space-y-4">
-        <div className="border-b border-stone-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h3 className="font-black text-base text-stone-900 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-amber-500" /> Matriz Comparativa de Accesos por Rol
-            </h3>
-            <p className="text-[11px] text-stone-500 mt-0.5">
-              Visualiza los permisos estándar asignados a cada uno de los roles principales del ERP.
-            </p>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-stone-50 text-stone-700 font-black border-b border-stone-200">
-              <tr>
-                <th className="p-3.5">Módulo / Capacidad del Sistema</th>
-                <th className="p-3.5 text-center bg-amber-500/10 text-amber-950 font-black">
-                  👑 Administrador
-                </th>
-                <th className="p-3.5 text-center bg-blue-500/10 text-blue-950 font-black">
-                  💼 Auxiliar Administrativo
-                </th>
-                <th className="p-3.5 text-center bg-emerald-500/10 text-emerald-950 font-black">
-                  🛒 Cajeros / Tienda
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100 font-medium">
-              {PERMISSION_DEFINITIONS.map((def) => {
-                const adminHas = ROLE_PERMISSIONS.admin[def.key];
-                const auxHas = ROLE_PERMISSIONS.auxiliar_admin[def.key];
-                const cajeroHas = ROLE_PERMISSIONS.cajero[def.key];
-                const IconComponent = def.icon;
-
-                return (
-                  <tr key={def.key} className="hover:bg-amber-50/30 transition-colors">
-                    <td className="p-3.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-stone-100 text-stone-700">
-                          <IconComponent className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-stone-900">{def.title}</p>
-                          <p className="text-[10px] text-stone-500">{def.description}</p>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="p-3.5 text-center bg-amber-500/5">
-                      {adminHas ? (
-                        <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold text-xs shadow-xs">
-                          ✓
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full text-xs">
-                          —
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="p-3.5 text-center bg-blue-500/5">
-                      {auxHas ? (
-                        <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold text-xs shadow-xs">
-                          ✓
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full text-xs">
-                          —
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="p-3.5 text-center bg-emerald-500/5">
-                      {cajeroHas ? (
-                        <span className="inline-flex items-center justify-center w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full font-bold text-xs shadow-xs">
-                          ✓
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center justify-center w-6 h-6 bg-stone-100 text-stone-400 rounded-full text-xs">
-                          —
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* ========================================================================= */}
       {/* MODAL: CREATE / EDIT EMPLOYEE WITH PHOTO, ROLES & PERMISSIONS             */}
@@ -1188,9 +1097,11 @@ export default function UserRoleManagement() {
                     <label className="font-bold text-stone-700">Teléfono / WhatsApp</label>
                     <input
                       type="tel"
+                      inputMode="numeric"
                       placeholder="55 1234 5678"
                       value={formPhone}
-                      onChange={(e) => setFormPhone(e.target.value)}
+                      onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                      onChange={(e) => setFormPhone(cleanOnlyNumbers(e.target.value))}
                       className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-medium text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
                     />
                   </div>

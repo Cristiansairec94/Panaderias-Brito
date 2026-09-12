@@ -33,34 +33,84 @@ import {
   Filter,
   X,
   Building2,
-  MapPin,
   ArrowRight,
   Lock,
   Unlock,
   KeyRound,
   Eye,
   EyeOff,
-  ShieldCheck
+  ShieldCheck,
+  Menu,
+  Pencil,
+  TrendingUp,
+  Barcode,
+  Printer,
+  Wifi,
+  WifiOff
 } from "lucide-react";
-import { Product, CartItem, Sale, CashExpense, Customer } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CashIncome } from "@/types";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES } from "@/lib/products";
+import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
 import { 
   DEFAULT_GENERAL_CUSTOMER, 
   getStoredCustomers, 
   saveStoredCustomers, 
-  addQuickCustomer 
+  addQuickCustomer,
+  createCustomerInDb,
+  recordCustomerSale,
+  fetchCustomersFromDb
 } from "@/lib/customers";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
+import { useSidebar } from "@/context/SidebarContext";
 import { useNotifications } from "@/context/NotificationContext";
+import { useSync } from "@/context/SyncContext";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
+import IncomesModal from "@/components/pos/IncomesModal";
+import IncomeReceiptModal from "@/components/ingresos/IncomeReceiptModal";
 import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
+import BreadDeliveryModal from "@/components/pos/BreadDeliveryModal";
+import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
+import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
+
+const INITIAL_BREAD_DELIVERIES: BreadDeliveryRecord[] = [
+  {
+    id: "CAM-49201",
+    source: "Camioneta 1 (Ruta Poniente)",
+    driver: "Manuel Sánchez",
+    cashier: "Cajera 1 - Turno Matutino",
+    date: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }),
+    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 07:30 AM`,
+    items: [
+      { productId: "p-bolillo", productName: "Bolillo Tradicional Caliente", quantity: 200, unitPrice: 3, previousStock: 20, newStock: 220 },
+      { productId: "p-telera", productName: "Telera para Torta", quantity: 120, unitPrice: 3.5, previousStock: 15, newStock: 135 },
+      { productId: "p-concha", productName: "Concha de Vainilla", quantity: 50, unitPrice: 10, previousStock: 10, newStock: 60 },
+    ],
+    totalPieces: 370,
+    totalEstimatedValue: 1520,
+    notes: "Primera descarga de la mañana recién salido del horno",
+  },
+  {
+    id: "CAM-49202",
+    source: "Camioneta 2 (Ruta Centro)",
+    driver: "Pedro Ramírez",
+    cashier: "Cajera 2 - Turno Vespertino",
+    date: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }),
+    timestamp: `${new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} • 02:45 PM`,
+    items: [
+      { productId: "p-cuerno", productName: "Cuerno de Mantequilla", quantity: 60, unitPrice: 10, previousStock: 8, newStock: 68 },
+      { productId: "p-dona", productName: "Dona de Azúcar", quantity: 50, unitPrice: 10, previousStock: 5, newStock: 55 },
+    ],
+    totalPieces: 110,
+    totalEstimatedValue: 1100,
+    notes: "Surtido de media tarde para merienda",
+  },
+];
 
 const POS_CATEGORIES = [
   { id: "all", label: "Todo el Pan", priceTag: "", icon: "🧺" },
@@ -122,10 +172,172 @@ function matchesPosCategory(prod: Product, catId: string): boolean {
 const CATEGORIES = POS_CATEGORIES;
 const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500];
 
+// Cuentas predefinidas para depósito / transferencia bancaria con nombres de a quién depositar
+const DEFAULT_TRANSFER_ACCOUNTS: TransferAccount[] = [
+  {
+    id: "cta-1",
+    name: "Don Antonio Brito (Don Toño)",
+    bank: "BBVA Bancomer",
+    clabe: "012 180 01598423012 5",
+    accountNumber: "159 842 3012",
+  },
+  {
+    id: "cta-2",
+    name: "Lupita Brito",
+    bank: "Banorte",
+    clabe: "072 180 00847291104 8",
+    accountNumber: "084 729 1104",
+  },
+  {
+    id: "cta-3",
+    name: "Panaderías Brito (Cuenta Fiscal)",
+    bank: "Santander México",
+    clabe: "014 180 06550914321 3",
+    accountNumber: "655 091 4321",
+  },
+  {
+    id: "cta-4",
+    name: "Cobro Rápido Panadería Brito (STP / Terminal)",
+    bank: "Mercado Pago / STP",
+    clabe: "646 180 12345678901 2",
+  },
+];
+
+/**
+ * Input editable directo y fluido para la cantidad de piezas de un producto en la charola.
+ * Permite borrar libremente el número 1 (sin trabas ni rebotes instantáneos),
+ * auto-selecciona el texto al hacer clic/foco para sobreescribir al instante,
+ * y valida con seguridad al desenfocar (blur).
+ */
+function CartQuantityInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (qty: number) => void;
+}) {
+  const [text, setText] = useState<string>(value > 0 ? value.toString() : "");
+
+  useEffect(() => {
+    setText(value > 0 ? value.toString() : "");
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const clean = cleanOnlyNumbers(e.target.value);
+    setText(clean);
+    if (clean === "") {
+      onChange(0);
+    } else {
+      const num = parseInt(clean, 10);
+      onChange(isNaN(num) ? 0 : num);
+    }
+  };
+
+  const handleBlur = () => {
+    if (text === "" || parseInt(text, 10) === 0) {
+      setText("");
+      onChange(0);
+    } else {
+      const num = parseInt(text, 10);
+      setText(num.toString());
+      onChange(num);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={text}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+          return;
+        }
+        onlyNumbersKeyDown(e, false);
+      }}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      placeholder=""
+      className="w-11 h-7 text-center font-black text-xs sm:text-sm bg-white border border-amber-400 focus:border-amber-600 rounded-lg focus:outline-none shadow-inner text-stone-900 cursor-text"
+      title="Cantidad de piezas (puedes borrarlo y escribir libremente)"
+    />
+  );
+}
+
+/**
+ * Control editable de precio unitario por pieza para el producto en la charola.
+ * Permite cambiar el precio c/pieza para esa venta específica de forma completamente editable y fluida.
+ */
+function CartPriceInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (price: number) => void;
+}) {
+  const [text, setText] = useState<string>(value > 0 ? value.toString() : "");
+
+  useEffect(() => {
+    setText(value > 0 ? value.toString() : "");
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const clean = cleanDecimalNumbers(e.target.value);
+    setText(clean);
+    if (clean === "" || clean === ".") {
+      onChange(0);
+    } else {
+      const num = parseFloat(clean);
+      onChange(isNaN(num) ? 0 : num);
+    }
+  };
+
+  const handleBlur = () => {
+    if (text === "" || text === "." || parseFloat(text) === 0) {
+      setText("");
+      onChange(0);
+    } else {
+      const num = parseFloat(text);
+      setText(num.toString());
+      onChange(num);
+    }
+  };
+
+  return (
+    <div
+      className="inline-flex items-center gap-0.5 bg-amber-50 hover:bg-amber-100/70 focus-within:bg-white border border-amber-300 focus-within:border-amber-600 rounded-lg px-1.5 py-0.5 transition-all shadow-2xs group"
+      title="Precio por pieza editable (haz clic para cambiar el precio de esta pieza)"
+    >
+      <span className="text-[11px] font-black text-amber-800 select-none">$</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={text}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+            return;
+          }
+          onlyNumbersKeyDown(e, true);
+        }}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        placeholder=""
+        className="w-12 text-xs font-black text-stone-900 bg-transparent text-center focus:outline-none cursor-text"
+      />
+      <span className="text-[10px] text-stone-400 font-bold select-none">c/pza</span>
+    </div>
+  );
+}
+
 export default function POSPage() {
   const { user } = useAuth();
   const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
   const { addNotification } = useNotifications();
+  const { toggleMobile } = useSidebar();
+  const { isOnline, isSyncing, isSynced, enqueueOfflineItem, pendingCount } = useSync();
   const activeBranch = currentBranch || branches[0];
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -134,6 +346,38 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [cashGiven, setCashGiven] = useState<string>("");
+
+  // Estados para Cobro y Escaneo por Código de Barras
+  const [cartBarcodeInput, setCartBarcodeInput] = useState("");
+  const [justScannedId, setJustScannedId] = useState<string | null>(null);
+  const [lastScannedItem, setLastScannedItem] = useState<{
+    success: boolean;
+    productName?: string;
+    code: string;
+    timestamp: number;
+  } | null>(null);
+  const cartBarcodeInputRef = useRef<HTMLInputElement>(null);
+  const cartContainerRef = useRef<HTMLDivElement>(null);
+  const keyStrokeBufferRef = useRef<{ buffer: string; lastStrokeTime: number }>({ buffer: "", lastStrokeTime: 0 });
+
+  // Cuentas bancarias para cobro por transferencia
+  const [transferAccounts] = useState<TransferAccount[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("brito_transfer_accounts");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_TRANSFER_ACCOUNTS;
+  });
+  const [selectedTransferAccountId, setSelectedTransferAccountId] = useState<string>(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+
+  const selectedTransferAccount = useMemo(() => {
+    return transferAccounts.find((acc) => acc.id === selectedTransferAccountId) || transferAccounts[0];
+  }, [transferAccounts, selectedTransferAccountId]);
   
   // Shift & Cashier state
   const [cashierName, setCashierName] = useState(activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino");
@@ -147,6 +391,22 @@ export default function POSPage() {
     }
     return activeBranch ? activeBranch.currentShift.initialFund : 500;
   });
+
+  // Configuración de Impresora Directa para Tickets
+  const [showPrinterModal, setShowPrinterModal] = useState(false);
+  const [printerConfig, setPrinterConfig] = useState<PrinterConfig>(() => getStoredPrinterConfig());
+
+  useEffect(() => {
+    const handlePrinterUpdate = (e: any) => {
+      if (e.detail) {
+        setPrinterConfig(e.detail);
+      } else {
+        setPrinterConfig(getStoredPrinterConfig());
+      }
+    };
+    window.addEventListener("brito_printer_config_updated", handlePrinterUpdate);
+    return () => window.removeEventListener("brito_printer_config_updated", handlePrinterUpdate);
+  }, []);
 
   // Auto-sync user and branch
   useEffect(() => {
@@ -175,10 +435,27 @@ export default function POSPage() {
   const [showRecentSales, setShowRecentSales] = useState(false);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
+  const [showBreadDeliveryModal, setShowBreadDeliveryModal] = useState(false);
+  const [breadDeliveriesList, setBreadDeliveriesList] = useState<BreadDeliveryRecord[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("brito_bread_deliveries");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return INITIAL_BREAD_DELIVERIES;
+  });
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>([]);
   const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
   const [shiftModalTab, setShiftModalTab] = useState<"cuentas" | "cambio" | "corte" | "historial">("cambio");
+  const [showIncomesModal, setShowIncomesModal] = useState(false);
+  const [incomesList, setIncomesList] = useState<CashIncome[]>([]);
+  const [receiptIncome, setReceiptIncome] = useState<CashIncome | null>(null);
+  const [showIncomeReceiptModal, setShowIncomeReceiptModal] = useState(false);
   
   // Customer State (Público General + Clientes Frecuentes, Mayoreo y Eventos)
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -188,6 +465,16 @@ export default function POSPage() {
   const [customerTypeFilter, setCustomerTypeFilter] = useState<"all" | Customer["type"]>("all");
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
   const customerPickerRef = useRef<HTMLDivElement>(null);
+
+  // Al seleccionar o cambiar de cliente, el método de pago SIEMPRE regresa a 'efectivo' como opción principal
+  const selectCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setPaymentMethod("efectivo");
+    setCashGiven("");
+    setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+    setIsCustomerPickerOpen(false);
+    setCustomerSearchQuery("");
+  };
 
   // New Customer Form State
   const [newCustName, setNewCustName] = useState("");
@@ -205,6 +492,7 @@ export default function POSPage() {
 
   // Shift Lock State (Candado de Seguridad por Cierre de Turno)
   const [isShiftLocked, setIsShiftLocked] = useState(false);
+  const [shiftFundInput, setShiftFundInput] = useState<string>("");
 
   const lastCutInfo = useMemo(() => {
     if (typeof window !== "undefined") {
@@ -221,11 +509,33 @@ export default function POSPage() {
     return null;
   }, [isShiftLocked]);
 
+  const baseShiftFund = useMemo(() => {
+    if (lastCutInfo && typeof lastCutInfo.nextFund === "number") {
+      return lastCutInfo.nextFund;
+    }
+    return initialCashFund;
+  }, [lastCutInfo, initialCashFund]);
+
+  // Sincronizar el cuadro editable cuando se bloquea la terminal o cambia baseShiftFund
+  useEffect(() => {
+    if (isShiftLocked) {
+      setShiftFundInput(baseShiftFund ? baseShiftFund.toString() : "0");
+    }
+  }, [isShiftLocked, baseShiftFund]);
+
+  const finalShiftFund = useMemo(() => {
+    if (!shiftFundInput.trim()) return 0;
+    const val = Number(shiftFundInput);
+    return isNaN(val) ? 0 : Math.max(0, val);
+  }, [shiftFundInput]);
+
   const handleDirectUnlockShift = () => {
-    setIsShiftLocked(false);
+    setInitialCashFund(finalShiftFund);
     try {
+      localStorage.setItem("brito_pos_initial_fund", finalShiftFund.toString());
       localStorage.removeItem("brito_pos_shift_locked");
     } catch (e) {}
+    setIsShiftLocked(false);
   };
 
   useEffect(() => {
@@ -237,9 +547,16 @@ export default function POSPage() {
     } catch (e) {}
   }, []);
 
-  // Load and synchronize customers
+  // Load and synchronize customers from local and direct server
   useEffect(() => {
     setCustomers(getStoredCustomers());
+
+    fetchCustomersFromDb().then(({ customers: dbCusts }) => {
+      if (dbCusts && dbCusts.length > 0) {
+        setCustomers(dbCusts);
+      }
+    });
+
     const handleCustomerSync = () => {
       setCustomers(getStoredCustomers());
     };
@@ -260,11 +577,11 @@ export default function POSPage() {
     }
   }, [isCustomerPickerOpen]);
 
-  const handleCreateQuickCustomer = (e: React.FormEvent) => {
+  const handleCreateQuickCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName.trim()) return;
 
-    const created = addQuickCustomer({
+    const created = await createCustomerInDb({
       name: newCustName.trim(),
       phone: newCustPhone.trim() || "Sin teléfono",
       type: "frecuente",
@@ -272,8 +589,7 @@ export default function POSPage() {
       notes: newCustNotes.trim(),
     });
 
-    setSelectedCustomer(created);
-    setIsCustomerPickerOpen(false);
+    selectCustomer(created);
     setIsNewCustomerModalOpen(false);
     
     // Reset form
@@ -295,19 +611,22 @@ export default function POSPage() {
     } catch (e) {}
   };
 
-  // Load and synchronize products with catalog
+  // Carga y sincronización directa con el catálogo del apartado de productos (/productos)
   useEffect(() => {
-    setProducts(getStoredProducts());
-
-    const handleSync = () => {
+    const loadCatalog = () => {
       setProducts(getStoredProducts());
     };
+    loadCatalog();
 
-    window.addEventListener("brito_products_updated", handleSync);
-    return () => window.removeEventListener("brito_products_updated", handleSync);
+    window.addEventListener("brito_products_updated", loadCatalog);
+    window.addEventListener("storage", loadCatalog);
+    return () => {
+      window.removeEventListener("brito_products_updated", loadCatalog);
+      window.removeEventListener("storage", loadCatalog);
+    };
   }, []);
 
-  // Load products, recent sales & expenses from Supabase
+  // Load products, recent sales & expenses from Supabase (respetando códigos de barra y catálogo de productos)
   useEffect(() => {
     async function loadInitialData() {
       try {
@@ -321,20 +640,34 @@ export default function POSPage() {
           .order("name");
 
         if (prodData && prodData.length > 0 && !prodErr) {
+          const stored = getStoredProducts();
           const mapped: Product[] = prodData.map((p: any) => {
-            const fallbackMatch = DEFAULT_PRODUCTS.find((fb) => fb.name.toLowerCase() === p.name.toLowerCase());
+            const storedMatch = stored.find((s) => s.id === p.id || s.name.toLowerCase() === p.name.toLowerCase());
+            const fallbackMatch = DEFAULT_PRODUCTS.find((fb) => fb.id === p.id || fb.name.toLowerCase() === p.name.toLowerCase());
             return {
               id: p.id,
+              code: p.code || storedMatch?.code || fallbackMatch?.code || `PRD-${p.id}`,
+              barcode: p.barcode || storedMatch?.barcode || fallbackMatch?.barcode,
               name: p.name,
               price: Number(p.price),
-              category: p.category_id || "dulce_10",
-              icon: p.icon || "🥐",
-              stock: p.stock || 0,
-              image: p.image || fallbackMatch?.image,
-              description: fallbackMatch?.description,
-              tag: fallbackMatch?.tag || `Pan $${p.price}`,
+              category: p.category_id || storedMatch?.category || "dulce_10",
+              icon: p.icon || storedMatch?.icon || "🥐",
+              stock: typeof p.stock === "number" ? p.stock : (storedMatch?.stock || 0),
+              image: p.image || storedMatch?.image || fallbackMatch?.image,
+              description: p.description || storedMatch?.description || fallbackMatch?.description,
+              tag: p.tag || storedMatch?.tag || fallbackMatch?.tag,
+              unit: p.unit || storedMatch?.unit || "pieza",
             };
           });
+
+          // Integrar productos locales creados en el apartado de productos
+          const mappedIds = new Set(mapped.map((m) => m.id));
+          for (const sp of stored) {
+            if (!mappedIds.has(sp.id)) {
+              mapped.push(sp);
+            }
+          }
+
           setProducts(mapped);
           setIsDbConnected(true);
         }
@@ -403,6 +736,18 @@ export default function POSPage() {
           }));
           setExpensesList(mappedExp);
         }
+        // 4. Load cash incomes from localStorage
+        try {
+          const savedIncomes = localStorage.getItem("brito_cash_incomes");
+          if (savedIncomes) {
+            const parsedInc = JSON.parse(savedIncomes);
+            if (Array.isArray(parsedInc) && parsedInc.length > 0) {
+              setIncomesList(parsedInc);
+            }
+          }
+        } catch (incErr) {
+          console.log("No local incomes yet", incErr);
+        }
       } catch (err) {
         console.log("Using fallback demo mode", err);
       }
@@ -412,10 +757,12 @@ export default function POSPage() {
 
   const filteredProducts = products.filter((prod) => {
     const matchesCat = matchesPosCategory(prod, selectedCategory);
+    const searchLower = search.toLowerCase();
     const matchesSearch = 
-      (prod.code && prod.code.toLowerCase().includes(search.toLowerCase())) ||
-      prod.name.toLowerCase().includes(search.toLowerCase()) || 
-      (prod.description && prod.description.toLowerCase().includes(search.toLowerCase()));
+      (prod.barcode && prod.barcode.toLowerCase().includes(searchLower)) ||
+      (prod.code && prod.code.toLowerCase().includes(searchLower)) ||
+      prod.name.toLowerCase().includes(searchLower) || 
+      (prod.description && prod.description.toLowerCase().includes(searchLower));
     return matchesCat && matchesSearch;
   });
 
@@ -424,12 +771,11 @@ export default function POSPage() {
       setIsMobileCartOpen(true);
       return;
     }
-    if (product.stock <= 0) return;
 
+    // Piezas de pan sin límites: se permite agregar libremente cualquier cantidad
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        if (existing.quantity >= product.stock) return prev;
         return prev.map((item) =>
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
@@ -438,14 +784,167 @@ export default function POSPage() {
     });
   };
 
+  // Auto disolver la alerta flotante de escaneo de código de barras tras 3.8s
+  useEffect(() => {
+    if (!lastScannedItem) return;
+    const timer = setTimeout(() => {
+      setLastScannedItem(null);
+    }, 3800);
+    return () => clearTimeout(timer);
+  }, [lastScannedItem]);
+
+  // Auto disolver el resaltado de producto recién escaneado en la charola tras 2.8s
+  useEffect(() => {
+    if (!justScannedId) return;
+    const timer = setTimeout(() => {
+      setJustScannedId(null);
+    }, 2800);
+    return () => clearTimeout(timer);
+  }, [justScannedId]);
+
+  // Manejador central de cobro por código de barras conectado directamente al catálogo de productos
+  const handleBarcodeScan = (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+
+    if (isShiftLocked) {
+      addNotification({
+        senderName: "🔒 Terminal Bloqueada",
+        senderAvatar: "⚠️",
+        badgeIcon: "alerta",
+        title: "Escaneo Deshabilitado",
+        highlightText: "Turno cerrado",
+        description: "Desbloquea la terminal con la encargada para comenzar a cobrar productos por código de barras.",
+        category: "caja",
+      });
+      setIsMobileCartOpen(true);
+      return;
+    }
+
+    // Consulta en tiempo real al catálogo guardado en productos y en memoria
+    const currentStored = getStoredProducts();
+    const matched = findProductByBarcodeOrCode(code, products) || findProductByBarcodeOrCode(code, currentStored);
+
+    if (matched) {
+      addToCart(matched);
+      playScanBeep(true);
+      setJustScannedId(matched.id);
+      setIsMobileCartOpen(true); // Se visualiza de inmediato en la charola de cobro
+
+      // Auto-desplazar la charola hacia el producto escaneado
+      setTimeout(() => {
+        if (cartContainerRef.current) {
+          const elem = cartContainerRef.current.querySelector(`[data-product-id="${matched.id}"]`);
+          if (elem) {
+            elem.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }
+      }, 50);
+
+      setLastScannedItem({
+        success: true,
+        productName: matched.name,
+        code: matched.barcode || code,
+        timestamp: Date.now(),
+      });
+      setCartBarcodeInput("");
+
+      addNotification({
+        senderName: "🏷️ Código de Barras",
+        senderAvatar: "🥖",
+        badgeIcon: "harina",
+        title: "Producto Escaneado",
+        highlightText: matched.name,
+        description: `+1 pieza agregada a la charola de cobro (Código: ${matched.barcode || code})`,
+        category: "inventario",
+      });
+    } else {
+      playScanBeep(false);
+      setLastScannedItem({
+        success: false,
+        code,
+        timestamp: Date.now(),
+      });
+      setIsMobileCartOpen(true);
+      addNotification({
+        senderName: "⚠️ Código No Registrado",
+        senderAvatar: "🔍",
+        badgeIcon: "alerta",
+        title: "Código Desconocido",
+        highlightText: code,
+        description: `No se encontró ningún producto con el código "${code}" en el catálogo de productos.`,
+        category: "inventario",
+      });
+    }
+  };
+
+  // Listener global de teclado para lectores de código de barras USB / Bluetooth (Keyboard Wedge)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (showReceiptModal || showExpensesModal || showIncomesModal || showCashDrawerModal || showBreadDeliveryModal) {
+        return;
+      }
+
+      const activeElem = document.activeElement;
+      const isInput = activeElem instanceof HTMLInputElement || activeElem instanceof HTMLTextAreaElement;
+
+      // Si el foco está en el input de escaneo de la Charola de Cobro y presiona Enter
+      if (activeElem === cartBarcodeInputRef.current) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleBarcodeScan(cartBarcodeInput);
+        }
+        return;
+      }
+
+      // Si el foco está en otros inputs (ej. buscador general de productos)
+      if (isInput && activeElem !== cartBarcodeInputRef.current) {
+        if (e.key === "Enter" && search.trim()) {
+          const matched = findProductByBarcodeOrCode(search.trim(), products) || findProductByBarcodeOrCode(search.trim(), getStoredProducts());
+          if (matched) {
+            e.preventDefault();
+            handleBarcodeScan(search.trim());
+            setSearch("");
+          }
+        }
+        return;
+      }
+
+      const now = Date.now();
+      const timeDiff = now - keyStrokeBufferRef.current.lastStrokeTime;
+
+      // Cuando la pistola física de código de barras termina de escanear envía Enter
+      if (e.key === "Enter") {
+        if (keyStrokeBufferRef.current.buffer.length >= 2) {
+          e.preventDefault();
+          handleBarcodeScan(keyStrokeBufferRef.current.buffer);
+        }
+        keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
+        return;
+      }
+
+      if (e.key.length === 1) {
+        if (timeDiff > 220) {
+          keyStrokeBufferRef.current = { buffer: e.key, lastStrokeTime: now };
+        } else {
+          keyStrokeBufferRef.current.buffer += e.key;
+          keyStrokeBufferRef.current.lastStrokeTime = now;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [products, cartBarcodeInput, search, isShiftLocked, showReceiptModal, showExpensesModal, showIncomesModal, showCashDrawerModal, showBreadDeliveryModal]);
+
   const addMultipleToCart = (product: Product, count: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (isShiftLocked) {
       setIsMobileCartOpen(true);
       return;
     }
-    if (product.stock <= 0) return;
 
+    // Sin límites: se permite sumar cualquier cantidad de piezas
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
@@ -459,32 +958,42 @@ export default function POSPage() {
 
   const updateQuantity = (id: string, delta: number) => {
     setCart((prev) =>
-      prev
-        .map((item) => {
-          if (item.product.id === id) {
-            const newQ = item.quantity + delta;
-            return newQ > 0 ? { ...item, quantity: newQ } : null;
-          }
-          return item;
-        })
-        .filter(Boolean) as CartItem[]
+      prev.map((item) => {
+        if (item.product.id === id) {
+          const newQ = item.quantity + delta;
+          // No permitir que el botón (-) baje de 1 para evitar borrar accidentalmente el producto.
+          // Para eliminarlo definitivamente de la charola se utiliza el botón de basurero.
+          return { ...item, quantity: Math.max(1, newQ) };
+        }
+        return item;
+      })
     );
   };
 
-  const setExactQuantity = (id: string, qty: number) => {
-    if (qty <= 0) {
-      setCart((prev) => prev.filter((item) => item.product.id !== id));
-      return;
-    }
+  const updateCartItemPrice = (id: string, newPrice: number) => {
     setCart((prev) =>
       prev.map((item) =>
-        item.product.id === id ? { ...item, quantity: qty } : item
+        item.product.id === id
+          ? { ...item, product: { ...item.product, price: Math.max(0, newPrice) } }
+          : item
       )
     );
   };
 
-  const total = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const totalPieces = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const removeFromCart = (id: string) => {
+    setCart((prev) => prev.filter((item) => item.product.id !== id));
+  };
+
+  const setExactQuantity = (id: string, qty: number) => {
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product.id === id ? { ...item, quantity: Math.max(0, qty) } : item
+      )
+    );
+  };
+
+  const total = cart.reduce((sum, item) => sum + (item.product.price || 0) * (item.quantity || 0), 0);
+  const totalPieces = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const parsedCashGiven = Number(cashGiven) || 0;
   const change = paymentMethod === "efectivo" && parsedCashGiven >= total ? parsedCashGiven - total : 0;
   const isPaymentValid = paymentMethod !== "efectivo" || parsedCashGiven >= total;
@@ -503,7 +1012,10 @@ export default function POSPage() {
     .filter((s) => s.paymentMethod === "efectivo")
     .reduce((sum, s) => sum + s.total, 0);
   const totalExpenses = currentShiftExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const netCashInDrawer = initialCashFund + totalCashSales - totalExpenses;
+  const totalExtraInCash = incomesList
+    .filter((i) => i.paymentMethod === "efectivo")
+    .reduce((sum, i) => sum + i.amount, 0);
+  const netCashInDrawer = initialCashFund + totalCashSales + totalExtraInCash - totalExpenses;
   const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
 
   const handleQuickCash = (amount: number) => {
@@ -518,66 +1030,127 @@ export default function POSPage() {
     setExpensesList((prev) => [newExpense, ...prev]);
   };
 
+  const handleAddIncome = (newIncome: CashIncome) => {
+    setIncomesList((prev) => {
+      const updated = [newIncome, ...prev];
+      try {
+        localStorage.setItem("brito_cash_incomes", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleDeleteIncome = (id: string) => {
+    setIncomesList((prev) => {
+      const updated = prev.filter((i) => i.id !== id);
+      try {
+        localStorage.setItem("brito_cash_incomes", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  const handleOpenIncomeReceipt = (income: CashIncome) => {
+    setReceiptIncome(income);
+    setShowIncomeReceiptModal(true);
+  };
+
   const handleCheckout = async () => {
-    if (cart.length === 0 || !isPaymentValid || isSubmitting) return;
+    const validItems = cart.filter((item) => (item.quantity || 0) > 0);
+    if (validItems.length === 0 || !isPaymentValid || isSubmitting) return;
     setIsSubmitting(true);
 
-    const currentItems = [...cart];
+    const currentItems = [...validItems];
     const currentTotal = total;
     const currentPaymentMethod = paymentMethod;
     const currentCashGiven = paymentMethod === "efectivo" ? parsedCashGiven : undefined;
     const currentChange = paymentMethod === "efectivo" ? change : undefined;
 
     let createdSaleId = `POS-${Date.now().toString().slice(-6)}`;
+    let savedToCloud = false;
 
-    try {
-      const supabase = createClient();
-      
-      const { data: saleData, error: saleErr } = await supabase
-        .from("sales")
-        .insert({
+    if (isOnline) {
+      try {
+        const supabase = createClient();
+        
+        const saleInsertPayload: any = {
           total: currentTotal,
           payment_method: currentPaymentMethod,
           cashier: cashierName,
-        })
-        .select()
-        .single();
+        };
+        if (selectedCustomer.id && !selectedCustomer.id.startsWith("cli-")) {
+          saleInsertPayload.customer_id = selectedCustomer.id;
+        }
 
-      if (saleData && !saleErr) {
-        createdSaleId = saleData.id;
+        const { data: saleData, error: saleErr } = await supabase
+          .from("sales")
+          .insert(saleInsertPayload)
+          .select()
+          .single();
 
-        const saleItemsToInsert = currentItems.map((item) => ({
-          sale_id: saleData.id,
-          product_id: item.product.id.includes("-") ? item.product.id : null,
-          product_name: item.product.name,
-          quantity: item.quantity,
-          unit_price: item.product.price,
-          subtotal: item.product.price * item.quantity,
-        }));
-        await supabase.from("sale_items").insert(saleItemsToInsert);
+        if (saleData && !saleErr) {
+          createdSaleId = saleData.id;
+          savedToCloud = true;
 
-        for (const item of currentItems) {
-          if (item.product.id.includes("-")) {
-            const newStock = Math.max(0, item.product.stock - item.quantity);
-            await supabase
-              .from("products")
-              .update({ stock: newStock })
-              .eq("id", item.product.id);
+          const saleItemsToInsert = currentItems.map((item) => ({
+            sale_id: saleData.id,
+            product_id: item.product.id.includes("-") ? item.product.id : null,
+            product_name: item.product.name,
+            quantity: item.quantity,
+            unit_price: item.product.price,
+            subtotal: item.product.price * item.quantity,
+          }));
+          await supabase.from("sale_items").insert(saleItemsToInsert);
+
+          for (const item of currentItems) {
+            if (item.product.id.includes("-")) {
+              const newStock = Math.max(0, item.product.stock - item.quantity);
+              await supabase
+                .from("products")
+                .update({ stock: newStock })
+                .eq("id", item.product.id);
+            }
           }
         }
+      } catch (e) {
+        console.log("Offline sale or db pending", e);
       }
-    } catch (e) {
-      console.log("Offline sale or db pending", e);
-    } finally {
-      setProducts((prev) =>
-        prev.map((prod) => {
+    }
+
+    // Si no se guardó en la nube (offline o falla de red), encolar de forma segura en la cola offline local
+    if (!savedToCloud) {
+      enqueueOfflineItem({
+        type: "sale",
+        title: `Venta POS #${createdSaleId} (${formatCurrency(currentTotal)})`,
+        amount: currentTotal,
+        branchId: activeBranch?.id,
+        data: {
+          saleId: createdSaleId,
+          total: currentTotal,
+          paymentMethod: currentPaymentMethod,
+          cashier: cashierName,
+          items: currentItems.map((item) => ({
+            productId: item.product.id,
+            name: item.product.name,
+            quantity: item.quantity,
+            price: item.product.price,
+            subtotal: item.product.price * item.quantity,
+          })),
+        },
+      });
+    }
+
+    setProducts((prev) => {
+        const updated = prev.map((prod) => {
           const bought = currentItems.find((ci) => ci.product.id === prod.id);
           if (bought) {
             return { ...prod, stock: Math.max(0, prod.stock - bought.quantity) };
           }
           return prod;
-        })
-      );
+        });
+        saveStoredProducts(updated);
+        return updated;
+      });
 
       const newSaleRecord: Sale = {
         id: createdSaleId,
@@ -585,6 +1158,9 @@ export default function POSPage() {
         items: currentItems,
         total: currentTotal,
         paymentMethod: currentPaymentMethod,
+        transferAccount: currentPaymentMethod === "transferencia" && selectedTransferAccount
+          ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})`
+          : undefined,
         cashier: cashierName,
         cashGiven: currentCashGiven,
         change: currentChange,
@@ -598,11 +1174,84 @@ export default function POSPage() {
         registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary);
       }
 
+      // Registrar la compra en el cliente para calcular automáticamente su MODA de compra
+      if (selectedCustomer.id && selectedCustomer.id !== "cli-0") {
+        recordCustomerSale(
+          selectedCustomer.id,
+          currentItems.map((ci) => ({
+            name: ci.product.name,
+            quantity: ci.quantity,
+            unitPrice: ci.product.price,
+            subtotal: ci.product.price * ci.quantity,
+          })),
+          currentTotal,
+          activeBranch?.name,
+          cashierName,
+          currentPaymentMethod
+        );
+      }
+
       setCompletedSale(newSaleRecord);
       setRecentSalesList((prev) => [newSaleRecord, ...prev]);
       setIsSubmitting(false);
       setShowReceiptModal(true);
+
+      // Al completar la compra, la charola se limpia y vuelve automáticamente a Público en General con efectivo
+      setCart([]);
+      setCashGiven("");
+      setPaymentMethod("efectivo");
+      setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+      setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+      setCustomerSearchQuery("");
+      setIsCustomerPickerOpen(false);
+    };
+
+    const handleReceiveBreadDelivery = async (delivery: BreadDeliveryRecord) => {
+    // 1. Sumar existencias en el catálogo local y estado
+    setProducts((prev) => {
+      const updated = prev.map((prod) => {
+        const delivered = delivery.items.find((item) => item.productId === prod.id);
+        if (delivered) {
+          return { ...prod, stock: prod.stock + delivered.quantity };
+        }
+        return prod;
+      });
+      saveStoredProducts(updated);
+      return updated;
+    });
+
+    // 2. Guardar en el historial de camionetas
+    const updatedDeliveries = [delivery, ...breadDeliveriesList];
+    setBreadDeliveriesList(updatedDeliveries);
+    try {
+      localStorage.setItem("brito_bread_deliveries", JSON.stringify(updatedDeliveries));
+    } catch (e) {}
+
+    // 3. Sincronizar en Supabase si está disponible
+    try {
+      const supabase = createClient();
+      for (const item of delivery.items) {
+        if (item.productId.includes("-")) {
+          await supabase
+            .from("products")
+            .update({ stock: item.newStock })
+            .eq("id", item.productId);
+        }
+      }
+    } catch (err) {
+      console.log("Offline mode or pending db sync", err);
     }
+
+    // 4. Disparar notificación de pan surtido
+    addNotification({
+      senderName: `🚚 ${delivery.driver || "Chofer"} (${delivery.source})`,
+      senderAvatar: "🥖",
+      badgeIcon: "horno",
+      title: "Entrada de Pan Recibida",
+      highlightText: `+${delivery.totalPieces} piezas agregadas`,
+      description: `Se ingresaron ${delivery.totalPieces} piezas de pan al mostrador entregadas por ${delivery.driver || "el chofer"} y recibidas por ${delivery.cashier}.`,
+      category: "inventario",
+    });
   };
 
   const handleReprintSale = (sale: Sale) => {
@@ -614,9 +1263,71 @@ export default function POSPage() {
   const resetSale = () => {
     setCart([]);
     setCashGiven("");
+    setPaymentMethod("efectivo");
+    setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
     setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+    setCustomerSearchQuery("");
+    setIsCustomerPickerOpen(false);
     setShowReceiptModal(false);
     setCompletedSale(null);
+  };
+
+  const handleCancelTicket = () => {
+    if (!completedSale) {
+      setShowReceiptModal(false);
+      return;
+    }
+
+    const sale = completedSale;
+
+    // 1. Devolver los panes al inventario local
+    setProducts((prev) => {
+      const updated = prev.map((prod) => {
+        const returnedItem = sale.items.find((ci) => ci.product.id === prod.id);
+        if (returnedItem) {
+          return { ...prod, stock: prod.stock + returnedItem.quantity };
+        }
+        return prod;
+      });
+      saveStoredProducts(updated);
+      return updated;
+    });
+
+    // 2. Reintegrar stock en Supabase si aplica
+    try {
+      const supabase = createClient();
+      for (const item of sale.items) {
+        if (item.product.id.includes("-")) {
+          const currentProd = products.find((p) => p.id === item.product.id);
+          const restoredStock = (currentProd?.stock || 0) + item.quantity;
+          supabase
+            .from("products")
+            .update({ stock: restoredStock })
+            .eq("id", item.product.id)
+            .then();
+        }
+      }
+    } catch (e) {
+      console.log("Offline mode, stock restored locally", e);
+    }
+
+    // 3. Eliminar la venta de recentSalesList (no se cobrará el dinero ni afectará el corte)
+    setRecentSalesList((prev) => prev.filter((s) => s.id !== sale.id));
+
+    // 4. Notificación en el sistema de Panaderías Brito
+    addNotification({
+      senderName: "🥖 Panaderías Brito",
+      senderAvatar: "🥐",
+      badgeIcon: "alerta",
+      title: "Ticket Cancelado",
+      highlightText: `Compra #${sale.id} Anulada`,
+      description: `Se canceló el ticket de ${formatCurrency(sale.total)} MXN y se devolvieron ${sale.items.reduce((s, i) => s + i.quantity, 0)} piezas de pan al mostrador.`,
+      category: "caja",
+    });
+
+    // 5. Cerrar ticket directamente y reiniciar estado de venta
+    setShowReceiptModal(false);
+    resetSale();
   };
 
   const catalogScrollRef = useRef<HTMLDivElement>(null);
@@ -681,20 +1392,39 @@ export default function POSPage() {
             {/* Contenedor Principal de Información Financiera de Relevo */}
             <div className="bg-gradient-to-b from-[#24120a] to-[#1a0c06] border-2 border-amber-500/50 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
               
-              {/* 1. TARJETA PROMINENTE: CON CUÁNTO DINERO SE INICIARÁ EL TURNO (NÚMEROS GRANDES) */}
-              <div className="bg-gradient-to-br from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 p-5 rounded-3xl text-center space-y-1.5 shadow-xl ring-2 ring-amber-400/20 relative overflow-hidden">
+              {/* 1. TARJETA PROMINENTE: CON CUÁNTO DINERO SE INICIARÁ EL TURNO (CUADRO DIRECTO PARA EDITAR) */}
+              <div className="bg-gradient-to-br from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 p-5 sm:p-6 rounded-3xl text-center space-y-3 shadow-xl ring-2 ring-amber-400/20 relative overflow-hidden">
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
+                
                 <span className="text-xs sm:text-sm font-black uppercase text-amber-300 tracking-wider flex items-center justify-center gap-1.5">
                   <span>🪙</span> Con este dinero se iniciará el turno:
                 </span>
-                
-                {/* NÚMERO GIGANTE */}
-                <div className="text-5xl sm:text-6xl font-black text-amber-300 tracking-tight py-1 filter drop-shadow-[0_4px_12px_rgba(245,158,11,0.35)]">
-                  {formatCurrency(initialCashFund)}
+
+                {/* EL CUADRO PARA EDITAR DIRECTO */}
+                <div className="relative max-w-sm mx-auto my-2">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-3xl sm:text-4xl text-amber-400 select-none">
+                    $
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={shiftFundInput}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => {
+                      setShiftFundInput(cleanDecimalNumbers(e.target.value));
+                    }}
+                    placeholder="0.00"
+                    className="w-full pl-12 pr-32 py-4 bg-black/65 border-2 border-amber-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-400/30 rounded-2xl font-black text-4xl sm:text-5xl text-amber-300 text-center tracking-tight focus:outline-none transition-all shadow-inner"
+                  />
+                  {/* Leyenda en lugar de las opciones */}
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black select-none pointer-events-none">
+                    <Pencil className="w-3 h-3 text-amber-400" />
+                    <span>Editar texto</span>
+                  </div>
                 </div>
 
-                <div className="inline-block bg-amber-500/20 text-amber-200 text-xs font-bold px-4 py-1 rounded-full border border-amber-400/30">
-                  Fondo Inicial disponible en el cajón para cambio
+                <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-200 text-[11px] font-bold px-3 py-1 rounded-full border border-amber-400/30">
+                  <span>Fondo Inicial disponible en el cajón para cambio</span>
                 </div>
               </div>
 
@@ -768,32 +1498,118 @@ export default function POSPage() {
         ref={catalogScrollRef}
         className="flex-1 flex flex-col min-w-0 px-4 lg:px-5 pb-6 pt-0 pr-3 sm:pr-4 overflow-y-auto scroll-smooth relative"
       >
+        {/* Alerta flotante de escaneo de código de barras */}
+        {lastScannedItem && (
+          <div className={`fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border-2 animate-in fade-in slide-in-from-top-3 duration-200 max-w-md w-[92vw] sm:w-auto ${
+            lastScannedItem.success
+              ? "bg-emerald-950/95 border-emerald-400 text-emerald-100 ring-4 ring-emerald-500/20"
+              : "bg-rose-950/95 border-rose-400 text-rose-100 ring-4 ring-rose-500/20"
+          }`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg font-black shrink-0 ${
+              lastScannedItem.success ? "bg-emerald-500 text-stone-950" : "bg-rose-500 text-white"
+            }`}>
+              {lastScannedItem.success ? "✓" : "✕"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm font-black truncate">
+                {lastScannedItem.success
+                  ? `${lastScannedItem.productName} (+1 pieza)`
+                  : `Código no registrado: ${lastScannedItem.code}`}
+              </p>
+              <p className="text-[11px] opacity-85 truncate font-medium">
+                {lastScannedItem.success
+                  ? `Código: ${lastScannedItem.code} • Sumado a la charola de cobro`
+                  : "Verifica que el producto tenga asignado este código en el Catálogo"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLastScannedItem(null)}
+              className="p-1 rounded-lg text-stone-300 hover:text-white hover:bg-white/10 shrink-0"
+              title="Cerrar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
         <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
-          <div className="flex items-center justify-between gap-3 w-full">
-            {/* Buscador de Productos (Grande, Claro y Cómodo) */}
-            <div className="relative flex-1 max-w-xl">
-              <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-              <input
-                type="text"
-                placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-12 pr-10 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+          {isSyncing && (
+            <div className="bg-amber-500/15 border border-amber-500/30 text-amber-950 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
+                <span>
+                  <strong>Sincronizando con la nube:</strong> Subiendo ventas acumuladas a la base de datos central...
+                </span>
+              </div>
+            </div>
+          )}
+
+          {!isOnline && (
+            <div className="bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 border border-amber-500/30 text-amber-950 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <WifiOff className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>
+                  <strong>Modo Fuera de Línea Activo:</strong> Cobro local habilitado. Las ventas se guardan en la memoria de esta PC y se sincronizarán al detectar internet.
+                </span>
+              </div>
+              {pendingCount > 0 && (
+                <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
+                  {pendingCount} {pendingCount === 1 ? "venta pendiente" : "ventas pendientes"}
+                </span>
               )}
             </div>
+          )}
 
-            {/* Botón Grande: Categorías y Precios (Fijo con colores oficiales, texto y tamaño estables) */}
-            <div className="relative shrink-0">
+          <div className="flex items-center justify-between gap-3 w-full">
+            {/* Botón Menú Móvil */}
+            <button
+              type="button"
+              onClick={toggleMobile}
+              className="md:hidden p-3 rounded-2xl bg-white hover:bg-stone-50 text-stone-700 transition-colors border-2 border-stone-200 shrink-0 shadow-xs"
+              title="Abrir menú"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {/* Buscador de Productos & Escáner de Código de Barras */}
+            <div className="flex items-center gap-2 flex-1 max-w-2xl min-w-0">
+              {/* Buscador General con Soporte de Enter para Código */}
+              <div className="relative flex-1 min-w-0">
+                <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && search.trim()) {
+                      const matched = findProductByBarcodeOrCode(search.trim(), products);
+                      if (matched) {
+                        e.preventDefault();
+                        handleBarcodeScan(search.trim());
+                        setSearch("");
+                      }
+                    }
+                  }}
+                  className="w-full pl-12 pr-10 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Grupo Catálogo y Pan: Categorías y Precios + Entrada de Pan directamente a lado */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Botón Grande: Categorías y Precios */}
               <button
                 type="button"
                 onClick={() => setShowCategoryPanel(!showCategoryPanel)}
@@ -817,10 +1633,70 @@ export default function POSPage() {
                 )}
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
               </button>
+
+              {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
+              {false && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isShiftLocked) {
+                      addNotification({
+                        senderName: "🔒 Terminal Bloqueada",
+                        senderAvatar: "⚠️",
+                        badgeIcon: "alerta",
+                        title: "Terminal Bloqueada",
+                        highlightText: "Turno cerrado por seguridad",
+                        description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar entrada de pan.",
+                        category: "inventario",
+                      });
+                      return;
+                    }
+                    setShowBreadDeliveryModal(true);
+                  }}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
+                    isShiftLocked
+                      ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
+                      : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black"
+                  }`}
+                  title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
+                >
+                  <span className="text-lg">🚐</span>
+                  <span>Entrada de Pan</span>
+                </button>
+              )}
+              {/* Botón Selector e Indicador de Impresora Directa */}
+              <button
+                type="button"
+                onClick={() => setShowPrinterModal(true)}
+                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-stone-300 hover:border-amber-400 bg-white hover:bg-amber-50/80 text-stone-900 transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer group"
+                title={`Impresora de tickets conectada: ${printerConfig.selectedPrinterName} (${printerConfig.port}). Haz clic para elegir la impresora directa o hacer prueba de impresión.`}
+              >
+                <div className="relative">
+                  <Printer className="w-5 h-5 text-amber-600 group-hover:scale-110 transition-transform" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
+                </div>
+                <div className="text-left hidden xl:block">
+                  <div className="flex items-center gap-1.5 leading-none">
+                    <span className="text-xs font-black text-stone-900 truncate max-w-[120px]">
+                      {printerConfig.selectedPrinterName}
+                    </span>
+                    <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 uppercase">
+                      {printerConfig.directPrinting ? "Directa" : "Diálogo"}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-stone-400 font-bold block mt-0.5">
+                    {printerConfig.paperWidth} • {printerConfig.port}
+                  </span>
+                </div>
+                <div className="xl:hidden flex items-center gap-1 text-xs font-black">
+                  <span>{printerConfig.selectedPrinterName}</span>
+                </div>
+              </button>
             </div>
 
-            {/* Botón Gasto Rápido (Colores, texto y tamaño estables) */}
-            <div className="relative shrink-0">
+            {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
               <button
                 type="button"
                 onClick={() => {
@@ -831,27 +1707,27 @@ export default function POSPage() {
                       badgeIcon: "alerta",
                       title: "Terminal Bloqueada",
                       highlightText: "Turno cerrado por seguridad",
-                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar gastos.",
+                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar movimientos de caja.",
                       category: "caja",
                     });
                     return;
                   }
                   setShowExpensesModal(true);
                 }}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
                   isShiftLocked
                     ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                    : "border-rose-200 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/80 text-rose-900 text-sm sm:text-base font-black"
+                    : "border-amber-300 hover:border-amber-400 bg-amber-50 hover:bg-amber-100/90 text-stone-900 text-sm sm:text-base font-black"
                 }`}
-                title={isShiftLocked ? "Terminal bloqueada" : "Registrar salida o gasto de dinero"}
+                title={isShiftLocked ? "Terminal bloqueada" : "Registrar gastos, retiros de dueños y entradas para cambio de billetes"}
               >
-                <span className="text-lg">💸</span>
-                <span>Gasto</span>
+                <span className="w-6 h-6 rounded-xl bg-amber-500 text-stone-950 font-black flex items-center justify-center text-xs shadow-xs border border-amber-400 shrink-0">
+                  $
+                </span>
+                <span>Movimientos de Caja</span>
               </button>
-            </div>
 
-            {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
-            <div className="relative shrink-0">
+              {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
               <button
                 type="button"
                 onClick={() => {
@@ -877,7 +1753,7 @@ export default function POSPage() {
                 }`}
                 title={isShiftLocked ? "Turno ya cerrado y bloqueado" : "Cerrar turno de la cajera y bloquear la terminal con candado"}
               >
-                <Lock className="w-4 h-4 text-amber-200" />
+                <span>🔒</span>
                 <span>{isShiftLocked ? "Turno Cerrado 🔒" : "Cerrar Turno"}</span>
               </button>
             </div>
@@ -1001,18 +1877,13 @@ export default function POSPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12">
           {filteredProducts.map((product) => {
-            const isOutOfStock = product.stock <= 0;
             const itemInCart = cart.find((i) => i.product.id === product.id);
 
             return (
               <div
                 key={product.id}
                 onClick={() => addToCart(product)}
-                className={`group bg-white rounded-2xl border border-stone-200/90 overflow-hidden flex flex-col justify-between transition-all duration-200 relative select-none cursor-pointer ${
-                  isOutOfStock
-                    ? "opacity-60 cursor-not-allowed bg-stone-100"
-                    : "hover:shadow-lg hover:border-amber-400 hover:-translate-y-0.5 active:scale-[0.99]"
-                }`}
+                className="group bg-white rounded-2xl border border-stone-200/90 overflow-hidden flex flex-col justify-between transition-all duration-200 relative select-none cursor-pointer hover:shadow-lg hover:border-amber-400 hover:-translate-y-0.5 active:scale-[0.99]"
               >
                 {/* Active in-cart indicator */}
                 {itemInCart && (
@@ -1050,14 +1921,10 @@ export default function POSPage() {
                     </span>
                   </div>
 
-                  {/* Stock Tag on Image */}
+                  {/* Tag on Image: Disponible libre sin límites */}
                   <div className="absolute bottom-2.5 left-2.5 z-10">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md shadow-xs ${
-                      isOutOfStock
-                        ? "bg-rose-600/90 text-white font-black"
-                        : "bg-black/65 text-stone-100"
-                    }`}>
-                      {isOutOfStock ? "Agotado" : `${product.stock} disp.`}
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md shadow-xs bg-black/60 text-stone-100">
+                      {product.stock > 0 ? `${product.stock} piezas` : "Disponible"}
                     </span>
                   </div>
                 </div>
@@ -1085,6 +1952,21 @@ export default function POSPage() {
                     <p className="text-xs text-stone-500 mt-0.5 line-clamp-1 font-sans">
                       {product.description || "Panadería artesanal horneada diariamente."}
                     </p>
+
+                    {/* Código / Código de barras */}
+                    {(product.barcode || product.code) && (
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-50/90 text-amber-900 border border-amber-200/90 shadow-2xs">
+                          <Barcode className="w-3 h-3 text-amber-700 shrink-0" />
+                          <span>{product.barcode || product.code}</span>
+                        </span>
+                        {product.code && product.barcode && (
+                          <span className="text-[10px] font-bold text-stone-400 font-mono">
+                            [{product.code}]
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1097,12 +1979,12 @@ export default function POSPage() {
       {isMobileCartOpen && (
         <div
           onClick={() => setIsMobileCartOpen(false)}
-          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          className="lg:hidden fixed inset-0 z-[120] bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
         />
       )}
 
       {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone - Amplia y Espaciosa) */}
-      <div className={`fixed lg:static inset-y-0 right-0 z-40 w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl transition-transform duration-300 ease-in-out relative overflow-hidden ${
+      <div className={`fixed lg:static inset-y-0 right-0 z-[120] lg:z-10 w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out relative overflow-hidden ${
         isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       }`}>
         {/* Header con colores de la marca y micro-animación */}
@@ -1113,12 +1995,21 @@ export default function POSPage() {
               <ShoppingBag className="w-4 h-4 text-white" />
             </div>
             <div>
-                  <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
-                    Charola de Cobro
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  </h3>
-                  <p className="text-[11px] text-amber-300 font-bold">{cashierName} • Mostrador</p>
-                </div>
+              <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
+                Charola de Cobro
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              </h3>
+              <div className="flex items-center gap-1.5 text-[11px] text-amber-300 font-bold flex-wrap mt-0.5">
+                <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-400/30 text-[10px] font-black tracking-wide shadow-2xs">
+                  <Store className="w-3 h-3 text-amber-300" />
+                  <span>{activeBranch ? activeBranch.name : "Sucursal Matriz"}</span>
+                </span>
+                <span className="text-amber-400/60">•</span>
+                <span className="text-stone-100 font-semibold">{cashierName}</span>
+                <span className="text-amber-400/60">•</span>
+                <span className="text-amber-300/80 font-medium">Mostrador</span>
+              </div>
+            </div>
               </div>
               <div className="flex items-center gap-2 relative z-10">
                 <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all ${
@@ -1139,24 +2030,58 @@ export default function POSPage() {
               </div>
             </div>
 
-        {/* CUSTOMER SELECTION / SMART SEARCH QUICK BAR */}
+        {/* CUSTOMER SELECTION / SMART SEARCH QUICK BAR: TODO EN EL MISMO CUADRO */}
         <div ref={customerPickerRef} className="p-2 sm:px-3 bg-gradient-to-r from-amber-50/90 via-stone-50 to-orange-50/70 border-b border-amber-200/80 shrink-0 relative">
-          {selectedCustomer.type === "general" ? (
-            /* 1. MODO BÚSQUEDA RÁPIDA / PÚBLICO GENERAL */
-            <div className="flex items-center gap-2 w-full">
-              {/* Buscador Inteligente Integrado Directo */}
-              <div className="flex-1 relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-amber-700 pointer-events-none" />
+          {/* Cuadro unificado: Badge del cliente (Público en General o Cliente Específico) + Buscador Integrado */}
+          <div className="flex items-center gap-2 w-full">
+            <div className="flex-1 flex items-center bg-white rounded-2xl border-2 border-amber-300/90 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-400/20 px-2 sm:px-2.5 py-1.5 gap-2 shadow-2xs transition-all">
+              
+              {/* 1. Badge / Indicador: Público en General o Cliente Específico */}
+              {selectedCustomer.id === "cli-0" ? (
+                <div 
+                  className="flex items-center gap-1.5 bg-amber-100 text-amber-950 border border-amber-300/90 px-2.5 py-1 rounded-xl text-xs font-black shrink-0 select-none shadow-2xs"
+                  title="Cliente actual: Público en General"
+                >
+                  <span className="text-sm">👤</span>
+                  <span className="whitespace-nowrap">Público en General</span>
+                </div>
+              ) : (
+                <div 
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2.5 py-1 rounded-xl text-xs font-black shrink-0 shadow-xs max-w-[190px]"
+                  title={`Cliente asignado: ${selectedCustomer.name}. Clic en ✕ para volver a Público en General`}
+                >
+                  <span className="text-xs shrink-0">👤</span>
+                  <span className="truncate max-w-[110px]">{selectedCustomer.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => selectCustomer(DEFAULT_GENERAL_CUSTOMER)}
+                    className="p-0.5 hover:bg-black/25 rounded-full transition-colors cursor-pointer shrink-0 ml-0.5"
+                    title="Terminar y volver a Público en General"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Separador vertical */}
+              <div className="h-4 w-px bg-stone-200 shrink-0" />
+
+              {/* 2. Campo de búsqueda de cliente en el mismo cuadro */}
+              <div className="flex-1 relative flex items-center min-w-0">
+                <Search className="w-3.5 h-3.5 text-stone-400 shrink-0 mr-1.5 pointer-events-none" />
                 <input
                   type="text"
-                  placeholder="🔍 Buscar cliente rápido (Teléfono, Nombre o Característica)..."
+                  placeholder={selectedCustomer.id === "cli-0" ? "Buscar cliente específico..." : "Buscar otro cliente..."}
                   value={customerSearchQuery}
-                  onFocus={() => setIsCustomerPickerOpen(true)}
-                  onChange={(e) => {
-                    setCustomerSearchQuery(e.target.value);
-                    if (!isCustomerPickerOpen) setIsCustomerPickerOpen(true);
+                  onFocus={() => {
+                    setIsCustomerPickerOpen(true);
                   }}
-                  className="w-full pl-9 pr-8 py-2 bg-white rounded-xl text-xs font-bold text-stone-900 border-2 border-amber-300/90 focus:border-amber-500 focus:ring-2 focus:ring-amber-400/20 focus:outline-none transition-all placeholder:text-stone-400 shadow-2xs"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomerSearchQuery(val);
+                    setIsCustomerPickerOpen(true);
+                  }}
+                  className="w-full bg-transparent text-xs font-bold text-stone-900 focus:outline-none placeholder:text-stone-400 min-w-0 truncate"
                 />
                 {customerSearchQuery && (
                   <button
@@ -1164,135 +2089,52 @@ export default function POSPage() {
                     onClick={() => {
                       setCustomerSearchQuery("");
                     }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5"
+                    className="text-stone-400 hover:text-stone-700 p-0.5 ml-1 shrink-0 cursor-pointer"
+                    title="Borrar texto de búsqueda"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
-
-              {/* Botón Lista Clientes */}
-              <button
-                type="button"
-                onClick={() => setIsCustomerPickerOpen(!isCustomerPickerOpen)}
-                className={`px-2.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all border shrink-0 active:scale-95 ${
-                  isCustomerPickerOpen
-                    ? "bg-stone-900 text-amber-300 border-stone-900 shadow-md"
-                    : "bg-white hover:bg-stone-100 text-stone-700 border-stone-200 shadow-2xs"
-                }`}
-                title="Ver lista de clientes"
-              >
-                <Users className="w-3.5 h-3.5 text-amber-600" />
-                <span className="hidden sm:inline">Clientes</span>
-                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isCustomerPickerOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              {/* Botón Registrar Nuevo Cliente */}
-              <button
-                type="button"
-                onClick={() => {
-                  setNewCustName("");
-                  setNewCustPhone("");
-                  setNewCustNotes("");
-                  setIsNewCustomerModalOpen(true);
-                  setIsCustomerPickerOpen(false);
-                }}
-                className="py-2 px-3 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1 shrink-0"
-                title="Registrar nuevo cliente"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="text-[11px]">Nuevo</span>
-              </button>
             </div>
-          ) : (
-            /* 2. MODO CLIENTE ASIGNADO */
-            <div className="flex items-center justify-between gap-2 w-full">
-              {/* Tarjeta del cliente asignado */}
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-xs font-bold text-sm">
-                  ⭐
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-black text-xs text-stone-900 truncate" title={selectedCustomer.name}>
-                      {selectedCustomer.name}
-                    </span>
-                    <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300">
-                      Cliente Asignado
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-stone-500 font-medium truncate">
-                    {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && selectedCustomer.phone !== "Sin teléfono" ? `📞 ${selectedCustomer.phone}` : "Cliente frecuente"}
-                    {selectedCustomer.notes ? ` • 📝 ${selectedCustomer.notes}` : ""}
-                  </p>
-                </div>
-              </div>
 
-              {/* Acciones */}
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
-                    setCustomerSearchQuery("");
-                    setIsCustomerPickerOpen(false);
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl text-stone-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-stone-200 hover:border-rose-200 text-xs font-bold transition-all flex items-center gap-1 shadow-2xs active:scale-95"
-                  title="Volver a Público General"
-                >
-                  <X className="w-3.5 h-3.5 text-rose-500" />
-                  <span className="text-[11px]">General</span>
-                </button>
+            {/* Botón Registrar Nuevo Cliente */}
+            <button
+              type="button"
+              onClick={() => {
+                setNewCustName(customerSearchQuery || "");
+                setNewCustPhone("");
+                setNewCustNotes("");
+                setIsNewCustomerModalOpen(true);
+                setIsCustomerPickerOpen(false);
+              }}
+              className="py-2.5 px-3 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1 shrink-0 cursor-pointer"
+              title="Registrar nuevo cliente"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="text-[11px]">Nuevo</span>
+            </button>
+          </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsCustomerPickerOpen(!isCustomerPickerOpen)}
-                  className={`p-1.5 px-2.5 rounded-xl text-xs font-black flex items-center gap-1 transition-all active:scale-95 shadow-2xs border ${
-                    isCustomerPickerOpen
-                      ? "bg-stone-900 text-amber-300 border-stone-900 shadow-md"
-                      : "bg-white hover:bg-amber-100/70 text-stone-800 border-stone-200"
-                  }`}
-                  title="Buscar otro cliente"
-                >
-                  <Search className="w-3.5 h-3.5 text-amber-600" />
-                  <span className="text-[11px] hidden sm:inline">Buscar</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewCustName("");
-                    setNewCustPhone("");
-                    setNewCustNotes("");
-                    setIsNewCustomerModalOpen(true);
-                    setIsCustomerPickerOpen(false);
-                  }}
-                  className="p-1.5 px-2.5 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 border border-amber-400 flex items-center gap-1"
-                  title="Registrar nuevo cliente"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Nuevo</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Customer Dropdown Popover con resultados desplegables */}
+          {/* Customer Dropdown Popover: Se despliega al interactuar o buscar */}
           {isCustomerPickerOpen && (
             <div className="absolute left-2 right-2 top-full mt-1.5 z-50 bg-white rounded-2xl shadow-2xl border-2 border-amber-400/90 p-3 space-y-2.5 animate-in fade-in zoom-in-95 duration-150 max-h-[400px] flex flex-col">
               {/* Popover Header */}
               <div className="flex items-center justify-between pb-1 border-b border-stone-100">
                 <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-amber-600" /> Resultados de Clientes
+                  <Users className="w-3.5 h-3.5 text-amber-600" />
+                  {customerSearchQuery.trim().length > 0 
+                    ? `Clientes encontrados para "${customerSearchQuery}"` 
+                    : "Selecciona un cliente o vuelve a Público en General"}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-stone-400 font-bold">
-                    {filteredCustomers.length} {filteredCustomers.length === 1 ? "resultado" : "resultados"}
-                  </span>
                   <button
                     type="button"
-                    onClick={() => setIsCustomerPickerOpen(false)}
-                    className="p-0.5 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+                    onClick={() => {
+                      setIsCustomerPickerOpen(false);
+                      setCustomerSearchQuery("");
+                    }}
+                    className="p-0.5 rounded-md text-stone-400 hover:text-stone-700 hover:bg-stone-100 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1301,35 +2143,35 @@ export default function POSPage() {
 
               {/* Options List */}
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[240px]">
-                {/* Default Público General Quick Select Option */}
-                {!customerSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
-                      setIsCustomerPickerOpen(false);
-                    }}
-                    className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border ${
-                      selectedCustomer.id === DEFAULT_GENERAL_CUSTOMER.id
-                        ? "bg-amber-50 border-amber-300 ring-1 ring-amber-300"
-                        : "bg-stone-50/70 hover:bg-amber-50/50 border-stone-200"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-stone-200 text-stone-700 flex items-center justify-center font-bold text-sm shrink-0">
-                        👤
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-black text-xs text-stone-900">Público General (Mostrador)</p>
-                        <p className="text-[10px] text-stone-500 font-medium">Venta rápida sin registro</p>
-                      </div>
+                {/* 1. Opción fija: Volver a Público en General */}
+                <button
+                  type="button"
+                  onClick={() => selectCustomer(DEFAULT_GENERAL_CUSTOMER)}
+                  className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border cursor-pointer ${
+                    selectedCustomer.id === "cli-0"
+                      ? "bg-amber-100 border-amber-400 ring-1 ring-amber-400 shadow-2xs font-black"
+                      : "bg-amber-50/60 hover:bg-amber-100/70 border-amber-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                      👤
                     </div>
-                    {selectedCustomer.id === DEFAULT_GENERAL_CUSTOMER.id && (
-                      <Check className="w-4 h-4 text-amber-600 shrink-0" />
-                    )}
-                  </button>
-                )}
+                    <div className="min-w-0 flex-1">
+                      <span className="font-black text-xs text-amber-950 truncate block">
+                        Público en General
+                      </span>
+                      <span className="text-[10px] text-amber-800 font-medium">
+                        Venta de mostrador al contado (predeterminado)
+                      </span>
+                    </div>
+                  </div>
+                  {selectedCustomer.id === "cli-0" && (
+                    <Check className="w-4 h-4 text-amber-700 shrink-0" />
+                  )}
+                </button>
 
+                {/* 2. Lista de clientes registrados coincidentes */}
                 {filteredCustomers
                   .filter((c) => c.id !== "cli-0")
                   .map((c) => {
@@ -1338,12 +2180,8 @@ export default function POSPage() {
                       <button
                         key={c.id}
                         type="button"
-                        onClick={() => {
-                          setSelectedCustomer(c);
-                          setIsCustomerPickerOpen(false);
-                          setCustomerSearchQuery("");
-                        }}
-                        className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border ${
+                        onClick={() => selectCustomer(c)}
+                        className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all border cursor-pointer ${
                           isSelected
                             ? "bg-amber-50 border-amber-300 ring-1 ring-amber-300 shadow-2xs"
                             : "bg-white hover:bg-amber-50/50 border-stone-200"
@@ -1361,8 +2199,13 @@ export default function POSPage() {
                               {c.phone && c.phone !== "N/A" && c.phone !== "Sin teléfono" && (
                                 <span className="font-bold text-stone-700">📞 {c.phone}</span>
                               )}
+                              {c.favoriteProduct && (
+                                <span className="text-amber-950 font-black bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md truncate max-w-[200px]">
+                                  🍞 Moda: {c.favoriteProduct}
+                                </span>
+                              )}
                               {c.notes && (
-                                <span className="text-amber-900 bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded">
+                                <span className="text-amber-900 bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded truncate max-w-[200px]">
                                   📝 {c.notes}
                                 </span>
                               )}
@@ -1377,10 +2220,10 @@ export default function POSPage() {
                     );
                   })}
 
-                {filteredCustomers.filter((c) => c.id !== "cli-0").length === 0 && (
+                {filteredCustomers.filter((c) => c.id !== "cli-0").length === 0 && customerSearchQuery.trim().length > 0 && (
                   <div className="p-4 text-center space-y-1.5 bg-stone-50 rounded-xl border border-dashed border-stone-200">
-                    <p className="text-xs font-black text-stone-700">No se encontró el cliente</p>
-                    <p className="text-[10px] text-stone-500">¿Deseas registrarlo con estos datos?</p>
+                    <p className="text-xs font-black text-stone-700">No se encontró &quot;{customerSearchQuery}&quot;</p>
+                    <p className="text-[10px] text-stone-500">¿Deseas registrarlo como un nuevo cliente?</p>
                     <button
                       type="button"
                       onClick={() => {
@@ -1403,30 +2246,86 @@ export default function POSPage() {
                   </div>
                 )}
               </div>
-
-              {/* Bottom Quick Register Action */}
-              <div className="pt-2 border-t border-stone-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewCustName("");
-                    setNewCustPhone("");
-                    setNewCustNotes("");
-                    setIsNewCustomerModalOpen(true);
-                    setIsCustomerPickerOpen(false);
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Registrar Nuevo Cliente</span>
-                </button>
-              </div>
             </div>
           )}
         </div>
 
+        {/* BARRA DE ESCÁNER DIRECTA EN LA CHAROLA DE COBRO */}
+        <div className="p-2 sm:px-3 bg-gradient-to-r from-amber-100/90 via-amber-50 to-orange-100/80 border-b border-amber-200/90 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 flex items-center">
+              <Barcode className="w-4 h-4 absolute left-2.5 text-amber-800 pointer-events-none" />
+              <input
+                ref={cartBarcodeInputRef}
+                type="text"
+                placeholder="Escanear código de barras..."
+                value={cartBarcodeInput}
+                onChange={(e) => setCartBarcodeInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleBarcodeScan(cartBarcodeInput);
+                  }
+                }}
+                className="w-full pl-8 pr-16 py-1.5 bg-white border-2 border-amber-300 focus:border-amber-600 rounded-xl text-xs font-mono font-black text-amber-950 placeholder:text-amber-700/60 focus:outline-none shadow-2xs transition-all"
+                title="Escanea con la pistola o teclea el código y presiona Enter para agregar a la charola"
+              />
+              <button
+                type="button"
+                onClick={() => handleBarcodeScan(cartBarcodeInput)}
+                disabled={!cartBarcodeInput.trim()}
+                className="absolute right-1 px-2 py-0.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white rounded-lg text-[10px] font-black transition-all cursor-pointer shadow-2xs"
+                title="Cobrar producto con este código de barras"
+              >
+                + Cobrar
+              </button>
+            </div>
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-1 rounded-xl shadow-2xs whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Lector Activo
+            </span>
+          </div>
+        </div>
+
+        {/* ALERTA VISUAL DE ESCANEO DENTRO DE LA CHAROLA */}
+        {lastScannedItem && (
+          <div className={`mx-2 sm:mx-3 mt-2 p-2 rounded-xl border-2 flex items-center justify-between gap-2 text-xs font-bold transition-all shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 shrink-0 ${
+            lastScannedItem.success
+              ? "bg-emerald-50 border-emerald-400 text-emerald-950 ring-2 ring-emerald-400/20"
+              : "bg-rose-50 border-rose-400 text-rose-950 ring-2 ring-rose-400/20"
+          }`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black shrink-0 shadow-2xs ${
+                lastScannedItem.success ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+              }`}>
+                {lastScannedItem.success ? "✓" : "✕"}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-black text-xs leading-tight">
+                  {lastScannedItem.success
+                    ? `¡Escaneado! ${lastScannedItem.productName} (+1)`
+                    : `Código no registrado: ${lastScannedItem.code}`}
+                </p>
+                <p className="text-[10px] opacity-80 font-mono truncate">
+                  {lastScannedItem.success
+                    ? `Código: ${lastScannedItem.code} • Sumado a la charola`
+                    : "Verifica que el producto esté registrado en el Catálogo de Productos"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLastScannedItem(null)}
+              className="p-1 text-stone-400 hover:text-stone-700 rounded-lg hover:bg-black/5 shrink-0"
+              title="Cerrar aviso"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Cart Items List - Optimizado para ver al menos 5 productos simultáneamente */}
-        <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-1.5">
+        <div ref={cartContainerRef} className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-1.5 scroll-smooth">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-2 animate-in fade-in zoom-in-95 duration-200">
               <div className="relative">
@@ -1440,15 +2339,22 @@ export default function POSPage() {
                 </span>
                 <p className="text-sm font-black text-stone-900">Charola vacía</p>
                 <p className="text-[11px] text-stone-500 max-w-[220px] leading-relaxed mx-auto font-medium">
-                  Toca cualquier pan del mostrador para agregarlo al pedido.
+                  Escanea el código de barras o toca cualquier pan del mostrador para agregarlo al cobro.
                 </p>
               </div>
             </div>
           ) : (
-            cart.map((item) => (
+            cart.map((item) => {
+              const isJustScanned = justScannedId === item.product.id;
+              return (
               <div
                 key={item.product.id}
-                className="p-2 sm:p-2.5 bg-white hover:bg-amber-50/30 rounded-2xl border border-stone-200 hover:border-amber-300 transition-all shadow-2xs hover:shadow-xs space-y-1.5"
+                data-product-id={item.product.id}
+                className={`p-2 sm:p-2.5 rounded-2xl border transition-all duration-300 space-y-1.5 relative ${
+                  isJustScanned
+                    ? "bg-emerald-50/80 border-emerald-400 ring-2 ring-emerald-500 shadow-md scale-[1.01]"
+                    : "bg-white hover:bg-amber-50/30 border-stone-200 hover:border-amber-300 shadow-2xs hover:shadow-xs"
+                }`}
               >
                 <div className="flex items-center gap-2 sm:gap-2.5">
                   {/* Foto del Pan */}
@@ -1464,16 +2370,42 @@ export default function POSPage() {
                     </div>
                   )}
 
-                  {/* Nombre y Precio Unitario */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-black text-xs sm:text-sm text-stone-900 leading-tight truncate" title={item.product.name}>
-                      {item.product.name}
-                    </p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span className="text-xs text-amber-800 font-black">
-                        {formatCurrency(item.product.price)}
-                      </span>
-                      <span className="text-[10px] text-stone-400 font-medium">c/pieza</span>
+                  {/* Nombre, Código de barras y Precio Unitario */}
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-black text-xs sm:text-sm text-stone-900 leading-tight truncate max-w-[170px]" title={item.product.name}>
+                        {item.product.name}
+                      </p>
+                      {isJustScanned && (
+                        <span className="px-1.5 py-0.2 rounded-md bg-emerald-600 text-white font-black text-[9px] uppercase tracking-wider animate-bounce inline-flex items-center gap-0.5 shadow-2xs">
+                          ⚡ ¡Escaneado!
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Chips de Código de Barras y Clave */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {item.product.barcode && (
+                        <span 
+                          className="inline-flex items-center gap-1 font-mono text-[9px] sm:text-[10px] font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300/80 shadow-2xs"
+                          title={`Código de barras: ${item.product.barcode}`}
+                        >
+                          <Barcode className="w-3 h-3 text-amber-700 shrink-0" />
+                          <span>{item.product.barcode}</span>
+                        </span>
+                      )}
+                      {item.product.code && (
+                        <span className="text-[9px] font-mono font-bold text-stone-500 bg-stone-100 px-1 rounded border border-stone-200">
+                          #{item.product.code}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 pt-0.5">
+                      <CartPriceInput
+                        value={item.product.price}
+                        onChange={(newPrice) => updateCartItemPrice(item.product.id, newPrice)}
+                      />
                     </div>
                   </div>
 
@@ -1482,44 +2414,40 @@ export default function POSPage() {
                     <button
                       type="button"
                       onClick={() => updateQuantity(item.product.id, -1)}
-                      className="w-7 h-7 flex items-center justify-center bg-stone-100 hover:bg-amber-100 active:scale-90 rounded-lg text-stone-800 transition-all font-black border border-stone-200 shadow-2xs"
-                      title="Restar 1 pieza"
+                      disabled={item.quantity <= 1}
+                      className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all font-black border border-stone-200 shadow-2xs ${
+                        item.quantity <= 1
+                          ? "opacity-35 cursor-not-allowed bg-stone-100 text-stone-400"
+                          : "bg-stone-100 hover:bg-amber-100 active:scale-90 text-stone-800 cursor-pointer"
+                      }`}
+                      title={item.quantity <= 1 ? "Mínimo 1 pieza (usa el bote de basura para quitar)" : "Restar 1 pieza"}
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
 
                     {/* Input editable directo para escribir piezas (ej. 100 bolillos) */}
-                    <input
-                      type="number"
-                      min="1"
-                      max="9999"
+                    <CartQuantityInput
                       value={item.quantity}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        setExactQuantity(item.product.id, isNaN(val) ? 1 : Math.max(1, val));
-                      }}
-                      onFocus={(e) => e.target.select()}
-                      className="w-11 h-7 text-center font-black text-xs sm:text-sm bg-white border border-amber-400 focus:border-amber-600 rounded-lg focus:outline-none shadow-inner text-stone-900 cursor-text"
-                      title="Haz clic para escribir la cantidad de piezas directamente (ej. 100)"
+                      onChange={(newQty) => setExactQuantity(item.product.id, newQty)}
                     />
 
                     <button
                       type="button"
                       onClick={() => updateQuantity(item.product.id, 1)}
-                      className="w-7 h-7 flex items-center justify-center bg-stone-100 hover:bg-amber-100 active:scale-90 rounded-lg text-stone-800 transition-all font-black border border-stone-200 shadow-2xs"
+                      className="w-7 h-7 flex items-center justify-center bg-stone-100 hover:bg-amber-100 active:scale-90 rounded-lg text-stone-800 transition-all font-black border border-stone-200 shadow-2xs cursor-pointer"
                       title="Sumar 1 pieza"
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
 
                     <span className="font-black text-xs sm:text-sm text-stone-900 min-w-[56px] text-right pl-1">
-                      {formatCurrency(item.product.price * item.quantity)}
+                      {formatCurrency((item.product.price || 0) * (item.quantity || 0))}
                     </span>
 
                     <button
                       type="button"
-                      onClick={() => setExactQuantity(item.product.id, 0)}
-                      className="p-1 text-stone-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-0.5"
+                      onClick={() => removeFromCart(item.product.id)}
+                      className="p-1 text-stone-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-0.5 cursor-pointer"
                       title="Eliminar de la charola"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1547,14 +2475,15 @@ export default function POSPage() {
                   ))}
                 </div>
               </div>
-            ))
+            );
+          })
           )}
         </div>
 
         {/* Payment Configuration & Checkout Area (Más grande, números destacados y micro-animaciones) */}
         <div className="p-3 sm:p-4 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/40 space-y-2.5 shadow-xl shrink-0">
           {/* Fila Principal: Total a Cobrar + Selector de Forma de Pago */}
-          <div className="bg-gradient-to-br from-[#24130c] via-[#2d1810] to-[#1f100a] text-white p-3 sm:p-3.5 px-4 rounded-2xl shadow-lg border-2 border-amber-900/70 flex items-center justify-between gap-3">
+          <div className="bg-gradient-to-br from-[#24130c] via-[#2d1810] to-[#1f100a] text-white p-3 sm:p-3.5 px-4 rounded-2xl shadow-lg border-2 border-amber-900/70 flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-black uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5">
                 <span>Total a Cobrar</span>
@@ -1565,12 +2494,12 @@ export default function POSPage() {
               </div>
             </div>
 
-            {/* Selector de Método de Pago integrado y animado */}
-            <div className="flex items-center bg-black/40 p-1.5 rounded-xl border border-white/10 gap-1.5 shrink-0">
+            {/* Selector de Método de Pago integrado con texto visible siempre */}
+            <div className="flex items-center bg-black/50 p-1.5 rounded-2xl border border-white/10 gap-1.5 flex-wrap">
               {[
                 { id: "efectivo", label: "Efectivo", icon: DollarSign },
                 { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
-                { id: "transferencia", label: "Transfer.", icon: Send },
+                { id: "transferencia", label: "Transferencia", icon: Send },
               ].map((m) => {
                 const Icon = m.icon;
                 const isSelected = paymentMethod === m.id;
@@ -1579,14 +2508,14 @@ export default function POSPage() {
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMethod(m.id as any)}
-                    className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs sm:text-sm font-black transition-all duration-200 active:scale-95 ${
+                    className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs sm:text-sm font-black transition-all duration-200 active:scale-95 cursor-pointer ${
                       isSelected
                         ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md scale-105 ring-2 ring-amber-300/40"
                         : "text-amber-200/80 hover:text-white hover:bg-white/10"
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span className="hidden xs:inline">{m.label}</span>
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="font-black whitespace-nowrap">{m.label}</span>
                   </button>
                 );
               })}
@@ -1627,10 +2556,18 @@ export default function POSPage() {
                 <div className="relative flex-1">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-black text-sm">💵</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="Paga con... ($)"
                     value={cashGiven}
-                    onChange={(e) => setCashGiven(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                        return;
+                      }
+                      onlyNumbersKeyDown(e, true);
+                    }}
+                    onChange={(e) => setCashGiven(cleanDecimalNumbers(e.target.value))}
                     className="w-full pl-9 pr-3 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 text-sm sm:text-base font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all"
                   />
                 </div>
@@ -1651,33 +2588,129 @@ export default function POSPage() {
             </div>
           )}
 
+          {/* Manejo de Tarjeta */}
+          {paymentMethod === "tarjeta" && (
+            <div className="p-3 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-300/90 flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h5 className="text-xs sm:text-sm font-black text-stone-900">Cobro con Tarjeta</h5>
+                  <p className="text-[11px] text-stone-600 font-bold">Cobrar en terminal bancaria</p>
+                </div>
+              </div>
+              <span className="font-black text-sm sm:text-base text-amber-950 bg-amber-200/80 px-3 py-1 rounded-xl border border-amber-300 shadow-2xs">
+                {formatCurrency(total)}
+              </span>
+            </div>
+          )}
+
+          {/* Manejo de Transferencia con Selector Desplegable de Cuentas */}
+          {paymentMethod === "transferencia" && (
+            <div className="p-3.5 bg-gradient-to-br from-amber-50/95 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-400/90 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
+              <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs">
+                    <Send className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs sm:text-sm font-black text-stone-900 leading-tight">
+                      Pago por Transferencia
+                    </h5>
+                    <p className="text-[11px] text-stone-600 font-bold">
+                      Selecciona la cuenta de depósito
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs sm:text-sm font-black text-amber-950 bg-amber-200/80 border border-amber-300 px-3 py-1 rounded-xl shadow-2xs">
+                  {formatCurrency(total)}
+                </span>
+              </div>
+
+              {/* Opción Desplegable de Cuentas con Nombres de a Quién Depositar */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">
+                  ¿A quién va a depositar? (Cuenta / Beneficiario):
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedTransferAccountId}
+                    onChange={(e) => setSelectedTransferAccountId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white text-stone-900 rounded-xl border-2 border-amber-400 focus:border-amber-600 font-black text-xs sm:text-sm focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
+                  >
+                    {transferAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} — {acc.bank}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-stone-600 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Ficha Visual con Datos de la Cuenta Seleccionada */}
+              {selectedTransferAccount && (
+                <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-2xs space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-stone-500 font-bold">Depositar a:</span>
+                    <span className="font-black text-stone-900">{selectedTransferAccount.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-stone-500 font-bold">Banco:</span>
+                    <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                      {selectedTransferAccount.bank}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-stone-100">
+                    <span className="text-stone-600 font-bold">CLABE:</span>
+                    <span className="font-mono font-black text-stone-900 bg-stone-100 px-2.5 py-0.5 rounded-lg border border-stone-200 select-all tracking-wider">
+                      {selectedTransferAccount.clabe}
+                    </span>
+                  </div>
+                  {selectedTransferAccount.accountNumber && (
+                    <div className="flex items-center justify-between text-[11px] text-stone-500">
+                      <span>No. Cuenta:</span>
+                      <span className="font-mono font-bold text-stone-800">{selectedTransferAccount.accountNumber}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Botones de Acción */}
-          <div className="grid grid-cols-4 gap-2 pt-0.5">
+          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">
             <button
               type="button"
               onClick={() => {
                 setCart([]);
                 setCashGiven("");
+                selectCustomer(DEFAULT_GENERAL_CUSTOMER);
               }}
               disabled={cart.length === 0}
-              className="col-span-1 py-3 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 text-stone-600 font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-stone-200 transition-all active:scale-95 shadow-xs"
-              title="Limpiar charola"
+              className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
+                cart.length > 0
+                  ? "bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-700 hover:to-rose-800 text-white shadow-red-600/30 hover:shadow-red-600/50 hover:scale-[1.01] active:scale-95 border border-red-400/80 ring-2 ring-red-400/30 cursor-pointer"
+                  : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
+              }`}
+              title="Cancelar compra y vaciar charola"
             >
-              <Trash2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Limpiar</span>
+              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+              <span className="truncate">Cancelar Compra</span>
             </button>
             <button
               type="button"
               onClick={handleCheckout}
               disabled={cart.length === 0 || !isPaymentValid || isSubmitting}
-              className={`col-span-3 py-3 sm:py-3.5 rounded-xl text-sm sm:text-base font-black flex items-center justify-center gap-2 transition-all duration-200 shadow-md ${
+              className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
                 cart.length > 0 && isPaymentValid && !isSubmitting
-                  ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-2 ring-amber-400/40"
-                  : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed"
+                  ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-2 ring-amber-400/40 cursor-pointer"
+                  : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
               }`}
             >
-              <CheckCircle className={`w-5 h-5 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
-              <span>{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
+              <CheckCircle className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
+              <span className="truncate">{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
             </button>
           </div>
         </div>
@@ -1715,21 +2748,33 @@ export default function POSPage() {
         <TicketModal
           isOpen={showReceiptModal}
           onClose={resetSale}
+          onCancelTicket={handleCancelTicket}
           saleId={completedSale.id}
           items={completedSale.items}
           total={completedSale.total}
           paymentMethod={completedSale.paymentMethod}
+          transferAccount={completedSale.transferAccount}
           cashGiven={completedSale.cashGiven}
           change={completedSale.change}
           cashierName={completedSale.cashier}
-          customerName={completedSale.customerName || "Público General"}
+          customerName={completedSale.customerName || "Público en General"}
           customerType={completedSale.customerType}
           branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
           branchAddress={activeBranch ? activeBranch.address : undefined}
           branchPhone={activeBranch ? activeBranch.phone : undefined}
           date={completedSale.date}
+          onConfigurePrinter={() => setShowPrinterModal(true)}
         />
       )}
+
+      {/* Modal de Configuración y Selección de Impresora Directa */}
+      <PrinterConfigModal
+        isOpen={showPrinterModal}
+        onClose={() => setShowPrinterModal(false)}
+        branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
+        cashierName={cashierName}
+        onPrinterUpdated={(updated) => setPrinterConfig(updated)}
+      />
 
       {/* Modal de Registro Rápido de Nuevo Cliente (Simple: Teléfono, Nombre y Característica) */}
       {isNewCustomerModalOpen && (
@@ -1757,22 +2802,7 @@ export default function POSPage() {
 
             {/* Formulario Simple */}
             <form onSubmit={handleCreateQuickCustomer} className="p-5 space-y-4 text-xs">
-              {/* 1. Teléfono */}
-              <div>
-                <label className="block text-stone-700 font-extrabold mb-1">
-                  📱 Número Telefónico (WhatsApp)
-                </label>
-                <input
-                  type="tel"
-                  autoFocus
-                  placeholder="ej. 55 1234 5678"
-                  value={newCustPhone}
-                  onChange={(e) => setNewCustPhone(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-stone-50 border-2 border-stone-200 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all text-sm"
-                />
-              </div>
-
-              {/* 2. Nombre */}
+              {/* 1. Nombre */}
               <div>
                 <label className="block text-stone-700 font-extrabold mb-1">
                   👤 Nombre del Cliente <span className="text-rose-500">*</span>
@@ -1780,6 +2810,7 @@ export default function POSPage() {
                 <input
                   type="text"
                   required
+                  autoFocus
                   placeholder="ej. Doña Lupita o Don Carlos"
                   value={newCustName}
                   onChange={(e) => setNewCustName(e.target.value)}
@@ -1787,7 +2818,25 @@ export default function POSPage() {
                 />
               </div>
 
-              {/* 3. Característica Opcional */}
+              {/* 2. Teléfono */}
+              <div>
+                <label className="block text-stone-700 font-extrabold mb-1">
+                  📱 Número Telefónico (WhatsApp)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="ej. 55 1234 5678"
+                  value={newCustPhone}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                  onChange={(e) => setNewCustPhone(cleanOnlyNumbers(e.target.value))}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border-2 border-stone-200 focus:border-amber-500 focus:bg-white rounded-xl font-bold text-stone-900 focus:outline-none transition-all text-sm"
+                />
+              </div>
+
+
+              {/* 4. Característica Opcional */}
               <div>
                 <label className="block text-stone-700 font-extrabold mb-1">
                   ✨ Característica o Detalle <span className="text-stone-400 font-normal">(Opcional)</span>
@@ -1832,14 +2881,43 @@ export default function POSPage() {
         onSelectSaleForReprint={handleReprintSale}
       />
 
-      {/* Expenses & Cash Out Modal */}
+      {/* Movimientos de Dinero en Caja Modal (Salidas/Gastos/Retiros y Entradas/Cambio) */}
       <ExpensesModal
         isOpen={showExpensesModal}
         onClose={() => setShowExpensesModal(false)}
         expenses={expensesList}
         onAddExpense={handleAddExpense}
+        onDeleteExpense={(id) => setExpensesList((prev) => prev.filter((e) => e.id !== id))}
+        incomes={incomesList}
+        onAddIncome={handleAddIncome}
+        onDeleteIncome={handleDeleteIncome}
         cashSalesTotal={totalCashSales}
+        initialFund={initialCashFund}
         cashierName={cashierName}
+      />
+
+      {/* Incomes & Cash In Modal */}
+      <IncomesModal
+        isOpen={showIncomesModal}
+        onClose={() => setShowIncomesModal(false)}
+        incomes={incomesList}
+        onAddIncome={handleAddIncome}
+        onDeleteIncome={handleDeleteIncome}
+        cashSalesTotal={totalCashSales}
+        totalExpenses={totalExpenses}
+        initialFund={initialCashFund}
+        branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
+        defaultCashier={cashierName}
+        onOpenReceipt={handleOpenIncomeReceipt}
+      />
+
+      {/* Income Receipt Thermal Ticket Modal */}
+      <IncomeReceiptModal
+        isOpen={showIncomeReceiptModal}
+        onClose={() => setShowIncomeReceiptModal(false)}
+        income={receiptIncome}
+        branchAddress={activeBranch?.address}
+        branchPhone={activeBranch?.phone}
       />
 
       {/* Cash Drawer & Shift Control Modal */}
@@ -1855,9 +2933,22 @@ export default function POSPage() {
           onChangeInitialFund={setInitialCashFund}
           sales={recentSalesList}
           expenses={expensesList}
+          incomes={incomesList}
           products={products}
           initialTab={shiftModalTab}
           onCompleteShiftCut={handleCompleteShiftCut}
+        />
+      )}
+
+      {/* Bread Delivery Modal (Recepción de Pan de Camionetas) */}
+      {showBreadDeliveryModal && (
+        <BreadDeliveryModal
+          isOpen={showBreadDeliveryModal}
+          onClose={() => setShowBreadDeliveryModal(false)}
+          products={products}
+          onConfirmDelivery={handleReceiveBreadDelivery}
+          cashierName={cashierName}
+          deliveriesHistory={breadDeliveriesList}
         />
       )}
     </div>

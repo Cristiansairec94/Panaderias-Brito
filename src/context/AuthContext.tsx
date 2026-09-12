@@ -52,7 +52,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageUsers: false,
   },
   cajero: {
-    canAccessDashboard: false,
+    canAccessDashboard: true,
     canAccessPos: true,
     canAccessCaja: true,
     canAccessInventario: false,
@@ -67,7 +67,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canManageUsers: false,
   },
   panadero: {
-    canAccessDashboard: false,
+    canAccessDashboard: true,
     canAccessPos: false,
     canAccessCaja: false,
     canAccessInventario: true,
@@ -86,6 +86,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
 export const ROUTE_PERMISSION_MAP: Record<string, keyof RolePermissions> = {
   "/": "canAccessDashboard",
   "/pos": "canAccessPos",
+  "/ingresos": "canAccessCaja",
+  "/gastos": "canAccessCaja",
   "/caja": "canAccessCaja",
   "/inventario": "canAccessInventario",
   "/pedidos": "canAccessPedidos",
@@ -184,6 +186,9 @@ interface AuthContextType {
   updateUser: (userId: string, updatedData: Partial<User>) => void;
   deleteUser: (userId: string) => { success: boolean; message?: string };
   toggleUserStatus: (userId: string) => void;
+  rolePermissionsMap: Record<UserRole, RolePermissions>;
+  updateRolePermissions: (role: UserRole, newPermissions: RolePermissions, roleLabel?: string) => void;
+  removeRolePermissions: (role: UserRole) => void;
   isLoading: boolean;
 }
 
@@ -192,6 +197,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [usersList, setUsersList] = useState<User[]>(DEMO_USERS);
+  const [rolePermissionsMap, setRolePermissionsMap] = useState<Record<UserRole, RolePermissions>>(ROLE_PERMISSIONS);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load custom users from localStorage on mount
@@ -206,6 +212,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       console.error("Error loading custom users:", e);
+    }
+  }, []);
+
+  // Load saved role permissions from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedRolePerms = localStorage.getItem("brito_role_permissions");
+      if (savedRolePerms) {
+        const parsed = JSON.parse(savedRolePerms);
+        // Garantizar que canAccessDashboard siempre permanezca activo para todos los roles
+        const sanitized: Record<string, Partial<RolePermissions>> = {};
+        Object.keys(parsed).forEach((key) => {
+          sanitized[key] = { ...parsed[key], canAccessDashboard: true };
+        });
+        setRolePermissionsMap((prev) => ({
+          ...prev,
+          ...parsed,
+          ...sanitized,
+        }));
+      }
+    } catch (e) {
+      console.error("Error loading saved role permissions:", e);
     }
   }, []);
 
@@ -227,9 +255,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  // Compute active permissions
+  // Compute active permissions combining role defaults (dynamically configured) and user overrides
   const permissions: RolePermissions = user
-    ? { ...ROLE_PERMISSIONS[user.role], ...(user.permissions || {}) }
+    ? { ...(rolePermissionsMap[user.role] || ROLE_PERMISSIONS[user.role]), ...(user.permissions || {}), canAccessDashboard: true }
     : {
         canAccessDashboard: false,
         canAccessPos: false,
@@ -260,8 +288,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Admin has blanket access
       if (user.role === "admin") return true;
 
-      // Extract base route e.g. /pos/ticket -> /pos
-      const baseRoute = "/" + pathname.split("/").filter(Boolean)[0] || "/";
+      // Extract base route e.g. /pos/ticket -> /pos, or / -> /
+      const firstSegment = pathname.split("/").filter(Boolean)[0];
+      const baseRoute = firstSegment ? `/${firstSegment}` : "/";
       const requiredPerm = ROUTE_PERMISSION_MAP[baseRoute] || ROUTE_PERMISSION_MAP[pathname];
 
       if (!requiredPerm) {
@@ -274,16 +303,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, permissions]
   );
 
-    const getDefaultRouteForUser = useCallback(
-    (targetUser?: User | null): string => {
-      const u = targetUser || user;
-      if (!u) return "/";
-      if (u.role === "cajero") return "/pos";
-      if (u.role === "panadero") return "/inventario";
-      if (u.role === "auxiliar_admin") return "/";
+  const getDefaultRouteForUser = useCallback(
+    (_targetUser?: User | null): string => {
       return "/";
     },
-    [user]
+    []
   );
 
   const login = (identifier: string, pass: string, rememberMe: boolean = true) => {
@@ -396,6 +420,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     localStorage.removeItem("brito_user");
     sessionStorage.removeItem("brito_user");
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brito_session_active");
+    }
   };
 
   const addUser = (newUser: User) => {
@@ -476,6 +503,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Dynamically update permissions and labels for a role in the system
+  const updateRolePermissions = useCallback((role: UserRole, newPermissions: RolePermissions, roleLabel?: string) => {
+    // El rol de administrador está blindado y no puede ser modificado
+    if (role === "admin") {
+      console.warn("El rol de administrador está protegido y no puede ser modificado.");
+      return;
+    }
+
+    setRolePermissionsMap((prev) => {
+      const updated = {
+        ...prev,
+        [role]: { ...newPermissions },
+      };
+      try {
+        localStorage.setItem("brito_role_permissions", JSON.stringify(updated));
+      } catch (e) {
+        console.error("Error saving role permissions:", e);
+      }
+      return updated;
+    });
+
+    // Also update users in usersList that have this role
+    setUsersList((prevUsers) => {
+      const updatedList = prevUsers.map((u) => {
+        if (u.role === role) {
+          return {
+            ...u,
+            roleLabel: roleLabel || u.roleLabel,
+            permissions: { ...newPermissions },
+          };
+        }
+        return u;
+      });
+      try {
+        localStorage.setItem("brito_custom_users", JSON.stringify(updatedList));
+      } catch (e) {
+        console.error("Error updating users with new role permissions:", e);
+      }
+      return updatedList;
+    });
+
+    // Update current active user if they have this role
+    setUser((curr) => {
+      if (curr && curr.role === role) {
+        const updatedUser = {
+          ...curr,
+          roleLabel: roleLabel || curr.roleLabel,
+          permissions: { ...newPermissions },
+        };
+        try {
+          localStorage.setItem("brito_user", JSON.stringify(updatedUser));
+        } catch (e) {}
+        return updatedUser;
+      }
+      return curr;
+    });
+  }, []);
+
+  // Remove permissions for a deleted role
+  const removeRolePermissions = useCallback((role: UserRole) => {
+    setRolePermissionsMap((prev) => {
+      const copy = { ...prev };
+      delete copy[role];
+      try {
+        localStorage.setItem("brito_role_permissions", JSON.stringify(copy));
+      } catch (e) {
+        console.error("Error saving updated role permissions after deletion:", e);
+      }
+      return copy;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -493,6 +592,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateUser,
         deleteUser,
         toggleUserStatus,
+        rolePermissionsMap,
+        updateRolePermissions,
+        removeRolePermissions,
         isLoading,
       }}
     >

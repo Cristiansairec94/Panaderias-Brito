@@ -55,3 +55,9 @@ src/
 1. Todos los precios se manejan en formato moneda mexicana (`$ MXN`).
 2. Mantener la interfaz limpia, moderna y táctil (botones grandes aptos para pantalla táctil en caja).
 3. Todas las interfaces de datos deben tiparse en `src/types/`.
+
+---
+
+## 🚀 Despliegue en Vercel (Regla Obligatoria)
+**Siempre subir los cambios a Vercel**: Al terminar cualquier cambio, mejora o corrección solicitada por el usuario, se debe verificar la compilación (`npx tsc --noEmit` / `npm run build`), hacer `commit` con mensaje descriptivo y hacer `git push origin main` para que Vercel despliegue la versión más reciente en vivo inmediatamente.
+

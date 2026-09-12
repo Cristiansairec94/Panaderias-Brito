@@ -35,16 +35,16 @@ if not exist ".env.local" (
 )
 
 echo  [2/3] Iniciando servidor local en http://localhost:3000...
-echo  [3/3] Abriendo el Punto de Venta en tu navegador...
+echo  [3/3] Abriendo el Sistema Panaderia Brito en tu navegador...
 echo.
 echo ======================================================================
-echo   ESTADO: Sistema Activo y Listo para cobrar.
+echo   ESTADO: Sistema Activo y Listo para operar.
 echo   NOTA: Mantener esta ventana abierta mientras se use el sistema.
 echo ======================================================================
 echo.
 
 :: Abrir navegador automaticamente tras 3 segundos
-start "" powershell -NoProfile -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:3000/pos'"
+start "" powershell -NoProfile -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:3000'"
 
 :: Ejecutar Next.js
 call npm run dev

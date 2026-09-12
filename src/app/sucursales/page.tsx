@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { 
   Building2, 
@@ -27,7 +27,6 @@ import {
   Croissant,
   Calendar,
   Layers,
-  Table as TableIcon,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -35,11 +34,18 @@ import {
   Flame,
   Award,
   Coffee,
-  PieChart
+  PieChart,
+  Plus,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { useBranch, SimulatedSale } from "@/context/BranchContext";
+import { Branch, BranchShift } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import GoogleBranchChart, { PeriodType } from "@/components/sucursales/GoogleBranchChart";
+import PeriodSelectorButton from "@/components/sucursales/PeriodSelectorButton";
+import CreateBranchModal from "@/components/sucursales/CreateBranchModal";
+import EditShiftModal from "@/components/sucursales/EditShiftModal";
 
 export default function SucursalesPage() {
   const { 
@@ -47,17 +53,51 @@ export default function SucursalesPage() {
     currentBranch, 
     isAllBranches, 
     switchBranch, 
+    addBranch,
+    updateBranch,
     simulateSale, 
-    simulateBulkSales,
     advanceShift,
-    isLiveSimulating,
-    toggleLiveSimulation,
-    recentSimulatedSales,
     consolidatedMetrics
   } = useBranch();
 
   const [lastSimulatedSale, setLastSimulatedSale] = useState<SimulatedSale | null>(null);
-  const [activeTab, setActiveTab] = useState<"general" | "turnos" | "feed">("general");
+  const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
+  const [editingShiftBranch, setEditingShiftBranch] = useState<Branch | null>(null);
+
+  // Fecha del día actual formateada
+  const [todayDateFormatted, setTodayDateFormatted] = useState<string>(() => {
+    try {
+      const now = new Date();
+      const dayName = now.toLocaleDateString("es-MX", { weekday: "long" });
+      const dayNum = now.getDate();
+      const monthName = now.toLocaleDateString("es-MX", { month: "long" });
+      const year = now.getFullYear();
+      const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      const capMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+      return `${capDay}, ${dayNum} de ${capMonth} de ${year}`;
+    } catch {
+      return "Lunes, 7 de Septiembre de 2026";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const now = new Date();
+      const dayName = now.toLocaleDateString("es-MX", { weekday: "long" });
+      const dayNum = now.getDate();
+      const monthName = now.toLocaleDateString("es-MX", { month: "long" });
+      const year = now.getFullYear();
+      const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      const capMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+      setTodayDateFormatted(`${capDay}, ${dayNum} de ${capMonth} de ${year}`);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleSaveShift = (branchId: string, updatedShift: any) => {
+    updateBranch(branchId, { currentShift: updatedShift });
+  };
 
   // Filter periods for Google-Style Chart & Table
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>("semana");
@@ -69,6 +109,12 @@ export default function SucursalesPage() {
 
   // Expandable statistics per branch state (hidden by default)
   const [expandedBranchIds, setExpandedBranchIds] = useState<Record<string, boolean>>({});
+
+  // Modo de visualización para la Tabla General de Sucursales:
+  // "auto": móvil usa tarjetas intuitivas, laptop usa tabla ejecutiva
+  // "cards": fuerza vista de tarjetas
+  // "table": fuerza vista de tabla
+  const [displayMode, setDisplayMode] = useState<"auto" | "cards" | "table">("auto");
 
   const toggleExpand = (branchId: string) => {
     setExpandedBranchIds((prev) => ({
@@ -90,10 +136,6 @@ export default function SucursalesPage() {
     const sale = simulateSale(branchId);
     setLastSimulatedSale(sale);
     setTimeout(() => setLastSimulatedSale(null), 3500);
-  };
-
-  const handleSimulateShift = (branchId?: string) => {
-    simulateBulkSales(branchId, 12);
   };
 
   // Compute period multiplier and days count for realistic period calculations
@@ -239,7 +281,7 @@ export default function SucursalesPage() {
   }, [branchesOverview, branches]);
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12 px-3 sm:px-6 lg:px-8">
       {/* Top Header Banner */}
       <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-stone-800">
         <div className="absolute -right-12 -top-12 w-80 h-80 bg-orange-500/20 rounded-full blur-3xl pointer-events-none" />
@@ -255,47 +297,18 @@ export default function SucursalesPage() {
               Control de Sucursales y Analítica General
             </h1>
             <p className="text-xs sm:text-sm text-stone-300 max-w-2xl leading-relaxed">
-              Monitoreo ejecutivo de las 3 tiendas de <strong>Panaderías Brito</strong>: gráfica desplegada de ventas y piezas de pan, tabla general de sucursales con estadísticas desplegables, turnos y simulador de flujo.
+              Monitoreo ejecutivo de las tiendas de <strong>Panaderías Brito</strong>: gráfica desplegada de ventas y piezas de pan, tabla general de sucursales con estadísticas detalladas y control de turnos.
             </p>
           </div>
 
-          {/* Quick Simulation Controls */}
+          {/* Action Buttons: Create Branch */}
           <div className="flex flex-wrap items-center gap-2.5">
             <button
-              onClick={() => handleSimulate()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-rose-500 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-orange-500/20 transition-all active:scale-95"
+              onClick={() => setIsCreateBranchOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
             >
-              <Zap className="w-4 h-4 fill-current animate-pulse" />
-              <span>⚡ Simular 1 Venta</span>
-            </button>
-
-            <button
-              onClick={() => handleSimulateShift()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white font-bold text-xs border border-white/10 transition-all active:scale-95"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-orange-400" />
-              <span>🎲 Simular Turno (12 Tkts)</span>
-            </button>
-
-            <button
-              onClick={toggleLiveSimulation}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all border ${
-                isLiveSimulating
-                  ? "bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-600/30"
-                  : "bg-stone-800 hover:bg-stone-700 border-stone-700 text-stone-300"
-              }`}
-            >
-              {isLiveSimulating ? (
-                <>
-                  <Pause className="w-3.5 h-3.5" />
-                  <span>Pausar En Vivo</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5 text-emerald-400 fill-current" />
-                  <span>Ventas en Vivo (Auto)</span>
-                </>
-              )}
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>+ Nueva Sucursal</span>
             </button>
           </div>
         </div>
@@ -321,61 +334,45 @@ export default function SucursalesPage() {
             </div>
           </div>
         )}
-      </div>
 
-      {/* Navigation View Switcher (Tabs) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setActiveTab("general")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === "general"
-                ? "bg-stone-900 text-white shadow-md"
-                : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
-            }`}
-          >
-            <TableIcon className="w-4 h-4 text-orange-500" />
-            <span>Resumen General & Gráfica</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("turnos")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === "turnos"
-                ? "bg-stone-900 text-white shadow-md"
-                : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
-            }`}
-          >
-            <Clock className="w-4 h-4 text-rose-500" />
-            <span>Estado de Turnos & Arqueo</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("feed")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === "feed"
-                ? "bg-stone-900 text-white shadow-md"
-                : "bg-white text-stone-600 hover:bg-stone-100 border border-stone-200"
-            }`}
-          >
-            <Zap className="w-4 h-4 text-amber-500" />
-            <span>Ventas Simuladas ({recentSimulatedSales.length})</span>
-          </button>
+        {/* Live KPI Pulse Ribbon */}
+        <div className="mt-6 pt-5 border-t border-stone-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="bg-white/[0.04] p-3.5 rounded-2xl border border-white/5">
+            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
+              Ventas Hoy (En Vivo)
+            </span>
+            <span className="text-lg sm:text-xl font-black text-white">
+              {formatCurrency(consolidatedMetrics.totalSales)}
+            </span>
+          </div>
+
+          <div className="bg-white/[0.04] p-3.5 rounded-2xl border border-white/5">
+            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-3 h-3 text-amber-400" />
+              Fecha del Día
+            </span>
+            <span 
+              suppressHydrationWarning
+              className="text-base sm:text-lg font-black text-amber-400 block mt-0.5 truncate"
+              title={todayDateFormatted}
+            >
+              {todayDateFormatted}
+            </span>
+          </div>
+
+          <div className="bg-white/[0.04] p-3.5 rounded-2xl border border-white/5">
+            <span className="text-stone-400 block text-[10px] uppercase font-bold tracking-wider">
+              Tickets Emitidos
+            </span>
+            <span className="text-lg sm:text-xl font-black text-amber-300">
+              {consolidatedMetrics.totalTickets} tickets
+            </span>
+          </div>
         </div>
-
-        <button
-          onClick={() => switchBranch("all")}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border self-start sm:self-auto ${
-            isAllBranches
-              ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
-              : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
-          }`}
-        >
-          {isAllBranches ? "✓ Consolidado Activo" : "Ver Toda la Cadena"}
-        </button>
       </div>
 
-      {/* TAB 1: Main Overview (Google-Style Chart + General Table) */}
-      {activeTab === "general" && (
-        <div className="space-y-6 animate-in fade-in">
+      {/* SECCIÓN PRINCIPAL: Gráfica de Análisis & Tabla General de Sucursales */}
+      <div className="space-y-6 animate-in fade-in">
           {/* SECCIÓN DESPLEGABLE: Gráfica de Análisis & Estadísticas Estilo Google (Oculta al inicio) */}
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 bg-white rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-md transition-all">
@@ -398,22 +395,37 @@ export default function SucursalesPage() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setShowStatisticsChart((prev) => !prev)}
-                className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs transition-all shadow-md active:scale-95 ${
-                  showStatisticsChart
-                    ? "bg-stone-900 text-white hover:bg-black"
-                    : "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-orange-500/20 hover:brightness-110"
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                <span>{showStatisticsChart ? "Ocultar Estadísticas" : "Ver Estadísticas"}</span>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform duration-300 ${
-                    showStatisticsChart ? "rotate-180" : ""
-                  }`}
+              <div className="flex flex-wrap items-center gap-2.5">
+                <PeriodSelectorButton
+                  selectedPeriod={selectedPeriod}
+                  onPeriodChange={setSelectedPeriod}
+                  customStartDate={customStartDate}
+                  customEndDate={customEndDate}
+                  onCustomDateChange={(start, end) => {
+                    setCustomStartDate(start);
+                    setCustomEndDate(end);
+                    setSelectedPeriod("custom");
+                  }}
+                  size="md"
                 />
-              </button>
+
+                <button
+                  onClick={() => setShowStatisticsChart((prev) => !prev)}
+                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs transition-all shadow-md active:scale-95 ${
+                    showStatisticsChart
+                      ? "bg-stone-900 text-white hover:bg-black"
+                      : "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-orange-500/20 hover:brightness-110"
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>{showStatisticsChart ? "Ocultar Estadísticas" : "Ver Estadísticas"}</span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform duration-300 ${
+                      showStatisticsChart ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Gráfica desplegada únicamente cuando showStatisticsChart es true */}
@@ -439,11 +451,11 @@ export default function SucursalesPage() {
 
           {/* SECTION 2: General Overview Table */}
           <div className="bg-white rounded-3xl border border-stone-200/90 shadow-xl overflow-hidden">
-            {/* Table Header with Details & Action to toggle all statistics */}
-            <div className="p-6 border-b border-stone-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-stone-50/50">
+            {/* Table Header with Details, View Switcher & Action to toggle all statistics */}
+            <div className="p-4 sm:p-6 border-b border-stone-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-stone-50/50">
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-black text-stone-900 tracking-tight">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-lg font-black text-stone-900 tracking-tight">
                     Tabla General de Sucursales
                   </h3>
                   <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-stone-200/70 text-stone-700">
@@ -455,8 +467,60 @@ export default function SucursalesPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {/* Selector de Modo de Vista (Auto / Tarjetas / Tabla) */}
+                <div className="inline-flex items-center bg-stone-200/60 p-0.5 rounded-xl border border-stone-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setDisplayMode("auto")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      displayMode === "auto"
+                        ? "bg-white text-stone-900 shadow-xs"
+                        : "text-stone-500 hover:text-stone-800"
+                    }`}
+                    title="Adaptar automáticamente a la resolución (móvil = tarjetas, laptop = tabla)"
+                  >
+                    Auto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDisplayMode("cards")}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      displayMode === "cards"
+                        ? "bg-white text-stone-900 shadow-xs"
+                        : "text-stone-500 hover:text-stone-800"
+                    }`}
+                    title="Forzar vista en tarjetas móviles"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5 text-orange-600" />
+                    <span className="hidden sm:inline">Tarjetas</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDisplayMode("table")}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      displayMode === "table"
+                        ? "bg-white text-stone-900 shadow-xs"
+                        : "text-stone-500 hover:text-stone-800"
+                    }`}
+                    title="Forzar vista en tabla ejecutiva"
+                  >
+                    <List className="w-3.5 h-3.5 text-orange-600" />
+                    <span className="hidden sm:inline">Tabla</span>
+                  </button>
+                </div>
+
                 <button
+                  type="button"
+                  onClick={() => setIsCreateBranchOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-xs shadow-sm active:scale-95 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>+ Nueva Sucursal</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={toggleAllExpanded}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs border border-stone-200 shadow-sm transition-all"
                 >
@@ -464,32 +528,442 @@ export default function SucursalesPage() {
                   <span>
                     {branches.every((b) => expandedBranchIds[b.id])
                       ? "Colapsar Todas"
-                      : "Desplegar Todas las Estadísticas"}
+                      : "Desplegar Todas"}
                   </span>
                 </button>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-stone-500 font-medium">Activa:</span>
-                  <span className="text-xs font-black text-orange-600 bg-orange-50 px-3 py-1 rounded-xl border border-orange-200">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-stone-400 font-medium hidden sm:inline">Activa:</span>
+                  <span className="text-xs font-black text-orange-600 bg-orange-50 px-2.5 py-1 rounded-xl border border-orange-200">
                     {isAllBranches ? "🌐 Cadena Completa" : currentBranch?.shortName}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* General Overview Table Content */}
-            <div className="overflow-x-auto">
+            {/* 1. VISTA MÓVIL: Tarjetas Operativas Intuitivas (< md por defecto) */}
+            <div
+              className={
+                displayMode === "cards"
+                  ? "block space-y-4 p-3.5 sm:p-5"
+                  : displayMode === "table"
+                  ? "hidden"
+                  : "block md:hidden space-y-4 p-3.5 sm:p-5"
+              }
+            >
+              {branchesOverview.map((b) => {
+                const isSelected = !isAllBranches && currentBranch?.id === b.id;
+                const isExpanded = !!expandedBranchIds[b.id];
+
+                return (
+                  <div
+                    key={`mobile-${b.id}`}
+                    className={`rounded-2xl sm:rounded-3xl border transition-all duration-200 overflow-hidden shadow-xs ${
+                      isSelected
+                        ? "border-orange-400 bg-orange-50/30 ring-2 ring-orange-400/20"
+                        : isExpanded
+                        ? "border-orange-300 bg-stone-50/70 shadow-md"
+                        : "border-stone-200 bg-white hover:border-stone-300"
+                    }`}
+                  >
+                    {/* Cabecera de la Tarjeta Móvil */}
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-sm ${
+                              b.id === "branch-matriz"
+                                ? "bg-gradient-to-br from-orange-500 to-orange-600"
+                                : b.id === "branch-benito"
+                                ? "bg-gradient-to-br from-rose-500 to-rose-600"
+                                : "bg-gradient-to-br from-amber-500 to-amber-600"
+                            }`}
+                          >
+                            <Store className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h4 className="font-black text-stone-900 text-sm sm:text-base">{b.name}</h4>
+                              {isSelected && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                                  Activa
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <span className="font-mono text-[10px] text-stone-400 font-extrabold uppercase">
+                                {b.code}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                {b.status}
+                              </span>
+                              <span className="text-[10px] font-bold text-orange-700 bg-orange-100/70 px-1.5 py-0.5 rounded border border-orange-200">
+                                {b.marketShare}% de la red
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Encargado y Contacto */}
+                      <div className="pt-2 border-t border-stone-100 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-600">
+                        <span className="font-bold text-stone-800 flex items-center gap-1 text-[11px]">
+                          <ShieldCheck className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          {b.manager}
+                        </span>
+                        <span className="text-[11px] text-stone-500 flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-stone-400 shrink-0" />
+                          {b.phone}
+                        </span>
+                      </div>
+
+                      {/* Cuadrícula de 4 Métricas Clave Operativas (2x2) */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-amber-50/70 p-2.5 rounded-2xl border border-amber-200/70 space-y-0.5">
+                          <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                            <Croissant className="w-3.5 h-3.5 text-amber-600" />
+                            Piezas de Pan
+                          </span>
+                          <p className="font-black text-amber-950 text-sm">
+                            {b.periodPieces.toLocaleString("es-MX")}{" "}
+                            <span className="text-[10px] text-stone-500 font-normal">pzas</span>
+                          </p>
+                          <p className="text-[9px] text-stone-500">
+                            Prom. ~{b.dailyAveragePieces.toLocaleString("es-MX")} pz/día
+                          </p>
+                        </div>
+
+                        <div className="bg-orange-50/70 p-2.5 rounded-2xl border border-orange-200/70 space-y-0.5">
+                          <span className="text-[10px] font-bold text-orange-900 uppercase tracking-wider flex items-center gap-1">
+                            <TrendingUp className="w-3.5 h-3.5 text-orange-600" />
+                            Ventas Totales
+                          </span>
+                          <p className="font-black text-stone-900 text-sm">
+                            {formatCurrency(b.periodSales)}
+                          </p>
+                          <p className="text-[9px] text-orange-700 font-bold">
+                            {b.marketShare}% participación
+                          </p>
+                        </div>
+
+                        <div className="bg-stone-50 p-2.5 rounded-2xl border border-stone-200/80 space-y-0.5">
+                          <span className="text-[10px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1">
+                            <Receipt className="w-3.5 h-3.5 text-stone-500" />
+                            Ticket Promedio
+                          </span>
+                          <p className="font-black text-stone-900 text-sm">
+                            {formatCurrency(b.averageTicket)}
+                          </p>
+                          <p className="text-[9px] text-stone-500">
+                            {b.periodTickets.toLocaleString("es-MX")} tickets
+                          </p>
+                        </div>
+
+                        <div className="bg-emerald-50/70 p-2.5 rounded-2xl border border-emerald-200/70 space-y-0.5">
+                          <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1">
+                            <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                            Caja en Gaveta
+                          </span>
+                          <p className="font-black text-emerald-900 text-sm">
+                            {formatCurrency(b.cashInDrawer)}
+                          </p>
+                          <p className="text-[9px] text-emerald-700 font-bold truncate">
+                            {b.currentShift.cashier}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Turno Actual y Acciones de la Tarjeta */}
+                      <div className="p-2.5 rounded-2xl bg-stone-100/80 border border-stone-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200">
+                            {b.currentShift.name}
+                          </span>
+                          <span className="text-[11px] text-stone-600 font-semibold truncate max-w-[130px]">
+                            {b.currentShift.cashier}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => setEditingShiftBranch(b)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-orange-50 text-orange-700 font-bold text-[11px] border border-stone-200 shadow-xs transition-colors"
+                            title="Modificar horario del turno"
+                          >
+                            <Clock className="w-3 h-3 text-orange-500" />
+                            <span>Horario</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(b.id)}
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-xl font-black text-[11px] transition-all border shadow-xs ${
+                              isExpanded
+                                ? "bg-stone-900 text-white border-stone-900"
+                                : "bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                            }`}
+                          >
+                            <BarChart3 className="w-3 h-3" />
+                            <span>{isExpanded ? "Ocultar" : "Estadísticas"}</span>
+                            <ChevronDown
+                              className={`w-3 h-3 transition-transform duration-200 ${
+                                isExpanded ? "rotate-180" : ""
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cajón Desplegable con Analítica Operativa para Móvil */}
+                    {isExpanded && (
+                      <div className="p-4 bg-orange-50/20 border-t border-orange-200/80 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center justify-between">
+                          <h5 className="font-black text-stone-900 text-xs flex items-center gap-1.5">
+                            <BarChart3 className="w-4 h-4 text-orange-600" />
+                            Estadísticas Operativas: {b.name}
+                          </h5>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(b.id)}
+                            className="text-xs text-stone-500 hover:text-stone-800 font-bold flex items-center gap-1"
+                          >
+                            <span>Cerrar</span>
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Bloques apilados o en 2 cols según el ancho de teléfono/phablet */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Variedad de Pan */}
+                          <div className="bg-white p-3 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                                <Croissant className="w-3.5 h-3.5 text-amber-600" />
+                                Variedad de Pan
+                              </span>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+                                {b.periodPieces.toLocaleString("es-MX")} pzas
+                              </span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {b.details.categories.map((cat, idx) => (
+                                <div key={idx} className="space-y-1">
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-stone-600 font-medium">{cat.name}</span>
+                                    <span className={`font-bold ${cat.textColor}`}>
+                                      {cat.pieces.toLocaleString("es-MX")} pz ({cat.pct}%)
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden">
+                                    <div
+                                      className={`${cat.color} h-full rounded-full`}
+                                      style={{ width: `${cat.pct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Medios de Pago */}
+                          <div className="bg-white p-3 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                                <Coins className="w-3.5 h-3.5 text-emerald-600" />
+                                Medios de Pago
+                              </span>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-900">
+                                {formatCurrency(b.periodSales)}
+                              </span>
+                            </div>
+                            <div className="space-y-1 text-xs">
+                              <div className="flex items-center justify-between p-1.5 rounded-xl bg-stone-50 border border-stone-100">
+                                <span className="text-stone-600 font-medium flex items-center gap-1 text-[11px]">
+                                  <Wallet className="w-3 h-3 text-emerald-600" /> Efectivo:
+                                </span>
+                                <span className="font-bold text-stone-900 text-[11px]">
+                                  {formatCurrency(b.details.payment.cashAmount)}{" "}
+                                  <span className="text-[9px] text-stone-400 font-normal">({b.details.payment.cashPct}%)</span>
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between p-1.5 rounded-xl bg-stone-50 border border-stone-100">
+                                <span className="text-stone-600 font-medium flex items-center gap-1 text-[11px]">
+                                  <CreditCard className="w-3 h-3 text-blue-600" /> Tarjeta:
+                                </span>
+                                <span className="font-bold text-stone-900 text-[11px]">
+                                  {formatCurrency(b.details.payment.cardAmount)}{" "}
+                                  <span className="text-[9px] text-stone-400 font-normal">({b.details.payment.cardPct}%)</span>
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between p-1.5 rounded-xl bg-stone-50 border border-stone-100">
+                                <span className="text-stone-600 font-medium flex items-center gap-1 text-[11px]">
+                                  <Receipt className="w-3 h-3 text-purple-600" /> Transf.:
+                                </span>
+                                <span className="font-bold text-stone-900 text-[11px]">
+                                  {formatCurrency(b.details.payment.transferAmount)}{" "}
+                                  <span className="text-[9px] text-stone-400 font-normal">({b.details.payment.transferPct}%)</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Horas Pico */}
+                          <div className="bg-white p-3 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-orange-600" />
+                                Horas Pico Mostrador
+                              </span>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-orange-100 text-orange-900">
+                                Afluencia
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {b.details.peakHours.map((peak, idx) => (
+                                <div key={idx} className="p-1.5 rounded-xl bg-stone-50 border border-stone-100 space-y-0.5">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span className="font-bold text-stone-800 flex items-center gap-1">
+                                      <span>{peak.icon}</span> {peak.hour}
+                                    </span>
+                                    <span className="font-black text-orange-600">
+                                      {peak.intensity}%
+                                    </span>
+                                  </div>
+                                  <p className="text-[9px] text-stone-500">{peak.label}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Panes Estrella */}
+                          <div className="bg-white p-3 rounded-2xl border border-stone-200/90 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                                <Award className="w-3.5 h-3.5 text-amber-500" />
+                                Top Panes Estrella
+                              </span>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+                                Top 4
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {b.details.topProducts.map((prod, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-1 rounded-xl bg-stone-50 border border-stone-100">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="w-4 h-4 rounded-full bg-stone-200 text-stone-700 font-bold text-[9px] flex items-center justify-center shrink-0">
+                                      #{idx + 1}
+                                    </span>
+                                    <span className="font-bold text-stone-800 text-[10px] truncate">
+                                      {prod.name}
+                                    </span>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <p className="font-bold text-stone-900 text-[10px]">
+                                      {prod.pieces.toLocaleString("es-MX")} <span className="text-[8px] text-stone-400">pz</span>
+                                    </p>
+                                    <p className="text-[9px] text-emerald-600 font-bold">
+                                      {formatCurrency(prod.revenue)}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Barra inferior del cajón en móvil */}
+                        <div className="pt-2 border-t border-stone-200/80 flex items-center justify-between gap-2 flex-wrap text-xs">
+                          <div className="text-[11px] text-stone-600">
+                            <span>Fondo Inicial: </span>
+                            <strong className="text-stone-900">{formatCurrency(b.currentShift.initialFund)}</strong>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingShiftBranch(b)}
+                              className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-800 font-bold text-xs border border-orange-200 transition-colors"
+                            >
+                              Modificar Horario
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => advanceShift(b.id)}
+                              className="px-3 py-1.5 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-xs transition-colors"
+                            >
+                              Corte de Turno
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Resumen Móvil Consolidado de la Cadena */}
+              <div className="rounded-2xl sm:rounded-3xl bg-stone-900 text-white p-4 sm:p-5 space-y-3 shadow-lg border border-stone-800">
+                <div className="flex items-center justify-between border-b border-stone-800 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-orange-400" />
+                    <div>
+                      <h4 className="text-sm font-black text-orange-400 uppercase tracking-wider">Total Cadena</h4>
+                      <p className="text-[10px] text-stone-400">{branches.length} Sucursales Activas</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => switchBranch("all")}
+                    className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition-all active:scale-95 shadow-sm"
+                  >
+                    Ver Toda la Red
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white/[0.06] p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                    <span className="text-[10px] text-stone-400 uppercase font-bold">Ventas Totales</span>
+                    <p className="text-sm font-black text-white">{formatCurrency(consolidatedOverview.totalSales)}</p>
+                  </div>
+                  <div className="bg-white/[0.06] p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                    <span className="text-[10px] text-stone-400 uppercase font-bold">Piezas de Pan</span>
+                    <p className="text-sm font-black text-amber-300">{consolidatedOverview.totalPieces.toLocaleString("es-MX")} pz</p>
+                  </div>
+                  <div className="bg-white/[0.06] p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                    <span className="text-[10px] text-stone-400 uppercase font-bold">Ticket Promedio</span>
+                    <p className="text-sm font-black text-stone-200">{formatCurrency(consolidatedOverview.averageTicket)}</p>
+                  </div>
+                  <div className="bg-white/[0.06] p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                    <span className="text-[10px] text-stone-400 uppercase font-bold">Efectivo en Cajas</span>
+                    <p className="text-sm font-black text-emerald-400">{formatCurrency(consolidatedOverview.totalCashInDrawers)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. VISTA LAPTOP / ESCRITORIO: Tabla Ejecutiva Ampliada (≥ md por defecto) */}
+            <div
+              className={
+                displayMode === "table"
+                  ? "block overflow-x-auto"
+                  : displayMode === "cards"
+                  ? "hidden"
+                  : "hidden md:block overflow-x-auto"
+              }
+            >
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-stone-200 bg-stone-100/60 text-stone-600 uppercase tracking-wider font-extrabold text-[10px]">
-                    <th className="py-3.5 px-4">Sucursal</th>
-                    <th className="py-3.5 px-4">Encargado & Contacto</th>
-                    <th className="py-3.5 px-4">Piezas Vendidas</th>
-                    <th className="py-3.5 px-4">Ventas Totales</th>
-                    <th className="py-3.5 px-4">Ticket Prom.</th>
-                    <th className="py-3.5 px-4">Meta & Cumplimiento</th>
-                    <th className="py-3.5 px-4">Caja & Turno Actual</th>
-                    <th className="py-3.5 px-4 text-right">Estadísticas & Acciones</th>
+                  <tr className="border-b border-stone-200 bg-stone-100/70 text-stone-700 uppercase tracking-wider font-extrabold text-[11px]">
+                    <th className="py-4 px-4 min-w-[200px]">Sucursal & Código</th>
+                    <th className="py-4 px-4 min-w-[170px]">Encargado & Contacto</th>
+                    <th className="py-4 px-4 min-w-[130px]">Piezas Vendidas</th>
+                    <th className="py-4 px-4 min-w-[140px]">Ventas Totales</th>
+                    <th className="py-4 px-4 min-w-[120px]">Ticket Prom.</th>
+                    <th className="py-4 px-4 min-w-[170px]">Caja & Turno Actual</th>
+                    <th className="py-4 px-4 min-w-[150px] text-right">Estadísticas</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 font-medium">
@@ -588,29 +1062,9 @@ export default function SucursalesPage() {
                             </div>
                           </td>
 
-                          {/* 6. Meta & Cumplimiento */}
-                          <td className="py-4 px-4 min-w-[140px]">
-                            <div className="space-y-1.5">
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="font-black text-stone-800">{b.percentGoal}%</span>
-                                <span className="text-[10px] text-stone-400">Meta: {formatCurrency(b.periodGoal)}</span>
-                              </div>
-                              <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-700 ${
-                                    b.percentGoal >= 90 ? "bg-emerald-500" :
-                                    b.percentGoal >= 70 ? "bg-amber-500" :
-                                    "bg-orange-500"
-                                  }`}
-                                  style={{ width: `${b.percentGoal}%` }}
-                                />
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* 7. Caja & Turno Actual */}
+                          {/* 6. Caja & Turno Actual */}
                           <td className="py-4 px-4">
-                            <div className="space-y-0.5">
+                            <div className="space-y-1">
                               <p className="font-black text-stone-900 flex items-center gap-1 text-xs">
                                 <Wallet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                 {formatCurrency(b.cashInDrawer)}
@@ -618,16 +1072,25 @@ export default function SucursalesPage() {
                               <p className="text-[11px] text-stone-600 font-semibold truncate max-w-[140px]">
                                 {b.currentShift.cashier}
                               </p>
-                              <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600">
-                                {b.currentShift.name.split("(")[0]}
-                              </span>
+                              <div className="flex items-center gap-1.5 pt-0.5">
+                                <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200">
+                                  {b.currentShift.name}
+                                </span>
+                                <button
+                                  onClick={() => setEditingShiftBranch(b)}
+                                  className="inline-flex items-center gap-0.5 text-[10px] text-orange-600 hover:text-orange-700 font-bold px-1.5 py-0.5 rounded hover:bg-orange-50 transition-colors"
+                                  title="Modificar horario del turno"
+                                >
+                                  <Clock className="w-3 h-3" />
+                                  <span>Horario</span>
+                                </button>
+                              </div>
                             </div>
                           </td>
 
-                          {/* 8. Botón Ver Estadísticas Desplegable & Acciones */}
+                          {/* 7. Botón Ver Estadísticas Desplegable */}
                           <td className="py-4 px-4 text-right">
-                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                              {/* BOTÓN PRINCIPAL SOLICITADO: Ver Estadísticas Desplegable */}
+                            <div className="flex items-center justify-end">
                               <button
                                 onClick={() => toggleExpand(b.id)}
                                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all border shadow-sm ${
@@ -641,36 +1104,6 @@ export default function SucursalesPage() {
                                 <span>{isExpanded ? "Ocultar Estadísticas" : "Ver Estadísticas"}</span>
                                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                               </button>
-
-                              <button
-                                onClick={() => handleSimulate(b.id)}
-                                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold transition-all active:scale-95 shadow-sm"
-                                title="Simular 1 venta rápida en esta tienda"
-                              >
-                                <Zap className="w-3.5 h-3.5 fill-current text-amber-600" />
-                              </button>
-
-                              <button
-                                onClick={() => switchBranch(b.id)}
-                                className={`px-2.5 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1 ${
-                                  isSelected
-                                    ? "bg-emerald-600 text-white shadow-sm"
-                                    : "bg-white hover:bg-stone-100 text-stone-700 border border-stone-200"
-                                }`}
-                                title={isSelected ? "Sucursal activa seleccionada" : "Seleccionar en POS"}
-                              >
-                                {isSelected ? (
-                                  <>
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                                    <span>Activa</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span>Ir a POS</span>
-                                    <ChevronRight className="w-3 h-3 text-stone-400" />
-                                  </>
-                                )}
-                              </button>
                             </div>
                           </td>
                         </tr>
@@ -678,7 +1111,7 @@ export default function SucursalesPage() {
                         {/* PANEL DESPLEGABLE: Estadísticas Detalladas de la Sucursal */}
                         {isExpanded && (
                           <tr className="bg-orange-50/20 border-b-2 border-orange-200/70">
-                            <td colSpan={8} className="p-4 sm:p-6 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <td colSpan={7} className="p-4 sm:p-6 animate-in fade-in slide-in-from-top-2 duration-200">
                               <div className="bg-white rounded-3xl border border-orange-200/90 shadow-xl p-5 sm:p-6 space-y-6">
                                 {/* Header del Panel Desplegable */}
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-4">
@@ -704,14 +1137,6 @@ export default function SucursalesPage() {
                                   </div>
 
                                   <div className="flex items-center gap-2 self-end sm:self-auto">
-                                    <button
-                                      onClick={() => handleSimulate(b.id)}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-md shadow-orange-500/20 active:scale-95 transition-all"
-                                    >
-                                      <Zap className="w-3.5 h-3.5 fill-current" />
-                                      <span>+1 Venta en {b.shortName}</span>
-                                    </button>
-
                                     <button
                                       onClick={() => toggleExpand(b.id)}
                                       className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs transition-colors"
@@ -873,6 +1298,14 @@ export default function SucursalesPage() {
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-stone-400">Turno Activo:</span>
                                       <strong className="text-stone-900">{b.currentShift.name}</strong>
+                                      <button
+                                        onClick={() => setEditingShiftBranch(b)}
+                                        className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white hover:bg-orange-50 text-orange-600 font-bold text-[10px] border border-stone-200 hover:border-orange-300 transition-colors shadow-xs"
+                                        title="Modificar horario del turno"
+                                      >
+                                        <Clock className="w-3 h-3 text-orange-500" />
+                                        <span>Modificar Horario</span>
+                                      </button>
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-stone-400">Cajera / Operador:</span>
@@ -890,16 +1323,17 @@ export default function SucursalesPage() {
 
                                   <div className="flex items-center gap-2">
                                     <button
+                                      onClick={() => setEditingShiftBranch(b)}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs border border-orange-200 transition-colors"
+                                    >
+                                      <Clock className="w-3.5 h-3.5" />
+                                      <span>Modificar Horario</span>
+                                    </button>
+                                    <button
                                       onClick={() => advanceShift(b.id)}
                                       className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold border border-stone-200 transition-colors"
                                     >
                                       Corte de Turno
-                                    </button>
-                                    <button
-                                      onClick={() => switchBranch(b.id)}
-                                      className="px-3.5 py-1.5 rounded-xl bg-stone-900 hover:bg-black text-white font-bold transition-all shadow-sm"
-                                    >
-                                      Usar en POS
                                     </button>
                                   </div>
                                 </div>
@@ -925,7 +1359,7 @@ export default function SucursalesPage() {
                       </div>
                     </td>
                     <td className="py-4 px-4 text-stone-300 text-[11px]">
-                      3 Sucursales Activas
+                      {branches.length} Sucursales Activas
                     </td>
                     <td className="py-4 px-4 text-amber-300 text-sm">
                       {consolidatedOverview.totalPieces.toLocaleString("es-MX")}{" "}
@@ -937,176 +1371,32 @@ export default function SucursalesPage() {
                     <td className="py-4 px-4 text-stone-200">
                       {formatCurrency(consolidatedOverview.averageTicket)}
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="space-y-1">
-                        <span className="text-emerald-400 text-xs">
-                          {consolidatedOverview.percentGoal}% Alcanzado
-                        </span>
-                        <div className="w-28 bg-stone-800 rounded-full h-1.5 overflow-hidden">
-                          <div 
-                            className="bg-emerald-400 h-full rounded-full"
-                            style={{ width: `${consolidatedOverview.percentGoal}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
                     <td className="py-4 px-4 text-emerald-300 text-sm">
                       {formatCurrency(consolidatedOverview.totalCashInDrawers)}
                     </td>
-                    <td className="py-4 px-4 text-right">
-                      <button
-                        onClick={() => switchBranch("all")}
-                        className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs transition-all active:scale-95 shadow-md"
-                      >
-                        Ver Consolidado
-                      </button>
-                    </td>
+                    <td className="py-4 px-4 text-right"></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           </div>
         </div>
-      )}
 
-      {/* TAB 2: Shift Management & Arqueo Comparison */}
-      {activeTab === "turnos" && (
-        <div className="space-y-6 animate-in fade-in">
-          <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
-            <h3 className="text-base font-black text-stone-900 mb-1">
-              Comparativa de Turnos Activos por Sucursal
-            </h3>
-            <p className="text-xs text-stone-500 mb-4">
-              Estado en tiempo real del fondo inicial, ventas por medio de pago y arqueo de caja
-            </p>
+      {/* Modal para Crear Nueva Sucursal y Asignar Encargado */}
+      <CreateBranchModal
+        isOpen={isCreateBranchOpen}
+        onClose={() => setIsCreateBranchOpen(false)}
+        onAddBranch={addBranch}
+        existingCount={branches.length}
+      />
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-stone-200 text-stone-500 uppercase tracking-wider font-bold">
-                    <th className="pb-3 px-3">Sucursal</th>
-                    <th className="pb-3 px-3">Turno Actual</th>
-                    <th className="pb-3 px-3">Cajera / Operador</th>
-                    <th className="pb-3 px-3">Fondo Inicial</th>
-                    <th className="pb-3 px-3">Venta Efectivo</th>
-                    <th className="pb-3 px-3">Venta Tarjeta/Transfer</th>
-                    <th className="pb-3 px-3">Total en Turno</th>
-                    <th className="pb-3 px-3">Efectivo en Caja</th>
-                    <th className="pb-3 px-3 text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100 font-medium">
-                  {branches.map((b) => (
-                    <tr key={b.id} className="hover:bg-stone-50/80 transition-colors">
-                      <td className="py-3.5 px-3 font-bold text-stone-900">
-                        {b.name}
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 font-semibold border border-orange-200">
-                          {b.currentShift.name}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 font-bold text-stone-800">
-                        {b.currentShift.cashier}
-                      </td>
-                      <td className="py-3.5 px-3 text-stone-600">
-                        {formatCurrency(b.currentShift.initialFund)}
-                      </td>
-                      <td className="py-3.5 px-3 font-bold text-emerald-700">
-                        {formatCurrency(b.currentShift.cashSales)}
-                      </td>
-                      <td className="py-3.5 px-3 text-stone-600">
-                        {formatCurrency(b.currentShift.cardSales + b.currentShift.transferSales)}
-                      </td>
-                      <td className="py-3.5 px-3 font-black text-stone-900">
-                        {formatCurrency(b.currentShift.totalSales)}
-                      </td>
-                      <td className="py-3.5 px-3 font-black text-stone-900 bg-stone-50">
-                        {formatCurrency(b.cashInDrawer)}
-                      </td>
-                      <td className="py-3.5 px-3 text-right">
-                        <button
-                          onClick={() => advanceShift(b.id)}
-                          className="px-3 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-white font-bold text-[11px] transition-colors"
-                        >
-                          Corte / Siguiente Turno
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: Live Sales Simulation Feed */}
-      {activeTab === "feed" && (
-        <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4 animate-in fade-in">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-black text-stone-900">
-                Historial de Ventas Simuladas en Tiempo Real
-              </h3>
-              <p className="text-xs text-stone-500">
-                Tickets emitidos recientemente a través del simulador de ventas multi-sucursal
-              </p>
-            </div>
-
-            <button
-              onClick={() => handleSimulate()}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-xs shadow-md transition-all active:scale-95"
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Emitir Ticket Ahora</span>
-            </button>
-          </div>
-
-          {recentSimulatedSales.length === 0 ? (
-            <div className="text-center py-12 text-stone-400 space-y-2">
-              <Receipt className="w-10 h-10 mx-auto opacity-40" />
-              <p className="font-semibold text-xs">No hay ventas simuladas recientes.</p>
-              <p className="text-[11px]">Presiona &quot;Simular 1 Venta&quot; para comenzar a generar tickets.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-stone-100">
-              {recentSimulatedSales.map((sale) => (
-                <div key={sale.id} className="py-3 flex items-center justify-between gap-4 text-xs hover:bg-stone-50/60 px-2 rounded-xl transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-black">
-                      <ShoppingBag className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-stone-900">{sale.branchName}</span>
-                        <span className="text-stone-300">•</span>
-                        <span className="text-[11px] text-stone-500">{sale.cashier}</span>
-                        <span className="text-stone-300">•</span>
-                        <span className="text-[10px] text-stone-400 font-mono">{sale.timestamp}</span>
-                      </div>
-                      <p className="text-[11px] text-stone-600 mt-0.5">{sale.itemsSummary}</p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-sm font-black text-stone-900">{formatCurrency(sale.total)}</p>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                      sale.paymentMethod === "efectivo"
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : sale.paymentMethod === "tarjeta"
-                        ? "bg-blue-50 text-blue-700 border border-blue-200"
-                        : "bg-purple-50 text-purple-700 border border-purple-200"
-                    }`}>
-                      {sale.paymentMethod}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Modal para Modificar Horario del Turno */}
+      <EditShiftModal
+        isOpen={!!editingShiftBranch}
+        onClose={() => setEditingShiftBranch(null)}
+        branch={editingShiftBranch}
+        onSaveShift={handleSaveShift}
+      />
     </div>
   );
 }

@@ -24,6 +24,8 @@ import {
   Flame,
   Sparkles,
   Building2,
+  ShieldCheck,
+  CalendarClock,
   X
 } from "lucide-react";
 import AnimatedLogo from "@/components/ui/AnimatedLogo";
@@ -80,6 +82,13 @@ const navigationItems: NavItem[] = [
   },
   {
     type: "link",
+    name: "Pedidos",
+    href: "/pedidos",
+    icon: CalendarClock,
+    badge: "Encargos",
+  },
+  {
+    type: "link",
     name: "Clientes",
     href: "/clientes",
     icon: Users,
@@ -99,8 +108,7 @@ const navigationItems: NavItem[] = [
     icon: TrendingUp,
     badge: "+Ventas",
     items: [
-      { name: "Ventas (POS)", href: "/pos", icon: ShoppingBag, badge: "Caja" },
-      { name: "Registro de ingresos", href: "/caja?tab=entradas", icon: PlusCircle, badge: "Abonos" },
+      { name: "Registro de ingresos", href: "/ingresos", icon: PlusCircle, badge: "Abonos" },
     ],
   },
   {
@@ -110,7 +118,7 @@ const navigationItems: NavItem[] = [
     icon: TrendingDown,
     badge: "Control",
     items: [
-      { name: "Registro de gastos", href: "/caja?tab=salidas", icon: Receipt, badge: "Compras" },
+      { name: "Registro de gastos", href: "/gastos", icon: Receipt, badge: "Control" },
     ],
   },
   {
@@ -132,7 +140,8 @@ const navigationItems: NavItem[] = [
     badge: null,
     items: [
       { name: "Catálogos de sistema", href: "/configuracion?tab=general", icon: Sliders },
-      { name: "Usuarios", href: "/configuracion?tab=usuarios", icon: UserCheck, badge: "Roles" },
+      { name: "Roles", href: "/configuracion?tab=roles", icon: ShieldCheck, badge: "Roles" },
+      { name: "Empleados", href: "/configuracion?tab=empleados", icon: Users, badge: "Personal" },
     ],
   },
 ];
@@ -140,7 +149,7 @@ const navigationItems: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, canAccessRoute } = useAuth();
-  const { currentBranch, isAllBranches } = useBranch();
+  const { currentBranch, isAllBranches, branches } = useBranch();
   const { 
     isCollapsed, 
     toggleCollapse, 
@@ -315,7 +324,7 @@ export default function Sidebar() {
                       {!isCollapsed && <span className="tracking-tight">{item.name}</span>}
                     </div>
 
-                    {!isCollapsed && item.badge && (
+                    {!isCollapsed && (item.badge || item.href === "/sucursales") && (
                       <span
                         className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
                           isActive
@@ -323,7 +332,7 @@ export default function Sidebar() {
                             : "bg-white/[0.05] text-stone-400 border border-white/[0.06]"
                         }`}
                       >
-                        {item.badge}
+                        {item.href === "/sucursales" ? `${branches.length} Tiendas` : item.badge}
                       </span>
                     )}
                   </Link>
@@ -492,8 +501,8 @@ export default function Sidebar() {
                 isCollapsed ? "justify-center p-2.5" : "justify-between p-3.5"
               } rounded-2xl font-bold text-xs transition-all shadow-xl group active:scale-95 ${
                 isPosActive
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white ring-2 ring-emerald-400/50 shadow-emerald-500/25 font-black"
-                  : "bg-gradient-to-r from-[#f97316] via-[#e11d48] to-[#be123c] hover:brightness-110 text-white font-black shadow-rose-950/40 border border-white/20"
+                  ? "bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 text-white ring-2 ring-emerald-400/60 shadow-lg shadow-emerald-500/40 font-black"
+                  : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black shadow-lg shadow-emerald-950/50 border border-emerald-400/30 hover:shadow-emerald-500/20"
               }`}
               title="Punto de Venta Mostrador (POS)"
             >
@@ -504,7 +513,7 @@ export default function Sidebar() {
                 {!isCollapsed && (
                   <div className="text-left">
                     <p className="leading-tight font-black tracking-tight text-white">Punto de Venta</p>
-                    <p className="text-[9px] font-medium text-orange-100">Caja Mostrador (POS)</p>
+                    <p className="text-[9px] font-medium text-emerald-100">Caja Mostrador (POS)</p>
                   </div>
                 )}
               </div>

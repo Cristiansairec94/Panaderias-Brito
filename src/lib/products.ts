@@ -1,9 +1,21 @@
 import { Product } from "@/types";
 
+export function calculateEan13CheckDigit(digits12: string): number {
+  const d = digits12.replace(/\D/g, "").slice(0, 12);
+  if (d.length < 12) return 0;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const num = parseInt(d[i], 10);
+    sum += i % 2 === 0 ? num : num * 3;
+  }
+  return (10 - (sum % 10)) % 10;
+}
+
 export const DEFAULT_PRODUCTS: Product[] = [
   {
     id: "prod-1",
     code: "PAN-001",
+    barcode: "7501000100019",
     name: "Concha de Vainilla",
     price: 12,
     category: "pan_dulce",
@@ -11,11 +23,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 50,
     tag: "Tradicional",
     description: "Esponjosa y suave con costra crujiente de azúcar y vainilla natural.",
-    image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-2",
     code: "PAN-002",
+    barcode: "7501000100026",
     name: "Concha de Chocolate",
     price: 12,
     category: "pan_dulce",
@@ -23,11 +41,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 40,
     tag: "Favorito",
     description: "Masa fina aromatizada con cacao selecto y cubierta crujiente chocolatosa.",
-    image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-3",
     code: "PAN-003",
+    barcode: "7501000100033",
     name: "Cuerno de Mantequilla",
     price: 15,
     category: "pan_dulce",
@@ -35,11 +59,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 30,
     tag: "Artesanal",
     description: "Hojaldre 100% mantequilla pura de vaca, dorado y crujiente por capas.",
-    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-4",
     code: "BLA-001",
+    barcode: "7501000100040",
     name: "Bolillo Tradicional",
     price: 5,
     category: "pan_blanco",
@@ -47,11 +77,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 150,
     tag: "Recién Salido",
     description: "Corteza dorada crujiente y migajón esponjoso, horneado en piso de piedra.",
-    image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1589367920969-ab8e050bbb04?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-5",
     code: "BLA-002",
+    barcode: "7501000100057",
     name: "Telera para Torta",
     price: 6,
     category: "pan_blanco",
@@ -59,11 +95,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 100,
     tag: "De la Casa",
     description: "Pan suave y dorado en tres secciones, el clásico para tortas mexicanas.",
-    image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-6",
     code: "PAN-004",
+    barcode: "7501000100064",
     name: "Oreja Hojaldrada",
     price: 14,
     category: "pan_dulce",
@@ -71,11 +113,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 35,
     tag: "Crujiente",
     description: "Hojaldre finamente caramelizado al horno con mantequilla y azúcar.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-7",
     code: "PAN-005",
+    barcode: "7501000100071",
     name: "Dona Glaseada",
     price: 13,
     category: "pan_dulce",
@@ -83,11 +131,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 30,
     tag: "Más Vendido",
     description: "Masa esponjada frita a punto exacto con glaseado clásico brillante.",
-    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-8",
     code: "PAS-001",
+    barcode: "7501000100088",
     name: "Rebanada Pastel 3 Leches",
     price: 45,
     category: "pasteleria",
@@ -95,11 +149,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 20,
     tag: "Gourmet",
     description: "Bizcocho húmedo bañado en infusión de tres leches y fresa fresca.",
-    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-9",
     code: "PAS-002",
+    barcode: "7501000100095",
     name: "Pay de Queso con Zarzamora",
     price: 40,
     category: "pasteleria",
@@ -107,11 +167,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 15,
     tag: "Especialidad",
     description: "Base crujiente de galleta con suave crema de queso y zarzamora silvestre.",
-    image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-10",
     code: "BEB-001",
+    barcode: "7501000100101",
     name: "Café de Olla Caliente",
     price: 25,
     category: "bebidas",
@@ -119,11 +185,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 60,
     tag: "Calientito",
     description: "Café de grano selecto colado con canela criolla y toque de piloncillo.",
-    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop&q=80",
+    hasIva: true,
+    ivaRate: 16,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-11",
     code: "BEB-002",
+    barcode: "7501000100118",
     name: "Chocolate Caliente con Leche",
     price: 30,
     category: "bebidas",
@@ -131,11 +203,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 40,
     tag: "Tradición",
     description: "Tablelilla artesanal espumada en jarra con leche entera caliente.",
-    image: "https://images.unsplash.com/photo-1542990253-0d0f5be5f0ed?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1542990253-0d0f5be5f0ed?w=800&auto=format&fit=crop&q=80",
+    hasIva: true,
+    ivaRate: 16,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-12",
     code: "TEM-001",
+    barcode: "7501000100125",
     name: "Empanada de Calabaza",
     price: 18,
     category: "temporada",
@@ -143,11 +221,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     stock: 25,
     tag: "Rellena",
     description: "Horneada al punto con relleno artesanal de dulce de calabaza y canela.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: true,
+    iepsRate: 8,
+    taxIncluded: true
   },
   {
     id: "prod-13",
     code: "AB-001",
+    barcode: "7501000100132",
     name: "Leche Entera 1L",
     price: 28,
     category: "abarrotes",
@@ -156,11 +240,17 @@ export const DEFAULT_PRODUCTS: Product[] = [
     unit: "pieza",
     tag: "Abarrote",
     description: "Leche pasteurizada entera fresca de primera calidad.",
-    image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   },
   {
     id: "prod-14",
     code: "MP-001",
+    barcode: "7501000100149",
     name: "Harina de Trigo San Antonio 1kg",
     price: 22,
     category: "materia_prima",
@@ -169,7 +259,12 @@ export const DEFAULT_PRODUCTS: Product[] = [
     unit: "kg",
     tag: "Insumo",
     description: "Harina de trigo de alta fuerza ideal para panificación tradicional.",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80"
+    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80",
+    hasIva: false,
+    ivaRate: 0,
+    hasIeps: false,
+    iepsRate: 0,
+    taxIncluded: true
   }
 ];
 
@@ -185,6 +280,95 @@ export const PRODUCT_CATEGORIES = [
 ];
 
 const STORAGE_KEY = "brito_products_v6";
+
+export function generateProductBarcode(): string {
+  const current = getStoredProducts();
+  let base = `75010001${String(current.length + 1).padStart(4, "0")}`;
+  let candidate = `${base}${calculateEan13CheckDigit(base)}`;
+  let attempt = 1;
+  while (current.some((p) => p.barcode === candidate)) {
+    base = `75010001${String(current.length + 1 + attempt).padStart(4, "0")}`;
+    candidate = `${base}${calculateEan13CheckDigit(base)}`;
+    attempt++;
+  }
+  return candidate;
+}
+
+export function findProductByBarcodeOrCode(query: string, productsList?: Product[]): Product | undefined {
+  const rawList = productsList && productsList.length > 0 ? productsList : getStoredProducts();
+  // Ensure we also consult stored products in case productsList in memory was stale or missing barcodes
+  const storedList = getStoredProducts();
+  const seenIds = new Set<string>();
+  const list: Product[] = [];
+  for (const item of [...rawList, ...storedList]) {
+    if (item && item.id && !seenIds.has(item.id)) {
+      seenIds.add(item.id);
+      list.push(item);
+    }
+  }
+
+  const clean = query.trim().toUpperCase();
+  if (!clean) return undefined;
+
+  // 1. Coincidencia exacta por código de barras
+  const byBarcode = list.find((p) => p.barcode && p.barcode.trim().toUpperCase() === clean);
+  if (byBarcode) return byBarcode;
+
+  // 2. Coincidencia numérica flexible (EAN-13, UPC-A, 12 vs 13 dígitos)
+  const queryDigits = query.replace(/\D/g, "");
+  if (queryDigits.length >= 3) {
+    // 2a. Comparación exacta de solo dígitos
+    const byExactDigits = list.find((p) => {
+      if (!p.barcode) return false;
+      const pDigits = p.barcode.replace(/\D/g, "");
+      return pDigits === queryDigits;
+    });
+    if (byExactDigits) return byExactDigits;
+
+    // 2b. Query tiene 13 dígitos y producto tiene 12 dígitos (falta dígito verificador en producto)
+    if (queryDigits.length === 13) {
+      const query12 = queryDigits.slice(0, 12);
+      const by12 = list.find((p) => {
+        if (!p.barcode) return false;
+        const pDigits = p.barcode.replace(/\D/g, "");
+        return pDigits === query12;
+      });
+      if (by12) return by12;
+    }
+
+    // 2c. Query tiene 12 dígitos y producto tiene 13 dígitos (escáner sin dígito verificador o UPC)
+    if (queryDigits.length === 12) {
+      const by13 = list.find((p) => {
+        if (!p.barcode) return false;
+        const pDigits = p.barcode.replace(/\D/g, "");
+        return pDigits.length === 13 && pDigits.slice(0, 12) === queryDigits;
+      });
+      if (by13) return by13;
+    }
+
+    // 2d. Compatibilidad con ceros a la izquierda (UPC-A vs EAN-13)
+    const strippedQuery = queryDigits.replace(/^0+/, "");
+    if (strippedQuery.length >= 4) {
+      const byStripped = list.find((p) => {
+        if (!p.barcode) return false;
+        const pDigits = p.barcode.replace(/\D/g, "").replace(/^0+/, "");
+        return pDigits === strippedQuery || 
+               (pDigits.length > 4 && (pDigits.startsWith(strippedQuery) || strippedQuery.startsWith(pDigits)));
+      });
+      if (byStripped) return byStripped;
+    }
+  }
+
+  // 3. Coincidencia exacta por código corto (ej. PAN-001, BLA-001)
+  const byCode = list.find((p) => p.code && p.code.trim().toUpperCase() === clean);
+  if (byCode) return byCode;
+
+  // 4. Coincidencia exacta por ID de producto
+  const byId = list.find((p) => p.id && p.id.trim().toUpperCase() === clean);
+  if (byId) return byId;
+
+  return undefined;
+}
 
 export function generateProductCode(category?: string): string {
   const current = getStoredProducts();
@@ -209,6 +393,45 @@ export function generateProductCode(category?: string): string {
   return codeCandidate;
 }
 
+export function calculateProductTaxes(
+  price: number,
+  hasIva: boolean = false,
+  ivaRate: number = 0,
+  hasIeps: boolean = false,
+  iepsRate: number = 0,
+  taxIncluded: boolean = true
+) {
+  const safePrice = Math.max(0, price || 0);
+  const safeIvaRate = hasIva ? Math.max(0, ivaRate || 0) : 0;
+  const safeIepsRate = hasIeps ? Math.max(0, iepsRate || 0) : 0;
+
+  if (taxIncluded) {
+    const totalTaxPercent = (safeIvaRate + safeIepsRate) / 100;
+    const basePrice = totalTaxPercent > 0 ? safePrice / (1 + totalTaxPercent) : safePrice;
+    const ivaAmount = basePrice * (safeIvaRate / 100);
+    const iepsAmount = basePrice * (safeIepsRate / 100);
+    return {
+      basePrice: Number(basePrice.toFixed(2)),
+      ivaAmount: Number(ivaAmount.toFixed(2)),
+      iepsAmount: Number(iepsAmount.toFixed(2)),
+      totalPrice: Number(safePrice.toFixed(2)),
+      totalTaxes: Number((ivaAmount + iepsAmount).toFixed(2)),
+    };
+  } else {
+    const basePrice = safePrice;
+    const ivaAmount = basePrice * (safeIvaRate / 100);
+    const iepsAmount = basePrice * (safeIepsRate / 100);
+    const totalPrice = basePrice + ivaAmount + iepsAmount;
+    return {
+      basePrice: Number(basePrice.toFixed(2)),
+      ivaAmount: Number(ivaAmount.toFixed(2)),
+      iepsAmount: Number(iepsAmount.toFixed(2)),
+      totalPrice: Number(totalPrice.toFixed(2)),
+      totalTaxes: Number((ivaAmount + iepsAmount).toFixed(2)),
+    };
+  }
+}
+
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") {
     return DEFAULT_PRODUCTS;
@@ -221,14 +444,53 @@ export function getStoredProducts(): Product[] {
       return DEFAULT_PRODUCTS;
     }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0 || !parsed.some(p => p.id === "prod-1")) {
+    if (!Array.isArray(parsed) || parsed.length === 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
       return DEFAULT_PRODUCTS;
     }
-    return parsed.map((p: Product, idx: number) => ({
-      ...p,
-      code: p.code || `PRD-${String(idx + 1).padStart(3, "0")}`,
-    }));
+
+    let needsResave = false;
+    const normalized = parsed.map((p: Product, idx: number) => {
+      const defaultMatch = DEFAULT_PRODUCTS.find(dp => dp.id === p.id);
+      let barcode = p.barcode || defaultMatch?.barcode;
+
+      if (barcode) {
+        const digits = barcode.replace(/\D/g, "");
+        // Si tiene 12 dígitos, migrar a 13 dígitos con su dígito verificador EAN-13
+        if (digits.length === 12) {
+          barcode = `${digits}${calculateEan13CheckDigit(digits)}`;
+          needsResave = true;
+        }
+      } else {
+        const base = `75010001${String(idx + 1).padStart(4, "0")}`;
+        barcode = `${base}${calculateEan13CheckDigit(base)}`;
+        needsResave = true;
+      }
+
+      const code = p.code || defaultMatch?.code || `PRD-${String(idx + 1).padStart(3, "0")}`;
+      if (code !== p.code || barcode !== p.barcode) {
+        needsResave = true;
+      }
+
+      return {
+        ...p,
+        code,
+        barcode,
+        hasIva: p.hasIva !== undefined ? p.hasIva : (defaultMatch?.hasIva ?? false),
+        ivaRate: p.ivaRate !== undefined ? p.ivaRate : (defaultMatch?.ivaRate ?? (p.hasIva ? 16 : 0)),
+        hasIeps: p.hasIeps !== undefined ? p.hasIeps : (defaultMatch?.hasIeps ?? false),
+        iepsRate: p.iepsRate !== undefined ? p.iepsRate : (defaultMatch?.iepsRate ?? (p.hasIeps ? 8 : 0)),
+        taxIncluded: p.taxIncluded !== undefined ? p.taxIncluded : true,
+      };
+    });
+
+    if (needsResave) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      } catch (e) {}
+    }
+
+    return normalized;
   } catch {
     return DEFAULT_PRODUCTS;
   }
@@ -259,9 +521,11 @@ export function updateProductPrice(id: string, newPrice: number): void {
 export function addProduct(product: Omit<Product, "id">): Product {
   const current = getStoredProducts();
   const assignedCode = product.code?.trim() || generateProductCode(product.category);
+  const assignedBarcode = product.barcode?.trim() || generateProductBarcode();
   const newProduct: Product = {
     ...product,
     code: assignedCode.toUpperCase(),
+    barcode: assignedBarcode,
     id: `prod-${Date.now()}`,
   };
   saveStoredProducts([...current, newProduct]);

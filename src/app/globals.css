@@ -25,15 +25,16 @@ body {
     margin: 0mm !important;
   }
 
-  *, *:before, *:after {
+  *, *::before, *::after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  body {
-    background: white !important;
+  html, body {
     margin: 0 !important;
     padding: 0 !important;
+    background: white !important;
+    color: black !important;
   }
 
   body * {
@@ -57,6 +58,7 @@ body {
     margin: 0 auto !important;
     padding: 4mm !important;
     border: none !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
     background: white !important;
     color: black !important;
@@ -117,5 +119,17 @@ body {
 
 html, body {
   scroll-behavior: smooth;
+}
+
+/* Ocultar flechas / spinners en inputs numéricos en todos los navegadores */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 

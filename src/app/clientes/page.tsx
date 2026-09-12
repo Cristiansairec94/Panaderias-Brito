@@ -1,411 +1,814 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { 
   Users, 
   Plus, 
   Search, 
   Phone, 
-  MapPin, 
-  Mail, 
-  Store, 
-  Cake, 
-  UserCheck, 
-  DollarSign, 
-  CreditCard,
-  MessageCircle,
-  X,
-  FileText
+  X, 
+  FileText, 
+  Edit3, 
+  Trash2, 
+  CheckCircle2, 
+  User,
+  AlertTriangle,
+  Sparkles,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Receipt,
+  Calendar,
+  BarChart3,
+  Clock,
+  ShoppingBag,
+  RefreshCw
 } from "lucide-react";
 import { Customer } from "@/types";
-import { formatCurrency } from "@/lib/utils";
-import { getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
+import { onlyNumbersKeyDown, cleanOnlyNumbers, formatCurrency } from "@/lib/utils";
+import { 
+  getStoredCustomers, 
+  saveStoredCustomers, 
+  fetchCustomersFromDb, 
+  createCustomerInDb, 
+  updateCustomerInDb, 
+  deleteCustomerInDb 
+} from "@/lib/customers";
+
+// Ícono SVG oficial y ordenado de WhatsApp
+function WhatsAppIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.711 1.457h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+    </svg>
+  );
+}
+
+// Formateador limpio y ordenado de números telefónicos (evita que se dividan en 2 renglones)
+function formatPhoneNumber(phone: string | undefined | null): string {
+  if (!phone || phone === "N/A" || phone.toLowerCase().includes("sin")) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+  // 10 dígitos (México estándar): 55 4433 2211
+  if (digits.length === 10) {
+    return `${digits.slice(0, 2)}\u00A0${digits.slice(2, 6)}\u00A0${digits.slice(6)}`;
+  }
+  // 9 dígitos: 213 213 123
+  if (digits.length === 9) {
+    return `${digits.slice(0, 3)}\u00A0${digits.slice(3, 6)}\u00A0${digits.slice(6)}`;
+  }
+  // 8 dígitos: 5544 2211
+  if (digits.length === 8) {
+    return `${digits.slice(0, 4)}\u00A0${digits.slice(4)}`;
+  }
+  // 12 dígitos: 123 982 198 231
+  if (digits.length === 12) {
+    return `${digits.slice(0, 3)}\u00A0${digits.slice(3, 6)}\u00A0${digits.slice(6, 9)}\u00A0${digits.slice(9)}`;
+  }
+  // 11 dígitos: 123 4567 8901
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}\u00A0${digits.slice(3, 7)}\u00A0${digits.slice(7)}`;
+  }
+  // 7 dígitos: 123 4567
+  if (digits.length === 7) {
+    return `${digits.slice(0, 3)}\u00A0${digits.slice(3)}`;
+  }
+  return digits;
+}
+
+// Generador de índices de paginación amigable (ej: 1, 2, 3 ... 10)
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 3) {
+    return [1, 2, 3, 4, "...", total];
+  }
+  if (current >= total - 2) {
+    return [1, "...", total - 3, total - 2, total - 1, total];
+  }
+  return [1, "...", current - 1, current, current + 1, "...", total];
+}
 
 export default function ClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | Customer["type"]>("all");
+  const [sortOrder, setSortOrder] = useState<"recent" | "alpha">("recent");
+
+  // Paginación: 10 clientes por página
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  // Modal de Historial y Moda de Compras por Cliente
+  const [historyModalCustomer, setHistoryModalCustomer] = useState<Customer | null>(null);
+
+  // Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  // Estado del Servidor Directo
+  const [isDbConnected, setIsDbConnected] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Form State: Nuevo Cliente
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [notes, setNotes] = useState("");
+
+  // Form State: Editar Cliente
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
+  // Sincronización directa con el servidor
+  const syncWithServer = async () => {
+    setIsSyncing(true);
+    try {
+      const { customers: dbCustomers, fromDb } = await fetchCustomersFromDb();
+      const valid = dbCustomers.filter((c) => c.id !== "cli-0" && c.type !== "general");
+      setCustomers(valid);
+      setIsDbConnected(fromDb);
+    } catch (err) {
+      console.warn("Error al sincronizar con el servidor directo:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
-    setCustomers(getStoredCustomers());
+    // 1. Carga inmediata de caché local para respuesta instantánea
+    const loaded = getStoredCustomers();
+    const cleaned = loaded.filter((c) => c.id !== "cli-0" && c.type !== "general");
+    setCustomers(cleaned);
+    if (cleaned.length !== loaded.length) {
+      saveStoredCustomers(cleaned);
+    }
+
+    // 2. Consulta y sincronización en segundo plano con el servidor directo
+    syncWithServer();
+
     const handleSync = () => {
-      setCustomers(getStoredCustomers());
+      const syncLoaded = getStoredCustomers();
+      const syncCleaned = syncLoaded.filter((c) => c.id !== "cli-0" && c.type !== "general");
+      setCustomers(syncCleaned);
     };
     window.addEventListener("brito_customers_updated", handleSync);
     return () => window.removeEventListener("brito_customers_updated", handleSync);
   }, []);
 
-  // Form State
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [type, setType] = useState<Customer["type"]>("frecuente");
-  const [creditLimit, setCreditLimit] = useState<string>("0");
-  const [notes, setNotes] = useState("");
+  // Al cambiar la búsqueda o el criterio de ordenamiento, regresar a la primera página
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, sortOrder]);
 
-  const filtered = customers.filter((c) => {
-    const matchesSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search) ||
-      (c.address && c.address.toLowerCase().includes(search.toLowerCase()));
-    const matchesType = typeFilter === "all" || c.type === typeFilter;
-    return matchesSearch && matchesType;
-  });
+  const showNotification = (msg: string) => {
+    setSuccessNotice(msg);
+    setTimeout(() => setSuccessNotice(null), 3500);
+  };
 
-  const totalDebt = customers.reduce((acc, c) => acc + c.currentDebt, 0);
-  const totalSalesAll = customers.reduce((acc, c) => acc + c.totalPurchases, 0);
-  const wholesaleCount = customers.filter((c) => c.type === "mayoreo").length;
+  // Timestamp numérico de recencia para ordenar empezando por el más reciente registro
+  const getCustomerRecency = (c: Customer): number => {
+    if (typeof (c as any).createdAt === "number" && (c as any).createdAt > 0) {
+      return (c as any).createdAt;
+    }
 
-  const handleCreateCustomer = (e: React.FormEvent) => {
+    // Extraer timestamp de id generado con Date.now() (ej. cli-1741369482103)
+    if (c.id && c.id.startsWith("cli-")) {
+      const rawNum = Number(c.id.replace("cli-", ""));
+      if (!isNaN(rawNum) && rawNum > 10000000) {
+        return rawNum;
+      }
+    }
+
+    // Extraer fecha ISO de registeredAt
+    if (c.registeredAt) {
+      const parsed = Date.parse(c.registeredAt);
+      if (!isNaN(parsed) && parsed > 0) {
+        const smallId = Number(c.id.replace(/\D/g, "")) || 0;
+        return parsed + Math.min(smallId, 9999);
+      }
+    }
+
+    return 0;
+  };
+
+  // Filtrado por búsqueda y ordenamiento (predeterminado: del más reciente al más antiguo)
+  const filteredCustomers = useMemo(() => {
+    const validCustomers = customers.filter((c) => c.id !== "cli-0" && c.type !== "general");
+    const q = search.toLowerCase().trim();
+    const qClean = q.replace(/\D/g, "");
+    const matched = !q
+      ? validCustomers
+      : validCustomers.filter((c) => {
+          const cClean = c.phone ? c.phone.replace(/\D/g, "") : "";
+          return (
+            c.name.toLowerCase().includes(q) ||
+            (c.phone && c.phone.toLowerCase().includes(q)) ||
+            (qClean.length > 0 && cClean.includes(qClean)) ||
+            (c.notes && c.notes.toLowerCase().includes(q)) ||
+            (c.favoriteProduct && c.favoriteProduct.toLowerCase().includes(q))
+          );
+        });
+
+    if (sortOrder === "alpha") {
+      return [...matched].sort((a, b) =>
+        a.name.localeCompare(b.name, "es", { sensitivity: "base", numeric: true })
+      );
+    }
+
+    // Ordenar empezando por el más reciente registro
+    return [...matched].sort((a, b) => {
+      const timeA = getCustomerRecency(a);
+      const timeB = getCustomerRecency(b);
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+      return a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+    });
+  }, [customers, search, sortOrder]);
+
+  // Cálculos de Paginación (10 clientes por página)
+  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE) || 1;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedCustomers = useMemo(() => {
+    const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+    return filteredCustomers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredCustomers, safeCurrentPage]);
+
+  // Apertura modal nuevo cliente
+  const handleOpenCreate = () => {
+    setName("");
+    setPhone("");
+    setNotes("");
+    setIsModalOpen(true);
+  };
+
+  // Guardar nuevo cliente (se agrega al inicio y se sincroniza en el servidor)
+  const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const newCustomer: Customer = {
-      id: `cli-${Date.now()}`,
+    const newCustomerData = {
       name: name.trim(),
-      phone: phone.trim() || "N/A",
-      email: email.trim() || undefined,
-      address: address.trim() || undefined,
-      type,
-      creditLimit: Number(creditLimit) || 0,
-      currentDebt: 0,
-      totalPurchases: 0,
+      phone: phone.trim() ? formatPhoneNumber(phone.trim()) : "N/A",
+      type: "frecuente" as const,
+      creditLimit: 0,
       notes: notes.trim() || undefined,
-      registeredAt: new Date().toISOString().split("T")[0],
     };
 
-    const updated = [...customers, newCustomer];
+    const created = await createCustomerInDb(newCustomerData);
+    const updated = [created, ...customers.filter((c) => c.id !== created.id)];
     setCustomers(updated);
-    saveStoredCustomers(updated);
+    setCurrentPage(1); // Muestra la primera página donde aparece el nuevo cliente recién creado
     setIsModalOpen(false);
-    // Reset form
-    setName("");
-    setPhone("");
-    setEmail("");
-    setAddress("");
-    setType("frecuente");
-    setCreditLimit("0");
-    setNotes("");
+    showNotification(`¡Cliente "${created.name}" registrado en el servidor correctamente!`);
   };
 
-  const getTypeBadge = (cType: Customer["type"]) => {
-    switch (cType) {
-      case "general":
-        return <span className="bg-stone-100 text-stone-700 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase">Mostrador General</span>;
-      case "mayoreo":
-        return <span className="bg-brito-orange-100 text-brito-orange-800 border border-brito-orange-300 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1"><Store className="w-3 h-3" /> Mayorista</span>;
-      case "frecuente":
-        return <span className="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1"><UserCheck className="w-3 h-3" /> Frecuente</span>;
-      case "evento":
-        return <span className="bg-brito-crimson-100 text-brito-crimson-800 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-1"><Cake className="w-3 h-3" /> Eventos & Pastelería</span>;
-    }
+  // Apertura modal editar
+  const handleOpenEdit = (c: Customer) => {
+    setEditingCustomer(c);
+    setEditName(c.name);
+    setEditPhone(c.phone === "N/A" ? "" : c.phone?.replace(/\D/g, "") || "");
+    setEditNotes(c.notes || "");
+  };
+
+  // Guardar edición
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCustomer || !editName.trim()) return;
+
+    const updates = {
+      name: editName.trim(),
+      phone: editPhone.trim() ? formatPhoneNumber(editPhone.trim()) : "N/A",
+      notes: editNotes.trim() || undefined,
+    };
+
+    await updateCustomerInDb(editingCustomer.id, updates);
+    const updated = customers.map((c) => {
+      if (c.id === editingCustomer.id) {
+        return {
+          ...c,
+          ...updates,
+        };
+      }
+      return c;
+    });
+
+    setCustomers(updated);
+    setEditingCustomer(null);
+    showNotification(`¡Cliente "${editName.trim()}" actualizado en el servidor con éxito!`);
+  };
+
+  // Confirmar eliminación
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+
+    const deletedId = deleteConfirm.id;
+    const deletedName = deleteConfirm.name;
+    setDeleteConfirm(null);
+
+    await deleteCustomerInDb(deletedId, deletedName);
+    const updated = customers.filter((c) => c.id !== deletedId);
+    setCustomers(updated);
+    showNotification(`Cliente "${deletedName}" eliminado del servidor.`);
   };
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="px-2 sm:px-4 lg:px-6 py-4 sm:py-6 w-full max-w-[1650px] mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-200">
+      {/* Notificación Flotante */}
+      {successNotice && (
+        <div className="fixed top-6 right-6 z-50 bg-stone-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-amber-500 animate-in slide-in-from-top-4">
+          <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
+          <span className="text-sm sm:text-base font-black">{successNotice}</span>
+        </div>
+      )}
+
+      {/* ENCABEZADO SIMPLE Y DIRECTO */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 sm:p-7 rounded-3xl border-2 border-stone-200 shadow-sm">
         <div>
-          <h2 className="text-2xl font-black text-stone-900 tracking-tight">Directorio de Clientes & Mayoristas</h2>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Gestión de público general, tienditas de mayoreo, clientes con crédito y pedidos de pastelería.
-          </p>
-        </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-700 hover:to-brito-crimson-700 text-white font-extrabold px-5 py-2.5 rounded-xl shadow-lg shadow-brito-orange-600/20 text-xs transition-all active:scale-95"
-        >
-          <Plus className="w-4 h-4" /> Registrar Nuevo Cliente
-        </button>
-      </div>
-
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-stone-200/80 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Total Clientes</span>
-            <div className="p-2 bg-stone-100 text-stone-700 rounded-xl">
-              <Users className="w-4 h-4" />
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-amber-100 text-amber-900 rounded-2xl">
+              <Users className="w-7 h-7 sm:w-8 sm:h-8" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+                Directorio de Clientes
+              </h1>
+              <p className="text-sm sm:text-base text-stone-600 font-bold mt-0.5">
+                Directorio organizado con historial y moda de compra habitual
+              </p>
             </div>
           </div>
-          <p className="text-2xl font-black text-stone-900">{customers.length}</p>
-          <p className="text-[11px] text-stone-400 mt-0.5">Público y registrados</p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-stone-200/80 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Tiendas de Mayoreo</span>
-            <div className="p-2 bg-brito-orange-100 text-brito-orange-700 rounded-xl">
-              <Store className="w-4 h-4" />
-            </div>
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full sm:w-auto">
+          {/* Indicador de Estado del Servidor Directo */}
+          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border-2 border-stone-200 bg-stone-50 text-xs sm:text-sm font-black text-stone-700 shadow-2xs">
+            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isDbConnected ? "bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse" : "bg-amber-500"}`} />
+            <span className="whitespace-nowrap">{isDbConnected ? "Servidor Directo Conectado" : "Servidor Local Sincronizado"}</span>
+            <button
+              type="button"
+              onClick={syncWithServer}
+              disabled={isSyncing}
+              title="Sincronizar clientes con el servidor ahora"
+              className="p-1 hover:bg-stone-200 rounded-lg transition-all active:scale-95 disabled:opacity-50 cursor-pointer ml-1"
+            >
+              <RefreshCw className={`w-4 h-4 text-stone-600 ${isSyncing ? "animate-spin text-amber-700" : ""}`} />
+            </button>
           </div>
-          <p className="text-2xl font-black text-brito-orange-600">{wholesaleCount} tiendas</p>
-          <p className="text-[11px] text-stone-400 mt-0.5">Bolillo y telera diaria</p>
-        </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-stone-200/80 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Cuentas por Cobrar (Deuda)</span>
-            <div className="p-2 bg-rose-100 text-rose-600 rounded-xl">
-              <CreditCard className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-rose-600">{formatCurrency(totalDebt)}</p>
-          <p className="text-[11px] text-rose-400 font-semibold mt-0.5">Crédito pendiente de pago</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-stone-200/80 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Ventas Acumuladas</span>
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
-              <DollarSign className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-stone-900">{formatCurrency(totalSalesAll)}</p>
-          <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">Histórico de compras</p>
-        </div>
-      </div>
-
-      {/* Search & Tabs */}
-      <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre, teléfono o dirección de entrega..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-stone-50 rounded-xl border border-stone-200 text-xs focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Filter Buttons */}
-        <div className="flex gap-2 overflow-x-auto pb-1 text-xs">
           <button
-            onClick={() => setTypeFilter("all")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-              typeFilter === "all" ? "bg-stone-900 text-white shadow-sm" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-            }`}
+            type="button"
+            onClick={handleOpenCreate}
+            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-6 py-3.5 rounded-2xl shadow-lg shadow-amber-600/25 text-base sm:text-lg transition-all active:scale-95 cursor-pointer"
           >
-            Todos ({customers.length})
-          </button>
-          <button
-            onClick={() => setTypeFilter("mayoreo")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-              typeFilter === "mayoreo" ? "bg-brito-orange-600 text-white shadow-sm" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-            }`}
-          >
-            Mayoristas & Tienditas
-          </button>
-          <button
-            onClick={() => setTypeFilter("frecuente")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-              typeFilter === "frecuente" ? "bg-emerald-600 text-white shadow-sm" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-            }`}
-          >
-            Clientes Frecuentes
-          </button>
-          <button
-            onClick={() => setTypeFilter("evento")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-              typeFilter === "evento" ? "bg-brito-crimson-600 text-white shadow-sm" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-            }`}
-          >
-            Pasteles & Eventos
-          </button>
-          <button
-            onClick={() => setTypeFilter("general")}
-            className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-              typeFilter === "general" ? "bg-stone-600 text-white shadow-sm" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-            }`}
-          >
-            Mostrador General
+            <Plus className="w-6 h-6" />
+            <span>Registrar Nuevo Cliente</span>
           </button>
         </div>
       </div>
 
-      {/* Customer Directory Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filtered.map((c) => (
-          <div
-            key={c.id}
-            className="bg-white rounded-2xl border border-stone-200/80 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-          >
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-extrabold text-sm text-stone-900 leading-snug">{c.name}</h3>
-                  <p className="text-[10px] text-stone-400 mt-0.5">Registrado: {c.registeredAt}</p>
-                </div>
-                {getTypeBadge(c.type)}
+      {/* BUSCADOR SIMPLE */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border-2 border-stone-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, número de teléfono, pan habitual o descripción..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-12 pr-10 py-3.5 bg-stone-50 hover:bg-white focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 text-sm sm:text-base font-bold text-stone-900 focus:outline-none transition-all placeholder:text-stone-400 shadow-2xs"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-sm font-bold w-7 h-7 rounded-full flex items-center justify-center cursor-pointer bg-stone-200/60"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:gap-3 shrink-0">
+          {/* Selector de ordenamiento: Más recientes (predeterminado) o A - Z */}
+          <div className="inline-flex items-center bg-stone-100 p-1.5 rounded-2xl border-2 border-stone-200 shadow-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setSortOrder("recent");
+                setCurrentPage(1);
+              }}
+              className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-black transition-all cursor-pointer flex items-center gap-2 ${
+                sortOrder === "recent"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-102"
+                  : "text-stone-700 hover:text-stone-950 hover:bg-stone-200/70"
+              }`}
+              title="Mostrar primero los clientes registrados más recientemente"
+            >
+              <span className="text-base sm:text-lg">⏱️</span>
+              <span>Más Recientes</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSortOrder("alpha");
+                setCurrentPage(1);
+              }}
+              className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-black transition-all cursor-pointer flex items-center gap-2 ${
+                sortOrder === "alpha"
+                  ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-102"
+                  : "text-stone-700 hover:text-stone-950 hover:bg-stone-200/70"
+              }`}
+              title="Ordenar alfabéticamente por nombre (A - Z)"
+            >
+              <span className="text-base sm:text-lg">🔤</span>
+              <span>A - Z</span>
+            </button>
+          </div>
+
+          {/* Contador de Total de Clientes */}
+          <div className="px-5 py-2 sm:py-2.5 bg-stone-100 rounded-2xl border-2 border-stone-200 shrink-0 text-center flex flex-col justify-center shadow-sm min-w-[130px]">
+            <span className="text-xs sm:text-sm text-stone-500 font-extrabold block uppercase tracking-wider">Total</span>
+            <span className="text-lg sm:text-xl font-black text-stone-900 leading-tight">
+              {filteredCustomers.length} {filteredCustomers.length === 1 ? "Cliente" : "Clientes"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* TABLA LIMPIA Y CON LETRAS GRANDES */}
+      <div className="bg-white rounded-3xl border-2 border-stone-200 shadow-sm overflow-hidden">
+        {filteredCustomers.length === 0 ? (
+          <div className="text-center py-16 px-4 space-y-4">
+            <div className="w-16 h-16 bg-stone-100 text-stone-400 rounded-full flex items-center justify-center mx-auto">
+              <Users className="w-8 h-8" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-lg font-black text-stone-800">
+                {search ? "No se encontraron clientes con esa búsqueda" : "Aún no hay clientes registrados"}
+              </p>
+              <p className="text-sm text-stone-500 font-medium">
+                {search ? "Intenta con otro nombre, número o tipo de pan." : "Haz clic en 'Registrar Nuevo Cliente' para agregar el primero."}
+              </p>
+            </div>
+            {search ? (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 text-sm font-bold rounded-xl cursor-pointer"
+              >
+                Limpiar búsqueda
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-black rounded-xl cursor-pointer shadow-md"
+              >
+                + Registrar Primer Cliente
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-stone-100 border-b-2 border-stone-200 text-xs sm:text-sm font-black text-stone-700 uppercase tracking-wider">
+                    <th className="py-3.5 px-3 sm:px-4 w-16 text-center whitespace-nowrap"># Lista</th>
+                    <th className="py-3.5 px-4 sm:px-5 min-w-[200px]">Cliente / Nombre</th>
+                    <th className="py-3.5 px-4 sm:px-5 min-w-[210px] whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="w-4 h-4 text-stone-500" />
+                        <span>Teléfono / WhatsApp</span>
+                      </div>
+                    </th>
+                    <th className="py-3.5 px-4 sm:px-5 min-w-[220px]">Descripción del Cliente</th>
+                    <th className="py-3.5 px-4 sm:px-5 min-w-[160px] whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-600" />
+                        <span>Historial</span>
+                      </div>
+                    </th>
+                    <th className="py-3.5 px-4 sm:px-5 text-center w-28 whitespace-nowrap">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-200">
+                  {paginatedCustomers.map((c, idx) => {
+                    const cleanPhone = c.phone ? c.phone.replace(/\D/g, "") : "";
+                    const formattedPhone = formatPhoneNumber(c.phone);
+                    const hasValidPhone = cleanPhone.length >= 7;
+                    const hasWhatsApp = cleanPhone.length >= 8;
+
+                    return (
+                      <tr
+                        key={c.id}
+                        className="hover:bg-amber-50/50 transition-colors"
+                      >
+                        {/* Número de Orden de Lista */}
+                        <td className="py-3.5 px-3 sm:px-4 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center min-w-8 h-8 px-2 rounded-xl bg-stone-100 border border-stone-300 font-mono text-xs sm:text-sm font-black text-stone-700 shadow-2xs">
+                            {(safeCurrentPage - 1) * ITEMS_PER_PAGE + idx + 1}
+                          </span>
+                        </td>
+
+                      {/* 1. Nombre */}
+                      <td className="py-3.5 px-4 sm:px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 font-black text-sm sm:text-base shadow-xs bg-amber-100 text-amber-900 border border-amber-300">
+                            {c.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="text-sm sm:text-base font-black text-stone-900 block leading-snug">
+                              {c.name}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 2. Número / Teléfono y WhatsApp (Emparejado y perfectamente alineado) */}
+                      <td className="py-3.5 px-4 sm:px-5 whitespace-nowrap">
+                        <div className="inline-flex items-center gap-2">
+                          {/* Pastilla de Teléfono con Ancho y Alto Fijo Uniforme */}
+                          {hasValidPhone ? (
+                            <div className="w-[165px] h-9 inline-flex items-center justify-between px-2.5 bg-stone-100/90 border border-stone-300/80 rounded-xl font-mono text-xs sm:text-sm font-black text-stone-900 tracking-wide select-all shadow-2xs">
+                              <Phone className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                              <span className="tabular-nums tracking-wider text-center flex-1 truncate">
+                                {formattedPhone}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="w-[165px] h-9 inline-flex items-center justify-center gap-1.5 px-2.5 bg-stone-50 border border-dashed border-stone-300 rounded-xl font-mono text-xs font-bold text-stone-400 italic shadow-2xs">
+                              <Phone className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                              <span>Sin teléfono</span>
+                            </div>
+                          )}
+
+                          {/* Casilla de WhatsApp en Columna Fija (Mismas dimensiones w-8 h-8 siempre) */}
+                          <div className="w-8 h-8 shrink-0 flex items-center justify-center">
+                            {hasWhatsApp ? (
+                              <a
+                                href={`https://wa.me/52${cleanPhone}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-90 text-white flex items-center justify-center transition-all shadow-2xs hover:shadow-md cursor-pointer shrink-0"
+                                title={`Abrir WhatsApp (${formattedPhone})`}
+                              >
+                                <WhatsAppIcon className="w-4 h-4 fill-white" />
+                              </a>
+                            ) : (
+                              <div
+                                className="w-8 h-8 rounded-xl border border-dashed border-stone-200 bg-stone-50/60 flex items-center justify-center text-stone-300"
+                                title="Sin WhatsApp disponible"
+                              >
+                                <WhatsAppIcon className="w-4 h-4 fill-stone-300/60" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 3. Cuadro de Descripción */}
+                      <td className="py-3.5 px-4 sm:px-5">
+                        {c.notes ? (
+                          <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-semibold text-stone-800 leading-relaxed max-w-sm">
+                            {c.notes}
+                          </div>
+                        ) : (
+                          <span className="text-xs sm:text-sm font-medium text-stone-400 italic">
+                            Sin descripción
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 4. Historial (Abre en Formato Modal) */}
+                      <td className="py-3.5 px-4 sm:px-5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setHistoryModalCustomer(c)}
+                          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-bold border border-amber-200/90 bg-gradient-to-r from-amber-50 to-orange-50/80 hover:bg-amber-100/90 text-amber-950 transition-all cursor-pointer shadow-2xs hover:shadow-md active:scale-95"
+                          title="Abrir historial y moda de compra en ventana modal"
+                        >
+                          <span className="text-base shrink-0">🍞</span>
+                          <span className="font-black leading-snug">Historial</span>
+                        </button>
+                      </td>
+
+                      {/* 5. Acciones (Editar y Eliminar) */}
+                      <td className="py-3.5 px-4 sm:px-5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(c)}
+                            className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
+                            title="Editar cliente"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirm({ id: c.id, name: c.name })}
+                            className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-rose-100 text-stone-400 hover:text-rose-700 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
+                            title="Eliminar cliente"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* BARRA DE PAGINACIÓN INFERIOR (10 Clientes por Página) */}
+          {filteredCustomers.length > 0 && (
+            <div className="p-4 sm:px-6 bg-stone-50 border-t-2 border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm">
+              {/* Contador de registros visibles */}
+              <div className="text-stone-600 font-bold text-center sm:text-left">
+                Mostrando <span className="text-stone-900 font-black">{(safeCurrentPage - 1) * ITEMS_PER_PAGE + 1}</span> a{" "}
+                <span className="text-stone-900 font-black">
+                  {Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredCustomers.length)}
+                </span>{" "}
+                de <span className="text-amber-950 font-black">{filteredCustomers.length}</span> clientes registrados
               </div>
 
-              {/* Contact Info */}
-              <div className="space-y-1 text-xs text-stone-600">
-                {c.phone !== "N/A" && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-stone-400" />
-                    <span>{c.phone}</span>
-                    <a
-                      href={`https://wa.me/52${c.phone.replace(/\D/g, "")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-auto text-emerald-600 hover:text-emerald-700 text-[11px] font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md"
-                    >
-                      <MessageCircle className="w-3 h-3" /> WhatsApp
-                    </a>
-                  </div>
-                )}
-                {c.address && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                    <span className="truncate">{c.address}</span>
-                  </div>
-                )}
-              </div>
+              {/* Controles de Paginación */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5 sm:gap-2 select-none">
+                  {/* Botón Anterior */}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-xl font-black text-xs transition-all ${
+                      safeCurrentPage === 1
+                        ? "text-stone-300 bg-stone-100/50 cursor-not-allowed border border-stone-200/60"
+                        : "text-stone-700 bg-white hover:bg-amber-50 hover:text-amber-900 border border-stone-300 shadow-2xs active:scale-95 cursor-pointer"
+                    }`}
+                    title="Página anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span className="hidden sm:inline">Anterior</span>
+                  </button>
 
-              {/* Notes */}
-              {c.notes && (
-                <div className="p-2.5 bg-stone-50 rounded-xl text-[11px] text-stone-600 leading-relaxed border border-stone-100 flex items-start gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-stone-400 shrink-0 mt-0.5" />
-                  <span>{c.notes}</span>
+                  {/* Botones numéricos de página */}
+                  <div className="flex items-center gap-1">
+                    {getPageNumbers(safeCurrentPage, totalPages).map((pageNum, pageIdx) => {
+                      if (pageNum === "...") {
+                        return (
+                          <span key={`ellipsis-${pageIdx}`} className="px-2 text-stone-400 font-bold">
+                            ...
+                          </span>
+                        );
+                      }
+                      const num = Number(pageNum);
+                      const isActive = num === safeCurrentPage;
+                      return (
+                        <button
+                          key={`page-${num}`}
+                          type="button"
+                          onClick={() => setCurrentPage(num)}
+                          className={`min-w-9 h-9 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center cursor-pointer ${
+                            isActive
+                              ? "bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-105 border border-amber-600"
+                              : "bg-white text-stone-700 hover:bg-amber-50 hover:text-amber-900 border border-stone-300 shadow-2xs active:scale-95"
+                          }`}
+                        >
+                          {num}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Botón Siguiente */}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-xl font-black text-xs transition-all ${
+                      safeCurrentPage === totalPages
+                        ? "text-stone-300 bg-stone-100/50 cursor-not-allowed border border-stone-200/60"
+                        : "text-stone-700 bg-white hover:bg-amber-50 hover:text-amber-900 border border-stone-300 shadow-2xs active:scale-95 cursor-pointer"
+                    }`}
+                    title="Página siguiente"
+                  >
+                    <span className="hidden sm:inline">Siguiente</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
               )}
             </div>
+          )}
+        </>
+      )}
+    </div>
 
-            {/* Balances & Credit */}
-            <div className="border-t border-stone-100 pt-3 space-y-1.5 text-xs">
-              <div className="flex justify-between items-center text-stone-600">
-                <span>Total Comprado:</span>
-                <span className="font-extrabold text-stone-900">{formatCurrency(c.totalPurchases)}</span>
-              </div>
-              {c.creditLimit > 0 && (
-                <div className="flex justify-between items-center text-stone-600">
-                  <span>Límite de Crédito:</span>
-                  <span className="font-semibold">{formatCurrency(c.creditLimit)}</span>
-                </div>
-              )}
-              <div className="flex justify-between items-center pt-1 border-t border-dashed border-stone-200">
-                <span className="font-bold text-stone-700">Deuda Actual:</span>
-                <span
-                  className={`font-black ${
-                    c.currentDebt > 0 ? "text-rose-600" : "text-emerald-600"
-                  }`}
-                >
-                  {c.currentDebt > 0 ? formatCurrency(c.currentDebt) : "Al corriente ($0.00)"}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* New Customer Modal */}
+      {/* MODAL 1: REGISTRAR NUEVO CLIENTE (SIMPLE: NÚMERO, NOMBRE Y DESCRIPCIÓN) */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-brito-orange-100 text-brito-orange-600 rounded-xl">
-                  <Users className="w-5 h-5" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 border-2 border-stone-300 animate-in zoom-in-95">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between border-b-2 border-stone-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-100 text-amber-900 rounded-2xl">
+                  <Plus className="w-6 h-6" />
                 </div>
-                <h3 className="font-black text-base text-stone-900">Registrar Nuevo Cliente</h3>
+                <div>
+                  <h3 className="font-black text-xl text-stone-900">Registrar Nuevo Cliente</h3>
+                  <p className="text-xs sm:text-sm text-stone-500 font-medium">Ingresa los datos del cliente</p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100"
+                className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 cursor-pointer text-base font-bold"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCustomer} className="space-y-3.5 text-xs">
-              <div className="space-y-1">
-                <label className="font-bold text-stone-700">Nombre Completo / Negocio *</label>
+            <form onSubmit={handleCreateCustomer} className="space-y-5 text-sm">
+              {/* 1. Nombre del Cliente */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <User className="w-4 h-4 text-amber-600" />
+                  <span>Nombre Completo del Cliente *</span>
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej. Abarrotes Los Güeros o Doña Carmen"
+                  autoFocus
+                  placeholder="Ej. Doña Carmen o Juan Pérez"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all placeholder:text-stone-400 placeholder:font-normal"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Teléfono / WhatsApp</label>
-                  <input
-                    type="tel"
-                    placeholder="Ej. 55 1234 5678"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-stone-700">Tipo de Cliente</label>
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value as Customer["type"])}
-                    className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none font-semibold"
-                  >
-                    <option value="frecuente">Cliente Frecuente</option>
-                    <option value="mayoreo">Mayorista (Tiendita / Taquería)</option>
-                    <option value="evento">Eventos / Pastelería</option>
-                    <option value="general">Público General</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-stone-700">Dirección de Entrega</label>
+              {/* 2. Número Telefónico (Solo números) */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-amber-600" />
+                  <span>Número Telefónico / WhatsApp</span>
+                </label>
                 <input
-                  type="text"
-                  placeholder="Calle, número, colonia..."
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="Ej. 5512345678 (10 dígitos)"
+                  value={phone}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                  onChange={(e) => setPhone(cleanOnlyNumbers(e.target.value))}
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all placeholder:text-stone-400 placeholder:font-normal"
                 />
+                {phone.length >= 8 && (
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <span className="text-xs text-stone-500 font-bold">Vista ordenada:</span>
+                    <span className="font-mono text-xs font-black bg-stone-100 text-stone-800 px-2.5 py-0.5 rounded-lg border border-stone-200">
+                      {formatPhoneNumber(phone)}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                      <WhatsAppIcon className="w-3 h-3 fill-emerald-600" /> WhatsApp listo
+                    </span>
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-1">
-                <label className="font-bold text-stone-700">Límite de Crédito ($ MXN)</label>
-                <input
-                  type="number"
-                  placeholder="0 para sin crédito"
-                  value={creditLimit}
-                  onChange={(e) => setCreditLimit(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-stone-700">Notas / Preferencias</label>
+              {/* 3. Cuadro con Descripción del Cliente */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-amber-600" />
+                  <span>Descripción o Detalle del Cliente</span>
+                </label>
                 <textarea
-                  rows={2}
-                  placeholder="Ej. Paga los sábados, pide bolillo bien dorado..."
+                  rows={3}
+                  placeholder="Ej. Compra bolillo para su puesto de tortas, viene todos los días a las 7am..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-brito-orange-500 focus:outline-none"
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-semibold text-sm sm:text-base text-stone-900 focus:outline-none transition-all placeholder:text-stone-400 placeholder:font-normal leading-relaxed"
                 />
               </div>
 
-              <div className="flex gap-2 pt-2">
+              {/* Botones */}
+              <div className="flex gap-3 pt-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-all"
+                  className="flex-1 py-3.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-black rounded-2xl transition-all cursor-pointer text-base"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-700 hover:to-brito-crimson-700 text-white font-extrabold rounded-xl shadow-md transition-all active:scale-95"
+                  disabled={!name.trim()}
+                  className="flex-1 py-3.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-black rounded-2xl shadow-lg shadow-amber-600/20 transition-all active:scale-95 cursor-pointer text-base"
                 >
                   Guardar Cliente
                 </button>
@@ -414,6 +817,396 @@ export default function ClientesPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL 2: EDITAR CLIENTE (SIMPLE: NÚMERO, NOMBRE Y DESCRIPCIÓN) */}
+      {editingCustomer && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 border-2 border-stone-300 animate-in zoom-in-95">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between border-b-2 border-stone-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-100 text-amber-900 rounded-2xl">
+                  <Edit3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-xl text-stone-900">Editar Datos del Cliente</h3>
+                  <p className="text-xs sm:text-sm text-stone-500 font-medium">{editingCustomer.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCustomer(null)}
+                className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 cursor-pointer font-bold"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-5 text-sm">
+              {/* 1. Nombre del Cliente */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <User className="w-4 h-4 text-amber-600" />
+                  <span>Nombre Completo del Cliente *</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all"
+                />
+              </div>
+
+              {/* 2. Número Telefónico (Solo números) */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-amber-600" />
+                  <span>Número Telefónico / WhatsApp</span>
+                </label>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="Ej. 5512345678 (10 dígitos)"
+                  value={editPhone}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, false)}
+                  onChange={(e) => setEditPhone(cleanOnlyNumbers(e.target.value))}
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base text-stone-900 focus:outline-none transition-all"
+                />
+                {editPhone.length >= 8 && (
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <span className="text-xs text-stone-500 font-bold">Vista ordenada:</span>
+                    <span className="font-mono text-xs font-black bg-stone-100 text-stone-800 px-2.5 py-0.5 rounded-lg border border-stone-200">
+                      {formatPhoneNumber(editPhone)}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                      <WhatsAppIcon className="w-3 h-3 fill-emerald-600" /> WhatsApp listo
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Cuadro con Descripción del Cliente */}
+              <div className="space-y-1.5">
+                <label className="font-black text-stone-800 text-sm sm:text-base flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-amber-600" />
+                  <span>Descripción o Detalle del Cliente</span>
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Descripción o detalle del cliente..."
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full px-4 py-3 bg-stone-50 focus:bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-semibold text-sm sm:text-base text-stone-900 focus:outline-none transition-all leading-relaxed"
+                />
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingCustomer(null)}
+                  className="flex-1 py-3.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-black rounded-2xl transition-all cursor-pointer text-base"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!editName.trim()}
+                  className="flex-1 py-3.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-black rounded-2xl shadow-lg shadow-amber-600/20 transition-all active:scale-95 cursor-pointer text-base"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: CONFIRMAR ELIMINACIÓN */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4 border-2 border-rose-200 animate-in zoom-in-95 text-center">
+            <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-stone-900">¿Eliminar este cliente?</h3>
+              <p className="text-sm text-stone-500 font-bold mt-1">
+                Se eliminará a <strong className="text-stone-900">{deleteConfirm.name}</strong> del directorio.
+              </p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-black rounded-xl text-sm cursor-pointer"
+              >
+                No, mantener
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-sm cursor-pointer shadow-md"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: FORMATO MODAL DE HISTORIAL Y MODA DE COMPRA */}
+      {historyModalCustomer && (() => {
+        const c = historyModalCustomer;
+        const purchaseCounts = c.purchaseCounts || {};
+        const aggregatedCounts: Record<string, number> = { ...purchaseCounts };
+        if (Object.keys(aggregatedCounts).length === 0 && c.purchaseHistory) {
+          for (const purchase of c.purchaseHistory) {
+            for (const item of purchase.items) {
+              if (item.name) {
+                aggregatedCounts[item.name] = (aggregatedCounts[item.name] || 0) + (item.quantity || 1);
+              }
+            }
+          }
+        }
+        const sortedProducts = Object.entries(aggregatedCounts).sort((a, b) => b[1] - a[1]);
+        const totalPieces = sortedProducts.reduce((sum, [, count]) => sum + count, 0);
+
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl p-5 sm:p-8 max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl space-y-6 border-2 border-stone-300 animate-in zoom-in-95">
+              {/* Header del Modal */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b-2 border-stone-100">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-md shrink-0">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl sm:text-2xl font-black text-stone-900">
+                      Historial y Moda de Compra: {c.name}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryModalCustomer(null)}
+                    className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 cursor-pointer font-bold transition-colors"
+                    title="Cerrar modal"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Resumen Superior de Indicadores */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+                    Pan Más Comprado (Moda)
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-amber-800 flex items-center gap-1.5 mt-0.5">
+                    <span>🍞</span>
+                    <span className="break-words leading-tight">
+                      {c.favoriteProduct || (sortedProducts.length > 0 ? sortedProducts[0][0] : "Por definir")}
+                    </span>
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+                    Total Acumulado Comprado
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-emerald-700 mt-0.5 block">
+                    {formatCurrency(c.totalPurchases || 0)}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+                    Tickets / Compras
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-stone-900 mt-0.5 block">
+                    {(c.purchaseHistory || []).length} {(c.purchaseHistory || []).length === 1 ? "ticket" : "tickets"}
+                  </span>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200">
+                  <span className="text-xs font-bold text-stone-500 uppercase tracking-wider block">
+                    Piezas Acumuladas
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-stone-900 mt-0.5 block">
+                    {totalPieces} piezas
+                  </span>
+                </div>
+              </div>
+
+              {/* Información Hacia Abajo (Flujo Vertical Completo) */}
+              <div className="flex flex-col gap-6">
+                {/* Bloque 1 (Arriba): ¿Qué es lo que más compra? (Moda y Frecuencia de Piezas) */}
+                <div className="w-full bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-amber-600" />
+                      <h5 className="font-black text-stone-900 text-sm sm:text-base">
+                        ¿Qué es lo que más compra? (Moda y Frecuencia de Piezas)
+                      </h5>
+                    </div>
+                    <span className="text-xs font-bold text-stone-500">
+                      Total: {totalPieces} piezas acumuladas
+                    </span>
+                  </div>
+
+                  {sortedProducts.length === 0 ? (
+                    <div className="text-center py-8 text-stone-400 text-xs sm:text-sm font-medium italic">
+                      Aún no hay desglose estadístico acumulado para este cliente.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {sortedProducts.map(([prodName, count], pIdx) => {
+                        const percent = totalPieces > 0 ? Math.round((count / totalPieces) * 100) : 0;
+                        const isTop = pIdx === 0;
+
+                        return (
+                          <div
+                            key={prodName}
+                            className={`p-3.5 rounded-xl border transition-all ${
+                              isTop
+                                ? "bg-amber-50/90 border-amber-300 shadow-2xs"
+                                : "bg-white border-stone-200"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-xs sm:text-sm font-black text-stone-900 mb-1.5 flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">{isTop ? "⭐" : "🥖"}</span>
+                                <span className="font-black text-stone-900 text-sm sm:text-base">{prodName}</span>
+                                {isTop && (
+                                  <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[10px] uppercase font-black tracking-wider">
+                                    Moda #1 Más Comprado
+                                  </span>
+                                )}
+                              </div>
+                              <span className="tabular-nums font-mono text-xs sm:text-sm font-black text-stone-700 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200">
+                                {count} piezas ({percent}%)
+                              </span>
+                            </div>
+                            {/* Barra de progreso */}
+                            <div className="w-full bg-stone-200 h-2.5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  isTop ? "bg-amber-500" : "bg-stone-400"
+                                }`}
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Bloque 2 (Abajo): Historial de Compras (Tickets) */}
+                <div className="w-full bg-stone-50/80 rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Receipt className="w-5 h-5 text-amber-600" />
+                      <h5 className="font-black text-stone-900 text-sm sm:text-base">
+                        Historial de Compras (Tickets)
+                      </h5>
+                    </div>
+                    <span className="text-xs font-bold text-stone-500">
+                      {(c.purchaseHistory || []).length} tickets registrados
+                    </span>
+                  </div>
+
+                  {(!c.purchaseHistory || c.purchaseHistory.length === 0) ? (
+                    <div className="text-center py-10 px-4 bg-white rounded-2xl border border-dashed border-stone-300 space-y-2">
+                      <Clock className="w-8 h-8 text-stone-400 mx-auto" />
+                      <p className="text-sm font-black text-stone-700">
+                        Sin tickets de venta registrados aún
+                      </p>
+                      <p className="text-xs text-stone-500 max-w-md mx-auto font-medium">
+                        Al cobrar una venta en el Punto de Venta (POS) y asignarla a este cliente, aquí aparecerá el ticket con los panes que llevó, sucursal, cajero y total pagado.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                      {c.purchaseHistory.map((purchase) => (
+                        <div
+                          key={purchase.id}
+                          className="p-4 bg-white rounded-2xl border border-stone-200 hover:border-amber-300 shadow-2xs space-y-3 transition-all"
+                        >
+                          <div className="flex items-center justify-between gap-2 border-b border-stone-100 pb-2.5 flex-wrap">
+                            <div className="flex items-center gap-2 text-xs font-bold text-stone-600 flex-wrap">
+                              <span className="flex items-center gap-1.5 text-stone-800 font-black">
+                                <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                {purchase.date}
+                              </span>
+                              {purchase.branchName && (
+                                <span className="bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-lg text-[11px] font-bold border border-amber-200">
+                                  {purchase.branchName}
+                                </span>
+                              )}
+                              {purchase.cashier && (
+                                <span className="text-stone-400 text-[11px]">
+                                  • Cajero: <strong className="text-stone-700">{purchase.cashier}</strong>
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {purchase.paymentMethod && (
+                                <span className="text-[11px] uppercase font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200">
+                                  {purchase.paymentMethod}
+                                </span>
+                              )}
+                              <span className="font-black text-base sm:text-lg text-stone-900">
+                                {formatCurrency(purchase.total)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Detalle de productos del ticket */}
+                          <div className="flex flex-wrap gap-2 pt-0.5">
+                            {purchase.items.map((it, itIdx) => (
+                              <div
+                                key={itIdx}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-bold text-stone-800"
+                              >
+                                <span className="text-amber-700 font-mono font-black">{it.quantity}x</span>
+                                <span>{it.name}</span>
+                                {it.subtotal && (
+                                  <span className="text-stone-400 text-[11px]">
+                                    ({formatCurrency(it.subtotal)})
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer con Botón de Cierre */}
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setHistoryModalCustomer(null)}
+                  className="px-6 py-3 bg-stone-100 hover:bg-stone-200 text-stone-800 font-black rounded-2xl transition-all cursor-pointer text-sm"
+                >
+                  Cerrar Historial
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, Heart } from "lucide-react";
 import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
 
 export default function LoginForm() {
+  const router = useRouter();
   const { login, verifyCredentials } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -44,6 +46,10 @@ export default function LoginForm() {
         // Mostrar el mensaje de bienvenida 2 segundos antes de ingresar a la app
         setTimeout(() => {
           login(identifier, password, rememberMe);
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("brito_session_active", "true");
+          }
+          router.push("/");
         }, 2000);
       } else {
         setError(res.message || "Usuario o contraseña incorrectos. Intenta de nuevo.");

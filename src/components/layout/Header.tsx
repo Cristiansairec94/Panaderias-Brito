@@ -18,12 +18,16 @@ import {
   CheckCircle2,
   Building2,
   TrendingUp,
-  Radio
+  Radio,
+  Wifi,
+  WifiOff,
+  RefreshCw
 } from "lucide-react";
 import NotificationsDropdown from "./NotificationsDropdown";
 import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { useBranch } from "@/context/BranchContext";
+import { useSync } from "@/context/SyncContext";
 import { formatCurrency } from "@/lib/utils";
 
 export default function Header() {
@@ -41,6 +45,7 @@ export default function Header() {
     toggleLiveSimulation,
     consolidatedMetrics
   } = useBranch();
+  const { isOnline, isSyncing, isSynced, pendingCount } = useSync();
 
   const [time, setTime] = useState<string>("");
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -90,6 +95,8 @@ export default function Header() {
         return { title: "Configuración del Sistema", subtitle: "Catálogos de sistema, datos de tickets y usuarios" };
       case "/pos":
         return { title: "Punto de Venta (POS)", subtitle: "Caja rápida mostrador y tickets de venta" };
+      case "/ingresos":
+        return { title: "Registro de Ingresos", subtitle: "Control de entradas de dinero, abonos a pedidos y cobros de clientes" };
       case "/caja":
         return { title: "Caja & Flujo de Efectivo", subtitle: "Historial de caja, arqueos y registro de movimientos" };
       case "/pedidos":
@@ -102,15 +109,18 @@ export default function Header() {
   const handleRoleSwitch = (demo: User) => {
     loginAs(demo);
     setShowUserMenu(false);
-    if (getDefaultRouteForUser) {
-      const targetRoute = getDefaultRouteForUser(demo);
-      router.push(targetRoute);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("brito_session_active", "true");
     }
+    router.push("/");
   };
 
   const handleLogout = () => {
     logout();
     setShowUserMenu(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brito_session_active");
+    }
     router.push("/");
   };
 
@@ -123,7 +133,7 @@ export default function Header() {
   const current = getPageTitle();
 
   return (
-    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-[70] shadow-sm">
+    <header className="h-16 shrink-0 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-[100] shadow-sm">
       {/* Left: Hamburger / Collapse Toggle + Page Title */}
       <div className="flex items-center gap-3">
         {/* Mobile Hamburger Drawer Toggle */}
@@ -195,6 +205,59 @@ export default function Header() {
 
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Offline / Cloud Status Pill */}
+        <Link
+          href="/configuracion?tab=offline"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs ${
+            !isOnline
+              ? "bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100 animate-pulse"
+              : isSyncing
+              ? "bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100"
+              : pendingCount > 0
+              ? "bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100"
+              : "bg-emerald-50/80 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+          }`}
+          title={
+            !isOnline
+              ? `Modo Sin Internet (Offline) - ${pendingCount} venta(s) guardadas localmente en esta PC`
+              : isSyncing
+              ? "Sincronizando transacciones con el servidor en la nube..."
+              : pendingCount > 0
+              ? `Conexión activa - ${pendingCount} registro(s) pendiente(s) de subir a la nube`
+              : "En Línea y Sincronizado: Toda la información está resguardada en la nube"
+          }
+        >
+          {!isOnline ? (
+            <>
+              <WifiOff className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+              <span className="text-[11px] font-black text-rose-700">Sin Red</span>
+              {pendingCount > 0 && (
+                <span className="px-1.5 py-0.2 bg-rose-600 text-white text-[9px] font-black rounded-full">
+                  {pendingCount}
+                </span>
+              )}
+            </>
+          ) : isSyncing ? (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin shrink-0" />
+              <span className="text-[11px] font-black text-amber-800">Sincronizando...</span>
+            </>
+          ) : pendingCount > 0 ? (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="text-[11px] font-black text-amber-800">{pendingCount} pend.</span>
+            </>
+          ) : (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-[11px] font-extrabold text-emerald-800">Sincronizado</span>
+            </>
+          )}
+        </Link>
+
         {/* Quick Sale Simulator Button */}
         <div className="relative">
           <button
@@ -216,7 +279,7 @@ export default function Header() {
         </div>
 
         {/* Branch Selector Dropdown */}
-        <div className="relative">
+        <div className="relative z-[110]">
           <button
             onClick={() => setShowBranchMenu(!showBranchMenu)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50/80 hover:bg-stone-100 text-stone-800 text-xs font-bold transition-all shadow-sm"
@@ -235,7 +298,7 @@ export default function Header() {
 
           {/* Branch Dropdown Menu */}
           {showBranchMenu && (
-            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-[100] animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-[150] animate-in fade-in zoom-in-95">
               <div className="p-2 border-b border-stone-100 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Red de Sucursales</p>
@@ -347,7 +410,7 @@ export default function Header() {
         <NotificationsDropdown />
 
         {/* User Session Dropdown */}
-        <div className="relative">
+        <div className="relative z-[110]">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/70 shadow-sm"
@@ -368,7 +431,7 @@ export default function Header() {
 
           {/* User & Role Switcher Menu */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-[100] animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-[150] animate-in fade-in zoom-in-95">
               <div className="p-2.5 border-b border-stone-100 bg-stone-50/60 rounded-xl mb-1.5">
                 <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Sesión activa:</p>
                 <p className="text-xs font-black text-stone-900">{user?.name}</p>

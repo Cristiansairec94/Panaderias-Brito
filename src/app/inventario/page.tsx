@@ -19,7 +19,7 @@ import {
   FileCheck
 } from "lucide-react";
 import { InventoryItem, InventoryMovement } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 const INITIAL_INVENTORY: InventoryItem[] = [
@@ -355,22 +355,25 @@ export default function InventarioPage() {
               <div className="space-y-1">
                 <label className="font-bold text-stone-700">Cantidad que Entra *</label>
                 <input
-                  type="number"
-                  step="0.1"
+                  type="text"
+                  inputMode="decimal"
                   required
                   placeholder="Ej. 10"
                   value={entryQty}
-                  onChange={(e) => setEntryQty(e.target.value)}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                  onChange={(e) => setEntryQty(cleanDecimalNumbers(e.target.value))}
                   className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
               <div className="space-y-1">
                 <label className="font-bold text-stone-700">Costo Total de la Compra ($ MXN)</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="Ej. 5200"
                   value={entryCost}
-                  onChange={(e) => setEntryCost(e.target.value)}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                  onChange={(e) => setEntryCost(cleanDecimalNumbers(e.target.value))}
                   className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
@@ -430,12 +433,13 @@ export default function InventarioPage() {
               <div className="space-y-1">
                 <label className="font-bold text-stone-700">Cantidad a Descontar *</label>
                 <input
-                  type="number"
-                  step="0.1"
+                  type="text"
+                  inputMode="decimal"
                   required
                   placeholder="Ej. 2.5"
                   value={wasteQty}
-                  onChange={(e) => setWasteQty(e.target.value)}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                  onChange={(e) => setWasteQty(cleanDecimalNumbers(e.target.value))}
                   className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-rose-600 focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 />
               </div>
