@@ -44,7 +44,6 @@ import {
   Pencil,
   TrendingUp,
   Barcode,
-  Printer,
   Wifi,
   WifiOff
 } from "lucide-react";
@@ -1664,34 +1663,7 @@ export default function POSPage() {
                   <span>Entrada de Pan</span>
                 </button>
               )}
-              {/* Botón Selector e Indicador de Impresora Directa */}
-              <button
-                type="button"
-                onClick={() => setShowPrinterModal(true)}
-                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-stone-300 hover:border-amber-400 bg-white hover:bg-amber-50/80 text-stone-900 transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer group"
-                title={`Impresora de tickets conectada: ${printerConfig.selectedPrinterName} (${printerConfig.port}). Haz clic para elegir la impresora directa o hacer prueba de impresión.`}
-              >
-                <div className="relative">
-                  <Printer className="w-5 h-5 text-amber-600 group-hover:scale-110 transition-transform" />
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
-                </div>
-                <div className="text-left hidden xl:block">
-                  <div className="flex items-center gap-1.5 leading-none">
-                    <span className="text-xs font-black text-stone-900 truncate max-w-[120px]">
-                      {printerConfig.selectedPrinterName}
-                    </span>
-                    <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 uppercase">
-                      {printerConfig.directPrinting ? "Directa" : "Diálogo"}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-stone-400 font-bold block mt-0.5">
-                    {printerConfig.paperWidth} • {printerConfig.port}
-                  </span>
-                </div>
-                <div className="xl:hidden flex items-center gap-1 text-xs font-black">
-                  <span>{printerConfig.selectedPrinterName}</span>
-                </div>
-              </button>
+
             </div>
 
             {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
