@@ -1,5 +1,5 @@
 // 🥖 Panadería Brito - Service Worker para Modo Fuera de Línea (Offline)
-const CACHE_NAME = "panaderia-brito-cache-v2";
+const CACHE_NAME = "panaderia-brito-cache-v5";
 
 const PRECACHE_ASSETS = [
   "/",

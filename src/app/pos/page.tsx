@@ -47,7 +47,7 @@ import {
   Wifi,
   WifiOff
 } from "lucide-react";
-import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CashIncome } from "@/types";
+import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
@@ -73,6 +73,11 @@ import IncomeReceiptModal from "@/components/ingresos/IncomeReceiptModal";
 import CashDrawerShiftModal from "@/components/pos/CashDrawerShiftModal";
 import BreadDeliveryModal from "@/components/pos/BreadDeliveryModal";
 import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
+import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
+import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
+import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
+import PosOrdersDrawer from "@/components/pos/PosOrdersDrawer";
+import { getStoredOrders } from "@/lib/orders";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
@@ -455,6 +460,79 @@ export default function POSPage() {
   const [incomesList, setIncomesList] = useState<CashIncome[]>([]);
   const [receiptIncome, setReceiptIncome] = useState<CashIncome | null>(null);
   const [showIncomeReceiptModal, setShowIncomeReceiptModal] = useState(false);
+
+  // Estados para Pedidos Especiales (Anticipo Mínimo 50% Obligatorio)
+  const [showOrdersDrawer, setShowOrdersDrawer] = useState(false);
+  const [showCreateOrderModal, setShowCreateOrderModal] = useState(false);
+  const [specialOrderInitialItems, setSpecialOrderInitialItems] = useState<OrderItem[]>([]);
+  const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
+  const [branchPendingOrdersCount, setBranchPendingOrdersCount] = useState<number>(0);
+
+  // Contar pedidos pendientes de la sucursal activa
+  const updatePendingOrdersCount = () => {
+    try {
+      const allOrders = getStoredOrders();
+      const currentBId = activeBranch?.id;
+      const count = allOrders.filter(
+        (o) =>
+          (!currentBId || !o.branchId || o.branchId === currentBId) &&
+          o.status !== "entregado" &&
+          o.status !== "cancelado"
+      ).length;
+      setBranchPendingOrdersCount(count);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    updatePendingOrdersCount();
+    const handleOrdersUpdated = () => updatePendingOrdersCount();
+    window.addEventListener("brito_orders_updated", handleOrdersUpdated);
+    return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
+  }, [activeBranch?.id]);
+
+  const handleOpenCreateOrder = (withCartItems = false) => {
+    if (withCartItems && cart.length > 0) {
+      const orderItems: OrderItem[] = cart.map((item) => ({
+        productId: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity,
+        unitPrice: item.product.price,
+        subtotal: item.quantity * item.product.price,
+      }));
+      setSpecialOrderInitialItems(orderItems);
+    } else {
+      setSpecialOrderInitialItems([]);
+    }
+    setShowCreateOrderModal(true);
+  };
+
+  const handleOrderCreated = (orderId: string) => {
+    updatePendingOrdersCount();
+    // Si se apartó desde la charola del POS, limpiamos la charola
+    if (specialOrderInitialItems.length > 0) {
+      setCart([]);
+      setCashGiven("");
+      selectCustomer(DEFAULT_GENERAL_CUSTOMER);
+    }
+
+    const allOrders = getStoredOrders();
+    const created = allOrders.find((o) => o.id === orderId || o.orderNumber === orderId);
+    if (created) {
+      setSelectedOrderForReceipt(created);
+      addNotification({
+        senderName: "🎂 Pedido Especial Apartado",
+        senderAvatar: "🎂",
+        badgeIcon: "pastel",
+        title: "Pedido Especial Registrado",
+        highlightText: `${created.orderNumber} - Anticipo 50%+ cubierto`,
+        description: `El anticipo de ${formatCurrency(created.deposit)} fue sumado a la caja de ${activeBranch?.name || "la sucursal"}.`,
+        category: "pedidos",
+      });
+    }
+  };
   
   // Customer State (Público General + Clientes Frecuentes, Mayoreo y Eventos)
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -880,7 +958,17 @@ export default function POSPage() {
   // Listener global de teclado para lectores de código de barras USB / Bluetooth (Keyboard Wedge)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (showReceiptModal || showExpensesModal || showIncomesModal || showCashDrawerModal || showBreadDeliveryModal) {
+      if (
+        showReceiptModal ||
+        showExpensesModal ||
+        showIncomesModal ||
+        showCashDrawerModal ||
+        showBreadDeliveryModal ||
+        showOrdersDrawer ||
+        showCreateOrderModal ||
+        Boolean(selectedOrderForReceipt) ||
+        Boolean(selectedOrderForPayment)
+      ) {
         return;
       }
 
@@ -934,7 +1022,21 @@ export default function POSPage() {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [products, cartBarcodeInput, search, isShiftLocked, showReceiptModal, showExpensesModal, showIncomesModal, showCashDrawerModal, showBreadDeliveryModal]);
+  }, [
+    products,
+    cartBarcodeInput,
+    search,
+    isShiftLocked,
+    showReceiptModal,
+    showExpensesModal,
+    showIncomesModal,
+    showCashDrawerModal,
+    showBreadDeliveryModal,
+    showOrdersDrawer,
+    showCreateOrderModal,
+    selectedOrderForReceipt,
+    selectedOrderForPayment,
+  ]);
 
   const addMultipleToCart = (product: Product, count: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -1631,6 +1733,44 @@ export default function POSPage() {
                   </span>
                 )}
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* Botón Pedidos Especiales (Anticipo 50% Mínimo) */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (isShiftLocked) {
+                    addNotification({
+                      senderName: "🔒 Terminal Bloqueada",
+                      senderAvatar: "⚠️",
+                      badgeIcon: "alerta",
+                      title: "Terminal Bloqueada",
+                      highlightText: "Turno cerrado por seguridad",
+                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de gestionar pedidos especiales.",
+                      category: "pedidos",
+                    });
+                    return;
+                  }
+                  setShowOrdersDrawer(true);
+                }}
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
+                  isShiftLocked
+                    ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
+                    : "border-amber-400/90 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 hover:from-amber-500/25 hover:to-orange-500/20 text-stone-900 text-sm sm:text-base font-black"
+                }`}
+                title="Tomar o gestionar pedidos especiales con anticipo mínimo del 50%"
+              >
+                <Cake className="w-5 h-5 text-amber-600 shrink-0" />
+                <span>Pedidos Especiales</span>
+                {branchPendingOrdersCount > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-black bg-amber-500 text-stone-950 shadow-xs">
+                    {branchPendingOrdersCount}
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded-md font-bold">
+                    50%
+                  </span>
+                )}
               </button>
 
               {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
@@ -2651,6 +2791,21 @@ export default function POSPage() {
             </div>
           )}
 
+          {/* Botón Rápido: Apartar Charola como Pedido Especial (50% min) */}
+          {cart.length > 0 && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => handleOpenCreateOrder(true)}
+                className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/15 hover:from-amber-500/25 hover:to-orange-500/25 text-amber-950 border-2 border-dashed border-amber-400/90 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all active:scale-98 shadow-xs cursor-pointer"
+                title="Apartar estos productos de la charola como un encargo o pedido especial con 50% de anticipo mínimo"
+              >
+                <Cake className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>Apartar como Pedido Especial (50% min)</span>
+              </button>
+            </div>
+          )}
+
           {/* Botones de Acción */}
           <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">
             <button
@@ -2923,6 +3078,56 @@ export default function POSPage() {
           deliveriesHistory={breadDeliveriesList}
         />
       )}
+
+      {/* Drawer de Pedidos Especiales de la Sucursal */}
+      <PosOrdersDrawer
+        isOpen={showOrdersDrawer}
+        onClose={() => setShowOrdersDrawer(false)}
+        branchId={activeBranch?.id || "branch-matriz"}
+        branchName={activeBranch?.name || "Sucursal Matriz"}
+        cashierName={cashierName}
+        onOpenCreateOrder={() => handleOpenCreateOrder(false)}
+        onSelectOrderForReceipt={(order) => setSelectedOrderForReceipt(order)}
+        onSelectOrderForPayment={(order) => setSelectedOrderForPayment(order)}
+      />
+
+      {/* Modal de Creación de Pedido Especial con Anticipo Obligatorio del 50% */}
+      <CreateOrderModal
+        isOpen={showCreateOrderModal}
+        onClose={() => setShowCreateOrderModal(false)}
+        onOrderCreated={handleOrderCreated}
+        initialBranchId={activeBranch?.id}
+        initialItems={specialOrderInitialItems}
+        initialCustomerId={selectedCustomer?.id !== "cli-1" ? selectedCustomer?.id : undefined}
+        initialCustomerName={selectedCustomer?.id !== "cli-1" ? selectedCustomer?.name : ""}
+        initialCustomerPhone={selectedCustomer?.id !== "cli-1" ? selectedCustomer?.phone : ""}
+      />
+
+      {/* Modal de Ticket Térmico / WhatsApp de Pedido Especial */}
+      <OrderReceiptModal
+        isOpen={Boolean(selectedOrderForReceipt)}
+        onClose={() => setSelectedOrderForReceipt(null)}
+        order={selectedOrderForReceipt}
+      />
+
+      {/* Modal de Liquidación / Cobro de Saldo de Pedido Especial */}
+      <OrderPaymentModal
+        isOpen={Boolean(selectedOrderForPayment)}
+        onClose={() => setSelectedOrderForPayment(null)}
+        order={selectedOrderForPayment}
+        onPaymentSuccess={() => {
+          updatePendingOrdersCount();
+          addNotification({
+            senderName: "💰 Pedido Liquidado",
+            senderAvatar: "🥖",
+            badgeIcon: "dinero",
+            title: "Saldo Cobrado & Pedido Entregado",
+            highlightText: "Ingreso registrado en caja",
+            description: "El saldo restante ha sido cobrado y sumado al turno actual.",
+            category: "caja",
+          });
+        }}
+      />
     </div>
   );
 }

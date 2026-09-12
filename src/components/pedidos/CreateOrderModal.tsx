@@ -41,6 +41,10 @@ interface CreateOrderModalProps {
   onClose: () => void;
   onOrderCreated: (orderId: string) => void;
   initialBranchId?: string;
+  initialItems?: OrderItem[];
+  initialCustomerId?: string;
+  initialCustomerName?: string;
+  initialCustomerPhone?: string;
 }
 
 export default function CreateOrderModal({
@@ -48,6 +52,10 @@ export default function CreateOrderModal({
   onClose,
   onOrderCreated,
   initialBranchId,
+  initialItems,
+  initialCustomerId,
+  initialCustomerName,
+  initialCustomerPhone,
 }: CreateOrderModalProps) {
   const { branches, currentBranch } = useBranch();
   const { user } = useAuth();
@@ -137,9 +145,39 @@ export default function CreateOrderModal({
       setProducts(getStoredProducts());
       setCustomers(getStoredCustomers());
       setSelectedBranchId(connectedBranchId);
+
+      // Pre-cargar items si se transfirieron desde la charola del POS
+      if (initialItems && initialItems.length > 0) {
+        setItems(initialItems);
+      } else {
+        setItems([]);
+      }
+
+      // Pre-cargar cliente si se transfirió desde el POS
+      if (initialCustomerId) {
+        setSelectedCustomerId(initialCustomerId);
+      } else {
+        setSelectedCustomerId("");
+      }
+
+      if (initialCustomerName && initialCustomerName !== "Público en General") {
+        setCustomerName(initialCustomerName);
+      } else if (!initialCustomerId) {
+        setCustomerName("");
+      }
+
+      if (initialCustomerPhone && initialCustomerPhone !== "N/A") {
+        setCustomerPhone(initialCustomerPhone);
+      } else if (!initialCustomerId) {
+        setCustomerPhone("");
+      }
+
+      setDeposit(0);
+      setDedication("");
+      setGeneralNotes("");
       setCurrentStep(1);
     }
-  }, [isOpen, connectedBranchId]);
+  }, [isOpen, connectedBranchId, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone]);
 
   // Total calculation
   const total = useMemo(() => {
