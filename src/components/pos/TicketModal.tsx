@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useRef } from "react";
-import { Printer, CheckCircle, X, Receipt } from "lucide-react";
+import React, { useRef, useState, useEffect } from "react";
+import { Printer, CheckCircle, X, Receipt, Zap } from "lucide-react";
 import { CartItem } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 
@@ -41,6 +41,30 @@ export default function TicketModal({
   date,
 }: TicketModalProps) {
   const ticketRef = useRef<HTMLDivElement>(null);
+  const [autoPrint, setAutoPrint] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("brito_autoprint_direct");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+
+  const toggleAutoPrint = () => {
+    const nextVal = !autoPrint;
+    setAutoPrint(nextVal);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("brito_autoprint_direct", String(nextVal));
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && autoPrint) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoPrint]);
 
   if (!isOpen) return null;
 
@@ -225,13 +249,32 @@ export default function TicketModal({
           </div>
         </div>
 
+        {/* Direct Silent Auto-Print Bar */}
+        <div className="px-5 py-2.5 bg-amber-50/90 border-t border-amber-200/80 flex items-center justify-between text-xs">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoPrint}
+              onChange={toggleAutoPrint}
+              className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+            />
+            <span className="font-bold text-stone-800 flex items-center gap-1.5">
+              <Zap className={`w-3.5 h-3.5 ${autoPrint ? 'text-amber-600 fill-amber-500' : 'text-stone-400'}`} />
+              Auto-impresión directa en segundo plano
+            </span>
+          </label>
+          <span className="text-[10px] font-bold text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full">
+            {autoPrint ? "Activo ⚡ (Sin Diálogo)" : "Manual"}
+          </span>
+        </div>
+
         {/* Action Buttons */}
         <div className="p-4 bg-white border-t border-stone-200 flex gap-3">
           <button
             onClick={handlePrint}
             className="flex-1 flex items-center justify-center gap-2 py-3 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs shadow-md transition-all active:scale-95"
           >
-            <Printer className="w-4 h-4" /> Imprimir Ticket
+            <Printer className="w-4 h-4" /> Re-Imprimir Ticket
           </button>
           <button
             onClick={onClose}

@@ -96,20 +96,33 @@
       scroll-behavior: smooth;
     }
     
+    @page {
+      size: auto;
+      margin: 0mm !important;
+    }
+
     @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       body * {
         visibility: hidden !important;
       }
-      #printable-ticket, #printable-ticket * {
+      #printable-ticket, #printable-ticket *, #thermal-receipt, #thermal-receipt * {
         visibility: visible !important;
       }
-      #printable-ticket {
+      #printable-ticket, #thermal-receipt {
         position: absolute;
         left: 0;
         top: 0;
         width: 80mm !important;
+        max-width: 80mm !important;
         margin: 0 !important;
-        padding: 8px !important;
+        padding: 6px 8px !important;
         background: white !important;
         color: black !important;
         border: none !important;
@@ -457,6 +470,30 @@
 
       // Modals
       const [showTicket, setShowTicket] = useState(false);
+      const [autoPrintDirect, setAutoPrintDirect] = useState(() => {
+        try {
+          const saved = localStorage.getItem("brito_autoprint_direct");
+          return saved !== null ? saved === "true" : true;
+        } catch(e) { return true; }
+      });
+
+      const toggleAutoPrintDirect = () => {
+        const next = !autoPrintDirect;
+        setAutoPrintDirect(next);
+        try {
+          localStorage.setItem("brito_autoprint_direct", String(next));
+        } catch(e) {}
+      };
+
+      useEffect(() => {
+        if (showTicket && completedSale && autoPrintDirect) {
+          const timer = setTimeout(() => {
+            window.print();
+          }, 350);
+          return () => clearTimeout(timer);
+        }
+      }, [showTicket, completedSale, autoPrintDirect]);
+
       const [showExpenses, setShowExpenses] = useState(false);
       const [showDrawerModal, setShowDrawerModal] = useState(false);
       const [showCategoryPanel, setShowCategoryPanel] = useState(false);
@@ -1890,18 +1927,36 @@
                   </div>
                 </div>
 
+                {/* Barra de Impresión Directa en Segundo Plano */}
+                <div className="px-5 py-2.5 bg-amber-50/90 border-t border-amber-200/80 flex items-center justify-between text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoPrintDirect}
+                      onChange={toggleAutoPrintDirect}
+                      className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                    />
+                    <span className="font-bold text-stone-800 flex items-center gap-1.5">
+                      <span>⚡</span> Auto-impresión directa en segundo plano
+                    </span>
+                  </label>
+                  <span className="text-[10px] font-bold text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full">
+                    {autoPrintDirect ? "Activo ⚡ (Sin Diálogo)" : "Manual"}
+                  </span>
+                </div>
+
                 <div className="p-4 bg-white border-t border-stone-200 flex gap-3">
                   <button
                     onClick={() => window.print()}
-                    className="flex-1 py-3 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs"
+                    className="flex-1 py-3 bg-stone-900 hover:bg-black text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-2"
                   >
-                    🖨️ Imprimir Ticket
+                    <span>🖨️</span> Re-Imprimir Ticket
                   </button>
                   <button
                     onClick={resetSale}
-                    className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs"
+                    className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-2"
                   >
-                    ✓ Siguiente Cliente
+                    <span>✓</span> Siguiente Cliente
                   </button>
                 </div>
               </div>
