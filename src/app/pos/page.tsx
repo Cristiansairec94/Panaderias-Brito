@@ -1753,21 +1753,21 @@ export default function POSPage() {
                   }
                   setShowOrdersDrawer(true);
                 }}
-                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer ${
                   isShiftLocked
                     ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                    : "border-amber-400/90 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 hover:from-amber-500/25 hover:to-orange-500/20 text-stone-900 text-sm sm:text-base font-black"
+                    : "border-amber-400/90 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 hover:from-amber-500/25 hover:to-orange-500/20 text-stone-900 text-xs sm:text-sm font-bold"
                 }`}
                 title="Tomar o gestionar pedidos especiales con anticipo mínimo del 50%"
               >
-                <Cake className="w-5 h-5 text-amber-600 shrink-0" />
+                <Cake className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>Pedidos Especiales</span>
                 {branchPendingOrdersCount > 0 ? (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-black bg-amber-500 text-stone-950 shadow-xs">
+                  <span className="px-1.5 py-0.2 rounded-full text-[11px] font-black bg-amber-500 text-stone-950 shadow-xs">
                     {branchPendingOrdersCount}
                   </span>
                 ) : (
-                  <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded-md font-bold">
+                  <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded font-bold">
                     50%
                   </span>
                 )}
