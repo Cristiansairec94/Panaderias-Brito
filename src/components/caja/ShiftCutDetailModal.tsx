@@ -251,6 +251,12 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
                 <span>(+) Ventas en Efectivo:</span>
                 <span>+{formatCurrency(cut.cashSales)}</span>
               </div>
+              {(cut.totalIncomes || 0) > 0 && (
+                <div className="flex justify-between text-emerald-800 font-bold">
+                  <span>(+) Anticipos / Entradas Pedidos:</span>
+                  <span>+{formatCurrency(cut.totalIncomes || 0)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-rose-800 font-bold">
                 <span>(-) Gastos / Salidas:</span>
                 <span>-{formatCurrency(cut.totalExpenses)}</span>

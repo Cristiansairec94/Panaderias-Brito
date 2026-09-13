@@ -111,11 +111,36 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+const STORAGE_NOTIFS_KEY = "brito_notifications";
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const [notifications, setNotifications] = useState<FBNotification[]>(INITIAL_FB_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<FBNotification[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(STORAGE_NOTIFS_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return INITIAL_FB_NOTIFICATIONS;
+  });
+
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [activeToast, setActiveToast] = useState<FBNotification | null>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const persistNotifs = (list: FBNotification[]) => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_NOTIFS_KEY, JSON.stringify(list));
+      } catch (e) {}
+    }
+  };
 
   const playChime = () => {
     if (!soundEnabled || typeof window === "undefined") return;
@@ -126,7 +151,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       osc.type = "sine";
       osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
       osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5
-      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
@@ -146,33 +171,62 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       read: false,
       ...notif,
     };
-    setNotifications((prev) => [fullNotif, ...prev]);
+    setNotifications((prev) => {
+      const updated = [fullNotif, ...prev];
+      persistNotifs(updated);
+      return updated;
+    });
+
+    // Reproducir sonido y mostrar banner flotante visible
     playChime();
+    setActiveToast(fullNotif);
   };
 
+  // Auto-desvanecer toast a los 5.5 segundos
+  useEffect(() => {
+    if (!activeToast) return;
+    const timer = setTimeout(() => {
+      setActiveToast(null);
+    }, 5500);
+    return () => clearTimeout(timer);
+  }, [activeToast]);
+
   const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+      persistNotifs(updated);
+      return updated;
+    });
   };
 
   const markAsUnread = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: false } : n))
-    );
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, read: false } : n));
+      persistNotifs(updated);
+      return updated;
+    });
   };
 
   const markAllAsRead = () => {
     playChime();
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, read: true }));
+      persistNotifs(updated);
+      return updated;
+    });
   };
 
   const deleteNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setNotifications((prev) => {
+      const updated = prev.filter((n) => n.id !== id);
+      persistNotifs(updated);
+      return updated;
+    });
   };
 
   const clearAll = () => {
     setNotifications([]);
+    persistNotifs([]);
   };
 
   const toggleSound = () => {
@@ -195,6 +249,36 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }}
     >
       {children}
+
+      {/* BANNER FLOTANTE DE NOTIFICACIÓN INMEDIATA (TOAST) */}
+      {activeToast && (
+        <div className="fixed top-4 right-4 z-[9999] max-w-sm w-full bg-stone-900/95 text-white p-3.5 sm:p-4 rounded-2xl shadow-2xl border-2 border-amber-500/90 backdrop-blur-md flex items-start gap-3 animate-in slide-in-from-top-4 duration-300">
+          <div className="w-10 h-10 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center text-xl font-black shrink-0 shadow-md">
+            {activeToast.senderAvatar || "🎂"}
+          </div>
+          <div className="flex-1 min-w-0 pr-1">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded-md">
+                {activeToast.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveToast(null)}
+                className="text-stone-400 hover:text-white text-xs p-1"
+                title="Cerrar notificación"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs font-black text-white mt-1 leading-snug">
+              {activeToast.highlightText}
+            </p>
+            <p className="text-[11px] text-stone-300 mt-0.5 line-clamp-2 leading-relaxed">
+              {activeToast.description}
+            </p>
+          </div>
+        </div>
+      )}
     </NotificationContext.Provider>
   );
 }

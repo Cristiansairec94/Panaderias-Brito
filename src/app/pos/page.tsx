@@ -493,6 +493,25 @@ export default function POSPage() {
     return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
   }, [activeBranch?.id]);
 
+  // Sincronizar en tiempo real el dinero ingresado por anticipos y liquidaciones de pedidos
+  useEffect(() => {
+    const handleIncomesUpdated = () => {
+      try {
+        const savedIncomes = localStorage.getItem("brito_cash_incomes");
+        if (savedIncomes) {
+          const parsedInc = JSON.parse(savedIncomes);
+          if (Array.isArray(parsedInc)) {
+            setIncomesList(parsedInc);
+          }
+        }
+      } catch (e) {
+        console.error("Error al sincronizar ingresos en POS:", e);
+      }
+    };
+    window.addEventListener("brito_incomes_updated", handleIncomesUpdated);
+    return () => window.removeEventListener("brito_incomes_updated", handleIncomesUpdated);
+  }, []);
+
   const handleOpenCreateOrder = (withCartItems = false) => {
     if (withCartItems && cart.length > 0) {
       const orderItems: OrderItem[] = cart.map((item) => ({
@@ -511,6 +530,18 @@ export default function POSPage() {
 
   const handleOrderCreated = (orderId: string) => {
     updatePendingOrdersCount();
+
+    // Actualizar inmediatamente los ingresos en caja de la terminal POS
+    try {
+      const savedIncomes = localStorage.getItem("brito_cash_incomes");
+      if (savedIncomes) {
+        const parsedInc = JSON.parse(savedIncomes);
+        if (Array.isArray(parsedInc)) {
+          setIncomesList(parsedInc);
+        }
+      }
+    } catch (e) {}
+
     // Si se apartó desde la charola del POS, limpiamos la charola
     if (specialOrderInitialItems.length > 0) {
       setCart([]);
@@ -522,15 +553,6 @@ export default function POSPage() {
     const created = allOrders.find((o) => o.id === orderId || o.orderNumber === orderId);
     if (created) {
       setSelectedOrderForReceipt(created);
-      addNotification({
-        senderName: "🎂 Pedido Especial Apartado",
-        senderAvatar: "🎂",
-        badgeIcon: "pastel",
-        title: "Pedido Especial Registrado",
-        highlightText: `${created.orderNumber} - Anticipo 50%+ cubierto`,
-        description: `El anticipo de ${formatCurrency(created.deposit)} fue sumado a la caja de ${activeBranch?.name || "la sucursal"}.`,
-        category: "pedidos",
-      });
     }
   };
   
@@ -3092,16 +3114,21 @@ export default function POSPage() {
       />
 
       {/* Modal de Creación de Pedido Especial con Anticipo Obligatorio del 50% */}
-      <CreateOrderModal
-        isOpen={showCreateOrderModal}
-        onClose={() => setShowCreateOrderModal(false)}
-        onOrderCreated={handleOrderCreated}
-        initialBranchId={activeBranch?.id}
-        initialItems={specialOrderInitialItems}
-        initialCustomerId={selectedCustomer?.id !== "cli-1" ? selectedCustomer?.id : undefined}
-        initialCustomerName={selectedCustomer?.id !== "cli-1" ? selectedCustomer?.name : ""}
-        initialCustomerPhone={selectedCustomer?.id !== "cli-1" ? selectedCustomer?.phone : ""}
-      />
+      {(() => {
+        const isGeneral = !selectedCustomer || selectedCustomer.id === "cli-0" || selectedCustomer.id === "cli-general" || selectedCustomer.name === "Público en General";
+        return (
+          <CreateOrderModal
+            isOpen={showCreateOrderModal}
+            onClose={() => setShowCreateOrderModal(false)}
+            onOrderCreated={handleOrderCreated}
+            initialBranchId={activeBranch?.id}
+            initialItems={specialOrderInitialItems}
+            initialCustomerId={!isGeneral ? selectedCustomer.id : undefined}
+            initialCustomerName={!isGeneral ? selectedCustomer.name : ""}
+            initialCustomerPhone={!isGeneral && selectedCustomer.phone !== "N/A" ? selectedCustomer.phone : ""}
+          />
+        );
+      })()}
 
       {/* Modal de Ticket Térmico / WhatsApp de Pedido Especial */}
       <OrderReceiptModal
@@ -3117,6 +3144,15 @@ export default function POSPage() {
         order={selectedOrderForPayment}
         onPaymentSuccess={() => {
           updatePendingOrdersCount();
+          try {
+            const savedIncomes = localStorage.getItem("brito_cash_incomes");
+            if (savedIncomes) {
+              const parsedInc = JSON.parse(savedIncomes);
+              if (Array.isArray(parsedInc)) {
+                setIncomesList(parsedInc);
+              }
+            }
+          } catch (e) {}
           addNotification({
             senderName: "💰 Pedido Liquidado",
             senderAvatar: "🥖",

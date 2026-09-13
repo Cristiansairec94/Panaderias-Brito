@@ -17,6 +17,7 @@ import {
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
 import { addOrderPayment } from "@/lib/orders";
 
 interface OrderPaymentModalProps {
@@ -33,6 +34,7 @@ export default function OrderPaymentModal({
   onPaymentSuccess,
 }: OrderPaymentModalProps) {
   const { user } = useAuth();
+  const { registerRealSale } = useBranch();
   const [amount, setAmount] = useState<number | "">(0);
   const [isAmountFocused, setIsAmountFocused] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
@@ -71,6 +73,16 @@ export default function OrderPaymentModal({
         notes: notes.trim() || undefined,
         markAsDelivered: markAsDelivered && numericAmount === order.remainingBalance,
       });
+
+      if (numericAmount > 0) {
+        registerRealSale(
+          order.branchId || "branch-matriz",
+          numericAmount,
+          paymentMethod,
+          user?.name || "Cajero en Turno",
+          `Liquidación/Abono Pedido ${order.orderNumber} - ${order.customerName}`
+        );
+      }
 
       onPaymentSuccess();
       onClose();

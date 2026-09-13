@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   X,
   Plus,
@@ -30,8 +30,21 @@ import { getStoredProducts } from "@/lib/products";
 import { getStoredCustomers, addQuickCustomer } from "@/lib/customers";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
 import { addCustomOrder } from "@/lib/orders";
+
+/**
+ * Retorna fecha local en formato YYYY-MM-DD sin desviaciones por zona horaria UTC
+ */
+function getLocalDateStr(daysOffset: number = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysOffset);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -116,8 +129,12 @@ export default function CreateOrderModal({
   initialCustomerName,
   initialCustomerPhone,
 }: CreateOrderModalProps) {
-  const { branches, currentBranch } = useBranch();
+  const { branches, currentBranch, registerRealSale } = useBranch();
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
+
+  const customerNameInputRef = useRef<HTMLInputElement>(null);
+  const customTotalInputRef = useRef<HTMLInputElement>(null);
 
   // Datos base
   const [products, setProducts] = useState<Product[]>([]);
@@ -146,12 +163,8 @@ export default function CreateOrderModal({
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
 
-  // 3. Entrega
-  const tomorrowStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
-  }, []);
+  // 3. Entrega (fecha local sin desfases de huso horario UTC)
+  const tomorrowStr = useMemo(() => getLocalDateStr(1), []);
   const [deliveryDate, setDeliveryDate] = useState<string>(tomorrowStr);
   const [deliveryTime, setDeliveryTime] = useState<string>("16:00");
   const [deliveryType, setDeliveryType] = useState<"sucursal" | "domicilio">("sucursal");
@@ -177,10 +190,11 @@ export default function CreateOrderModal({
       } else {
         setItems([]);
         setDescription("");
+        setCustomTotal("");
       }
 
-      // Pre-llenar cliente si viene del POS
-      if (initialCustomerId) {
+      // Pre-llenar cliente si viene del POS (verificando que no sea Público en General)
+      if (initialCustomerId && initialCustomerId !== "cli-0" && initialCustomerId !== "cli-general") {
         setSelectedCustomerId(initialCustomerId);
       } else {
         setSelectedCustomerId("");
@@ -188,13 +202,13 @@ export default function CreateOrderModal({
 
       if (initialCustomerName && initialCustomerName !== "Público en General") {
         setCustomerName(initialCustomerName);
-      } else if (!initialCustomerId) {
+      } else {
         setCustomerName("");
       }
 
       if (initialCustomerPhone && initialCustomerPhone !== "N/A") {
         setCustomerPhone(initialCustomerPhone);
-      } else if (!initialCustomerId) {
+      } else {
         setCustomerPhone("");
       }
 
@@ -307,19 +321,16 @@ export default function CreateOrderModal({
     });
   };
 
-  // Atajos rápidos de fecha
+  // Atajos rápidos de fecha (usando fecha local para evitar errores de huso horario)
   const handleSetQuickDate = (days: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    setDeliveryDate(d.toISOString().split("T")[0]);
+    setDeliveryDate(getLocalDateStr(days));
   };
 
   const handleSetNextSaturday = () => {
     const d = new Date();
     const day = d.getDay();
     const diff = (6 - day + 7) % 7 || 7;
-    d.setDate(d.getDate() + diff);
-    setDeliveryDate(d.toISOString().split("T")[0]);
+    setDeliveryDate(getLocalDateStr(diff));
   };
 
   // Guardar y levantar pedido
@@ -327,12 +338,14 @@ export default function CreateOrderModal({
     e.preventDefault();
 
     if (!customerName.trim()) {
-      alert("Por favor escribe el nombre del cliente.");
+      alert("Por favor escribe el nombre de la persona que encarga el pedido.");
+      customerNameInputRef.current?.focus();
       return;
     }
 
     if (total <= 0) {
-      alert("Por favor indica qué encargo es y su precio total.");
+      alert("Por favor agrega productos del catálogo o escribe el precio total acordado.");
+      customTotalInputRef.current?.focus();
       return;
     }
 
@@ -342,6 +355,7 @@ export default function CreateOrderModal({
           minRequiredDeposit
         )}).\n\nActualmente ingresaste: ${formatCurrency(numericDeposit)}`
       );
+      setDeposit(minRequiredDeposit);
       return;
     }
 
@@ -393,6 +407,30 @@ export default function CreateOrderModal({
         deposit: numericDeposit,
         paymentMethod: paymentMethod,
         cashier: user?.name || "Cajero en Turno",
+      });
+
+      // 1. REGISTRAR EL DINERO INGRESADO EN LA CAJA Y SUCURSAL
+      if (numericDeposit > 0) {
+        registerRealSale(
+          activeBranch.id,
+          numericDeposit,
+          paymentMethod,
+          user?.name || "Cajero en Turno",
+          `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()}`
+        );
+      }
+
+      // 2. NOTIFICACIÓN INMEDIATA AUDITIVA Y VISUAL CON CHIME Y BANNER
+      addNotification({
+        senderName: `🎂 Pedido Apartado (${activeBranch.name})`,
+        senderAvatar: "🎂",
+        badgeIcon: "pastel",
+        title: `Nuevo Pedido ${newOrder.orderNumber}`,
+        highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(numericDeposit)}`,
+        description: `${newOrder.description}. Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(newOrder.remainingBalance)}.`,
+        category: "pedidos",
+        actionLabel: "Ver Pedidos",
+        actionLink: "/pedidos",
       });
 
       onOrderCreated(newOrder.id);
@@ -464,8 +502,8 @@ export default function CreateOrderModal({
                 <div className="relative">
                   <User className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
+                    ref={customerNameInputRef}
                     type="text"
-                    required
                     placeholder="Ej. Sra. Lupita Mendoza"
                     value={customerName}
                     onChange={(e) => {
@@ -503,13 +541,12 @@ export default function CreateOrderModal({
 
               <div>
                 <label className="text-xs font-bold text-stone-700 block mb-1">
-                  Teléfono / WhatsApp *
+                  Teléfono / WhatsApp (Opcional)
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="tel"
-                    required
                     placeholder="Ej. 55 1234 5678"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
@@ -655,10 +692,10 @@ export default function CreateOrderModal({
                 <div className="relative w-40">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-amber-600">$</span>
                   <input
+                    ref={customTotalInputRef}
                     type="number"
                     min="1"
                     step="any"
-                    required
                     placeholder="Ej. 650"
                     value={customTotal}
                     onChange={(e) => setCustomTotal(e.target.value === "" ? "" : Number(e.target.value))}
@@ -721,9 +758,8 @@ export default function CreateOrderModal({
                 <label className="text-xs font-bold text-stone-700 block mb-1">Fecha prometida *</label>
                 <input
                   type="date"
-                  required
                   value={deliveryDate}
-                  min={new Date().toISOString().split("T")[0]}
+                  min={getLocalDateStr(0)}
                   onChange={(e) => setDeliveryDate(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
@@ -733,7 +769,6 @@ export default function CreateOrderModal({
                 <label className="text-xs font-bold text-stone-700 block mb-1">Hora estimada *</label>
                 <input
                   type="time"
-                  required
                   value={deliveryTime}
                   onChange={(e) => setDeliveryTime(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -923,19 +958,39 @@ export default function CreateOrderModal({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSubmitting || !isDepositSufficient || !customerName.trim()}
+              disabled={isSubmitting}
               className={`w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
-                isDepositSufficient && customerName.trim()
-                  ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-emerald-950/30 active:scale-98"
-                  : "bg-stone-300 text-stone-500 cursor-not-allowed border border-stone-400 shadow-none"
+                isSubmitting
+                  ? "bg-stone-400 text-stone-700 cursor-wait"
+                  : isDepositSufficient && customerName.trim() && total > 0
+                  ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-emerald-950/30 active:scale-98 ring-4 ring-emerald-500/20"
+                  : !customerName.trim()
+                  ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-amber-900/20 active:scale-98"
+                  : total <= 0
+                  ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-amber-900/20 active:scale-98"
+                  : "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-900/20 active:scale-98"
               }`}
             >
-              <span>✅</span>
+              <span>
+                {isSubmitting
+                  ? "⏳"
+                  : isDepositSufficient && customerName.trim() && total > 0
+                  ? "✅"
+                  : !customerName.trim()
+                  ? "👤"
+                  : total <= 0
+                  ? "🎂"
+                  : "💵"}
+              </span>
               <span>
                 {isSubmitting
                   ? "Guardando Pedido..."
+                  : !customerName.trim()
+                  ? "Escribe el nombre del cliente para apartar"
+                  : total <= 0
+                  ? "Indica el monto total del encargo"
                   : !isDepositSufficient
-                  ? `Se requiere mínimo el 50% (${formatCurrency(minRequiredDeposit)})`
+                  ? `Falta anticipo mínimo del 50% (${formatCurrency(minRequiredDeposit)})`
                   : `GUARDAR Y APARTAR PEDIDO (${formatCurrency(numericDeposit)} Recibidos)`}
               </span>
             </button>
