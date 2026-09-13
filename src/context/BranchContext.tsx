@@ -336,56 +336,76 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     cashier: string,
     itemsSummary: string
   ) => {
-    const isCash = paymentMethod === "efectivo";
-    const isCard = paymentMethod === "tarjeta";
-    const isTransfer = paymentMethod === "transferencia";
+    try {
+      const isCash = paymentMethod === "efectivo";
+      const isCard = paymentMethod === "tarjeta";
+      const isTransfer = paymentMethod === "transferencia";
 
-    setBranches((prev) => {
-      const updated = prev.map((b) => {
-        if (b.id !== branchId) return b;
+      setBranches((prev) => {
+        const updated = prev.map((b) => {
+          if (b.id !== branchId) return b;
 
-        const updatedShift: BranchShift = {
-          ...b.currentShift,
-          totalSales: b.currentShift.totalSales + amount,
-          ticketCount: b.currentShift.ticketCount + 1,
-          cashSales: b.currentShift.cashSales + (isCash ? amount : 0),
-          cardSales: b.currentShift.cardSales + (isCard ? amount : 0),
-          transferSales: b.currentShift.transferSales + (isTransfer ? amount : 0),
-        };
+          const defShift: BranchShift = {
+            id: `shift-${b.id}`,
+            name: "Turno General",
+            cashier: cashier || "Cajero",
+            openedAt: "06:00 AM",
+            initialFund: 1000,
+            status: "abierto",
+            totalSales: 0,
+            ticketCount: 0,
+            cashSales: 0,
+            cardSales: 0,
+            transferSales: 0,
+          };
 
-        return {
-          ...b,
-          todaySales: b.todaySales + amount,
-          todayTickets: b.todayTickets + 1,
-          cashInDrawer: b.cashInDrawer + (isCash ? amount : 0),
-          currentShift: updatedShift,
-        };
+          const curShift: BranchShift = b.currentShift ? { ...b.currentShift } : defShift;
+
+          const updatedShift: BranchShift = {
+            ...curShift,
+            totalSales: (Number(curShift.totalSales) || 0) + amount,
+            ticketCount: (Number(curShift.ticketCount) || 0) + 1,
+            cashSales: (Number(curShift.cashSales) || 0) + (isCash ? amount : 0),
+            cardSales: (Number(curShift.cardSales) || 0) + (isCard ? amount : 0),
+            transferSales: (Number(curShift.transferSales) || 0) + (isTransfer ? amount : 0),
+          };
+
+          return {
+            ...b,
+            todaySales: (Number(b.todaySales) || 0) + amount,
+            todayTickets: (Number(b.todayTickets) || 0) + 1,
+            cashInDrawer: (Number(b.cashInDrawer) || 0) + (isCash ? amount : 0),
+            currentShift: updatedShift,
+          };
+        });
+
+        persistBranches(updated);
+        return updated;
       });
 
-      persistBranches(updated);
-      return updated;
-    });
+      const timeStr = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const targetBranch = branches.find((b) => b.id === branchId);
+      const saleLog: SimulatedSale = {
+        id: `pos-${Date.now()}`,
+        branchId,
+        branchName: targetBranch?.shortName || targetBranch?.name || "POS",
+        itemsSummary: itemsSummary || "Venta mostrador POS",
+        total: amount,
+        paymentMethod,
+        cashier: cashier || "Cajero",
+        timestamp: timeStr,
+      };
 
-    const timeStr = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    const targetBranch = branches.find((b) => b.id === branchId);
-    const saleLog: SimulatedSale = {
-      id: `pos-${Date.now()}`,
-      branchId,
-      branchName: targetBranch ? targetBranch.shortName : "POS",
-      itemsSummary: itemsSummary || "Venta mostrador POS",
-      total: amount,
-      paymentMethod,
-      cashier,
-      timestamp: timeStr,
-    };
-
-    setRecentSimulatedSales((prev) => {
-      const next = [saleLog, ...prev.slice(0, 19)];
-      try {
-        localStorage.setItem("brito_simulated_sales", JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+      setRecentSimulatedSales((prev) => {
+        const next = [saleLog, ...prev.slice(0, 19)];
+        try {
+          localStorage.setItem("brito_simulated_sales", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    } catch (err) {
+      console.error("Error inside registerRealSale:", err);
+    }
   }, [branches]);
 
   const currentBranch = currentBranchId === "all" 

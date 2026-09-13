@@ -362,17 +362,21 @@ export default function CreateOrderModal({
     setIsSubmitting(true);
 
     try {
-      // Registrar cliente si es nuevo
+      // 1. Registrar cliente si es nuevo
       let finalCustomerId = selectedCustomerId;
-      if (!finalCustomerId && customerName.trim()) {
-        const created = addQuickCustomer({
-          name: customerName.trim(),
-          phone: customerPhone.trim() || undefined,
-          address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
-          type: "evento",
-          notes: "Cliente registrado desde Pedido Especial",
-        });
-        finalCustomerId = created.id;
+      try {
+        if (!finalCustomerId && customerName.trim()) {
+          const created = addQuickCustomer({
+            name: customerName.trim(),
+            phone: customerPhone.trim() || undefined,
+            address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
+            type: "evento",
+            notes: "Cliente registrado desde Pedido Especial",
+          });
+          finalCustomerId = created.id;
+        }
+      } catch (custErr) {
+        console.warn("Could not register quick customer:", custErr);
       }
 
       const finalDescription =
@@ -391,12 +395,13 @@ export default function CreateOrderModal({
               },
             ];
 
+      // 2. CREACIÓN DEL PEDIDO (BASE CENTRAL)
       const newOrder = addCustomOrder({
         customerName: customerName.trim(),
         phone: customerPhone.trim() || "55 0000 0000",
         customerId: finalCustomerId || undefined,
-        branchId: activeBranch.id,
-        branchName: activeBranch.name,
+        branchId: activeBranch?.id || "branch-matriz",
+        branchName: activeBranch?.name || "Sucursal Matriz (Centro)",
         description: finalDescription,
         items: finalItems,
         deliveryDate: deliveryDate || tomorrowStr,
@@ -409,35 +414,49 @@ export default function CreateOrderModal({
         cashier: user?.name || "Cajero en Turno",
       });
 
-      // 1. REGISTRAR EL DINERO INGRESADO EN LA CAJA Y SUCURSAL
+      // 3. REGISTRAR EL DINERO INGRESADO EN LA CAJA Y SUCURSAL (CON RESGUARDO)
       if (numericDeposit > 0) {
-        registerRealSale(
-          activeBranch.id,
-          numericDeposit,
-          paymentMethod,
-          user?.name || "Cajero en Turno",
-          `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()}`
-        );
+        try {
+          registerRealSale(
+            activeBranch?.id || "branch-matriz",
+            numericDeposit,
+            paymentMethod,
+            user?.name || "Cajero en Turno",
+            `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()}`
+          );
+        } catch (saleErr) {
+          console.warn("Could not record in registerRealSale:", saleErr);
+        }
       }
 
-      // 2. NOTIFICACIÓN INMEDIATA AUDITIVA Y VISUAL CON CHIME Y BANNER
-      addNotification({
-        senderName: `🎂 Pedido Apartado (${activeBranch.name})`,
-        senderAvatar: "🎂",
-        badgeIcon: "pastel",
-        title: `Nuevo Pedido ${newOrder.orderNumber}`,
-        highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(numericDeposit)}`,
-        description: `${newOrder.description}. Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(newOrder.remainingBalance)}.`,
-        category: "pedidos",
-        actionLabel: "Ver Pedidos",
-        actionLink: "/pedidos",
-      });
+      // 4. NOTIFICACIÓN AUDITIVA Y VISUAL CON CHIME Y BANNER (CON RESGUARDO)
+      try {
+        addNotification({
+          senderName: `🎂 Pedido Apartado (${activeBranch?.name || "Sucursal"})`,
+          senderAvatar: "🎂",
+          badgeIcon: "pastel",
+          title: `Nuevo Pedido ${newOrder.orderNumber}`,
+          highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(numericDeposit)}`,
+          description: `${newOrder.description}. Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(newOrder.remainingBalance)}.`,
+          category: "pedidos",
+          actionLabel: "Ver Pedidos",
+          actionLink: "/pedidos",
+        });
+      } catch (notifErr) {
+        console.warn("Could not fire notification:", notifErr);
+      }
 
-      onOrderCreated(newOrder.id);
+      // 5. CALLBACK AL POS Y CERRAR VENTANA
+      try {
+        onOrderCreated(newOrder.id);
+      } catch (cbErr) {
+        console.warn("Could not run onOrderCreated callback:", cbErr);
+      }
       onClose();
     } catch (err) {
       console.error("Error al apartar pedido especial:", err);
-      alert("Ocurrió un error al guardar el pedido. Intenta nuevamente.");
+      const errMsg = err instanceof Error ? err.message : "Intenta nuevamente.";
+      alert(`Ocurrió un error al guardar el pedido: ${errMsg}`);
     } finally {
       setIsSubmitting(false);
     }

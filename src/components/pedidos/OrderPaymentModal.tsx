@@ -75,16 +75,24 @@ export default function OrderPaymentModal({
       });
 
       if (numericAmount > 0) {
-        registerRealSale(
-          order.branchId || "branch-matriz",
-          numericAmount,
-          paymentMethod,
-          user?.name || "Cajero en Turno",
-          `Liquidación/Abono Pedido ${order.orderNumber} - ${order.customerName}`
-        );
+        try {
+          registerRealSale(
+            order.branchId || "branch-matriz",
+            numericAmount,
+            paymentMethod,
+            user?.name || "Cajero en Turno",
+            `Liquidación/Abono Pedido ${order.orderNumber} - ${order.customerName}`
+          );
+        } catch (saleErr) {
+          console.warn("Could not register in registerRealSale:", saleErr);
+        }
       }
 
-      onPaymentSuccess();
+      try {
+        onPaymentSuccess();
+      } catch (cbErr) {
+        console.warn("Could not run onPaymentSuccess callback:", cbErr);
+      }
       onClose();
     } catch (err) {
       console.error("Error submitting order payment:", err);
