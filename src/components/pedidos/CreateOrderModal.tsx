@@ -30,7 +30,7 @@ import { getStoredProducts } from "@/lib/products";
 import { getStoredCustomers, addQuickCustomer } from "@/lib/customers";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
 import { addCustomOrder } from "@/lib/orders";
 
 interface CreateOrderModalProps {
@@ -42,6 +42,68 @@ interface CreateOrderModalProps {
   initialCustomerId?: string;
   initialCustomerName?: string;
   initialCustomerPhone?: string;
+}
+
+/**
+ * Input editable directo para la cantidad de piezas de un producto en el pedido especial.
+ * Permite hacer clic, borrar o escribir cualquier cantidad directamente (ej. 50, 100),
+ * o usar los botones - y +.
+ */
+function OrderItemQuantityInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (qty: number) => void;
+}) {
+  const [text, setText] = useState<string>(value > 0 ? value.toString() : "1");
+
+  useEffect(() => {
+    setText(value > 0 ? value.toString() : "1");
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const clean = cleanOnlyNumbers(e.target.value);
+    setText(clean);
+    if (clean === "") {
+      onChange(1);
+    } else {
+      const num = parseInt(clean, 10);
+      onChange(isNaN(num) || num <= 0 ? 1 : num);
+    }
+  };
+
+  const handleBlur = () => {
+    if (text === "" || parseInt(text, 10) <= 0) {
+      setText("1");
+      onChange(1);
+    } else {
+      const num = parseInt(text, 10);
+      setText(num.toString());
+      onChange(num);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={text}
+      onFocus={(e) => e.target.select()}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+          return;
+        }
+        onlyNumbersKeyDown(e, false);
+      }}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      className="w-12 h-6 text-center font-black text-xs sm:text-sm bg-white border border-stone-300 focus:border-amber-500 rounded-md focus:outline-none text-stone-900 cursor-text select-all"
+      title="Cantidad de piezas (haz clic para escribir el número que quieras)"
+    />
+  );
 }
 
 export default function CreateOrderModal({
@@ -230,6 +292,17 @@ export default function CreateOrderModal({
       }
       copy[index].quantity = newQty;
       copy[index].subtotal = newQty * copy[index].unitPrice;
+      return copy;
+    });
+  };
+
+  const handleSetExactItemQty = (index: number, qty: number) => {
+    setItems((prev) => {
+      const copy = [...prev];
+      if (!copy[index]) return prev;
+      const validQty = Math.max(1, qty);
+      copy[index].quantity = validQty;
+      copy[index].subtotal = validQty * copy[index].unitPrice;
       return copy;
     });
   };
@@ -510,19 +583,24 @@ export default function CreateOrderModal({
                   >
                     <span className="font-bold text-stone-900 truncate flex-1">{it.name}</span>
                     <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5 border">
+                      <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5 border border-stone-300 shadow-2xs">
                         <button
                           type="button"
                           onClick={() => handleUpdateItemQty(idx, -1)}
-                          className="w-5 h-5 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded font-black"
+                          className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 hover:text-stone-900 rounded font-black text-xs transition-colors active:scale-90"
+                          title="Restar 1 pieza"
                         >
                           -
                         </button>
-                        <span className="w-8 text-center font-black text-stone-900">{it.quantity}</span>
+                        <OrderItemQuantityInput
+                          value={it.quantity}
+                          onChange={(newQty) => handleSetExactItemQty(idx, newQty)}
+                        />
                         <button
                           type="button"
                           onClick={() => handleUpdateItemQty(idx, 1)}
-                          className="w-5 h-5 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded font-black"
+                          className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 hover:text-stone-900 rounded font-black text-xs transition-colors active:scale-90"
+                          title="Sumar 1 pieza"
                         >
                           +
                         </button>
