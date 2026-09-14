@@ -178,7 +178,6 @@ export default function TicketModal({
             <Receipt className="w-5 h-5 text-amber-400 shrink-0" />
             <div>
               <span className="font-bold text-sm block leading-tight">Comprobante de Venta</span>
-<<<<<<< HEAD
               <div className="flex items-center gap-1 text-[10px] text-amber-300/90 font-normal">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
                 <span>Impresora: <strong>{printerConfig.selectedPrinterName}</strong> ({printerConfig.paperWidth})</span>
@@ -193,11 +192,6 @@ export default function TicketModal({
                   </button>
                 )}
               </div>
-=======
-              <span className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
-                <Zap className="w-3 h-3 fill-amber-400" /> Impresión Directa a POS-58
-              </span>
->>>>>>> 486b1b4 (feat: habilitar impresion directa y silenciosa omitiendo ventana de vista previa)
             </div>
           </div>
           <button

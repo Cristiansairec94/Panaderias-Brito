@@ -108,6 +108,7 @@
         background: #ffffff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+        text-align: center !important;
       }
       body * {
         visibility: hidden !important;
@@ -116,18 +117,21 @@
         visibility: visible !important;
       }
       #printable-ticket, #thermal-receipt {
-        position: absolute !important;
-        left: 0 !important;
+        position: relative !important;
+        left: auto !important;
+        right: auto !important;
         top: 0 !important;
-        width: 80mm !important;
+        margin: 0 auto !important;
+        width: 100% !important;
         max-width: 80mm !important;
-        margin: 0 !important;
-        padding: 4mm !important;
+        padding: 4mm 3mm !important;
         background: white !important;
         color: black !important;
-        border: none !important;
-        border-radius: 0 !important;
+        border: 1px dashed #444 !important;
+        border-radius: 4px !important;
         box-shadow: none !important;
+        text-align: left !important;
+        box-sizing: border-box !important;
         page-break-after: avoid !important;
         page-break-inside: avoid !important;
       }

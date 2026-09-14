@@ -107,22 +107,19 @@ namespace PanaderiaBrito
                 Directory.CreateDirectory(defaultDir);
                 string prefFile = Path.Combine(defaultDir, "Preferences");
 
-                string targetPrinter = "POS-58";
-
-                if (File.Exists(prefFile))
+                string targetPrinter = "Brother DCP-T530DW Printer";
+                try
                 {
-                    string content = File.ReadAllText(prefFile);
-                    if (content.Contains("Microsoft Print to PDF"))
+                    System.Drawing.Printing.PrinterSettings ps = new System.Drawing.Printing.PrinterSettings();
+                    if (ps.IsValid && !string.IsNullOrEmpty(ps.PrinterName))
                     {
-                        content = content.Replace("Microsoft Print to PDF", targetPrinter);
-                        File.WriteAllText(prefFile, content);
+                        targetPrinter = ps.PrinterName;
                     }
                 }
-                else
-                {
-                    string printerSnippet = "{\"printing\":{\"print_preview_sticky_settings\":{\"appState\":\"{\\\"version\\\":2,\\\"recentDestinations\\\":[{\\\"id\\\":\\\"" + targetPrinter + "\\\",\\\"origin\\\":\\\"local\\\",\\\"displayName\\\":\\\"" + targetPrinter + "\\\",\\\"printerStatus\\\":\\\"printerStatusReady\\\",\\\"extensionId\\\":\\\"\\\",\\\"extensionName\\\":\\\"\\\"}],\\\"dpi\\\":{},\\\"duplexType\\\":\\\"LONG_EDGE\\\",\\\"mediaSize\\\":{},\\\"marginsType\\\":1,\\\"isColorEnabled\\\":false,\\\"isHeaderFooterEnabled\\\":false,\\\"isLandscapeEnabled\\\":false,\\\"isCollateEnabled\\\":true,\\\"isCssBackgroundEnabled\\\":true,\\\"scaling\\\":\\\"100\\\",\\\"vendorOptions\\\":{}}\"}}}";
-                    File.WriteAllText(prefFile, printerSnippet);
-                }
+                catch { }
+
+                string printerSnippet = "{\"printing\":{\"print_preview_sticky_settings\":{\"appState\":\"{\\\"version\\\":2,\\\"recentDestinations\\\":[{\\\"id\\\":\\\"" + targetPrinter + "\\\",\\\"origin\\\":\\\"local\\\",\\\"displayName\\\":\\\"" + targetPrinter + "\\\",\\\"printerStatus\\\":\\\"printerStatusReady\\\",\\\"extensionId\\\":\\\"\\\",\\\"extensionName\\\":\\\"\\\"}],\\\"dpi\\\":{},\\\"duplexType\\\":\\\"LONG_EDGE\\\",\\\"mediaSize\\\":{},\\\"marginsType\\\":1,\\\"isColorEnabled\\\":false,\\\"isHeaderFooterEnabled\\\":false,\\\"isLandscapeEnabled\\\":false,\\\"isCollateEnabled\\\":true,\\\"isCssBackgroundEnabled\\\":true,\\\"scaling\\\":\\\"100\\\",\\\"vendorOptions\\\":{}}\"}}}";
+                File.WriteAllText(prefFile, printerSnippet);
             }
             catch { }
         }
