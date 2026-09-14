@@ -34,7 +34,7 @@ export default function OrderPaymentModal({
   onPaymentSuccess,
 }: OrderPaymentModalProps) {
   const { user } = useAuth();
-  const { registerRealSale } = useBranch();
+  const { currentBranch, registerRealSale } = useBranch();
   const [amount, setAmount] = useState<number | "">(0);
   const [isAmountFocused, setIsAmountFocused] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
@@ -66,10 +66,15 @@ export default function OrderPaymentModal({
 
     setIsSubmitting(true);
     try {
+      const operatingBranchId = currentBranch?.id || order.branchId || "branch-matriz";
+      const operatingBranchName = currentBranch?.name || order.branchName || "Sucursal Matriz (Centro)";
+
       addOrderPayment(order.id, {
         amount: numericAmount,
         paymentMethod,
         cashier: user?.name || "Cajero en Turno",
+        operatingBranchId,
+        operatingBranchName,
         notes: notes.trim() || undefined,
         markAsDelivered: markAsDelivered && numericAmount === order.remainingBalance,
       });
@@ -77,7 +82,7 @@ export default function OrderPaymentModal({
       if (numericAmount > 0) {
         try {
           registerRealSale(
-            order.branchId || "branch-matriz",
+            operatingBranchId,
             numericAmount,
             paymentMethod,
             user?.name || "Cajero en Turno",

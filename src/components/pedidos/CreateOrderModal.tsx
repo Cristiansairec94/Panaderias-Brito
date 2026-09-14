@@ -23,11 +23,14 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldCheck,
-  Search
+  Search,
+  UserPlus,
+  Users,
+  Check
 } from "lucide-react";
 import { Product, Customer, OrderItem } from "@/types";
 import { getStoredProducts } from "@/lib/products";
-import { getStoredCustomers, addQuickCustomer } from "@/lib/customers";
+import { getStoredCustomers, addQuickCustomer, createCustomerInDb } from "@/lib/customers";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -156,6 +159,25 @@ export default function CreateOrderModal({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
+  // Modal de Añadir / Seleccionar Cliente
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [customerModalTab, setCustomerModalTab] = useState<"search" | "new">("search");
+  const [custModalSearch, setCustModalSearch] = useState("");
+  const [custModalTypeFilter, setCustModalTypeFilter] = useState<"all" | Customer["type"]>("all");
+  
+  // Formulario nuevo cliente
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustType, setNewCustType] = useState<Customer["type"]>("frecuente");
+  const [newCustAddress, setNewCustAddress] = useState("");
+  const [newCustNotes, setNewCustNotes] = useState("");
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+
+  const selectedCustomer = useMemo(() => {
+    if (!selectedCustomerId) return null;
+    return customers.find((c) => c.id === selectedCustomerId) || null;
+  }, [customers, selectedCustomerId]);
+
   // 2. Detalle del pedido
   const [description, setDescription] = useState("");
   const [items, setItems] = useState<OrderItem[]>([]);
@@ -275,6 +297,74 @@ export default function CreateOrderModal({
       (c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q))
     ).slice(0, 4);
   }, [customers, customerName]);
+
+  // Lista de clientes filtrada para el modal de búsqueda
+  const filteredModalCustomers = useMemo(() => {
+    let list = customers.filter((c) => c.id !== "cli-0" && c.id !== "cli-general");
+    if (custModalTypeFilter !== "all") {
+      list = list.filter((c) => c.type === custModalTypeFilter);
+    }
+    if (custModalSearch.trim()) {
+      const q = custModalSearch.toLowerCase().trim();
+      list = list.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.phone && c.phone.includes(q)) ||
+          (c.notes && c.notes.toLowerCase().includes(q)) ||
+          (c.address && c.address.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [customers, custModalSearch, custModalTypeFilter]);
+
+  const handleSelectCustomer = (c: Customer) => {
+    setCustomerName(c.name);
+    setCustomerPhone(c.phone && c.phone !== "N/A" ? c.phone : "");
+    setSelectedCustomerId(c.id);
+    if (c.address && (!deliveryAddress || deliveryAddress.trim() === "")) {
+      setDeliveryAddress(c.address);
+    }
+    setIsCustomerModalOpen(false);
+    setShowCustomerSearch(false);
+  };
+
+  const handleClearSelectedCustomer = () => {
+    setSelectedCustomerId("");
+    setCustomerName("");
+    setCustomerPhone("");
+  };
+
+  const handleCreateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustName.trim()) return;
+    setIsSavingCustomer(true);
+    try {
+      const created = await createCustomerInDb({
+        name: newCustName.trim(),
+        phone: newCustPhone.trim() || undefined,
+        type: newCustType,
+        address: newCustAddress.trim() || undefined,
+        notes: newCustNotes.trim() || undefined,
+      });
+
+      const updatedCusts = getStoredCustomers();
+      setCustomers(updatedCusts);
+
+      handleSelectCustomer(created);
+
+      // Reset form
+      setNewCustName("");
+      setNewCustPhone("");
+      setNewCustType("frecuente");
+      setNewCustAddress("");
+      setNewCustNotes("");
+      setIsCustomerModalOpen(false);
+    } catch (err) {
+      console.error("Error creating customer", err);
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
 
   // Filtro de productos para catálogo opcional
   const filteredCatalog = useMemo(() => {
@@ -419,6 +509,8 @@ export default function CreateOrderModal({
         customerId: finalCustomerId || undefined,
         branchId: finalPickupBranch?.id || "branch-matriz",
         branchName: finalPickupBranch?.name || "Sucursal Matriz (Centro)",
+        operatingBranchId: activeBranch?.id || "branch-matriz",
+        operatingBranchName: activeBranch?.name || "Sucursal Matriz (Centro)",
         description: finalDescription,
         items: finalItems,
         deliveryDate: deliveryDate || tomorrowStr,
@@ -428,7 +520,7 @@ export default function CreateOrderModal({
         total: total,
         deposit: numericDeposit,
         paymentMethod: paymentMethod,
-        cashier: user?.name || "Cajero en Turno",
+        cashier: user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
       });
 
       // 3. REGISTRAR EL DINERO INGRESADO EN LA CAJA Y SUCURSAL (CON RESGUARDO)
@@ -521,14 +613,53 @@ export default function CreateOrderModal({
           
           {/* PASO 1: ¿A NOMBRE DE QUIÉN? */}
           <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center gap-2 text-stone-900">
-              <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
-                1
-              </span>
-              <h3 className="font-black text-sm uppercase tracking-wide text-amber-950">
-                ¿A nombre de quién es el pedido?
-              </h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-stone-900">
+                <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
+                  1
+                </span>
+                <h3 className="font-black text-sm uppercase tracking-wide text-amber-950">
+                  ¿A nombre de quién es el pedido?
+                </h3>
+              </div>
+
+              {/* Botón para abrir selector / registro de cliente */}
+              <button
+                type="button"
+                onClick={() => {
+                  setCustModalSearch(customerName);
+                  setIsCustomerModalOpen(true);
+                }}
+                className="text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-100/70 hover:bg-amber-200/80 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors border border-amber-300/60 cursor-pointer shadow-xs active:scale-95"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-amber-800" />
+                <span>+ Añadir Cliente</span>
+              </button>
             </div>
+
+            {/* Banner si hay un cliente vinculado */}
+            {selectedCustomer && (
+              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-300/90 rounded-xl px-3 py-1.5 text-xs text-emerald-900 animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <span className="bg-emerald-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded uppercase">
+                    {selectedCustomer.type || "Cliente"}
+                  </span>
+                  <span className="font-extrabold">{selectedCustomer.name}</span>
+                  {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && (
+                    <span className="text-emerald-700 font-mono text-[11px]">({selectedCustomer.phone})</span>
+                  )}
+                  <span className="text-emerald-600 text-[10px] font-medium hidden sm:inline">✓ Seleccionado</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClearSelectedCustomer}
+                  className="text-emerald-700 hover:text-emerald-950 p-1 hover:bg-emerald-200/50 rounded-lg text-xs cursor-pointer"
+                  title="Desvincular cliente"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="relative">
@@ -553,24 +684,40 @@ export default function CreateOrderModal({
                 </div>
 
                 {/* Sugerencias rápidas de clientes */}
-                {showCustomerSearch && customerSuggestions.length > 0 && (
+                {showCustomerSearch && (customerSuggestions.length > 0 || customerName.trim().length > 0) && (
                   <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden divide-y divide-stone-100">
                     {customerSuggestions.map((c) => (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => {
-                          setCustomerName(c.name);
-                          setCustomerPhone(c.phone !== "N/A" ? c.phone : "");
-                          setSelectedCustomerId(c.id);
-                          setShowCustomerSearch(false);
+                          handleSelectCustomer(c);
                         }}
-                        className="w-full p-2.5 text-left hover:bg-amber-50 flex items-center justify-between text-xs"
+                        className="w-full p-2.5 text-left hover:bg-amber-50 flex items-center justify-between text-xs cursor-pointer"
                       >
-                        <span className="font-bold text-stone-900">{c.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-stone-900">{c.name}</span>
+                          <span className="text-[9px] bg-stone-100 text-stone-600 px-1.5 py-0.2 rounded font-semibold uppercase">{c.type || "cliente"}</span>
+                        </div>
                         <span className="text-[11px] text-stone-500">{c.phone}</span>
                       </button>
                     ))}
+                    {customerName.trim().length > 0 && !customers.some(c => c.name.toLowerCase() === customerName.trim().toLowerCase()) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewCustName(customerName);
+                          setNewCustPhone(customerPhone);
+                          setCustomerModalTab("new");
+                          setIsCustomerModalOpen(true);
+                          setShowCustomerSearch(false);
+                        }}
+                        className="w-full p-2.5 text-left bg-amber-50 hover:bg-amber-100/80 text-amber-900 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <UserPlus className="w-3.5 h-3.5 text-amber-700" />
+                        <span>+ Registrar "{customerName}" como nuevo cliente</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1142,6 +1289,293 @@ export default function CreateOrderModal({
           </div>
         </form>
       </div>
+
+      {/* MODAL / PANEL DE AÑADIR O SELECCIONAR CLIENTE */}
+      {isCustomerModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border-2 border-amber-900/30 text-stone-900 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* Header café Panadería Brito */}
+            <div className="bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] p-4 sm:p-5 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl text-white shadow-md">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-white">
+                    Añadir / Elegir Cliente para el Pedido
+                  </h3>
+                  <p className="text-[11px] text-amber-200/90 font-medium">
+                    Selecciona un cliente frecuente o registra uno nuevo
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCustomerModalOpen(false)}
+                className="p-1.5 rounded-lg text-amber-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Pestañas: Buscar vs Nuevo */}
+            <div className="grid grid-cols-2 p-2 bg-stone-100 border-b border-stone-200 text-xs font-bold shrink-0">
+              <button
+                type="button"
+                onClick={() => setCustomerModalTab("search")}
+                className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  customerModalTab === "search"
+                    ? "bg-white text-amber-950 font-black shadow-xs"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Buscar Cliente ({customers.filter(c => c.id !== "cli-0" && c.id !== "cli-general").length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCustomerModalTab("new")}
+                className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  customerModalTab === "new"
+                    ? "bg-white text-amber-950 font-black shadow-xs"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ Registrar Nuevo</span>
+              </button>
+            </div>
+
+            {/* Contenido Pestaña 1: Buscar */}
+            {customerModalTab === "search" && (
+              <div className="p-4 space-y-3 overflow-y-auto flex-1 text-xs">
+                {/* Buscador */}
+                <div className="relative">
+                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Buscar por nombre, teléfono..."
+                    value={custModalSearch}
+                    onChange={(e) => setCustModalSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  {custModalSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setCustModalSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Filtro por tipo de cliente */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+                  {[
+                    { id: "all", label: "Todos" },
+                    { id: "frecuente", label: "Frecuentes" },
+                    { id: "mayoreo", label: "Mayoreo" },
+                    { id: "evento", label: "Eventos" },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setCustModalTypeFilter(f.id as any)}
+                      className={`px-2.5 py-1 rounded-lg font-bold shrink-0 transition-all cursor-pointer ${
+                        custModalTypeFilter === f.id
+                          ? "bg-amber-500 text-stone-950 font-black shadow-xs"
+                          : "bg-stone-200/70 text-stone-600 hover:bg-stone-200"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Lista de Clientes */}
+                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  {filteredModalCustomers.length > 0 ? (
+                    filteredModalCustomers.map((c) => (
+                      <div
+                        key={c.id}
+                        onClick={() => handleSelectCustomer(c)}
+                        className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 hover:bg-amber-50 hover:border-amber-300 ${
+                          selectedCustomerId === c.id
+                            ? "bg-amber-50 border-amber-500 ring-2 ring-amber-400/30"
+                            : "bg-white border-stone-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 font-black text-xs flex items-center justify-center shrink-0">
+                            {c.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-extrabold text-stone-900 text-xs truncate">
+                                {c.name}
+                              </span>
+                              <span className={`text-[9px] font-black px-1.5 py-0.2 rounded uppercase ${
+                                c.type === "mayoreo"
+                                  ? "bg-purple-100 text-purple-800"
+                                  : c.type === "evento"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-emerald-100 text-emerald-800"
+                              }`}>
+                                {c.type || "Frecuente"}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-stone-500 block truncate">
+                              {c.phone && c.phone !== "N/A" ? `📞 ${c.phone}` : "Sin teléfono"}
+                              {c.address ? ` • 📍 ${c.address}` : ""}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-lg shrink-0 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          Elegir
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 px-3 bg-stone-50 rounded-2xl border border-dashed border-stone-300 space-y-2">
+                      <p className="text-xs text-stone-500">
+                        {custModalSearch ? `No se encontró ningún cliente con "${custModalSearch}".` : "No hay clientes registrados en esta categoría."}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewCustName(custModalSearch);
+                          setCustomerModalTab("new");
+                        }}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>+ Registrar "{custModalSearch || 'nuevo cliente'}"</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botón para pasar a registrar nuevo */}
+                <div className="pt-2 border-t border-stone-200 flex justify-between items-center">
+                  <span className="text-[11px] text-stone-500">
+                    ¿Es un cliente nuevo que no está en la lista?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewCustName(custModalSearch);
+                      setCustomerModalTab("new");
+                    }}
+                    className="text-xs font-black text-amber-700 hover:text-amber-900 flex items-center gap-1 cursor-pointer"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>+ Registrar Nuevo Cliente</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Contenido Pestaña 2: Registrar Nuevo Cliente */}
+            {customerModalTab === "new" && (
+              <form onSubmit={handleCreateCustomer} className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1 text-xs">
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">
+                    Nombre del Cliente *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="Ej. Sra. Lupita Mendoza"
+                    value={newCustName}
+                    onChange={(e) => setNewCustName(e.target.value)}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-stone-700 block mb-1">
+                      Teléfono / WhatsApp
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="Ej. 55 1234 5678"
+                      value={newCustPhone}
+                      onChange={(e) => setNewCustPhone(e.target.value)}
+                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-stone-700 block mb-1">
+                      Tipo de Cliente
+                    </label>
+                    <select
+                      value={newCustType}
+                      onChange={(e) => setNewCustType(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="frecuente">Frecuente</option>
+                      <option value="mayoreo">Mayoreo</option>
+                      <option value="evento">Eventos / Banquetes</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">
+                    Dirección (Opcional - para entregas a domicilio)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Calle Morelos #45, Col. Centro"
+                    value={newCustAddress}
+                    onChange={(e) => setNewCustAddress(e.target.value)}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">
+                    Notas u Observaciones del Cliente (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Prefiere poco dulce, cliente recomendado"
+                    value={newCustNotes}
+                    onChange={(e) => setNewCustNotes(e.target.value)}
+                    className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-200">
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomerModalOpen(false)}
+                    className="px-4 py-2 text-stone-600 hover:text-stone-900 font-bold rounded-xl hover:bg-stone-100 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!newCustName.trim() || isSavingCustomer}
+                    className="px-5 py-2 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 text-stone-950 font-black rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{isSavingCustomer ? "Guardando..." : "Guardar y Seleccionar Cliente"}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

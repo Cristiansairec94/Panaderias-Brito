@@ -365,6 +365,14 @@ export function generateNextOrderNumber(): string {
   return `PED-${maxNum + 1}`;
 }
 
+function formatOrderDateTime(d: Date = new Date()): string {
+  try {
+    return d.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return `${d.toLocaleDateString("es-MX")} ${d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+}
+
 /**
  * Agrega un nuevo pedido al sistema y registra el anticipo en caja si aplica
  */
@@ -374,6 +382,8 @@ export function addCustomOrder(data: {
   customerId?: string;
   branchId: string;
   branchName: string;
+  operatingBranchId?: string;
+  operatingBranchName?: string;
   description: string;
   items: OrderItem[];
   deliveryDate: string;
@@ -399,14 +409,14 @@ export function addCustomOrder(data: {
   if (deposit > 0) {
     payments.push({
       id: `PAY-${orderNumber}-1`,
-      date: new Date().toLocaleDateString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+      date: formatOrderDateTime(),
       amount: deposit,
       paymentMethod: data.paymentMethod,
       cashier: data.cashier,
       notes: remaining === 0 ? "Pago total inmediato" : "Anticipo al levantar pedido",
     });
 
-    // Registrar en ingresos de caja
+    // Registrar en ingresos de caja de la sucursal de quien opera el turno
     recordOrderCashIncome({
       amount: deposit,
       orderNumber,
@@ -414,8 +424,8 @@ export function addCustomOrder(data: {
       customerName: data.customerName,
       customerId: data.customerId,
       cashier: data.cashier,
-      branchId: data.branchId,
-      branchName: data.branchName,
+      branchId: data.operatingBranchId || data.branchId,
+      branchName: data.operatingBranchName || data.branchName,
       paymentMethod: data.paymentMethod,
       isLiquidation: remaining === 0,
     });
@@ -461,6 +471,8 @@ export function addOrderPayment(
     amount: number;
     paymentMethod: "efectivo" | "tarjeta" | "transferencia";
     cashier: string;
+    operatingBranchId?: string;
+    operatingBranchName?: string;
     notes?: string;
     markAsDelivered?: boolean;
   }
@@ -480,7 +492,7 @@ export function addOrderPayment(
 
   const newPayment: OrderPayment = {
     id: `PAY-${order.orderNumber}-${(order.payments?.length || 0) + 1}`,
-    date: new Date().toLocaleDateString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+    date: formatOrderDateTime(),
     amount: paymentAmount,
     paymentMethod: params.paymentMethod,
     cashier: params.cashier,
@@ -496,7 +508,7 @@ export function addOrderPayment(
     order.status = "entregado";
   }
 
-  // Registrar en ingresos de caja
+  // Registrar en ingresos de caja de quien opera el turno
   recordOrderCashIncome({
     amount: paymentAmount,
     orderNumber: order.orderNumber,
@@ -504,8 +516,8 @@ export function addOrderPayment(
     customerName: order.customerName,
     customerId: order.customerId,
     cashier: params.cashier,
-    branchId: order.branchId,
-    branchName: order.branchName,
+    branchId: params.operatingBranchId || order.branchId,
+    branchName: params.operatingBranchName || order.branchName,
     paymentMethod: params.paymentMethod,
     isLiquidation: isFullLiquidation,
   });

@@ -502,7 +502,18 @@ export default function POSPage() {
   const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
   const [shiftModalTab, setShiftModalTab] = useState<"cuentas" | "cambio" | "corte" | "historial">("cambio");
   const [showIncomesModal, setShowIncomesModal] = useState(false);
-  const [incomesList, setIncomesList] = useState<CashIncome[]>([]);
+  const [incomesList, setIncomesList] = useState<CashIncome[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("brito_cash_incomes");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
   const [receiptIncome, setReceiptIncome] = useState<CashIncome | null>(null);
   const [showIncomeReceiptModal, setShowIncomeReceiptModal] = useState(false);
 
@@ -553,6 +564,7 @@ export default function POSPage() {
         console.error("Error al sincronizar ingresos en POS:", e);
       }
     };
+    handleIncomesUpdated();
     window.addEventListener("brito_incomes_updated", handleIncomesUpdated);
     return () => window.removeEventListener("brito_incomes_updated", handleIncomesUpdated);
   }, []);
