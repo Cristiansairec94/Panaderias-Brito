@@ -241,6 +241,14 @@ export default function TicketModal({
 
         {/* Printable Ticket Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-neutral-100">
+          <div className="flex items-center justify-center gap-1.5 mb-3 text-[11px] font-bold text-neutral-500 uppercase tracking-wider select-none">
+            <span>👁️</span>
+            <span>Vista Previa del Ticket Térmico</span>
+            <span className="text-[10px] bg-neutral-200 text-neutral-700 px-2 py-0.5 rounded-full font-semibold">
+              {printerConfig.paperWidth}
+            </span>
+          </div>
+
           <div
             ref={ticketRef}
             id="thermal-receipt"
@@ -443,31 +451,36 @@ export default function TicketModal({
 
         {/* Mensaje si no se detectó la impresora */}
         {printError && (
-          <div className="mx-4 mt-3 p-3 bg-rose-50 border-2 border-rose-400 rounded-2xl text-xs text-rose-900 flex items-center justify-between gap-2 shadow-sm animate-in fade-in">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
-              <div className="text-left leading-tight">
-                <span className="font-black block uppercase text-[10px] text-rose-700">Estado de Impresión</span>
-                <span className="font-bold text-rose-900">{printError}</span>
+          <div className="mx-4 mt-3 p-3.5 bg-rose-50 border-2 border-rose-400 rounded-2xl text-xs text-rose-900 shadow-sm animate-in fade-in space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                <div className="text-left leading-tight">
+                  <span className="font-black block uppercase text-[10px] text-rose-700">Estado de Impresión</span>
+                  <span className="font-bold text-rose-900">{printError}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handlePrint(false)}
+                  className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-sm cursor-pointer transition-all active:scale-95"
+                >
+                  Reintentar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrint(true)}
+                  className="px-2 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 font-semibold rounded-xl text-[11px] cursor-pointer"
+                  title="Abrir ventana de impresión manual si lo necesitas de emergencia"
+                >
+                  Manual
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => handlePrint(false)}
-                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-sm cursor-pointer transition-all active:scale-95"
-              >
-                Reintentar
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePrint(true)}
-                className="px-2 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 font-semibold rounded-xl text-[11px] cursor-pointer"
-                title="Abrir ventana de impresión manual si lo necesitas de emergencia"
-              >
-                Manual
-              </button>
-            </div>
+            <p className="text-[11px] text-rose-800 font-medium pl-7 bg-rose-100/60 p-2 rounded-xl border border-rose-200">
+              💡 <strong>Diagnóstico de hardware:</strong> Revisa que la impresora <strong>POS-58</strong> esté encendida con luz verde, tenga el rollo de papel insertado con la tapa trabada y el cable USB conectado.
+            </p>
           </div>
         )}
 
