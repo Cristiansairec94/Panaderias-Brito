@@ -42,12 +42,14 @@ import {
   ShieldCheck,
   Menu,
   Pencil,
+  Copy,
   TrendingUp,
   Barcode,
+  Printer,
   Wifi,
   WifiOff
 } from "lucide-react";
-import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
+import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
@@ -204,6 +206,26 @@ const DEFAULT_TRANSFER_ACCOUNTS: TransferAccount[] = [
     name: "Cobro Rápido Panadería Brito (STP / Terminal)",
     bank: "Mercado Pago / STP",
     clabe: "646 180 12345678901 2",
+  },
+];
+
+// Terminales bancarias y puntos de cobro con tarjeta
+const DEFAULT_CARD_TERMINALS: CardTerminalAccount[] = [
+  {
+    id: "term-1",
+    name: "Terminal Mostrador Principal (Mercado Pago)",
+    bank: "Mercado Pago / STP",
+    accountDestination: "Cuenta Principal Mostrador",
+    model: "Point Smart",
+    terminalNumber: "MP-98421",
+  },
+  {
+    id: "term-2",
+    name: "Terminal BBVA Clip",
+    bank: "BBVA Bancomer / Clip",
+    accountDestination: "Don Antonio Brito",
+    model: "Clip Pro",
+    terminalNumber: "CLIP-5510",
   },
 ];
 
@@ -382,6 +404,29 @@ export default function POSPage() {
   const selectedTransferAccount = useMemo(() => {
     return transferAccounts.find((acc) => acc.id === selectedTransferAccountId) || transferAccounts[0];
   }, [transferAccounts, selectedTransferAccountId]);
+
+  // Terminales y cuentas para cobro con tarjeta
+  const [cardTerminals] = useState<CardTerminalAccount[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("brito_card_terminals");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_CARD_TERMINALS;
+  });
+  const [selectedCardTerminalId, setSelectedCardTerminalId] = useState<string>(DEFAULT_CARD_TERMINALS[0].id);
+
+  const selectedCardTerminal = useMemo(() => {
+    return cardTerminals.find((t) => t.id === selectedCardTerminalId) || cardTerminals[0];
+  }, [cardTerminals, selectedCardTerminalId]);
+
+  // Referencia o autorización de pago (para tarjeta o SPEI)
+  const [paymentReference, setPaymentReference] = useState<string>("");
+  const [copiedClabe, setCopiedClabe] = useState<boolean>(false);
   
   // Shift & Cashier state
   const [cashierName, setCashierName] = useState(activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino");
@@ -591,7 +636,6 @@ export default function POSPage() {
 
   // Shift Lock State (Candado de Seguridad por Cierre de Turno)
   const [isShiftLocked, setIsShiftLocked] = useState(false);
-  const [shiftFundInput, setShiftFundInput] = useState<string>("");
 
   const lastCutInfo = useMemo(() => {
     if (typeof window !== "undefined") {
@@ -615,23 +659,10 @@ export default function POSPage() {
     return initialCashFund;
   }, [lastCutInfo, initialCashFund]);
 
-  // Sincronizar el cuadro editable cuando se bloquea la terminal o cambia baseShiftFund
-  useEffect(() => {
-    if (isShiftLocked) {
-      setShiftFundInput(baseShiftFund ? baseShiftFund.toString() : "0");
-    }
-  }, [isShiftLocked, baseShiftFund]);
-
-  const finalShiftFund = useMemo(() => {
-    if (!shiftFundInput.trim()) return 0;
-    const val = Number(shiftFundInput);
-    return isNaN(val) ? 0 : Math.max(0, val);
-  }, [shiftFundInput]);
-
   const handleDirectUnlockShift = () => {
-    setInitialCashFund(finalShiftFund);
+    setInitialCashFund(baseShiftFund);
     try {
-      localStorage.setItem("brito_pos_initial_fund", finalShiftFund.toString());
+      localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
       localStorage.removeItem("brito_pos_shift_locked");
     } catch (e) {}
     setIsShiftLocked(false);
@@ -1284,6 +1315,10 @@ export default function POSPage() {
         transferAccount: currentPaymentMethod === "transferencia" && selectedTransferAccount
           ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})`
           : undefined,
+        cardTerminal: currentPaymentMethod === "tarjeta" && selectedCardTerminal
+          ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})`
+          : undefined,
+        paymentReference: paymentReference.trim() || undefined,
         cashier: cashierName,
         cashGiven: currentCashGiven,
         change: currentChange,
@@ -1515,39 +1550,21 @@ export default function POSPage() {
             {/* Contenedor Principal de Información Financiera de Relevo */}
             <div className="bg-gradient-to-b from-[#24120a] to-[#1a0c06] border-2 border-amber-500/50 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
               
-              {/* 1. TARJETA PROMINENTE: CON CUÁNTO DINERO SE INICIARÁ EL TURNO (CUADRO DIRECTO PARA EDITAR) */}
-              <div className="bg-gradient-to-br from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 p-5 sm:p-6 rounded-3xl text-center space-y-3 shadow-xl ring-2 ring-amber-400/20 relative overflow-hidden">
+              {/* 1. TARJETA PROMINENTE: CON CUÁNTO DINERO SE INICIARÁ EL TURNO (NÚMERO FIJO NO EDITABLE) */}
+              <div className="bg-gradient-to-br from-amber-950/90 via-stone-900 to-amber-950/90 border-2 border-amber-400 p-5 sm:p-6 rounded-3xl text-center space-y-2 shadow-xl ring-2 ring-amber-400/20 relative overflow-hidden">
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
                 
                 <span className="text-xs sm:text-sm font-black uppercase text-amber-300 tracking-wider flex items-center justify-center gap-1.5">
                   <span>🪙</span> Con este dinero se iniciará el turno:
                 </span>
 
-                {/* EL CUADRO PARA EDITAR DIRECTO */}
-                <div className="relative max-w-sm mx-auto my-2">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-3xl sm:text-4xl text-amber-400 select-none">
-                    $
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={shiftFundInput}
-                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                    onChange={(e) => {
-                      setShiftFundInput(cleanDecimalNumbers(e.target.value));
-                    }}
-                    placeholder="0.00"
-                    className="w-full pl-12 pr-32 py-4 bg-black/65 border-2 border-amber-400 focus:border-amber-300 focus:ring-4 focus:ring-amber-400/30 rounded-2xl font-black text-4xl sm:text-5xl text-amber-300 text-center tracking-tight focus:outline-none transition-all shadow-inner"
-                  />
-                  {/* Leyenda en lugar de las opciones */}
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black select-none pointer-events-none">
-                    <Pencil className="w-3 h-3 text-amber-400" />
-                    <span>Editar texto</span>
-                  </div>
+                {/* NÚMERO FIJO NO EDITABLE */}
+                <div className="text-5xl sm:text-6xl font-black text-amber-300 tracking-tight py-2 filter drop-shadow-[0_4px_12px_rgba(245,158,11,0.35)] select-none">
+                  {formatCurrency(baseShiftFund)}
                 </div>
 
                 <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-200 text-[11px] font-bold px-3 py-1 rounded-full border border-amber-400/30">
-                  <span>Fondo Inicial disponible en el cajón para cambio</span>
+                  <span>Fondo Inicial establecido en el cajón para cambio</span>
                 </div>
               </div>
 
@@ -2633,7 +2650,7 @@ export default function POSPage() {
               {[
                 { id: "efectivo", label: "Efectivo", icon: DollarSign },
                 { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
-                { id: "transferencia", label: "Transferencia", icon: Send },
+                { id: "transferencia", label: "SPEI", icon: Send },
               ].map((m) => {
                 const Icon = m.icon;
                 const isSelected = paymentMethod === m.id;
@@ -2722,21 +2739,82 @@ export default function POSPage() {
             </div>
           )}
 
-          {/* Manejo de Tarjeta */}
+          {/* Manejo de Tarjeta con Despliegue de Cuentas y Terminales a Cobrar */}
           {paymentMethod === "tarjeta" && (
-            <div className="p-3 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-300/90 flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs">
-                  <CreditCard className="w-4 h-4" />
+            <div className="p-3.5 bg-gradient-to-br from-amber-50/95 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-400/90 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
+              <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs sm:text-sm font-black text-stone-900 leading-tight">
+                      Cobro con Tarjeta (Terminal Bancaria)
+                    </h5>
+                    <p className="text-[11px] text-stone-600 font-bold">
+                      Selecciona la terminal / cuenta de cobro
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h5 className="text-xs sm:text-sm font-black text-stone-900">Cobro con Tarjeta</h5>
-                  <p className="text-[11px] text-stone-600 font-bold">Cobrar en terminal bancaria</p>
+                <span className="text-xs sm:text-sm font-black text-amber-950 bg-amber-200/80 border border-amber-300 px-3 py-1 rounded-xl shadow-2xs">
+                  {formatCurrency(total)}
+                </span>
+              </div>
+
+              {/* Selector Desplegable de Terminales */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">
+                  Terminal / Cuenta a Cobrar:
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedCardTerminalId}
+                    onChange={(e) => setSelectedCardTerminalId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white text-stone-900 rounded-xl border-2 border-amber-400 focus:border-amber-600 font-black text-xs sm:text-sm focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
+                  >
+                    {cardTerminals.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} — {t.bank}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-stone-600 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </div>
-              <span className="font-black text-sm sm:text-base text-amber-950 bg-amber-200/80 px-3 py-1 rounded-xl border border-amber-300 shadow-2xs">
-                {formatCurrency(total)}
-              </span>
+
+              {/* Ficha Visual de la Terminal Seleccionada */}
+              {selectedCardTerminal && (
+                <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-2xs space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-stone-500 font-bold">Terminal de Cobro:</span>
+                    <span className="font-black text-stone-900">{selectedCardTerminal.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-stone-500 font-bold">Banco / Plataforma:</span>
+                    <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                      {selectedCardTerminal.bank}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-stone-100">
+                    <span className="text-stone-500 font-bold">Abono a Cuenta:</span>
+                    <span className="font-bold text-stone-800">{selectedCardTerminal.accountDestination}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Campo opcional de No. de Autorización / Voucher */}
+              <div className="pt-0.5">
+                <label className="block text-[10px] font-bold text-stone-600 mb-1">
+                  No. de Autorización / Voucher / Últimos 4 dígitos (Opcional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. AUTH-4912 o 5519"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 focus:border-amber-500 text-xs font-mono font-bold text-stone-900 focus:outline-none placeholder:font-normal placeholder:text-stone-400"
+                />
+              </div>
             </div>
           )}
 
@@ -2750,7 +2828,7 @@ export default function POSPage() {
                   </div>
                   <div>
                     <h5 className="text-xs sm:text-sm font-black text-stone-900 leading-tight">
-                      Pago por Transferencia
+                      Pago por Transferencia SPEI
                     </h5>
                     <p className="text-[11px] text-stone-600 font-bold">
                       Selecciona la cuenta de depósito
@@ -2785,7 +2863,7 @@ export default function POSPage() {
 
               {/* Ficha Visual con Datos de la Cuenta Seleccionada */}
               {selectedTransferAccount && (
-                <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-2xs space-y-1.5 text-xs">
+                <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-2xs space-y-2 text-xs">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-stone-500 font-bold">Depositar a:</span>
                     <span className="font-black text-stone-900">{selectedTransferAccount.name}</span>
@@ -2796,11 +2874,32 @@ export default function POSPage() {
                       {selectedTransferAccount.bank}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between pt-1 border-t border-stone-100">
-                    <span className="text-stone-600 font-bold">CLABE:</span>
-                    <span className="font-mono font-black text-stone-900 bg-stone-100 px-2.5 py-0.5 rounded-lg border border-stone-200 select-all tracking-wider">
-                      {selectedTransferAccount.clabe}
-                    </span>
+                  <div className="flex items-center justify-between pt-1.5 border-t border-stone-100 gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-stone-600 font-bold block text-[11px]">CLABE Interbancaria:</span>
+                      <span className="font-mono font-black text-stone-900 bg-stone-100 px-2 py-0.5 rounded-lg border border-stone-200 select-all tracking-wider text-xs block truncate">
+                        {selectedTransferAccount.clabe}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof navigator !== "undefined" && navigator.clipboard) {
+                          navigator.clipboard.writeText(selectedTransferAccount.clabe.replace(/\s+/g, ""));
+                          setCopiedClabe(true);
+                          setTimeout(() => setCopiedClabe(false), 2000);
+                        }
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+                        copiedClabe
+                          ? "bg-emerald-600 text-white"
+                          : "bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300"
+                      }`}
+                      title="Copiar CLABE al portapapeles"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{copiedClabe ? "¡Copiada!" : "Copiar"}</span>
+                    </button>
                   </div>
                   {selectedTransferAccount.accountNumber && (
                     <div className="flex items-center justify-between text-[11px] text-stone-500">
@@ -2810,6 +2909,20 @@ export default function POSPage() {
                   )}
                 </div>
               )}
+
+              {/* Campo opcional de Folio o Referencia SPEI */}
+              <div className="pt-0.5">
+                <label className="block text-[10px] font-bold text-stone-600 mb-1">
+                  Folio de Rastreo / Referencia SPEI (Opcional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. SPEI-88219 o nombre de quien transfiere"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 focus:border-amber-500 text-xs font-mono font-bold text-stone-900 focus:outline-none placeholder:font-normal placeholder:text-stone-400"
+                />
+              </div>
             </div>
           )}
 
@@ -2903,6 +3016,8 @@ export default function POSPage() {
           total={completedSale.total}
           paymentMethod={completedSale.paymentMethod}
           transferAccount={completedSale.transferAccount}
+          cardTerminal={completedSale.cardTerminal}
+          paymentReference={completedSale.paymentReference}
           cashGiven={completedSale.cashGiven}
           change={completedSale.change}
           cashierName={completedSale.cashier}

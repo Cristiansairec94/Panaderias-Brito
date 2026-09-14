@@ -32,6 +32,15 @@ export interface TransferAccount {
   accountNumber?: string;
 }
 
+export interface CardTerminalAccount {
+  id: string;
+  name: string;
+  bank: string;
+  accountDestination: string;
+  model?: string;
+  terminalNumber?: string;
+}
+
 export interface Sale {
   id: string;
   date: string;
@@ -39,6 +48,8 @@ export interface Sale {
   total: number;
   paymentMethod: "efectivo" | "tarjeta" | "transferencia";
   transferAccount?: string;
+  cardTerminal?: string;
+  paymentReference?: string;
   cashier: string;
   cashGiven?: number;
   change?: number;

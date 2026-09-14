@@ -17,6 +17,8 @@ interface TicketModalProps {
   total: number;
   paymentMethod: "efectivo" | "tarjeta" | "transferencia";
   transferAccount?: string;
+  cardTerminal?: string;
+  paymentReference?: string;
   cashGiven?: number;
   change?: number;
   cashierName?: string;
@@ -38,6 +40,8 @@ export default function TicketModal({
   total,
   paymentMethod,
   transferAccount,
+  cardTerminal,
+  paymentReference,
   cashGiven,
   change,
   cashierName = "Caja Principal - Don Toño",

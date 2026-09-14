@@ -169,6 +169,16 @@ export default function CreateOrderModal({
   const [deliveryTime, setDeliveryTime] = useState<string>("16:00");
   const [deliveryType, setDeliveryType] = useState<"sucursal" | "domicilio">("sucursal");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [pickupBranchId, setPickupBranchId] = useState<string>("");
+
+  // Sucursal seleccionada resuelta
+  const selectedPickupBranch = useMemo(() => {
+    return (
+      branches.find((b) => b.id === (pickupBranchId || activeBranch?.id)) ||
+      activeBranch ||
+      branches[0]
+    );
+  }, [branches, pickupBranchId, activeBranch]);
 
   // 4. Cobro del Anticipo (50% obligatorio)
   const [deposit, setDeposit] = useState<number | "">("");
@@ -215,12 +225,13 @@ export default function CreateOrderModal({
       setDeliveryDate(tomorrowStr);
       setDeliveryTime("16:00");
       setDeliveryType("sucursal");
+      setPickupBranchId(initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz");
       setDeliveryAddress("");
       setShowCatalog(false);
       setShowCustomerSearch(false);
       setPaymentMethod("efectivo");
     }
-  }, [isOpen, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone, tomorrowStr]);
+  }, [isOpen, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone, tomorrowStr, initialBranchId, activeBranch, branches]);
 
   // Cálculo del Total: Si hay items se suman, si no, toma customTotal
   const total = useMemo(() => {
@@ -395,13 +406,19 @@ export default function CreateOrderModal({
               },
             ];
 
+      // Determinar la sucursal de recolección elegida
+      const finalPickupBranch =
+        deliveryType === "sucursal"
+          ? (branches.find((b) => b.id === pickupBranchId) || activeBranch)
+          : activeBranch;
+
       // 2. CREACIÓN DEL PEDIDO (BASE CENTRAL)
       const newOrder = addCustomOrder({
         customerName: customerName.trim(),
         phone: customerPhone.trim() || "55 0000 0000",
         customerId: finalCustomerId || undefined,
-        branchId: activeBranch?.id || "branch-matriz",
-        branchName: activeBranch?.name || "Sucursal Matriz (Centro)",
+        branchId: finalPickupBranch?.id || "branch-matriz",
+        branchName: finalPickupBranch?.name || "Sucursal Matriz (Centro)",
         description: finalDescription,
         items: finalItems,
         deliveryDate: deliveryDate || tomorrowStr,
@@ -422,7 +439,7 @@ export default function CreateOrderModal({
             numericDeposit,
             paymentMethod,
             user?.name || "Cajero en Turno",
-            `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()}`
+            `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()} (${deliveryType === "sucursal" ? `Recoge en ${finalPickupBranch?.name}` : "A Domicilio"})`
           );
         } catch (saleErr) {
           console.warn("Could not record in registerRealSale:", saleErr);
@@ -432,12 +449,12 @@ export default function CreateOrderModal({
       // 4. NOTIFICACIÓN AUDITIVA Y VISUAL CON CHIME Y BANNER (CON RESGUARDO)
       try {
         addNotification({
-          senderName: `🎂 Pedido Apartado (${activeBranch?.name || "Sucursal"})`,
+          senderName: `🎂 Pedido Apartado (${finalPickupBranch?.name || "Sucursal"})`,
           senderAvatar: "🎂",
           badgeIcon: "pastel",
           title: `Nuevo Pedido ${newOrder.orderNumber}`,
           highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(numericDeposit)}`,
-          description: `${newOrder.description}. Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(newOrder.remainingBalance)}.`,
+          description: `${newOrder.description}. ${deliveryType === "sucursal" ? `Recoge en: ${finalPickupBranch?.name}. ` : "Entrega a domicilio. "}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(newOrder.remainingBalance)}.`,
           category: "pedidos",
           actionLabel: "Ver Pedidos",
           actionLink: "/pedidos",
@@ -739,7 +756,7 @@ export default function CreateOrderModal({
             {/* Atajos rápidos de fecha */}
             <div>
               <label className="text-xs font-bold text-stone-600 block mb-1.5">Atajos rápidos:</label>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
                   onClick={() => handleSetQuickDate(0)}
@@ -753,13 +770,6 @@ export default function CreateOrderModal({
                   className="py-1.5 px-2 bg-white hover:bg-amber-100/70 border border-stone-300 rounded-xl text-xs font-extrabold text-stone-700 transition-colors"
                 >
                   Mañana
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetQuickDate(2)}
-                  className="py-1.5 px-2 bg-white hover:bg-amber-100/70 border border-stone-300 rounded-xl text-xs font-extrabold text-stone-700 transition-colors"
-                >
-                  En 2 días
                 </button>
                 <button
                   type="button"
@@ -801,7 +811,7 @@ export default function CreateOrderModal({
                 <button
                   type="button"
                   onClick={() => setDeliveryType("sucursal")}
-                  className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     deliveryType === "sucursal"
                       ? "bg-stone-900 text-white border-stone-900 shadow-sm"
                       : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
@@ -812,7 +822,7 @@ export default function CreateOrderModal({
                 <button
                   type="button"
                   onClick={() => setDeliveryType("domicilio")}
-                  className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     deliveryType === "domicilio"
                       ? "bg-stone-900 text-white border-stone-900 shadow-sm"
                       : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
@@ -822,14 +832,130 @@ export default function CreateOrderModal({
                 </button>
               </div>
 
+              {/* Si es A Domicilio: campo de dirección */}
               {deliveryType === "domicilio" && (
-                <input
-                  type="text"
-                  placeholder="Calle, número, colonia y referencias de entrega..."
-                  value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 animate-in fade-in"
-                />
+                <div className="space-y-1 animate-in fade-in duration-150">
+                  <label className="text-xs font-bold text-stone-700 block">
+                    Dirección de entrega a domicilio:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Calle, número, colonia y referencias de entrega..."
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 animate-in fade-in"
+                  />
+                </div>
+              )}
+
+              {/* Si es Recoge en Tienda: desplegamos las sucursales disponibles */}
+              {deliveryType === "sucursal" && (
+                <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold text-stone-800 flex items-center gap-1.5">
+                      <Store className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Sucursales disponibles para recoger:</span>
+                    </label>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                      {branches.length} {branches.length === 1 ? "tienda disponible" : "tiendas disponibles"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {branches.map((br) => {
+                      const isSelected = selectedPickupBranch?.id === br.id;
+                      const isCurrentStore = br.id === activeBranch?.id;
+
+                      return (
+                        <button
+                          key={br.id}
+                          type="button"
+                          onClick={() => setPickupBranchId(br.id)}
+                          className={`p-2.5 rounded-xl text-left border-2 transition-all flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
+                            isSelected
+                              ? "bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20 shadow-xs"
+                              : "bg-white border-stone-200 hover:border-stone-300 hover:bg-stone-50"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <div className="min-w-0 flex-1">
+                              <span
+                                className={`text-xs font-black block leading-snug truncate ${
+                                  isSelected ? "text-amber-950" : "text-stone-900"
+                                }`}
+                              >
+                                {br.name}
+                              </span>
+                              {br.address && (
+                                <p className="text-[10px] text-stone-500 flex items-start gap-1 leading-tight line-clamp-2 mt-0.5">
+                                  <MapPin className="w-3 h-3 text-stone-400 shrink-0 mt-0.5" />
+                                  <span>{br.address}</span>
+                                </p>
+                              )}
+                            </div>
+                            <div className="shrink-0 mt-0.5">
+                              {isSelected ? (
+                                <CheckCircle2 className="w-4 h-4 text-amber-600 fill-amber-100" />
+                              ) : (
+                                <div className="w-4 h-4 rounded-full border-2 border-stone-300 group-hover:border-stone-400 bg-white" />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1 border-t border-stone-100 text-[9px]">
+                            {isCurrentStore ? (
+                              <span className="font-extrabold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                                📍 Esta tienda
+                              </span>
+                            ) : (
+                              <span className="text-stone-400 font-medium truncate">
+                                {br.phone ? `📞 ${br.phone}` : "Brito"}
+                              </span>
+                            )}
+
+                            {br.status === "abierta" ? (
+                              <span className="font-bold text-emerald-700 flex items-center gap-1 shrink-0">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Abierta
+                              </span>
+                            ) : (
+                              <span className="font-bold text-stone-400 shrink-0">Cerrada</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Badge informativo de sucursal elegida */}
+                  {selectedPickupBranch && (
+                    <div className="p-2.5 bg-amber-50 border border-amber-200/90 rounded-xl flex items-center justify-between text-xs text-amber-950">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base shrink-0">🏬</span>
+                        <div className="min-w-0">
+                          <p className="font-bold text-[11px] leading-tight">
+                            Recolección en mostrador:{" "}
+                            <span className="font-black text-amber-900">{selectedPickupBranch.name}</span>
+                          </p>
+                          {selectedPickupBranch.address && (
+                            <p className="text-[10px] text-amber-800/80 truncate">
+                              {selectedPickupBranch.address}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {selectedPickupBranch.id !== activeBranch?.id ? (
+                        <span className="text-[9px] font-black uppercase bg-amber-200 text-amber-950 px-2 py-0.5 rounded shrink-0">
+                          ⚠️ Otra Tienda
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded shrink-0">
+                          Esta Tienda
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
