@@ -281,7 +281,7 @@ export default function SucursalesPage() {
   }, [branchesOverview, branches]);
 
   return (
-    <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12 px-3 sm:px-6 lg:px-8">
+    <div className="w-full space-y-5 sm:space-y-6 pb-12">
       {/* Top Header Banner */}
       <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-stone-800">
         <div className="absolute -right-12 -top-12 w-80 h-80 bg-orange-500/20 rounded-full blur-3xl pointer-events-none" />

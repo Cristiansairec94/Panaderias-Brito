@@ -314,7 +314,7 @@ export default function ProductosPage() {
   };
 
   return (
-    <div className="p-3 sm:p-6 md:p-8 space-y-4 sm:space-y-8 max-w-7xl mx-auto select-none">
+    <div className="w-full space-y-5 sm:space-y-6 select-none">
       {/* Toast notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-amber-500/40 flex items-center gap-3 animate-in slide-in-from-bottom-5">

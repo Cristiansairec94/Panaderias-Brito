@@ -199,7 +199,7 @@ export default function Home() {
   }, [branches]);
 
   return (
-    <div className="p-4 sm:p-7 space-y-7 max-w-7xl mx-auto">
+    <div className="w-full space-y-5 sm:space-y-6">
       {/* Top Hero: Official Deep Charcoal & Onyx with Warm Brito Orange & Crimson Accents */}
       <div className="relative overflow-hidden bg-gradient-to-br from-[#0c0d14] via-[#12141f] to-[#090a0f] rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-white/[0.08]">
         {/* Glow ambient spots */}

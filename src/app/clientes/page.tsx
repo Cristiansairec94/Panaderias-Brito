@@ -317,7 +317,7 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="px-2 sm:px-4 lg:px-6 py-4 sm:py-6 w-full max-w-[1650px] mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-200">
+    <div className="w-full space-y-4 sm:space-y-5 animate-in fade-in duration-200">
       {/* Notificación Flotante */}
       {successNotice && (
         <div className="fixed top-6 right-6 z-50 bg-stone-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-amber-500 animate-in slide-in-from-top-4">

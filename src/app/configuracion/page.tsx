@@ -236,7 +236,7 @@ function ConfiguracionContent() {
   };
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="w-full space-y-5 sm:space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -412,7 +412,7 @@ function ConfiguracionContent() {
 
       {/* Tab: Sucursales & Puntos de Venta */}
       {activeTab === "sucursales" && (
-        <div className="space-y-6 max-w-7xl animate-in fade-in">
+        <div className="space-y-6 w-full animate-in fade-in">
           {/* Header Action Bar */}
           <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>

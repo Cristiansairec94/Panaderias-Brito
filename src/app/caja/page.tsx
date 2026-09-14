@@ -534,7 +534,7 @@ export default function CajaPage() {
   };
 
   return (
-    <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="w-full space-y-5 sm:space-y-6">
       {/* Banner de Sincronización y Estado Offline */}
       {isSyncing && (
         <div className="bg-amber-500/10 border border-amber-500/30 text-amber-900 px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
