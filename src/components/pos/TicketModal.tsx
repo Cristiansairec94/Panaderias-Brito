@@ -131,38 +131,53 @@ export default function TicketModal({
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-      const res = await fetch("http://127.0.0.1:9191/print", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          printerName: printerConfig.selectedPrinterName || "POS-58",
-          folio,
-          date: formattedDate,
-          cashier: cashierName,
-          customerName: customerName || "Público en General",
-          customerType,
-          paymentMethod,
-          transferAccount,
-          branchName: branchName || "Panaderías Brito",
-          branchPhone: branchPhone || "Don Antonio Brito & Hijos",
-          branchAddress,
-          items: items.map((it) => ({
-            name: it.product.name,
-            quantity: it.quantity,
-            price: it.product.price,
-            subtotal: it.product.price * it.quantity,
-          })),
-          total,
-          cashGiven,
-          change,
-        }),
-        signal: controller.signal,
-      });
+      const payload = {
+        printerName: printerConfig.selectedPrinterName || "POS-58",
+        folio,
+        date: formattedDate,
+        cashier: cashierName,
+        customerName: customerName || "Público en General",
+        customerType,
+        paymentMethod,
+        transferAccount,
+        branchName: branchName || "Panaderías Brito",
+        branchPhone: branchPhone || "Don Antonio Brito & Hijos",
+        branchAddress,
+        items: items.map((it) => ({
+          name: it.product.name,
+          quantity: it.quantity,
+          price: it.product.price,
+          subtotal: it.product.price * it.quantity,
+        })),
+        total,
+        cashGiven,
+        change,
+      };
+
+      let res: Response | null = null;
+      try {
+        res = await fetch("http://127.0.0.1:9191/print", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } catch (err1) {
+        try {
+          res = await fetch("http://localhost:9191/print", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
+        } catch (err2) {}
+      }
+
       clearTimeout(timeoutId);
 
-      if (res.ok) {
+      if (res && res.ok) {
         const json = await res.json();
         if (json && json.success) {
           printedDirectly = true;

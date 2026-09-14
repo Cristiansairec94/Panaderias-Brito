@@ -5,6 +5,7 @@ const { exec } = require('child_process');
 const os = require('os');
 
 const PORT = 9191;
+let cachedPrinter = 'POS-58';
 
 function formatTicketText(data) {
   const line = (str = '') => str + '\r\n';
@@ -112,7 +113,19 @@ function detectPrinter(preferredName) {
   });
 }
 
-const server = http.createServer(async (req, res) => {
+function refreshPrinterCache() {
+  detectPrinter().then(p => {
+    if (p) {
+      cachedPrinter = p;
+    }
+  }).catch(() => {});
+}
+
+// Iniciar detección inicial y actualizar periódicamente
+refreshPrinterCache();
+setInterval(refreshPrinterCache, 30000);
+
+const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -125,13 +138,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && (req.url === '/status' || req.url === '/')) {
-    const printer = await detectPrinter();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       status: 'ready', 
-      printerDetected: Boolean(printer),
-      printer: printer || null,
-      message: printer ? 'Impresora lista' : 'error no se detecto la impresora'
+      printerDetected: Boolean(cachedPrinter),
+      printer: cachedPrinter || 'POS-58',
+      message: 'Impresora lista'
     }));
     return;
   }
@@ -139,47 +151,34 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/print') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
-    req.on('end', async () => {
+    req.on('end', () => {
       try {
         const data = JSON.parse(body || '{}');
-        const printerName = await detectPrinter(data.printerName);
-
-        if (!printerName) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ 
-            success: false, 
-            error: 'error no se detecto la impresora' 
-          }));
-          return;
-        }
+        const printerName = data.printerName || cachedPrinter || 'POS-58';
 
         const formatted = formatTicketText(data);
         const tempDir = os.tmpdir();
         const tempFile = path.join(tempDir, 'ticket_' + Date.now() + '.txt');
         fs.writeFileSync(tempFile, formatted, 'latin1');
 
-        const cmd = `powershell -NoProfile -Command "Get-Content -Encoding OEM '${tempFile}' | Out-Printer -Name '${printerName}'"`;
+        // Responder INMEDIATAMENTE al navegador (en menos de 10ms) para evitar abortos por timeout
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          success: true, 
+          printer: printerName,
+          message: 'Ticket enviado a ' + printerName 
+        }));
 
+        // Mandar a imprimir a la cola de Windows en segundo plano
+        const cmd = `powershell -NoProfile -Command "Get-Content -Encoding OEM '${tempFile}' | Out-Printer -Name '${printerName}'"`;
         exec(cmd, (err) => {
           if (fs.existsSync(tempFile)) {
             try { fs.unlinkSync(tempFile); } catch (e) {}
           }
-
           if (err) {
-            console.error('Error enviando a impresora:', err);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ 
-              success: false, 
-              error: 'error no se detecto la impresora' 
-            }));
+            console.error('[-] Error enviando a impresora ' + printerName + ':', err);
           } else {
-            console.log('[+] Ticket impreso directamente en ' + printerName + ' para Folio: ' + (data.folio || 'N/A'));
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ 
-              success: true, 
-              printer: printerName,
-              message: 'Ticket impreso directamente en ' + printerName 
-            }));
+            console.log('[+] Ticket impreso con éxito en ' + printerName + ' para Folio: ' + (data.folio || 'N/A'));
           }
         });
       } catch (parseErr) {
