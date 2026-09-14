@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Printer, CheckCircle, X, Receipt, Settings2, Zap } from "lucide-react";
+import { Printer, CheckCircle, X, Receipt, Settings2, Zap, AlertTriangle } from "lucide-react";
 import { CartItem } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { playCashRegisterSound } from "@/lib/sound";
@@ -91,7 +91,7 @@ export default function TicketModal({
       if (autoPrint && !hasPrintedRef.current) {
         hasPrintedRef.current = true;
         const timer = setTimeout(() => {
-          handlePrint();
+          handlePrint(false);
         }, 300);
         return () => clearTimeout(timer);
       }
@@ -110,19 +110,34 @@ export default function TicketModal({
   const folio = saleId ? saleId.slice(-6).toUpperCase() : `POS-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const [printed, setPrinted] = React.useState(false);
+  const [printError, setPrintError] = React.useState<string | null>(null);
 
-  const handlePrint = async () => {
+  const handlePrint = async (forceBrowserDialog = false) => {
+    setPrintError(null);
+
+    if (forceBrowserDialog) {
+      setPrinted(true);
+      window.print();
+      setTimeout(() => {
+        setPrinted(false);
+        onClose();
+      }, 1000);
+      return;
+    }
+
     setPrinted(true);
-
     let printedDirectly = false;
+    let errorMsg = "";
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
 
       const res = await fetch("http://127.0.0.1:9191/print", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          printerName: printerConfig.selectedPrinterName || "POS-58",
           folio,
           date: formattedDate,
           cashier: cashierName,
@@ -151,23 +166,28 @@ export default function TicketModal({
         const json = await res.json();
         if (json && json.success) {
           printedDirectly = true;
+        } else {
+          errorMsg = json?.error || "error no se detecto la impresora";
         }
+      } else {
+        errorMsg = "error no se detecto la impresora";
       }
     } catch (err) {
-      // Local print bridge not available
+      errorMsg = "error no se detecto la impresora";
     }
 
-    if (!printedDirectly) {
-      window.print();
-    }
-
-    setTimeout(() => {
-      setPrinted(false);
+    if (printedDirectly) {
       try {
         playCashRegisterSound();
       } catch (e) {}
-      onClose();
-    }, 1000);
+      setTimeout(() => {
+        setPrinted(false);
+        onClose();
+      }, 800);
+    } else {
+      setPrinted(false);
+      setPrintError(errorMsg || "error no se detecto la impresora");
+    }
   };
 
   return (
@@ -406,6 +426,36 @@ export default function TicketModal({
           </span>
         </div>
 
+        {/* Mensaje si no se detectó la impresora */}
+        {printError && (
+          <div className="mx-4 mt-3 p-3 bg-rose-50 border-2 border-rose-400 rounded-2xl text-xs text-rose-900 flex items-center justify-between gap-2 shadow-sm animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+              <div className="text-left leading-tight">
+                <span className="font-black block uppercase text-[10px] text-rose-700">Estado de Impresión</span>
+                <span className="font-bold text-rose-900">{printError}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => handlePrint(false)}
+                className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-sm cursor-pointer transition-all active:scale-95"
+              >
+                Reintentar
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePrint(true)}
+                className="px-2 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 font-semibold rounded-xl text-[11px] cursor-pointer"
+                title="Abrir ventana de impresión manual si lo necesitas de emergencia"
+              >
+                Manual
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="p-4 bg-white border-t border-neutral-200 space-y-2.5">
 
@@ -413,7 +463,7 @@ export default function TicketModal({
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
-              onClick={handlePrint}
+              onClick={() => handlePrint(false)}
               className={`flex items-center justify-center gap-2 py-3.5 px-3 font-bold rounded-2xl text-xs sm:text-sm shadow-md border transition-all active:scale-95 cursor-pointer ${
                 printed
                   ? "bg-emerald-700 text-white border-emerald-600 animate-pulse"

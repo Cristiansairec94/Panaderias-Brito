@@ -5,7 +5,6 @@ const { exec } = require('child_process');
 const os = require('os');
 
 const PORT = 9191;
-const PRINTER_NAME = 'POS-58';
 
 function formatTicketText(data) {
   const line = (str = '') => str + '\r\n';
@@ -86,10 +85,38 @@ function formatTicketText(data) {
   return out;
 }
 
-const server = http.createServer((req, res) => {
+function detectPrinter(preferredName) {
+  return new Promise((resolve) => {
+    const psScript = `
+      $all = Get-Printer -ErrorAction SilentlyContinue;
+      if (-not $all) { exit 1 }
+      $pref = '${(preferredName || '').replace(/'/g, "''")}';
+      if ($pref) {
+        $found = $all | Where-Object { $_.Name -eq $pref };
+        if ($found) { ($found | Select-Object -First 1).Name; exit 0 }
+      }
+      $pos = $all | Where-Object { $_.Name -like '*POS*' -or $_.Name -like '*58*' -or $_.Name -like '*Thermal*' };
+      if ($pos) { ($pos | Select-Object -First 1).Name; exit 0 }
+      $def = $all | Where-Object { $_.Default -eq $true };
+      if ($def) { ($def | Select-Object -First 1).Name; exit 0 }
+      ($all | Select-Object -First 1).Name
+    `;
+
+    exec(`powershell -NoProfile -Command "${psScript.replace(/\r?\n/g, ' ')}"`, (err, stdout) => {
+      if (err || !stdout || !stdout.trim()) {
+        resolve(null);
+      } else {
+        resolve(stdout.trim());
+      }
+    });
+  });
+}
+
+const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -97,25 +124,41 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === 'GET' && req.url === '/status') {
+  if (req.method === 'GET' && (req.url === '/status' || req.url === '/')) {
+    const printer = await detectPrinter();
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ready', printer: PRINTER_NAME }));
+    res.end(JSON.stringify({ 
+      status: 'ready', 
+      printerDetected: Boolean(printer),
+      printer: printer || null,
+      message: printer ? 'Impresora lista' : 'error no se detecto la impresora'
+    }));
     return;
   }
 
   if (req.method === 'POST' && req.url === '/print') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
+    req.on('end', async () => {
       try {
         const data = JSON.parse(body || '{}');
-        const formatted = formatTicketText(data);
+        const printerName = await detectPrinter(data.printerName);
 
+        if (!printerName) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ 
+            success: false, 
+            error: 'error no se detecto la impresora' 
+          }));
+          return;
+        }
+
+        const formatted = formatTicketText(data);
         const tempDir = os.tmpdir();
         const tempFile = path.join(tempDir, 'ticket_' + Date.now() + '.txt');
         fs.writeFileSync(tempFile, formatted, 'latin1');
 
-        const cmd = 'powershell -NoProfile -Command "Get-Content -Encoding OEM \'' + tempFile + '\' | Out-Printer -Name \'' + PRINTER_NAME + '\'"';
+        const cmd = `powershell -NoProfile -Command "Get-Content -Encoding OEM '${tempFile}' | Out-Printer -Name '${printerName}'"`;
 
         exec(cmd, (err) => {
           if (fs.existsSync(tempFile)) {
@@ -125,16 +168,23 @@ const server = http.createServer((req, res) => {
           if (err) {
             console.error('Error enviando a impresora:', err);
             res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: err.message }));
+            res.end(JSON.stringify({ 
+              success: false, 
+              error: 'error no se detecto la impresora' 
+            }));
           } else {
-            console.log('[+] Ticket impreso directamente en ' + PRINTER_NAME + ' para Folio: ' + (data.folio || 'N/A'));
+            console.log('[+] Ticket impreso directamente en ' + printerName + ' para Folio: ' + (data.folio || 'N/A'));
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, message: 'Ticket impreso en ' + PRINTER_NAME }));
+            res.end(JSON.stringify({ 
+              success: true, 
+              printer: printerName,
+              message: 'Ticket impreso directamente en ' + printerName 
+            }));
           }
         });
       } catch (parseErr) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: parseErr.message }));
+        res.end(JSON.stringify({ success: false, error: 'Datos de ticket inválidos' }));
       }
     });
     return;

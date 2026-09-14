@@ -18,8 +18,8 @@ body {
 
 @media print {
   @page {
-    size: auto;
-    margin: 5mm auto !important;
+    size: 58mm auto;
+    margin: 0 !important;
   }
   *, *::before, *::after {
     -webkit-print-color-adjust: exact !important;
@@ -33,6 +33,7 @@ body {
     width: 100% !important;
     height: auto !important;
     display: block !important;
+    overflow: visible !important;
     text-align: center !important;
   }
   body * {
@@ -46,22 +47,23 @@ body {
   }
   #thermal-receipt,
   #printable-ticket {
-    position: relative !important;
-    left: auto !important;
-    right: auto !important;
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
     top: 0 !important;
     margin: 0 auto !important;
     width: 100% !important;
-    max-width: 80mm !important;
-    padding: 4mm 3mm !important;
-    border: 1px dashed #444 !important;
-    border-radius: 4px !important;
+    max-width: 58mm !important;
+    padding: 2mm 3mm !important;
+    border: none !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
     background: white !important;
     color: black !important;
     font-size: 11px !important;
     box-sizing: border-box !important;
     text-align: left !important;
+    z-index: 9999999 !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
   }
