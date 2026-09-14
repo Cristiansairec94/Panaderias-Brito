@@ -501,8 +501,8 @@ export default function Sidebar() {
                 isCollapsed ? "justify-center p-2.5" : "justify-between p-3.5"
               } rounded-2xl font-bold text-xs transition-all shadow-xl group active:scale-95 ${
                 isPosActive
-                  ? "bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 text-white ring-2 ring-emerald-400/60 shadow-lg shadow-emerald-500/40 font-black"
-                  : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black shadow-lg shadow-emerald-950/50 border border-emerald-400/30 hover:shadow-emerald-500/20"
+                  ? "bg-gradient-to-r from-amber-500 via-orange-600 to-rose-600 text-white ring-2 ring-amber-300 shadow-lg shadow-orange-500/40 font-black"
+                  : "bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 hover:from-amber-400 hover:to-orange-500 text-white font-black shadow-lg shadow-orange-950/50 border border-amber-300/40 hover:shadow-orange-500/30"
               }`}
               title="Punto de Venta Mostrador (POS)"
             >
@@ -513,7 +513,7 @@ export default function Sidebar() {
                 {!isCollapsed && (
                   <div className="text-left">
                     <p className="leading-tight font-black tracking-tight text-white">Punto de Venta</p>
-                    <p className="text-[9px] font-medium text-emerald-100">Caja Mostrador (POS)</p>
+                    <p className="text-[9px] font-medium text-amber-100">Caja Mostrador (POS)</p>
                   </div>
                 )}
               </div>
