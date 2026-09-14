@@ -61,6 +61,7 @@ export default function TicketModal({
   });
 
   const hasPrintedRef = useRef(false);
+  const ticketRef = useRef<HTMLDivElement>(null);
 
   const toggleAutoPrint = () => {
     const nextVal = !autoPrint;
