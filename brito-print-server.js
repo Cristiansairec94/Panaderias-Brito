@@ -8,43 +8,40 @@ const PORT = 9191;
 let cachedPrinter = 'POS-58';
 
 function formatTicketText(data) {
+  // Ancho exacto para papel térmico de 58mm: 28 caracteres por línea para evitar cortes laterales
+  const W = 28;
   const line = (str = '') => str + '\r\n';
-  const divider = () => '--------------------------------\r\n';
-  const doubleDivider = () => '================================\r\n';
-  const center = (text, width = 32) => {
-    if (text.length >= width) return text.slice(0, width) + '\r\n';
-    const left = Math.floor((width - text.length) / 2);
-    return ' '.repeat(left) + text + '\r\n';
+  const divider = () => '----------------------------\r\n';
+  const doubleDivider = () => '============================\r\n';
+  const center = (text, width = W) => {
+    const t = String(text || '').slice(0, width);
+    if (t.length >= width) return t + '\r\n';
+    const left = Math.floor((width - t.length) / 2);
+    return ' '.repeat(left) + t + '\r\n';
   };
-  const row = (left, right, width = 32) => {
-    const l = String(left);
-    const r = String(right);
+  const row = (left, right, width = W) => {
+    const r = String(right || '');
+    const maxL = Math.max(1, width - r.length - 1);
+    const l = String(left || '').slice(0, maxL);
     const spaces = Math.max(1, width - l.length - r.length);
     return l + ' '.repeat(spaces) + r + '\r\n';
   };
 
   let out = '';
   out += center('PANADERIAS BRITO');
-  out += center('Tradicion & Sabor Familiar');
+  out += center('Tradicion & Sabor');
   if (data.branchName) out += center(data.branchName);
-  if (data.branchAddress) out += center(data.branchAddress);
-  if (data.branchPhone) out += center(data.branchPhone);
+  if (data.branchPhone) out += center('Tel: ' + data.branchPhone);
   out += divider();
 
   out += row('FOLIO: #' + (data.folio || '000000'), '');
-  out += row('FECHA:', data.date || new Date().toLocaleString('es-MX'));
-  out += row('CLIENTE:', (data.customerName || 'Publico en General').slice(0, 20));
-  if (data.customerType && data.customerType !== 'general') {
-    out += row('TIPO CLIENTE:', '[' + data.customerType.toUpperCase() + ']');
-  }
-  out += row('ATENDIO:', (data.cashier || 'Don Tono Brito').slice(0, 20));
-  out += row('PAGO:', '[ ' + (data.paymentMethod || 'EFECTIVO').toUpperCase() + ' ]');
-  if (data.transferAccount) {
-    out += row('CUENTA DEP:', data.transferAccount.slice(0, 19));
-  }
+  out += row('FECHA:', String(data.date || new Date().toLocaleTimeString('es-MX')).slice(0, 18));
+  out += row('CLIENTE:', String(data.customerName || 'General').slice(0, 18));
+  out += row('ATENDIO:', String(data.cashier || 'Don Tono').slice(0, 18));
+  out += row('PAGO:', '[ ' + String(data.paymentMethod || 'EFECTIVO').toUpperCase() + ' ]');
   out += divider();
 
-  out += row('CANT / PRODUCTO', 'IMPORTE');
+  out += row('CANT/PRODUCTO', 'IMPORTE');
   out += divider();
 
   if (Array.isArray(data.items)) {
@@ -56,30 +53,27 @@ function formatTicketText(data) {
       const subtotal = '$' + Number(item.subtotal || (item.price * qty) || 0).toFixed(2);
       
       const prefix = qty + 'x ' + name;
-      if (prefix.length + subtotal.length >= 31) {
-        out += line(prefix);
+      if (prefix.length + subtotal.length >= 27) {
+        out += line(prefix.slice(0, 27));
         out += row('', subtotal);
       } else {
         out += row(prefix, subtotal);
       }
     }
     out += divider();
-    out += row('Total de piezas:', totalPieces + ' pzas');
+    out += row('Total piezas:', totalPieces + ' pzas');
   }
 
   out += doubleDivider();
-  out += row('TOTAL A PAGAR:', '$' + Number(data.total || 0).toFixed(2));
+  out += row('TOTAL:', '$' + Number(data.total || 0).toFixed(2));
   if (data.cashGiven !== undefined && data.cashGiven !== null && data.cashGiven !== '') {
-    out += row('Efectivo recibido:', '$' + Number(data.cashGiven || 0).toFixed(2));
+    out += row('Efectivo:', '$' + Number(data.cashGiven || 0).toFixed(2));
     out += row('SU CAMBIO:', '$' + Number(data.change || 0).toFixed(2));
   }
   out += doubleDivider();
 
-  out += line('');
-  out += center('GRACIAS POR SU PREFERENCIA!');
-  out += center('Horneado artesanal con amor');
+  out += center('GRACIAS POR SU COMPRA!');
   out += center('Panaderias Brito');
-  out += line('');
   out += line('');
   out += line('');
 
@@ -121,7 +115,6 @@ function refreshPrinterCache() {
   }).catch(() => {});
 }
 
-// Iniciar detección inicial y actualizar periódicamente
 refreshPrinterCache();
 setInterval(refreshPrinterCache, 30000);
 
@@ -161,7 +154,6 @@ const server = http.createServer((req, res) => {
         const tempFile = path.join(tempDir, 'ticket_' + Date.now() + '.txt');
         fs.writeFileSync(tempFile, formatted, 'latin1');
 
-        // Responder INMEDIATAMENTE al navegador (en menos de 10ms) para evitar abortos por timeout
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
           success: true, 
@@ -169,7 +161,6 @@ const server = http.createServer((req, res) => {
           message: 'Ticket enviado a ' + printerName 
         }));
 
-        // Mandar a imprimir a la cola de Windows en segundo plano
         const cmd = `powershell -NoProfile -Command "Get-Content -Encoding OEM '${tempFile}' | Out-Printer -Name '${printerName}'"`;
         exec(cmd, (err) => {
           if (fs.existsSync(tempFile)) {

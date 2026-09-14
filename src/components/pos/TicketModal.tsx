@@ -252,33 +252,31 @@ export default function TicketModal({
           <div
             ref={ticketRef}
             id="thermal-receipt"
-            className={`bg-white p-4 sm:p-5 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3 mx-auto ${
-              printerConfig.paperWidth === "80mm" ? "max-w-md" : "max-w-sm"
+            className={`bg-white p-3.5 sm:p-4 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-2 mx-auto ${
+              printerConfig.paperWidth === "80mm" ? "max-w-md" : "max-w-xs"
             }`}
           >
-            {/* Business Header con Logotipo Oficial en escala de grises de alto contraste */}
-            <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3">
-              {/* Logotipo Oficial Panaderías Brito (Filtrado para B&N térmico) */}
-              <div className="flex justify-center mb-1">
+            {/* Business Header con Logotipo Oficial */}
+            <div className="text-center space-y-1 border-b-2 border-dashed border-black pb-2">
+              <div className="flex justify-center mb-0.5">
                 <img
                   src="/logo.svg"
                   alt="Panadería Brito Logo"
-                  className="w-16 h-16 object-contain filter grayscale contrast-200"
+                  className="w-10 h-10 object-contain filter grayscale contrast-200"
                 />
               </div>
-              <h1 className="font-black text-base sm:text-lg tracking-wider uppercase text-black font-mono leading-none">
+              <h1 className="font-black text-sm tracking-wider uppercase text-black font-mono leading-none">
                 PANADERÍAS BRITO
               </h1>
-              <div className="inline-block border border-black px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-black">
+              <div className="inline-block text-[9px] font-bold uppercase tracking-wider text-black">
                 Tradición & Sabor Familiar
               </div>
-              <p className="text-xs font-bold text-black font-sans mt-1">{branchName}</p>
-              {branchAddress && (
-                <p className="text-[10px] text-neutral-700 font-sans leading-tight px-3">{branchAddress}</p>
+              <p className="text-[11px] font-bold text-black font-sans leading-tight">{branchName}</p>
+              {branchPhone && (
+                <p className="text-[9px] text-neutral-800 font-sans">
+                  Tel: {branchPhone}
+                </p>
               )}
-              <p className="text-[10px] text-neutral-800 font-sans font-semibold">
-                {branchPhone ? `Tel: ${branchPhone}` : "Don Antonio Brito & Hijos"}
-              </p>
             </div>
 
             {/* Ticket Metadata (Folio, Fecha, Atendió, Pago) */}
@@ -382,50 +380,14 @@ export default function TicketModal({
               )}
             </div>
 
-            {/* Horarios de Pan Calientito (Optimizado para B&N: Letras Grandes y Claridad Total) */}
-            <div className="p-3 border-2 border-black rounded-xl text-center space-y-1 font-sans bg-white my-2">
-              <div className="flex items-center justify-center gap-1 text-xs font-black text-black uppercase tracking-wider">
-                <span>★</span>
-                <span>¡PAN CALIENTITO RECIÉN HORNEADO!</span>
-                <span>★</span>
-              </div>
-              <p className="text-xs sm:text-sm font-black text-black">
-                🥐 De 6:00 AM a 10:00 PM 🥐
+            {/* Pie de Ticket Compacto Térmico */}
+            <div className="text-center pt-2 space-y-1 font-sans border-t-2 border-dashed border-black">
+              <p className="font-black text-black text-xs uppercase tracking-wider">
+                ¡GRACIAS POR SU PREFERENCIA!
               </p>
-              <p className="text-[9px] text-neutral-700 uppercase font-semibold">
-                Horneado continuo todos los días
+              <p className="text-[10px] text-neutral-700 font-bold">
+                Panaderías Brito • Tradición & Sabor Familiar
               </p>
-            </div>
-
-            {/* Pedidos Especiales y Agradecimiento (Encuadre B&N limpio) */}
-            <div className="text-center pt-2 space-y-2.5 font-sans border-t-2 border-dashed border-black">
-              <div className="space-y-2 border-2 border-black rounded-xl p-3.5 bg-neutral-50">
-                <p className="text-sm sm:text-base font-black text-black uppercase tracking-wider flex items-center justify-center gap-1.5">
-                  <span>🎉</span>
-                  <span>¿TIENES FIESTA, REUNIÓN O EVENTO?</span>
-                  <span>🎂</span>
-                </p>
-                <p className="text-sm sm:text-[15px] font-extrabold text-black leading-snug px-1">
-                  ¡Endulzamos tus mejores momentos! Horneamos pedidos especiales para consentir a tus invitados con el auténtico sabor tradicional.
-                </p>
-                <div className="pt-1">
-                  <span className="inline-block px-3.5 py-2 bg-white text-black font-black text-xs sm:text-sm rounded-xl border-2 border-black uppercase tracking-wide shadow-2xs">
-                    ✨ PEDIDOS ESPECIALES CON 50% DE ANTICIPO EN MOSTRADOR ✨
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-1 space-y-0.5">
-                <p className="font-black text-black text-sm tracking-wide uppercase">
-                  ¡GRACIAS POR SU PREFERENCIA!
-                </p>
-                <p className="text-[10px] font-bold text-neutral-600">
-                  Consérvese en un lugar fresco y seco • Panaderías Brito
-                </p>
-                <p className="text-[8px] text-neutral-500 uppercase tracking-widest pt-0.5">
-                  Comprobante simplificado de venta
-                </p>
-              </div>
             </div>
           </div>
         </div>

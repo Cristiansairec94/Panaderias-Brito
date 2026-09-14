@@ -52,20 +52,27 @@ body {
     right: 0 !important;
     top: 0 !important;
     margin: 0 auto !important;
-    width: 100% !important;
-    max-width: 58mm !important;
-    padding: 2mm 3mm !important;
+    width: 48mm !important;
+    max-width: 48mm !important;
+    padding: 1mm 1.5mm !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     background: white !important;
     color: black !important;
-    font-size: 11px !important;
+    font-size: 9.5px !important;
+    line-height: 1.25 !important;
     box-sizing: border-box !important;
     text-align: left !important;
     z-index: 9999999 !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
+  }
+  #thermal-receipt img,
+  #printable-ticket img {
+    max-width: 28px !important;
+    max-height: 28px !important;
+    margin: 0 auto 2px auto !important;
   }
 }
 
