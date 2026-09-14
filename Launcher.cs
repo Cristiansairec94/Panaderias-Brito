@@ -99,6 +99,34 @@ namespace PanaderiaBrito
             }
         }
 
+        private static void EnsureKioskPrintingPreferences(string profileDir)
+        {
+            try
+            {
+                string defaultDir = Path.Combine(profileDir, "Default");
+                Directory.CreateDirectory(defaultDir);
+                string prefFile = Path.Combine(defaultDir, "Preferences");
+
+                string targetPrinter = "POS-58";
+
+                if (File.Exists(prefFile))
+                {
+                    string content = File.ReadAllText(prefFile);
+                    if (content.Contains("Microsoft Print to PDF"))
+                    {
+                        content = content.Replace("Microsoft Print to PDF", targetPrinter);
+                        File.WriteAllText(prefFile, content);
+                    }
+                }
+                else
+                {
+                    string printerSnippet = "{\"printing\":{\"print_preview_sticky_settings\":{\"appState\":\"{\\\"version\\\":2,\\\"recentDestinations\\\":[{\\\"id\\\":\\\"" + targetPrinter + "\\\",\\\"origin\\\":\\\"local\\\",\\\"displayName\\\":\\\"" + targetPrinter + "\\\",\\\"printerStatus\\\":\\\"printerStatusReady\\\",\\\"extensionId\\\":\\\"\\\",\\\"extensionName\\\":\\\"\\\"}],\\\"dpi\\\":{},\\\"duplexType\\\":\\\"LONG_EDGE\\\",\\\"mediaSize\\\":{},\\\"marginsType\\\":1,\\\"isColorEnabled\\\":false,\\\"isHeaderFooterEnabled\\\":false,\\\"isLandscapeEnabled\\\":false,\\\"isCollateEnabled\\\":true,\\\"isCssBackgroundEnabled\\\":true,\\\"scaling\\\":\\\"100\\\",\\\"vendorOptions\\\":{}}\"}}}";
+                    File.WriteAllText(prefFile, printerSnippet);
+                }
+            }
+            catch { }
+        }
+
         private static void LaunchAppWindow(string url)
         {
             string edge86 = @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe";
@@ -118,8 +146,9 @@ namespace PanaderiaBrito
                 string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 string profileDir = Path.Combine(appData, "PanaderiaBrito", "AppProfile");
                 Directory.CreateDirectory(profileDir);
+                EnsureKioskPrintingPreferences(profileDir);
 
-                string arguments = string.Format("--app=\"{0}\" --user-data-dir=\"{1}\" --window-size=1400,900 --start-maximized", url, profileDir);
+                string arguments = string.Format("--app=\"{0}\" --user-data-dir=\"{1}\" --window-size=1400,900 --start-maximized --kiosk-printing", url, profileDir);
                 ProcessStartInfo psi = new ProcessStartInfo(browser, arguments)
                 {
                     UseShellExecute = false

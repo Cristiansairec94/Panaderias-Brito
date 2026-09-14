@@ -52,20 +52,22 @@ export default function TicketModal({
   branchPhone = "55 1234 5678",
   date,
 }: TicketModalProps) {
-  const ticketRef = useRef<HTMLDivElement>(null);
   const [autoPrint, setAutoPrint] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("brito_autoprint_direct");
+      const saved = localStorage.getItem("brito_autoprint_direct") || localStorage.getItem("brito_pos_auto_print");
       return saved !== null ? saved === "true" : true;
     }
     return true;
   });
+
+  const hasPrintedRef = useRef(false);
 
   const toggleAutoPrint = () => {
     const nextVal = !autoPrint;
     setAutoPrint(nextVal);
     if (typeof window !== "undefined") {
       localStorage.setItem("brito_autoprint_direct", String(nextVal));
+      localStorage.setItem("brito_pos_auto_print", String(nextVal));
     }
   };
 
@@ -82,6 +84,20 @@ export default function TicketModal({
     window.addEventListener("brito_printer_config_updated", handleUpdate);
     return () => window.removeEventListener("brito_printer_config_updated", handleUpdate);
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (autoPrint && !hasPrintedRef.current) {
+        hasPrintedRef.current = true;
+        const timer = setTimeout(() => {
+          handlePrint();
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      hasPrintedRef.current = false;
+    }
+  }, [isOpen, autoPrint]);
 
   if (!isOpen) return null;
 
@@ -162,6 +178,7 @@ export default function TicketModal({
             <Receipt className="w-5 h-5 text-amber-400 shrink-0" />
             <div>
               <span className="font-bold text-sm block leading-tight">Comprobante de Venta</span>
+<<<<<<< HEAD
               <div className="flex items-center gap-1 text-[10px] text-amber-300/90 font-normal">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
                 <span>Impresora: <strong>{printerConfig.selectedPrinterName}</strong> ({printerConfig.paperWidth})</span>
@@ -176,6 +193,11 @@ export default function TicketModal({
                   </button>
                 )}
               </div>
+=======
+              <span className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
+                <Zap className="w-3 h-3 fill-amber-400" /> Impresión Directa a POS-58
+              </span>
+>>>>>>> 486b1b4 (feat: habilitar impresion directa y silenciosa omitiendo ventana de vista previa)
             </div>
           </div>
           <button
@@ -391,6 +413,7 @@ export default function TicketModal({
 
         {/* Action Buttons */}
         <div className="p-4 bg-white border-t border-neutral-200 space-y-2.5">
+
           {/* Fila principal: Imprimir y Siguiente Cliente */}
           <div className="grid grid-cols-2 gap-2.5">
             <button

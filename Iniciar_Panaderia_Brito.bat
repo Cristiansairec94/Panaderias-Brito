@@ -43,8 +43,8 @@ echo   NOTA: Mantener esta ventana abierta mientras se use el sistema.
 echo ======================================================================
 echo.
 
-:: Abrir navegador automaticamente tras 3 segundos
-start "" powershell -NoProfile -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:3000'"
+:: Abrir navegador automaticamente tras 3 segundos con impresion directa
+start "" powershell -NoProfile -Command "Start-Sleep -Seconds 3; if (Test-Path 'PanaderiaBrito.exe') { Start-Process 'PanaderiaBrito.exe' 'http://localhost:3000/pos' } else { Start-Process 'http://localhost:3000/pos' }"
 
 :: Ejecutar Next.js
 call npm run dev

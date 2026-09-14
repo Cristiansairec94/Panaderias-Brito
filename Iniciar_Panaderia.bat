@@ -20,8 +20,8 @@ if not exist ".env.local" (
     )
 )
 
-:: Abrir navegador automáticamente tras 2 segundos
-start "" /b cmd /c "timeout /t 3 /nobreak >nul & start http://localhost:3000"
+:: Abrir navegador automáticamente tras 3 segundos con impresión directa
+start "" /b cmd /c "timeout /t 3 /nobreak >nul & if exist PanaderiaBrito.exe (start PanaderiaBrito.exe http://localhost:3000/pos) else (start http://localhost:3000/pos)"
 
 :: Iniciar servidor Next.js
 if exist ".next" (

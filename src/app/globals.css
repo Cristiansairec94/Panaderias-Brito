@@ -1,16 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Satisfy&family=Pacifico&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-.font-brito-script {
-  font-family: var(--font-satisfy), 'Satisfy', var(--font-dancing), 'Dancing Script', 'Pacifico', cursive;
-}
-
 :root {
   --background: #fdfbf7;
   --foreground: #2d1810;
+  --brito-amber: #d97706;
+  --brito-orange: #ea580c;
+  --brito-gold: #f59e0b;
 }
 
 body {
@@ -22,46 +19,49 @@ body {
 @media print {
   @page {
     size: auto;
-    margin: 0mm !important;
+    margin: 5mm auto !important;
   }
-
   *, *::before, *::after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-
   html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: white !important;
     color: black !important;
+    width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    text-align: center !important;
   }
-
   body * {
     visibility: hidden !important;
   }
-
   #thermal-receipt,
   #thermal-receipt *,
   #printable-ticket,
   #printable-ticket * {
     visibility: visible !important;
   }
-
   #thermal-receipt,
   #printable-ticket {
-    position: absolute !important;
-    left: 0 !important;
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
     top: 0 !important;
-    width: 80mm !important;
-    max-width: 100% !important;
     margin: 0 auto !important;
-    padding: 4mm !important;
-    border: none !important;
-    border-radius: 0 !important;
+    width: 100% !important;
+    max-width: 80mm !important;
+    padding: 4mm 3mm !important;
+    border: 1px dashed #444 !important;
+    border-radius: 4px !important;
     box-shadow: none !important;
     background: white !important;
     color: black !important;
+    font-size: 11px !important;
+    box-sizing: border-box !important;
+    text-align: left !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
   }
@@ -89,47 +89,14 @@ body {
   border-radius: 9999px;
   border: 2px solid #ede8e1;
   box-shadow: 0 1px 3px rgba(45, 24, 16, 0.2);
-  transition: background 0.2s ease, transform 0.1s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #d97706 0%, #b45309 100%);
-  box-shadow: 0 2px 5px rgba(180, 83, 9, 0.4);
+  background: linear-gradient(180deg, #d97706 0%, #b45309 50%, #92400e 100%);
 }
 
-::-webkit-scrollbar-thumb:active {
-  background: #78350f;
-}
-
-/* Ocultar botones de flecha toscos por defecto del navegador */
-::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
+/* Firefox */
 * {
   scrollbar-width: thin;
   scrollbar-color: #d97706 #ede8e1;
 }
-
-html, body {
-  scroll-behavior: smooth;
-}
-
-/* Ocultar flechas / spinners en inputs numéricos en todos los navegadores */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-input[type="number"] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
