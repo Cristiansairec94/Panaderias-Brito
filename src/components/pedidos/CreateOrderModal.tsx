@@ -861,7 +861,7 @@ export default function CreateOrderModal({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-1">
                     {branches.map((br) => {
                       const isSelected = selectedPickupBranch?.id === br.id;
                       const isCurrentStore = br.id === activeBranch?.id;

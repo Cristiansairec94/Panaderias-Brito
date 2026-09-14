@@ -96,47 +96,40 @@
       scroll-behavior: smooth;
     }
     
+    @page {
+      size: auto;
+      margin: 0mm !important;
+    }
+
     @media print {
-      @page {
-        size: 58mm auto;
-        margin: 0mm !important;
-      }
-      *, *::before, *::after {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
       html, body {
-        width: 58mm !important;
-        max-width: 58mm !important;
         margin: 0 !important;
         padding: 0 !important;
-        background: white !important;
-        color: black !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
       body * {
         visibility: hidden !important;
       }
-      #printable-ticket, #printable-ticket *,
-      #thermal-receipt, #thermal-receipt * {
+      #printable-ticket, #printable-ticket *, #thermal-receipt, #thermal-receipt * {
         visibility: visible !important;
       }
-      #printable-ticket,
-      #thermal-receipt {
+      #printable-ticket, #thermal-receipt {
         position: absolute !important;
         left: 0 !important;
         top: 0 !important;
-        width: 54mm !important;
-        max-width: 54mm !important;
-        box-sizing: border-box !important;
-        margin: 0 auto !important;
-        padding: 1.5mm 1mm 8mm 1mm !important;
+        width: 80mm !important;
+        max-width: 80mm !important;
+        margin: 0 !important;
+        padding: 4mm !important;
         background: white !important;
         color: black !important;
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
-        font-size: 10.5px !important;
-        line-height: 1.25 !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
       }
     }
   </style>
@@ -574,6 +567,60 @@
       }
     ];
 
+    const DEFAULT_TRANSFER_ACCOUNTS = [
+      {
+        id: "cta-1",
+        name: "Don Antonio Brito (Don Toño)",
+        bank: "BBVA Bancomer",
+        clabe: "012 180 01598423012 5",
+        accountNumber: "159 842 3012",
+      },
+      {
+        id: "cta-2",
+        name: "Lupita Brito",
+        bank: "Banorte",
+        clabe: "072 180 00847291104 8",
+        accountNumber: "084 729 1104",
+      },
+      {
+        id: "cta-3",
+        name: "Panaderías Brito (Cuenta Fiscal)",
+        bank: "Santander México",
+        clabe: "014 180 06550914321 3",
+        accountNumber: "655 091 4321",
+      },
+      {
+        id: "cta-4",
+        name: "Cobro Rápido Panadería Brito (STP / Terminal)",
+        bank: "Mercado Pago / STP",
+        clabe: "646 180 12345678901 2",
+      },
+    ];
+
+    const DEFAULT_CARD_TERMINALS = [
+      {
+        id: "term-1",
+        name: "Terminal 1 - Mercado Pago Point (Don Toño)",
+        bank: "Mercado Pago / BBVA",
+        accountDestination: "Don Antonio Brito (Cuenta Principal)",
+        model: "Point Smart 4G",
+      },
+      {
+        id: "term-2",
+        name: "Terminal 2 - BBVA Bancomer (Matriz)",
+        bank: "BBVA México",
+        accountDestination: "Panaderías Brito Sucursal Matriz",
+        model: "Terminal Bancaria Fija",
+      },
+      {
+        id: "term-3",
+        name: "Terminal 3 - Clip Total / Santander (Fiscal)",
+        bank: "Santander / Clip",
+        accountDestination: "Panaderías Brito S.A. de C.V. (Fiscal)",
+        model: "Clip Total con Impresora",
+      },
+    ];
+
     function App() {
       const [products, setProducts] = useState(() => {
         const saved = localStorage.getItem("brito_products_v2");
@@ -585,6 +632,34 @@
       const [search, setSearch] = useState("");
       const [paymentMethod, setPaymentMethod] = useState("efectivo");
       const [cashGiven, setCashGiven] = useState("");
+
+      // Cuentas y Terminales para Cobro
+      const [transferAccounts] = useState(() => {
+        try {
+          const saved = localStorage.getItem("brito_transfer_accounts");
+          if (saved) return JSON.parse(saved);
+        } catch(e) {}
+        return DEFAULT_TRANSFER_ACCOUNTS;
+      });
+      const [selectedTransferAccountId, setSelectedTransferAccountId] = useState(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+      const selectedTransferAccount = useMemo(() => {
+        return transferAccounts.find((a) => a.id === selectedTransferAccountId) || transferAccounts[0];
+      }, [transferAccounts, selectedTransferAccountId]);
+
+      const [cardTerminals] = useState(() => {
+        try {
+          const saved = localStorage.getItem("brito_card_terminals");
+          if (saved) return JSON.parse(saved);
+        } catch(e) {}
+        return DEFAULT_CARD_TERMINALS;
+      });
+      const [selectedCardTerminalId, setSelectedCardTerminalId] = useState(DEFAULT_CARD_TERMINALS[0].id);
+      const selectedCardTerminal = useMemo(() => {
+        return cardTerminals.find((t) => t.id === selectedCardTerminalId) || cardTerminals[0];
+      }, [cardTerminals, selectedCardTerminalId]);
+
+      const [paymentReference, setPaymentReference] = useState("");
+      const [copiedClabe, setCopiedClabe] = useState(false);
 
       // Barcode Scanner State
       const [barcodeInput, setBarcodeInput] = useState("");
@@ -704,8 +779,72 @@
       // Modals
       const [showTicket, setShowTicket] = useState(false);
       const [ticketPrinted, setTicketPrinted] = useState(false);
+      const [autoPrintDirect, setAutoPrintDirect] = useState(() => {
+        try {
+          const saved = localStorage.getItem("brito_autoprint_direct");
+          return saved !== null ? saved === "true" : true;
+        } catch(e) { return true; }
+      });
+
+      const toggleAutoPrintDirect = () => {
+        const next = !autoPrintDirect;
+        setAutoPrintDirect(next);
+        try {
+          localStorage.setItem("brito_autoprint_direct", String(next));
+        } catch(e) {}
+      };
+
+      useEffect(() => {
+        if (showTicket && completedSale && autoPrintDirect) {
+          const timer = setTimeout(() => {
+            window.print();
+          }, 350);
+          return () => clearTimeout(timer);
+        }
+      }, [showTicket, completedSale, autoPrintDirect]);
+
       const [showExpenses, setShowExpenses] = useState(false);
       const [showBreadDelivery, setShowBreadDelivery] = useState(false);
+      const [showBreadOrdersDrawer, setShowBreadOrdersDrawer] = useState(false);
+      const [customOrders, setCustomOrders] = useState(() => {
+        try {
+          const raw = localStorage.getItem("brito_custom_orders");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          }
+        } catch(e) {}
+        return [
+          {
+            id: "PED-101",
+            orderNumber: "PED-101",
+            customerName: "Sra. María González",
+            phone: "55 1234 5678",
+            description: "50 Conchas de vainilla y 50 Bolillos para fiesta",
+            deliveryDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+            deliveryTime: "08:30",
+            status: "pendiente",
+            total: 650,
+            deposit: 350,
+            remainingBalance: 300,
+            notes: "Pan caliente recién salido a las 8:30 AM",
+          }
+        ];
+      });
+      const [orderCustomerName, setOrderCustomerName] = useState("");
+      const [orderCustomerPhone, setOrderCustomerPhone] = useState("");
+      const [orderDeliveryDate, setOrderDeliveryDate] = useState(() => {
+        const d = new Date(Date.now() + 86400000);
+        return d.toISOString().split("T")[0];
+      });
+      const [orderDeliveryTime, setOrderDeliveryTime] = useState("08:00");
+      const [orderItemsList, setOrderItemsList] = useState([]);
+      const [orderCustomDesc, setOrderCustomDesc] = useState("");
+      const [orderCustomTotal, setOrderCustomTotal] = useState("");
+      const [orderDepositInput, setOrderDepositInput] = useState("");
+      const [orderPaymentMethod, setOrderPaymentMethod] = useState("efectivo");
+      const [orderNotes, setOrderNotes] = useState("");
+      const [orderActiveTab, setOrderActiveTab] = useState("new");
       const [showDrawerModal, setShowDrawerModal] = useState(false);
       const [showCategoryPanel, setShowCategoryPanel] = useState(false);
       const [showOperationsMenu, setShowOperationsMenu] = useState(false);
@@ -1069,6 +1208,13 @@
           items: [...cart],
           total,
           paymentMethod,
+          transferAccount: paymentMethod === "transferencia" && selectedTransferAccount
+            ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})`
+            : undefined,
+          cardTerminal: paymentMethod === "tarjeta" && selectedCardTerminal
+            ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})`
+            : undefined,
+          paymentReference: paymentReference.trim() || undefined,
           cashier: cashierName,
           cashGiven: paymentMethod === "efectivo" ? parsedCash : undefined,
           change: paymentMethod === "efectivo" ? change : undefined,
@@ -1086,6 +1232,9 @@
         setCart([]);
         setCashGiven("");
         setPaymentMethod("efectivo");
+        setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+        setSelectedCardTerminalId(DEFAULT_CARD_TERMINALS[0].id);
+        setPaymentReference("");
         setSelectedCustomer(DEFAULT_CUSTOMERS_DATA[0]);
         setShowTicket(false);
         setCompletedSale(null);
@@ -1416,6 +1565,20 @@
                       </span>
                     )}
                     <span className="text-sm text-stone-400">▾</span>
+                  </button>
+
+                  {/* Botón Pedidos de Pan (Mínimo 50% Anticipo) */}
+                  <button
+                    type="button"
+                    onClick={() => setShowBreadOrdersDrawer(true)}
+                    className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border-2 border-amber-600/50 bg-[#3e2723] hover:bg-stone-900 text-amber-50 text-xs sm:text-sm font-bold transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
+                    title="Hacer o consultar pedidos y encargos de pan con anticipo mínimo del 50%"
+                  >
+                    <span className="text-base">🥖</span>
+                    <span>Pedidos de Pan</span>
+                    <span className="text-[10px] bg-amber-500 text-stone-950 font-black px-1.5 py-0.5 rounded-full shadow-xs">
+                      50% Anticipo
+                    </span>
                   </button>
 
                   {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
@@ -2133,7 +2296,7 @@
                   {[
                     { id: "efectivo", label: "Efectivo", icon: "💵" },
                     { id: "tarjeta", label: "Tarjeta", icon: "💳" },
-                    { id: "transferencia", label: "Transf.", icon: "📱" },
+                    { id: "transferencia", label: "SPEI", icon: "📱" },
                   ].map((m) => {
                     const isSelected = paymentMethod === m.id;
                     return (
@@ -2209,6 +2372,192 @@
                         </span>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Manejo de Tarjeta con Despliegue de Cuentas y Terminales a Cobrar */}
+              {paymentMethod === "tarjeta" && (
+                <div className="p-3.5 bg-gradient-to-br from-amber-50/95 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-400/90 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs text-base">
+                        💳
+                      </div>
+                      <div>
+                        <h5 className="text-xs sm:text-sm font-black text-stone-900 leading-tight">
+                          Cobro con Tarjeta (Terminal Bancaria)
+                        </h5>
+                        <p className="text-[11px] text-stone-600 font-bold">
+                          Selecciona la terminal / cuenta de cobro
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs sm:text-sm font-black text-amber-950 bg-amber-200/80 border border-amber-300 px-3 py-1 rounded-xl shadow-2xs">
+                      {formatCurrency(total)}
+                    </span>
+                  </div>
+
+                  {/* Selector Desplegable de Terminales */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">
+                      Terminal / Cuenta a Cobrar:
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedCardTerminalId}
+                        onChange={(e) => setSelectedCardTerminalId(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white text-stone-900 rounded-xl border-2 border-amber-400 focus:border-amber-600 font-black text-xs sm:text-sm focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
+                      >
+                        {cardTerminals.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} — {t.bank}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-stone-600 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none font-bold text-xs">▼</span>
+                    </div>
+                  </div>
+
+                  {/* Ficha Visual de la Terminal Seleccionada */}
+                  {selectedCardTerminal && (
+                    <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-2xs space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-stone-500 font-bold">Terminal de Cobro:</span>
+                        <span className="font-black text-stone-900">{selectedCardTerminal.name}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-stone-500 font-bold">Banco / Plataforma:</span>
+                        <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                          {selectedCardTerminal.bank}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-stone-100">
+                        <span className="text-stone-500 font-bold">Abono a Cuenta:</span>
+                        <span className="font-bold text-stone-800">{selectedCardTerminal.accountDestination}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Campo opcional de No. de Autorización / Voucher */}
+                  <div className="pt-0.5">
+                    <label className="block text-[10px] font-bold text-stone-600 mb-1">
+                      No. de Autorización / Voucher / Últimos 4 dígitos (Opcional):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. AUTH-4912 o 5519"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 focus:border-amber-500 text-xs font-mono font-bold text-stone-900 focus:outline-none placeholder:font-normal placeholder:text-stone-400"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Manejo de Transferencia con Selector Desplegable de Cuentas */}
+              {paymentMethod === "transferencia" && (
+                <div className="p-3.5 bg-gradient-to-br from-amber-50/95 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-400/90 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 text-white rounded-xl shadow-xs text-base">
+                        📱
+                      </div>
+                      <div>
+                        <h5 className="text-xs sm:text-sm font-black text-stone-900 leading-tight">
+                          Pago por Transferencia SPEI
+                        </h5>
+                        <p className="text-[11px] text-stone-600 font-bold">
+                          Selecciona la cuenta de depósito
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs sm:text-sm font-black text-amber-950 bg-amber-200/80 border border-amber-300 px-3 py-1 rounded-xl shadow-2xs">
+                      {formatCurrency(total)}
+                    </span>
+                  </div>
+
+                  {/* Opción Desplegable de Cuentas con Nombres de a Quién Depositar */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-stone-700 uppercase tracking-wider">
+                      ¿A quién va a depositar? (Cuenta / Beneficiario):
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedTransferAccountId}
+                        onChange={(e) => setSelectedTransferAccountId(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white text-stone-900 rounded-xl border-2 border-amber-400 focus:border-amber-600 font-black text-xs sm:text-sm focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
+                      >
+                        {transferAccounts.map((acc) => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.name} — {acc.bank}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-stone-600 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none font-bold text-xs">▼</span>
+                    </div>
+                  </div>
+
+                  {/* Ficha Visual con Datos de la Cuenta Seleccionada */}
+                  {selectedTransferAccount && (
+                    <div className="bg-white rounded-xl p-3 border border-amber-200 shadow-2xs space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-stone-500 font-bold">Depositar a:</span>
+                        <span className="font-black text-stone-900">{selectedTransferAccount.name}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-stone-500 font-bold">Banco:</span>
+                        <span className="font-extrabold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                          {selectedTransferAccount.bank}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1.5 border-t border-stone-100 gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-stone-600 font-bold block text-[11px]">CLABE Interbancaria:</span>
+                          <span className="font-mono font-black text-stone-900 bg-stone-100 px-2 py-0.5 rounded-lg border border-stone-200 select-all tracking-wider text-xs block truncate">
+                            {selectedTransferAccount.clabe}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (navigator.clipboard) {
+                              navigator.clipboard.writeText(selectedTransferAccount.clabe.replace(/\s+/g, ""));
+                              setCopiedClabe(true);
+                              setTimeout(() => setCopiedClabe(false), 2000);
+                            }
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+                            copiedClabe
+                              ? "bg-emerald-600 text-white"
+                              : "bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300"
+                          }`}
+                          title="Copiar CLABE al portapapeles"
+                        >
+                          <span>{copiedClabe ? "✓ ¡Copiada!" : "📋 Copiar"}</span>
+                        </button>
+                      </div>
+                      {selectedTransferAccount.accountNumber && (
+                        <div className="flex items-center justify-between text-[11px] text-stone-500">
+                          <span>No. Cuenta:</span>
+                          <span className="font-mono font-bold text-stone-800">{selectedTransferAccount.accountNumber}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Campo opcional de Folio o Referencia SPEI */}
+                  <div className="pt-0.5">
+                    <label className="block text-[10px] font-bold text-stone-600 mb-1">
+                      Folio de Rastreo / Referencia SPEI (Opcional):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. SPEI-88219 o nombre de quien transfiere"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 focus:border-amber-500 text-xs font-mono font-bold text-stone-900 focus:outline-none placeholder:font-normal placeholder:text-stone-400"
+                    />
                   </div>
                 </div>
               )}
@@ -2330,6 +2679,38 @@
                           [ {completedSale.paymentMethod} ]
                         </span>
                       </div>
+                      {completedSale.paymentMethod === "transferencia" && (
+                        <div className="space-y-0.5 border-t border-dotted border-black pt-1">
+                          {completedSale.transferAccount && (
+                            <div className="flex justify-between text-[10px]">
+                              <span className="font-bold text-black">CUENTA DEPÓSITO:</span>
+                              <span className="font-black text-black text-right max-w-[190px] truncate">{completedSale.transferAccount}</span>
+                            </div>
+                          )}
+                          {completedSale.paymentReference && (
+                            <div className="flex justify-between text-[10px]">
+                              <span className="font-bold text-black">REF. SPEI:</span>
+                              <span className="font-mono font-bold text-black">{completedSale.paymentReference}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {completedSale.paymentMethod === "tarjeta" && (
+                        <div className="space-y-0.5 border-t border-dotted border-black pt-1">
+                          <div className="flex justify-between text-[10px]">
+                            <span className="font-bold text-black">TERMINAL / CUENTA:</span>
+                            <span className="font-black text-black text-right max-w-[190px] truncate">
+                              {completedSale.cardTerminal || "Terminal Principal"}
+                            </span>
+                          </div>
+                          {completedSale.paymentReference && (
+                            <div className="flex justify-between text-[10px]">
+                              <span className="font-bold text-black">NO. AUTORIZACIÓN:</span>
+                              <span className="font-mono font-bold text-black">{completedSale.paymentReference}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Detalle de Productos */}
@@ -2437,6 +2818,22 @@
                       </div>
                     </div>
                   </div>
+                {/* Barra de Impresión Directa en Segundo Plano */}
+                <div className="px-5 py-2.5 bg-amber-50/90 border-t border-amber-200/80 flex items-center justify-between text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoPrintDirect}
+                      onChange={toggleAutoPrintDirect}
+                      className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                    />
+                    <span className="font-bold text-stone-800 flex items-center gap-1.5">
+                      <span>⚡</span> Auto-impresión directa en segundo plano
+                    </span>
+                  </label>
+                  <span className="text-[10px] font-bold text-amber-900 bg-amber-200/80 px-2 py-0.5 rounded-full">
+                    {autoPrintDirect ? "Activo ⚡ (Sin Diálogo)" : "Manual"}
+                  </span>
                 </div>
 
                 <div className="p-4 bg-white border-t border-stone-200 space-y-2.5">
@@ -2523,6 +2920,7 @@
                   >
                     <span className="text-sm font-bold text-rose-600">✕</span>
                     <span>Cancelar Ticket (Anular compra y reponer panes)</span>
+>>>>>>> origin/main
                   </button>
                 </div>
               </div>
@@ -2714,6 +3112,493 @@
               </div>
             </div>
           )}
+
+          {/* DRAWER DESLIZABLE: PEDIDOS DE PAN CON MÍNIMO 50% DE ANTICIPO */}
+          {showBreadOrdersDrawer && (() => {
+            const orderTotal = orderItemsList.length > 0
+              ? orderItemsList.reduce((acc, it) => acc + it.subtotal, 0)
+              : (Number(orderCustomTotal) || 0);
+            const minDeposit = orderTotal > 0 ? Math.ceil(orderTotal * 0.5) : 0;
+            const numDeposit = Number(orderDepositInput) || 0;
+            const isDepositValid = orderTotal > 0 && numDeposit >= minDeposit;
+            const remainingBalance = Math.max(0, orderTotal - numDeposit);
+
+            const handleAddQuickBread = (prod) => {
+              setOrderItemsList((prev) => {
+                const ex = prev.find((it) => it.id === prod.id);
+                if (ex) {
+                  return prev.map((it) => it.id === prod.id ? { ...it, quantity: it.quantity + 5, subtotal: (it.quantity + 5) * it.price } : it);
+                }
+                return [...prev, { id: prod.id, name: prod.name, price: prod.price, quantity: 10, subtotal: 10 * prod.price }];
+              });
+            };
+
+            const handleUpdateQty = (id, delta) => {
+              setOrderItemsList((prev) =>
+                prev.map((it) => it.id === id ? { ...it, quantity: Math.max(1, it.quantity + delta), subtotal: Math.max(1, it.quantity + delta) * it.price } : it).filter((it) => it.quantity > 0)
+              );
+            };
+
+            const handleRemoveOrderItem = (id) => {
+              setOrderItemsList((prev) => prev.filter((it) => it.id !== id));
+            };
+
+            const handleSubmitOrder = (e) => {
+              e.preventDefault();
+              if (!orderCustomerName.trim() || !orderCustomerPhone.trim()) {
+                alert("Por favor completa el nombre y teléfono del cliente.");
+                return;
+              }
+              if (orderTotal <= 0) {
+                alert("Agrega panes al pedido o especifica el monto total acordado.");
+                return;
+              }
+              if (numDeposit < minDeposit) {
+                alert(`Regla obligatoria: Se requiere un anticipo mínimo del 50% (${formatCurrency(minDeposit)}) para confirmar y hornear su pedido sin detalles.`);
+                return;
+              }
+
+              const desc = orderItemsList.length > 0
+                ? orderItemsList.map((i) => `${i.quantity}x ${i.name}`).join(", ")
+                : orderCustomDesc.trim() || "Encargo especial de panadería";
+
+              const newOrd = {
+                id: `PED-${Math.floor(100 + Math.random() * 900)}`,
+                orderNumber: `PED-${Math.floor(100 + Math.random() * 900)}`,
+                customerName: orderCustomerName.trim(),
+                phone: orderCustomerPhone.trim(),
+                description: desc,
+                deliveryDate: orderDeliveryDate,
+                deliveryTime: orderDeliveryTime,
+                total: orderTotal,
+                deposit: numDeposit,
+                remainingBalance: remainingBalance,
+                paymentMethod: orderPaymentMethod,
+                notes: orderNotes.trim(),
+                status: "pendiente",
+                createdAt: new Date().toISOString(),
+              };
+
+              const updatedList = [newOrd, ...customOrders];
+              setCustomOrders(updatedList);
+              try {
+                localStorage.setItem("brito_custom_orders", JSON.stringify(updatedList));
+              } catch(err) {}
+
+              // Limpiar formulario
+              setOrderCustomerName("");
+              setOrderCustomerPhone("");
+              setOrderItemsList([]);
+              setOrderCustomDesc("");
+              setOrderCustomTotal("");
+              setOrderDepositInput("");
+              setOrderNotes("");
+              setOrderActiveTab("list");
+            };
+
+            const handleLiquidateOrder = (orderId) => {
+              const updated = customOrders.map((o) => {
+                if (o.id === orderId) {
+                  return { ...o, deposit: o.total, remainingBalance: 0, status: "entregado" };
+                }
+                return o;
+              });
+              setCustomOrders(updated);
+              try {
+                localStorage.setItem("brito_custom_orders", JSON.stringify(updated));
+              } catch(err) {}
+            };
+
+            const handleSendOrderWhatsApp = (ord) => {
+              const cleanPhone = ord.phone.replace(/\D/g, "");
+              const formattedPhone = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
+              const msg = `🥖 *PANADERÍA BRITO - PEDIDO DE PAN*\nHola *${ord.customerName}*,\n¡Tu pedido *${ord.orderNumber}* está programado en nuestro horno!\n📅 *Entrega:* ${ord.deliveryDate} a las ${ord.deliveryTime} hrs\n🥖 *Pan:* ${ord.description}\n💰 *Total:* ${formatCurrency(ord.total)}\n💵 *Anticipo Cubierto (50%+):* ${formatCurrency(ord.deposit)}\n⚠️ *Resta al entregar:* ${formatCurrency(ord.remainingBalance)}\n\n¡Muchas gracias por tu preferencia!`;
+              window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, "_blank");
+            };
+
+            const activeOrders = customOrders.filter((o) => o.status !== "entregado");
+
+            return (
+              <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
+                <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col">
+                  
+                  {/* Header Café Panadería */}
+                  <div className="p-4 px-6 bg-[#3e2723] text-white flex items-center justify-between border-b-2 border-amber-600/40 shrink-0">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🥖</span>
+                      <div>
+                        <h3 className="font-black text-sm tracking-wide text-amber-50 flex items-center gap-2">
+                          <span>Pedidos & Encargos de Pan</span>
+                          <span className="text-[10px] bg-amber-500 text-stone-950 font-black px-2 py-0.5 rounded-full">
+                            Mínimo 50% Anticipo
+                          </span>
+                        </h3>
+                        <p className="text-[11px] text-amber-200/80">Don Antonio Brito & Hijos</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowBreadOrdersDrawer(false)}
+                      className="p-1.5 hover:bg-white/10 rounded-xl text-amber-200 hover:text-white transition-colors text-lg cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Banner Informativo Política 50% */}
+                  <div className="bg-amber-500/15 border-b border-amber-500/30 p-3.5 px-6 flex items-start gap-2.5 text-amber-950 shrink-0">
+                    <span className="text-lg shrink-0">🛡️</span>
+                    <div className="text-xs leading-relaxed">
+                      <p className="font-black text-amber-900 uppercase text-[11px]">
+                        Regla Oficial para Encargos de Panadería
+                      </p>
+                      <p className="font-medium text-stone-800 text-[11px] mt-0.5">
+                        Para apartar producto y hornear <strong>sin detalles ni contratiempos</strong>, se requiere un <strong>anticipo mínimo del 50%</strong>. El 50% restante se liquida al entregar.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tabs */}
+                  <div className="flex border-b border-stone-200 bg-stone-100 p-2 gap-2 shrink-0">
+                    <button
+                      onClick={() => setOrderActiveTab("new")}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                        orderActiveTab === "new"
+                          ? "bg-[#3e2723] text-amber-50 shadow-md border border-amber-700/50"
+                          : "bg-white text-stone-600 border border-stone-200"
+                      }`}
+                    >
+                      + Nuevo Pedido de Pan
+                    </button>
+                    <button
+                      onClick={() => setOrderActiveTab("list")}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        orderActiveTab === "list"
+                          ? "bg-[#3e2723] text-amber-50 shadow-md border border-amber-700/50"
+                          : "bg-white text-stone-600 border border-stone-200"
+                      }`}
+                    >
+                      <span>Pedidos Activos</span>
+                      <span className="text-[10px] bg-amber-500 text-stone-950 px-1.5 py-0.5 rounded-full font-black">
+                        {activeOrders.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Drawer Content */}
+                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                    {orderActiveTab === "new" ? (
+                      <form onSubmit={handleSubmitOrder} className="space-y-4">
+                        
+                        {/* Cliente */}
+                        <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-2.5">
+                          <p className="text-[11px] font-black text-stone-800 uppercase">👤 Datos del Cliente</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-stone-600 block mb-1">Nombre Completo *</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Ej. Doña Carmen"
+                                value={orderCustomerName}
+                                onChange={(e) => setOrderCustomerName(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-stone-600 block mb-1">Teléfono / WhatsApp *</label>
+                              <input
+                                type="tel"
+                                required
+                                placeholder="Ej. 55 1234 5678"
+                                value={orderCustomerPhone}
+                                onChange={(e) => setOrderCustomerPhone(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Fecha y Hora de Entrega */}
+                        <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-2.5">
+                          <p className="text-[11px] font-black text-stone-800 uppercase">⏰ Fecha y Hora de Entrega</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-stone-600 block mb-1">Fecha de Entrega *</label>
+                              <input
+                                type="date"
+                                required
+                                value={orderDeliveryDate}
+                                onChange={(e) => setOrderDeliveryDate(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-stone-600 block mb-1">Hora Estimada *</label>
+                              <input
+                                type="time"
+                                required
+                                value={orderDeliveryTime}
+                                onChange={(e) => setOrderDeliveryTime(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Selección de Panes */}
+                        <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] font-black text-stone-800 uppercase">🥖 Selección de Pan</p>
+                            <span className="text-[10px] text-stone-500 font-bold">{orderItemsList.length} agregados</span>
+                          </div>
+
+                          {/* Chips de Panes Populares */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {products.slice(0, 8).map((prod) => (
+                              <button
+                                key={prod.id}
+                                type="button"
+                                onClick={() => handleAddQuickBread(prod)}
+                                className="px-2.5 py-1.5 bg-white hover:bg-amber-100 text-stone-800 rounded-xl border border-stone-200 text-xs font-bold transition-all active:scale-95 shadow-xs cursor-pointer"
+                              >
+                                <span>{prod.icon || "🥖"}</span> {prod.name} ({formatCurrency(prod.price)})
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Lista de Panes Agregados */}
+                          {orderItemsList.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-stone-200">
+                              {orderItemsList.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between bg-white p-2 px-3 rounded-xl border border-stone-200 text-xs">
+                                  <span className="font-bold text-stone-900 truncate max-w-[150px]">{item.name}</span>
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5">
+                                      <button type="button" onClick={() => handleUpdateQty(item.id, -5)} className="px-1.5 hover:bg-stone-200 rounded font-bold cursor-pointer">-</button>
+                                      <span className="font-black w-8 text-center">{item.quantity}</span>
+                                      <button type="button" onClick={() => handleUpdateQty(item.id, 5)} className="px-1.5 hover:bg-stone-200 rounded font-bold cursor-pointer">+</button>
+                                    </div>
+                                    <span className="font-black text-amber-900 w-14 text-right">{formatCurrency(item.subtotal)}</span>
+                                    <button type="button" onClick={() => handleRemoveOrderItem(item.id)} className="text-stone-400 hover:text-rose-600 font-bold cursor-pointer">✕</button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {orderItemsList.length === 0 && (
+                            <div className="space-y-2 pt-2 border-t border-stone-200">
+                              <label className="text-[10px] font-bold text-stone-600 block">O ingresa descripción y total acordado:</label>
+                              <input
+                                type="text"
+                                placeholder="Ej. 100 conchas surtidas y 40 mini cuernitos"
+                                value={orderCustomDesc}
+                                onChange={(e) => setOrderCustomDesc(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold text-stone-700">Total Acordado ($):</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  placeholder="Ej. 700"
+                                  value={orderCustomTotal}
+                                  onChange={(e) => setOrderCustomTotal(e.target.value)}
+                                  className="w-28 px-3 py-1.5 bg-white rounded-xl border border-stone-300 text-xs font-black text-right focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Tarjeta Café: 50% Anticipo y Liquidación */}
+                        <div className="bg-[#3e2723] text-white p-4 rounded-2xl shadow-lg space-y-3 border-2 border-amber-600/40">
+                          <div className="flex items-center justify-between pb-2 border-b border-amber-700/50">
+                            <div>
+                              <span className="text-[10px] font-black text-amber-200 uppercase block">Total del Pedido</span>
+                              <span className="text-xl font-black text-white">{formatCurrency(orderTotal)}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] font-extrabold text-amber-300 uppercase block">🛡️ Anticipo Mínimo (50%)</span>
+                              <span className="text-lg font-black text-amber-400">{formatCurrency(minDeposit)}</span>
+                            </div>
+                          </div>
+
+                          {/* Campo de Anticipo */}
+                          <div>
+                            <label className="text-xs font-black text-amber-100 block mb-1">
+                              Anticipo Abonado por el Cliente ($ MXN):
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              required
+                              placeholder={`Mínimo ${formatCurrency(minDeposit)}`}
+                              value={orderDepositInput}
+                              onChange={(e) => setOrderDepositInput(e.target.value)}
+                              className="w-full px-3 py-2.5 bg-white text-stone-900 rounded-xl text-base font-black focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            />
+                            
+                            {/* Botones de Atajo */}
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                type="button"
+                                onClick={() => setOrderDepositInput(minDeposit)}
+                                className="flex-1 py-1 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-lg text-[10px] font-black text-amber-200 transition-colors cursor-pointer"
+                              >
+                                50% ({formatCurrency(minDeposit)})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setOrderDepositInput(Math.round(orderTotal * 0.7))}
+                                className="flex-1 py-1 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-lg text-[10px] font-black text-amber-200 transition-colors cursor-pointer"
+                              >
+                                70% ({formatCurrency(orderTotal * 0.7)})
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setOrderDepositInput(orderTotal)}
+                                className="flex-1 py-1 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-lg text-[10px] font-black text-amber-200 transition-colors cursor-pointer"
+                              >
+                                100% Total
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Mensaje de Validación del 50% */}
+                          {orderTotal > 0 && (
+                            <div className="pt-2 border-t border-amber-800/60">
+                              {!isDepositValid ? (
+                                <div className="p-2.5 bg-rose-500/25 border border-rose-400/60 rounded-xl text-xs font-bold text-rose-200 flex items-center gap-2">
+                                  <span>⚠️</span>
+                                  <span>Anticipo insuficiente: Faltan {formatCurrency(minDeposit - numDeposit)} para cumplir con el 50% mínimo.</span>
+                                </div>
+                              ) : (
+                                <div className="p-2.5 bg-emerald-500/25 border border-emerald-400/60 rounded-xl text-xs font-bold text-emerald-200 flex items-center gap-2">
+                                  <span>✓</span>
+                                  <span>Anticipo cubierto. Resta por liquidar al entregar: {formatCurrency(remainingBalance)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Forma de Pago */}
+                          <div className="pt-1 border-t border-amber-800/60">
+                            <label className="text-[10px] font-bold text-amber-200 block mb-1">Forma de pago del anticipo:</label>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {["efectivo", "tarjeta", "transferencia"].map((m) => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => setOrderPaymentMethod(m)}
+                                  className={`py-1.5 px-2 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
+                                    orderPaymentMethod === m
+                                      ? "bg-amber-500 text-stone-950 font-black shadow-sm"
+                                      : "bg-white/10 text-amber-100 hover:bg-white/20"
+                                  }`}
+                                >
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* Botón de Confirmación */}
+                        <button
+                          type="submit"
+                          disabled={!isDepositValid || !orderCustomerName.trim() || !orderCustomerPhone.trim()}
+                          className={`w-full py-3.5 rounded-xl text-xs font-black shadow-lg transition-all flex items-center justify-center gap-2 ${
+                            isDepositValid && orderCustomerName.trim() && orderCustomerPhone.trim()
+                              ? "bg-[#3e2723] hover:bg-black text-amber-50 border-2 border-amber-500 active:scale-98 shadow-amber-950/30 cursor-pointer"
+                              : "bg-stone-300 text-stone-500 border border-stone-400 cursor-not-allowed"
+                          }`}
+                        >
+                          <span>🥖</span>
+                          <span>
+                            {!isDepositValid
+                              ? `Mínimo 50% de Anticipo Requerido (${formatCurrency(minDeposit)})`
+                              : `Confirmar Pedido con Anticipo de ${formatCurrency(numDeposit)}`}
+                          </span>
+                        </button>
+
+                      </form>
+                    ) : (
+                      /* Lista de Pedidos Activos */
+                      <div className="space-y-3">
+                        {activeOrders.length === 0 ? (
+                          <div className="text-center py-10 bg-stone-50 rounded-2xl border border-dashed border-stone-300 space-y-2">
+                            <span className="text-3xl">🍞</span>
+                            <p className="font-bold text-xs text-stone-700">No hay pedidos pendientes</p>
+                            <button
+                              type="button"
+                              onClick={() => setOrderActiveTab("new")}
+                              className="px-3 py-1.5 bg-[#3e2723] text-amber-100 rounded-lg text-xs font-bold cursor-pointer"
+                            >
+                              Tomar Nuevo Pedido
+                            </button>
+                          </div>
+                        ) : (
+                          activeOrders.map((ord) => (
+                            <div key={ord.id} className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-xs space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono text-xs font-black text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                                  {ord.orderNumber || ord.id}
+                                </span>
+                                <span className="text-xs font-black text-stone-900">{formatCurrency(ord.total)}</span>
+                              </div>
+                              <div>
+                                <p className="font-extrabold text-xs text-stone-900">{ord.customerName}</p>
+                                <p className="text-[11px] text-stone-500">Tel: {ord.phone} • Entrega: {ord.deliveryDate} ({ord.deliveryTime})</p>
+                              </div>
+                              <div className="bg-stone-50 p-2 rounded-lg text-[11px] text-stone-700 font-medium">
+                                {ord.description}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-stone-100">
+                                <div className="bg-emerald-50 p-1.5 rounded-lg border border-emerald-200">
+                                  <span className="text-[10px] font-bold text-emerald-700 block">Anticipo (50%+):</span>
+                                  <span className="font-black text-emerald-900">{formatCurrency(ord.deposit)}</span>
+                                </div>
+                                <div className="bg-rose-50 p-1.5 rounded-lg border border-rose-200">
+                                  <span className="text-[10px] font-bold text-rose-700 block">Resta al Entregar:</span>
+                                  <span className="font-black text-rose-900">{formatCurrency(ord.remainingBalance)}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between pt-1 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendOrderWhatsApp(ord)}
+                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                  📲 WhatsApp
+                                </button>
+                                {ord.remainingBalance > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLiquidateOrder(ord.id)}
+                                    className="px-3 py-1.5 bg-[#3e2723] hover:bg-black text-amber-50 rounded-lg text-xs font-black flex items-center gap-1 cursor-pointer"
+                                  >
+                                    💰 Cobrar {formatCurrency(ord.remainingBalance)} y Entregar
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg">
+                                    ✓ Entregado
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            );
+          })()}
 
           {/* MODAL MOVIMIENTOS DE CAJA ($) (Salidas/Gastos/Retiros y Entradas/Cambio) */}
           {showExpenses && (
