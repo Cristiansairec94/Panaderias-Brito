@@ -1841,44 +1841,6 @@ export default function POSPage() {
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
               </button>
 
-              {/* Botón Pedidos Especiales (Anticipo 50% Mínimo) */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (isShiftLocked) {
-                    addNotification({
-                      senderName: "🔒 Terminal Bloqueada",
-                      senderAvatar: "⚠️",
-                      badgeIcon: "alerta",
-                      title: "Terminal Bloqueada",
-                      highlightText: "Turno cerrado por seguridad",
-                      description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de gestionar pedidos especiales.",
-                      category: "pedidos",
-                    });
-                    return;
-                  }
-                  setShowOrdersDrawer(true);
-                }}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer ${
-                  isShiftLocked
-                    ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                    : "border-amber-400/90 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 hover:from-amber-500/25 hover:to-orange-500/20 text-stone-900 text-xs sm:text-sm font-bold"
-                }`}
-                title="Tomar o gestionar pedidos especiales con anticipo mínimo del 50%"
-              >
-                <Cake className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Pedidos Especiales</span>
-                {branchPendingOrdersCount > 0 ? (
-                  <span className="px-1.5 py-0.2 rounded-full text-[11px] font-black bg-amber-500 text-stone-950 shadow-xs">
-                    {branchPendingOrdersCount}
-                  </span>
-                ) : (
-                  <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded font-bold">
-                    50%
-                  </span>
-                )}
-              </button>
-
               {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
               {false && (
                 <button
@@ -2230,16 +2192,6 @@ export default function POSPage() {
             </div>
               </div>
               <div className="flex items-center gap-2 relative z-10">
-                <button
-                  type="button"
-                  onClick={() => handleOpenCreateOrder(cart.length > 0)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-stone-950 font-black text-xs shadow-xs hover:shadow-md transition-all active:scale-95 border border-amber-300 cursor-pointer"
-                  title="Levantar Pedido Especial para otra fecha con anticipo"
-                >
-                  <Cake className="w-3.5 h-3.5 text-stone-950" />
-                  <span className="hidden sm:inline">Pedido Especial</span>
-                  <span className="sm:hidden">Especial</span>
-                </button>
                 <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all ${
                   totalPieces > 0
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/60 scale-105 animate-pulse"

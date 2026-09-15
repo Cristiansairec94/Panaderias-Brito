@@ -899,28 +899,13 @@ export default function CreateOrderModal({
           
           {/* PASO 1: ¿A NOMBRE DE QUIÉN? */}
           <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-stone-900">
-                <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
-                  1
-                </span>
-                <h3 className="font-black text-sm uppercase tracking-wide text-amber-950">
-                  ¿A nombre de quién es el pedido?
-                </h3>
-              </div>
-
-              {/* Botón para abrir selector / registro de cliente */}
-              <button
-                type="button"
-                onClick={() => {
-                  setCustModalSearch(customerName);
-                  setIsCustomerModalOpen(true);
-                }}
-                className="text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-100/70 hover:bg-amber-200/80 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors border border-amber-300/60 cursor-pointer shadow-xs active:scale-95"
-              >
-                <UserPlus className="w-3.5 h-3.5 text-amber-800" />
-                <span>+ Añadir Cliente</span>
-              </button>
+            <div className="flex items-center gap-2 text-stone-900">
+              <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
+                1
+              </span>
+              <h3 className="font-black text-sm uppercase tracking-wide text-amber-950">
+                ¿A nombre de quién es el pedido?
+              </h3>
             </div>
 
             {/* Banner si hay un cliente vinculado */}
