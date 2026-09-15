@@ -156,7 +156,13 @@ export default function IngresosPage() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setIncomes(parsed);
+          const sanitized = parsed.filter(
+            (i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5
+          );
+          setIncomes(sanitized);
+          if (sanitized.length !== parsed.length) {
+            localStorage.setItem("brito_cash_incomes", JSON.stringify(sanitized));
+          }
           return;
         }
       }

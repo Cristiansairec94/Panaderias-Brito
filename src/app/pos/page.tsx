@@ -564,15 +564,23 @@ export default function POSPage() {
   const [incomesList, setIncomesList] = useState<CashIncome[]>(() => {
     if (typeof window !== "undefined") {
       try {
-        const saved = localStorage.getItem("brito_cash_incomes");
+        const saved = localStorage.getItem("brito_pos_current_incomes");
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed)) {
+            return parsed.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5);
+          }
         }
       } catch (e) {}
     }
     return [];
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("brito_pos_current_incomes", JSON.stringify(incomesList));
+    } catch (e) {}
+  }, [incomesList]);
   const [receiptIncome, setReceiptIncome] = useState<CashIncome | null>(null);
   const [showIncomeReceiptModal, setShowIncomeReceiptModal] = useState(false);
 
@@ -608,16 +616,20 @@ export default function POSPage() {
     return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
   }, [activeBranch?.id]);
 
-  // Sincronizar en tiempo real el dinero ingresado por anticipos y liquidaciones de pedidos
+  // Sincronizar en tiempo real el dinero ingresado del turno activo
   useEffect(() => {
     const handleIncomesUpdated = () => {
       try {
-        const savedIncomes = localStorage.getItem("brito_cash_incomes");
+        const savedIncomes = localStorage.getItem("brito_pos_current_incomes");
         if (savedIncomes) {
           const parsedInc = JSON.parse(savedIncomes);
           if (Array.isArray(parsedInc)) {
-            setIncomesList(parsedInc);
+            setIncomesList(
+              parsedInc.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+            );
           }
+        } else {
+          setIncomesList([]);
         }
       } catch (e) {
         console.error("Error al sincronizar ingresos en POS:", e);
@@ -626,6 +638,42 @@ export default function POSPage() {
     handleIncomesUpdated();
     window.addEventListener("brito_incomes_updated", handleIncomesUpdated);
     return () => window.removeEventListener("brito_incomes_updated", handleIncomesUpdated);
+  }, []);
+
+  // Sanitización de seguridad: eliminar registros corruptos o atípicos de localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("brito_cash_incomes");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const sanitized = parsed.filter(
+              (i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5
+            );
+            if (sanitized.length !== parsed.length) {
+              localStorage.setItem("brito_cash_incomes", JSON.stringify(sanitized));
+            }
+          }
+        }
+
+        const shiftRaw = localStorage.getItem("brito_pos_current_incomes");
+        if (shiftRaw) {
+          const shiftParsed = JSON.parse(shiftRaw);
+          if (Array.isArray(shiftParsed)) {
+            const shiftSanitized = shiftParsed.filter(
+              (i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5
+            );
+            if (shiftSanitized.length !== shiftParsed.length) {
+              localStorage.setItem("brito_pos_current_incomes", JSON.stringify(shiftSanitized));
+              setIncomesList(shiftSanitized);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error al sanitizar ingresos:", e);
+      }
+    }
   }, []);
 
   const handleOpenCreateOrder = (withCartItems = false) => {
@@ -647,13 +695,15 @@ export default function POSPage() {
   const handleOrderCreated = (orderId: string) => {
     updatePendingOrdersCount();
 
-    // Actualizar inmediatamente los ingresos en caja de la terminal POS
+    // Actualizar inmediatamente los ingresos en caja del turno de la terminal POS
     try {
-      const savedIncomes = localStorage.getItem("brito_cash_incomes");
+      const savedIncomes = localStorage.getItem("brito_pos_current_incomes");
       if (savedIncomes) {
         const parsedInc = JSON.parse(savedIncomes);
         if (Array.isArray(parsedInc)) {
-          setIncomesList(parsedInc);
+          setIncomesList(
+            parsedInc.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+          );
         }
       }
     } catch (e) {}
@@ -732,9 +782,15 @@ export default function POSPage() {
 
   const handleDirectUnlockShift = () => {
     setInitialCashFund(baseShiftFund);
+    setRecentSalesList([]);
+    setExpensesList([]);
+    setIncomesList([]);
     try {
       localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
       localStorage.removeItem("brito_pos_shift_locked");
+      localStorage.removeItem("brito_pos_current_sales");
+      localStorage.removeItem("brito_pos_current_expenses");
+      localStorage.removeItem("brito_pos_current_incomes");
     } catch (e) {}
     setIsShiftLocked(false);
   };
@@ -805,9 +861,11 @@ export default function POSPage() {
   const handleCompleteShiftCut = () => {
     setRecentSalesList([]);
     setExpensesList([]);
+    setIncomesList([]);
     try {
       localStorage.removeItem("brito_pos_current_sales");
       localStorage.removeItem("brito_pos_current_expenses");
+      localStorage.removeItem("brito_pos_current_incomes");
       localStorage.setItem("brito_pos_shift_locked", "true");
     } catch (e) {}
     setShowCashDrawerModal(false);
@@ -913,7 +971,9 @@ export default function POSPage() {
               quantity: si.quantity,
             })),
           }));
-          setRecentSalesList(mappedSales);
+          if (typeof window !== "undefined" && localStorage.getItem("brito_pos_current_sales") === null) {
+            setRecentSalesList(mappedSales);
+          }
         }
 
         // 3. Load cash expenses from Supabase
@@ -931,19 +991,23 @@ export default function POSPage() {
             cashier: e.cashier || "Don Toño Brito",
             date: formatDateTimeSafe(e.created_at),
           }));
-          setExpensesList(mappedExp);
+          if (typeof window !== "undefined" && localStorage.getItem("brito_pos_current_expenses") === null) {
+            setExpensesList(mappedExp);
+          }
         }
-        // 4. Load cash incomes from localStorage
+        // 4. Load cash incomes for current shift from localStorage
         try {
-          const savedIncomes = localStorage.getItem("brito_cash_incomes");
+          const savedIncomes = localStorage.getItem("brito_pos_current_incomes");
           if (savedIncomes) {
             const parsedInc = JSON.parse(savedIncomes);
             if (Array.isArray(parsedInc) && parsedInc.length > 0) {
-              setIncomesList(parsedInc);
+              setIncomesList(
+                parsedInc.filter((i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+              );
             }
           }
         } catch (incErr) {
-          console.log("No local incomes yet", incErr);
+          console.log("No local shift incomes yet", incErr);
         }
       } catch (err) {
         console.log("Using fallback demo mode", err);
@@ -1255,7 +1319,10 @@ export default function POSPage() {
     setIncomesList((prev) => {
       const updated = [newIncome, ...prev];
       try {
-        localStorage.setItem("brito_cash_incomes", JSON.stringify(updated));
+        localStorage.setItem("brito_pos_current_incomes", JSON.stringify(updated));
+        const allRaw = localStorage.getItem("brito_cash_incomes");
+        const allIncomes = allRaw ? JSON.parse(allRaw) : [];
+        localStorage.setItem("brito_cash_incomes", JSON.stringify([newIncome, ...allIncomes]));
       } catch (e) {}
       return updated;
     });
@@ -1265,7 +1332,12 @@ export default function POSPage() {
     setIncomesList((prev) => {
       const updated = prev.filter((i) => i.id !== id);
       try {
-        localStorage.setItem("brito_cash_incomes", JSON.stringify(updated));
+        localStorage.setItem("brito_pos_current_incomes", JSON.stringify(updated));
+        const allRaw = localStorage.getItem("brito_cash_incomes");
+        if (allRaw) {
+          const allIncomes: CashIncome[] = JSON.parse(allRaw);
+          localStorage.setItem("brito_cash_incomes", JSON.stringify(allIncomes.filter((i) => i.id !== id)));
+        }
       } catch (e) {}
       return updated;
     });
@@ -3306,11 +3378,13 @@ export default function POSPage() {
         onPaymentSuccess={() => {
           updatePendingOrdersCount();
           try {
-            const savedIncomes = localStorage.getItem("brito_cash_incomes");
+            const savedIncomes = localStorage.getItem("brito_pos_current_incomes");
             if (savedIncomes) {
               const parsedInc = JSON.parse(savedIncomes);
               if (Array.isArray(parsedInc)) {
-                setIncomesList(parsedInc);
+                setIncomesList(
+                  parsedInc.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+                );
               }
             }
           } catch (e) {}

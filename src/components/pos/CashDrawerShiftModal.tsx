@@ -230,7 +230,7 @@ export default function CashDrawerShiftModal({
   // 2. Cálculos de Gastos y Entradas del Turno
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
   const totalIncomesInCash = incomes
-    .filter((i) => i.paymentMethod === "efectivo" || !i.paymentMethod)
+    .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
     .reduce((sum, i) => sum + i.amount, 0);
 
   // 3. Dinero esperado en caja (Cajón)
@@ -698,7 +698,7 @@ export default function CashDrawerShiftModal({
                 /* Formulario Directo de Arqueo y Relevo */
                 <div className="space-y-3.5">
                   {/* 1. Resumen Financiero del Turno */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs">
+                  <div className={`grid ${totalIncomesInCash > 0 ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"} gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
                       <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
                       <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(initialFund)}</span>
@@ -707,12 +707,20 @@ export default function CashDrawerShiftModal({
                       <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
                       <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(cashSales)}</span>
                     </div>
+                    {totalIncomesInCash > 0 && (
+                      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-amber-300/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                        <span className="text-[11px] sm:text-xs text-amber-800 font-black block uppercase tracking-wider">(+) Entradas Extra</span>
+                        <span className="text-xl sm:text-2xl font-black text-amber-800 mt-0.5 block">+{formatCurrency(totalIncomesInCash)}</span>
+                      </div>
+                    )}
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
                       <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos / Retiros</span>
                       <span className="text-xl sm:text-2xl font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
                     </div>
                     <div className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20">
-                      <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">En Caja</span>
+                      <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">
+                        {cashSales === 0 && totalExpenses === 0 && totalIncomesInCash === 0 ? "En Caja (Fondo)" : "En Caja"}
+                      </span>
                       <span className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(expectedCashInDrawer)}</span>
                     </div>
                   </div>
