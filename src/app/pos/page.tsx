@@ -2467,24 +2467,6 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* ACCESO RÁPIDO PARA PEDIDOS ESPECIALES / ENCARGOS */}
-        <div className="px-3 py-1.5 bg-gradient-to-r from-amber-100/90 via-orange-50 to-amber-100/80 border-b border-amber-200/90 flex items-center justify-between gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-xs">🎂</span>
-            <span className="text-[11px] font-bold text-amber-950 truncate">
-              ¿Pasteles o encargo para otra fecha?
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleOpenCreateOrder(cart.length > 0)}
-            className="py-1 px-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl shadow-2xs transition-all active:scale-95 border border-amber-400/80 flex items-center gap-1 shrink-0 cursor-pointer"
-            title="Abrir formulario de Pedido Especial con anticipo"
-          >
-            <Cake className="w-3.5 h-3.5 text-stone-950" />
-            <span>+ Pedido Especial</span>
-          </button>
-        </div>
 
         {/* ALERTA VISUAL DE ESCANEO DENTRO DE LA CHAROLA */}
         {lastScannedItem && (
