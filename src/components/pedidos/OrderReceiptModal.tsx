@@ -115,7 +115,10 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
     const formattedPhone = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
     
     const itemsText = (order.items || [])
-      .map((it) => `• ${it.quantity}x ${it.name} (${formatCurrency(it.subtotal)})`)
+      .map((it) => {
+        const uPrice = it.unitPrice || (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0);
+        return `• *${it.quantity} pza(s)* - *${it.name}*\n   └ P. Unit: ${formatCurrency(uPrice)} | Subtotal: ${formatCurrency(it.subtotal)}`;
+      })
       .join("\n");
 
     const message = `🥖 *PANADERÍA BRITO - COMPROBANTE DE PEDIDO*\n` +
@@ -227,24 +230,60 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
               </div>
             )}
 
-            {/* Products breakdown */}
-            <div className="space-y-1.5 border-b border-dashed border-stone-300 pb-3">
-              <span className="text-[10px] font-bold text-stone-400 block uppercase font-sans">
-                Detalle de Productos
-              </span>
-              {(order.items && order.items.length > 0 ? order.items : []).map((it, idx) => (
-                <div key={idx} className="space-y-0.5">
-                  <div className="flex justify-between items-start font-sans">
-                    <span className="font-bold text-stone-800">
-                      {it.quantity}x {it.name}
-                    </span>
-                    <span className="font-extrabold text-stone-900">{formatCurrency(it.subtotal)}</span>
-                  </div>
-                  {it.notes && (
-                    <p className="text-[10px] text-stone-500 italic pl-3 font-sans">↳ {it.notes}</p>
-                  )}
-                </div>
-              ))}
+            {/* Desglose Detallado de Productos */}
+            <div className="space-y-1.5 border-b border-dashed border-stone-400 pb-3 font-mono">
+              <div className="flex justify-between items-center text-[9px] font-black uppercase text-stone-800 border-y border-stone-300 py-1 tracking-wider">
+                <span>CANT. / PRODUCTO</span>
+                <span className="text-right">P.UNIT / TOTAL</span>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                {(order.items && order.items.length > 0 ? order.items : []).map((it, idx) => {
+                  const unitPrice = it.unitPrice || (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0);
+                  const subtotal = it.subtotal || unitPrice * it.quantity;
+
+                  return (
+                    <div key={idx} className="space-y-0.5 text-stone-900 border-b border-dotted border-stone-200 pb-1.5 last:border-0 last:pb-0">
+                      {/* Línea 1: Nombre completo del producto y subtotal */}
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="font-black text-xs text-stone-950 leading-tight">
+                          {it.name}
+                        </span>
+                        <span className="font-black text-xs text-stone-950 text-right whitespace-nowrap">
+                          {formatCurrency(subtotal)}
+                        </span>
+                      </div>
+
+                      {/* Línea 2: Cantidad desglosada y Precio unitario */}
+                      <div className="flex justify-between items-center text-[10.5px] text-stone-600 font-bold">
+                        <span className="flex items-center gap-1.5 text-stone-700">
+                          <span className="bg-amber-100 text-amber-950 font-black px-1.5 py-0.2 rounded text-[10px] border border-amber-300/80">
+                            {it.quantity} {it.quantity === 1 ? "pieza" : "piezas"}
+                          </span>
+                          <span>× {formatCurrency(unitPrice)} c/u</span>
+                        </span>
+                        <span className="text-[10px] text-stone-400 font-normal">
+                          Subtotal
+                        </span>
+                      </div>
+
+                      {it.notes && (
+                        <p className="text-[10px] text-amber-900 font-sans italic pl-2 pt-0.5">
+                          ↳ Obs: {it.notes}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Total acumulado de piezas desglosadas */}
+              <div className="flex justify-between items-center text-[10px] font-bold text-stone-700 pt-1.5 border-t border-dashed border-stone-300">
+                <span>Total de piezas encargadas:</span>
+                <span className="font-black text-xs text-stone-950 bg-stone-100 px-2 py-0.5 rounded border border-stone-200">
+                  {(order.items || []).reduce((sum, it) => sum + (it.quantity || 0), 0)} pzas
+                </span>
+              </div>
             </div>
 
             {/* Totals & Balance */}

@@ -307,22 +307,26 @@ export default function TicketModal({
             </div>
 
             {/* Items Breakdown */}
-            <div className="space-y-1 border-b border-dashed border-black pb-1.5">
+            <div className="space-y-1 border-b border-dashed border-black pb-1.5 font-mono">
               <div className="border-y border-black py-0.5 flex justify-between font-black text-[8.5px] text-black uppercase tracking-wider">
-                <span>CANT / PRODUCTO</span>
-                <span className="text-right">IMPORTE</span>
+                <span>CANT. / PRODUCTO</span>
+                <span className="text-right">P.UNIT / IMPORTE</span>
               </div>
 
-              <div className="space-y-0.5 pt-0.5">
+              <div className="space-y-1 pt-0.5">
                 {items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-black text-[9.5px] leading-tight items-start gap-1">
-                    <div className="flex-1 min-w-0 pr-1">
-                      <span className="font-black mr-1">{item.quantity}x</span>
-                      <span className="font-bold">{item.product.name}</span>
-                      <span className="text-[8.5px] text-neutral-600 ml-1">@{formatCurrency(item.product.price)}</span>
+                  <div key={idx} className="text-black text-[9.5px] leading-tight space-y-0.5 border-b border-dotted border-neutral-200 pb-1 last:border-0 last:pb-0">
+                    <div className="flex justify-between items-start gap-1">
+                      <span className="font-bold text-black flex-1 pr-1">{item.product.name}</span>
+                      <span className="font-black text-black whitespace-nowrap text-right shrink-0">
+                        {formatCurrency(item.product.price * item.quantity)}
+                      </span>
                     </div>
-                    <div className="font-black text-black whitespace-nowrap text-right shrink-0">
-                      {formatCurrency(item.product.price * item.quantity)}
+                    <div className="flex justify-between items-center text-[8.5px] text-neutral-600">
+                      <span className="font-bold text-neutral-800">
+                        {item.quantity} {item.quantity === 1 ? "pza" : "pzas"} × {formatCurrency(item.product.price)} c/u
+                      </span>
+                      <span className="text-[8px] text-neutral-400">Subtotal</span>
                     </div>
                   </div>
                 ))}
