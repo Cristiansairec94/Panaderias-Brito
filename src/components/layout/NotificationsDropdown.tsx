@@ -81,11 +81,11 @@ export default function NotificationsDropdown() {
   };
 
   return (
-    <div className="relative z-[110]" ref={dropdownRef}>
+    <div className="relative z-[110] shrink-0" ref={dropdownRef}>
       {/* Bell Button (Facebook Style with dynamic badge) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all focus:outline-none ${
+        className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all focus:outline-none shrink-0 ${
           isOpen
             ? "bg-brito-orange-100 text-brito-orange-700 ring-2 ring-brito-orange-500"
             : "bg-stone-100 hover:bg-stone-200 text-stone-700"

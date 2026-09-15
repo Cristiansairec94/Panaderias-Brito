@@ -170,13 +170,13 @@ export default function Header() {
   const current = getPageTitle();
 
   return (
-    <header className="h-16 shrink-0 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-[100] shadow-sm">
+    <header className="h-16 shrink-0 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-3 sm:px-5 lg:px-6 flex items-center justify-between sticky top-0 z-[100] shadow-xs">
       {/* Left: Hamburger / Collapse Toggle + Page Title */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 mr-2">
         {/* Mobile Hamburger Drawer Toggle */}
         <button
           onClick={toggleMobile}
-          className="md:hidden p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors border border-stone-200"
+          className="md:hidden p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors border border-stone-200 shrink-0"
           title="Abrir menú"
         >
           <Menu className="w-5 h-5" />
@@ -185,7 +185,7 @@ export default function Header() {
         {/* Desktop Quick Toggle Button */}
         <button
           onClick={toggleCollapse}
-          className="hidden md:flex p-2 rounded-xl bg-stone-100/80 hover:bg-stone-200/80 text-stone-600 hover:text-stone-900 transition-colors border border-stone-200/80"
+          className="hidden md:flex p-2 rounded-xl bg-stone-100/80 hover:bg-stone-200/80 text-stone-600 hover:text-stone-900 transition-colors border border-stone-200/80 shrink-0"
           title={isCollapsed ? "Desplegar menú lateral" : "Contraer menú lateral"}
         >
           {isCollapsed ? (
@@ -196,14 +196,14 @@ export default function Header() {
         </button>
 
         {/* Breadcrumb / Title with Official Animated Brand Logo */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           {/* Animated Mini Brand Logo */}
           <div 
             onClick={handleLogoClick}
             className="relative cursor-pointer group select-none shrink-0" 
             title="Panadería Brito • Clic para animar"
           >
-            <div className={`relative w-10 h-10 rounded-2xl p-[1.5px] bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] shadow-md shadow-orange-500/20 group-hover:scale-110 group-hover:shadow-rose-500/30 transition-all duration-300 ${
+            <div className={`relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl p-[1.5px] bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] shadow-md shadow-orange-500/20 group-hover:scale-110 group-hover:shadow-rose-500/30 transition-all duration-300 ${
               isLogoSpinning ? "rotate-[360deg] scale-110" : ""
             }`}>
               <div className="w-full h-full bg-white rounded-[14px] p-1 flex items-center justify-center overflow-hidden">
@@ -217,15 +217,15 @@ export default function Header() {
                 />
               </div>
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse" />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-black text-stone-900 tracking-tight leading-tight">
+              <h2 className="text-base sm:text-lg font-black text-stone-900 tracking-tight leading-tight whitespace-nowrap truncate">
                 {current.title}
               </h2>
-              <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold text-stone-800 bg-gradient-to-r from-orange-50 via-rose-50 to-orange-50 px-3 py-0.5 rounded-full border border-rose-200/80 shadow-xs group cursor-default">
+              <div className="hidden 2xl:inline-flex items-center gap-1.5 text-[11px] font-bold text-stone-800 bg-gradient-to-r from-orange-50 via-rose-50 to-orange-50 px-3 py-0.5 rounded-full border border-rose-200/80 shadow-xs group cursor-default shrink-0">
                 <Sparkles className="w-3 h-3 text-orange-500 group-hover:rotate-180 transition-transform duration-500" />
                 <span className="font-extrabold text-stone-700">Panadería</span>
                 <span className="text-xs font-black bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
@@ -233,7 +233,7 @@ export default function Header() {
                 </span>
               </div>
             </div>
-            <p className="text-[10px] sm:text-[11px] text-stone-500 font-medium line-clamp-1 mt-0.5">
+            <p className="text-[10px] sm:text-[11px] text-stone-500 font-medium truncate max-w-[170px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[420px] leading-tight mt-0.5">
               {current.subtitle}
             </p>
           </div>
@@ -241,11 +241,11 @@ export default function Header() {
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {/* Offline / Cloud Status Pill */}
         <Link
           href="/configuracion?tab=offline"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs ${
+          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap ${
             !isOnline
               ? "bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100 animate-pulse"
               : isSyncing
@@ -286,51 +286,51 @@ export default function Header() {
             </>
           ) : (
             <>
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex h-2 w-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
-              <span className="text-[11px] font-extrabold text-emerald-800">Sincronizado</span>
+              <span className="text-[11px] font-extrabold text-emerald-800 hidden sm:inline">Sincronizado</span>
             </>
           )}
         </Link>
 
         {/* Quick Sale Simulator Button */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             onClick={handleQuickSimulate}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 text-white text-xs font-black shadow-md shadow-orange-500/20 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 text-white text-xs font-black shadow-md shadow-orange-500/20 active:scale-95 transition-all shrink-0 whitespace-nowrap"
             title="Simular 1 venta en la sucursal activa"
           >
-            <Zap className="w-3.5 h-3.5 fill-current animate-pulse" />
+            <Zap className="w-3.5 h-3.5 fill-current animate-pulse shrink-0" />
             <span className="hidden md:inline">Simular Venta</span>
           </button>
 
           {/* Toast Alert when simulated */}
           {simulatedAlert && (
             <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-stone-950 text-emerald-400 text-[11px] font-black px-3 py-1.5 rounded-xl shadow-2xl border border-emerald-500/40 z-50 whitespace-nowrap animate-in fade-in zoom-in-95 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>{simulatedAlert}</span>
             </div>
           )}
         </div>
 
         {/* Branch Selector Dropdown */}
-        <div ref={branchMenuRef} className="relative z-[110]">
+        <div ref={branchMenuRef} className="relative z-[110] shrink-0">
           <button
             onClick={toggleBranchMenu}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50/80 hover:bg-stone-100 text-stone-800 text-xs font-bold transition-all shadow-sm"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50/80 hover:bg-stone-100 text-stone-800 text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap"
             title="Cambiar sucursal activa"
           >
-            <span className="relative flex h-2 w-2">
+            <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <Building2 className="w-3.5 h-3.5 text-orange-600" />
-            <span className="max-w-[80px] sm:max-w-[140px] truncate">
+            <Building2 className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+            <span className="max-w-[75px] sm:max-w-[110px] md:max-w-[140px] truncate">
               {isAllBranches ? "Todas las Sucursales" : currentBranch?.shortName}
             </span>
-            <ChevronDown className="w-3 h-3 text-stone-400" />
+            <ChevronDown className="w-3 h-3 text-stone-400 shrink-0" />
           </button>
 
           {/* Branch Dropdown Menu */}
@@ -438,32 +438,32 @@ export default function Header() {
         </div>
 
         {/* Live Clock */}
-        <div className="hidden lg:flex items-center gap-2 bg-stone-100/80 px-3 py-1.5 rounded-xl border border-stone-200/80 text-stone-700 text-xs font-bold shadow-sm">
-          <Clock className="w-3.5 h-3.5 text-orange-600" />
-          <span className="tabular-nums">{time || "Cargando..."}</span>
+        <div className="hidden xl:flex items-center gap-1.5 bg-stone-100/80 px-2.5 py-1.5 rounded-xl border border-stone-200/80 text-stone-700 text-xs font-bold shadow-xs shrink-0 whitespace-nowrap">
+          <Clock className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+          <span className="tabular-nums whitespace-nowrap">{time || "Cargando..."}</span>
         </div>
 
         {/* Facebook Style Notifications */}
         <NotificationsDropdown />
 
         {/* User Session Dropdown */}
-        <div ref={userMenuRef} className="relative z-[110]">
+        <div ref={userMenuRef} className="relative z-[110] shrink-0">
           <button
             onClick={toggleUserMenu}
-            className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/70 shadow-sm"
+            className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/70 shadow-xs shrink-0"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-rose-500/20 overflow-hidden">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-rose-500/20 overflow-hidden shrink-0">
               {user?.photoUrl || (user?.avatar && (user.avatar.startsWith("data:image") || user.avatar.startsWith("http"))) ? (
                 <img src={user.photoUrl || user.avatar} alt={user.name} className="w-full h-full object-cover" />
               ) : (
                 user?.avatar || "👨‍🍳"
               )}
             </div>
-            <div className="text-left hidden sm:block">
-              <p className="text-xs font-black text-stone-900 leading-tight">{user?.name || "Invitado"}</p>
-              <p className="text-[9px] text-rose-700 font-bold uppercase tracking-wider">{user?.roleLabel || "Sin Rol"}</p>
+            <div className="text-left hidden sm:block min-w-0 max-w-[85px] md:max-w-[110px]">
+              <p className="text-xs font-black text-stone-900 leading-tight truncate">{user?.name || "Invitado"}</p>
+              <p className="text-[9px] text-rose-700 font-bold uppercase tracking-wider truncate">{user?.roleLabel || "Sin Rol"}</p>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
           </button>
 
           {/* User & Role Switcher Menu */}
