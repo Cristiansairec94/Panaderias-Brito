@@ -1373,44 +1373,71 @@ export default function CreateOrderModal({
               </h3>
             </div>
 
-            {/* Atajos rápidos de fecha */}
-            <div>
-              <label className="text-xs font-bold text-stone-600 block mb-1.5">Atajos rápidos:</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => handleSetQuickDate(0)}
-                  className="py-1.5 px-2 bg-white hover:bg-amber-100/70 border border-stone-300 rounded-xl text-xs font-extrabold text-stone-700 transition-colors"
-                >
-                  Hoy
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetQuickDate(1)}
-                  className="py-1.5 px-2 bg-white hover:bg-amber-100/70 border border-stone-300 rounded-xl text-xs font-extrabold text-stone-700 transition-colors"
-                >
-                  Mañana
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSetNextSaturday}
-                  className="py-1.5 px-2 bg-white hover:bg-amber-100/70 border border-stone-300 rounded-xl text-xs font-extrabold text-stone-700 transition-colors"
-                >
-                  Sábado
-                </button>
+            {/* Selector interactivo de días de la semana */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-stone-800 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Selecciona el día de entrega:</span>
+                </label>
+                <span className="text-[10px] text-stone-500 font-bold">
+                  Toca un día para elegirlo
+                </span>
               </div>
+
+              {/* Botones de los días para tocar y seleccionar */}
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                {upcomingDays.map((day) => {
+                  const isSelected = deliveryDate === day.dateStr;
+
+                  return (
+                    <button
+                      key={day.dateStr}
+                      type="button"
+                      onClick={() => setDeliveryDate(day.dateStr)}
+                      className={`py-2 px-1 rounded-xl text-center border-2 transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer select-none active:scale-95 ${
+                        isSelected
+                          ? "bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-500 text-stone-950 font-black shadow-md border-amber-600 ring-2 ring-amber-400/50 scale-[1.02]"
+                          : "bg-white hover:bg-amber-50/80 border-stone-200 text-stone-700 hover:border-amber-300"
+                      }`}
+                    >
+                      <span className={`text-[11px] font-black leading-tight ${isSelected ? "text-stone-950" : "text-stone-800"}`}>
+                        {day.shortTitle}
+                      </span>
+                      <span className={`text-[10px] font-bold ${isSelected ? "text-stone-950/90" : "text-stone-500"}`}>
+                        {day.dayNum} {day.monthStr}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Resumen visible del día seleccionado */}
+              {selectedDeliveryDateLabel && (
+                <div className="p-2.5 bg-amber-50/90 border border-amber-300/80 rounded-xl flex items-center justify-between text-xs text-amber-950 shadow-xs">
+                  <span className="flex items-center gap-2 font-black">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Entrega: <strong className="text-stone-900">{selectedDeliveryDateLabel}</strong></span>
+                  </span>
+                  <span className="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded-md border border-amber-300 shrink-0">
+                    Día Seleccionado
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Fecha y Hora exactas */}
+            {/* Fecha y Hora exactas (Calendario libre + Hora) */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">Fecha prometida *</label>
+                <label className="text-xs font-bold text-stone-700 block mb-1">
+                  O cambiar a otra fecha en calendario:
+                </label>
                 <input
                   type="date"
                   value={deliveryDate}
                   min={getLocalDateStr(0)}
                   onChange={(e) => setDeliveryDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs"
                 />
               </div>
 
