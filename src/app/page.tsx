@@ -759,9 +759,9 @@ export default function Home() {
 
         {/* Dynamic Interactive Chart Bars */}
         <div className="space-y-3">
-          <div className="h-44 sm:h-48 w-full flex items-end gap-2 sm:gap-3 pt-6 pb-2 px-1">
+          <div className="h-48 sm:h-56 w-full flex items-end gap-1.5 sm:gap-3 pt-6 pb-2 px-1">
             {activeChartItems.map((d) => {
-              const heightPercent = Math.max(14, Math.round((d.amount / maxChartAmount) * 100));
+              const heightPercent = Math.max(12, Math.round((d.amount / maxChartAmount) * 100));
               const isPeak = d.isPeak;
               const isHovered = hoveredDataIndex === d.index;
 
@@ -774,7 +774,7 @@ export default function Home() {
                 >
                   {/* Tooltip Hover Bubble */}
                   <div
-                    className={`absolute bottom-full mb-2 bg-stone-950 text-white rounded-2xl px-3.5 py-2.5 text-xs shadow-2xl border border-stone-800 pointer-events-none transition-all duration-150 z-20 whitespace-nowrap ${
+                    className={`absolute bottom-full mb-3 bg-stone-950 text-white rounded-2xl px-3.5 py-2.5 text-xs shadow-2xl border border-stone-800 pointer-events-none transition-all duration-150 z-30 whitespace-nowrap ${
                       isHovered ? "opacity-100 scale-100 -translate-y-1" : "opacity-0 scale-95 pointer-events-none"
                     }`}
                   >
@@ -792,15 +792,19 @@ export default function Home() {
                     )}
                   </div>
 
-                  {/* Visual Bar */}
-                  <div className="w-full relative flex items-end justify-center">
+                  {/* Visual Bar with explicit height container */}
+                  <div className="w-full h-36 sm:h-44 relative flex items-end justify-center">
+                    {/* Background track */}
+                    <div className="absolute inset-x-0 bottom-0 top-0 mx-auto w-full max-w-[34px] sm:max-w-[40px] bg-stone-100/80 rounded-xl" />
+
+                    {/* Colored bar */}
                     <div
-                      className={`w-full max-w-[44px] rounded-2xl transition-all duration-300 ${
+                      className={`w-full max-w-[34px] sm:max-w-[40px] rounded-xl relative z-10 transition-all duration-300 ${
                         isPeak
-                          ? "bg-gradient-to-t from-orange-600 via-rose-500 to-amber-400 shadow-md shadow-orange-500/20"
-                          : "bg-gradient-to-t from-stone-200 to-stone-300 hover:from-orange-300 hover:to-orange-400"
+                          ? "bg-gradient-to-t from-orange-600 via-rose-500 to-amber-400 shadow-md shadow-orange-500/25"
+                          : "bg-gradient-to-t from-stone-300 via-stone-300 to-stone-400 hover:from-orange-400 hover:to-amber-400"
                       } ${isHovered ? "ring-2 ring-orange-500 brightness-110 scale-105" : ""}`}
-                      style={{ height: `${heightPercent}%` }}
+                      style={{ height: `${heightPercent}%`, minHeight: "14px" }}
                     />
                   </div>
 
