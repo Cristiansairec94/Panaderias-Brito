@@ -110,6 +110,12 @@ export default function CreateBranchModal({
       todayTickets: 0,
       cashInDrawer: 0,
       color,
+      topProduct: {
+        name: "Bolillo Tradicional",
+        piecesSold: 0,
+        category: "Pan Salado",
+        icon: "🥖",
+      },
       currentShift: {
         id: `shift-${branchCode.toLowerCase()}-${Date.now()}`,
         name: shiftName,

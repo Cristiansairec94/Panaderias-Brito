@@ -313,6 +313,13 @@ export interface BranchShift {
   status: "abierto" | "cerrado";
 }
 
+export interface BranchTopProduct {
+  name: string;
+  piecesSold: number;
+  category?: string;
+  icon?: string;
+}
+
 export interface Branch {
   id: string;
   name: string;
@@ -331,6 +338,7 @@ export interface Branch {
   todayTickets: number;
   cashInDrawer: number;
   color: string; // e.g. "orange", "rose", "emerald", "blue", "purple"
+  topProduct?: BranchTopProduct;
 }
 
 export interface BranchCashMovement {

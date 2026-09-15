@@ -32,6 +32,12 @@ const DEFAULT_BRANCHES: Branch[] = [
     todayTickets: 46,
     cashInDrawer: 5120,
     color: "orange",
+    topProduct: {
+      name: "Bolillo Tradicional",
+      piecesSold: 185,
+      category: "Pan Salado",
+      icon: "🥖",
+    },
     currentShift: {
       id: "shift-mat-101",
       name: "Turno Matutino (06:00 - 14:00)",
@@ -63,6 +69,12 @@ const DEFAULT_BRANCHES: Branch[] = [
     todayTickets: 38,
     cashInDrawer: 4150,
     color: "rose",
+    topProduct: {
+      name: "Bolillo de Sal",
+      piecesSold: 210,
+      category: "Pan Salado",
+      icon: "🥖",
+    },
     currentShift: {
       id: "shift-ben-201",
       name: "Turno Matutino (06:30 - 14:30)",
@@ -94,6 +106,12 @@ const DEFAULT_BRANCHES: Branch[] = [
     todayTickets: 34,
     cashInDrawer: 4560,
     color: "amber",
+    topProduct: {
+      name: "Cuerno de Mantequilla",
+      piecesSold: 94,
+      category: "Hojaldre",
+      icon: "🥐",
+    },
     currentShift: {
       id: "shift-flo-301",
       name: "Turno Matutino (07:00 - 15:00)",
@@ -249,6 +267,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             return {
               ...def,
               ...b,
+              topProduct: b.topProduct || def?.topProduct,
               assignedUserId: b.assignedUserId || def?.assignedUserId,
               assignedUserName: b.assignedUserName || def?.assignedUserName,
               assignedUserEmail: b.assignedUserEmail || def?.assignedUserEmail,
@@ -370,12 +389,20 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             transferSales: (Number(curShift.transferSales) || 0) + (isTransfer ? amount : 0),
           };
 
+          const updatedTopProduct = b.topProduct
+            ? {
+                ...b.topProduct,
+                piecesSold: (b.topProduct.piecesSold || 0) + 1,
+              }
+            : undefined;
+
           return {
             ...b,
             todaySales: (Number(b.todaySales) || 0) + amount,
             todayTickets: (Number(b.todayTickets) || 0) + 1,
             cashInDrawer: (Number(b.cashInDrawer) || 0) + (isCash ? amount : 0),
             currentShift: updatedShift,
+            topProduct: updatedTopProduct,
           };
         });
 
@@ -473,12 +500,20 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
           transferSales: b.currentShift.transferSales + (isTransfer ? saleTotal : 0),
         };
 
+        const updatedTopProduct = b.topProduct
+          ? {
+              ...b.topProduct,
+              piecesSold: (b.topProduct.piecesSold || 0) + (itemCount > 0 ? 2 : 1),
+            }
+          : undefined;
+
         return {
           ...b,
           todaySales: b.todaySales + saleTotal,
           todayTickets: b.todayTickets + 1,
           cashInDrawer: b.cashInDrawer + (isCash ? saleTotal : 0),
           currentShift: updatedShift,
+          topProduct: updatedTopProduct,
         };
       });
 

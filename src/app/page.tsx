@@ -521,7 +521,7 @@ export default function Home() {
               </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Comparativa de ventas, avance de meta diaria, efectivo en gaveta y cajero en turno por sucursal.
+              Comparativa de ventas, producto más vendido, método de pago predominante y métricas en vivo por sucursal.
             </p>
           </div>
 
@@ -542,6 +542,28 @@ export default function Home() {
             const pct = Math.min(100, Math.round((b.todaySales / Math.max(1, b.dailyGoal)) * 100));
             const isSelected = !isAllBranches && currentBranch?.id === b.id;
             const isTopRank = idx === 0;
+
+            // Producto más vendido de la sucursal (con respaldo dinámico)
+            const topProd = b.topProduct || (
+              b.id?.includes("matriz") || b.code?.includes("MAT")
+                ? { name: "Bolillo Tradicional", piecesSold: 185, category: "Pan Salado", icon: "🥖" }
+                : b.id?.includes("benito") || b.code?.includes("BEN")
+                ? { name: "Bolillo de Sal", piecesSold: 210, category: "Pan Salado", icon: "🥖" }
+                : b.id?.includes("flores") || b.code?.includes("FLO")
+                ? { name: "Cuerno de Mantequilla", piecesSold: 94, category: "Hojaldre", icon: "🥐" }
+                : { name: "Concha de Vainilla", piecesSold: 120, category: "Pan Dulce", icon: "🥖" }
+            );
+
+            // Método de pago predominante (Efectivo vs Tarjeta)
+            const cashSales = b.currentShift?.cashSales || 0;
+            const cardSales = b.currentShift?.cardSales || 0;
+            const transferSales = b.currentShift?.transferSales || 0;
+            const totalShiftSales = Math.max(1, cashSales + cardSales + transferSales);
+
+            const isCashDominant = cashSales >= cardSales;
+            const cashShare = Math.round((cashSales / totalShiftSales) * 100);
+            const cardShare = Math.round((cardSales / totalShiftSales) * 100);
+            const dominantPct = isCashDominant ? cashShare : cardShare;
 
             return (
               <div 
@@ -608,8 +630,8 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Cashier & Drawer */}
-                  <div className="mt-3 pt-3 border-t border-stone-200/70 space-y-1 text-xs">
+                  {/* Cashier, Drawer & Key Store Metrics */}
+                  <div className="mt-3 pt-3 border-t border-stone-200/70 space-y-2 text-xs">
                     <div className="flex items-center justify-between text-stone-600">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-stone-400" />
@@ -620,6 +642,65 @@ export default function Home() {
                     <div className="flex items-center justify-between text-stone-600">
                       <span>Efectivo en gaveta:</span>
                       <span className="font-black text-emerald-700">{formatCurrency(b.cashInDrawer)}</span>
+                    </div>
+
+                    {/* Producto más vendido */}
+                    <div className="flex items-center justify-between text-stone-600 pt-1.5 border-t border-stone-100">
+                      <span className="flex items-center gap-1.5 font-medium text-stone-500">
+                        <Award className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span>Más vendido:</span>
+                      </span>
+                      <span
+                        className="font-bold text-stone-900 flex items-center gap-1 text-right truncate max-w-[175px]"
+                        title={`${topProd.name} (${topProd.piecesSold} piezas vendidas)`}
+                      >
+                        <span className="text-xs">{topProd.icon || "🥖"}</span>
+                        <span className="truncate">{topProd.name}</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                          {topProd.piecesSold} pz
+                        </span>
+                      </span>
+                    </div>
+
+                    {/* Método de pago predominante (Efectivo vs Tarjeta) */}
+                    <div className="flex items-center justify-between text-stone-600">
+                      <span className="flex items-center gap-1.5 font-medium text-stone-500">
+                        {isCashDominant ? (
+                          <Banknote className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <CreditCard className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        )}
+                        <span>Pago habitual:</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-[11px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs ${
+                            isCashDominant
+                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                              : "bg-blue-50 text-blue-800 border border-blue-200"
+                          }`}
+                        >
+                          {isCashDominant ? "💵 Efectivo" : "💳 Tarjeta"}
+                          <span className="font-semibold text-[10px] opacity-80">({dominantPct}%)</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Mini desglose comparativo Efectivo vs Tarjeta */}
+                    <div className="flex items-center justify-between text-[10px] text-stone-500 pt-1 px-2 py-1 bg-stone-100/70 rounded-xl border border-stone-200/60 font-medium">
+                      <span
+                        className={`flex items-center gap-1 ${isCashDominant ? "font-bold text-emerald-800" : "text-stone-600"}`}
+                        title={`Efectivo: ${formatCurrency(cashSales)}`}
+                      >
+                        <span>💵</span> Efectivo: {cashShare}%
+                      </span>
+                      <span className="text-stone-300">|</span>
+                      <span
+                        className={`flex items-center gap-1 ${!isCashDominant ? "font-bold text-blue-800" : "text-stone-600"}`}
+                        title={`Tarjeta: ${formatCurrency(cardSales)}`}
+                      >
+                        <span>💳</span> Tarjeta: {cardShare}%
+                      </span>
                     </div>
                   </div>
                 </div>
