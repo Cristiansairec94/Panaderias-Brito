@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
@@ -52,6 +52,43 @@ export default function Header() {
   const [isLogoSpinning, setIsLogoSpinning] = useState(false);
   const [showBranchMenu, setShowBranchMenu] = useState(false);
   const [simulatedAlert, setSimulatedAlert] = useState<string | null>(null);
+
+  const branchMenuRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const toggleBranchMenu = () => {
+    setShowBranchMenu((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowUserMenu(false);
+      }
+      return next;
+    });
+  };
+
+  const toggleUserMenu = () => {
+    setShowUserMenu((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowBranchMenu(false);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (branchMenuRef.current && !branchMenuRef.current.contains(target)) {
+        setShowBranchMenu(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setShowUserMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLogoClick = () => {
     setIsLogoSpinning(true);
@@ -279,9 +316,9 @@ export default function Header() {
         </div>
 
         {/* Branch Selector Dropdown */}
-        <div className="relative z-[110]">
+        <div ref={branchMenuRef} className="relative z-[110]">
           <button
-            onClick={() => setShowBranchMenu(!showBranchMenu)}
+            onClick={toggleBranchMenu}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50/80 hover:bg-stone-100 text-stone-800 text-xs font-bold transition-all shadow-sm"
             title="Cambiar sucursal activa"
           >
@@ -410,9 +447,9 @@ export default function Header() {
         <NotificationsDropdown />
 
         {/* User Session Dropdown */}
-        <div className="relative z-[110]">
+        <div ref={userMenuRef} className="relative z-[110]">
           <button
-            onClick={() => setShowUserMenu(!showUserMenu)}
+            onClick={toggleUserMenu}
             className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/70 shadow-sm"
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-rose-500/20 overflow-hidden">
