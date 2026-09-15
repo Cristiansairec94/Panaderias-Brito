@@ -347,161 +347,164 @@ export default function Home() {
       </div>
 
       {/* Period Filter Bar & Live Sync Status */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-stone-200/90 shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-          </span>
-          <span className="text-xs font-black text-stone-900 uppercase tracking-wider">
-            Métricas de Rendimiento en Tiempo Real
-          </span>
-          <span className="text-xs text-stone-400 hidden md:inline">
-            • {isAllBranches ? "Consolidando las 3 sucursales de Brito" : `Filtrando sucursal ${currentBranch?.name}`}
-          </span>
+      {/* Live Global Quick Stats Hub (Métricas de Rendimiento en Tiempo Real) */}
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+            </span>
+            <h2 className="text-xs sm:text-sm font-black text-stone-900 uppercase tracking-wider">
+              Métricas de Rendimiento en Tiempo Real
+            </h2>
+            <span className="text-xs text-stone-400 hidden md:inline">
+              • {isAllBranches ? "Consolidando las 3 sucursales de Brito" : `Filtrando sucursal ${currentBranch?.name}`}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
+            <button
+              onClick={() => setSelectedPeriod("hoy")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                selectedPeriod === "hoy"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Hoy en Vivo
+            </button>
+            <button
+              onClick={() => setSelectedPeriod("semana")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                selectedPeriod === "semana"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Esta Semana
+            </button>
+            <button
+              onClick={() => setSelectedPeriod("mes")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+                selectedPeriod === "mes"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Este Mes
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
-          <button
-            onClick={() => setSelectedPeriod("hoy")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
-              selectedPeriod === "hoy"
-                ? "bg-white text-stone-900 shadow-sm"
-                : "text-stone-500 hover:text-stone-900"
-            }`}
-          >
-            Hoy en Vivo
-          </button>
-          <button
-            onClick={() => setSelectedPeriod("semana")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
-              selectedPeriod === "semana"
-                ? "bg-white text-stone-900 shadow-sm"
-                : "text-stone-500 hover:text-stone-900"
-            }`}
-          >
-            Esta Semana
-          </button>
-          <button
-            onClick={() => setSelectedPeriod("mes")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
-              selectedPeriod === "mes"
-                ? "bg-white text-stone-900 shadow-sm"
-                : "text-stone-500 hover:text-stone-900"
-            }`}
-          >
-            Este Mes
-          </button>
-        </div>
-      </div>
+        {/* 4 Hero KPI Cards: Ventas, Caja, Ticket Promedio, Piezas Horneadas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Card 1: Ventas Totales */}
+          <div className="bg-stone-50/60 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Ventas Totales</span>
+              <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200">
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+                {formatCurrency(activeSales)}
+              </p>
+              <div className="flex items-center justify-between text-xs text-stone-500 mt-1 font-semibold">
+                <span className="flex items-center gap-1 text-emerald-700">
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  {activeTickets} tickets
+                </span>
+                <span>{percentGoal}% de meta</span>
+              </div>
 
-      {/* 4 Hero KPI Cards: Ventas, Caja, Ticket Promedio, Piezas Horneadas */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: Ventas Totales */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-md transition-all space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Ventas Totales</span>
-            <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200">
-              <DollarSign className="w-5 h-5" />
+              {/* Goal Progress bar */}
+              <div className="w-full bg-stone-100 rounded-full h-2 mt-2 overflow-hidden border border-stone-200/60">
+                <div
+                  className="bg-gradient-to-r from-orange-500 via-rose-500 to-emerald-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${percentGoal}%` }}
+                />
+              </div>
+
+              {/* Payment method pills */}
+              <div className="flex items-center justify-between text-[10px] text-stone-500 pt-2 font-medium">
+                <span title={`Efectivo: ${formatCurrency(cashAmount)}`}>💵 {Math.round(cashShare * 100)}% Efec.</span>
+                <span title={`Tarjeta: ${formatCurrency(cardAmount)}`}>💳 {Math.round(cardShare * 100)}% Tarj.</span>
+                <span title={`Transferencia: ${formatCurrency(transferAmount)}`}>📱 {Math.round(transferShare * 100)}% Transf.</span>
+              </div>
             </div>
           </div>
-          <div>
-            <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-              {formatCurrency(activeSales)}
-            </p>
-            <div className="flex items-center justify-between text-xs text-stone-500 mt-1 font-semibold">
-              <span className="flex items-center gap-1 text-emerald-700">
+
+          {/* Card 2: Efectivo Neto en Caja */}
+          <div className="bg-stone-50/60 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Efectivo en Caja</span>
+              <div className="p-2.5 rounded-2xl bg-orange-50 text-orange-600 border border-orange-200">
+                <Wallet className="w-5 h-5" />
+              </div>
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+                {formatCurrency(activeCash)}
+              </p>
+              <p className="text-xs text-stone-600 mt-1 font-semibold">
+                {isAllBranches ? "3 gavetas activas" : `${currentBranch?.currentShift.name.split("(")[0]}`}
+              </p>
+              <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
+                <span>{isAllBranches ? "Total consolidado" : `Cajero: ${currentBranch?.currentShift.cashier}`}</span>
+                <Link href="/caja" className="text-orange-600 font-bold hover:underline flex items-center gap-0.5">
+                  Arqueo <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Ticket Promedio */}
+          <div className="bg-stone-50/60 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Ticket Promedio</span>
+              <div className="p-2.5 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
+                <Receipt className="w-5 h-5" />
+              </div>
+            </div>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+                {formatCurrency(avgTicket)}
+              </p>
+              <p className="text-xs text-emerald-700 font-semibold mt-1 flex items-center gap-1">
                 <ArrowUpRight className="w-3.5 h-3.5" />
-                {activeTickets} tickets
-              </span>
-              <span>{percentGoal}% de meta</span>
+                +8.4% vs semana previa
+              </p>
+              <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
+                <span>Gasto medio por cliente</span>
+                <span className="font-bold text-stone-700">~8.5 pzas/ticket</span>
+              </div>
             </div>
+          </div>
 
-            {/* Goal Progress bar */}
-            <div className="w-full bg-stone-100 rounded-full h-2 mt-2 overflow-hidden border border-stone-200/60">
-              <div
-                className="bg-gradient-to-r from-orange-500 via-rose-500 to-emerald-500 h-full rounded-full transition-all duration-500"
-                style={{ width: `${percentGoal}%` }}
-              />
+          {/* Card 4: Piezas Horneadas & Vendidas */}
+          <div className="bg-stone-50/60 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Piezas de Pan</span>
+              <div className="p-2.5 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200">
+                <Flame className="w-5 h-5" />
+              </div>
             </div>
-
-            {/* Payment method pills */}
-            <div className="flex items-center justify-between text-[10px] text-stone-500 pt-2 font-medium">
-              <span title={`Efectivo: ${formatCurrency(cashAmount)}`}>💵 {Math.round(cashShare * 100)}% Efec.</span>
-              <span title={`Tarjeta: ${formatCurrency(cardAmount)}`}>💳 {Math.round(cardShare * 100)}% Tarj.</span>
-              <span title={`Transferencia: ${formatCurrency(transferAmount)}`}>📱 {Math.round(transferShare * 100)}% Transf.</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Efectivo Neto en Caja */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-md transition-all space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Efectivo en Caja</span>
-            <div className="p-2.5 rounded-2xl bg-orange-50 text-orange-600 border border-orange-200">
-              <Wallet className="w-5 h-5" />
-            </div>
-          </div>
-          <div>
-            <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-              {formatCurrency(activeCash)}
-            </p>
-            <p className="text-xs text-stone-600 mt-1 font-semibold">
-              {isAllBranches ? "3 gavetas activas" : `${currentBranch?.currentShift.name.split("(")[0]}`}
-            </p>
-            <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-              <span>{isAllBranches ? "Total consolidado" : `Cajero: ${currentBranch?.currentShift.cashier}`}</span>
-              <Link href="/caja" className="text-orange-600 font-bold hover:underline flex items-center gap-0.5">
-                Arqueo <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Ticket Promedio */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-md transition-all space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Ticket Promedio</span>
-            <div className="p-2.5 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
-              <Receipt className="w-5 h-5" />
-            </div>
-          </div>
-          <div>
-            <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-              {formatCurrency(avgTicket)}
-            </p>
-            <p className="text-xs text-emerald-700 font-semibold mt-1 flex items-center gap-1">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              +8.4% vs semana previa
-            </p>
-            <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-              <span>Gasto medio por cliente</span>
-              <span className="font-bold text-stone-700">~8.5 pzas/ticket</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Piezas Horneadas & Vendidas */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 shadow-sm hover:shadow-md transition-all space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Piezas de Pan</span>
-            <div className="p-2.5 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200">
-              <Flame className="w-5 h-5" />
-            </div>
-          </div>
-          <div>
-            <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-              {estimatedPieces.toLocaleString("es-MX")} pzas
-            </p>
-            <p className="text-xs text-stone-600 mt-1 font-semibold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              5 tandas horneadas hoy
-            </p>
-            <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-              <span>Horno Leña & Gas</span>
-              <Link href="/inventario" className="text-rose-600 font-bold hover:underline flex items-center gap-0.5">
-                Almacén <ArrowRight className="w-3 h-3" />
-              </Link>
+            <div>
+              <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+                {estimatedPieces.toLocaleString("es-MX")} pzas
+              </p>
+              <p className="text-xs text-stone-600 mt-1 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                5 tandas horneadas hoy
+              </p>
+              <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
+                <span>Horno Leña & Gas</span>
+                <Link href="/inventario" className="text-rose-600 font-bold hover:underline flex items-center gap-0.5">
+                  Almacén <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -571,7 +574,7 @@ export default function Home() {
                 className={`p-5 rounded-3xl transition-all border flex flex-col justify-between space-y-4 ${
                   isSelected 
                     ? "bg-gradient-to-br from-orange-50/60 via-white to-rose-50/40 border-orange-400 shadow-lg ring-2 ring-orange-400/40" 
-                    : "bg-stone-50/60 hover:bg-white border-stone-200/90 hover:shadow-md"
+                    : "bg-stone-50/60 hover:bg-white border-stone-200/90 hover:border-orange-400 hover:shadow-md"
                 }`}
               >
                 <div>
