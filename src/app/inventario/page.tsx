@@ -19,7 +19,7 @@ import {
   FileCheck
 } from "lucide-react";
 import { InventoryItem, InventoryMovement } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 const INITIAL_INVENTORY: InventoryItem[] = [
@@ -91,7 +91,7 @@ export default function InventarioPage() {
       cost: totalCostNumber,
       reason: entrySupplier ? `Compra: ${entrySupplier}` : "Entrada directa de almacén",
       responsible: "Don Toño Brito",
-      timestamp: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+      timestamp: formatDateTimeSafe(),
     };
 
     setMovements((prev) => [newMov, ...prev]);
@@ -124,7 +124,7 @@ export default function InventarioPage() {
       cost: qtyNumber * targetItem.costPerUnit,
       reason: wasteReason || (wasteType === "merma_horno" ? "Merma en horneado" : "Pan duro de mostrador"),
       responsible: "Maestro Panadero Juan",
-      timestamp: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+      timestamp: formatDateTimeSafe(),
     };
 
     setMovements((prev) => [newMov, ...prev]);

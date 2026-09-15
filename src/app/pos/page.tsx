@@ -50,7 +50,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
 import { 
@@ -431,14 +431,24 @@ export default function POSPage() {
   // Shift & Cashier state
   const [cashierName, setCashierName] = useState(activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino");
   const [shiftName, setShiftName] = useState(activeBranch ? activeBranch.currentShift.name : "Turno Matutino (06:00 - 14:00)");
-  const [initialCashFund, setInitialCashFund] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("brito_pos_initial_fund");
-        if (saved && !isNaN(Number(saved))) return Number(saved);
-      } catch (e) {}
-    }
-    return activeBranch ? activeBranch.currentShift.initialFund : 500;
+  const getStoredShiftFund = (fallback: number = 500): number => {
+    if (typeof window === "undefined") return fallback;
+    try {
+      const raw = localStorage.getItem("brito_shift_cuts_history");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0].nextFund === "number") {
+          return parsed[0].nextFund;
+        }
+      }
+      const saved = localStorage.getItem("brito_pos_initial_fund");
+      if (saved && !isNaN(Number(saved))) return Number(saved);
+    } catch (e) {}
+    return fallback;
+  };
+
+  const [initialCashFund, setInitialCashFund] = useState<number>(() => {
+    return getStoredShiftFund(activeBranch ? activeBranch.currentShift.initialFund : 500);
   });
 
   // Configuración de Impresora Directa para Tickets
@@ -457,6 +467,20 @@ export default function POSPage() {
     return () => window.removeEventListener("brito_printer_config_updated", handlePrinterUpdate);
   }, []);
 
+  // Sincronización automática de cortes de turno y fondos de caja
+  useEffect(() => {
+    const handleShiftSync = () => {
+      const fund = getStoredShiftFund();
+      setInitialCashFund(fund);
+    };
+    window.addEventListener("brito_shift_cuts_updated", handleShiftSync);
+    window.addEventListener("storage", handleShiftSync);
+    return () => {
+      window.removeEventListener("brito_shift_cuts_updated", handleShiftSync);
+      window.removeEventListener("storage", handleShiftSync);
+    };
+  }, []);
+
   // Auto-sync user and branch
   useEffect(() => {
     if (user) {
@@ -468,10 +492,11 @@ export default function POSPage() {
     }
   }, [user, branches]);
 
-  // Sync shift info when branch changes
+  // Sync shift info when branch changes (respetando el fondo del último corte cerrado)
   useEffect(() => {
     if (activeBranch) {
-      setInitialCashFund(activeBranch.currentShift.initialFund);
+      const storedFund = getStoredShiftFund(activeBranch.currentShift.initialFund);
+      setInitialCashFund(storedFund);
       setShiftName(activeBranch.currentShift.name);
       if (!user) {
         setCashierName(activeBranch.assignedUserName || activeBranch.currentShift.cashier);
@@ -498,8 +523,42 @@ export default function POSPage() {
     return INITIAL_BREAD_DELIVERIES;
   });
   const [completedSale, setCompletedSale] = useState<Sale | null>(null);
-  const [recentSalesList, setRecentSalesList] = useState<Sale[]>([]);
-  const [expensesList, setExpensesList] = useState<CashExpense[]>(INITIAL_EXPENSES);
+  const [recentSalesList, setRecentSalesList] = useState<Sale[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("brito_pos_current_sales");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {}
+    }
+    return [];
+  });
+  const [expensesList, setExpensesList] = useState<CashExpense[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("brito_pos_current_expenses");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {}
+    }
+    return INITIAL_EXPENSES;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("brito_pos_current_sales", JSON.stringify(recentSalesList));
+    } catch (e) {}
+  }, [recentSalesList]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("brito_pos_current_expenses", JSON.stringify(expensesList));
+    } catch (e) {}
+  }, [expensesList]);
   const [shiftModalTab, setShiftModalTab] = useState<"cuentas" | "cambio" | "corte" | "historial">("cambio");
   const [showIncomesModal, setShowIncomesModal] = useState(false);
   const [incomesList, setIncomesList] = useState<CashIncome[]>(() => {
@@ -746,11 +805,13 @@ export default function POSPage() {
   const handleCompleteShiftCut = () => {
     setRecentSalesList([]);
     setExpensesList([]);
-    setShowCashDrawerModal(false);
-    setIsShiftLocked(true);
     try {
+      localStorage.removeItem("brito_pos_current_sales");
+      localStorage.removeItem("brito_pos_current_expenses");
       localStorage.setItem("brito_pos_shift_locked", "true");
     } catch (e) {}
+    setShowCashDrawerModal(false);
+    setIsShiftLocked(true);
   };
 
   // Carga y sincronización directa con el catálogo del apartado de productos (/productos)
@@ -837,10 +898,7 @@ export default function POSPage() {
         if (salesData && !salesErr) {
           const mappedSales: Sale[] = salesData.map((s: any) => ({
             id: s.id,
-            date: new Date(s.created_at).toLocaleString("es-MX", {
-              dateStyle: "short",
-              timeStyle: "short",
-            }),
+            date: formatDateTimeSafe(s.created_at),
             total: Number(s.total),
             paymentMethod: (s.payment_method as any) || "efectivo",
             cashier: s.cashier || "Don Toño Brito",
@@ -871,10 +929,7 @@ export default function POSPage() {
             category: e.category,
             description: e.description,
             cashier: e.cashier || "Don Toño Brito",
-            date: new Date(e.created_at).toLocaleString("es-MX", {
-              dateStyle: "short",
-              timeStyle: "short",
-            }),
+            date: formatDateTimeSafe(e.created_at),
           }));
           setExpensesList(mappedExp);
         }
@@ -1320,7 +1375,7 @@ export default function POSPage() {
 
       const newSaleRecord: Sale = {
         id: createdSaleId,
-        date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+        date: formatDateTimeSafe(new Date()),
         items: currentItems,
         total: currentTotal,
         paymentMethod: currentPaymentMethod,
@@ -2175,6 +2230,16 @@ export default function POSPage() {
             </div>
               </div>
               <div className="flex items-center gap-2 relative z-10">
+                <button
+                  type="button"
+                  onClick={() => handleOpenCreateOrder(cart.length > 0)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-stone-950 font-black text-xs shadow-xs hover:shadow-md transition-all active:scale-95 border border-amber-300 cursor-pointer"
+                  title="Levantar Pedido Especial para otra fecha con anticipo"
+                >
+                  <Cake className="w-3.5 h-3.5 text-stone-950" />
+                  <span className="hidden sm:inline">Pedido Especial</span>
+                  <span className="sm:hidden">Especial</span>
+                </button>
                 <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all ${
                   totalPieces > 0
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/60 scale-105 animate-pulse"
@@ -2450,6 +2515,25 @@ export default function POSPage() {
           </div>
         </div>
 
+        {/* ACCESO RÁPIDO PARA PEDIDOS ESPECIALES / ENCARGOS */}
+        <div className="px-3 py-1.5 bg-gradient-to-r from-amber-100/90 via-orange-50 to-amber-100/80 border-b border-amber-200/90 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs">🎂</span>
+            <span className="text-[11px] font-bold text-amber-950 truncate">
+              ¿Pasteles o encargo para otra fecha?
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleOpenCreateOrder(cart.length > 0)}
+            className="py-1 px-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl shadow-2xs transition-all active:scale-95 border border-amber-400/80 flex items-center gap-1 shrink-0 cursor-pointer"
+            title="Abrir formulario de Pedido Especial con anticipo"
+          >
+            <Cake className="w-3.5 h-3.5 text-stone-950" />
+            <span>+ Pedido Especial</span>
+          </button>
+        </div>
+
         {/* ALERTA VISUAL DE ESCANEO DENTRO DE LA CHAROLA */}
         {lastScannedItem && (
           <div className={`mx-2 sm:mx-3 mt-2 p-2 rounded-xl border-2 flex items-center justify-between gap-2 text-xs font-bold transition-all shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 shrink-0 ${
@@ -2504,6 +2588,17 @@ export default function POSPage() {
                 <p className="text-[11px] text-stone-500 max-w-[220px] leading-relaxed mx-auto font-medium">
                   Escanea el código de barras o toca cualquier pan del mostrador para agregarlo al cobro.
                 </p>
+              </div>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenCreateOrder(false)}
+                  className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black text-xs shadow-xs hover:shadow-md transition-all active:scale-95 border border-amber-400 flex items-center gap-1.5 mx-auto cursor-pointer"
+                  title="Levantar un pedido especial para otra fecha"
+                >
+                  <Cake className="w-4 h-4 text-stone-950" />
+                  <span>Hacer Pedido Especial</span>
+                </button>
               </div>
             </div>
           ) : (
@@ -3205,8 +3300,13 @@ export default function POSPage() {
           onChangeCashier={setCashierName}
           shiftName={shiftName}
           onChangeShift={setShiftName}
-          initialFund={initialCashFund}
-          onChangeInitialFund={setInitialCashFund}
+          initialFund={baseShiftFund}
+          onChangeInitialFund={(val) => {
+            setInitialCashFund(val);
+            try {
+              localStorage.setItem("brito_pos_initial_fund", val.toString());
+            } catch (e) {}
+          }}
           sales={recentSalesList}
           expenses={expensesList}
           incomes={incomesList}

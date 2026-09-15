@@ -3,7 +3,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Printer, CheckCircle, X, Receipt, Settings2, Zap } from "lucide-react";
 import { CartItem } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe } from "@/lib/utils";
 import { playCashRegisterSound } from "@/lib/sound";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
@@ -103,10 +103,7 @@ export default function TicketModal({
   if (!isOpen) return null;
 
   const totalPieces = items.reduce((sum, item) => sum + item.quantity, 0);
-  const formattedDate = date || new Date().toLocaleString("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const formattedDate = date || formatDateTimeSafe();
   const folio = saleId ? saleId.slice(-6).toUpperCase() : `POS-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const [printed, setPrinted] = React.useState(false);

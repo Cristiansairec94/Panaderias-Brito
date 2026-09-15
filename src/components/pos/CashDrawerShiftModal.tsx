@@ -32,7 +32,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe } from "@/lib/utils";
 import { useNotifications } from "@/context/NotificationContext";
 
 interface CashDrawerShiftModalProps {
@@ -55,7 +55,7 @@ interface CashDrawerShiftModalProps {
 const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [
   {
     id: "CORTE-948210",
-    date: new Date(Date.now() - 6 * 3600000).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+    date: formatDateTimeSafe(new Date(Date.now() - 6 * 3600000)),
     timestamp: Date.now() - 6 * 3600000,
     shiftRange: "06:00 AM — 02:00 PM",
     outgoingCashier: "Cajera 1 - Turno Matutino",
@@ -79,7 +79,7 @@ const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [
   },
   {
     id: "CORTE-893120",
-    date: new Date(Date.now() - 26 * 3600000).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+    date: formatDateTimeSafe(new Date(Date.now() - 26 * 3600000)),
     timestamp: Date.now() - 26 * 3600000,
     shiftRange: "02:00 PM — 10:00 PM",
     outgoingCashier: "Cajera 2 - Turno Vespertino",
@@ -196,9 +196,11 @@ export default function CashDrawerShiftModal({
 
   useEffect(() => {
     if (isOpen) {
-      setNextInitialFund("");
+      const defaultFund = initialFund > 0 ? initialFund : 500;
+      setNextInitialFund(defaultFund.toString());
+      setCountedCash("");
     }
-  }, [isOpen]);
+  }, [isOpen, initialFund]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -258,10 +260,7 @@ export default function CashDrawerShiftModal({
     if (!isNextFundValid) return;
     setIsFinalizing(true);
 
-    const nowDateTime = new Date().toLocaleString("es-MX", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
+    const nowDateTime = formatDateTimeSafe();
 
     const newFolio = `CORTE-${Date.now().toString().slice(-6)}`;
 
@@ -909,6 +908,39 @@ export default function CashDrawerShiftModal({
                           <span className="text-emerald-700 font-bold">
                             ✓ Monto válido
                           </span>
+                        )}
+                      </div>
+
+                      {/* Botones de Atajo Rápido para Fondo Siguiente */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        <span className="text-[10px] text-stone-500 font-bold self-center mr-1">Atajos:</span>
+                        {initialFund > 0 && initialFund <= maxAllowedFund && (
+                          <button
+                            type="button"
+                            onClick={() => setNextInitialFund(initialFund.toString())}
+                            className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-black rounded-lg border border-amber-300 transition-colors cursor-pointer"
+                          >
+                            Mismo fondo ({formatCurrency(initialFund)})
+                          </button>
+                        )}
+                        {[300, 500, 800, 1000].filter((val) => val <= maxAllowedFund && val !== initialFund).map((val) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setNextInitialFund(val.toString())}
+                            className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-black rounded-lg border border-stone-300 transition-colors cursor-pointer"
+                          >
+                            {formatCurrency(val)}
+                          </button>
+                        ))}
+                        {maxAllowedFund > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setNextInitialFund(maxAllowedFund.toString())}
+                            className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-black rounded-lg border border-emerald-300 transition-colors cursor-pointer"
+                          >
+                            Todo ({formatCurrency(maxAllowedFund)})
+                          </button>
                         )}
                       </div>
                     </div>

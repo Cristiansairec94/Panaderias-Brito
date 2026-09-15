@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState, useMemo } from "react";
 import {
   Printer,
   X,
@@ -14,10 +14,13 @@ import {
   CheckCircle2,
   Cake,
   Receipt,
-  Download
+  Download,
+  UserPlus
 } from "lucide-react";
-import { CustomOrder } from "@/types";
+import { CustomOrder, Customer } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { getStoredCustomers, createCustomerInDb } from "@/lib/customers";
+import { updateCustomOrder } from "@/lib/orders";
 
 interface OrderReceiptModalProps {
   isOpen: boolean;
@@ -27,6 +30,78 @@ interface OrderReceiptModalProps {
 
 export default function OrderReceiptModal({ isOpen, onClose, order }: OrderReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [isSavedRecently, setIsSavedRecently] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null);
+
+  // Verificar si el cliente ya está registrado en la base de datos
+  const existingCustomer = useMemo(() => {
+    if (!order) return null;
+    const all = getStoredCustomers();
+    if (order.customerId && order.customerId !== "cli-0" && order.customerId !== "cli-general") {
+      const byId = all.find((c) => c.id === order.customerId);
+      if (byId) return byId;
+    }
+    const cleanPhone = order.phone?.replace(/\D/g, "");
+    return all.find((c) => {
+      const matchName = c.name.toLowerCase().trim() === order.customerName.toLowerCase().trim();
+      const matchPhone = cleanPhone && cleanPhone.length >= 7 && c.phone.replace(/\D/g, "").includes(cleanPhone);
+      return matchName || matchPhone;
+    }) || null;
+  }, [order, isSavedRecently]);
+
+  const isCustomerRegistered = Boolean(existingCustomer || isSavedRecently);
+
+  // Captura y registro automático del cliente
+  const handleAddCustomer = async () => {
+    if (!order || isSaving) return;
+    setIsSaving(true);
+    setSaveStatusMessage(null);
+
+    try {
+      const custName = order.customerName.trim();
+      const custPhone = order.phone?.trim() || "N/A";
+      const custAddress = order.deliveryAddress?.trim() || undefined;
+      const mainItem = order.items && order.items.length > 0 ? order.items[0].name : undefined;
+      const custNotes = order.dedication 
+        ? `Dedicatoria: "${order.dedication}" (Pedido ${order.orderNumber})` 
+        : order.description 
+        ? `${order.description} (Pedido ${order.orderNumber})`
+        : `Registrado automáticamente desde pedido ${order.orderNumber}`;
+
+      const custType: Customer["type"] = order.total >= 1000 ? "mayoreo" : "frecuente";
+
+      const newCust = await createCustomerInDb({
+        name: custName,
+        phone: custPhone,
+        address: custAddress,
+        notes: custNotes,
+        type: custType,
+        favoriteProduct: mainItem,
+      });
+
+      // Vincular el ID del nuevo cliente al pedido
+      try {
+        updateCustomOrder(order.id, { customerId: newCust.id });
+      } catch (e) {}
+
+      // Disparar evento para sincronizar con POS y catálogo de Clientes
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("brito_customers_updated"));
+      }
+
+      setIsSavedRecently(true);
+      setSaveStatusMessage(`¡Cliente "${custName}" añadido exitosamente con sus datos!`);
+      setTimeout(() => {
+        setSaveStatusMessage(null);
+      }, 5000);
+    } catch (err) {
+      console.error("Error al añadir cliente:", err);
+      setSaveStatusMessage("Error al guardar cliente. Inténtalo de nuevo.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!isOpen || !order) return null;
 
@@ -53,7 +128,10 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
       (order.dedication ? `📝 *Observaciones:* "${order.dedication}"\n` : "") +
       `\n*Detalle del pedido:*\n${itemsText}\n\n` +
       `💰 *Total:* ${formatCurrency(order.total)}\n` +
-      `💵 *Anticipo Pagado:* ${formatCurrency(order.deposit)}\n` +
+      `💵 *Anticipo Pagado:* ${formatCurrency(order.deposit)} (${order.paymentMethod === "transferencia" ? "Transferencia SPEI" : order.paymentMethod === "tarjeta" ? "Tarjeta" : "Efectivo"})\n` +
+      (order.transferAccount ? `💳 *Cuenta/Tarjeta:* ${order.transferAccount}\n` : "") +
+      (order.cardTerminal ? `🏢 *Terminal:* ${order.cardTerminal}\n` : "") +
+      (order.paymentReference ? `🧾 *Comprobante/Ref:* ${order.paymentReference}\n` : "") +
       `⚠️ *Resta por liquidar:* ${formatCurrency(order.remainingBalance)}\n\n` +
       `¡Muchas gracias por tu preferencia! Cualquier duda comunícate con nosotros.`;
 
@@ -179,6 +257,31 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
                 <span>ANTICIPO PAGADO:</span>
                 <span>{formatCurrency(order.deposit)}</span>
               </div>
+              {order.paymentMethod && (
+                <div className="text-[10px] text-stone-500 font-sans space-y-0.5 pt-0.5 border-t border-dotted border-stone-200">
+                  <div className="flex justify-between">
+                    <span>Método de anticipo:</span>
+                    <span className="font-bold text-stone-800 uppercase">
+                      {order.paymentMethod === "transferencia" ? "Transferencia SPEI" : order.paymentMethod === "tarjeta" ? "Tarjeta en Terminal" : "Efectivo"}
+                    </span>
+                  </div>
+                  {order.transferAccount && (
+                    <div className="text-[9px] text-stone-600 truncate">
+                      ↳ {order.transferAccount}
+                    </div>
+                  )}
+                  {order.cardTerminal && (
+                    <div className="text-[9px] text-stone-600 truncate">
+                      ↳ {order.cardTerminal}
+                    </div>
+                  )}
+                  {order.paymentReference && (
+                    <div className="text-[9px] text-stone-600 font-mono">
+                      Ref / Folio: {order.paymentReference}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex justify-between items-center text-rose-600 font-extrabold text-sm pt-1 border-t border-dashed border-stone-300">
                 <span>FALTA POR LIQUIDAR:</span>
                 <span>{order.remainingBalance === 0 ? "¡LIQUIDADO!" : formatCurrency(order.remainingBalance)}</span>
@@ -211,21 +314,62 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
         </div>
 
         {/* Modal Actions */}
-        <div className="bg-white border-t border-stone-200 p-4 px-6 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={handleWhatsApp}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
-          >
-            <Send className="w-4 h-4" /> Enviar por WhatsApp
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
-          >
-            <Printer className="w-4 h-4" /> Imprimir Comprobante
-          </button>
+        <div className="bg-white border-t border-stone-200 p-4 px-5 space-y-2.5">
+          {/* Mensaje de confirmación si se guardó el cliente */}
+          {saveStatusMessage && (
+            <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-900 text-xs font-bold text-center flex items-center justify-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{saveStatusMessage}</span>
+            </div>
+          )}
+
+          {/* Fila de Acciones */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* 1. Botón Añadir Cliente */}
+            <button
+              type="button"
+              onClick={handleAddCustomer}
+              disabled={isCustomerRegistered || isSaving}
+              className={`text-xs font-black py-2.5 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                isCustomerRegistered
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-300/80 cursor-default"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-md active:scale-95"
+              }`}
+              title={isCustomerRegistered ? "El cliente ya está registrado en el catálogo" : "Capturar automáticamente los datos del cliente y agregarlo"}
+            >
+              {isCustomerRegistered ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="truncate">✓ Cliente Registrado</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{isSaving ? "Guardando..." : "Añadir Cliente"}</span>
+                </>
+              )}
+            </button>
+
+            {/* 2. Enviar por WhatsApp */}
+            <button
+              type="button"
+              onClick={handleWhatsApp}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+            >
+              <Send className="w-4 h-4 shrink-0" />
+              <span className="truncate">Enviar por WhatsApp</span>
+            </button>
+
+            {/* 3. Imprimir Comprobante */}
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+            >
+              <Printer className="w-4 h-4 shrink-0" />
+              <span className="truncate">Imprimir Comprobante</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

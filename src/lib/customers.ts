@@ -1,5 +1,6 @@
 import { Customer, CustomerPurchase } from "@/types";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTimeSafe } from "@/lib/utils";
 
 export const STORAGE_CUSTOMERS_KEY = "brito_customers";
 
@@ -367,7 +368,7 @@ export function recordCustomerSale(
     // Registrar en el historial de compras del cliente
     const newPurchase: CustomerPurchase = {
       id: `comp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+      date: formatDateTimeSafe(new Date()),
       total: saleAmount,
       branchName: branchName || "Sucursal Matriz",
       cashier: cashier || "Don Toño Brito",

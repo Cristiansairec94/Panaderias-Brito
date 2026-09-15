@@ -18,7 +18,7 @@ import {
   Building
 } from "lucide-react";
 import { CashIncome, CashIncomeCategory } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 
@@ -103,7 +103,7 @@ export default function IncomesModal({
       customerName: customerOrOrder.trim() || undefined,
       cashier: cashier.trim() || defaultCashier,
       branchName,
-      date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+      date: formatDateTimeSafe(new Date()),
       timestamp: new Date().toISOString(),
     };
 

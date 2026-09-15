@@ -30,6 +30,8 @@ export interface TransferAccount {
   bank: string;
   clabe: string;
   accountNumber?: string;
+  cardNumber?: string;
+  cardType?: string;
 }
 
 export interface CardTerminalAccount {
@@ -97,6 +99,9 @@ export interface OrderPayment {
   paymentMethod: "efectivo" | "tarjeta" | "transferencia";
   cashier: string;
   notes?: string;
+  transferAccount?: string;
+  cardTerminal?: string;
+  paymentReference?: string;
 }
 
 export interface CustomOrder {
@@ -119,6 +124,9 @@ export interface CustomOrder {
   remainingBalance: number;
   paymentStatus: "anticipo" | "liquidado" | "sin_anticipo";
   paymentMethod?: "efectivo" | "tarjeta" | "transferencia";
+  transferAccount?: string;
+  cardTerminal?: string;
+  paymentReference?: string;
   dedication?: string;
   notes?: string;
   createdAt: string;

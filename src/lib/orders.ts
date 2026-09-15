@@ -1,4 +1,5 @@
 import { CustomOrder, OrderItem, OrderPayment, CashIncome } from "@/types";
+import { formatDateTimeSafe } from "@/lib/utils";
 
 export const STORAGE_ORDERS_KEY = "brito_custom_orders";
 
@@ -366,11 +367,7 @@ export function generateNextOrderNumber(): string {
 }
 
 function formatOrderDateTime(d: Date = new Date()): string {
-  try {
-    return d.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
-  } catch {
-    return `${d.toLocaleDateString("es-MX")} ${d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
-  }
+  return formatDateTimeSafe(d);
 }
 
 /**
@@ -393,6 +390,9 @@ export function addCustomOrder(data: {
   total: number;
   deposit: number;
   paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  transferAccount?: string;
+  cardTerminal?: string;
+  paymentReference?: string;
   dedication?: string;
   notes?: string;
   cashier: string;
@@ -413,6 +413,9 @@ export function addCustomOrder(data: {
       amount: deposit,
       paymentMethod: data.paymentMethod,
       cashier: data.cashier,
+      transferAccount: data.transferAccount,
+      cardTerminal: data.cardTerminal,
+      paymentReference: data.paymentReference,
       notes: remaining === 0 ? "Pago total inmediato" : "Anticipo al levantar pedido",
     });
 
@@ -451,6 +454,9 @@ export function addCustomOrder(data: {
     remainingBalance: remaining,
     paymentStatus: paymentStatus,
     paymentMethod: data.paymentMethod,
+    transferAccount: data.transferAccount,
+    cardTerminal: data.cardTerminal,
+    paymentReference: data.paymentReference,
     dedication: data.dedication?.trim(),
     notes: data.notes?.trim(),
     createdAt: new Date().toISOString(),

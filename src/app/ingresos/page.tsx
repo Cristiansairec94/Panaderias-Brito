@@ -30,7 +30,7 @@ import {
   Building2
 } from "lucide-react";
 import { CashIncome, CashIncomeCategory, Customer, CustomOrder } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -238,7 +238,7 @@ export default function IngresosPage() {
       referenceNumber: referenceNumber.trim() || undefined,
       cashier: user?.name || "Don Toño Brito",
       branchName,
-      date: new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }),
+      date: formatDateTimeSafe(new Date()),
       timestamp: new Date().toISOString(),
     };
 

@@ -26,16 +26,19 @@ import {
   Search,
   UserPlus,
   Users,
-  Check
+  Check,
+  Barcode,
+  Copy
 } from "lucide-react";
 import { Product, Customer, OrderItem } from "@/types";
-import { getStoredProducts } from "@/lib/products";
+import { getStoredProducts, findProductByBarcodeOrCode } from "@/lib/products";
 import { getStoredCustomers, addQuickCustomer, createCustomerInDb } from "@/lib/customers";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, playScanBeep } from "@/lib/utils";
 import { addCustomOrder } from "@/lib/orders";
+import { DEFAULT_TRANSFER_ACCOUNTS, DEFAULT_CARD_TERMINALS, ExtendedTransferAccount } from "@/lib/paymentAccounts";
 
 /**
  * Retorna fecha local en formato YYYY-MM-DD sin desviaciones por zona horaria UTC
@@ -159,6 +162,10 @@ export default function CreateOrderModal({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
+  // Pregunta al finalizar pedido sobre registrar al cliente en el catálogo
+  const [showAskCustomerModal, setShowAskCustomerModal] = useState(false);
+  const [saveCustomerDecision, setSaveCustomerDecision] = useState<"ask" | "yes" | "no">("ask");
+
   // Modal de Añadir / Seleccionar Cliente
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [customerModalTab, setCustomerModalTab] = useState<"search" | "new">("search");
@@ -185,6 +192,23 @@ export default function CreateOrderModal({
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
 
+  // Escáner de código de barras (POS)
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const [lastScannedAlert, setLastScannedAlert] = useState<{
+    success: boolean;
+    message: string;
+    productName?: string;
+    price?: number;
+    code?: string;
+  } | null>(null);
+
+  // Buffer para pistola de código de barras USB / Bluetooth
+  const keyStrokeBufferRef = useRef<{ buffer: string; lastStrokeTime: number }>({
+    buffer: "",
+    lastStrokeTime: 0,
+  });
+
   // 3. Entrega (fecha local sin desfases de huso horario UTC)
   const tomorrowStr = useMemo(() => getLocalDateStr(1), []);
   const [deliveryDate, setDeliveryDate] = useState<string>(tomorrowStr);
@@ -205,6 +229,26 @@ export default function CreateOrderModal({
   // 4. Cobro del Anticipo (50% obligatorio)
   const [deposit, setDeposit] = useState<number | "">("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
+  const [selectedTransferAccountId, setSelectedTransferAccountId] = useState<string>(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+  const [selectedCardTerminalId, setSelectedCardTerminalId] = useState<string>(DEFAULT_CARD_TERMINALS[0].id);
+  const [paymentReference, setPaymentReference] = useState<string>("");
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const selectedTransferAccount = useMemo(() => {
+    return DEFAULT_TRANSFER_ACCOUNTS.find((acc) => acc.id === selectedTransferAccountId) || DEFAULT_TRANSFER_ACCOUNTS[0];
+  }, [selectedTransferAccountId]);
+
+  const selectedCardTerminal = useMemo(() => {
+    return DEFAULT_CARD_TERMINALS.find((term) => term.id === selectedCardTerminalId) || DEFAULT_CARD_TERMINALS[0];
+  }, [selectedCardTerminalId]);
+
+  const handleCopyText = (text: string, fieldId: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text.replace(/\s+/g, ""));
+      setCopiedField(fieldId);
+      setTimeout(() => setCopiedField(null), 2500);
+    }
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Cargar datos al abrir
@@ -252,6 +296,15 @@ export default function CreateOrderModal({
       setShowCatalog(false);
       setShowCustomerSearch(false);
       setPaymentMethod("efectivo");
+      setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+      setSelectedCardTerminalId(DEFAULT_CARD_TERMINALS[0].id);
+      setPaymentReference("");
+      setCopiedField(null);
+      setBarcodeInput("");
+      setLastScannedAlert(null);
+      keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
+      setShowAskCustomerModal(false);
+      setSaveCustomerDecision("ask");
     }
   }, [isOpen, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone, tomorrowStr, initialBranchId, activeBranch, branches]);
 
@@ -398,6 +451,133 @@ export default function CreateOrderModal({
     });
   };
 
+  // Escaneo y verificación de código de barras desde catálogo del POS
+  const handleBarcodeScan = (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+
+    const currentStored = getStoredProducts();
+    const matched =
+      findProductByBarcodeOrCode(code, products) ||
+      findProductByBarcodeOrCode(code, currentStored);
+
+    if (matched) {
+      handleAddProductFromCatalog(matched);
+      playScanBeep(true);
+      setLastScannedAlert({
+        success: true,
+        message: `¡Producto verificado y agregado!`,
+        productName: matched.name,
+        price: matched.price,
+        code: matched.barcode || matched.code || code,
+      });
+      setBarcodeInput("");
+
+      // Limpiar mensaje de éxito tras 4 segundos
+      setTimeout(() => {
+        setLastScannedAlert((prev) =>
+          prev?.code === (matched.barcode || matched.code || code) ? null : prev
+        );
+      }, 4000);
+    } else {
+      playScanBeep(false);
+      setLastScannedAlert({
+        success: false,
+        message: `Código "${code}" no encontrado en el catálogo del Punto de Venta.`,
+        code,
+      });
+
+      // Limpiar mensaje de error tras 4.5 segundos
+      setTimeout(() => {
+        setLastScannedAlert((prev) => (prev?.code === code ? null : prev));
+      }, 4500);
+    }
+  };
+
+  // Listener global de teclado para pistola lectora física USB / Bluetooth (Keyboard Wedge)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Si el modal de nuevo cliente está abierto o se está guardando, no procesar escaneo
+      if (isCustomerModalOpen || isSubmitting) return;
+
+      const activeElem = document.activeElement;
+      const isBarcodeField = activeElem === barcodeInputRef.current;
+      const isOtherInput =
+        activeElem instanceof HTMLInputElement ||
+        activeElem instanceof HTMLTextAreaElement;
+
+      // Si está enfocado en el campo del código de barras y presiona Enter
+      if (isBarcodeField) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          handleBarcodeScan(barcodeInput);
+        }
+        return;
+      }
+
+      // Si está enfocado en el buscador de catálogo y presiona Enter
+      if (
+        isOtherInput &&
+        activeElem &&
+        (activeElem as HTMLElement).getAttribute("data-catalog-search") === "true"
+      ) {
+        if (e.key === "Enter" && catalogSearch.trim()) {
+          const matched =
+            findProductByBarcodeOrCode(catalogSearch.trim(), products) ||
+            findProductByBarcodeOrCode(catalogSearch.trim(), getStoredProducts());
+          if (matched) {
+            e.preventDefault();
+            handleBarcodeScan(catalogSearch.trim());
+            setCatalogSearch("");
+            return;
+          }
+        }
+      }
+
+      const now = Date.now();
+      const timeDiff = now - keyStrokeBufferRef.current.lastStrokeTime;
+
+      // Cuando la pistola de código de barras termina de escanear envía Enter
+      if (e.key === "Enter") {
+        if (keyStrokeBufferRef.current.buffer.length >= 2) {
+          e.preventDefault();
+          const scannedCode = keyStrokeBufferRef.current.buffer;
+          keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
+          handleBarcodeScan(scannedCode);
+        } else {
+          keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
+        }
+        return;
+      }
+
+      // Si el foco está en otro input (ej. nombre del cliente, dirección, notas),
+      // solo capturar en el buffer si la ráfaga de teclas es ultra rápida típica de escáner (<45ms)
+      if (isOtherInput) {
+        if (timeDiff > 45) {
+          keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: now };
+          return;
+        }
+      }
+
+      // Acumular caracteres del lector
+      if (e.key.length === 1) {
+        if (timeDiff > 250) {
+          keyStrokeBufferRef.current.buffer = e.key;
+        } else {
+          keyStrokeBufferRef.current.buffer += e.key;
+        }
+        keyStrokeBufferRef.current.lastStrokeTime = now;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, isCustomerModalOpen, isSubmitting, barcodeInput, catalogSearch, products]);
+
   const handleUpdateItemQty = (index: number, delta: number) => {
     setItems((prev) => {
       const copy = [...prev];
@@ -422,6 +602,54 @@ export default function CreateOrderModal({
     });
   };
 
+  // Lista de los próximos 7 días para selección rápida táctil de fecha
+  const upcomingDays = useMemo(() => {
+    const list = [];
+    const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+    const fullDayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
+
+      let shortTitle = "";
+      if (i === 0) shortTitle = "Hoy";
+      else if (i === 1) shortTitle = "Mañana";
+      else shortTitle = dayNames[d.getDay()];
+
+      list.push({
+        dateStr,
+        shortTitle,
+        dayOfWeek: fullDayNames[d.getDay()],
+        dayNum: d.getDate(),
+        monthStr: monthNames[d.getMonth()],
+      });
+    }
+    return list;
+  }, []);
+
+  // Formato amigable de la fecha de entrega seleccionada
+  const selectedDeliveryDateLabel = useMemo(() => {
+    if (!deliveryDate) return "";
+    const parts = deliveryDate.split("-");
+    if (parts.length !== 3) return deliveryDate;
+    const year = parseInt(parts[0], 10);
+    const monthIndex = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const d = new Date(year, monthIndex, day);
+    const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const monthNames = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+    return `${dayNames[d.getDay()]}, ${day} de ${monthNames[monthIndex]} de ${year}`;
+  }, [deliveryDate]);
+
   // Atajos rápidos de fecha (usando fecha local para evitar errores de huso horario)
   const handleSetQuickDate = (days: number) => {
     setDeliveryDate(getLocalDateStr(days));
@@ -434,51 +662,12 @@ export default function CreateOrderModal({
     setDeliveryDate(getLocalDateStr(diff));
   };
 
-  // Guardar y levantar pedido
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!customerName.trim()) {
-      alert("Por favor escribe el nombre de la persona que encarga el pedido.");
-      customerNameInputRef.current?.focus();
-      return;
-    }
-
-    if (total <= 0) {
-      alert("Por favor agrega productos del catálogo o escribe el precio total acordado.");
-      customTotalInputRef.current?.focus();
-      return;
-    }
-
-    if (!isDepositSufficient) {
-      alert(
-        `Para apartar el pedido se necesita mínimo el 50% de anticipo (${formatCurrency(
-          minRequiredDeposit
-        )}).\n\nActualmente ingresaste: ${formatCurrency(numericDeposit)}`
-      );
-      setDeposit(minRequiredDeposit);
-      return;
-    }
-
+  // Ejecución centralizada de guardado de pedido (con o sin cliente registrado)
+  const executeSaveOrder = (targetCustomerId?: string) => {
     setIsSubmitting(true);
 
     try {
-      // 1. Registrar cliente si es nuevo
-      let finalCustomerId = selectedCustomerId;
-      try {
-        if (!finalCustomerId && customerName.trim()) {
-          const created = addQuickCustomer({
-            name: customerName.trim(),
-            phone: customerPhone.trim() || undefined,
-            address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
-            type: "evento",
-            notes: "Cliente registrado desde Pedido Especial",
-          });
-          finalCustomerId = created.id;
-        }
-      } catch (custErr) {
-        console.warn("Could not register quick customer:", custErr);
-      }
+      const finalCustomerId = targetCustomerId || selectedCustomerId || undefined;
 
       const finalDescription =
         description.trim() ||
@@ -506,7 +695,7 @@ export default function CreateOrderModal({
       const newOrder = addCustomOrder({
         customerName: customerName.trim(),
         phone: customerPhone.trim() || "55 0000 0000",
-        customerId: finalCustomerId || undefined,
+        customerId: finalCustomerId,
         branchId: finalPickupBranch?.id || "branch-matriz",
         branchName: finalPickupBranch?.name || "Sucursal Matriz (Centro)",
         operatingBranchId: activeBranch?.id || "branch-matriz",
@@ -520,6 +709,13 @@ export default function CreateOrderModal({
         total: total,
         deposit: numericDeposit,
         paymentMethod: paymentMethod,
+        transferAccount: paymentMethod === "transferencia" && selectedTransferAccount
+          ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank} - CLABE ${selectedTransferAccount.clabe})`
+          : undefined,
+        cardTerminal: paymentMethod === "tarjeta" && selectedCardTerminal
+          ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})`
+          : undefined,
+        paymentReference: paymentReference.trim() || undefined,
         cashier: user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
       });
 
@@ -561,6 +757,7 @@ export default function CreateOrderModal({
       } catch (cbErr) {
         console.warn("Could not run onOrderCreated callback:", cbErr);
       }
+      setShowAskCustomerModal(false);
       onClose();
     } catch (err) {
       console.error("Error al apartar pedido especial:", err);
@@ -569,6 +766,95 @@ export default function CreateOrderModal({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Confirmar y registrar nuevo cliente en el catálogo
+  const handleConfirmSaveCustomer = async () => {
+    let newCustId: string | undefined = undefined;
+    try {
+      const created = addQuickCustomer({
+        name: customerName.trim(),
+        phone: customerPhone.trim() || undefined,
+        address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
+        type: "evento",
+        notes: "Cliente registrado desde Pedido Especial",
+      });
+      newCustId = created.id;
+      setCustomers(getStoredCustomers());
+      setSelectedCustomerId(created.id);
+
+      try {
+        createCustomerInDb({
+          name: customerName.trim(),
+          phone: customerPhone.trim() || undefined,
+          address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
+          type: "evento",
+          notes: "Cliente registrado desde Pedido Especial",
+        }).catch((e) => console.warn("Supabase background customer sync:", e));
+      } catch {}
+    } catch (custErr) {
+      console.warn("Could not register quick customer:", custErr);
+    }
+    executeSaveOrder(newCustId);
+  };
+
+  // Guardar pedido sin registrar cliente en el catálogo (cliente invitado)
+  const handleDeclineSaveCustomer = () => {
+    executeSaveOrder(undefined);
+  };
+
+  // Guardar y levantar pedido
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!customerName.trim()) {
+      alert("Por favor escribe el nombre de la persona que encarga el pedido.");
+      customerNameInputRef.current?.focus();
+      return;
+    }
+
+    if (total <= 0) {
+      alert("Por favor agrega productos del catálogo o escribe el precio total acordado.");
+      customTotalInputRef.current?.focus();
+      return;
+    }
+
+    if (!isDepositSufficient) {
+      alert(
+        `Para apartar el pedido se necesita mínimo el 50% de anticipo (${formatCurrency(
+          minRequiredDeposit
+        )}).\n\nActualmente ingresaste: ${formatCurrency(numericDeposit)}`
+      );
+      setDeposit(minRequiredDeposit);
+      return;
+    }
+
+    // Verificar si el cliente ya está registrado en el catálogo
+    const existing = customers.find(
+      (c) =>
+        (selectedCustomerId && c.id === selectedCustomerId) ||
+        (c.id !== "cli-0" &&
+          c.id !== "cli-general" &&
+          c.name.trim().toLowerCase() === customerName.trim().toLowerCase())
+    );
+
+    if (existing) {
+      // Cliente ya registrado en base de datos: vincularlo y guardar directo
+      executeSaveOrder(existing.id);
+      return;
+    }
+
+    // Si el usuario ya marcó su preferencia en el formulario:
+    if (saveCustomerDecision === "yes") {
+      handleConfirmSaveCustomer();
+      return;
+    } else if (saveCustomerDecision === "no") {
+      handleDeclineSaveCustomer();
+      return;
+    }
+
+    // Si aún no ha decidido (valor por defecto 'ask'): desplegar la pregunta al finalizar el pedido
+    setShowAskCustomerModal(true);
   };
 
   if (!isOpen) return null;
@@ -752,27 +1038,173 @@ export default function CreateOrderModal({
                 </h3>
               </div>
 
-              {/* Botón para abrir catálogo opcional */}
-              <button
-                type="button"
-                onClick={() => setShowCatalog(!showCatalog)}
-                className="text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-100/70 hover:bg-amber-200/80 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
-              >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>{showCatalog ? "Cerrar Catálogo" : "+ Elegir del Catálogo"}</span>
-              </button>
+              {/* Botones de acción */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    barcodeInputRef.current?.focus();
+                  }}
+                  className="text-xs font-black text-amber-950 bg-amber-400 hover:bg-amber-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs border border-amber-500/30 active:scale-95 cursor-pointer"
+                  title="Escanear o ingresar código de barras"
+                >
+                  <Barcode className="w-4 h-4 text-stone-950" />
+                  <span>+ Elegir por Código de Barras</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCatalog(!showCatalog)}
+                  className="text-xs font-bold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 border border-stone-200 px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5 text-stone-500" />
+                  <span>{showCatalog ? "Cerrar" : "Ver Lista"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ESCANEO RÁPIDO DE CÓDIGO DE BARRAS DEL PUNTO DE VENTA */}
+            <div className="bg-gradient-to-br from-amber-50 via-orange-50/60 to-amber-100/40 border-2 border-amber-300 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-black text-amber-950">
+                  <div className="w-7 h-7 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center shadow-xs">
+                    <Barcode className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block leading-tight font-black text-xs">Elegir Pan por Código de Barras (POS)</span>
+                    <span className="text-[10px] text-amber-800/80 font-bold block">Verifica nombre y precio oficial del catálogo</span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-amber-200 text-amber-950 font-black px-2.5 py-1 rounded-lg border border-amber-300 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Pistola / Lector Activo
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Barcode className="w-4 h-4 text-amber-700 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    ref={barcodeInputRef}
+                    type="text"
+                    placeholder="Pasa la pistola lectora o escribe el código de barras aquí (ej. 7501000100019)..."
+                    value={barcodeInput}
+                    onChange={(e) => setBarcodeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleBarcodeScan(barcodeInput);
+                      }
+                    }}
+                    className="w-full pl-9 pr-8 py-2.5 bg-white border-2 border-amber-400 focus:border-amber-600 rounded-xl text-xs font-mono font-bold text-stone-900 placeholder:text-stone-400 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-amber-500/20 shadow-xs"
+                  />
+                  {barcodeInput && (
+                    <button
+                      type="button"
+                      onClick={() => setBarcodeInput("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleBarcodeScan(barcodeInput)}
+                  disabled={!barcodeInput.trim()}
+                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shadow-sm shrink-0 active:scale-95 cursor-pointer"
+                  title="Verificar y agregar producto"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Agregar</span>
+                </button>
+              </div>
+
+              {/* Alerta interactiva de escaneo */}
+              {lastScannedAlert && (
+                <div
+                  className={`rounded-xl p-2.5 border flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1 duration-200 shadow-2xs ${
+                    lastScannedAlert.success
+                      ? "bg-emerald-50 border-emerald-300 text-emerald-950"
+                      : "bg-rose-50 border-rose-300 text-rose-950"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 font-bold ${
+                        lastScannedAlert.success
+                          ? "bg-emerald-200 text-emerald-800"
+                          : "bg-rose-200 text-rose-800"
+                      }`}
+                    >
+                      {lastScannedAlert.success ? (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      ) : (
+                        <AlertCircle className="w-3.5 h-3.5" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      {lastScannedAlert.success ? (
+                        <>
+                          <p className="font-bold text-emerald-950 truncate leading-tight">
+                            {lastScannedAlert.productName}{" "}
+                            <span className="font-black text-emerald-800">
+                              ({formatCurrency(lastScannedAlert.price || 0)})
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-emerald-700 font-mono">
+                            ✓ Verificado en el catálogo POS • Código: {lastScannedAlert.code} (+1 agregado)
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-bold text-rose-950 leading-tight">
+                            Código no registrado
+                          </p>
+                          <p className="text-[10px] text-rose-700">
+                            El código <span className="font-mono font-bold">"{lastScannedAlert.code}"</span> no existe en el catálogo del Punto de Venta.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLastScannedAlert(null)}
+                    className={`p-1 rounded-lg transition-colors shrink-0 ml-2 ${
+                      lastScannedAlert.success
+                        ? "text-emerald-700 hover:bg-emerald-100"
+                        : "text-rose-700 hover:bg-rose-100"
+                    }`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Catálogo rápido desplegable (Opcional) */}
             {showCatalog && (
               <div className="bg-white p-3 rounded-xl border border-amber-200 space-y-2 animate-in fade-in duration-150">
                 <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Barcode className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Buscar pan o pastel..."
+                    data-catalog-search="true"
+                    placeholder="Escanear código de barras o buscar pan por nombre..."
                     value={catalogSearch}
                     onChange={(e) => setCatalogSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && catalogSearch.trim()) {
+                        const matched =
+                          findProductByBarcodeOrCode(catalogSearch.trim(), products) ||
+                          findProductByBarcodeOrCode(catalogSearch.trim(), getStoredProducts());
+                        if (matched) {
+                          e.preventDefault();
+                          handleBarcodeScan(catalogSearch.trim());
+                          setCatalogSearch("");
+                        }
+                      }
+                    }}
                     className="w-full pl-8 pr-2 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                 </div>
@@ -782,10 +1214,22 @@ export default function CreateOrderModal({
                       key={prod.id}
                       type="button"
                       onClick={() => handleAddProductFromCatalog(prod)}
-                      className="p-1.5 bg-stone-50 hover:bg-amber-100/70 border border-stone-200 rounded-lg text-left text-xs transition-colors flex items-center justify-between gap-1"
+                      className="p-1.5 bg-stone-50 hover:bg-amber-100/70 border border-stone-200 rounded-lg text-left text-xs transition-colors flex items-center justify-between gap-1 group"
                     >
-                      <span className="truncate font-bold text-stone-800">{prod.name}</span>
-                      <span className="font-black text-amber-900 shrink-0">{formatCurrency(prod.price)}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className="truncate block font-bold text-stone-800 group-hover:text-amber-950">
+                          {prod.name}
+                        </span>
+                        {(prod.barcode || prod.code) && (
+                          <span className="flex items-center gap-0.5 text-[9px] text-stone-500 font-mono truncate">
+                            <Barcode className="w-2.5 h-2.5 shrink-0 text-stone-400" />
+                            <span className="truncate">{prod.barcode || prod.code}</span>
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-black text-amber-900 shrink-0">
+                        {formatCurrency(prod.price)}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -795,50 +1239,79 @@ export default function CreateOrderModal({
             {/* Lista de productos agregados desde el catálogo o la charola */}
             {items.length > 0 && (
               <div className="space-y-1.5 pt-1">
-                <p className="text-[11px] font-black text-stone-600 uppercase">Productos en la lista:</p>
-                {items.map((it, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-white p-2 px-3 rounded-xl border border-stone-200 flex items-center justify-between text-xs"
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-black text-stone-600 uppercase">
+                    Productos en la lista ({items.length}):
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setItems([])}
+                    className="text-[10px] font-bold text-rose-600 hover:underline"
                   >
-                    <span className="font-bold text-stone-900 truncate flex-1">{it.name}</span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5 border border-stone-300 shadow-2xs">
+                    Vaciar lista
+                  </button>
+                </div>
+                {items.map((it, idx) => {
+                  const matchingProd = products.find((p) => p.id === it.productId);
+                  const barcodeTag = matchingProd?.barcode || matchingProd?.code;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-white p-2 px-3 rounded-xl border border-stone-200 flex items-center justify-between text-xs hover:border-amber-300 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1 pr-2">
+                        <span className="font-bold text-stone-900 truncate block">{it.name}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-stone-500 font-medium">
+                            {formatCurrency(it.unitPrice)} c/u
+                          </span>
+                          {barcodeTag && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] text-stone-500 font-mono bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200">
+                              <Barcode className="w-2.5 h-2.5 text-stone-400" />
+                              <span>{barcodeTag}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5 border border-stone-300 shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateItemQty(idx, -1)}
+                            className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 hover:text-stone-900 rounded font-black text-xs transition-colors active:scale-90"
+                            title="Restar 1 pieza"
+                          >
+                            -
+                          </button>
+                          <OrderItemQuantityInput
+                            value={it.quantity}
+                            onChange={(newQty) => handleSetExactItemQty(idx, newQty)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateItemQty(idx, 1)}
+                            className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 hover:text-stone-900 rounded font-black text-xs transition-colors active:scale-90"
+                            title="Sumar 1 pieza"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="font-black text-stone-900 w-16 text-right">
+                          {formatCurrency(it.subtotal)}
+                        </span>
                         <button
                           type="button"
-                          onClick={() => handleUpdateItemQty(idx, -1)}
-                          className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 hover:text-stone-900 rounded font-black text-xs transition-colors active:scale-90"
-                          title="Restar 1 pieza"
+                          onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                          className="text-stone-400 hover:text-rose-600 p-1 transition-colors"
+                          title="Quitar"
                         >
-                          -
-                        </button>
-                        <OrderItemQuantityInput
-                          value={it.quantity}
-                          onChange={(newQty) => handleSetExactItemQty(idx, newQty)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateItemQty(idx, 1)}
-                          className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 hover:text-stone-900 rounded font-black text-xs transition-colors active:scale-90"
-                          title="Sumar 1 pieza"
-                        >
-                          +
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                      <span className="font-black text-stone-900 w-16 text-right">
-                        {formatCurrency(it.subtotal)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                        className="text-stone-400 hover:text-rose-600 p-1"
-                        title="Quitar"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -1243,7 +1716,359 @@ export default function CreateOrderModal({
                   </button>
                 ))}
               </div>
+
+              {/* 1. DESPLIEGUE COMPLETO: OPCIONES DE TRANSFERENCIA SPEI CON INFORMACIÓN DE TARJETAS Y CUENTAS */}
+              {paymentMethod === "transferencia" && (
+                <div className="p-3.5 bg-gradient-to-br from-stone-900 via-stone-900 to-amber-950/70 rounded-2xl border-2 border-amber-500/80 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200 shadow-xl mt-2">
+                  {/* Header */}
+                  <div className="flex items-center justify-between gap-2 border-b border-stone-800 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-xs">
+                        <Send className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-white leading-tight">
+                          Transferencia Bancaria SPEI
+                        </h4>
+                        <p className="text-[10px] text-amber-300 font-bold">
+                          Datos de la tarjeta para recibir el anticipo
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-black text-amber-300 bg-amber-950 border border-amber-500/50 px-2.5 py-1 rounded-lg">
+                      {formatCurrency(numericDeposit)}
+                    </span>
+                  </div>
+
+                  {/* Selector Desplegable de Tarjetas / Cuentas */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-stone-300 block">
+                      💳 ¿A qué tarjeta o cuenta van a transferir?:
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedTransferAccountId}
+                        onChange={(e) => setSelectedTransferAccountId(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-stone-950 text-white rounded-xl border-2 border-amber-400 focus:border-amber-500 font-bold text-xs focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
+                      >
+                        {DEFAULT_TRANSFER_ACCOUNTS.map((acc) => (
+                          <option key={acc.id} value={acc.id} className="bg-stone-950 text-white">
+                            {acc.name} — {acc.bank}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Ficha Visual de la Tarjeta Bancaria Seleccionada */}
+                  {selectedTransferAccount && (
+                    <div className={`p-4 rounded-2xl border-2 shadow-2xl relative overflow-hidden text-white space-y-3 bg-gradient-to-br ${selectedTransferAccount.themeColor.gradient}`}>
+                      <div className="absolute -right-6 -bottom-6 opacity-10 text-8xl pointer-events-none select-none">
+                        💳
+                      </div>
+
+                      {/* Header de la tarjeta */}
+                      <div className="flex items-center justify-between relative z-10">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base sm:text-lg font-black tracking-wide">
+                            {selectedTransferAccount.bank}
+                          </span>
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs ${selectedTransferAccount.themeColor.badge}`}>
+                            {selectedTransferAccount.cardType || "Débito"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono font-black text-amber-300 bg-black/40 px-2 py-0.5 rounded">
+                          SPEI 24/7
+                        </span>
+                      </div>
+
+                      {/* Chip simulado */}
+                      <div className="flex items-center gap-2 py-0.5 relative z-10">
+                        <div className="w-7 h-5 bg-gradient-to-tr from-amber-400 to-amber-200 rounded-md border border-amber-500/80 shadow-xs flex items-center justify-center">
+                          <div className="w-5 h-3 border border-stone-800/40 rounded-xs" />
+                        </div>
+                        <span className="text-xs opacity-70">📶</span>
+                      </div>
+
+                      {/* CLABE Interbancaria con Botón Copiar */}
+                      <div className="bg-black/50 backdrop-blur-xs p-2.5 rounded-xl border border-white/15 space-y-1 relative z-10">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] uppercase font-bold text-stone-300">
+                            CLABE Interbancaria (18 dígitos):
+                          </span>
+                          {copiedField === `clabe-${selectedTransferAccount.id}` ? (
+                            <span className="text-[10px] font-black text-emerald-400 flex items-center gap-1 bg-emerald-950/90 border border-emerald-500/50 px-2 py-0.5 rounded">
+                              ✓ ¡Copiada!
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(selectedTransferAccount.clabe, `clabe-${selectedTransferAccount.id}`)}
+                              className="text-[10px] font-bold text-amber-300 hover:text-white flex items-center gap-1 cursor-pointer bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded transition-colors"
+                            >
+                              <Copy className="w-3 h-3" /> Copiar CLABE
+                            </button>
+                          )}
+                        </div>
+                        <div className="font-mono text-sm sm:text-base font-black tracking-widest text-amber-200 select-all">
+                          {selectedTransferAccount.clabe}
+                        </div>
+                      </div>
+
+                      {/* Tarjeta y Cuenta */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs relative z-10">
+                        {selectedTransferAccount.cardNumber && (
+                          <div className="bg-black/40 p-2 rounded-xl border border-white/10 space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] text-stone-300 font-bold">No. de Tarjeta:</span>
+                              {copiedField === `card-${selectedTransferAccount.id}` ? (
+                                <span className="text-[9px] font-black text-emerald-400">✓ Copiado</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyText(selectedTransferAccount.cardNumber!, `card-${selectedTransferAccount.id}`)}
+                                  className="text-[9px] font-bold text-amber-300 hover:text-white flex items-center gap-1"
+                                >
+                                  <Copy className="w-2.5 h-2.5" /> Copiar
+                                </button>
+                              )}
+                            </div>
+                            <span className="font-mono font-bold text-white text-xs block tracking-wider">
+                              {selectedTransferAccount.cardNumber}
+                            </span>
+                          </div>
+                        )}
+
+                        {selectedTransferAccount.accountNumber && (
+                          <div className="bg-black/40 p-2 rounded-xl border border-white/10 space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] text-stone-300 font-bold">No. de Cuenta:</span>
+                              {copiedField === `acc-${selectedTransferAccount.id}` ? (
+                                <span className="text-[9px] font-black text-emerald-400">✓ Copiado</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyText(selectedTransferAccount.accountNumber!, `acc-${selectedTransferAccount.id}`)}
+                                  className="text-[9px] font-bold text-amber-300 hover:text-white flex items-center gap-1"
+                                >
+                                  <Copy className="w-2.5 h-2.5" /> Copiar
+                                </button>
+                              )}
+                            </div>
+                            <span className="font-mono font-bold text-white text-xs block">
+                              {selectedTransferAccount.accountNumber}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Titular y Monto */}
+                      <div className="pt-1.5 flex items-center justify-between text-xs border-t border-white/20 relative z-10">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-stone-300 block">Titular / Beneficiario:</span>
+                          <span className="font-black text-white text-xs sm:text-sm">
+                            {selectedTransferAccount.holder}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[9px] uppercase font-bold text-amber-300 block">Anticipo a transferir:</span>
+                          <span className="font-black text-amber-300 text-sm sm:text-base">
+                            {formatCurrency(numericDeposit)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Campo de Comprobante / Referencia SPEI */}
+                  <div className="space-y-1 pt-0.5">
+                    <label className="text-[10px] font-bold text-stone-300 block">
+                      Folio de Rastreo SPEI / Comprobante / Referencia (Opcional):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. RASTREO-94821 o últimos 4 dígitos"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-stone-950 border border-stone-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-amber-400 placeholder:text-stone-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 2. DESPLIEGUE: COBRO CON TARJETA EN TERMINAL */}
+              {paymentMethod === "tarjeta" && (
+                <div className="p-3.5 bg-gradient-to-br from-stone-900 via-stone-900 to-amber-950/70 rounded-2xl border-2 border-amber-500/80 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200 shadow-xl mt-2">
+                  <div className="flex items-center justify-between gap-2 border-b border-stone-800 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-xs">
+                        <CreditCard className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-white leading-tight">
+                          Cobro con Tarjeta en Terminal
+                        </h4>
+                        <p className="text-[10px] text-amber-300 font-bold">
+                          Selecciona la terminal donde pasará la tarjeta
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-black text-amber-300 bg-amber-950 border border-amber-500/50 px-2.5 py-1 rounded-lg">
+                      {formatCurrency(numericDeposit)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-stone-300 block">
+                      💳 Terminal de Cobro:
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedCardTerminalId}
+                        onChange={(e) => setSelectedCardTerminalId(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-stone-950 text-white rounded-xl border-2 border-amber-400 focus:border-amber-500 font-bold text-xs focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
+                      >
+                        {DEFAULT_CARD_TERMINALS.map((term) => (
+                          <option key={term.id} value={term.id} className="bg-stone-950 text-white">
+                            {term.name} — {term.bank}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {selectedCardTerminal && (
+                    <div className="bg-stone-950 rounded-xl p-3 border border-stone-800 text-xs space-y-2 text-stone-300">
+                      <div className="flex items-center justify-between">
+                        <span className="text-stone-400 font-bold">Terminal Activa:</span>
+                        <span className="font-black text-white">{selectedCardTerminal.name}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-stone-400 font-bold">Plataforma / Banco:</span>
+                        <span className="font-extrabold text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
+                          {selectedCardTerminal.bank}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-stone-800">
+                        <span className="text-stone-400 font-bold">Abono a Cuenta:</span>
+                        <span className="font-bold text-stone-200">{selectedCardTerminal.accountDestination}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-1 pt-0.5">
+                    <label className="text-[10px] font-bold text-stone-300 block">
+                      No. de Autorización / Voucher / Últimos 4 dígitos (Opcional):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. AUTH-4912 o 5519"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-stone-950 border border-stone-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-amber-400 placeholder:text-stone-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 3. DESPLIEGUE: COBRO EN EFECTIVO */}
+              {paymentMethod === "efectivo" && (
+                <div className="p-3 bg-stone-900/90 rounded-2xl border border-stone-800 flex items-center justify-between text-xs animate-in fade-in duration-200 mt-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-base shrink-0">
+                      💵
+                    </div>
+                    <div>
+                      <span className="font-black text-stone-100 block">Cobro en Efectivo</span>
+                      <span className="text-[10px] text-stone-400">Ingreso directo al cajón de caja de la sucursal</span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Anticipo recibido:</span>
+                    <span className="font-black text-emerald-400 text-sm sm:text-base">{formatCurrency(numericDeposit)}</span>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Pregunta para registrar al cliente en el catálogo para búsquedas futuras */}
+            {(() => {
+              const isAlreadySaved = customers.some(
+                (c) =>
+                  (selectedCustomerId && c.id === selectedCustomerId) ||
+                  (customerName.trim() &&
+                    c.id !== "cli-0" &&
+                    c.id !== "cli-general" &&
+                    c.name.trim().toLowerCase() === customerName.trim().toLowerCase())
+              );
+
+              if (isAlreadySaved) {
+                return (
+                  <div className="pt-2 border-t border-stone-800 flex items-center justify-between text-xs bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-3">
+                    <span className="text-emerald-300 font-bold flex items-center gap-1.5">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Cliente en catálogo: <strong className="text-white">{customerName.trim() || "Cliente"}</strong></span>
+                    </span>
+                    <span className="text-[10px] bg-emerald-900/60 text-emerald-200 font-bold px-2 py-0.5 rounded-full shrink-0">
+                      Vinculado
+                    </span>
+                  </div>
+                );
+              }
+
+              if (!customerName.trim()) return null;
+
+              return (
+                <div className="pt-2 border-t border-stone-800 space-y-2 bg-gradient-to-br from-amber-950/40 via-stone-900/60 to-stone-900/80 border border-amber-500/40 rounded-2xl p-3.5 shadow-md">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-amber-400 shrink-0" />
+                        ¿Deseas agregar a "{customerName.trim()}" al sistema?
+                      </p>
+                      <p className="text-[11px] text-stone-300 mt-0.5">
+                        Para que la próxima vez sea más fácil buscarlo por su nombre o teléfono al levantar pedidos.
+                      </p>
+                    </div>
+                    {saveCustomerDecision !== "ask" && (
+                      <button
+                        type="button"
+                        onClick={() => setSaveCustomerDecision("ask")}
+                        className="text-[10px] text-amber-400 underline hover:text-amber-300 cursor-pointer shrink-0 font-bold"
+                      >
+                        Cambiar
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setSaveCustomerDecision("yes")}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        saveCustomerDecision === "yes"
+                          ? "bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-black shadow-lg ring-2 ring-emerald-400"
+                          : "bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white"
+                      }`}
+                    >
+                      <span>⭐ Sí, guardar cliente</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSaveCustomerDecision("no")}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        saveCustomerDecision === "no"
+                          ? "bg-stone-700 text-amber-200 font-black shadow-lg ring-2 ring-amber-400/50"
+                          : "bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-stone-300"
+                      }`}
+                    >
+                      <span>❌ No, solo este pedido</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* BOTÓN FINAL GIGANTE Y TÁCTIL */}
@@ -1573,6 +2398,100 @@ export default function CreateOrderModal({
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMACIÓN AL FINALIZAR: ¿AGREGAR CLIENTE AL SISTEMA? */}
+      {showAskCustomerModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-stone-950/85 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-2 border-amber-900/30 text-stone-900 animate-in zoom-in-95 duration-200 flex flex-col">
+            {/* Encabezado café Panadería Brito */}
+            <div className="bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30 shrink-0">
+                  👤
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-white leading-tight">
+                    ¿Deseas agregar a este cliente?
+                  </h3>
+                  <p className="text-xs text-amber-200/90 font-medium mt-0.5">
+                    Para que la próxima vez sea más fácil buscarlo
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAskCustomerModal(false)}
+                className="p-1.5 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Contenido con datos del cliente */}
+            <div className="p-5 space-y-4">
+              <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                    Datos del Pedido
+                  </span>
+                  <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded-full">
+                    Cliente no registrado
+                  </span>
+                </div>
+                <div className="pt-1">
+                  <p className="text-base font-black text-stone-900 flex items-center gap-2">
+                    <User className="w-4 h-4 text-amber-600" />
+                    {customerName.trim()}
+                  </p>
+                  <p className="text-xs text-stone-600 flex items-center gap-2 mt-1">
+                    <Phone className="w-4 h-4 text-amber-600" />
+                    {customerPhone.trim() || "Sin teléfono registrado"}
+                  </p>
+                  {deliveryType === "domicilio" && deliveryAddress.trim() && (
+                    <p className="text-xs text-stone-600 flex items-center gap-2 mt-1">
+                      <MapPin className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span className="truncate">{deliveryAddress.trim()}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-stone-100 rounded-2xl text-xs text-stone-600 flex items-start gap-2.5">
+                <span className="text-base">💡</span>
+                <p>
+                  Si lo agregas, quedará guardado en tu catálogo de clientes frecuentes y la próxima vez solo tendrás que buscarlo por su nombre o teléfono al tomar un pedido o cobrar en caja.
+                </p>
+              </div>
+
+              {/* Botones de decisión táctiles */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setSaveCustomerDecision("no");
+                    handleDeclineSaveCustomer();
+                  }}
+                  className="w-full py-3.5 px-4 bg-stone-100 hover:bg-stone-200 active:bg-stone-300 text-stone-700 font-bold rounded-2xl text-xs sm:text-sm transition-all flex items-center justify-center gap-2 border border-stone-300 cursor-pointer"
+                >
+                  <span>❌ No, solo este pedido</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setSaveCustomerDecision("yes");
+                    handleConfirmSaveCustomer();
+                  }}
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-700 hover:to-emerald-600 active:scale-98 text-white font-black rounded-2xl text-xs sm:text-sm transition-all shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>⭐ Sí, guardar cliente</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

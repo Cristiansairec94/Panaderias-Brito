@@ -20,7 +20,7 @@ import {
   UserCheck
 } from "lucide-react";
 import { CashExpense, CashIncome } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
@@ -239,7 +239,7 @@ export default function ExpensesModal({
     if (!parsedAmount || parsedAmount <= 0 || !finalDescription) return;
 
     setIsSubmitting(true);
-    const nowDateTime = new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+    const nowDateTime = formatDateTimeSafe();
 
     if (movementType === "salida") {
       // 1. REGISTRO DE SALIDA (Gasto o Retiro de Dueño)

@@ -37,7 +37,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -56,17 +56,17 @@ const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
     branchName: "Sucursal Matriz Centro",
     previousShift: "Turno Matutino (06:00 - 14:00)",
     nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 1000,
+    initialFund: 500,
     cashSales: 4150,
     cardSales: 700,
     transferSales: 350,
     totalSales: 5200,
     totalSalesAll: 5200,
     totalExpenses: 570,
-    expectedCash: 4580,
-    countedCash: 4580,
+    expectedCash: 4080,
+    countedCash: 4080,
     difference: 0,
-    nextFund: 1000,
+    nextFund: 600,
     notes: "Entrega de turno matutino sin ninguna anomalía. Vitrina de conchas y bolillo surtida.",
     stockPieces: 180,
     stockValue: 2340,
@@ -82,17 +82,17 @@ const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
     branchName: "Sucursal Matriz Centro",
     previousShift: "Turno Vespertino (14:00 - 22:00)",
     nextShift: "Turno Matutino (06:00 - 14:00)",
-    initialFund: 1000,
+    initialFund: 600,
     cashSales: 3820,
     cardSales: 680,
     transferSales: 230,
     totalSales: 4730,
     totalSalesAll: 4730,
     totalExpenses: 200,
-    expectedCash: 4620,
-    countedCash: 4620,
+    expectedCash: 4220,
+    countedCash: 4220,
     difference: 0,
-    nextFund: 1000,
+    nextFund: 500,
     notes: "Cierre nocturno completado. Pan dulce agotado y efectivo entregado a Don Toño.",
     stockPieces: 25,
     stockValue: 325,
@@ -108,17 +108,17 @@ const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
     branchName: "Sucursal Matriz Centro",
     previousShift: "Turno Matutino (06:00 - 14:00)",
     nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 1000,
+    initialFund: 500,
     cashSales: 4500,
     cardSales: 550,
     transferSales: 120,
     totalSales: 5170,
     totalSalesAll: 5170,
     totalExpenses: 350,
-    expectedCash: 5150,
-    countedCash: 5200,
+    expectedCash: 4650,
+    countedCash: 4700,
     difference: 50,
-    nextFund: 1000,
+    nextFund: 500,
     notes: "Sobrante de $50 pesos por redondeo voluntario de clientes en mostrador.",
     stockPieces: 195,
     stockValue: 2535,
@@ -134,17 +134,17 @@ const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
     branchName: "Sucursal Matriz Centro",
     previousShift: "Turno Vespertino (14:00 - 22:00)",
     nextShift: "Turno Matutino (06:00 - 14:00)",
-    initialFund: 1000,
+    initialFund: 500,
     cashSales: 3400,
     cardSales: 480,
     transferSales: 200,
     totalSales: 4080,
     totalSalesAll: 4080,
     totalExpenses: 180,
-    expectedCash: 4220,
-    countedCash: 4190,
+    expectedCash: 3720,
+    countedCash: 3690,
     difference: -30,
-    nextFund: 1000,
+    nextFund: 500,
     notes: "Faltante menor de $30 en monedas de cambio en hora pico. Supervisado por Don Toño.",
     stockPieces: 30,
     stockValue: 390,
@@ -160,17 +160,17 @@ const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
     branchName: "Sucursal Matriz Centro",
     previousShift: "Turno Matutino (06:00 - 14:00)",
     nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 1000,
+    initialFund: 500,
     cashSales: 4300,
     cardSales: 620,
     transferSales: 280,
     totalSales: 5200,
     totalSalesAll: 5200,
     totalExpenses: 400,
-    expectedCash: 4900,
-    countedCash: 4900,
+    expectedCash: 4400,
+    countedCash: 4400,
     difference: 0,
-    nextFund: 1000,
+    nextFund: 500,
     notes: "Turno entregado conforme con pago de gas LP realizado y comprobante archivado.",
     stockPieces: 160,
     stockValue: 2080,
@@ -202,9 +202,29 @@ export default function CajaPage() {
   const [filterResponsible, setFilterResponsible] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "cuadrado" | "sobrante" | "faltante">("all");
 
+  const getStoredCajaInitialFund = (fallback: number = 500): number => {
+    try {
+      const raw = localStorage.getItem("brito_shift_cuts_history");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0].nextFund === "number") {
+          return parsed[0].nextFund;
+        }
+      }
+      const saved = localStorage.getItem("brito_pos_initial_fund");
+      if (saved && !isNaN(Number(saved))) return Number(saved);
+    } catch (e) {}
+    return fallback;
+  };
+
   // Live Shift state
   const [movements, setMovements] = useState<CashMovement[]>(INITIAL_MOVEMENTS);
-  const [initialCash] = useState(1000); // Fondo inicial del turno actual
+  const [initialCash, setInitialCash] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      return getStoredCajaInitialFund(500);
+    }
+    return 500;
+  });
   const [cashSales] = useState(4150);
   const [cardSales] = useState(700);
   const [transferSales] = useState(350);
@@ -219,7 +239,7 @@ export default function CajaPage() {
   // Live Shift Cut Modal
   const [isCorteModalOpen, setIsCorteModalOpen] = useState(false);
   const [countedCash, setCountedCash] = useState<string>("");
-  const [nextFundAmount, setNextFundAmount] = useState<string>("1000");
+  const [nextFundAmount, setNextFundAmount] = useState<string>("500");
   const [corteNotes, setCorteNotes] = useState<string>("");
 
   // Load and sync cuts history from localStorage
@@ -249,9 +269,16 @@ export default function CajaPage() {
 
   useEffect(() => {
     loadCutsHistory();
-    const handleSync = () => loadCutsHistory();
+    const handleSync = () => {
+      loadCutsHistory();
+      setInitialCash(getStoredCajaInitialFund(500));
+    };
     window.addEventListener("brito_shift_cuts_updated", handleSync);
-    return () => window.removeEventListener("brito_shift_cuts_updated", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("brito_shift_cuts_updated", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
   }, []);
 
   // URL query params handling (?tab=historial, ?tab=turno, ?tab=entradas, ?tab=salidas)
@@ -461,7 +488,7 @@ export default function CajaPage() {
     const parsedNextFund = Number(nextFundAmount) || 0;
     const diff = parsedCounted - expectedCashInDrawer;
     const newFolio = `CORTE-${Date.now().toString().slice(-6)}`;
-    const nowStr = new Date().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+    const nowStr = formatDateTimeSafe();
 
     const newCut: ShiftCutRecord = {
       id: newFolio,
@@ -494,6 +521,7 @@ export default function CajaPage() {
       );
       const updated = [newCut, ...existing];
       localStorage.setItem("brito_shift_cuts_history", JSON.stringify(updated));
+      localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
       setCutsHistory(updated);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
     } catch (err) {

@@ -101,4 +101,20 @@ export function playScanBeep(success: boolean = true) {
     // Ignorar si el navegador bloquea audio antes de interacción
   }
 }
-
+/**
+ * Formatea fecha y hora de forma 100% segura y compatible con todos los navegadores y WebViews,
+ * evitando cualquier error por 'dateStyle' o 'timeStyle' de Intl.
+ */
+export function formatDateTimeSafe(inputDate?: Date | string | number): string {
+  const d = inputDate ? (inputDate instanceof Date ? inputDate : new Date(inputDate)) : new Date();
+  if (isNaN(d.getTime())) return "";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "p. m." : "a. m.";
+  hours = hours % 12 || 12;
+  const hoursStr = String(hours).padStart(2, "0");
+  return `${day}/${month}/${year}, ${hoursStr}:${minutes} ${ampm}`;
+}
