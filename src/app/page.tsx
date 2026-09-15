@@ -685,23 +685,6 @@ export default function Home() {
                         </span>
                       </div>
                     </div>
-
-                    {/* Mini desglose comparativo Efectivo vs Tarjeta */}
-                    <div className="flex items-center justify-between text-[10px] text-stone-500 pt-1 px-2 py-1 bg-stone-100/70 rounded-xl border border-stone-200/60 font-medium">
-                      <span
-                        className={`flex items-center gap-1 ${isCashDominant ? "font-bold text-emerald-800" : "text-stone-600"}`}
-                        title={`Efectivo: ${formatCurrency(cashSales)}`}
-                      >
-                        <span>💵</span> Efectivo: {cashShare}%
-                      </span>
-                      <span className="text-stone-300">|</span>
-                      <span
-                        className={`flex items-center gap-1 ${!isCashDominant ? "font-bold text-blue-800" : "text-stone-600"}`}
-                        title={`Tarjeta: ${formatCurrency(cardSales)}`}
-                      >
-                        <span>💳</span> Tarjeta: {cardShare}%
-                      </span>
-                    </div>
                   </div>
                 </div>
 
