@@ -5,43 +5,46 @@ const { exec } = require('child_process');
 const os = require('os');
 
 const PORT = 9191;
-let cachedPrinter = 'POS-58';
+const PRINTER_NAME = 'POS-58';
 
 function formatTicketText(data) {
-  // Ancho exacto para papel térmico de 58mm: 28 caracteres por línea para evitar cortes laterales
-  const W = 28;
   const line = (str = '') => str + '\r\n';
-  const divider = () => '----------------------------\r\n';
-  const doubleDivider = () => '============================\r\n';
-  const center = (text, width = W) => {
-    const t = String(text || '').slice(0, width);
-    if (t.length >= width) return t + '\r\n';
-    const left = Math.floor((width - t.length) / 2);
-    return ' '.repeat(left) + t + '\r\n';
+  const divider = () => '--------------------------------\r\n';
+  const doubleDivider = () => '================================\r\n';
+  const center = (text, width = 32) => {
+    if (text.length >= width) return text.slice(0, width) + '\r\n';
+    const left = Math.floor((width - text.length) / 2);
+    return ' '.repeat(left) + text + '\r\n';
   };
-  const row = (left, right, width = W) => {
-    const r = String(right || '');
-    const maxL = Math.max(1, width - r.length - 1);
-    const l = String(left || '').slice(0, maxL);
+  const row = (left, right, width = 32) => {
+    const l = String(left);
+    const r = String(right);
     const spaces = Math.max(1, width - l.length - r.length);
     return l + ' '.repeat(spaces) + r + '\r\n';
   };
 
   let out = '';
   out += center('PANADERIAS BRITO');
-  out += center('Tradicion & Sabor');
+  out += center('Tradicion & Sabor Familiar');
   if (data.branchName) out += center(data.branchName);
-  if (data.branchPhone) out += center('Tel: ' + data.branchPhone);
+  if (data.branchAddress) out += center(data.branchAddress);
+  if (data.branchPhone) out += center(data.branchPhone);
   out += divider();
 
   out += row('FOLIO: #' + (data.folio || '000000'), '');
-  out += row('FECHA:', String(data.date || new Date().toLocaleTimeString('es-MX')).slice(0, 18));
-  out += row('CLIENTE:', String(data.customerName || 'General').slice(0, 18));
-  out += row('ATENDIO:', String(data.cashier || 'Don Tono').slice(0, 18));
-  out += row('PAGO:', '[ ' + String(data.paymentMethod || 'EFECTIVO').toUpperCase() + ' ]');
+  out += row('FECHA:', data.date || new Date().toLocaleString('es-MX'));
+  out += row('CLIENTE:', (data.customerName || 'Publico en General').slice(0, 20));
+  if (data.customerType && data.customerType !== 'general') {
+    out += row('TIPO CLIENTE:', '[' + data.customerType.toUpperCase() + ']');
+  }
+  out += row('ATENDIO:', (data.cashier || 'Don Tono Brito').slice(0, 20));
+  out += row('PAGO:', '[ ' + (data.paymentMethod || 'EFECTIVO').toUpperCase() + ' ]');
+  if (data.transferAccount) {
+    out += row('CUENTA DEP:', data.transferAccount.slice(0, 19));
+  }
   out += divider();
 
-  out += row('CANT/PRODUCTO', 'IMPORTE');
+  out += row('CANT / PRODUCTO', 'IMPORTE');
   out += divider();
 
   if (Array.isArray(data.items)) {
@@ -53,76 +56,40 @@ function formatTicketText(data) {
       const subtotal = '$' + Number(item.subtotal || (item.price * qty) || 0).toFixed(2);
       
       const prefix = qty + 'x ' + name;
-      if (prefix.length + subtotal.length >= 27) {
-        out += line(prefix.slice(0, 27));
+      if (prefix.length + subtotal.length >= 31) {
+        out += line(prefix);
         out += row('', subtotal);
       } else {
         out += row(prefix, subtotal);
       }
     }
     out += divider();
-    out += row('Total piezas:', totalPieces + ' pzas');
+    out += row('Total de piezas:', totalPieces + ' pzas');
   }
 
   out += doubleDivider();
-  out += row('TOTAL:', '$' + Number(data.total || 0).toFixed(2));
+  out += row('TOTAL A PAGAR:', '$' + Number(data.total || 0).toFixed(2));
   if (data.cashGiven !== undefined && data.cashGiven !== null && data.cashGiven !== '') {
-    out += row('Efectivo:', '$' + Number(data.cashGiven || 0).toFixed(2));
+    out += row('Efectivo recibido:', '$' + Number(data.cashGiven || 0).toFixed(2));
     out += row('SU CAMBIO:', '$' + Number(data.change || 0).toFixed(2));
   }
   out += doubleDivider();
 
-  out += center('GRACIAS POR SU COMPRA!');
+  out += line('');
+  out += center('GRACIAS POR SU PREFERENCIA!');
+  out += center('Horneado artesanal con amor');
   out += center('Panaderias Brito');
+  out += line('');
   out += line('');
   out += line('');
 
   return out;
 }
 
-function detectPrinter(preferredName) {
-  return new Promise((resolve) => {
-    const psScript = `
-      $all = Get-Printer -ErrorAction SilentlyContinue;
-      if (-not $all) { exit 1 }
-      $pref = '${(preferredName || '').replace(/'/g, "''")}';
-      if ($pref) {
-        $found = $all | Where-Object { $_.Name -eq $pref };
-        if ($found) { ($found | Select-Object -First 1).Name; exit 0 }
-      }
-      $pos = $all | Where-Object { $_.Name -like '*POS*' -or $_.Name -like '*58*' -or $_.Name -like '*Thermal*' };
-      if ($pos) { ($pos | Select-Object -First 1).Name; exit 0 }
-      $def = $all | Where-Object { $_.Default -eq $true };
-      if ($def) { ($def | Select-Object -First 1).Name; exit 0 }
-      ($all | Select-Object -First 1).Name
-    `;
-
-    exec(`powershell -NoProfile -Command "${psScript.replace(/\r?\n/g, ' ')}"`, (err, stdout) => {
-      if (err || !stdout || !stdout.trim()) {
-        resolve(null);
-      } else {
-        resolve(stdout.trim());
-      }
-    });
-  });
-}
-
-function refreshPrinterCache() {
-  detectPrinter().then(p => {
-    if (p) {
-      cachedPrinter = p;
-    }
-  }).catch(() => {});
-}
-
-refreshPrinterCache();
-setInterval(refreshPrinterCache, 30000);
-
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', '*');
-  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -130,14 +97,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === 'GET' && (req.url === '/status' || req.url === '/')) {
+  if (req.method === 'GET' && req.url === '/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      status: 'ready', 
-      printerDetected: Boolean(cachedPrinter),
-      printer: cachedPrinter || 'POS-58',
-      message: 'Impresora lista'
-    }));
+    res.end(JSON.stringify({ status: 'ready', printer: PRINTER_NAME }));
     return;
   }
 
@@ -147,34 +109,32 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const data = JSON.parse(body || '{}');
-        const printerName = data.printerName || cachedPrinter || 'POS-58';
-
         const formatted = formatTicketText(data);
+
         const tempDir = os.tmpdir();
         const tempFile = path.join(tempDir, 'ticket_' + Date.now() + '.txt');
         fs.writeFileSync(tempFile, formatted, 'latin1');
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-          success: true, 
-          printer: printerName,
-          message: 'Ticket enviado a ' + printerName 
-        }));
+        const cmd = 'powershell -NoProfile -Command "Get-Content -Encoding OEM \'' + tempFile + '\' | Out-Printer -Name \'' + PRINTER_NAME + '\'"';
 
-        const cmd = `powershell -NoProfile -Command "Get-Content -Encoding OEM '${tempFile}' | Out-Printer -Name '${printerName}'"`;
         exec(cmd, (err) => {
           if (fs.existsSync(tempFile)) {
             try { fs.unlinkSync(tempFile); } catch (e) {}
           }
+
           if (err) {
-            console.error('[-] Error enviando a impresora ' + printerName + ':', err);
+            console.error('Error enviando a impresora:', err);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: err.message }));
           } else {
-            console.log('[+] Ticket impreso con éxito en ' + printerName + ' para Folio: ' + (data.folio || 'N/A'));
+            console.log('[+] Ticket impreso directamente en ' + PRINTER_NAME + ' para Folio: ' + (data.folio || 'N/A'));
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'Ticket impreso en ' + PRINTER_NAME }));
           }
         });
       } catch (parseErr) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: 'Datos de ticket inválidos' }));
+        res.end(JSON.stringify({ success: false, error: parseErr.message }));
       }
     });
     return;

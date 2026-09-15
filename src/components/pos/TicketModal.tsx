@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Printer, CheckCircle, X, Receipt, Settings2, Zap, AlertTriangle } from "lucide-react";
+import { Printer, CheckCircle, X, Receipt, Settings2, Zap } from "lucide-react";
 import { CartItem } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { playCashRegisterSound } from "@/lib/sound";
@@ -91,7 +91,7 @@ export default function TicketModal({
       if (autoPrint && !hasPrintedRef.current) {
         hasPrintedRef.current = true;
         const timer = setTimeout(() => {
-          handlePrint(false);
+          handlePrint();
         }, 300);
         return () => clearTimeout(timer);
       }
@@ -110,99 +110,64 @@ export default function TicketModal({
   const folio = saleId ? saleId.slice(-6).toUpperCase() : `POS-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const [printed, setPrinted] = React.useState(false);
-  const [printError, setPrintError] = React.useState<string | null>(null);
 
-  const handlePrint = async (forceBrowserDialog = false) => {
-    setPrintError(null);
-
-    if (forceBrowserDialog) {
-      setPrinted(true);
-      window.print();
-      setTimeout(() => {
-        setPrinted(false);
-        onClose();
-      }, 1000);
-      return;
-    }
-
+  const handlePrint = async () => {
     setPrinted(true);
-    let printedDirectly = false;
-    let errorMsg = "";
 
+    let printedDirectly = false;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
 
-      const payload = {
-        printerName: printerConfig.selectedPrinterName || "POS-58",
-        folio,
-        date: formattedDate,
-        cashier: cashierName,
-        customerName: customerName || "Público en General",
-        customerType,
-        paymentMethod,
-        transferAccount,
-        branchName: branchName || "Panaderías Brito",
-        branchPhone: branchPhone || "Don Antonio Brito & Hijos",
-        branchAddress,
-        items: items.map((it) => ({
-          name: it.product.name,
-          quantity: it.quantity,
-          price: it.product.price,
-          subtotal: it.product.price * it.quantity,
-        })),
-        total,
-        cashGiven,
-        change,
-      };
-
-      let res: Response | null = null;
-      try {
-        res = await fetch("http://127.0.0.1:9191/print", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-      } catch (err1) {
-        try {
-          res = await fetch("http://localhost:9191/print", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-            signal: controller.signal,
-          });
-        } catch (err2) {}
-      }
-
+      const res = await fetch("http://127.0.0.1:9191/print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folio,
+          date: formattedDate,
+          cashier: cashierName,
+          customerName: customerName || "Público en General",
+          customerType,
+          paymentMethod,
+          transferAccount,
+          branchName: branchName || "Panaderías Brito",
+          branchPhone: branchPhone || "Don Antonio Brito & Hijos",
+          branchAddress,
+          items: items.map((it) => ({
+            name: it.product.name,
+            quantity: it.quantity,
+            price: it.product.price,
+            subtotal: it.product.price * it.quantity,
+          })),
+          total,
+          cashGiven,
+          change,
+        }),
+        signal: controller.signal,
+      });
       clearTimeout(timeoutId);
 
-      if (res && res.ok) {
+      if (res.ok) {
         const json = await res.json();
         if (json && json.success) {
           printedDirectly = true;
-        } else {
-          errorMsg = json?.error || "error no se detecto la impresora";
         }
-      } else {
-        errorMsg = "error no se detecto la impresora";
       }
     } catch (err) {
-      errorMsg = "error no se detecto la impresora";
+      // Local print bridge not available
     }
 
-    if (printedDirectly) {
+    if (!printedDirectly) {
+      window.print();
+    }
+
+    setTimeout(() => {
+      setPrinted(false);
       try {
         playCashRegisterSound();
       } catch (e) {}
-      setTimeout(() => {
-        setPrinted(false);
-        onClose();
-      }, 800);
-    } else {
-      setPrinted(false);
-      setPrintError(errorMsg || "error no se detecto la impresora");
-    }
+      onClose();
+    }, 1000);
   };
 
   return (
@@ -241,42 +206,36 @@ export default function TicketModal({
 
         {/* Printable Ticket Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-neutral-100">
-          <div className="flex items-center justify-center gap-1.5 mb-3 text-[11px] font-bold text-neutral-500 uppercase tracking-wider select-none">
-            <span>👁️</span>
-            <span>Vista Previa del Ticket Térmico</span>
-            <span className="text-[10px] bg-neutral-200 text-neutral-700 px-2 py-0.5 rounded-full font-semibold">
-              {printerConfig.paperWidth}
-            </span>
-          </div>
-
           <div
             ref={ticketRef}
             id="thermal-receipt"
-            className={`bg-white p-3.5 sm:p-4 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-2 mx-auto ${
-              printerConfig.paperWidth === "80mm" ? "max-w-md" : "max-w-xs"
+            className={`bg-white p-4 sm:p-5 rounded-2xl border-2 border-neutral-300 shadow-md font-mono text-xs text-black space-y-3 mx-auto ${
+              printerConfig.paperWidth === "80mm" ? "max-w-md" : "max-w-sm"
             }`}
           >
-            {/* Business Header con Logotipo Oficial */}
-            <div className="text-center space-y-1 border-b-2 border-dashed border-black pb-2">
-              <div className="flex justify-center mb-0.5">
+            {/* Business Header con Logotipo Oficial en escala de grises de alto contraste */}
+            <div className="text-center space-y-1.5 border-b-2 border-dashed border-black pb-3">
+              {/* Logotipo Oficial Panaderías Brito (Filtrado para B&N térmico) */}
+              <div className="flex justify-center mb-1">
                 <img
                   src="/logo.svg"
                   alt="Panadería Brito Logo"
-                  className="w-10 h-10 object-contain filter grayscale contrast-200"
+                  className="w-16 h-16 object-contain filter grayscale contrast-200"
                 />
               </div>
-              <h1 className="font-black text-sm tracking-wider uppercase text-black font-mono leading-none">
+              <h1 className="font-black text-base sm:text-lg tracking-wider uppercase text-black font-mono leading-none">
                 PANADERÍAS BRITO
               </h1>
-              <div className="inline-block text-[9px] font-bold uppercase tracking-wider text-black">
+              <div className="inline-block border border-black px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-black">
                 Tradición & Sabor Familiar
               </div>
-              <p className="text-[11px] font-bold text-black font-sans leading-tight">{branchName}</p>
-              {branchPhone && (
-                <p className="text-[9px] text-neutral-800 font-sans">
-                  Tel: {branchPhone}
-                </p>
+              <p className="text-xs font-bold text-black font-sans mt-1">{branchName}</p>
+              {branchAddress && (
+                <p className="text-[10px] text-neutral-700 font-sans leading-tight px-3">{branchAddress}</p>
               )}
+              <p className="text-[10px] text-neutral-800 font-sans font-semibold">
+                {branchPhone ? `Tel: ${branchPhone}` : "Don Antonio Brito & Hijos"}
+              </p>
             </div>
 
             {/* Ticket Metadata (Folio, Fecha, Atendió, Pago) */}
@@ -380,14 +339,50 @@ export default function TicketModal({
               )}
             </div>
 
-            {/* Pie de Ticket Compacto Térmico */}
-            <div className="text-center pt-2 space-y-1 font-sans border-t-2 border-dashed border-black">
-              <p className="font-black text-black text-xs uppercase tracking-wider">
-                ¡GRACIAS POR SU PREFERENCIA!
+            {/* Horarios de Pan Calientito (Optimizado para B&N: Letras Grandes y Claridad Total) */}
+            <div className="p-3 border-2 border-black rounded-xl text-center space-y-1 font-sans bg-white my-2">
+              <div className="flex items-center justify-center gap-1 text-xs font-black text-black uppercase tracking-wider">
+                <span>★</span>
+                <span>¡PAN CALIENTITO RECIÉN HORNEADO!</span>
+                <span>★</span>
+              </div>
+              <p className="text-xs sm:text-sm font-black text-black">
+                🥐 De 6:00 AM a 10:00 PM 🥐
               </p>
-              <p className="text-[10px] text-neutral-700 font-bold">
-                Panaderías Brito • Tradición & Sabor Familiar
+              <p className="text-[9px] text-neutral-700 uppercase font-semibold">
+                Horneado continuo todos los días
               </p>
+            </div>
+
+            {/* Pedidos Especiales y Agradecimiento (Encuadre B&N limpio) */}
+            <div className="text-center pt-2 space-y-2.5 font-sans border-t-2 border-dashed border-black">
+              <div className="space-y-2 border-2 border-black rounded-xl p-3.5 bg-neutral-50">
+                <p className="text-sm sm:text-base font-black text-black uppercase tracking-wider flex items-center justify-center gap-1.5">
+                  <span>🎉</span>
+                  <span>¿TIENES FIESTA, REUNIÓN O EVENTO?</span>
+                  <span>🎂</span>
+                </p>
+                <p className="text-sm sm:text-[15px] font-extrabold text-black leading-snug px-1">
+                  ¡Endulzamos tus mejores momentos! Horneamos pedidos especiales para consentir a tus invitados con el auténtico sabor tradicional.
+                </p>
+                <div className="pt-1">
+                  <span className="inline-block px-3.5 py-2 bg-white text-black font-black text-xs sm:text-sm rounded-xl border-2 border-black uppercase tracking-wide shadow-2xs">
+                    ✨ PEDIDOS ESPECIALES CON 50% DE ANTICIPO EN MOSTRADOR ✨
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-1 space-y-0.5">
+                <p className="font-black text-black text-sm tracking-wide uppercase">
+                  ¡GRACIAS POR SU PREFERENCIA!
+                </p>
+                <p className="text-[10px] font-bold text-neutral-600">
+                  Consérvese en un lugar fresco y seco • Panaderías Brito
+                </p>
+                <p className="text-[8px] text-neutral-500 uppercase tracking-widest pt-0.5">
+                  Comprobante simplificado de venta
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -411,41 +406,6 @@ export default function TicketModal({
           </span>
         </div>
 
-        {/* Mensaje si no se detectó la impresora */}
-        {printError && (
-          <div className="mx-4 mt-3 p-3.5 bg-rose-50 border-2 border-rose-400 rounded-2xl text-xs text-rose-900 shadow-sm animate-in fade-in space-y-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
-                <div className="text-left leading-tight">
-                  <span className="font-black block uppercase text-[10px] text-rose-700">Estado de Impresión</span>
-                  <span className="font-bold text-rose-900">{printError}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handlePrint(false)}
-                  className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-sm cursor-pointer transition-all active:scale-95"
-                >
-                  Reintentar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePrint(true)}
-                  className="px-2 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 font-semibold rounded-xl text-[11px] cursor-pointer"
-                  title="Abrir ventana de impresión manual si lo necesitas de emergencia"
-                >
-                  Manual
-                </button>
-              </div>
-            </div>
-            <p className="text-[11px] text-rose-800 font-medium pl-7 bg-rose-100/60 p-2 rounded-xl border border-rose-200">
-              💡 <strong>Diagnóstico de hardware:</strong> Revisa que la impresora <strong>POS-58</strong> esté encendida con luz verde, tenga el rollo de papel insertado con la tapa trabada y el cable USB conectado.
-            </p>
-          </div>
-        )}
-
         {/* Action Buttons */}
         <div className="p-4 bg-white border-t border-neutral-200 space-y-2.5">
 
@@ -453,7 +413,7 @@ export default function TicketModal({
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
-              onClick={() => handlePrint(false)}
+              onClick={handlePrint}
               className={`flex items-center justify-center gap-2 py-3.5 px-3 font-bold rounded-2xl text-xs sm:text-sm shadow-md border transition-all active:scale-95 cursor-pointer ${
                 printed
                   ? "bg-emerald-700 text-white border-emerald-600 animate-pulse"

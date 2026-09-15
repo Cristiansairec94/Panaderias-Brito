@@ -42,7 +42,6 @@ namespace PanaderiaBrito
                 }
 
                 string targetUrl = ResolveUrl(args, savedUrl);
-                EnsurePrintBridgeRunning();
                 LaunchAppWindow(targetUrl);
             }
             catch (Exception ex)
@@ -100,33 +99,6 @@ namespace PanaderiaBrito
             }
         }
 
-        private static void EnsurePrintBridgeRunning()
-        {
-            try
-            {
-                if (!IsServerAlive("http://127.0.0.1:9191/status"))
-                {
-                    string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "brito-print-server.js");
-                    if (!File.Exists(scriptPath))
-                    {
-                        scriptPath = @"c:\Users\HP\Desktop\ANTIGRAVITI\brito-print-server.js";
-                    }
-                    if (File.Exists(scriptPath))
-                    {
-                        ProcessStartInfo psi = new ProcessStartInfo("node", "\"" + scriptPath + "\"")
-                        {
-                            CreateNoWindow = true,
-                            UseShellExecute = false,
-                            WindowStyle = ProcessWindowStyle.Hidden,
-                            WorkingDirectory = Path.GetDirectoryName(scriptPath)
-                        };
-                        Process.Start(psi);
-                    }
-                }
-            }
-            catch { }
-        }
-
         private static void EnsureKioskPrintingPreferences(string profileDir)
         {
             try
@@ -135,7 +107,7 @@ namespace PanaderiaBrito
                 Directory.CreateDirectory(defaultDir);
                 string prefFile = Path.Combine(defaultDir, "Preferences");
 
-                string targetPrinter = "POS-58";
+                string targetPrinter = "Brother DCP-T530DW Printer";
                 try
                 {
                     System.Drawing.Printing.PrinterSettings ps = new System.Drawing.Printing.PrinterSettings();
