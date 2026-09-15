@@ -344,6 +344,14 @@ function recordOrderCashIncome(params: {
 
     const updated = [newIncome, ...currentIncomes];
     localStorage.setItem("brito_cash_incomes", JSON.stringify(updated));
+
+    // Sincronizar también con los ingresos del turno activo de la terminal POS
+    try {
+      const shiftIncomesRaw = localStorage.getItem("brito_pos_current_incomes");
+      const shiftIncomes: CashIncome[] = shiftIncomesRaw ? JSON.parse(shiftIncomesRaw) : [];
+      localStorage.setItem("brito_pos_current_incomes", JSON.stringify([newIncome, ...shiftIncomes]));
+    } catch (e) {}
+
     window.dispatchEvent(new Event("brito_incomes_updated"));
   } catch (err) {
     console.error("Error logging cash income for order:", err);

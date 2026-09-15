@@ -602,35 +602,46 @@ export default function CreateOrderModal({
     });
   };
 
-  // Lista de los próximos 7 días para selección rápida táctil de fecha
+  // Lista de 4 opciones rápidas de fecha: Hoy, Mañana, Sábado, Domingo
   const upcomingDays = useMemo(() => {
-    const list = [];
-    const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-    const fullDayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const fullDayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-    for (let i = 0; i < 7; i++) {
+    const getDayInfo = (offset: number, label: string) => {
       const d = new Date();
-      d.setDate(d.getDate() + i);
+      d.setDate(d.getDate() + offset);
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
       const dateStr = `${year}-${month}-${day}`;
 
-      let shortTitle = "";
-      if (i === 0) shortTitle = "Hoy";
-      else if (i === 1) shortTitle = "Mañana";
-      else shortTitle = dayNames[d.getDay()];
-
-      list.push({
+      return {
         dateStr,
-        shortTitle,
+        shortTitle: label,
         dayOfWeek: fullDayNames[d.getDay()],
         dayNum: d.getDate(),
         monthStr: monthNames[d.getMonth()],
-      });
-    }
-    return list;
+      };
+    };
+
+    const today = new Date();
+    const currentDay = today.getDay(); // 0: Dom, 1: Lun, 2: Mar, 3: Mié, 4: Jue, 5: Vie, 6: Sáb
+
+    // 1. Hoy
+    const hoy = getDayInfo(0, "Hoy");
+
+    // 2. Mañana
+    const manana = getDayInfo(1, "Mañana");
+
+    // 3. Sábado (próximo sábado: si hoy es sábado, calcula el siguiente sábado +7)
+    const sabOffset = currentDay === 6 ? 7 : (6 - currentDay + 7) % 7;
+    const sabado = getDayInfo(sabOffset, "Sábado");
+
+    // 4. Domingo (próximo domingo: si hoy es domingo, calcula el siguiente domingo +7)
+    const domOffset = currentDay === 0 ? 7 : (7 - currentDay) % 7;
+    const domingo = getDayInfo(domOffset, "Domingo");
+
+    return [hoy, manana, sabado, domingo];
   }, []);
 
   // Formato amigable de la fecha de entrega seleccionada
@@ -1370,26 +1381,26 @@ export default function CreateOrderModal({
                 </span>
               </div>
 
-              {/* Botones de los días para tocar y seleccionar */}
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+              {/* Botones de los 4 días para tocar y seleccionar */}
+              <div className="grid grid-cols-4 gap-2">
                 {upcomingDays.map((day) => {
                   const isSelected = deliveryDate === day.dateStr;
 
                   return (
                     <button
-                      key={day.dateStr}
+                      key={`${day.shortTitle}-${day.dateStr}`}
                       type="button"
                       onClick={() => setDeliveryDate(day.dateStr)}
-                      className={`py-2 px-1 rounded-xl text-center border-2 transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer select-none active:scale-95 ${
+                      className={`py-2.5 px-1.5 sm:px-2 rounded-xl text-center border-2 transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer select-none active:scale-95 shadow-xs ${
                         isSelected
                           ? "bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-500 text-stone-950 font-black shadow-md border-amber-600 ring-2 ring-amber-400/50 scale-[1.02]"
                           : "bg-white hover:bg-amber-50/80 border-stone-200 text-stone-700 hover:border-amber-300"
                       }`}
                     >
-                      <span className={`text-[11px] font-black leading-tight ${isSelected ? "text-stone-950" : "text-stone-800"}`}>
+                      <span className={`text-xs sm:text-sm font-black leading-tight ${isSelected ? "text-stone-950" : "text-stone-800"}`}>
                         {day.shortTitle}
                       </span>
-                      <span className={`text-[10px] font-bold ${isSelected ? "text-stone-950/90" : "text-stone-500"}`}>
+                      <span className={`text-[10px] sm:text-xs font-bold ${isSelected ? "text-stone-950/90" : "text-stone-500"}`}>
                         {day.dayNum} {day.monthStr}
                       </span>
                     </button>
