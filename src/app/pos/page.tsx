@@ -2523,14 +2523,14 @@ export default function POSPage() {
                   Escanea el código de barras o toca cualquier pan del mostrador para agregarlo al cobro.
                 </p>
               </div>
-              <div className="pt-2">
+              <div className="pt-3 w-full max-w-xs mx-auto">
                 <button
                   type="button"
                   onClick={() => handleOpenCreateOrder(false)}
-                  className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black text-xs shadow-xs hover:shadow-md transition-all active:scale-95 border border-amber-400 flex items-center gap-1.5 mx-auto cursor-pointer"
+                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black text-sm sm:text-base shadow-lg shadow-amber-500/25 hover:shadow-xl hover:shadow-amber-500/35 transition-all active:scale-95 border-2 border-amber-400 flex items-center justify-center gap-2.5 mx-auto cursor-pointer hover:scale-[1.02]"
                   title="Levantar un pedido especial para otra fecha"
                 >
-                  <Cake className="w-4 h-4 text-stone-950" />
+                  <Cake className="w-5 h-5 sm:w-6 sm:h-6 text-stone-950 shrink-0" />
                   <span>Hacer Pedido Especial</span>
                 </button>
               </div>
