@@ -22,6 +22,8 @@ import {
   ShoppingBag,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   ShieldCheck,
   Search,
   UserPlus,
@@ -216,6 +218,67 @@ export default function CreateOrderModal({
   const [deliveryType, setDeliveryType] = useState<"sucursal" | "domicilio">("sucursal");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [pickupBranchId, setPickupBranchId] = useState<string>("");
+
+  // Estado y sincronización para el calendario ampliado desplegable
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
+  const [calendarViewDate, setCalendarViewDate] = useState<Date>(() => new Date());
+  const nativeDateInputRef = useRef<HTMLInputElement>(null);
+
+  // Sincronizar el mes visible del calendario cuando cambie la fecha seleccionada
+  useEffect(() => {
+    if (deliveryDate) {
+      const parts = deliveryDate.split("-");
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        if (!isNaN(y) && !isNaN(m)) {
+          setCalendarViewDate(new Date(y, m, 1));
+        }
+      }
+    }
+  }, [deliveryDate]);
+
+  // Cuadrícula y datos del mes para el calendario ampliado
+  const calendarMonthData = useMemo(() => {
+    const year = calendarViewDate.getFullYear();
+    const month = calendarViewDate.getMonth();
+    const monthNames = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+    const monthLabel = `${monthNames[month]} ${year}`;
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0: Dom
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const todayStr = getLocalDateStr(0);
+
+    const blanks = Array.from({ length: firstDayIndex }, (_, i) => i);
+    const days = [];
+    for (let d = 1; d <= totalDays; d++) {
+      const mStr = String(month + 1).padStart(2, "0");
+      const dStr = String(d).padStart(2, "0");
+      const dateStr = `${year}-${mStr}-${dStr}`;
+      days.push({
+        dayNum: d,
+        dateStr,
+        isPast: dateStr < todayStr,
+        isToday: dateStr === todayStr,
+        isSelected: dateStr === deliveryDate,
+      });
+    }
+
+    return { monthLabel, blanks, days, year, month };
+  }, [calendarViewDate, deliveryDate]);
+
+  const handlePrevMonth = () => {
+    setCalendarViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+  const handleNextMonth = () => {
+    setCalendarViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+  const handleSelectCalendarDay = (dateStr: string) => {
+    setDeliveryDate(dateStr);
+    setIsCalendarExpanded(false);
+  };
 
   // Sucursal seleccionada resuelta
   const selectedPickupBranch = useMemo(() => {
@@ -966,7 +1029,7 @@ export default function CreateOrderModal({
                 </div>
 
                 {/* Sugerencias rápidas de clientes */}
-                {showCustomerSearch && (customerSuggestions.length > 0 || customerName.trim().length > 0) && (
+                {showCustomerSearch && customerSuggestions.length > 0 && (
                   <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden divide-y divide-stone-100">
                     {customerSuggestions.map((c) => (
                       <button
@@ -984,22 +1047,6 @@ export default function CreateOrderModal({
                         <span className="text-[11px] text-stone-500">{c.phone}</span>
                       </button>
                     ))}
-                    {customerName.trim().length > 0 && !customers.some(c => c.name.toLowerCase() === customerName.trim().toLowerCase()) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewCustName(customerName);
-                          setNewCustPhone(customerPhone);
-                          setCustomerModalTab("new");
-                          setIsCustomerModalOpen(true);
-                          setShowCustomerSearch(false);
-                        }}
-                        className="w-full p-2.5 text-left bg-amber-50 hover:bg-amber-100/80 text-amber-900 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <UserPlus className="w-3.5 h-3.5 text-amber-700" />
-                        <span>+ Registrar "{customerName}" como nuevo cliente</span>
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -1425,28 +1472,193 @@ export default function CreateOrderModal({
             {/* Fecha y Hora exactas (Calendario libre + Hora) */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
-                  O cambiar a otra fecha en calendario:
+                <label className="text-xs sm:text-sm font-black text-stone-800 flex items-center justify-between mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-amber-600" />
+                    <span>Fecha de entrega:</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsCalendarExpanded((prev) => !prev)}
+                    className="text-[11px] font-black text-amber-700 hover:text-amber-800 flex items-center gap-0.5 hover:underline cursor-pointer"
+                  >
+                    <span>{isCalendarExpanded ? "▲ Ocultar" : "▼ Desplegar"}</span>
+                  </button>
                 </label>
+
+                {/* Botón / Selector de Fecha Ampliado */}
+                <button
+                  type="button"
+                  onClick={() => setIsCalendarExpanded((prev) => !prev)}
+                  className={`w-full h-12 sm:h-14 px-3.5 sm:px-4 bg-white border-2 rounded-2xl flex items-center justify-between text-base sm:text-lg font-black text-stone-900 shadow-xs transition-all cursor-pointer select-none active:scale-[0.99] ${
+                    isCalendarExpanded
+                      ? "border-amber-500 ring-4 ring-amber-400/20 bg-amber-50/30"
+                      : "border-stone-300 hover:border-amber-400"
+                  }`}
+                >
+                  <span className="tracking-wide">
+                    {deliveryDate ? (() => {
+                      const parts = deliveryDate.split("-");
+                      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : deliveryDate;
+                    })() : "DD/MM/AAAA"}
+                  </span>
+                  <div className="flex items-center gap-1 text-amber-600">
+                    <Calendar className="w-5 h-5" />
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isCalendarExpanded ? "rotate-180" : ""}`} />
+                  </div>
+                </button>
+
+                {/* Input nativo oculto sincronizado */}
                 <input
+                  ref={nativeDateInputRef}
                   type="date"
                   value={deliveryDate}
                   min={getLocalDateStr(0)}
                   onChange={(e) => setDeliveryDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs"
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden="true"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">Hora estimada *</label>
-                <input
-                  type="time"
-                  value={deliveryTime}
-                  onChange={(e) => setDeliveryTime(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
+                <label className="text-xs sm:text-sm font-black text-stone-800 flex items-center gap-1.5 mb-1.5">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  <span>Hora estimada:</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="time"
+                    value={deliveryTime}
+                    onChange={(e) => setDeliveryTime(e.target.value)}
+                    className="w-full h-12 sm:h-14 px-3.5 sm:px-4 bg-white border-2 border-stone-300 hover:border-amber-400 focus:border-amber-500 focus:outline-none focus:ring-4 focus:ring-amber-400/20 rounded-2xl text-base sm:text-lg font-black text-stone-900 shadow-xs transition-all cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:scale-125 [&::-webkit-calendar-picker-indicator]:hover:scale-135"
+                  />
+                </div>
               </div>
             </div>
+
+            {/* Calendario Desplegado Ampliado y Táctil */}
+            {isCalendarExpanded && (
+              <div className="p-3.5 sm:p-4 bg-white border-2 border-amber-400/90 rounded-2xl shadow-lg space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                {/* Cabecera del Mes */}
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={handlePrevMonth}
+                    className="p-2 sm:p-2.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-amber-100 hover:border-amber-300 text-stone-700 transition-colors cursor-pointer active:scale-95"
+                    title="Mes anterior"
+                  >
+                    <ChevronLeft className="w-5 h-5 text-stone-800" />
+                  </button>
+
+                  <div className="text-center">
+                    <span className="text-base sm:text-lg font-black text-stone-900 capitalize block leading-tight">
+                      {calendarMonthData.monthLabel}
+                    </span>
+                    <span className="text-[11px] font-bold text-amber-800 block">
+                      Toca un día para seleccionarlo
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleNextMonth}
+                    className="p-2 sm:p-2.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-amber-100 hover:border-amber-300 text-stone-700 transition-colors cursor-pointer active:scale-95"
+                    title="Mes siguiente"
+                  >
+                    <ChevronRight className="w-5 h-5 text-stone-800" />
+                  </button>
+                </div>
+
+                {/* Días de la semana */}
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((dName, idx) => (
+                    <div
+                      key={dName}
+                      className={`text-xs sm:text-sm font-black py-0.5 ${
+                        idx === 0 || idx === 6 ? "text-amber-700" : "text-stone-500"
+                      }`}
+                    >
+                      {dName}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Cuadrícula de Días Grandes */}
+                <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+                  {calendarMonthData.blanks.map((b) => (
+                    <div key={`blank-${b}`} className="h-10 sm:h-12" />
+                  ))}
+
+                  {calendarMonthData.days.map((day) => {
+                    return (
+                      <button
+                        key={day.dateStr}
+                        type="button"
+                        disabled={day.isPast}
+                        onClick={() => handleSelectCalendarDay(day.dateStr)}
+                        className={`h-10 sm:h-12 rounded-xl sm:rounded-2xl text-sm sm:text-base font-black flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
+                          day.isPast
+                            ? "bg-stone-100 text-stone-300 border border-transparent cursor-not-allowed"
+                            : day.isSelected
+                            ? "bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-500 text-stone-950 font-black shadow-md border-2 border-amber-600 scale-[1.05] ring-2 ring-amber-400/50"
+                            : day.isToday
+                            ? "bg-amber-50 text-amber-900 border-2 border-amber-400 hover:bg-amber-100 shadow-2xs"
+                            : "bg-white text-stone-800 border border-stone-200 hover:bg-amber-50 hover:border-amber-300 shadow-2xs"
+                        }`}
+                      >
+                        <span>{day.dayNum}</span>
+                        {day.isToday && (
+                          <span className="text-[9px] font-black uppercase text-amber-800 -mt-1">
+                            Hoy
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Pie del calendario con atajos */}
+                <div className="flex items-center justify-between pt-2 border-t border-stone-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date();
+                      setCalendarViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                      setDeliveryDate(getLocalDateStr(0));
+                      setIsCalendarExpanded(false);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 font-black hover:bg-amber-100 transition-colors cursor-pointer"
+                  >
+                    Hoy
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          nativeDateInputRef.current?.showPicker();
+                        } catch (e) {
+                          nativeDateInputRef.current?.focus();
+                        }
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-stone-500 hover:text-stone-800 font-semibold transition-colors cursor-pointer"
+                      title="Abrir selector nativo del sistema"
+                    >
+                      Selector del sistema
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCalendarExpanded(false)}
+                      className="px-4 py-2 rounded-xl bg-stone-900 text-white font-black hover:bg-stone-800 transition-colors shadow-xs cursor-pointer"
+                    >
+                      Listo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Modalidad: Mostrador vs Domicilio */}
             <div className="space-y-2 pt-1">
