@@ -3039,20 +3039,6 @@ export default function POSPage() {
             </div>
           )}
 
-          {/* Botón Rápido: Apartar Charola como Pedido Especial (50% min) */}
-          {cart.length > 0 && (
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => handleOpenCreateOrder(true)}
-                className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/15 hover:from-amber-500/25 hover:to-orange-500/25 text-amber-950 border-2 border-dashed border-amber-400/90 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all active:scale-98 shadow-xs cursor-pointer"
-                title="Apartar estos productos de la charola como un encargo o pedido especial con 50% de anticipo mínimo"
-              >
-                <Cake className="w-4 h-4 text-amber-700 shrink-0" />
-                <span>Apartar como Pedido Especial (50% min)</span>
-              </button>
-            </div>
-          )}
 
           {/* Botones de Acción */}
           <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">

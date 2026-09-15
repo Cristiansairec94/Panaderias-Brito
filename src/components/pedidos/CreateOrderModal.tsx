@@ -143,6 +143,8 @@ export default function CreateOrderModal({
 
   const customerNameInputRef = useRef<HTMLInputElement>(null);
   const customTotalInputRef = useRef<HTMLInputElement>(null);
+  const customerDecisionRef = useRef<HTMLDivElement>(null);
+  const [mustChooseCustomerAlert, setMustChooseCustomerAlert] = useState(false);
 
   // Datos base
   const [products, setProducts] = useState<Product[]>([]);
@@ -164,8 +166,7 @@ export default function CreateOrderModal({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
-  // Pregunta al finalizar pedido sobre registrar al cliente en el catálogo
-  const [showAskCustomerModal, setShowAskCustomerModal] = useState(false);
+  // Pregunta obligatoria sobre registrar al cliente en el catálogo
   const [saveCustomerDecision, setSaveCustomerDecision] = useState<"ask" | "yes" | "no">("ask");
 
   // Modal de Añadir / Seleccionar Cliente
@@ -186,6 +187,27 @@ export default function CreateOrderModal({
     if (!selectedCustomerId) return null;
     return customers.find((c) => c.id === selectedCustomerId) || null;
   }, [customers, selectedCustomerId]);
+
+  // Determinar si el cliente ya existe en el catálogo registrado
+  const isCustomerInCatalog = useMemo(() => {
+    if (!customerName.trim()) return false;
+    return customers.some(
+      (c) =>
+        (selectedCustomerId && c.id === selectedCustomerId) ||
+        (c.id !== "cli-0" &&
+          c.id !== "cli-general" &&
+          c.name.trim().toLowerCase() === customerName.trim().toLowerCase())
+    );
+  }, [customers, selectedCustomerId, customerName]);
+
+  // Si no está en el catálogo, es obligatorio decidir antes de guardar el pedido
+  const isCustomerDecisionNeeded = useMemo(() => {
+    return !isCustomerInCatalog && customerName.trim().length > 0;
+  }, [isCustomerInCatalog, customerName]);
+
+  const isCustomerDecisionPending = useMemo(() => {
+    return isCustomerDecisionNeeded && saveCustomerDecision === "ask";
+  }, [isCustomerDecisionNeeded, saveCustomerDecision]);
 
   // 2. Detalle del pedido
   const [description, setDescription] = useState("");
@@ -366,8 +388,8 @@ export default function CreateOrderModal({
       setBarcodeInput("");
       setLastScannedAlert(null);
       keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
-      setShowAskCustomerModal(false);
       setSaveCustomerDecision("ask");
+      setMustChooseCustomerAlert(false);
     }
   }, [isOpen, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone, tomorrowStr, initialBranchId, activeBranch, branches]);
 
@@ -442,12 +464,16 @@ export default function CreateOrderModal({
     }
     setIsCustomerModalOpen(false);
     setShowCustomerSearch(false);
+    setSaveCustomerDecision("ask");
+    setMustChooseCustomerAlert(false);
   };
 
   const handleClearSelectedCustomer = () => {
     setSelectedCustomerId("");
     setCustomerName("");
     setCustomerPhone("");
+    setSaveCustomerDecision("ask");
+    setMustChooseCustomerAlert(false);
   };
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
@@ -831,7 +857,6 @@ export default function CreateOrderModal({
       } catch (cbErr) {
         console.warn("Could not run onOrderCreated callback:", cbErr);
       }
-      setShowAskCustomerModal(false);
       onClose();
     } catch (err) {
       console.error("Error al apartar pedido especial:", err);
@@ -918,6 +943,13 @@ export default function CreateOrderModal({
       return;
     }
 
+    // Si el cliente no está en el catálogo, ES OBLIGATORIO elegir una opción antes de guardar
+    if (isCustomerDecisionPending) {
+      setMustChooseCustomerAlert(true);
+      customerDecisionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     // Si el usuario ya marcó su preferencia en el formulario:
     if (saveCustomerDecision === "yes") {
       handleConfirmSaveCustomer();
@@ -927,8 +959,8 @@ export default function CreateOrderModal({
       return;
     }
 
-    // Si aún no ha decidido (valor por defecto 'ask'): desplegar la pregunta al finalizar el pedido
-    setShowAskCustomerModal(true);
+    // Fallback de seguridad
+    handleDeclineSaveCustomer();
   };
 
   if (!isOpen) return null;
@@ -1022,6 +1054,8 @@ export default function CreateOrderModal({
                       setCustomerName(e.target.value);
                       setSelectedCustomerId("");
                       setShowCustomerSearch(true);
+                      setSaveCustomerDecision("ask");
+                      setMustChooseCustomerAlert(false);
                     }}
                     onFocus={() => setShowCustomerSearch(true)}
                     className="w-full pl-9 pr-3 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -2228,82 +2262,119 @@ export default function CreateOrderModal({
               )}
             </div>
 
-            {/* Pregunta para registrar al cliente en el catálogo para búsquedas futuras */}
-            {(() => {
-              const isAlreadySaved = customers.some(
-                (c) =>
-                  (selectedCustomerId && c.id === selectedCustomerId) ||
-                  (customerName.trim() &&
-                    c.id !== "cli-0" &&
-                    c.id !== "cli-general" &&
-                    c.name.trim().toLowerCase() === customerName.trim().toLowerCase())
-              );
-
-              if (isAlreadySaved) {
-                return (
-                  <div className="pt-2 border-t border-stone-800 flex items-center justify-between text-xs bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-3">
-                    <span className="text-emerald-300 font-bold flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>Cliente en catálogo: <strong className="text-white">{customerName.trim() || "Cliente"}</strong></span>
-                    </span>
-                    <span className="text-[10px] bg-emerald-900/60 text-emerald-200 font-bold px-2 py-0.5 rounded-full shrink-0">
-                      Vinculado
-                    </span>
-                  </div>
-                );
-              }
-
-              if (!customerName.trim()) return null;
-
-              return (
-                <div className="pt-2 border-t border-stone-800 space-y-2 bg-gradient-to-br from-amber-950/40 via-stone-900/60 to-stone-900/80 border border-amber-500/40 rounded-2xl p-3.5 shadow-md">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-amber-400 shrink-0" />
+            {/* Pregunta obligatoria para registrar al cliente en el catálogo para búsquedas futuras */}
+            {isCustomerInCatalog ? (
+              <div className="pt-2 border-t border-stone-800 flex items-center justify-between text-xs bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-3">
+                <span className="text-emerald-300 font-bold flex items-center gap-1.5">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Cliente en catálogo: <strong className="text-white">{customerName.trim() || "Cliente"}</strong></span>
+                </span>
+                <span className="text-[10px] bg-emerald-900/60 text-emerald-200 font-bold px-2 py-0.5 rounded-full shrink-0">
+                  Vinculado
+                </span>
+              </div>
+            ) : customerName.trim() ? (
+              <div
+                ref={customerDecisionRef}
+                className={`pt-2 border-t space-y-2.5 rounded-2xl p-4 transition-all duration-200 shadow-md ${
+                  mustChooseCustomerAlert
+                    ? "bg-gradient-to-br from-amber-950 via-stone-900 to-amber-950 border-2 border-amber-400 ring-4 ring-amber-400/40 shadow-amber-500/20"
+                    : isCustomerDecisionPending
+                    ? "bg-gradient-to-br from-amber-950/50 via-stone-900/80 to-stone-900 border-2 border-amber-500/60"
+                    : saveCustomerDecision === "yes"
+                    ? "bg-gradient-to-br from-emerald-950/40 via-stone-900/70 to-stone-900 border border-emerald-500/60"
+                    : "bg-stone-900/90 border border-stone-700/80"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Users className={`w-4 h-4 shrink-0 ${saveCustomerDecision === "yes" ? "text-emerald-400" : "text-amber-400"}`} />
+                      <p className="text-xs font-black text-amber-300">
                         ¿Deseas agregar a "{customerName.trim()}" al sistema?
                       </p>
-                      <p className="text-[11px] text-stone-300 mt-0.5">
-                        Para que la próxima vez sea más fácil buscarlo por su nombre o teléfono al levantar pedidos.
-                      </p>
+                      {isCustomerDecisionPending ? (
+                        <span className="text-[9px] bg-amber-400 text-stone-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Requerido antes de guardar
+                        </span>
+                      ) : (
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${saveCustomerDecision === "yes" ? "bg-emerald-500 text-white" : "bg-stone-700 text-amber-200"}`}>
+                          {saveCustomerDecision === "yes" ? "✓ Se guardará" : "✓ Solo este pedido"}
+                        </span>
+                      )}
                     </div>
-                    {saveCustomerDecision !== "ask" && (
-                      <button
-                        type="button"
-                        onClick={() => setSaveCustomerDecision("ask")}
-                        className="text-[10px] text-amber-400 underline hover:text-amber-300 cursor-pointer shrink-0 font-bold"
-                      >
-                        Cambiar
-                      </button>
-                    )}
+                    <p className="text-[11px] text-stone-300 mt-1">
+                      Para que la próxima vez sea más fácil buscarlo por su nombre o teléfono al levantar pedidos.
+                    </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  {saveCustomerDecision !== "ask" && (
                     <button
                       type="button"
-                      onClick={() => setSaveCustomerDecision("yes")}
-                      className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        saveCustomerDecision === "yes"
-                          ? "bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-black shadow-lg ring-2 ring-emerald-400"
-                          : "bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white"
-                      }`}
+                      onClick={() => {
+                        setSaveCustomerDecision("ask");
+                        setMustChooseCustomerAlert(false);
+                      }}
+                      className="text-[10px] text-amber-400 underline hover:text-amber-300 cursor-pointer shrink-0 font-bold ml-1"
                     >
-                      <span>⭐ Sí, guardar cliente</span>
+                      Cambiar
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setSaveCustomerDecision("no")}
-                      className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        saveCustomerDecision === "no"
-                          ? "bg-stone-700 text-amber-200 font-black shadow-lg ring-2 ring-amber-400/50"
-                          : "bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-stone-300"
-                      }`}
-                    >
-                      <span>❌ No, solo este pedido</span>
-                    </button>
-                  </div>
+                  )}
                 </div>
-              );
-            })()}
+
+                {mustChooseCustomerAlert && isCustomerDecisionPending && (
+                  <div className="bg-amber-400 text-stone-950 text-xs font-black p-2.5 rounded-xl flex items-center gap-2 animate-in fade-in">
+                    <span className="text-base">⚠️</span>
+                    <span>Debes elegir una de las 2 opciones siguientes antes de poder apartar el pedido:</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaveCustomerDecision("yes");
+                      setMustChooseCustomerAlert(false);
+                    }}
+                    className={`py-3 px-3.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer border ${
+                      saveCustomerDecision === "yes"
+                        ? "bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-black shadow-lg ring-2 ring-emerald-400 border-emerald-400 scale-[1.01]"
+                        : "bg-stone-800/90 text-stone-200 hover:bg-stone-700 hover:text-white border-stone-700 hover:border-emerald-500/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span>⭐</span>
+                      <span>Sí, guardar cliente</span>
+                      {saveCustomerDecision === "yes" && <Check className="w-3.5 h-3.5 text-white ml-1" />}
+                    </div>
+                    <span className={`text-[10px] font-normal ${saveCustomerDecision === "yes" ? "text-emerald-100" : "text-stone-400"}`}>
+                      Se registrará en el catálogo
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaveCustomerDecision("no");
+                      setMustChooseCustomerAlert(false);
+                    }}
+                    className={`py-3 px-3.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer border ${
+                      saveCustomerDecision === "no"
+                        ? "bg-stone-700 text-amber-200 font-black shadow-lg ring-2 ring-amber-400 border-amber-400/80 scale-[1.01]"
+                        : "bg-stone-800/90 text-stone-300 hover:bg-stone-700 hover:text-white border-stone-700 hover:border-amber-500/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span>❌</span>
+                      <span>No, solo este pedido</span>
+                      {saveCustomerDecision === "no" && <Check className="w-3.5 h-3.5 text-amber-300 ml-1" />}
+                    </div>
+                    <span className={`text-[10px] font-normal ${saveCustomerDecision === "no" ? "text-amber-100/70" : "text-stone-400"}`}>
+                      Continuar como cliente invitado
+                    </span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* BOTÓN FINAL GIGANTE Y TÁCTIL */}
@@ -2314,25 +2385,29 @@ export default function CreateOrderModal({
               className={`w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
                 isSubmitting
                   ? "bg-stone-400 text-stone-700 cursor-wait"
-                  : isDepositSufficient && customerName.trim() && total > 0
-                  ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-emerald-950/30 active:scale-98 ring-4 ring-emerald-500/20"
                   : !customerName.trim()
                   ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-amber-900/20 active:scale-98"
                   : total <= 0
                   ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-amber-900/20 active:scale-98"
-                  : "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-900/20 active:scale-98"
+                  : !isDepositSufficient
+                  ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-900/20 active:scale-98"
+                  : isCustomerDecisionPending
+                  ? "bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-stone-950 shadow-amber-900/30 ring-4 ring-amber-400/40 active:scale-98"
+                  : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-emerald-950/30 active:scale-98 ring-4 ring-emerald-500/20"
               }`}
             >
               <span>
                 {isSubmitting
                   ? "⏳"
-                  : isDepositSufficient && customerName.trim() && total > 0
-                  ? "✅"
                   : !customerName.trim()
                   ? "👤"
                   : total <= 0
                   ? "🎂"
-                  : "💵"}
+                  : !isDepositSufficient
+                  ? "💵"
+                  : isCustomerDecisionPending
+                  ? "👥"
+                  : "✅"}
               </span>
               <span>
                 {isSubmitting
@@ -2343,6 +2418,8 @@ export default function CreateOrderModal({
                   ? "Indica el monto total del encargo"
                   : !isDepositSufficient
                   ? `Falta anticipo mínimo del 50% (${formatCurrency(minRequiredDeposit)})`
+                  : isCustomerDecisionPending
+                  ? `Elige si guardar o no al cliente antes de apartar`
                   : `GUARDAR Y APARTAR PEDIDO (${formatCurrency(numericDeposit)} Recibidos)`}
               </span>
             </button>
@@ -2633,100 +2710,6 @@ export default function CreateOrderModal({
                 </div>
               </form>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE CONFIRMACIÓN AL FINALIZAR: ¿AGREGAR CLIENTE AL SISTEMA? */}
-      {showAskCustomerModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-stone-950/85 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-2 border-amber-900/30 text-stone-900 animate-in zoom-in-95 duration-200 flex flex-col">
-            {/* Encabezado café Panadería Brito */}
-            <div className="bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] p-5 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30 shrink-0">
-                  👤
-                </div>
-                <div>
-                  <h3 className="font-black text-base text-white leading-tight">
-                    ¿Deseas agregar a este cliente?
-                  </h3>
-                  <p className="text-xs text-amber-200/90 font-medium mt-0.5">
-                    Para que la próxima vez sea más fácil buscarlo
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAskCustomerModal(false)}
-                className="p-1.5 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Contenido con datos del cliente */}
-            <div className="p-5 space-y-4">
-              <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
-                    Datos del Pedido
-                  </span>
-                  <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded-full">
-                    Cliente no registrado
-                  </span>
-                </div>
-                <div className="pt-1">
-                  <p className="text-base font-black text-stone-900 flex items-center gap-2">
-                    <User className="w-4 h-4 text-amber-600" />
-                    {customerName.trim()}
-                  </p>
-                  <p className="text-xs text-stone-600 flex items-center gap-2 mt-1">
-                    <Phone className="w-4 h-4 text-amber-600" />
-                    {customerPhone.trim() || "Sin teléfono registrado"}
-                  </p>
-                  {deliveryType === "domicilio" && deliveryAddress.trim() && (
-                    <p className="text-xs text-stone-600 flex items-center gap-2 mt-1">
-                      <MapPin className="w-4 h-4 text-amber-600 shrink-0" />
-                      <span className="truncate">{deliveryAddress.trim()}</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-stone-100 rounded-2xl text-xs text-stone-600 flex items-start gap-2.5">
-                <span className="text-base">💡</span>
-                <p>
-                  Si lo agregas, quedará guardado en tu catálogo de clientes frecuentes y la próxima vez solo tendrás que buscarlo por su nombre o teléfono al tomar un pedido o cobrar en caja.
-                </p>
-              </div>
-
-              {/* Botones de decisión táctiles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    setSaveCustomerDecision("no");
-                    handleDeclineSaveCustomer();
-                  }}
-                  className="w-full py-3.5 px-4 bg-stone-100 hover:bg-stone-200 active:bg-stone-300 text-stone-700 font-bold rounded-2xl text-xs sm:text-sm transition-all flex items-center justify-center gap-2 border border-stone-300 cursor-pointer"
-                >
-                  <span>❌ No, solo este pedido</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    setSaveCustomerDecision("yes");
-                    handleConfirmSaveCustomer();
-                  }}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-700 hover:to-emerald-600 active:scale-98 text-white font-black rounded-2xl text-xs sm:text-sm transition-all shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span>⭐ Sí, guardar cliente</span>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
