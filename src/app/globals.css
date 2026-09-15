@@ -19,7 +19,7 @@ body {
 @media print {
   @page {
     size: auto;
-    margin: 0mm !important;
+    margin: 0 !important;
   }
   *, *::before, *::after {
     -webkit-print-color-adjust: exact !important;
@@ -32,10 +32,8 @@ body {
     color: black !important;
     width: 100% !important;
     height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
     display: block !important;
-    text-align: left !important;
+    text-align: center !important;
   }
   body * {
     visibility: hidden !important;
@@ -48,21 +46,21 @@ body {
   }
   #thermal-receipt,
   #printable-ticket {
-    position: fixed !important;
+    position: absolute !important;
     left: 0 !important;
     right: 0 !important;
     top: 0 !important;
     margin: 0 auto !important;
     width: 48mm !important;
     max-width: 48mm !important;
-    padding: 0.5mm 1mm !important;
+    padding: 1mm 1.5mm !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     background: white !important;
     color: black !important;
-    font-size: 9.5px !important;
-    line-height: 1.2 !important;
+    font-size: 10px !important;
+    line-height: 1.25 !important;
     box-sizing: border-box !important;
     text-align: left !important;
     page-break-after: avoid !important;
@@ -74,8 +72,8 @@ body {
   .paper-80mm {
     width: 72mm !important;
     max-width: 72mm !important;
-    font-size: 11px !important;
-    padding: 1mm 1.5mm !important;
+    font-size: 11.5px !important;
+    padding: 2mm 2mm !important;
   }
 
   #thermal-receipt[data-paper-width="58mm"],
@@ -83,14 +81,14 @@ body {
   .paper-58mm {
     width: 48mm !important;
     max-width: 48mm !important;
-    font-size: 9.5px !important;
-    padding: 0.5mm 1mm !important;
+    font-size: 10px !important;
+    padding: 1mm 1.5mm !important;
   }
 
   #thermal-receipt img,
   #printable-ticket img {
-    max-width: 24mm !important;
-    max-height: 14mm !important;
+    max-width: 32mm !important;
+    max-height: 18mm !important;
     height: auto !important;
     margin-left: auto !important;
     margin-right: auto !important;
