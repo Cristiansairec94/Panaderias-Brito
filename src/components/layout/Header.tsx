@@ -14,7 +14,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Store,
-  Zap,
   CheckCircle2,
   Building2,
   TrendingUp,
@@ -40,7 +39,6 @@ export default function Header() {
     currentBranch, 
     isAllBranches, 
     switchBranch, 
-    simulateSale, 
     isLiveSimulating,
     toggleLiveSimulation,
     consolidatedMetrics
@@ -51,7 +49,6 @@ export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isLogoSpinning, setIsLogoSpinning] = useState(false);
   const [showBranchMenu, setShowBranchMenu] = useState(false);
-  const [simulatedAlert, setSimulatedAlert] = useState<string | null>(null);
 
   const branchMenuRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -159,12 +156,6 @@ export default function Header() {
       sessionStorage.removeItem("brito_session_active");
     }
     router.push("/");
-  };
-
-  const handleQuickSimulate = () => {
-    const sale = simulateSale();
-    setSimulatedAlert(`+${formatCurrency(sale.total)} (${sale.branchName})`);
-    setTimeout(() => setSimulatedAlert(null), 2500);
   };
 
   const current = getPageTitle();
@@ -294,26 +285,6 @@ export default function Header() {
             </>
           )}
         </Link>
-
-        {/* Quick Sale Simulator Button */}
-        <div className="relative shrink-0">
-          <button
-            onClick={handleQuickSimulate}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 text-white text-xs font-black shadow-md shadow-orange-500/20 active:scale-95 transition-all shrink-0 whitespace-nowrap"
-            title="Simular 1 venta en la sucursal activa"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current animate-pulse shrink-0" />
-            <span className="hidden md:inline">Simular Venta</span>
-          </button>
-
-          {/* Toast Alert when simulated */}
-          {simulatedAlert && (
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-stone-950 text-emerald-400 text-[11px] font-black px-3 py-1.5 rounded-xl shadow-2xl border border-emerald-500/40 z-50 whitespace-nowrap animate-in fade-in zoom-in-95 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>{simulatedAlert}</span>
-            </div>
-          )}
-        </div>
 
         {/* Branch Selector Dropdown */}
         <div ref={branchMenuRef} className="relative z-[110] shrink-0">
