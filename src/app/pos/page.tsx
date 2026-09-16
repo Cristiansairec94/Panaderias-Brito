@@ -2599,11 +2599,14 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => handleOpenCreateOrder(false)}
-                  className="w-full py-3 px-5 rounded-2xl bg-[#3e2723] hover:bg-[#2d1b18] text-amber-50 font-black text-sm sm:text-base shadow-lg shadow-stone-950/20 hover:shadow-xl hover:shadow-stone-950/30 transition-all active:scale-95 border-2 border-amber-600/70 hover:border-amber-500 flex items-center justify-center gap-2.5 mx-auto cursor-pointer hover:scale-[1.02] group"
+                  className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-[#881337] via-[#be123c] to-[#9a3412] hover:from-[#9f1239] hover:via-[#e11d48] hover:to-[#c2410c] text-white font-black text-sm sm:text-base shadow-xl shadow-rose-950/30 hover:shadow-2xl hover:shadow-rose-900/40 transition-all active:scale-95 border-2 border-amber-300/90 hover:border-amber-200 ring-4 ring-amber-400/20 flex items-center justify-center gap-2.5 mx-auto cursor-pointer hover:scale-[1.02] group"
                   title="Levantar un pedido especial para otra fecha"
                 >
-                  <Cake className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="tracking-wide">Hacer Pedido Especial</span>
+                  <div className="w-8 h-8 rounded-xl bg-amber-400/25 border border-amber-300/50 flex items-center justify-center shrink-0 shadow-inner">
+                    <Cake className="w-4 h-4 sm:w-5 sm:h-5 text-amber-200 group-hover:scale-110 transition-transform" />
+                  </div>
+                  <span className="tracking-wide drop-shadow-sm font-black">Hacer Pedido Especial</span>
+                  <Sparkles className="w-4 h-4 text-amber-300 animate-pulse shrink-0 drop-shadow" />
                 </button>
               </div>
             </div>
