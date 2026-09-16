@@ -2599,11 +2599,11 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => handleOpenCreateOrder(false)}
-                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-stone-950 font-black text-sm sm:text-base shadow-lg shadow-amber-500/25 hover:shadow-xl hover:shadow-amber-500/35 transition-all active:scale-95 border-2 border-amber-400 flex items-center justify-center gap-2.5 mx-auto cursor-pointer hover:scale-[1.02]"
+                  className="w-full py-3 px-5 rounded-2xl bg-[#3e2723] hover:bg-[#2d1b18] text-amber-50 font-black text-sm sm:text-base shadow-lg shadow-stone-950/20 hover:shadow-xl hover:shadow-stone-950/30 transition-all active:scale-95 border-2 border-amber-600/70 hover:border-amber-500 flex items-center justify-center gap-2.5 mx-auto cursor-pointer hover:scale-[1.02] group"
                   title="Levantar un pedido especial para otra fecha"
                 >
-                  <Cake className="w-5 h-5 sm:w-6 sm:h-6 text-stone-950 shrink-0" />
-                  <span>Hacer Pedido Especial</span>
+                  <Cake className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
+                  <span className="tracking-wide">Hacer Pedido Especial</span>
                 </button>
               </div>
             </div>
