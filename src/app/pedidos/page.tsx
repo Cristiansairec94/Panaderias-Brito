@@ -706,85 +706,77 @@ export default function PedidosPage() {
                       {isExpanded && (
                         <tr className="bg-amber-50/30 border-b border-stone-200 animate-in fade-in duration-150">
                           <td colSpan={9} className="p-5 px-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                               
                               {/* Col 1: Itemized list */}
-                              <div className="space-y-2 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
-                                <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
-                                  Desglose de Productos
-                                </span>
-                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                                  {(order.items && order.items.length > 0 ? order.items : []).map((it, idx) => (
-                                    <div key={idx} className="space-y-0.5 border-b border-stone-100 pb-1.5 last:border-none">
-                                      <div className="flex justify-between font-bold text-stone-900">
-                                        <span>{it.quantity}x {it.name}</span>
-                                        <span className="font-mono">{formatCurrency(it.subtotal)}</span>
+                              <div className="space-y-2 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs flex flex-col justify-between">
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
+                                      Desglose de Productos
+                                    </span>
+                                    {order.items && order.items.length > 0 && (
+                                      <span className="text-[10px] font-bold text-stone-400">
+                                        {order.items.length} {order.items.length === 1 ? "artículo" : "artículos"}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                    {order.items && order.items.length > 0 ? (
+                                      order.items.map((it, idx) => (
+                                        <div key={idx} className="space-y-0.5 border-b border-stone-100 pb-1.5 last:border-none">
+                                          <div className="flex justify-between font-bold text-stone-900">
+                                            <span>{it.quantity}x {it.name}</span>
+                                            <span className="font-mono">{formatCurrency(it.subtotal)}</span>
+                                          </div>
+                                          {it.notes && (
+                                            <p className="text-[11px] text-stone-500 italic pl-3">↳ {it.notes}</p>
+                                          )}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="text-stone-700 font-medium py-1">
+                                        {order.description || "Sin desglose de productos"}
                                       </div>
-                                      {it.notes && (
-                                        <p className="text-[11px] text-stone-500 italic pl-3">↳ {it.notes}</p>
-                                      )}
-                                    </div>
-                                  ))}
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
                               {/* Col 2: Observaciones & Delivery address */}
-                              <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
-                                <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
-                                  Detalles de Entrega & Observaciones
-                                </span>
-                                {order.dedication ? (
-                                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-950">
-                                    <strong className="block text-[10px] text-amber-800 uppercase">📝 Observaciones:</strong>
-                                    <span className="italic font-bold">"{order.dedication}"</span>
-                                  </div>
-                                ) : (
-                                  <p className="text-stone-400 italic">Sin observaciones especiales especificadas.</p>
-                                )}
+                              <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs flex flex-col justify-between">
+                                <div className="space-y-2.5">
+                                  <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
+                                    Detalles de Entrega & Observaciones
+                                  </span>
+                                  {order.dedication ? (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-950">
+                                      <strong className="block text-[10px] text-amber-800 uppercase">📝 Observaciones:</strong>
+                                      <span className="italic font-bold">"{order.dedication}"</span>
+                                    </div>
+                                  ) : (
+                                    <p className="text-stone-400 italic">Sin observaciones especiales especificadas.</p>
+                                  )}
 
-                                {order.deliveryType === "domicilio" ? (
-                                  <div className="text-[11px] text-stone-700 bg-stone-50 p-2.5 rounded-xl border border-stone-200">
-                                    <strong className="block text-stone-900">🚚 Entrega a Domicilio:</strong>
-                                    <span>{order.deliveryAddress || "Dirección pendiente"}</span>
-                                  </div>
-                                ) : (
-                                  <div className="text-[11px] text-stone-700">
-                                    <strong>🏬 Recoger en Tienda:</strong> {order.branchName}
-                                  </div>
-                                )}
+                                  {order.deliveryType === "domicilio" ? (
+                                    <div className="text-[11px] text-stone-700 bg-stone-50 p-2.5 rounded-xl border border-stone-200">
+                                      <strong className="block text-stone-900">🚚 Entrega a Domicilio:</strong>
+                                      <span>{order.deliveryAddress || "Dirección pendiente"}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="text-[11px] text-stone-700">
+                                      <strong>🏬 Recoger en Tienda:</strong> {order.branchName}
+                                    </div>
+                                  )}
 
-                                {order.notes && (
-                                  <p className="text-[11px] text-stone-500 bg-stone-50 p-2 rounded-lg">
-                                    <strong>Notas:</strong> {order.notes}
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* Col 3: Payment History & Balances */}
-                              <div className="space-y-2 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs">
-                                <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
-                                  Historial de Cobros & Saldo
-                                </span>
-                                <div className="space-y-1 text-xs">
-                                  <div className="flex justify-between text-stone-600">
-                                    <span>Total:</span>
-                                    <span className="font-black text-stone-900">{formatCurrency(order.total)}</span>
-                                  </div>
-                                  <div className="flex justify-between text-emerald-700 font-bold">
-                                    <span>Anticipo Inicial:</span>
-                                    <span>{formatCurrency(order.deposit)}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center pt-1.5 border-t border-dashed border-stone-300 font-black">
-                                    <span className="text-stone-800">Falta por Liquidar:</span>
-                                    <span className={`text-sm ${
-                                      order.remainingBalance === 0 ? "text-emerald-600" : "text-rose-600 font-mono"
-                                    }`}>
-                                      {order.remainingBalance === 0 ? "¡Liquidado!" : formatCurrency(order.remainingBalance)}
-                                    </span>
-                                  </div>
+                                  {order.notes && (
+                                    <p className="text-[11px] text-stone-500 bg-stone-50 p-2 rounded-lg">
+                                      <strong>Notas:</strong> {order.notes}
+                                    </p>
+                                  )}
                                 </div>
 
-                                <div className="pt-2 flex items-center justify-between">
+                                <div className="pt-2.5 border-t border-stone-100 flex items-center justify-between mt-2">
                                   <span className="text-[10px] text-stone-400">Atendió: {order.cashier}</span>
                                   {order.status !== "cancelado" ? (
                                     <button
