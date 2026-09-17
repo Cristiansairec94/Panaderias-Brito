@@ -15,7 +15,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { CustomOrder } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { addOrderPayment } from "@/lib/orders";
@@ -177,6 +177,7 @@ export default function OrderPaymentModal({
                 step="any"
                 placeholder="0"
                 value={amount === 0 && isAmountFocused ? "" : amount}
+                onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                 onFocus={(e) => {
                   setIsAmountFocused(true);
                   if (amount === 0) {

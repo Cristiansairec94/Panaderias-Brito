@@ -1431,6 +1431,7 @@ export default function CreateOrderModal({
                     step="any"
                     placeholder="Ej. 650"
                     value={customTotal}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                     onChange={(e) => setCustomTotal(e.target.value === "" ? "" : Number(e.target.value))}
                     className="w-full pl-7 pr-3 py-2 bg-amber-50/50 border-2 border-amber-400 rounded-xl text-right text-base font-black text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
@@ -1925,6 +1926,7 @@ export default function CreateOrderModal({
                   max={total}
                   step="any"
                   value={deposit}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                   onChange={(e) => setDeposit(e.target.value === "" ? "" : Number(e.target.value))}
                   className="w-full pl-7 pr-3 py-1.5 bg-stone-950 border border-stone-700 rounded-xl text-right text-sm font-black text-white focus:outline-none focus:border-amber-400"
                 />

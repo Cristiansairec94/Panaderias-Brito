@@ -25,7 +25,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { Product, CustomOrder, OrderItem } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown } from "@/lib/utils";
 import { getStoredProducts } from "@/lib/products";
 import { getStoredOrders, addCustomOrder, addOrderPayment, updateOrderStatus } from "@/lib/orders";
 
@@ -572,6 +572,7 @@ export default function BreadOrdersDrawer({
                         step="1"
                         placeholder="Ej. 750"
                         value={customTotalAmount}
+                        onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                         onChange={(e) => setCustomTotalAmount(e.target.value === "" ? "" : Number(e.target.value))}
                         className="w-32 px-3 py-1.5 bg-white rounded-xl border border-stone-300 text-xs font-black focus:outline-none focus:ring-2 focus:ring-amber-500 text-right"
                       />
@@ -633,6 +634,7 @@ export default function BreadOrdersDrawer({
                       required
                       placeholder={`Mínimo ${formatCurrency(minRequiredDeposit)}`}
                       value={depositInput}
+                      onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                       onChange={(e) => setDepositInput(e.target.value === "" ? "" : Number(e.target.value))}
                       className="w-full pl-10 pr-4 py-3 bg-white text-stone-900 rounded-2xl text-lg font-black focus:outline-none focus:ring-4 focus:ring-amber-500 shadow-inner"
                     />

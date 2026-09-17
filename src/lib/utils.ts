@@ -19,6 +19,11 @@ export function onlyNumbersKeyDown(
   e: React.KeyboardEvent<HTMLInputElement>,
   allowDecimal: boolean = false
 ) {
+  // Prevenir expresamente las teclas de notación científica y signos (+, -, e, E)
+  if (["e", "E", "+", "-"].includes(e.key)) {
+    e.preventDefault();
+    return;
+  }
   if (
     [
       "Backspace",
