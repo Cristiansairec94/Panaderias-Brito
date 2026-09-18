@@ -767,15 +767,18 @@ export default function GastosPage() {
                 <div className="space-y-3">
                   {statsData.list.map((item) => (
                     <div key={item.id} className="space-y-1">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="flex items-center gap-1.5 text-stone-800">
+                      <div className="flex justify-between items-center text-xs font-bold gap-2">
+                        <span className="flex items-center gap-1.5 text-stone-800 shrink-0">
                           <span>{item.icon}</span>
                           <span>{item.label}</span>
                         </span>
-                        <span className="font-mono text-stone-900">
-                          {formatCurrency(item.total)}{" "}
+                        <div className="flex items-center gap-2 font-mono text-stone-900 text-right flex-wrap justify-end">
+                          <span>{formatCurrency(item.total)}</span>
                           <span className="text-stone-400 font-normal">({item.pct.toFixed(1)}%)</span>
-                        </span>
+                          <span className="text-stone-600 font-bold text-[11px] bg-stone-100 px-2 py-0.5 rounded-lg border border-stone-200/80 font-sans">
+                            Cant: {item.count} {item.count === 1 ? "gasto" : "gastos"}
+                          </span>
+                        </div>
                       </div>
                       <div className="w-full bg-stone-100 h-2.5 rounded-full overflow-hidden">
                         <div
@@ -788,8 +791,8 @@ export default function GastosPage() {
                 </div>
               </div>
 
-              {/* Tarjeta Resumen y Mini Tabla */}
-              <div className="lg:col-span-5 space-y-4">
+              {/* Tarjeta Resumen Total del Período */}
+              <div className="lg:col-span-5 h-fit">
                 <div className="bg-gradient-to-br from-stone-900 to-stone-950 p-5 rounded-2xl text-white border border-stone-800 shadow-md flex items-center justify-between">
                   <div>
                     <span className="text-[10px] font-bold text-rose-300 uppercase tracking-wider block">
@@ -807,32 +810,6 @@ export default function GastosPage() {
                       {statsData.totalOps}
                     </span>
                   </div>
-                </div>
-
-                <div className="border border-stone-200 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-stone-50 border-b border-stone-200 text-stone-500 font-bold text-[10px] uppercase">
-                      <tr>
-                        <th className="p-2.5">Categoría</th>
-                        <th className="p-2.5 text-center">Cant.</th>
-                        <th className="p-2.5 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-100">
-                      {statsData.list.map((item) => (
-                        <tr key={item.id} className="hover:bg-stone-50/50">
-                          <td className="p-2.5 flex items-center gap-1.5 font-medium text-stone-800">
-                            <span>{item.icon}</span>
-                            <span className="truncate max-w-[140px]">{item.label}</span>
-                          </td>
-                          <td className="p-2.5 text-center font-bold text-stone-500">{item.count}</td>
-                          <td className="p-2.5 text-right font-black text-rose-700 font-mono">
-                            {formatCurrency(item.total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </div>
