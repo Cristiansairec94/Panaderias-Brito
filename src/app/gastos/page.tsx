@@ -86,6 +86,31 @@ const formatExpenseDisplayDate = (raw: string | undefined): string => {
   });
 };
 
+const getExpenseTimestamp = (g: ExpenseRecord): number => {
+  if (g.timestamp) {
+    const t = new Date(g.timestamp).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const d = parseExpenseDate(g.date);
+  if (d) {
+    if (g.displayDate) {
+      const match = g.displayDate.match(/(\d{1,2}):(\d{2})(?:\s*([ap]\.?\s*m\.?|[AP]M))?/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const mins = parseInt(match[2], 10);
+        const ampm = match[3]?.toLowerCase();
+        if (ampm) {
+          if ((ampm.includes("p") || ampm.includes("pm")) && hours < 12) hours += 12;
+          if ((ampm.includes("a") || ampm.includes("am")) && hours === 12) hours = 0;
+        }
+        d.setHours(hours, mins, 0, 0);
+      }
+    }
+    return d.getTime();
+  }
+  return 0;
+};
+
 const getExpenseDateTimeInfo = (g: { date: string; timestamp?: string; displayDate?: string }) => {
   const todayStr = getLocalDateISO(new Date());
   const yest = new Date();
@@ -93,8 +118,9 @@ const getExpenseDateTimeInfo = (g: { date: string; timestamp?: string; displayDa
   const yesterdayStr = getLocalDateISO(yest);
 
   const rawDate = g.date ? g.date.split("T")[0] : "";
-  const isHoy = rawDate === todayStr;
-  const isAyer = rawDate === yesterdayStr;
+  const timestampDateStr = g.timestamp ? getLocalDateISO(new Date(g.timestamp)) : "";
+  const isHoy = rawDate === todayStr || timestampDateStr === todayStr;
+  const isAyer = !isHoy && (rawDate === yesterdayStr || timestampDateStr === yesterdayStr);
 
   let timeStr = "";
   if (g.timestamp) {
@@ -450,29 +476,31 @@ export default function GastosPage() {
     );
   };
 
-  // ─── Filtrado Principal ───────────────────────────────────────────────────
+  // ─── Filtrado Principal y Ordenamiento Cronológico (Más reciente primero) ─
   const filteredGastos = useMemo(() => {
-    return gastos.filter((g) => {
-      // 1. Filtro por Sucursal
-      if (filtroSucursal !== "all" && g.branchId !== filtroSucursal) {
-        return false;
-      }
-      // 2. Filtro por Categoría
-      if (filtroCategoria !== "all" && g.category !== filtroCategoria && g.categoryLabel !== filtroCategoria) {
-        return false;
-      }
-      // 3. Filtro por Tipo de Pago
-      if (filtroTipoPago !== "all" && g.paymentMethod !== filtroTipoPago) {
-        return false;
-      }
-      // 4. Búsqueda libre
-      if (search.trim()) {
-        const query = search.toLowerCase();
-        const haystack = `${g.id} ${g.date} ${g.categoryLabel} ${g.branchName} ${g.description} ${g.paymentMethod} ${g.accountOrigin} ${g.cashier} ${g.supplier || ""}`.toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      return true;
-    });
+    return gastos
+      .filter((g) => {
+        // 1. Filtro por Sucursal
+        if (filtroSucursal !== "all" && g.branchId !== filtroSucursal) {
+          return false;
+        }
+        // 2. Filtro por Categoría
+        if (filtroCategoria !== "all" && g.category !== filtroCategoria && g.categoryLabel !== filtroCategoria) {
+          return false;
+        }
+        // 3. Filtro por Tipo de Pago
+        if (filtroTipoPago !== "all" && g.paymentMethod !== filtroTipoPago) {
+          return false;
+        }
+        // 4. Búsqueda libre
+        if (search.trim()) {
+          const query = search.toLowerCase();
+          const haystack = `${g.id} ${g.date} ${g.categoryLabel} ${g.branchName} ${g.description} ${g.paymentMethod} ${g.accountOrigin} ${g.cashier} ${g.supplier || ""}`.toLowerCase();
+          if (!haystack.includes(query)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => getExpenseTimestamp(b) - getExpenseTimestamp(a));
   }, [gastos, filtroSucursal, filtroCategoria, filtroTipoPago, search]);
 
   // ─── Cálculos de KPIs (Reactivos al filtro de sucursal) ─────────────────────
@@ -1140,12 +1168,12 @@ export default function GastosPage() {
                   return (
                     <tr
                       key={g.id}
-                      className={`hover:bg-amber-50/40 transition-colors h-14 ${
+                      className={`transition-colors h-14 ${
                         isAnulado
-                          ? "bg-stone-50/80 opacity-60 border-l-[3px] border-l-stone-300"
+                          ? "bg-stone-50/80 opacity-60 border-l-4 border-l-stone-300"
                           : isHoy
-                          ? "border-l-[3px] border-l-amber-500 bg-amber-50/15"
-                          : "border-l-[3px] border-l-stone-200"
+                          ? "border-l-4 border-l-amber-500 bg-amber-50/50 hover:bg-amber-100/60 shadow-xs"
+                          : "border-l-4 border-l-transparent hover:bg-stone-50/70"
                       }`}
                     >
                       {/* 1. Folio */}
@@ -1155,11 +1183,11 @@ export default function GastosPage() {
 
                       {/* 2. Fecha */}
                       <td className="py-2.5 px-3.5 align-middle whitespace-nowrap">
-                        <span className={`font-semibold ${isAnulado ? "line-through text-stone-400" : "text-stone-700"}`}>
+                        <span className={`font-semibold ${isAnulado ? "line-through text-stone-400" : isHoy ? "text-stone-900 font-bold" : "text-stone-700"}`}>
                           {formattedDate}
                         </span>
                         {isHoy && !isAnulado && (
-                          <span className="ml-1.5 bg-amber-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded uppercase">
+                          <span className="ml-1.5 bg-amber-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider shadow-xs inline-flex items-center justify-center">
                             Hoy
                           </span>
                         )}
