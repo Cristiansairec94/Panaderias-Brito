@@ -851,7 +851,7 @@ export default function GastosPage() {
 
       {/* ── Panel Colapsable de Estadísticas y Analítica (Estilo Sairec ERP) ── */}
       {mostrarStats && (
-        <div className="bg-white rounded-3xl border border-stone-200/80 p-6 shadow-sm space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="bg-white rounded-3xl border border-stone-200/80 p-6 shadow-sm space-y-6 animate-in fade-in slide-in-from-top-4 duration-300 transition-all duration-200 hover:border-rose-400/80 hover:shadow-xl hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
             <div className="flex items-center gap-3">
               <span className="text-2xl">📊</span>
@@ -925,7 +925,7 @@ export default function GastosPage() {
 
               {/* Tarjeta Resumen Total del Período */}
               <div className="lg:col-span-5 h-fit">
-                <div className="bg-gradient-to-br from-stone-900 to-stone-950 p-5 rounded-2xl text-white border border-stone-800 shadow-md flex items-center justify-between">
+                <div className="bg-gradient-to-br from-stone-900 to-stone-950 p-5 rounded-2xl text-white border border-stone-800 shadow-md flex items-center justify-between transition-all duration-200 hover:border-rose-400 hover:shadow-xl hover:shadow-rose-900/30 hover:ring-2 hover:ring-rose-400/20">
                   <div>
                     <span className="text-[10px] font-bold text-rose-300 uppercase tracking-wider block">
                       Total del Período ({periodoStats.toUpperCase()})
@@ -952,7 +952,7 @@ export default function GastosPage() {
       {/* ── KPI Cards Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gastos de Hoy */}
-        <div className="bg-gradient-to-br from-rose-900 via-rose-950 to-stone-950 p-5 rounded-3xl border border-rose-800/60 shadow-xl text-white">
+        <div className="bg-gradient-to-br from-rose-900 via-rose-950 to-stone-950 p-5 rounded-3xl border border-rose-800/60 shadow-xl text-white transition-all duration-200 hover:border-rose-400 hover:shadow-2xl hover:shadow-rose-950/50 hover:ring-2 hover:ring-rose-400/30 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-rose-200 uppercase tracking-wider">Gastos de Hoy</span>
             <div className="p-2 bg-rose-600/40 text-rose-300 rounded-xl border border-rose-500/30">
@@ -968,7 +968,7 @@ export default function GastosPage() {
         </div>
 
         {/* Gastos de la Semana */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm">
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-stone-500">Gastos de la Semana</span>
             <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
@@ -984,7 +984,7 @@ export default function GastosPage() {
         </div>
 
         {/* Gastos del Mes */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm">
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-stone-500">Gastos del Mes</span>
             <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
@@ -1000,7 +1000,7 @@ export default function GastosPage() {
         </div>
 
         {/* Total Registros */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm">
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-stone-500">Total Registros</span>
             <div className="p-2 bg-stone-100 text-stone-700 rounded-xl">
@@ -1017,7 +1017,7 @@ export default function GastosPage() {
       </div>
 
       {/* ── Filtros y Buscador Dinámico (Con Filtro por Sucursal Clave) ── */}
-      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-4">
+      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-4 transition-all duration-200 hover:border-rose-400/80 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Buscador de Texto Libre */}
           <div className="relative flex-1 w-full">
@@ -1118,7 +1118,7 @@ export default function GastosPage() {
       </div>
 
       {/* ── Tabla de Gastos con Diseño Panadería Brito ── */}
-      <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden transition-all duration-200 hover:border-rose-400/80 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20">
         <div className="p-5 border-b border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
@@ -1355,7 +1355,7 @@ export default function GastosPage() {
       {/* ── Modal: Registrar Nuevo Gasto ── */}
       {modalNuevoOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto transition-all duration-200 hover:border-rose-400/60 hover:ring-2 hover:ring-rose-400/20">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="p-2.5 bg-rose-100 text-rose-700 rounded-xl">
@@ -1556,7 +1556,7 @@ export default function GastosPage() {
       {/* ── Modal: Editar Gasto ── */}
       {modalEditarOpen && gastoSeleccionado && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto transition-all duration-200 hover:border-amber-400/60 hover:ring-2 hover:ring-amber-400/20">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
@@ -1681,7 +1681,7 @@ export default function GastosPage() {
       {/* ── Modal: Ver Detalle de Gasto ── */}
       {modalVerOpen && gastoSeleccionado && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95 transition-all duration-200 hover:border-rose-400/60 hover:ring-2 hover:ring-rose-400/20">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
@@ -1783,7 +1783,7 @@ export default function GastosPage() {
       {/* ── Modal: Anular Gasto (Con Motivo Obligatorio como Sairec ERP) ── */}
       {modalAnularOpen && gastoSeleccionado && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95 transition-all duration-200 hover:border-rose-400/60 hover:ring-2 hover:ring-rose-400/20">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">

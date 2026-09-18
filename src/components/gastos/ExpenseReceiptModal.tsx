@@ -41,7 +41,7 @@ export default function ExpenseReceiptModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200 transition-all duration-200 hover:border-rose-400/80 hover:ring-2 hover:ring-rose-400/20">
         {/* Header bar */}
         <div className="bg-gradient-to-r from-stone-950 via-rose-950 to-stone-950 text-white p-4 px-6 flex items-center justify-between border-b border-rose-900/40">
           <div className="flex items-center gap-2.5">
