@@ -39,7 +39,7 @@ import {
   HelpCircle
 } from "lucide-react";
 import { ExpenseRecord } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -1274,13 +1274,14 @@ export default function GastosPage() {
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-2xl text-rose-600">$</span>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     required
                     autoFocus
                     placeholder="0.00"
                     value={form.amount}
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => setForm({ ...form, amount: cleanDecimalNumbers(e.target.value) })}
                     className="w-full pl-10 pr-4 py-3 bg-stone-50 rounded-2xl border-2 border-stone-200 focus:border-rose-500 focus:bg-white focus:outline-none text-2xl font-black text-stone-900 shadow-inner"
                   />
                 </div>
@@ -1469,11 +1470,13 @@ export default function GastosPage() {
               <div className="space-y-1">
                 <label className="font-black text-stone-900">Monto ($ MXN) *</label>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   required
+                  placeholder="0.00"
                   value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                  onChange={(e) => setForm({ ...form, amount: cleanDecimalNumbers(e.target.value) })}
                   className="w-full p-2.5 bg-stone-50 border border-stone-200 rounded-xl text-base font-black text-stone-900 focus:ring-2 focus:ring-rose-500 focus:outline-none"
                 />
               </div>
