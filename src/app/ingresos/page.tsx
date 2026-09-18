@@ -374,7 +374,7 @@ export default function IngresosPage() {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total General de Ingresos */}
-        <div className="bg-gradient-to-br from-emerald-900 via-emerald-950 to-stone-950 p-5 rounded-3xl border border-emerald-800/60 shadow-xl text-white">
+        <div className="bg-gradient-to-br from-emerald-900 via-emerald-950 to-stone-950 p-5 rounded-3xl border border-emerald-800/60 shadow-xl text-white transition-all duration-200 hover:border-emerald-400 hover:shadow-2xl hover:shadow-emerald-900/30 hover:ring-2 hover:ring-emerald-400/30 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Total Entradas Hoy</span>
             <div className="p-2 bg-emerald-600/40 text-emerald-300 rounded-xl border border-emerald-500/30">
@@ -390,7 +390,7 @@ export default function IngresosPage() {
         </div>
 
         {/* Efectivo en Cajón */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm">
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-stone-500">Efectivo a Cajón</span>
             <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
@@ -406,7 +406,7 @@ export default function IngresosPage() {
         </div>
 
         {/* Tarjeta & Transferencia */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm">
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-stone-500">Bancos (Tarjeta & SPEI)</span>
             <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
@@ -422,7 +422,7 @@ export default function IngresosPage() {
         </div>
 
         {/* Abonos y Deudas Recuperadas */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm">
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-stone-500">Anticipos & Deudas</span>
             <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
@@ -439,7 +439,7 @@ export default function IngresosPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-4">
+      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-4 transition-all duration-200 hover:border-emerald-400/80 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Search Box */}
           <div className="relative flex-1 w-full">
@@ -636,7 +636,7 @@ export default function IngresosPage() {
       {/* Modal: Registrar Nuevo Ingreso */}
       {isNewIncomeModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 border border-stone-200/80 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto transition-all duration-200 hover:border-emerald-400/60 hover:ring-2 hover:ring-emerald-400/20">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-xl">

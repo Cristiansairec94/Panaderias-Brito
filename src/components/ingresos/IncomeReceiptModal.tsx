@@ -41,7 +41,7 @@ export default function IncomeReceiptModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col max-h-[92vh] border border-stone-200 transition-all duration-200 hover:border-emerald-400/60 hover:ring-2 hover:ring-emerald-400/20">
         {/* Header bar */}
         <div className="bg-gradient-to-r from-emerald-950 via-stone-900 to-emerald-950 text-white p-4 px-6 flex items-center justify-between border-b border-emerald-900/40">
           <div className="flex items-center gap-2.5">
