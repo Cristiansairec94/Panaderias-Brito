@@ -273,7 +273,7 @@ export default function PedidosPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between">
+        <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
           <div>
             <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
               Pedidos Activos
@@ -288,7 +288,7 @@ export default function PedidosPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between">
+        <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-all duration-200 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20 hover:-translate-y-0.5 cursor-default">
           <div>
             <span className="text-[11px] font-bold uppercase text-rose-500 tracking-wider block">
               ¡Entregas para HOY!
@@ -303,7 +303,7 @@ export default function PedidosPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between">
+        <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-all duration-200 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20 hover:-translate-y-0.5 cursor-default">
           <div>
             <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
               Por Cobrar (Saldos)
@@ -318,7 +318,7 @@ export default function PedidosPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between">
+        <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-all duration-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20 hover:-translate-y-0.5 cursor-default">
           <div>
             <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
               Listos en Mostrador
@@ -515,8 +515,10 @@ export default function PedidosPage() {
                   return (
                     <React.Fragment key={order.id}>
                       <tr
-                        className={`hover:bg-amber-50/40 transition-colors group cursor-pointer ${
-                          isExpanded ? "bg-amber-50/60" : ""
+                        className={`transition-all duration-150 group cursor-pointer ${
+                          isExpanded
+                            ? "bg-amber-100/70 border-l-4 border-l-amber-600 shadow-xs"
+                            : "hover:bg-amber-100/60 hover:shadow-xs"
                         }`}
                         onClick={() => setExpandedRowId(isExpanded ? null : order.id)}
                       >
@@ -709,7 +711,7 @@ export default function PedidosPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
                               
                               {/* Col 1: Itemized list */}
-                              <div className="space-y-2 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs flex flex-col justify-between">
+                              <div className="space-y-2 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs flex flex-col justify-between transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/15 hover:ring-2 hover:ring-amber-400/30">
                                 <div>
                                   <div className="flex items-center justify-between mb-2">
                                     <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
@@ -724,7 +726,7 @@ export default function PedidosPage() {
                                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                                     {order.items && order.items.length > 0 ? (
                                       order.items.map((it, idx) => (
-                                        <div key={idx} className="space-y-0.5 border-b border-stone-100 pb-1.5 last:border-none">
+                                        <div key={idx} className="space-y-0.5 border-b border-stone-100 pb-1.5 last:border-none hover:bg-amber-50/60 px-2 py-1 rounded-xl transition-colors">
                                           <div className="flex justify-between font-bold text-stone-900">
                                             <span>{it.quantity}x {it.name}</span>
                                             <span className="font-mono">{formatCurrency(it.subtotal)}</span>
@@ -744,13 +746,13 @@ export default function PedidosPage() {
                               </div>
 
                               {/* Col 2: Observaciones & Delivery address */}
-                              <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs flex flex-col justify-between">
+                              <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-stone-200 shadow-2xs flex flex-col justify-between transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/15 hover:ring-2 hover:ring-amber-400/30">
                                 <div className="space-y-2.5">
                                   <span className="text-[10px] font-extrabold uppercase text-stone-400 tracking-wider block">
                                     Detalles de Entrega & Observaciones
                                   </span>
                                   {order.dedication ? (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-950">
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-amber-950 hover:bg-amber-100/60 hover:border-amber-300 transition-colors">
                                       <strong className="block text-[10px] text-amber-800 uppercase">📝 Observaciones:</strong>
                                       <span className="italic font-bold">"{order.dedication}"</span>
                                     </div>
@@ -759,20 +761,26 @@ export default function PedidosPage() {
                                   )}
 
                                   {order.deliveryType === "domicilio" ? (
-                                    <div className="text-[11px] text-stone-700 bg-stone-50 p-2.5 rounded-xl border border-stone-200">
+                                    <div className="text-[11px] text-stone-700 bg-stone-50 p-2.5 rounded-xl border border-stone-200 hover:bg-amber-50/40 hover:border-amber-300 transition-colors">
                                       <strong className="block text-stone-900">🚚 Entrega a Domicilio:</strong>
                                       <span>{order.deliveryAddress || "Dirección pendiente"}</span>
                                     </div>
                                   ) : (
-                                    <div className="text-[11px] text-stone-700">
-                                      <strong>🏬 Recoger en Tienda:</strong> {order.branchName}
+                                    <div className="text-[11px] text-stone-700 bg-stone-50 p-2.5 rounded-xl border border-stone-200 hover:bg-amber-50/40 hover:border-amber-300 transition-colors">
+                                      <strong className="text-stone-900">🏬 Recoger en Tienda:</strong> {order.branchName}
                                     </div>
                                   )}
 
                                   {order.notes && (
-                                    <p className="text-[11px] text-stone-500 bg-stone-50 p-2 rounded-lg">
-                                      <strong>Notas:</strong> {order.notes}
-                                    </p>
+                                    <div className="bg-amber-100/80 border-2 border-amber-400/90 rounded-xl p-3 text-amber-950 shadow-xs hover:bg-amber-100 hover:border-amber-500 hover:shadow-sm transition-all duration-150">
+                                      <div className="flex items-center gap-1.5 text-amber-900 font-black text-[11px] uppercase tracking-wider mb-1">
+                                        <span>📌</span>
+                                        <span>Notas:</span>
+                                      </div>
+                                      <p className="text-xs font-bold text-amber-950 leading-relaxed pl-5">
+                                        {order.notes}
+                                      </p>
+                                    </div>
                                   )}
                                 </div>
 
