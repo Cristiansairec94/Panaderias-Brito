@@ -30,7 +30,7 @@ import {
   Building2
 } from "lucide-react";
 import { CashIncome, CashIncomeCategory, Customer, CustomOrder } from "@/types";
-import { formatCurrency, formatDateTimeSafe } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -664,13 +664,14 @@ export default function IngresosPage() {
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-2xl text-emerald-600">$</span>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     required
                     autoFocus
                     placeholder="0.00"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => setAmount(cleanDecimalNumbers(e.target.value))}
                     className="w-full pl-10 pr-4 py-3 bg-stone-50 rounded-2xl border-2 border-stone-200 focus:border-emerald-500 focus:bg-white focus:outline-none text-2xl font-black text-stone-900 shadow-inner"
                   />
                 </div>
