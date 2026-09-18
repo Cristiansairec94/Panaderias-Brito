@@ -47,7 +47,20 @@ import { createClient } from "@/lib/supabase/client";
 import ExpenseReceiptModal from "@/components/gastos/ExpenseReceiptModal";
 
 // ─── Helpers de Fecha ────────────────────────────────────────────────────────
-const TODAY_ISO = () => new Date().toISOString().split("T")[0];
+const getLocalDateISO = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const TODAY_ISO = () => getLocalDateISO(new Date());
+
+const getPastDateISO = (daysAgo: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return getLocalDateISO(d);
+};
 
 const parseExpenseDate = (raw: string | Date | undefined): Date | null => {
   if (!raw) return null;
@@ -71,6 +84,50 @@ const formatExpenseDisplayDate = (raw: string | undefined): string => {
     month: "2-digit",
     year: "numeric",
   });
+};
+
+const getExpenseDateTimeInfo = (g: { date: string; timestamp?: string; displayDate?: string }) => {
+  const todayStr = getLocalDateISO(new Date());
+  const yest = new Date();
+  yest.setDate(yest.getDate() - 1);
+  const yesterdayStr = getLocalDateISO(yest);
+
+  const rawDate = g.date ? g.date.split("T")[0] : "";
+  const isHoy = rawDate === todayStr;
+  const isAyer = rawDate === yesterdayStr;
+
+  let timeStr = "";
+  if (g.timestamp) {
+    const dt = new Date(g.timestamp);
+    if (!isNaN(dt.getTime())) {
+      timeStr = dt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+    }
+  }
+  if (!timeStr && g.displayDate) {
+    const match = g.displayDate.match(/(\d{1,2}:\d{2}(?:\s*(?:[ap]\.?\s*m\.?|[AP]M))?)/i);
+    if (match) {
+      timeStr = match[1];
+    }
+  }
+
+  let formattedDate = "";
+  if (isHoy) {
+    formattedDate = timeStr ? `Hoy, ${timeStr}` : "Hoy";
+  } else if (isAyer) {
+    formattedDate = timeStr ? `Ayer, ${timeStr}` : "Ayer";
+  } else if (rawDate) {
+    const parts = rawDate.split("-");
+    if (parts.length === 3) {
+      const ddmmyyyy = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      formattedDate = timeStr ? `${ddmmyyyy}, ${timeStr}` : ddmmyyyy;
+    } else {
+      formattedDate = rawDate;
+    }
+  } else {
+    formattedDate = g.displayDate || "-";
+  }
+
+  return { isHoy, isAyer, formattedDate };
 };
 
 // ─── Catálogo de Categorías Especializado en Panadería ──────────────────────
@@ -109,8 +166,8 @@ const QUICK_AMOUNTS = [50, 100, 200, 300, 500, 1000];
 const INITIAL_GASTOS: ExpenseRecord[] = [
   {
     id: "GST-001001",
-    date: TODAY_ISO(),
-    displayDate: "Hoy, 07:30 AM",
+    date: getPastDateISO(3),
+    displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 07:30 AM`,
     category: "gas_lp",
     categoryLabel: "Gas LP para Hornos",
     branchId: "branch-matriz",
@@ -123,12 +180,12 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
     cashier: "Don Toño Brito",
     status: "activo",
     notes: "Factura Folio A-8891 recibida en oficina",
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(Date.now() - 259200000).toISOString(),
   },
   {
     id: "GST-001002",
-    date: TODAY_ISO(),
-    displayDate: "Hoy, 09:15 AM",
+    date: getPastDateISO(3),
+    displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 09:15 AM`,
     category: "insumos",
     categoryLabel: "Materia Prima & Harinas",
     branchId: "branch-matriz",
@@ -141,12 +198,12 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
     cashier: "Lupita Brito",
     status: "activo",
     notes: "Ticket de compra adjunto en cajón",
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(Date.now() - 259200000).toISOString(),
   },
   {
     id: "GST-001003",
-    date: TODAY_ISO(),
-    displayDate: "Hoy, 10:45 AM",
+    date: getPastDateISO(2),
+    displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 10:45 AM`,
     category: "empaques",
     categoryLabel: "Bolsas Kraft & Empaques",
     branchId: "branch-benito",
@@ -158,12 +215,12 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
     supplier: "Papelera San Benito",
     cashier: "Carlos Mendoza",
     status: "activo",
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(Date.now() - 172800000).toISOString(),
   },
   {
     id: "GST-001004",
-    date: TODAY_ISO(),
-    displayDate: "Hoy, 11:20 AM",
+    date: getPastDateISO(2),
+    displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 11:20 AM`,
     category: "gasolina",
     categoryLabel: "Gasolina & Repartos",
     branchId: "branch-matriz",
@@ -176,12 +233,12 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
     cashier: "Don Toño Brito",
     status: "activo",
     notes: "Odómetro: 142,580 km",
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(Date.now() - 172800000).toISOString(),
   },
   {
     id: "GST-001005",
-    date: TODAY_ISO(),
-    displayDate: "Hoy, 12:30 PM",
+    date: getPastDateISO(1),
+    displayDate: "Ayer, 12:30 PM",
     category: "mantenimiento",
     categoryLabel: "Mantenimiento & Refacciones",
     branchId: "branch-flores",
@@ -193,12 +250,12 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
     supplier: "Técnico Luis Hernández",
     cashier: "Elena Brito",
     status: "activo",
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(Date.now() - 86400000).toISOString(),
   },
   {
     id: "GST-001006",
-    date: TODAY_ISO(),
-    displayDate: "Hoy, 01:10 PM",
+    date: getPastDateISO(1),
+    displayDate: "Ayer, 01:10 PM",
     category: "retiro_dueno",
     categoryLabel: "Retiro Don Toño / Socios",
     branchId: "branch-matriz",
@@ -210,7 +267,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
     cashier: "Don Toño Brito",
     status: "activo",
     notes: "Resguardo preventivo turno mañana",
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(Date.now() - 86400000).toISOString(),
   },
   {
     id: "GST-001007",
@@ -294,8 +351,53 @@ export default function GastosPage() {
     try {
       const saved = localStorage.getItem("brito_gastos_registro");
       if (saved) {
-        const parsed = JSON.parse(saved);
+        let parsed: ExpenseRecord[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          const todayStr = getLocalDateISO(new Date());
+          let needsUpdate = false;
+
+          parsed = parsed.map((item) => {
+            // #GST-2460 fue registrado antes de hoy
+            if (item.id === "GST-2460" && item.date === todayStr) {
+              needsUpdate = true;
+              return {
+                ...item,
+                date: getPastDateISO(1),
+                displayDate: "Ayer, 01:30 p.m.",
+                timestamp: new Date(Date.now() - 86400000).toISOString(),
+              };
+            }
+            // GST-001001 a GST-001006 son datos demo que no deben marcarse con la fecha de hoy
+            if (item.id === "GST-001006" && item.date === todayStr) {
+              needsUpdate = true;
+              return { ...item, date: getPastDateISO(1), displayDate: "Ayer, 01:10 PM", timestamp: new Date(Date.now() - 86400000).toISOString() };
+            }
+            if (item.id === "GST-001005" && item.date === todayStr) {
+              needsUpdate = true;
+              return { ...item, date: getPastDateISO(1), displayDate: "Ayer, 12:30 PM", timestamp: new Date(Date.now() - 86400000).toISOString() };
+            }
+            if (item.id === "GST-001004" && item.date === todayStr) {
+              needsUpdate = true;
+              return { ...item, date: getPastDateISO(2), displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 11:20 AM`, timestamp: new Date(Date.now() - 172800000).toISOString() };
+            }
+            if (item.id === "GST-001003" && item.date === todayStr) {
+              needsUpdate = true;
+              return { ...item, date: getPastDateISO(2), displayDate: `${getPastDateISO(2).split("-").reverse().join("/")}, 10:45 AM`, timestamp: new Date(Date.now() - 172800000).toISOString() };
+            }
+            if (item.id === "GST-001002" && item.date === todayStr) {
+              needsUpdate = true;
+              return { ...item, date: getPastDateISO(3), displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 09:15 AM`, timestamp: new Date(Date.now() - 259200000).toISOString() };
+            }
+            if (item.id === "GST-001001" && item.date === todayStr) {
+              needsUpdate = true;
+              return { ...item, date: getPastDateISO(3), displayDate: `${getPastDateISO(3).split("-").reverse().join("/")}, 07:30 AM`, timestamp: new Date(Date.now() - 259200000).toISOString() };
+            }
+            return item;
+          });
+
+          if (needsUpdate) {
+            localStorage.setItem("brito_gastos_registro", JSON.stringify(parsed));
+          }
           setGastos(parsed);
           return;
         }
@@ -506,7 +608,9 @@ export default function GastosPage() {
     const nuevoGasto: ExpenseRecord = {
       id: `GST-${nextNum}`,
       date: form.fecha,
-      displayDate: `Hoy, ${new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
+      displayDate: form.fecha === TODAY_ISO()
+        ? `Hoy, ${new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+        : `${form.fecha.split("-").reverse().join("/")}, ${new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
       category: form.categoriaId,
       categoryLabel: catInfo.label,
       branchId: targetBranch.id,
@@ -1031,7 +1135,7 @@ export default function GastosPage() {
                 filteredGastos.map((g) => {
                   const isAnulado = g.status === "anulado";
                   const catInfo = getCategoryInfo(g.category);
-                  const isHoy = g.date === TODAY_ISO() || (g.displayDate && g.displayDate.includes("Hoy"));
+                  const { isHoy, formattedDate } = getExpenseDateTimeInfo(g);
 
                   return (
                     <tr
@@ -1052,7 +1156,7 @@ export default function GastosPage() {
                       {/* 2. Fecha */}
                       <td className="py-2.5 px-3.5 align-middle whitespace-nowrap">
                         <span className={`font-semibold ${isAnulado ? "line-through text-stone-400" : "text-stone-700"}`}>
-                          {g.displayDate || formatExpenseDisplayDate(g.date)}
+                          {formattedDate}
                         </span>
                         {isHoy && !isAnulado && (
                           <span className="ml-1.5 bg-amber-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded uppercase">
