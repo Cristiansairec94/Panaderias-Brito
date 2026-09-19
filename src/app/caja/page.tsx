@@ -687,7 +687,7 @@ export default function CajaPage() {
         <div className="space-y-6">
           {/* Tarjetas KPI de Auditoría */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between">
+            <div className="bg-white hover:bg-stone-50/50 p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
                   Cortes Registrados
@@ -704,7 +704,7 @@ export default function CajaPage() {
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between">
+            <div className="bg-white hover:bg-stone-50/50 p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">
                   Efectivo Entregado a Don Toño
@@ -721,7 +721,7 @@ export default function CajaPage() {
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between">
+            <div className="bg-white hover:bg-stone-50/50 p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
                   Ventas Totales Auditadas
@@ -738,7 +738,7 @@ export default function CajaPage() {
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm flex items-center justify-between">
+            <div className="bg-white hover:bg-stone-50/50 p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
                   Auditoría de Arqueo
@@ -764,7 +764,7 @@ export default function CajaPage() {
           </div>
 
           {/* Barra de Búsqueda y Filtros de Auditoría */}
-          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-3">
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 space-y-3">
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
               {/* Buscador de texto */}
               <div className="relative flex-1">
@@ -866,7 +866,7 @@ export default function CajaPage() {
           </div>
 
           {/* Tabla / Listado de Cortes */}
-          <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
             {filteredCuts.length === 0 ? (
               <div className="p-12 text-center space-y-3">
                 <div className="text-5xl">📜</div>
@@ -1037,7 +1037,7 @@ export default function CajaPage() {
       {activeTab === "turno" && (
         <div className="space-y-6">
           {/* Live Shift Box Status */}
-          <div className="bg-gradient-to-br from-stone-900 via-stone-850 to-stone-950 rounded-3xl p-6 text-white shadow-2xl border border-stone-800 space-y-6">
+          <div className="bg-gradient-to-br from-stone-900 via-stone-850 to-stone-950 rounded-3xl p-6 text-white shadow-2xl border border-stone-800 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 transition-all duration-200 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-800 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-amber-600 text-white rounded-2xl shadow-lg shadow-amber-600/30">
@@ -1072,27 +1072,27 @@ export default function CajaPage() {
 
             {/* Breakdown Row */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800">
+              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
                 <span className="text-stone-400 text-[10px] font-bold block">Fondo Inicial:</span>
                 <span className="text-base font-bold text-stone-200">{formatCurrency(initialCash)}</span>
               </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800">
+              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
                 <span className="text-stone-400 text-[10px] font-bold block">Ventas Efectivo:</span>
                 <span className="text-base font-bold text-emerald-400">+{formatCurrency(cashSales)}</span>
               </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800">
+              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
                 <span className="text-stone-400 text-[10px] font-bold block">Otras Entradas:</span>
                 <span className="text-base font-bold text-emerald-400">+{formatCurrency(totalEntries)}</span>
               </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800">
+              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
                 <span className="text-stone-400 text-[10px] font-bold block">Gastos / Retiros:</span>
                 <span className="text-base font-bold text-rose-400">-{formatCurrency(totalExpenses)}</span>
               </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800">
+              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
                 <span className="text-stone-400 text-[10px] font-bold block">Cobros Tarjeta:</span>
                 <span className="text-base font-bold text-blue-400">{formatCurrency(cardSales)}</span>
               </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800">
+              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
                 <span className="text-stone-400 text-[10px] font-bold block">Transferencias:</span>
                 <span className="text-base font-bold text-purple-400">{formatCurrency(transferSales)}</span>
               </div>
@@ -1130,7 +1130,7 @@ export default function CajaPage() {
           </div>
 
           {/* Movements Table */}
-          <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden space-y-3 p-6">
+          <div className="bg-white rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden space-y-3 p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <History className="w-5 h-5 text-amber-600" />
@@ -1189,7 +1189,7 @@ export default function CajaPage() {
       {/* ========================================================================= */}
       {isMovementModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-stone-200 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 transition-all duration-200 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2">
                 <div className={`p-2 rounded-xl ${movementType === "entrada" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"}`}>
@@ -1282,7 +1282,7 @@ export default function CajaPage() {
       {/* ========================================================================= */}
       {isCorteModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 border border-stone-100 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 border border-stone-200 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 transition-all duration-200 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-stone-900 text-white rounded-xl">

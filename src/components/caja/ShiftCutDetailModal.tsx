@@ -102,7 +102,7 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
         }
       `}</style>
 
-      <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[92vh] border-2 border-stone-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[92vh] border-2 border-stone-200 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 transition-all duration-200">
         {/* Cabecera del Modal */}
         <div className="bg-gradient-to-r from-stone-900 via-amber-950 to-stone-900 text-white p-4 sm:p-5 px-6 flex items-center justify-between border-b border-amber-900/50 shadow-sm shrink-0">
           <div className="flex items-center gap-3">
