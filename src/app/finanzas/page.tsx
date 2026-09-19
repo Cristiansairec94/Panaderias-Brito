@@ -71,7 +71,7 @@ export default function FinanzasPage() {
     <div className="w-full space-y-6 pb-12">
       {/* Top Header & Controles Globales */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/80 shadow-sm">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-brito-orange-100 text-brito-orange-800 border border-brito-orange-200">
               ERP Finanzas & Control
@@ -87,22 +87,22 @@ export default function FinanzasPage() {
         </div>
 
         {/* Acciones Rápidas */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
           <button 
             onClick={() => setIsReportModalOpen(true)}
-            className="flex items-center gap-1.5 bg-brito-orange-600 hover:bg-brito-orange-700 text-white font-black px-4 py-2.5 rounded-2xl shadow-md text-xs transition-all active:scale-95"
+            className="flex items-center gap-1.5 bg-brito-orange-600 hover:bg-brito-orange-700 text-white font-black px-3.5 sm:px-4 py-2.5 rounded-2xl shadow-md text-xs whitespace-nowrap transition-all active:scale-95 shrink-0"
           >
             <Download className="w-4 h-4" /> Exportar Balance
           </button>
           <Link
             href="/gastos"
-            className="flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-extrabold px-4 py-2.5 rounded-2xl text-xs transition-all border border-stone-200"
+            className="flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-extrabold px-3.5 sm:px-4 py-2.5 rounded-2xl text-xs whitespace-nowrap transition-all border border-stone-200 shrink-0"
           >
             <TrendingDown className="w-4 h-4 text-rose-600" /> Registro de Gastos
           </Link>
           <Link
             href="/caja"
-            className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-extrabold px-4 py-2.5 rounded-2xl shadow-sm text-xs transition-all"
+            className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-extrabold px-3.5 sm:px-4 py-2.5 rounded-2xl shadow-sm text-xs whitespace-nowrap transition-all shrink-0"
           >
             <Wallet className="w-4 h-4 text-brito-orange-400" /> Cortes de Caja
           </Link>
