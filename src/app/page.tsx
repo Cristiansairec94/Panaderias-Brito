@@ -277,25 +277,15 @@ export default function Home() {
           </div>
 
           {/* Quick Operations Action Bar */}
-          <div className="relative z-10 flex flex-col gap-2.5 self-start lg:self-center w-full lg:w-auto lg:min-w-[320px]">
-            {/* Main Operations Row: POS Mostrador & Corte de Caja */}
-            <div className="flex items-stretch gap-2 w-full">
-              <Link
-                href="/pos"
-                className="flex-[1.5] flex items-center justify-center gap-2 bg-gradient-to-r from-[#f97316] via-[#ea580c] to-[#e11d48] hover:brightness-110 text-white font-black px-4 py-3 rounded-2xl shadow-xl shadow-orange-600/30 transition-all active:scale-95 text-xs tracking-wide whitespace-nowrap"
-              >
-                <ShoppingBag className="w-4 h-4 text-amber-200 shrink-0" />
-                <span><span className="hidden sm:inline">Abrir </span>POS Mostrador</span>
-              </Link>
-              <Link
-                href="/caja"
-                className="flex-1 flex items-center justify-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.15] text-white font-bold px-3 py-3 rounded-2xl border border-white/15 hover:border-orange-500/40 transition-all active:scale-95 text-xs whitespace-nowrap"
-                title="Corte y Arqueo de Caja"
-              >
-                <Wallet className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                <span>Corte<span className="hidden sm:inline"> Caja</span></span>
-              </Link>
-            </div>
+          <div className="relative z-10 flex flex-col gap-2.5 self-start lg:self-center w-full lg:w-auto lg:min-w-[280px]">
+            {/* Primary Action: Abrir POS Mostrador */}
+            <Link
+              href="/pos"
+              className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-[#f97316] via-[#ea580c] to-[#e11d48] hover:brightness-110 text-white font-black px-6 py-3.5 rounded-2xl shadow-xl shadow-orange-600/30 transition-all active:scale-95 text-xs tracking-wide"
+            >
+              <ShoppingBag className="w-4 h-4 text-amber-200" />
+              <span>Abrir POS Mostrador</span>
+            </Link>
 
             {/* Sales Simulation Controls */}
             <div className="flex items-center gap-2 w-full">
