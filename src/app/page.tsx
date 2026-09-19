@@ -20,8 +20,6 @@ import {
   Flame,
   Play,
   Pause,
-  PlusCircle,
-  TrendingDown,
   CheckCircle2,
   ArrowUpRight,
   Sparkles,
@@ -279,68 +277,55 @@ export default function Home() {
           </div>
 
           {/* Quick Operations Action Bar */}
-          <div className="relative z-10 flex flex-wrap lg:flex-col gap-2.5 self-start lg:self-center min-w-[240px]">
-            <Link
-              href="/pos"
-              className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-[#f97316] via-[#ea580c] to-[#e11d48] hover:brightness-110 text-white font-black px-6 py-3.5 rounded-2xl shadow-xl shadow-orange-600/30 transition-all active:scale-95 text-xs tracking-wide"
-            >
-              <ShoppingBag className="w-4 h-4 text-amber-200" />
-              <span>Abrir POS Mostrador</span>
-            </Link>
+          <div className="relative z-10 flex flex-col gap-2.5 self-start lg:self-center w-full lg:w-auto lg:min-w-[320px]">
+            {/* Main Operations Row: POS Mostrador & Corte de Caja */}
+            <div className="flex items-stretch gap-2 w-full">
+              <Link
+                href="/pos"
+                className="flex-[1.5] flex items-center justify-center gap-2 bg-gradient-to-r from-[#f97316] via-[#ea580c] to-[#e11d48] hover:brightness-110 text-white font-black px-4 py-3 rounded-2xl shadow-xl shadow-orange-600/30 transition-all active:scale-95 text-xs tracking-wide whitespace-nowrap"
+              >
+                <ShoppingBag className="w-4 h-4 text-amber-200 shrink-0" />
+                <span><span className="hidden sm:inline">Abrir </span>POS Mostrador</span>
+              </Link>
+              <Link
+                href="/caja"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.15] text-white font-bold px-3 py-3 rounded-2xl border border-white/15 hover:border-orange-500/40 transition-all active:scale-95 text-xs whitespace-nowrap"
+                title="Corte y Arqueo de Caja"
+              >
+                <Wallet className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                <span>Corte<span className="hidden sm:inline"> Caja</span></span>
+              </Link>
+            </div>
 
-            <div className="flex gap-2 w-full">
+            {/* Sales Simulation Controls */}
+            <div className="flex items-center gap-2 w-full">
               <button
                 onClick={() => simulateSale()}
                 title="Simula un ticket de venta en la sucursal activa"
-                className="flex-1 flex items-center justify-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.16] text-white font-bold px-3 py-2.5 rounded-xl border border-white/15 transition-all active:scale-95 text-xs"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.16] text-white font-bold px-3 py-2.5 rounded-xl border border-white/15 transition-all active:scale-95 text-xs whitespace-nowrap"
               >
-                <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 animate-pulse" />
-                +1 Venta
+                <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 animate-pulse shrink-0" />
+                <span>+1 Venta</span>
               </button>
               <button
                 onClick={() => simulateBulkSales(undefined, 5)}
                 title="Simula 5 ventas automáticas"
-                className="flex items-center justify-center gap-1 bg-white/[0.08] hover:bg-white/[0.16] text-white font-bold px-3 py-2.5 rounded-xl border border-white/15 transition-all active:scale-95 text-xs"
+                className="flex-1 flex items-center justify-center gap-1 bg-white/[0.08] hover:bg-white/[0.16] text-white font-bold px-3 py-2.5 rounded-xl border border-white/15 transition-all active:scale-95 text-xs whitespace-nowrap"
               >
-                +5 Ventas
+                <span>+5 Ventas</span>
               </button>
               <button
                 onClick={toggleLiveSimulation}
                 title={isLiveSimulating ? "Pausar simulación" : "Activar simulación continua en segundo plano"}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border font-bold text-xs transition-all active:scale-95 ${
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border font-bold text-xs transition-all active:scale-95 whitespace-nowrap ${
                   isLiveSimulating
                     ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/35"
                     : "bg-white/[0.08] text-stone-300 border-white/15 hover:bg-white/[0.16]"
                 }`}
               >
-                {isLiveSimulating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 text-emerald-400" />}
+                {isLiveSimulating ? <Pause className="w-3.5 h-3.5 shrink-0" /> : <Play className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                 <span>{isLiveSimulating ? "Pausar" : "Auto"}</span>
               </button>
-            </div>
-
-            <div className="flex gap-2 w-full">
-              <Link
-                href="/ingresos"
-                className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 font-bold px-3 py-2.5 rounded-xl border border-emerald-500/30 transition-all text-xs"
-              >
-                <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
-                + Abono
-              </Link>
-              <Link
-                href="/gastos"
-                className="flex-1 flex items-center justify-center gap-1.5 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 font-bold px-3 py-2.5 rounded-xl border border-rose-500/30 transition-all text-xs"
-              >
-                <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
-                - Gasto
-              </Link>
-              <Link
-                href="/caja"
-                className="flex items-center justify-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.14] text-white font-bold px-3 py-2.5 rounded-xl border border-white/15 transition-all text-xs"
-                title="Corte y Arqueo de Caja"
-              >
-                <Wallet className="w-3.5 h-3.5 text-orange-400" />
-                Corte
-              </Link>
             </div>
           </div>
         </div>
