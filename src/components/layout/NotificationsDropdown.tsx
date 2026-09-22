@@ -102,7 +102,7 @@ export default function NotificationsDropdown() {
 
       {/* Facebook Style Popover Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-[420px] sm:w-[440px] max-w-[calc(100vw-2rem)] bg-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.25)] border-2 border-stone-200 z-[150] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 flex flex-col max-h-[85vh]">
+        <div className="fixed sm:absolute left-3 sm:left-auto right-3 sm:right-0 top-16 sm:top-auto mt-1 sm:mt-3 w-auto sm:w-[440px] max-w-[calc(100vw-1.5rem)] bg-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.25)] border-2 border-stone-200 z-[150] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 flex flex-col max-h-[80vh]">
           {/* Header Bar */}
           <div className="p-4 pb-3 border-b border-stone-100 space-y-3">
             <div className="flex items-center justify-between">

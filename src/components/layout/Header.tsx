@@ -236,7 +236,7 @@ export default function Header() {
         {/* Offline / Cloud Status Pill */}
         <Link
           href="/configuracion?tab=offline"
-          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap ${
+          className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap ${
             !isOnline
               ? "bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100 animate-pulse"
               : isSyncing
@@ -258,7 +258,7 @@ export default function Header() {
           {!isOnline ? (
             <>
               <WifiOff className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-              <span className="text-[11px] font-black text-rose-700">Sin Red</span>
+              <span className="text-[11px] font-black text-rose-700 hidden sm:inline">Sin Red</span>
               {pendingCount > 0 && (
                 <span className="px-1.5 py-0.2 bg-rose-600 text-white text-[9px] font-black rounded-full">
                   {pendingCount}
@@ -268,12 +268,12 @@ export default function Header() {
           ) : isSyncing ? (
             <>
               <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin shrink-0" />
-              <span className="text-[11px] font-black text-amber-800">Sincronizando...</span>
+              <span className="text-[11px] font-black text-amber-800 hidden sm:inline">Sincronizando...</span>
             </>
           ) : pendingCount > 0 ? (
             <>
               <RefreshCw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span className="text-[11px] font-black text-amber-800">{pendingCount} pend.</span>
+              <span className="text-[11px] font-black text-amber-800 hidden sm:inline">{pendingCount} pend.</span>
             </>
           ) : (
             <>
@@ -290,7 +290,7 @@ export default function Header() {
         <div ref={branchMenuRef} className="relative z-[110] shrink-0">
           <button
             onClick={toggleBranchMenu}
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50/80 hover:bg-stone-100 text-stone-800 text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50/80 hover:bg-stone-100 text-stone-800 text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap"
             title="Cambiar sucursal activa"
           >
             <span className="relative flex h-2 w-2 shrink-0">
@@ -298,10 +298,10 @@ export default function Header() {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
             <Building2 className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-            <span className="max-w-[75px] sm:max-w-[110px] md:max-w-[140px] truncate">
-              {isAllBranches ? "Todas las Sucursales" : currentBranch?.shortName}
+            <span className="max-w-[65px] sm:max-w-[110px] md:max-w-[140px] truncate">
+              {isAllBranches ? "Todas" : currentBranch?.shortName}
             </span>
-            <ChevronDown className="w-3 h-3 text-stone-400 shrink-0" />
+            <ChevronDown className="w-3 h-3 text-stone-400 shrink-0 hidden sm:inline" />
           </button>
 
           {/* Branch Dropdown Menu */}

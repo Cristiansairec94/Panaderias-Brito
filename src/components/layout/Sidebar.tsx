@@ -214,7 +214,7 @@ export default function Sidebar() {
       {/* Main Modern Sidebar: Deep Onyx with Brito Brand Orange & Crimson accents */}
       <aside
         className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl border-r border-white/[0.08] bg-[#090a0f] text-stone-200 ${
-          isCollapsed ? "w-20" : "w-64"
+          isCollapsed ? "w-20" : "w-72 md:w-64 max-w-[85vw]"
         } ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
@@ -275,6 +275,29 @@ export default function Sidebar() {
               )}
             </button>
           </div>
+
+          {/* Mobile User Profile Card (Solo visible en drawer celular) */}
+          {user && (
+            <div className="md:hidden mx-3 mb-3 p-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] flex items-center justify-center text-sm font-bold text-white shadow-md shadow-orange-500/20 overflow-hidden shrink-0">
+                  {user?.photoUrl || (user?.avatar && (user.avatar.startsWith("data:image") || user.avatar.startsWith("http"))) ? (
+                    <img src={user.photoUrl || user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    user?.avatar || "👨‍🍳"
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-white leading-tight truncate">{user.name}</p>
+                  <p className="text-[10px] text-orange-400 font-bold tracking-wide truncate">{user.roleLabel}</p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Activo
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Navigation Modules (Middle Scrollable) */}
@@ -488,7 +511,7 @@ export default function Sidebar() {
         </div>
 
         {/* Bottom Section: Hero POS Action in Brito Brand Dual Gradient */}
-        <div className="p-3 border-t border-white/[0.06] bg-white/[0.01] space-y-2">
+        <div className="p-3 border-t border-white/[0.06] bg-white/[0.01] space-y-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {/* Quick Action according to Role */}
           {canAccessRoute && canAccessRoute("/pos") ? (
             <Link
