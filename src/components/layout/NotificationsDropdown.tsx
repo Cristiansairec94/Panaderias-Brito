@@ -33,6 +33,8 @@ export default function NotificationsDropdown() {
     notifications,
     unreadCount,
     soundEnabled,
+    nativePermission,
+    requestNativePermission,
     toggleSound,
     markAsRead,
     markAsUnread,
@@ -184,6 +186,30 @@ export default function NotificationsDropdown() {
                 )}
               </button>
             </div>
+
+            {/* Banner para Activar Notificaciones Nativas en Celular */}
+            {nativePermission !== "granted" && (
+              <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10 border border-orange-500/25 rounded-2xl p-2.5 flex items-center justify-between gap-2 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base">🔔</span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black text-stone-900 leading-tight">
+                      Activar avisos en tu teléfono
+                    </p>
+                    <p className="text-[10px] text-stone-500 leading-tight">
+                      Recibe alertas de ventas y pedidos con sonido
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={requestNativePermission}
+                  className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-rose-600 hover:brightness-110 active:scale-95 text-white font-black text-[10px] rounded-xl shrink-0 shadow-sm transition-all"
+                >
+                  Activar
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Notifications Scroll List */}

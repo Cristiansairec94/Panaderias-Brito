@@ -512,7 +512,29 @@ export default function Sidebar() {
 
         {/* Bottom Section: Hero POS Action in Brito Brand Dual Gradient */}
         <div className="p-3 border-t border-white/[0.06] bg-white/[0.01] space-y-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {/* Quick Action according to Role */}
+          {/* Quick Action on Mobile: Configuración del Sistema (Sin POS) */}
+          <Link
+            href="/configuracion"
+            onClick={() => {
+              setMobileOpen(false);
+              setCurrentSearch("");
+            }}
+            className="md:hidden w-full flex items-center justify-between p-3 rounded-2xl font-bold text-xs transition-all shadow-lg bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 text-white active:scale-95"
+            title="Ir a Configuración"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-xl">
+                <Settings className="w-4 h-4 text-white" />
+              </div>
+              <div className="text-left">
+                <p className="leading-tight font-black tracking-tight text-white">Configuración del Sistema</p>
+                <p className="text-[9px] font-medium text-amber-100">Catálogos, Roles y Ajustes</p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-white" />
+          </Link>
+
+          {/* Quick Action on Desktop according to Role */}
           {canAccessRoute && canAccessRoute("/pos") ? (
             <Link
               href="/pos"
@@ -520,7 +542,7 @@ export default function Sidebar() {
                 setMobileOpen(false);
                 setCurrentSearch("");
               }}
-              className={`w-full flex items-center ${
+              className={`hidden md:flex items-center ${
                 isCollapsed ? "justify-center p-2.5" : "justify-between p-3.5"
               } rounded-2xl font-bold text-xs transition-all shadow-xl group active:scale-95 ${
                 isPosActive

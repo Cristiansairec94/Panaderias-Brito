@@ -1,12 +1,12 @@
-﻿{
-  "name": "Panadería Bakery Brito - Sistema ERP & POS",
+{
+  "name": "Panadería Brito - Sistema ERP & Gestión",
   "short_name": "Panadería Brito",
-  "description": "Sistema integral de punto de venta, inventario y gestión para Panadería Brito. Funciona 100% sin internet.",
-  "start_url": "/pos",
+  "description": "Sistema integral de gestión, catálogo de precios, finanzas y control en tiempo real de Panadería Brito.",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "any",
-  "background_color": "#0c0d12",
+  "orientation": "portrait-primary",
+  "background_color": "#090a0f",
   "theme_color": "#f97316",
   "categories": ["business", "finance", "productivity"],
   "icons": [
@@ -30,17 +30,31 @@
   ],
   "shortcuts": [
     {
-      "name": "Punto de Venta (Caja Rápida)",
-      "short_name": "Caja POS",
-      "description": "Abrir directamente el mostrador de ventas",
-      "url": "/pos",
+      "name": "Dashboard General",
+      "short_name": "Dashboard",
+      "description": "Métricas y ventas en tiempo real",
+      "url": "/",
       "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
     },
     {
-      "name": "Configuración & Modo Offline",
-      "short_name": "Modo Offline",
-      "description": "Monitoreo de sincronización y datos locales",
-      "url": "/configuracion?tab=offline",
+      "name": "Catálogo y Modificar Precios",
+      "short_name": "Precios",
+      "description": "Ver panes y editar precios",
+      "url": "/productos",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Configuración del Sistema",
+      "short_name": "Configuración",
+      "description": "Ajustes, catálogos y roles",
+      "url": "/configuracion",
+      "icons": [{ "src": "/logo.png", "sizes": "/logo.png" }]
+    },
+    {
+      "name": "Finanzas & Caja",
+      "short_name": "Caja",
+      "description": "Arqueos y flujo de dinero",
+      "url": "/caja",
       "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
     }
   ]

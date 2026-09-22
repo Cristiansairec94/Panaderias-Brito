@@ -33,6 +33,7 @@ import { Product } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { BarcodeCard } from "@/components/productos/BarcodeCard";
 import { PrintBarcodesModal } from "@/components/productos/PrintBarcodesModal";
+import { QuickPriceModal } from "@/components/productos/QuickPriceModal";
 import { 
   getStoredProducts, 
   createProduct, 
@@ -62,6 +63,10 @@ export default function ProductosPage() {
 
   // Success toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Quick Price Modal state (para editar precios ágilmente desde el celular)
+  const [quickPriceProduct, setQuickPriceProduct] = useState<Product | null>(null);
+  const [isQuickPriceOpen, setIsQuickPriceOpen] = useState(false);
 
   // Categories visibility (permanent while in use)
   const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
@@ -105,6 +110,22 @@ export default function ProductosPage() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleOpenQuickPrice = (product: Product) => {
+    setQuickPriceProduct(product);
+    setIsQuickPriceOpen(true);
+  };
+
+  const handleSaveQuickPrice = (productId: string, newPrice: number) => {
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return;
+
+    const updated = updateProduct(productId, { price: newPrice });
+    if (updated) {
+      setProducts(getStoredProducts());
+      showToast(`Precio de "${prod.name}" actualizado a ${formatCurrency(newPrice)}`);
+    }
   };
 
   // Filtered products
@@ -590,10 +611,19 @@ export default function ProductosPage() {
                           {product.name}
                         </h3>
                       </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-base font-black text-amber-600">
-                          {formatCurrency(product.price)}
-                        </span>
+                      <div 
+                        onClick={() => handleOpenQuickPrice(product)}
+                        className="text-right shrink-0 cursor-pointer group/price select-none"
+                        title="Toca para modificar precio rápidamente"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-base font-black text-amber-600 group-hover/price:underline group-hover/price:text-amber-700">
+                            {formatCurrency(product.price)}
+                          </span>
+                          <span className="text-[10px] font-black text-amber-600 bg-amber-100/80 px-1.5 py-0.5 rounded-lg border border-amber-300 group-hover/price:bg-amber-200 transition-colors">
+                            ⚡
+                          </span>
+                        </div>
                         {product.unit && (
                           <span className="text-[11px] font-bold text-stone-500 ml-1">
                             /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
@@ -626,10 +656,17 @@ export default function ProductosPage() {
                   </div>
 
                   {/* Card Actions */}
-                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-1.5">
+                    <button
+                      onClick={() => handleOpenQuickPrice(product)}
+                      className="py-2 px-3 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-200/80 text-xs font-black rounded-xl flex items-center justify-center gap-1 transition-all"
+                      title="Modificar precio rápido"
+                    >
+                      <TagIcon className="w-3.5 h-3.5 text-amber-600" /> Precio
+                    </button>
                     <button
                       onClick={() => handleOpenEdit(product)}
-                      className="flex-1 py-2 px-3 bg-stone-100 hover:bg-amber-100 hover:text-amber-900 text-stone-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                      className="flex-1 py-2 px-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
                     >
                       <Edit3 className="w-3.5 h-3.5" /> Editar
                     </button>
@@ -702,11 +739,16 @@ export default function ProductosPage() {
                           {catBadge.label}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-black text-amber-600 text-sm whitespace-nowrap">
-                        <div>
-                          {formatCurrency(product.price)}
+                      <td 
+                        onClick={() => handleOpenQuickPrice(product)}
+                        className="py-3 px-4 text-right font-black text-amber-600 text-sm whitespace-nowrap cursor-pointer hover:bg-amber-50/70 transition-colors group/cell select-none"
+                        title="Toca para modificar precio rápidamente"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="group-hover/cell:underline">{formatCurrency(product.price)}</span>
+                          <span className="text-[10px] text-amber-600 bg-amber-100 px-1 py-0.2 rounded font-black">⚡</span>
                           {product.unit && (
-                            <span className="text-[10px] font-bold text-stone-400 ml-1">
+                            <span className="text-[10px] font-bold text-stone-400 ml-0.5">
                               /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
                             </span>
                           )}
@@ -735,9 +777,16 @@ export default function ProductosPage() {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
+                            onClick={() => handleOpenQuickPrice(product)}
+                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg transition-colors"
+                            title="Modificar precio rápido"
+                          >
+                            <TagIcon className="w-3.5 h-3.5 text-amber-600" />
+                          </button>
+                          <button
                             onClick={() => handleOpenEdit(product)}
                             className="p-1.5 bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 rounded-lg transition-colors"
-                            title="Editar"
+                            title="Editar completo"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
@@ -746,7 +795,7 @@ export default function ProductosPage() {
                             className="p-1.5 bg-stone-100 hover:bg-rose-100 text-stone-500 hover:text-rose-600 rounded-lg transition-colors"
                             title="Eliminar"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -1339,6 +1388,17 @@ export default function ProductosPage() {
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         products={products}
+      />
+
+      {/* Modal Táctil de Modificación Rápida de Precio en Celular */}
+      <QuickPriceModal
+        isOpen={isQuickPriceOpen}
+        product={quickPriceProduct}
+        onClose={() => {
+          setIsQuickPriceOpen(false);
+          setQuickPriceProduct(null);
+        }}
+        onSave={handleSaveQuickPrice}
       />
     </div>
   );

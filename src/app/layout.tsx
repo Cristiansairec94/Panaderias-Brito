@@ -27,16 +27,22 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Panadería Bakery Brito - Sistema ERP & POS",
-  description: "Sistema integral de punto de venta, inventario y gestión para Panadería Brito (Don Toño)",
+  title: "Panadería Brito - Sistema ERP & Gestión",
+  description: "Sistema integral de gestión, catálogo de precios, finanzas y control en tiempo real de Panadería Brito",
   manifest: "/manifest.json",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Panadería Brito",
+  },
 };
 
 import { SyncProvider } from "@/context/SyncContext";
+import PwaInstallPrompt from "@/components/ui/PwaInstallPrompt";
 
 export default function RootLayout({
   children,
@@ -47,8 +53,11 @@ export default function RootLayout({
     <html lang="es" className={`${satisfy.variable} ${dancingScript.variable}`}>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Panadería Brito" />
       </head>
       <body className="antialiased font-sans">
         <AuthProvider>
@@ -57,6 +66,7 @@ export default function RootLayout({
               <AppLayout>
                 {children}
               </AppLayout>
+              <PwaInstallPrompt />
             </NotificationProvider>
           </SyncProvider>
         </AuthProvider>

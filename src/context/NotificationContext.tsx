@@ -100,6 +100,8 @@ interface NotificationContextType {
   notifications: FBNotification[];
   unreadCount: number;
   soundEnabled: boolean;
+  nativePermission: NotificationPermission;
+  requestNativePermission: () => Promise<NotificationPermission>;
   toggleSound: () => void;
   markAsRead: (id: string) => void;
   markAsUnread: (id: string) => void;
@@ -130,7 +132,36 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   });
 
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [nativePermission, setNativePermission] = useState<NotificationPermission>("default");
   const [activeToast, setActiveToast] = useState<FBNotification | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNativePermission(Notification.permission);
+    }
+  }, []);
+
+  const requestNativePermission = async (): Promise<NotificationPermission> => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      return "denied";
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      setNativePermission(perm);
+      if (perm === "granted") {
+        try {
+          new Notification("🥖 Panadería Brito", {
+            body: "¡Notificaciones del negocio activadas con éxito en tu teléfono!",
+            icon: "/logo.png",
+            badge: "/logo.png",
+          });
+        } catch (e) {}
+      }
+      return perm;
+    } catch (e) {
+      return "denied";
+    }
+  };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -180,6 +211,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     // Reproducir sonido y mostrar banner flotante visible
     playChime();
     setActiveToast(fullNotif);
+
+    // Disparar Notificación Nativa del Sistema Operativo en el Celular
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(`🥖 ${fullNotif.title}`, {
+          body: `${fullNotif.highlightText}\n${fullNotif.description}`,
+          icon: "/logo.png",
+          badge: "/logo.png",
+          tag: fullNotif.id,
+        });
+      } catch (e) {
+        console.warn("Error triggering native notification:", e);
+      }
+    }
   };
 
   // Auto-desvanecer toast a los 5.5 segundos
@@ -239,6 +284,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         notifications,
         unreadCount,
         soundEnabled,
+        nativePermission,
+        requestNativePermission,
         toggleSound,
         markAsRead,
         markAsUnread,
