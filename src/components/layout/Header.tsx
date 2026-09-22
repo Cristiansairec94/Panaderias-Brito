@@ -20,7 +20,8 @@ import {
   Radio,
   Wifi,
   WifiOff,
-  RefreshCw
+  RefreshCw,
+  Smartphone
 } from "lucide-react";
 import NotificationsDropdown from "./NotificationsDropdown";
 import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
@@ -135,6 +136,8 @@ export default function Header() {
         return { title: "Caja & Flujo de Efectivo", subtitle: "Historial de caja, arqueos y registro de movimientos" };
       case "/pedidos":
         return { title: "Pedidos & Encargos", subtitle: "Pasteles para eventos y fechas de entrega programadas" };
+      case "/simulador":
+        return { title: "Simulador Móvil", subtitle: "Prueba interactiva del sistema en teléfonos celulares" };
       default:
         return { title: "Panadería Brito", subtitle: "Sistema Integral ERP & POS" };
     }
@@ -284,6 +287,19 @@ export default function Header() {
               <span className="text-[11px] font-extrabold text-emerald-800 hidden sm:inline">Sincronizado</span>
             </>
           )}
+        </Link>
+
+        {/* Mobile Simulator Access Button */}
+        <Link
+          href="/simulador"
+          className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap active:scale-95 group"
+          title="Abrir simulador móvil en pantalla"
+        >
+          <Smartphone className="w-3.5 h-3.5 text-orange-400 group-hover:scale-110 transition-transform" />
+          <span>Probar en Celular</span>
+          <span className="px-1.5 py-0.2 rounded-md bg-orange-500/20 text-orange-300 text-[9px] font-black uppercase">
+            Simulador
+          </span>
         </Link>
 
         {/* Branch Selector Dropdown */}

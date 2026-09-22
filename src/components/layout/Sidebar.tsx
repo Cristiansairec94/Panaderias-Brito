@@ -26,6 +26,7 @@ import {
   Building2,
   ShieldCheck,
   CalendarClock,
+  Smartphone,
   X
 } from "lucide-react";
 import AnimatedLogo from "@/components/ui/AnimatedLogo";
@@ -143,6 +144,13 @@ const navigationItems: NavItem[] = [
       { name: "Roles", href: "/configuracion?tab=roles", icon: ShieldCheck, badge: "Roles" },
       { name: "Empleados", href: "/configuracion?tab=empleados", icon: Users, badge: "Personal" },
     ],
+  },
+  {
+    type: "link",
+    name: "Simulador Celular",
+    href: "/simulador",
+    icon: Smartphone,
+    badge: "App",
   },
 ];
 
