@@ -9,7 +9,6 @@ import {
   ChevronDown, 
   LogOut, 
   UserCheck,
-  Menu,
   Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
@@ -34,7 +33,7 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loginAs, logout, getDefaultRouteForUser } = useAuth();
-  const { isCollapsed, toggleCollapse, toggleMobile } = useSidebar();
+  const { isCollapsed, toggleCollapse } = useSidebar();
   const { 
     branches, 
     currentBranch, 
@@ -165,17 +164,8 @@ export default function Header() {
 
   return (
     <header className="h-16 shrink-0 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-3 sm:px-5 lg:px-6 flex items-center justify-between sticky top-0 z-[100] shadow-xs">
-      {/* Left: Hamburger / Collapse Toggle + Page Title */}
+      {/* Left: Desktop Collapse Toggle + Page Title */}
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 mr-2">
-        {/* Mobile Hamburger Drawer Toggle */}
-        <button
-          onClick={toggleMobile}
-          className="md:hidden p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors border border-stone-200 shrink-0"
-          title="Abrir menú"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-
         {/* Desktop Quick Toggle Button */}
         <button
           onClick={toggleCollapse}

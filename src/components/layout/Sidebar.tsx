@@ -211,35 +211,35 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile Backdrop Overlay */}
+      {/* Mobile Backdrop Overlay - High z-index above header & bottom nav */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[190] md:hidden transition-opacity duration-300"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Main Modern Sidebar: Deep Onyx with Brito Brand Orange & Crimson accents */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl border-r border-white/[0.08] bg-[#090a0f] text-stone-200 ${
-          isCollapsed ? "w-20" : "w-72 md:w-64 max-w-[85vw]"
+        className={`fixed md:static inset-y-0 left-0 z-[200] md:z-30 flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl border-r border-white/[0.08] bg-[#090a0f] text-stone-200 ${
+          isCollapsed ? "w-20" : "w-[84vw] max-w-[325px] md:w-64"
         } ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
         {/* Top Header / Brand Logo & Toggle */}
-        <div className="flex flex-col border-b border-white/[0.06] bg-gradient-to-b from-white/[0.03] to-transparent">
-          <div className={`p-4 flex items-center ${isCollapsed ? "justify-center flex-col gap-2" : "justify-between"}`}>
+        <div className="flex flex-col border-b border-white/[0.06] bg-gradient-to-b from-white/[0.04] to-transparent shrink-0">
+          <div className={`p-4 pt-[max(1rem,env(safe-area-inset-top))] flex items-center ${isCollapsed ? "justify-center flex-col gap-2" : "justify-between"}`}>
             <div className={`flex items-center gap-3.5 ${isCollapsed ? "justify-center" : ""}`}>
-              <AnimatedLogo compact={isCollapsed} size={isCollapsed ? 40 : 52} showGlow={!isCollapsed} />
+              <AnimatedLogo compact={isCollapsed} size={isCollapsed ? 40 : 48} showGlow={!isCollapsed} />
               {!isCollapsed && (
                 <div className="overflow-hidden pl-1">
-                  <p className="text-[11px] font-extrabold tracking-[0.28em] text-stone-400 uppercase leading-none select-none">
+                  <p className="text-[10px] font-extrabold tracking-[0.28em] text-stone-400 uppercase leading-none select-none">
                     Panadería
                   </p>
-                  <div className="flex items-baseline gap-1 my-1">
+                  <div className="flex items-baseline gap-1 my-0.5">
                     <span
-                      className="font-brito-script text-[38px] leading-[0.95] text-white tracking-wide select-none inline-block -rotate-2 bg-gradient-to-r from-white via-orange-100 to-rose-200 bg-clip-text text-transparent"
+                      className="font-brito-script text-[34px] leading-[0.95] text-white tracking-wide select-none inline-block -rotate-2 bg-gradient-to-r from-white via-orange-100 to-rose-200 bg-clip-text text-transparent"
                       style={{
                         fontFamily: "var(--font-satisfy), 'Satisfy', var(--font-dancing), 'Dancing Script', 'Pacifico', cursive",
                         filter: "drop-shadow(0 2px 10px rgba(249, 115, 22, 0.45)) drop-shadow(0 4px 14px rgba(225, 29, 72, 0.35))",
@@ -259,10 +259,10 @@ export default function Sidebar() {
               )}
             </div>
 
-            {/* Mobile Close Button */}
+            {/* Mobile Close Button - Clearly styled & prominent */}
             <button
               onClick={() => setMobileOpen(false)}
-              className="md:hidden flex items-center justify-center p-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-stone-400 hover:text-white transition-colors"
+              className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-stone-300 hover:text-white transition-all active:scale-95 border border-white/[0.08]"
               title="Cerrar menú lateral"
             >
               <X className="w-5 h-5" />
@@ -309,7 +309,7 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation Modules (Middle Scrollable) */}
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 scrollbar-thin scrollbar-thumb-stone-800">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 space-y-1.5 scrollbar-thin scrollbar-thumb-stone-800">
           {!isCollapsed && (
             <div className="px-3 pb-1 pt-1 text-[10px] font-bold tracking-wider text-stone-500 uppercase flex items-center justify-between">
               <span>Módulos del Sistema</span>
@@ -519,7 +519,7 @@ export default function Sidebar() {
         </div>
 
         {/* Bottom Section: Hero POS Action in Brito Brand Dual Gradient */}
-        <div className="p-3 border-t border-white/[0.06] bg-white/[0.01] space-y-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="p-3 border-t border-white/[0.06] bg-[#090a0f] space-y-2 pb-[max(1rem,env(safe-area-inset-bottom))] shrink-0">
           {/* Quick Action on Mobile: Configuración del Sistema (Sin POS) */}
           <Link
             href="/configuracion"
