@@ -152,23 +152,6 @@ export default function NotificationsDropdown() {
   const recentNotifications = filtered.filter((n) => n.group === "recientes");
   const olderNotifications = filtered.filter((n) => n.group === "anteriores");
 
-  const getBadgeIcon = (icon: FBNotification["badgeIcon"]) => {
-    switch (icon) {
-      case "harina":
-        return <Package className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
-      case "pastel":
-        return <Cake className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
-      case "dinero":
-        return <DollarSign className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
-      case "horno":
-        return <Flame className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
-      case "cliente":
-        return <Store className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
-      default:
-        return <AlertTriangle className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
-    }
-  };
-
   return (
     <div className="relative z-[110] shrink-0" ref={dropdownRef}>
       {/* Bell Button */}
@@ -588,3 +571,22 @@ function NotificationCardItem({
     </div>
   );
 }
+
+export function getBadgeIcon(icon: FBNotification["badgeIcon"]) {
+  switch (icon) {
+    case "harina":
+      return <Package className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
+    case "pastel":
+      return <Cake className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
+    case "dinero":
+      return <DollarSign className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
+    case "horno":
+      return <Flame className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
+    case "cliente":
+      return <Store className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
+    default:
+      return <AlertTriangle className="w-2.5 h-2.5 text-white stroke-[2.4]" />;
+  }
+}
+
+export { NotificationCardItem as NotificationItem };

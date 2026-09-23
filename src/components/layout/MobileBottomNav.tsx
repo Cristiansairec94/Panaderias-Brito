@@ -32,6 +32,7 @@ export default function MobileBottomNav() {
   const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
+  const [showBanner, setShowBanner] = useState(true);
 
   const {
     notifications,
@@ -98,54 +99,25 @@ export default function MobileBottomNav() {
             }}
           />
 
-          {/* Sheet deslizable hacia arriba */}
-          <div className="relative z-50 bg-white rounded-t-[28px] rounded-b-2xl mx-2 sm:mx-auto max-w-lg w-[calc(100%-1rem)] sm:w-full shadow-2xl border border-stone-200/90 max-h-[72vh] flex flex-col overflow-hidden pointer-events-auto animate-in slide-in-from-bottom duration-300">
-            {/* Handle táctil */}
-            <div className="w-12 h-1.5 bg-stone-300 rounded-full mx-auto mt-2.5 mb-1 shrink-0" />
+          {/* Sheet deslizable hacia arriba con estilo y espaciado exacto de maqueta */}
+          <div className="relative z-50 bg-[#faf6f0] rounded-[28px] sm:rounded-[32px] mx-2 sm:mx-auto max-w-lg w-[calc(100%-1rem)] sm:w-full shadow-2xl border border-[#e8ded2] max-h-[82vh] flex flex-col overflow-hidden pointer-events-auto animate-in slide-in-from-bottom duration-300">
+            {/* Grab handle táctil */}
+            <div className="w-12 h-1 bg-stone-300/80 rounded-full mx-auto mt-2.5 mb-1.5 shrink-0" />
 
-            {/* Cabecera */}
-            <div className="p-4 pb-3 border-b border-stone-100 space-y-3">
+            {/* Cabecera y Controles */}
+            <div className="p-4 sm:p-5 pb-2 flex flex-col shrink-0">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
-                    <Bell className="w-5 h-5 text-orange-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-stone-900 tracking-tight leading-tight">
-                      Avisos & Notificaciones
-                    </h3>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <p className="text-[10px] text-stone-500 font-semibold">
-                        Alertas operativas
-                      </p>
-                      {realtimeStatus === "connected" && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-100/90 border border-emerald-300/60 px-1.5 py-0.2 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          En vivo
-                        </span>
-                      )}
-                      {realtimeStatus === "connecting" && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                          Conectando...
-                        </span>
-                      )}
-                      {realtimeStatus === "disconnected" && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-stone-500 bg-stone-100 border border-stone-300 px-1.5 py-0.2 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
-                          Sin conexión
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <h3 className="text-xl sm:text-[22px] font-bold text-stone-900 tracking-tight">
+                  Avisos & Notificaciones
+                </h3>
 
                 <div className="flex items-center gap-1">
                   {/* Menú de opciones rápidas */}
                   <div className="relative">
                     <button
+                      type="button"
                       onClick={() => setShowOptionsMenu(!showOptionsMenu)}
-                      className="w-8 h-8 rounded-full hover:bg-stone-100 text-stone-600 flex items-center justify-center transition-colors"
+                      className="w-8 h-8 rounded-full hover:bg-stone-200/70 text-stone-600 flex items-center justify-center transition-colors"
                       title="Opciones de notificaciones"
                     >
                       <MoreHorizontal className="w-5 h-5" />
@@ -154,33 +126,36 @@ export default function MobileBottomNav() {
                     {showOptionsMenu && (
                       <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-2xl border border-stone-200 p-2 z-[60] text-xs font-semibold space-y-1 animate-in fade-in zoom-in-95">
                         <button
+                          type="button"
                           onClick={() => {
                             markAllAsRead();
                             setShowOptionsMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-stone-100 flex items-center gap-2 text-stone-700"
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-stone-100 flex items-center gap-2 text-stone-700 cursor-pointer"
                         >
                           <CheckCheck className="w-4 h-4 text-emerald-600" /> Marcar todas como leídas
                         </button>
                         <button
+                          type="button"
                           onClick={() => {
                             toggleSound();
                             setShowOptionsMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-stone-100 flex items-center justify-between text-stone-700"
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-stone-100 flex items-center justify-between text-stone-700 cursor-pointer"
                         >
                           <span className="flex items-center gap-2">
-                            {soundEnabled ? <Volume2 className="w-4 h-4 text-orange-600" /> : <VolumeX className="w-4 h-4 text-stone-400" />}
+                            {soundEnabled ? <Volume2 className="w-4 h-4 text-[#c25425]" /> : <VolumeX className="w-4 h-4 text-stone-400" />}
                             Sonidos de alerta
                           </span>
                           <span className="text-[10px] font-bold text-stone-400">{soundEnabled ? "Activo" : "Mudo"}</span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => {
                             clearAll();
                             setShowOptionsMenu(false);
                           }}
-                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50 flex items-center gap-2 text-rose-600"
+                          className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-50 flex items-center gap-2 text-rose-600 cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" /> Limpiar todas
                         </button>
@@ -190,87 +165,102 @@ export default function MobileBottomNav() {
 
                   {/* Cerrar modal */}
                   <button
+                    type="button"
                     onClick={() => {
                       setShowNotifications(false);
                       setShowOptionsMenu(false);
                       setActiveItemMenu(null);
                     }}
-                    className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-colors"
+                    className="w-8 h-8 rounded-full hover:bg-stone-200/70 text-stone-600 flex items-center justify-center transition-colors"
+                    title="Cerrar avisos"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
-              {/* Filtro: Todas / No leídas */}
-              <div className="flex gap-2 text-xs font-bold">
+              {/* Botones de filtro y enlace marcar todo como leído */}
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
                 <button
+                  type="button"
                   onClick={() => setActiveTab("all")}
-                  className={`px-3 py-1.5 rounded-full transition-all ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
                     activeTab === "all"
-                      ? "bg-orange-100 text-orange-800"
-                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                      ? "bg-[#ebe4dc] text-stone-900 font-semibold shadow-2xs border border-transparent"
+                      : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
                   }`}
                 >
                   Todas ({notifications.length})
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveTab("unread")}
-                  className={`px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
                     activeTab === "unread"
-                      ? "bg-orange-100 text-orange-800"
-                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                      ? "bg-[#ebe4dc] text-stone-900 font-semibold shadow-2xs border border-transparent"
+                      : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
                   }`}
                 >
-                  No leídas
-                  {unreadCount > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-[#e41e3f] text-white text-[10px] font-black flex items-center justify-center">
-                      {unreadCount}
-                    </span>
-                  )}
+                  No leídas ({unreadCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={markAllAsRead}
+                  disabled={unreadCount === 0}
+                  className="text-[#c25425] hover:text-[#9e3f18] underline underline-offset-2 font-medium text-xs sm:text-[13px] ml-1.5 cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed transition-colors"
+                >
+                  Marcar todo como leído
                 </button>
               </div>
 
-              {/* Banner de permisos nativos si aplica */}
-              {nativePermission !== "granted" && (
-                <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10 border border-orange-500/25 rounded-2xl p-2.5 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base">🔔</span>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-black text-stone-900 leading-tight">
-                        Activar avisos en celular
-                      </p>
-                      <p className="text-[10px] text-stone-500 leading-tight">
-                        Alertas con sonido de ventas y pedidos
-                      </p>
-                    </div>
+              {/* Banner de aviso móvil */}
+              {showBanner && (
+                <div className="bg-[#f4ede4] border border-[#ebdcd0] rounded-2xl p-2.5 sm:p-3 px-3.5 flex items-center justify-between gap-3 mt-3.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowBanner(false)}
+                      className="text-stone-400 hover:text-stone-700 transition-colors p-0.5 shrink-0"
+                      title="Descartar aviso"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <span className="text-xs sm:text-[13px] font-medium text-stone-800 truncate">
+                      Activar avisos en celular
+                    </span>
                   </div>
                   <button
                     type="button"
-                    onClick={requestNativePermission}
-                    className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-rose-600 text-white font-black text-[10px] rounded-xl shrink-0 shadow-sm"
+                    onClick={() => {
+                      requestNativePermission();
+                    }}
+                    className="bg-[#c25425] hover:bg-[#a8441b] text-white text-xs font-semibold px-4 py-1.5 rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
                   >
-                    Activar
+                    {nativePermission === "granted" ? "Activado" : "Activar"}
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Lista con scroll */}
-            <div className="flex-1 overflow-y-auto divide-y divide-stone-100 p-2.5 pb-6 space-y-1.5 overscroll-contain">
+            {/* Lista con scroll y tarjetas */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-5 pb-3 space-y-3.5 overscroll-contain">
               {filtered.length === 0 ? (
-                <div className="p-10 text-center text-stone-400 flex flex-col items-center justify-center space-y-2">
+                <div className="p-8 my-4 text-center text-stone-400 flex flex-col items-center justify-center space-y-2 bg-white/70 rounded-2xl border border-[#ede5dc]">
                   <Inbox className="w-10 h-10 text-stone-300 stroke-[1.5]" />
-                  <p className="font-bold text-sm text-stone-700">No hay notificaciones</p>
+                  <p className="font-bold text-sm text-stone-800">No hay notificaciones pendientes</p>
                   <p className="text-xs text-stone-400">Te avisaremos con alertas de horno, pedidos o caja.</p>
                 </div>
               ) : (
                 <>
                   {recentNotifications.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="px-3 pt-2 pb-1 text-xs font-extrabold text-stone-900 flex items-center justify-between">
-                        <span>Recientes</span>
-                        <span className="text-[10px] text-stone-400 font-semibold">{recentNotifications.length} nuevas</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between pt-1 px-0.5">
+                        <h4 className="text-base sm:text-[17px] font-bold text-stone-900 tracking-tight">
+                          Recientes
+                        </h4>
+                        <span className="text-xs text-stone-400 font-normal">
+                          {recentNotifications.length} nuevas
+                        </span>
                       </div>
                       {recentNotifications.map((notif) => (
                         <NotificationItem
@@ -289,9 +279,11 @@ export default function MobileBottomNav() {
                   )}
 
                   {olderNotifications.length > 0 && (
-                    <div className="space-y-1 pt-2">
-                      <div className="px-3 pt-2 pb-1 text-xs font-extrabold text-stone-500">
-                        <span>Anteriores</span>
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between px-0.5">
+                        <h4 className="text-sm sm:text-base font-bold text-stone-500">
+                          Anteriores
+                        </h4>
                       </div>
                       {olderNotifications.map((notif) => (
                         <NotificationItem
@@ -313,15 +305,8 @@ export default function MobileBottomNav() {
             </div>
 
             {/* Footer */}
-            <div className="p-3 bg-stone-50/90 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500 shrink-0">
-              <span className="text-[11px] font-semibold text-stone-400">Panadería Brito • Avisos en vivo</span>
-              <button
-                onClick={markAllAsRead}
-                disabled={unreadCount === 0}
-                className="text-orange-600 hover:text-orange-700 font-extrabold text-[11px] disabled:opacity-40"
-              >
-                Marcar leídas
-              </button>
+            <div className="py-2.5 text-center text-xs text-stone-400 font-normal shrink-0 border-t border-[#ede5dc]/70 bg-[#faf6f0]">
+              Panadería Brito • Avisos en vivo
             </div>
           </div>
         </div>
