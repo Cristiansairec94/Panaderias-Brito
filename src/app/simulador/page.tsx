@@ -28,8 +28,6 @@ import { useNotifications } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
 import { formatCurrency } from "@/lib/utils";
 
-type DeviceModel = "iphone15" | "galaxyS24" | "pixel8" | "compact";
-
 interface DeviceConfig {
   name: string;
   os: "iOS" | "Android";
@@ -40,50 +38,20 @@ interface DeviceConfig {
   description: string;
 }
 
-const DEVICES: Record<DeviceModel, DeviceConfig> = {
-  iphone15: {
-    name: "iPhone 15 Pro",
-    os: "iOS",
-    width: 393,
-    height: 852,
-    borderRadius: "rounded-[52px]",
-    notchType: "dynamic-island",
-    description: "Resolución estándar iPhone 15 / 14 Pro con Dynamic Island",
-  },
-  galaxyS24: {
-    name: "Samsung Galaxy S24",
-    os: "Android",
-    width: 360,
-    height: 780,
-    borderRadius: "rounded-[44px]",
-    notchType: "punch-hole",
-    description: "Estándar de teléfonos Android modernos Samsung",
-  },
-  pixel8: {
-    name: "Google Pixel 8",
-    os: "Android",
-    width: 412,
-    height: 915,
-    borderRadius: "rounded-[48px]",
-    notchType: "punch-hole",
-    description: "Pantalla amplia con proporción moderna de Google",
-  },
-  compact: {
-    name: "Celular Compacto",
-    os: "iOS",
-    width: 375,
-    height: 667,
-    borderRadius: "rounded-[38px]",
-    notchType: "classic",
-    description: "iPhone SE / pantalla compacta para probar ergonomía",
-  },
+const DEVICE: DeviceConfig = {
+  name: "Teléfono Celular",
+  os: "iOS",
+  width: 390,
+  height: 844,
+  borderRadius: "rounded-[48px]",
+  notchType: "dynamic-island",
+  description: "Simulador de teléfono celular",
 };
 
 export default function SimuladorPage() {
   const { addNotification } = useNotifications();
   const { simulateSale } = useBranch();
 
-  const [activeDevice, setActiveDevice] = useState<DeviceModel>("iphone15");
   const [currentRoute, setCurrentRoute] = useState<string>("/");
   const [iframeKey, setIframeKey] = useState<number>(0);
   const [scale, setScale] = useState<number>(0.85);
@@ -94,7 +62,7 @@ export default function SimuladorPage() {
   const [simTime, setSimTime] = useState<string>("09:41");
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const device = DEVICES[activeDevice];
+  const device = DEVICE;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -208,34 +176,16 @@ export default function SimuladorPage() {
           </div>
         </div>
 
-        {/* Device Model Selector Pills */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {(Object.keys(DEVICES) as DeviceModel[]).map((key) => {
-            const dev = DEVICES[key];
-            const isSelected = activeDevice === key;
-
-            return (
-              <button
-                key={key}
-                onClick={() => setActiveDevice(key)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
-                  isSelected
-                    ? "bg-stone-900 text-white shadow-md ring-2 ring-orange-500/50 font-black"
-                    : "bg-stone-100 hover:bg-stone-200 text-stone-700"
-                }`}
-              >
-                <span>{dev.os === "iOS" ? "🍏" : "📱"}</span>
-                <span>{dev.name}</span>
-              </button>
-            );
-          })}
-
+        {/* Controls */}
+        <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors"
+            className="px-3.5 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors cursor-pointer flex items-center gap-2 text-xs font-bold"
             title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            <span>{isFullscreen ? "Ventana normal" : "Pantalla completa"}</span>
           </button>
         </div>
       </div>
