@@ -22,7 +22,6 @@ import {
   Smartphone
 } from "lucide-react";
 
-import NotificationsDropdown from "./NotificationsDropdown";
 import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { useBranch } from "@/context/BranchContext";
@@ -406,9 +405,6 @@ export default function Header() {
         </div>
 
 
-
-        {/* Notifications Dropdown */}
-        <NotificationsDropdown />
 
         {/* User Session Dropdown */}
         <div ref={userMenuRef} className="relative z-[110] shrink-0">
