@@ -65,23 +65,6 @@ export default function NotificationsDropdown() {
   const recentNotifications = filtered.filter((n) => n.group === "recientes");
   const olderNotifications = filtered.filter((n) => n.group === "anteriores");
 
-  const getBadgeIcon = (icon: FBNotification["badgeIcon"]) => {
-    switch (icon) {
-      case "harina":
-        return <div className="p-1 bg-amber-500 text-white rounded-full"><Package className="w-3 h-3" /></div>;
-      case "pastel":
-        return <div className="p-1 bg-brito-crimson-600 text-white rounded-full"><Cake className="w-3 h-3" /></div>;
-      case "dinero":
-        return <div className="p-1 bg-emerald-500 text-white rounded-full"><DollarSign className="w-3 h-3" /></div>;
-      case "horno":
-        return <div className="p-1 bg-brito-orange-600 text-white rounded-full"><Flame className="w-3 h-3" /></div>;
-      case "cliente":
-        return <div className="p-1 bg-blue-500 text-white rounded-full"><Store className="w-3 h-3" /></div>;
-      default:
-        return <div className="p-1 bg-stone-600 text-white rounded-full"><AlertTriangle className="w-3 h-3" /></div>;
-    }
-  };
-
   return (
     <div className="relative z-[110] shrink-0" ref={dropdownRef}>
       {/* Bell Button (Facebook Style with dynamic badge) */}
@@ -289,8 +272,25 @@ export default function NotificationsDropdown() {
   );
 }
 
+export function getBadgeIcon(icon: FBNotification["badgeIcon"]) {
+  switch (icon) {
+    case "harina":
+      return <div className="p-1 bg-amber-500 text-white rounded-full"><Package className="w-3 h-3" /></div>;
+    case "pastel":
+      return <div className="p-1 bg-brito-crimson-600 text-white rounded-full"><Cake className="w-3 h-3" /></div>;
+    case "dinero":
+      return <div className="p-1 bg-emerald-500 text-white rounded-full"><DollarSign className="w-3 h-3" /></div>;
+    case "horno":
+      return <div className="p-1 bg-brito-orange-600 text-white rounded-full"><Flame className="w-3 h-3" /></div>;
+    case "cliente":
+      return <div className="p-1 bg-blue-500 text-white rounded-full"><Store className="w-3 h-3" /></div>;
+    default:
+      return <div className="p-1 bg-stone-600 text-white rounded-full"><AlertTriangle className="w-3 h-3" /></div>;
+  }
+}
+
 // Subcomponent for individual Facebook-style notification item
-function NotificationItem({
+export function NotificationItem({
   notif,
   getBadgeIcon,
   markAsRead,
