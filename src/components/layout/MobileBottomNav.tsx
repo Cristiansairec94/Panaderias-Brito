@@ -8,7 +8,6 @@ import {
   Building2, 
   Bell, 
   Croissant, 
-  Receipt, 
   Menu,
   X,
   CheckCheck,
@@ -53,7 +52,6 @@ export default function MobileBottomNav() {
   const isDashboard = pathname === "/";
   const isSucursales = pathname.startsWith("/sucursales");
   const isProductos = pathname.startsWith("/productos");
-  const isFinanzas = pathname.startsWith("/caja") || pathname.startsWith("/finanzas");
 
   const handleLinkClick = () => {
     if (isMobileOpen) {
@@ -350,7 +348,7 @@ export default function MobileBottomNav() {
             <span className="text-[10px] tracking-tight mt-0.5 leading-none">Sucursales</span>
           </Link>
 
-          {/* 3. Notificaciones */}
+          {/* 3. Notificaciones (Ubicado en la esquina, justo al lado del Menú de tres rayas) */}
           <button
             type="button"
             onClick={handleToggleNotifications}
@@ -375,47 +373,7 @@ export default function MobileBottomNav() {
             <span className="text-[10px] tracking-tight mt-0.5 leading-none">Notif.</span>
           </button>
 
-          {/* 4. Precios & Catálogo */}
-          <Link
-            href="/productos"
-            onClick={handleLinkClick}
-            className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 transition-all active:scale-95 group ${
-              isProductos
-                ? "text-orange-600 font-black"
-                : "text-stone-400 hover:text-stone-600 font-semibold"
-            }`}
-            title="Catálogo & Modificar Precios"
-          >
-            <div className="relative">
-              <Croissant className={`w-5 h-5 transition-transform group-hover:scale-110 ${isProductos ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
-              {isProductos && (
-                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-600" />
-              )}
-            </div>
-            <span className="text-[10px] tracking-tight mt-0.5 leading-none">Precios</span>
-          </Link>
-
-          {/* 5. Finanzas / Caja */}
-          <Link
-            href="/caja"
-            onClick={handleLinkClick}
-            className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 transition-all active:scale-95 group ${
-              isFinanzas
-                ? "text-orange-600 font-black"
-                : "text-stone-400 hover:text-stone-600 font-semibold"
-            }`}
-            title="Finanzas & Flujo de Caja"
-          >
-            <div className="relative">
-              <Receipt className={`w-5 h-5 transition-transform group-hover:scale-110 ${isFinanzas ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
-              {isFinanzas && (
-                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-600" />
-              )}
-            </div>
-            <span className="text-[10px] tracking-tight mt-0.5 leading-none">Finanzas</span>
-          </Link>
-
-          {/* 6. Menú Completo */}
+          {/* 5. Menú Completo (Tres rayas) */}
           <button
             type="button"
             onClick={toggleMobile}

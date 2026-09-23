@@ -26,6 +26,8 @@ import {
   RefreshCw,
   Croissant,
   Calendar,
+  CalendarClock,
+  Phone,
   Layers,
   ChevronRight,
   ExternalLink,
@@ -39,6 +41,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
+import { getStoredOrders } from "@/lib/orders";
+import { CustomOrder } from "@/types";
 
 // Top bakery products data
 const TOP_BAKERY_PRODUCTS = [
@@ -72,6 +76,18 @@ export default function Home() {
     isLiveSimulating,
     toggleLiveSimulation
   } = useBranch();
+
+  // Orders state (Pedidos de mostrador levantados por cajeros)
+  const [orders, setOrders] = useState<CustomOrder[]>([]);
+
+  useEffect(() => {
+    setOrders(getStoredOrders());
+    const handleStorageChange = () => {
+      setOrders(getStoredOrders());
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
 
   // Filters state
   const [selectedPeriod, setSelectedPeriod] = useState<"hoy" | "semana" | "mes">("hoy");
@@ -116,6 +132,17 @@ export default function Home() {
   const percentGoal = Math.min(100, Math.round((activeSales / Math.max(1, activeGoal)) * 100));
   const avgTicket = Math.round(activeSales / Math.max(1, activeTickets));
   const estimatedPieces = Math.round(activeTickets * 8.6);
+
+  // Filtered orders for active branch
+  const filteredOrders = useMemo(() => {
+    if (isAllBranches) return orders;
+    return orders.filter((o) => !o.branchId || o.branchId === currentBranch?.id);
+  }, [orders, isAllBranches, currentBranch]);
+
+  const pendingOrdersCount = filteredOrders.filter((o) => o.status === "pendiente").length;
+  const inOvenOrdersCount = filteredOrders.filter((o) => o.status === "en_horno").length;
+  const readyOrdersCount = filteredOrders.filter((o) => o.status === "listo").length;
+  const totalPendingCollection = filteredOrders.reduce((sum, o) => sum + (o.remainingBalance || 0), 0);
 
   // Method breakdowns
   const cashShare = isAllBranches ? 0.70 : (currentBranch ? currentBranch.currentShift.cashSales / Math.max(1, currentBranch.currentShift.totalSales) : 0.70);
@@ -216,12 +243,10 @@ export default function Home() {
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 {isAllBranches ? "Consolidado General (3 Sucursales)" : currentBranch?.name}
               </span>
-              {isLiveSimulating && (
-                <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400" />
-                  Ventas en Vivo
-                </span>
-              )}
+              <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
+                Operación en Tiempo Real
+              </span>
             </div>
 
             <div>
@@ -276,38 +301,47 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Quick Operations Action Bar */}
+          {/* Quick Real-Time Operations Action Bar */}
           <div className="relative z-10 flex flex-col gap-2.5 self-start lg:self-center w-full lg:w-auto lg:min-w-[280px]">
+            {/* Live Operational Status Badge */}
+            <div className="flex items-center justify-between gap-3 bg-white/[0.06] border border-white/10 px-4 py-2.5 rounded-2xl backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                </span>
+                <span className="text-xs font-black text-emerald-300 tracking-wide">
+                  Mostrador & Cajas Activas
+                </span>
+              </div>
+              <span className="text-[10px] font-bold text-stone-300 bg-white/10 px-2 py-0.5 rounded-full">
+                En Vivo
+              </span>
+            </div>
 
-            {/* Sales Simulation Controls */}
+            {/* Quick Real Cash Flow Actions */}
             <div className="flex items-center gap-2 w-full">
-              <button
-                onClick={() => simulateSale()}
-                title="Simula un ticket de venta en la sucursal activa"
-                className="flex-1 flex items-center justify-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.16] text-white font-bold px-3 py-2.5 rounded-xl border border-white/15 transition-all active:scale-95 text-xs whitespace-nowrap"
+              <Link
+                href="/ingresos"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 font-bold px-3 py-2.5 rounded-xl border border-emerald-500/30 transition-all text-xs active:scale-95 shadow-sm"
+                title="Registrar abonos y cobros"
               >
-                <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 animate-pulse shrink-0" />
-                <span>+1 Venta</span>
-              </button>
-              <button
-                onClick={() => simulateBulkSales(undefined, 5)}
-                title="Simula 5 ventas automáticas"
-                className="flex-1 flex items-center justify-center gap-1 bg-white/[0.08] hover:bg-white/[0.16] text-white font-bold px-3 py-2.5 rounded-xl border border-white/15 transition-all active:scale-95 text-xs whitespace-nowrap"
+                <span>+ Abono</span>
+              </Link>
+              <Link
+                href="/gastos"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 font-bold px-3 py-2.5 rounded-xl border border-rose-500/30 transition-all text-xs active:scale-95 shadow-sm"
+                title="Registrar gastos menores de caja"
               >
-                <span>+5 Ventas</span>
-              </button>
-              <button
-                onClick={toggleLiveSimulation}
-                title={isLiveSimulating ? "Pausar simulación" : "Activar simulación continua en segundo plano"}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border font-bold text-xs transition-all active:scale-95 whitespace-nowrap ${
-                  isLiveSimulating
-                    ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/35"
-                    : "bg-white/[0.08] text-stone-300 border-white/15 hover:bg-white/[0.16]"
-                }`}
+                <span>- Gasto</span>
+              </Link>
+              <Link
+                href="/caja"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.14] text-white font-bold px-3 py-2.5 rounded-xl border border-white/15 transition-all text-xs active:scale-95 shadow-sm"
+                title="Corte y Arqueo de Caja"
               >
-                {isLiveSimulating ? <Pause className="w-3.5 h-3.5 shrink-0" /> : <Play className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                <span>{isLiveSimulating ? "Pausar" : "Auto"}</span>
-              </button>
+                <span>Corte</span>
+              </Link>
             </div>
           </div>
         </div>
@@ -883,7 +917,199 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Apartado Especial: Pedidos y Encargos de Mostrador (Levantados por Cajeros) */}
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shadow-xs">
+                <CalendarClock className="w-5 h-5 text-orange-600" />
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-black text-stone-900 tracking-tight">
+                    Pedidos & Encargos de Mostrador
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-700 border border-orange-500/20 text-[11px] font-black">
+                    {filteredOrders.length} {filteredOrders.length === 1 ? "Pedido" : "Pedidos"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-stone-500">
+              Encargos especiales y pasteles levantados por cajeros en mostrador con anticipo del 50%.
+            </p>
+          </div>
 
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <Link
+              href="/pedidos"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-rose-600 hover:brightness-110 text-white font-black text-xs shadow-md shadow-orange-500/20 active:scale-95 transition-all"
+            >
+              <span>Ver Módulo de Pedidos</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Resumen Rápido de Estatus de Pedidos */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Por Preparar</p>
+              <p className="text-lg font-black text-amber-950 mt-0.5">{pendingOrdersCount}</p>
+            </div>
+            <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
+              🕒
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-orange-50/70 border border-orange-200/80 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-orange-800 uppercase tracking-wider">En Horno</p>
+              <p className="text-lg font-black text-orange-950 mt-0.5">{inOvenOrdersCount}</p>
+            </div>
+            <span className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-xs">
+              🔥
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Listos p/ Entrega</p>
+              <p className="text-lg font-black text-emerald-950 mt-0.5">{readyOrdersCount}</p>
+            </div>
+            <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+              ✅
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200/80 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Por Cobrar en Caja</p>
+              <p className="text-lg font-black text-rose-950 mt-0.5">{formatCurrency(totalPendingCollection)}</p>
+            </div>
+            <span className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xs">
+              💰
+            </span>
+          </div>
+        </div>
+
+        {/* Tarjetas de Pedidos Levantados por Cajeros */}
+        {filteredOrders.length === 0 ? (
+          <div className="p-8 text-center bg-stone-50 rounded-2xl border border-dashed border-stone-200 space-y-2">
+            <CalendarClock className="w-10 h-10 text-stone-300 mx-auto" />
+            <p className="font-bold text-sm text-stone-700">No hay pedidos pendientes en esta sucursal</p>
+            <p className="text-xs text-stone-400 max-w-sm mx-auto">
+              Cuando los cajeros capturen pedidos especiales de pasteles o pan en el mostrador, aparecerán aquí de inmediato.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredOrders.slice(0, 6).map((order) => {
+              const isReady = order.status === "listo";
+              const isDelivered = order.status === "entregado";
+              const isInOven = order.status === "en_horno";
+
+              return (
+                <div
+                  key={order.id}
+                  className="p-4 sm:p-5 rounded-2xl border border-stone-200/90 bg-stone-50/60 hover:bg-white hover:border-orange-300 hover:shadow-md transition-all flex flex-col justify-between space-y-3.5 group"
+                >
+                  {/* Top info: Folio, Status & Cajero */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-xs text-stone-900 bg-white px-2.5 py-1 rounded-lg border border-stone-200 shadow-xs">
+                          {order.orderNumber}
+                        </span>
+                        <span className="text-[11px] font-bold text-stone-400">
+                          {order.branchName?.replace("Sucursal ", "")}
+                        </span>
+                      </div>
+
+                      {/* Estatus Pill */}
+                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
+                        isReady
+                          ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                          : isInOven
+                          ? "bg-orange-100 text-orange-800 border-orange-300"
+                          : isDelivered
+                          ? "bg-stone-100 text-stone-600 border-stone-200"
+                          : "bg-amber-100 text-amber-800 border-amber-300"
+                      }`}>
+                        {isReady ? "✅ Listo" : isInOven ? "🔥 En Horno" : isDelivered ? "Entregado" : "🕒 Pendiente"}
+                      </span>
+                    </div>
+
+                    {/* Cajero Responsable */}
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-600 bg-white/80 px-2.5 py-1 rounded-lg border border-stone-200/70">
+                      <span className="text-xs">👨‍🍳</span>
+                      <span>Cajero:</span>
+                      <strong className="text-stone-900 font-extrabold">{order.cashier || "Cajero de turno"}</strong>
+                    </div>
+
+                    {/* Cliente & Teléfono */}
+                    <div>
+                      <p className="font-black text-sm text-stone-900 leading-tight">
+                        {order.customerName}
+                      </p>
+                      {order.phone && (
+                        <p className="text-[11px] font-medium text-stone-500 mt-0.5 flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-stone-400" /> {order.phone}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Descripción del encargo */}
+                    <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed bg-white p-2.5 rounded-xl border border-stone-200/60">
+                      {order.description}
+                    </p>
+                  </div>
+
+                  {/* Bottom: Fechas y Finanzas */}
+                  <div className="space-y-3 pt-2 border-t border-stone-200/60">
+                    {/* Fecha de entrega */}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[11px] font-bold text-stone-400">Entrega:</span>
+                      <span className="font-extrabold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200/60">
+                        📅 {order.deliveryDate} {order.deliveryTime && `• ${order.deliveryTime} hrs`}
+                      </span>
+                    </div>
+
+                    {/* Desglose de dinero */}
+                    <div className="grid grid-cols-3 gap-1 bg-white p-2 rounded-xl border border-stone-200/80 text-center text-xs">
+                      <div>
+                        <p className="text-[9px] font-bold text-stone-400 uppercase">Total</p>
+                        <p className="font-black text-stone-900">{formatCurrency(order.total)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-emerald-600 uppercase">Anticipo (50%)</p>
+                        <p className="font-black text-emerald-700">{formatCurrency(order.deposit)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-rose-500 uppercase">Resta Cobrar</p>
+                        <p className={`font-black ${order.remainingBalance > 0 ? "text-rose-600 font-extrabold" : "text-stone-400"}`}>
+                          {order.remainingBalance > 0 ? formatCurrency(order.remainingBalance) : "$0 (Pagado)"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Botón rápido para ver pedido */}
+                    <Link
+                      href="/pedidos"
+                      className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-stone-100 hover:bg-orange-50 hover:text-orange-700 text-stone-700 font-bold text-xs transition-colors border border-stone-200"
+                    >
+                      <span>Ver Detalles / Cobrar Restante</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Quick Direct ERP Links Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

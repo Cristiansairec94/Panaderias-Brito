@@ -638,21 +638,9 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     [branches]
   );
 
-  // Live simulation ticker (one sale every 8 seconds across random branches)
-  useEffect(() => {
-    if (!isLiveSimulating) return;
-
-    const interval = setInterval(() => {
-      // Pick a random branch
-      const randomBranch = branches[Math.floor(Math.random() * branches.length)];
-      simulateSale(randomBranch.id);
-    }, 8000);
-
-    return () => clearInterval(interval);
-  }, [isLiveSimulating, branches, simulateSale]);
-
+  // Live simulation ticker (Desactivado para asegurar ventas y movimientos 100% en tiempo real)
   const toggleLiveSimulation = () => {
-    setIsLiveSimulating((prev) => !prev);
+    setIsLiveSimulating(false);
   };
 
   // Consolidated metrics across all branches

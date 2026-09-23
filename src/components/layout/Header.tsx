@@ -16,13 +16,12 @@ import {
   CheckCircle2,
   Building2,
   TrendingUp,
-  Radio,
   Wifi,
   WifiOff,
   RefreshCw,
   Smartphone
 } from "lucide-react";
-import NotificationsDropdown from "./NotificationsDropdown";
+
 import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { useBranch } from "@/context/BranchContext";
@@ -39,8 +38,6 @@ export default function Header() {
     currentBranch, 
     isAllBranches, 
     switchBranch, 
-    isLiveSimulating,
-    toggleLiveSimulation,
     consolidatedMetrics
   } = useBranch();
   const { isOnline, isSyncing, isSynced, pendingCount } = useSync();
@@ -392,24 +389,6 @@ export default function Header() {
                   );
                 })}
               </div>
-
-              {/* Live simulation toggle inside menu */}
-              <div className="border-t border-stone-100 pt-2 mt-1.5 px-2 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5">
-                  <Radio className={`w-3.5 h-3.5 ${isLiveSimulating ? "text-emerald-500 animate-pulse" : "text-stone-400"}`} />
-                  <span className="text-[11px] font-semibold text-stone-700">Ventas en Vivo:</span>
-                </div>
-                <button
-                  onClick={toggleLiveSimulation}
-                  className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all ${
-                    isLiveSimulating
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "bg-stone-100 hover:bg-stone-200 text-stone-700"
-                  }`}
-                >
-                  {isLiveSimulating ? "Activo (8s)" : "Pausado"}
-                </button>
-              </div>
             </div>
           )}
         </div>
@@ -420,8 +399,7 @@ export default function Header() {
           <span className="tabular-nums whitespace-nowrap">{time || "Cargando..."}</span>
         </div>
 
-        {/* Facebook Style Notifications */}
-        <NotificationsDropdown />
+
 
         {/* User Session Dropdown */}
         <div ref={userMenuRef} className="relative z-[110] shrink-0">
