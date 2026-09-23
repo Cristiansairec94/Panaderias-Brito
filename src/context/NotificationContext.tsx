@@ -17,6 +17,8 @@ export interface FBNotification {
   read: boolean;
   actionLabel?: string;
   actionLink?: string;
+  secondaryActionLabel?: string;
+  secondaryActionLink?: string;
   category: "inventario" | "pedidos" | "caja" | "produccion" | "clientes";
 }
 
@@ -47,8 +49,10 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
     timeAgo: "Hace 28 min",
     group: "recientes",
     read: false,
-    actionLabel: "Ver Pedido",
-    actionLink: "/pedidos",
+    actionLabel: "Cobrar $450",
+    actionLink: "/caja",
+    secondaryActionLabel: "Ver pedido",
+    secondaryActionLink: "/pedidos",
     category: "pedidos",
   },
   {
