@@ -44,6 +44,116 @@ export default function ShiftCutDetailModal({
   const responsibleName = cut.responsible || cut.outgoingCashier || "Responsable de Caja";
 
   const handlePrint = () => {
+    if (!ticketRef.current) {
+      window.print();
+      return;
+    }
+
+    try {
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        const ticketHtml = ticketRef.current.innerHTML;
+        doc.open();
+        doc.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8" />
+              <title>Comprobante de Corte - ${cut.id}</title>
+              <style>
+                @page {
+                  size: auto;
+                  margin: 2mm;
+                }
+                *, *::before, *::after {
+                  box-sizing: border-box;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+                body {
+                  margin: 0 auto;
+                  padding: 4px;
+                  width: 76mm;
+                  max-width: 100%;
+                  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                  font-size: 11px;
+                  line-height: 1.35;
+                  color: #000;
+                  background: #fff;
+                }
+                .flex { display: flex; }
+                .justify-between { justify-content: space-between; }
+                .justify-center { justify-content: center; }
+                .items-center { align-items: center; }
+                .text-center { text-align: center; }
+                .space-y-1 > * + * { margin-top: 3px; }
+                .space-y-1\\.5 > * + * { margin-top: 4px; }
+                .space-y-4 > * + * { margin-top: 10px; }
+                .font-black, .font-bold { font-weight: bold; }
+                .border-b-2 { border-bottom: 2px dashed #000; }
+                .border-t-2 { border-top: 2px dashed #000; }
+                .border-dashed { border-style: dashed; }
+                .border-dotted { border-style: dotted; }
+                .border-b { border-bottom: 1px dashed #666; }
+                .border-t { border-top: 1px dashed #666; }
+                .pb-3 { padding-bottom: 8px; }
+                .pt-1 { padding-top: 3px; }
+                .pt-2 { padding-top: 6px; }
+                .pt-4 { padding-top: 12px; }
+                .p-2 { padding: 5px; }
+                .p-3 { padding: 6px; }
+                .grid { display: grid; }
+                .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                .gap-4 { gap: 12px; }
+                .bg-stone-900 { background-color: #000 !important; color: #fff !important; }
+                .text-white { color: #fff !important; }
+                .bg-stone-50, .bg-amber-50, .bg-amber-50\\/70, .bg-emerald-100, .bg-blue-100, .bg-rose-100 {
+                  background-color: #f5f5f5 !important;
+                }
+                .rounded-md, .rounded-xl, .rounded-2xl, .rounded-3xl { border-radius: 4px; }
+                .border { border: 1px solid #ccc; }
+                .text-emerald-800, .text-emerald-900, .text-emerald-950, .text-amber-950, .text-amber-900, .text-rose-800, .text-rose-950, .text-blue-950 {
+                  color: #000 !important;
+                }
+                .text-stone-500, .text-stone-600, .text-stone-400 {
+                  color: #333 !important;
+                }
+                svg { display: inline-block; vertical-align: middle; }
+              </style>
+            </head>
+            <body>
+              <div id="print-wrapper">
+                ${ticketHtml}
+              </div>
+            </body>
+          </html>
+        `);
+        doc.close();
+
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          setTimeout(() => {
+            if (iframe.parentNode) {
+              iframe.parentNode.removeChild(iframe);
+            }
+          }, 2000);
+        }, 300);
+        return;
+      }
+    } catch (e) {
+      console.warn("Fallback to window.print():", e);
+    }
+
     window.print();
   };
 
@@ -72,35 +182,6 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/80 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
-      {/* Estilos para impresión limpia de ticket térmico */}
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #thermal-ticket-print,
-          #thermal-ticket-print * {
-            visibility: visible;
-          }
-          #thermal-ticket-print {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 80mm !important;
-            max-width: 80mm !important;
-            margin: 0 auto;
-            padding: 4mm !important;
-            background: white !important;
-            color: black !important;
-            font-size: 11px !important;
-            box-shadow: none !important;
-            border: none !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-        }
-      `}</style>
 
       <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[92vh] border-2 border-stone-200 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 transition-all duration-200">
         {/* Cabecera del Modal */}
@@ -177,9 +258,10 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
         {/* Cuerpo del Modal con el Ticket Térmico Oficial */}
         <div className="p-4 sm:p-6 overflow-y-auto bg-stone-100 flex justify-center">
           <div
-            id="thermal-ticket-print"
+            id="thermal-receipt"
+            data-paper-width="80mm"
             ref={ticketRef}
-            className="w-full max-w-[370px] bg-white p-5 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-dashed border-stone-300 shadow-lg space-y-4 font-mono text-stone-900"
+            className="w-full max-w-[370px] bg-white p-5 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-dashed border-stone-300 shadow-lg space-y-4 font-mono text-stone-900 paper-80mm"
           >
             {/* Header del Ticket */}
             <div className="text-center space-y-1 border-b-2 border-dashed border-stone-300 pb-3">

@@ -168,7 +168,9 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
         <div className="flex-1 overflow-y-auto p-6 bg-stone-100 flex justify-center">
           <div
             ref={receiptRef}
-            className="bg-white p-6 shadow-sm border border-stone-200 rounded-2xl w-full max-w-xs font-mono text-[11px] text-stone-900 space-y-3 print:shadow-none print:border-none print:p-0"
+            id="thermal-receipt"
+            data-paper-width="80mm"
+            className="bg-white p-6 shadow-sm border border-stone-200 rounded-2xl w-full max-w-xs font-mono text-[11px] text-stone-900 space-y-3 paper-80mm print:shadow-none print:border-none print:p-0"
           >
             {/* Header / Brand */}
             <div className="text-center space-y-1 border-b border-dashed border-stone-300 pb-3">

@@ -1,6 +1,6 @@
 import { ExpenseRecord, ShiftCutRecord, Customer, CustomOrder, CashIncome, Branch } from "@/types";
 
-export type FinancialPeriod = "hoy" | "semana" | "mes" | "mes_anterior";
+export type FinancialPeriod = "hoy" | "semana" | "mes" | "mes_anterior" | "trimestre" | "anio";
 
 export interface PLStatement {
   grossSales: number;
@@ -60,8 +60,12 @@ export interface BakeryKPIs {
   ticketAverage: number;
   totalTicketsCount: number;
   dailyBreakEven: number;    // Punto de equilibrio diario estimado en $
+  breakEvenPieces: number;   // Piezas de pan diarias estimadas (~$10-$12 promedio)
   wasteCostShare: number;    // % de pérdida por merma sobre venta bruta
   busiestDay: string;
+  coverageDays: number;      // Días de operación cubiertos con efectivo disponible
+  healthStatus: "excelente" | "saludable" | "atencion";
+  healthScore: number;       // Puntuación 0-100
 }
 
 export interface CashFlowDay {
@@ -171,6 +175,12 @@ export function calculateFinancialSummary({
   } else if (period === "mes_anterior") {
     multiplier = 25.8;
     periodLabel = "Mes Anterior";
+  } else if (period === "trimestre") {
+    multiplier = 79.5;
+    periodLabel = "Trimestre Actual";
+  } else if (period === "anio") {
+    multiplier = 318;
+    periodLabel = "Año en Curso";
   }
 
   // Multi-branch base values
@@ -349,12 +359,40 @@ export function calculateFinancialSummary({
   const grossMarginRatio = grossMarginPercent > 0 ? grossMarginPercent / 100 : 0.6;
   const dailyBreakEven = Math.round(dailyFixedCosts / grossMarginRatio);
 
+  const avgBreadPrice = 11; // precio promedio estimado por pieza en mostrador
+  const breakEvenPieces = Math.round(dailyBreakEven / avgBreadPrice);
+
+  // Días de cobertura con efectivo en caja y bancos
+  const daysInPeriod = period === "hoy" ? 1 : period === "semana" ? 7 : period === "mes" || period === "mes_anterior" ? 30 : period === "trimestre" ? 90 : 365;
+  const dailyBurn = (totalCogs + totalOpex) / daysInPeriod;
+  const coverageDays = dailyBurn > 0 ? Number((totalLiquidFunds / dailyBurn).toFixed(1)) : 14.5;
+
+  // Semáforo y Puntuación de Salud Financiera (0 - 100)
+  let healthScore = 72;
+  if (netMarginPercent >= 20) healthScore += 14;
+  else if (netMarginPercent >= 12) healthScore += 8;
+  else if (netMarginPercent < 5) healthScore -= 20;
+
+  if (grossMarginPercent >= 55) healthScore += 10;
+  else if (grossMarginPercent < 45) healthScore -= 15;
+
+  if (coverageDays >= 10) healthScore += 4;
+  else if (coverageDays < 3) healthScore -= 12;
+
+  healthScore = Math.max(15, Math.min(98, healthScore));
+  const healthStatus: "excelente" | "saludable" | "atencion" = 
+    healthScore >= 80 ? "excelente" : healthScore >= 60 ? "saludable" : "atencion";
+
   const kpis: BakeryKPIs = {
     ticketAverage,
     totalTicketsCount: totalTickets,
     dailyBreakEven,
+    breakEvenPieces,
     wasteCostShare: Number(((wasteLoss / estimatedGrossSales) * 100).toFixed(1)),
     busiestDay: "Sábado (Tarde Familiar)",
+    coverageDays,
+    healthStatus,
+    healthScore,
   };
 
   // ─── Weekly Cash Flow Simulation ───────────────────────────────────────────
@@ -393,4 +431,89 @@ export function calculateFinancialSummary({
     kpis,
     cashFlow,
   };
+}
+
+// ─── Exportación a CSV Formateado para Excel (UTF-8 BOM) ──────────────────────
+export function exportFinancialSummaryToCSV(summary: FullFinancialSummary): void {
+  const { pl, treasury, receivables, kpis, periodLabel, branchName } = summary;
+
+  const rows = [
+    ["PANADERIAS BRITO - REPORTE Y ESTADO FINANCIERO OFICIAL"],
+    ["Periodo:", periodLabel],
+    ["Sucursal:", branchName],
+    ["Fecha de Generacion:", new Date().toLocaleDateString("es-MX", { dateStyle: "long" })],
+    [],
+    ["1. ESTADO DE RESULTADOS (P&L)", "Monto (MXN)", "% sobre Ventas"],
+    ["(+) Ventas Brutas Totales", pl.grossSales, "100.0%"],
+    ["  - Venta en Mostrador (Efectivo/Tarjeta)", pl.counterSales, `${((pl.counterSales / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Tienditas y Mayoristas", pl.wholesaleSales, `${((pl.wholesaleSales / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Encargos Especiales y Pasteles", pl.ordersSales, `${((pl.ordersSales / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Otros Ingresos", pl.otherIncomes, `${((pl.otherIncomes / pl.grossSales) * 100).toFixed(1)}%`],
+    [],
+    ["(-) Costo de Ventas (COGS / Produccion)", pl.totalCogs, `${((pl.totalCogs / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Harinas, Mantecas, Azucar e Insumos", pl.cogsIngredients, `${((pl.cogsIngredients / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Gas LP Hornos de Lena/Gas", pl.cogsGasLP, `${((pl.cogsGasLP / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Bolsas Kraft y Empaques", pl.cogsPackaging, `${((pl.cogsPackaging / pl.grossSales) * 100).toFixed(1)}%`],
+    [],
+    ["(=) MARGEN BRUTO RESULTANTE", pl.grossProfit, `${pl.grossMarginPercent}%`],
+    [],
+    ["(-) Gastos Operativos (OPEX)", pl.totalOpex, `${((pl.totalOpex / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Nominas y Sueldos Panaderos/Cajeras", pl.opexPayroll, `${((pl.opexPayroll / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Servicios Fijos (Luz CFE, Agua, Internet)", pl.opexUtilities, `${((pl.opexUtilities / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Mantenimiento Hornos y Amasadoras", pl.opexMaintenance, `${((pl.opexMaintenance / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Gasolina Repartos", pl.opexFuelDelivery, `${((pl.opexFuelDelivery / pl.grossSales) * 100).toFixed(1)}%`],
+    ["  - Otros Gastos Menores", pl.opexOther, `${((pl.opexOther / pl.grossSales) * 100).toFixed(1)}%`],
+    ["(-) Costo de Mermas (Pan Frio)", pl.wasteLoss, `${((pl.wasteLoss / pl.grossSales) * 100).toFixed(1)}%`],
+    [],
+    ["(=) UTILIDAD OPERATIVA (EBITDA)", pl.operatingProfit, `${pl.operatingMarginPercent}%`],
+    ["(-) Retiros Personales Don Tono / Socios", pl.ownerDraws, `${((pl.ownerDraws / pl.grossSales) * 100).toFixed(1)}%`],
+    [],
+    ["(=) UTILIDAD NETA FINAL REAL", pl.netProfit, `${pl.netMarginPercent}%`],
+    [],
+    ["2. POSICION DE TESORERIA Y DISPONIBLE", "Monto (MXN)"],
+    ["Efectivo en Gavetas de Caja", treasury.cashInDrawers],
+    ["BBVA Bancomer (Don Tono)", treasury.bancoBBVA],
+    ["Santander Negocio (Tarjetas)", treasury.bancoSantander],
+    ["Caja Chica Emergencias", treasury.pettyCash],
+    ["TOTAL LIQUIDEZ INMEDIATA", treasury.totalLiquidFunds],
+    [],
+    ["3. METRICAS Y EFICIENCIA DE PANADERIA", "Valor"],
+    ["Ticket Promedio en Mostrador", `$${kpis.ticketAverage}`],
+    ["Total de Tickets Emitidos", kpis.totalTicketsCount],
+    ["Punto de Equilibrio Diario ($)", `$${kpis.dailyBreakEven}`],
+    ["Punto de Equilibrio Diario (Piezas de Pan)", `${kpis.breakEvenPieces} piezas`],
+    ["Porcentaje de Mermas de Produccion", `${kpis.wasteCostShare}%`],
+    ["Dias de Cobertura de Caja Operativa", `${kpis.coverageDays} dias`],
+    ["Cartera Fiada a Tienditas / Mayoristas", `$${receivables.totalReceivables}`],
+    ["Pedidos Pendientes por Liquidar", `$${receivables.ordersPendingBalance}`]
+  ];
+
+  const csvContent = "\uFEFF" + rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `Balance_Financiero_Brito_${periodLabel.replace(/\s+/g, "_")}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// ─── Generador de Resumen para WhatsApp ───────────────────────────────────────
+export function generateWhatsAppFinancialSummary(summary: FullFinancialSummary): string {
+  const { pl, treasury, receivables, kpis, periodLabel, branchName } = summary;
+  return `🥖 *PANADERÍAS BRITO* — *BALANCE FINANCIERO*
+📅 *Periodo:* ${periodLabel} | *Sucursal:* ${branchName}
+━━━━━━━━━━━━━━━━━━━━
+💰 *Ventas Brutas:* $${pl.grossSales.toLocaleString("es-MX")}
+🌾 *Costo Producción (COGS):* -$${pl.totalCogs.toLocaleString("es-MX")}
+📊 *Margen Bruto:* $${pl.grossProfit.toLocaleString("es-MX")} (${pl.grossMarginPercent}%)
+🏢 *Gastos Operativos (OPEX):* -$${pl.totalOpex.toLocaleString("es-MX")}
+📉 *Mermas de Pan:* -$${pl.wasteLoss.toLocaleString("es-MX")}
+━━━━━━━━━━━━━━━━━━━━
+🔥 *UTILIDAD NETA LIBRE:* $${pl.netProfit.toLocaleString("es-MX")} (*${pl.netMarginPercent}%*)
+🏦 *Liquidez en Tesorería:* $${treasury.totalLiquidFunds.toLocaleString("es-MX")}
+🥖 *Punto Equilibrio:* $${kpis.dailyBreakEven.toLocaleString("es-MX")} (~${kpis.breakEvenPieces} pzas/día)
+🏪 *Cartera Fiada a Tienditas:* $${receivables.totalReceivables.toLocaleString("es-MX")}
+🛡️ *Días de Cobertura:* ${kpis.coverageDays} días`;
 }

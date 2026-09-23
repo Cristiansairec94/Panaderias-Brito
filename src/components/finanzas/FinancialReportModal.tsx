@@ -15,9 +15,10 @@ import {
   ShieldCheck,
   Percent,
   Wallet,
-  Coins
+  Coins,
+  Download
 } from "lucide-react";
-import { FullFinancialSummary } from "@/lib/finanzas";
+import { FullFinancialSummary, exportFinancialSummaryToCSV } from "@/lib/finanzas";
 import { formatCurrency } from "@/lib/utils";
 
 interface FinancialReportModalProps {
@@ -89,12 +90,20 @@ Punto de Equilibrio Diario: ${formatCurrency(kpis.dailyBreakEven)}`;
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => exportFinancialSummaryToCSV(summary)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-all shadow-sm active:scale-95"
+              title="Descargar Balance en Excel / CSV"
+            >
+              <Download className="w-4 h-4 text-emerald-600" />
+              <span className="hidden sm:inline">Excel/CSV</span>
+            </button>
+            <button
               onClick={handleCopySummary}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-all shadow-sm"
               title="Copiar texto resumen"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-              <span>{copied ? "¡Copiado!" : "Copiar"}</span>
+              <span className="hidden sm:inline">{copied ? "¡Copiado!" : "Copiar"}</span>
             </button>
             <button
               onClick={handlePrint}
