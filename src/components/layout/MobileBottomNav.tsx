@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
   Store, 
   Building2, 
+  CalendarClock,
   Bell, 
   Croissant, 
   Menu,
@@ -51,6 +52,7 @@ export default function MobileBottomNav() {
 
   const isDashboard = pathname === "/";
   const isSucursales = pathname.startsWith("/sucursales");
+  const isPedidos = pathname.startsWith("/pedidos");
   const isProductos = pathname.startsWith("/productos");
 
   const handleLinkClick = () => {
@@ -348,7 +350,27 @@ export default function MobileBottomNav() {
             <span className="text-[10px] tracking-tight mt-0.5 leading-none">Sucursales</span>
           </Link>
 
-          {/* 3. Notificaciones (Ubicado en la esquina, justo al lado del Menú de tres rayas) */}
+          {/* 3. Pedidos (Encargos de mostrador) */}
+          <Link
+            href="/pedidos"
+            onClick={handleLinkClick}
+            className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 transition-all active:scale-95 group ${
+              isPedidos
+                ? "text-orange-600 font-black"
+                : "text-stone-400 hover:text-stone-600 font-semibold"
+            }`}
+            title="Pedidos Especiales & Encargos de Mostrador"
+          >
+            <div className="relative">
+              <CalendarClock className={`w-5 h-5 transition-transform group-hover:scale-110 ${isPedidos ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
+              {isPedidos && (
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-600" />
+              )}
+            </div>
+            <span className="text-[10px] tracking-tight mt-0.5 leading-none">Pedidos</span>
+          </Link>
+
+          {/* 4. Notificaciones */}
           <button
             type="button"
             onClick={handleToggleNotifications}
