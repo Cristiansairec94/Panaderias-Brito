@@ -163,7 +163,7 @@ export default function Header() {
   const current = getPageTitle();
 
   return (
-    <header className="h-16 shrink-0 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-3 sm:px-5 lg:px-6 flex items-center justify-between sticky top-0 z-[100] shadow-xs">
+    <header className="h-16 shrink-0 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-2.5 sm:px-5 lg:px-6 flex items-center justify-between sticky top-0 z-[100] shadow-xs w-full max-w-full overflow-hidden">
       {/* Left: Desktop Collapse Toggle + Page Title */}
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 mr-2">
         {/* Desktop Quick Toggle Button */}

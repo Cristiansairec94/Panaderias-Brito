@@ -197,7 +197,7 @@ export default function Home() {
   }, [branches]);
 
   return (
-    <div className="w-full space-y-5 sm:space-y-6">
+    <div className="w-full max-w-full space-y-5 sm:space-y-6 overflow-x-hidden">
       {/* Top Hero: Official Deep Charcoal & Onyx with Warm Brito Orange & Crimson Accents */}
       <div className="relative overflow-hidden bg-gradient-to-br from-[#0c0d14] via-[#12141f] to-[#090a0f] rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-white/[0.08]">
         {/* Glow ambient spots */}
@@ -278,14 +278,6 @@ export default function Home() {
 
           {/* Quick Operations Action Bar */}
           <div className="relative z-10 flex flex-col gap-2.5 self-start lg:self-center w-full lg:w-auto lg:min-w-[280px]">
-            {/* Primary Action: Abrir POS Mostrador */}
-            <Link
-              href="/pos"
-              className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-[#f97316] via-[#ea580c] to-[#e11d48] hover:brightness-110 text-white font-black px-6 py-3.5 rounded-2xl shadow-xl shadow-orange-600/30 transition-all active:scale-95 text-xs tracking-wide"
-            >
-              <ShoppingBag className="w-4 h-4 text-amber-200" />
-              <span>Abrir POS Mostrador</span>
-            </Link>
 
             {/* Sales Simulation Controls */}
             <div className="flex items-center gap-2 w-full">
@@ -338,10 +330,10 @@ export default function Home() {
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
+          <div className="flex flex-wrap items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto max-w-full">
             <button
               onClick={() => setSelectedPeriod("hoy")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
                 selectedPeriod === "hoy"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-500 hover:text-stone-900"
@@ -351,7 +343,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setSelectedPeriod("semana")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
                 selectedPeriod === "semana"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-500 hover:text-stone-900"
@@ -361,7 +353,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setSelectedPeriod("mes")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
                 selectedPeriod === "mes"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-500 hover:text-stone-900"
@@ -736,8 +728,9 @@ export default function Home() {
         </div>
 
         {/* Dynamic Interactive Chart Bars */}
-        <div className="space-y-3">
-          <div className="h-48 sm:h-56 w-full flex items-end gap-1.5 sm:gap-3 pt-6 pb-2 px-1">
+        <div className="space-y-3 w-full">
+          <div className="w-full overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+            <div className="h-48 sm:h-56 min-w-[480px] sm:min-w-0 w-full flex items-end gap-1.5 sm:gap-3 pt-6 pb-2 px-1">
             {activeChartItems.map((d) => {
               const heightPercent = Math.max(12, Math.round((d.amount / maxChartAmount) * 100));
               const isPeak = d.isPeak;
@@ -795,6 +788,7 @@ export default function Home() {
                 </div>
               );
             })}
+          </div>
           </div>
 
           {/* Peak Bakery Insights Callouts */}
