@@ -95,10 +95,11 @@ export default function PwaInstallPrompt() {
               <Image
                 src="/logo.png"
                 alt="Panadería Brito Logo"
-                width={40}
-                height={40}
-                className="w-full h-full object-contain"
+                width={160}
+                height={160}
+                unoptimized
                 priority
+                className="w-full h-full object-contain"
               />
             </div>
           </div>

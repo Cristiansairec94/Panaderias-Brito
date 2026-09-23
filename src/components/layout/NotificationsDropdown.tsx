@@ -353,7 +353,7 @@ export function NotificationItem({
                 markAsRead(notif.id);
                 onCloseDropdown();
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-brito-orange-600 hover:text-white text-stone-800 font-bold text-[11px] rounded-xl border border-stone-200 shadow-sm transition-all active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50/70 hover:bg-orange-600 hover:text-white text-stone-800 font-bold text-[11px] rounded-xl border border-orange-200/70 shadow-xs transition-all active:scale-95"
             >
               <span>{notif.actionLabel}</span>
               <ArrowRight className="w-3 h-3" />
@@ -368,13 +368,15 @@ export function NotificationItem({
       )}
 
       {/* 3-Dots Individual Context Menu */}
-      <div className="absolute right-2 top-3 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute right-2 top-3 opacity-70 hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             setActiveItemMenu(isMenuOpen ? null : notif.id);
           }}
           className="w-7 h-7 rounded-full bg-white hover:bg-stone-200 text-stone-600 flex items-center justify-center shadow-sm border border-stone-200"
+          title="Opciones"
         >
           <MoreHorizontal className="w-4 h-4" />
         </button>

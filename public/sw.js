@@ -131,3 +131,46 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+// 4. Gestión de Notificaciones Nativas en Celular (Android & iOS PWA)
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.link || "/";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          if (client.url && client.url.includes(targetUrl)) {
+            return client.focus();
+          }
+          return client.focus().then(() => {
+            if ("navigate" in client) return client.navigate(targetUrl);
+          });
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  try {
+    const payload = event.data.json();
+    const title = payload.title || "🥖 Panadería Brito";
+    const options = {
+      body: payload.body || "Nuevo movimiento registrado en la panadería",
+      icon: "/logo.png",
+      badge: "/logo.png",
+      vibrate: [200, 100, 200],
+      data: payload.data || { link: "/" },
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch (e) {
+    console.error("[ServiceWorker] Error en push:", e);
+  }
+});
+

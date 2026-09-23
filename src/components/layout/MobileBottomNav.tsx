@@ -38,6 +38,7 @@ export default function MobileBottomNav() {
     unreadCount,
     soundEnabled,
     nativePermission,
+    realtimeStatus,
     requestNativePermission,
     toggleSound,
     markAsRead,
@@ -83,10 +84,13 @@ export default function MobileBottomNav() {
     <>
       {/* Panel Móvil de Notificaciones (Bottom Sheet) */}
       {showNotifications && (
-        <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end animate-in fade-in duration-200">
+        <div 
+          className="md:hidden fixed inset-0 z-50 flex flex-col justify-end pointer-events-none animate-in fade-in duration-200"
+          style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom, 0px))" }}
+        >
           {/* Backdrop con desenfoque */}
           <div 
-            className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs transition-opacity pointer-events-auto"
             onClick={() => {
               setShowNotifications(false);
               setShowOptionsMenu(false);
@@ -95,7 +99,7 @@ export default function MobileBottomNav() {
           />
 
           {/* Sheet deslizable hacia arriba */}
-          <div className="relative z-50 bg-white rounded-t-[28px] shadow-2xl border-t border-stone-200 max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+          <div className="relative z-50 bg-white rounded-t-[28px] rounded-b-2xl mx-2 sm:mx-auto max-w-lg w-[calc(100%-1rem)] sm:w-full shadow-2xl border border-stone-200/90 max-h-[72vh] flex flex-col overflow-hidden pointer-events-auto animate-in slide-in-from-bottom duration-300">
             {/* Handle táctil */}
             <div className="w-12 h-1.5 bg-stone-300 rounded-full mx-auto mt-2.5 mb-1 shrink-0" />
 
@@ -110,9 +114,29 @@ export default function MobileBottomNav() {
                     <h3 className="text-lg font-black text-stone-900 tracking-tight leading-tight">
                       Avisos & Notificaciones
                     </h3>
-                    <p className="text-[10px] text-stone-500 font-semibold">
-                      Alertas operativas en tiempo real
-                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-[10px] text-stone-500 font-semibold">
+                        Alertas operativas
+                      </p>
+                      {realtimeStatus === "connected" && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-100/90 border border-emerald-300/60 px-1.5 py-0.2 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          En vivo
+                        </span>
+                      )}
+                      {realtimeStatus === "connecting" && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                          Conectando...
+                        </span>
+                      )}
+                      {realtimeStatus === "disconnected" && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-black text-stone-500 bg-stone-100 border border-stone-300 px-1.5 py-0.2 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
+                          Sin conexión
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -233,7 +257,7 @@ export default function MobileBottomNav() {
             </div>
 
             {/* Lista con scroll */}
-            <div className="flex-1 overflow-y-auto divide-y divide-stone-100 p-2 space-y-1">
+            <div className="flex-1 overflow-y-auto divide-y divide-stone-100 p-2.5 pb-6 space-y-1.5 overscroll-contain">
               {filtered.length === 0 ? (
                 <div className="p-10 text-center text-stone-400 flex flex-col items-center justify-center space-y-2">
                   <Inbox className="w-10 h-10 text-stone-300 stroke-[1.5]" />
@@ -306,7 +330,7 @@ export default function MobileBottomNav() {
       {/* Barra de Navegación Inferior Móvil (Dock) */}
       <nav 
         aria-label="Navegación inferior móvil"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-stone-200/90 shadow-[0_-6px_25px_rgba(0,0,0,0.08)] px-1 sm:px-3 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-[60] bg-white/95 backdrop-blur-xl border-t border-stone-200/90 shadow-[0_-6px_25px_rgba(0,0,0,0.08)] px-1 sm:px-3 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1"
       >
         <div className="flex items-center justify-around max-w-lg mx-auto relative h-14">
           
@@ -315,15 +339,15 @@ export default function MobileBottomNav() {
             href="/"
             onClick={handleLinkClick}
             className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 transition-all active:scale-95 group ${
-              isDashboard
+              isDashboard && !showNotifications
                 ? "text-orange-600 font-black"
                 : "text-stone-400 hover:text-stone-600 font-semibold"
             }`}
             title="Dashboard / Inicio"
           >
             <div className="relative">
-              <Store className={`w-5 h-5 transition-transform group-hover:scale-110 ${isDashboard ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
-              {isDashboard && (
+              <Store className={`w-5 h-5 transition-transform group-hover:scale-110 ${isDashboard && !showNotifications ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
+              {isDashboard && !showNotifications && (
                 <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-600" />
               )}
             </div>
@@ -335,15 +359,15 @@ export default function MobileBottomNav() {
             href="/sucursales"
             onClick={handleLinkClick}
             className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 transition-all active:scale-95 group ${
-              isSucursales
+              isSucursales && !showNotifications
                 ? "text-orange-600 font-black"
                 : "text-stone-400 hover:text-stone-600 font-semibold"
             }`}
             title="Red de Sucursales"
           >
             <div className="relative">
-              <Building2 className={`w-5 h-5 transition-transform group-hover:scale-110 ${isSucursales ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
-              {isSucursales && (
+              <Building2 className={`w-5 h-5 transition-transform group-hover:scale-110 ${isSucursales && !showNotifications ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
+              {isSucursales && !showNotifications && (
                 <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-600" />
               )}
             </div>
@@ -355,15 +379,15 @@ export default function MobileBottomNav() {
             href="/pedidos"
             onClick={handleLinkClick}
             className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 transition-all active:scale-95 group ${
-              isPedidos
+              isPedidos && !showNotifications
                 ? "text-orange-600 font-black"
                 : "text-stone-400 hover:text-stone-600 font-semibold"
             }`}
             title="Pedidos Especiales & Encargos de Mostrador"
           >
             <div className="relative">
-              <CalendarClock className={`w-5 h-5 transition-transform group-hover:scale-110 ${isPedidos ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
-              {isPedidos && (
+              <CalendarClock className={`w-5 h-5 transition-transform group-hover:scale-110 ${isPedidos && !showNotifications ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
+              {isPedidos && !showNotifications && (
                 <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-600" />
               )}
             </div>
@@ -398,17 +422,20 @@ export default function MobileBottomNav() {
           {/* 5. Menú Completo (Tres rayas) */}
           <button
             type="button"
-            onClick={toggleMobile}
+            onClick={() => {
+              if (showNotifications) setShowNotifications(false);
+              toggleMobile();
+            }}
             className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 transition-all active:scale-95 group ${
-              isMobileOpen
+              isMobileOpen && !showNotifications
                 ? "text-orange-600 font-black"
                 : "text-stone-400 hover:text-stone-600 font-semibold"
             }`}
             title="Abrir menú para desglosar opciones"
           >
             <div className="relative">
-              <Menu className={`w-5 h-5 transition-transform group-hover:scale-110 ${isMobileOpen ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
-              {isMobileOpen && (
+              <Menu className={`w-5 h-5 transition-transform group-hover:scale-110 ${isMobileOpen && !showNotifications ? "stroke-[2.5]" : "stroke-[1.75]"}`} />
+              {isMobileOpen && !showNotifications && (
                 <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-600" />
               )}
             </div>

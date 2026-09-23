@@ -66,6 +66,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { useNotifications } from "@/context/NotificationContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { useSync } from "@/context/SyncContext";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
@@ -1549,6 +1550,17 @@ export default function POSPage() {
       description: `Se ingresaron ${delivery.totalPieces} piezas de pan al mostrador entregadas por ${delivery.driver || "el chofer"} y recibidas por ${delivery.cashier}.`,
       category: "inventario",
     });
+
+    if (realtimeHub?.broadcastBreadDelivery) {
+      realtimeHub.broadcastBreadDelivery({
+        id: delivery.id,
+        driver: delivery.driver || "Chofer",
+        source: delivery.source,
+        totalPieces: delivery.totalPieces,
+        cashier: delivery.cashier,
+        timestamp: delivery.timestamp,
+      });
+    }
   };
 
   const handleReprintSale = (sale: Sale) => {

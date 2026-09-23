@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 
+import { realtimeHub, RealtimeStatus } from "@/lib/realtime/realtimeHub";
+
 export interface FBNotification {
   id: string;
   senderName: string;
@@ -101,6 +103,7 @@ interface NotificationContextType {
   unreadCount: number;
   soundEnabled: boolean;
   nativePermission: NotificationPermission;
+  realtimeStatus: RealtimeStatus;
   requestNativePermission: () => Promise<NotificationPermission>;
   toggleSound: () => void;
   markAsRead: (id: string) => void;
@@ -133,6 +136,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [nativePermission, setNativePermission] = useState<NotificationPermission>("default");
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>(() =>
+    realtimeHub.getStatus ? realtimeHub.getStatus() : "disconnected"
+  );
   const [activeToast, setActiveToast] = useState<FBNotification | null>(null);
 
   useEffect(() => {
@@ -140,6 +146,43 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setNativePermission(Notification.permission);
     }
   }, []);
+
+  const triggerNativeNotification = (notif: FBNotification) => {
+    if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+    try {
+      if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((reg) => {
+          reg
+            .showNotification(`🥖 ${notif.title}`, {
+              body: `${notif.highlightText}\n${notif.description}`,
+              icon: "/logo.png",
+              badge: "/logo.png",
+              tag: notif.id,
+              data: { link: notif.actionLink || "/" },
+            })
+            .catch(() => {
+              new Notification(`🥖 ${notif.title}`, {
+                body: `${notif.highlightText}\n${notif.description}`,
+                icon: "/logo.png",
+                badge: "/logo.png",
+                tag: notif.id,
+              });
+            });
+        });
+      } else {
+        new Notification(`🥖 ${notif.title}`, {
+          body: `${notif.highlightText}\n${notif.description}`,
+          icon: "/logo.png",
+          badge: "/logo.png",
+          tag: notif.id,
+        });
+      }
+    } catch (e) {
+      console.warn("Error triggering native notification:", e);
+    }
+  };
 
   const requestNativePermission = async (): Promise<NotificationPermission> => {
     if (typeof window === "undefined" || !("Notification" in window)) {
@@ -150,10 +193,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setNativePermission(perm);
       if (perm === "granted") {
         try {
-          new Notification("🥖 Panadería Brito", {
-            body: "¡Notificaciones del negocio activadas con éxito en tu teléfono!",
-            icon: "/logo.png",
-            badge: "/logo.png",
+          triggerNativeNotification({
+            id: `welcome-${Date.now()}`,
+            senderName: "🥖 Panadería Brito",
+            senderAvatar: "🥖",
+            badgeIcon: "harina",
+            title: "Notificaciones Activadas",
+            highlightText: "¡Alertas en tiempo real activas!",
+            description: "Recibirás avisos de ventas, cobros y encargos al instante en tu celular.",
+            timeAgo: "Ahora",
+            group: "recientes",
+            read: false,
+            category: "caja",
           });
         } catch (e) {}
       }
@@ -193,8 +244,37 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
+  // Conectar con el Hub de Tiempo Real de Supabase para recibir alertas remotas
+  useEffect(() => {
+    if (typeof window === "undefined" || !realtimeHub.onNotification) return;
+
+    const unsubNotification = realtimeHub.onNotification((remoteNotif) => {
+      setNotifications((prev) => {
+        // Evitar duplicados si ya existe
+        if (prev.some((n) => n.id === remoteNotif.id)) return prev;
+        const updated = [remoteNotif, ...prev];
+        persistNotifs(updated);
+        return updated;
+      });
+
+      // Efectos inmediatos en el celular
+      playChime();
+      setActiveToast(remoteNotif);
+      triggerNativeNotification(remoteNotif);
+    });
+
+    const unsubStatus = realtimeHub.onStatusChange((status) => {
+      setRealtimeStatus(status);
+    });
+
+    return () => {
+      unsubNotification();
+      unsubStatus();
+    };
+  }, []);
+
   const addNotification = (notif: Omit<FBNotification, "id" | "read" | "timeAgo" | "group"> & Partial<FBNotification>) => {
-    const newId = `notif-${Date.now()}`;
+    const newId = notif.id || `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const fullNotif: FBNotification = {
       id: newId,
       timeAgo: "Hace un momento",
@@ -202,7 +282,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       read: false,
       ...notif,
     };
+
     setNotifications((prev) => {
+      if (prev.some((n) => n.id === newId)) return prev;
       const updated = [fullNotif, ...prev];
       persistNotifs(updated);
       return updated;
@@ -211,19 +293,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     // Reproducir sonido y mostrar banner flotante visible
     playChime();
     setActiveToast(fullNotif);
+    triggerNativeNotification(fullNotif);
 
-    // Disparar Notificación Nativa del Sistema Operativo en el Celular
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-      try {
-        new Notification(`🥖 ${fullNotif.title}`, {
-          body: `${fullNotif.highlightText}\n${fullNotif.description}`,
-          icon: "/logo.png",
-          badge: "/logo.png",
-          tag: fullNotif.id,
-        });
-      } catch (e) {
-        console.warn("Error triggering native notification:", e);
-      }
+    // Transmitir en vivo por WebSocket a los demás celulares/computadoras del negocio
+    if (realtimeHub.broadcastNotification) {
+      realtimeHub.broadcastNotification(fullNotif);
     }
   };
 
@@ -285,6 +359,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         unreadCount,
         soundEnabled,
         nativePermission,
+        realtimeStatus,
         requestNativePermission,
         toggleSound,
         markAsRead,

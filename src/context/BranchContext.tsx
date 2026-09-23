@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { Branch, BranchShift, BranchCashMovement } from "@/types";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
 export interface SimulatedSale {
   id: string;
@@ -293,6 +294,133 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Escuchar ventas y movimientos de caja transmitidos en tiempo real desde otros dispositivos
+  useEffect(() => {
+    if (typeof window === "undefined" || !realtimeHub.onSale) return;
+
+    const unsubSale = realtimeHub.onSale((sale) => {
+      // 1. Actualizar métricas y turno de la sucursal receptora
+      setBranches((prev) => {
+        const isCash = sale.paymentMethod === "efectivo";
+        const isCard = sale.paymentMethod === "tarjeta";
+        const isTransfer = sale.paymentMethod === "transferencia";
+
+        const updated = prev.map((b) => {
+          if (b.id !== sale.branchId) return b;
+
+          const curShift: BranchShift = b.currentShift || {
+            id: `shift-${b.id}`,
+            name: "Turno General",
+            cashier: sale.cashier || "Cajero",
+            openedAt: "06:00 AM",
+            initialFund: 1000,
+            status: "abierto",
+            totalSales: 0,
+            ticketCount: 0,
+            cashSales: 0,
+            cardSales: 0,
+            transferSales: 0,
+          };
+
+          const updatedShift: BranchShift = {
+            ...curShift,
+            totalSales: (Number(curShift.totalSales) || 0) + sale.total,
+            ticketCount: (Number(curShift.ticketCount) || 0) + 1,
+            cashSales: (Number(curShift.cashSales) || 0) + (isCash ? sale.total : 0),
+            cardSales: (Number(curShift.cardSales) || 0) + (isCard ? sale.total : 0),
+            transferSales: (Number(curShift.transferSales) || 0) + (isTransfer ? sale.total : 0),
+          };
+
+          const updatedTopProduct = b.topProduct
+            ? {
+                ...b.topProduct,
+                piecesSold: (b.topProduct.piecesSold || 0) + 1,
+              }
+            : undefined;
+
+          return {
+            ...b,
+            todaySales: (Number(b.todaySales) || 0) + sale.total,
+            todayTickets: (Number(b.todayTickets) || 0) + 1,
+            cashInDrawer: (Number(b.cashInDrawer) || 0) + (isCash ? sale.total : 0),
+            currentShift: updatedShift,
+            topProduct: updatedTopProduct,
+          };
+        });
+
+        try {
+          localStorage.setItem("brito_branches_data", JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      // 2. Registrar en la lista de ventas recientes
+      setRecentSimulatedSales((prev) => {
+        if (prev.some((s) => s.id === sale.id)) return prev;
+        const saleLog: SimulatedSale = {
+          id: sale.id,
+          branchId: sale.branchId,
+          branchName: sale.branchName,
+          itemsSummary: sale.itemsSummary,
+          total: sale.total,
+          paymentMethod: sale.paymentMethod,
+          cashier: sale.cashier,
+          timestamp: sale.timestamp,
+        };
+        const next = [saleLog, ...prev.slice(0, 19)];
+        try {
+          localStorage.setItem("brito_simulated_sales", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    });
+
+    const unsubCashMovement = realtimeHub.onCashMovement((movement) => {
+      // 1. Agregar a la lista de movimientos de caja
+      setCashMovements((prev) => {
+        if (prev.some((m) => m.id === movement.id)) return prev;
+        const newMov: BranchCashMovement = {
+          id: movement.id,
+          branchId: movement.branchId,
+          branchName: movement.branchName,
+          type: movement.type,
+          category: movement.category,
+          categoryLabel: movement.categoryLabel,
+          amount: movement.amount,
+          reason: movement.reason,
+          authorizedBy: movement.authorizedBy,
+          timestamp: movement.timestamp,
+        };
+        const next = [newMov, ...prev];
+        try {
+          localStorage.setItem("brito_branch_cash_movements", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // 2. Actualizar efectivo en gaveta de la sucursal
+      setBranches((prev) => {
+        const updated = prev.map((b) => {
+          if (b.id !== movement.branchId) return b;
+          const delta = movement.type === "entrada" ? movement.amount : -movement.amount;
+          return {
+            ...b,
+            cashInDrawer: Math.max(0, b.cashInDrawer + delta),
+          };
+        });
+        try {
+          localStorage.setItem("brito_branches_data", JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    });
+
+    return () => {
+      unsubSale();
+      unsubCashMovement();
+    };
+  }, []);
+
   // Save branches changes
   const persistBranches = (updated: Branch[]) => {
     setBranches(updated);
@@ -430,6 +558,39 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         } catch {}
         return next;
       });
+
+      // Transmisión en tiempo real por WebSocket a celulares y computadoras
+      if (realtimeHub.broadcastSale) {
+        realtimeHub.broadcastSale({
+          id: saleLog.id,
+          branchId,
+          branchName: saleLog.branchName,
+          total: amount,
+          paymentMethod,
+          cashier: saleLog.cashier,
+          itemsSummary: saleLog.itemsSummary,
+          timestamp: timeStr,
+        });
+      }
+
+      // Alerta y timbre inmediato en el celular del dueño/cajeros
+      if (realtimeHub.broadcastNotification) {
+        realtimeHub.broadcastNotification({
+          id: `sale-notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          senderName: `🥖 Mostrador ${saleLog.branchName}`,
+          senderAvatar: "🥖",
+          badgeIcon: "dinero",
+          title: "Venta en Mostrador",
+          highlightText: `+$${amount.toFixed(2)} MXN • ${saleLog.branchName}`,
+          description: `${saleLog.cashier}: ${saleLog.itemsSummary} (${paymentMethod.toUpperCase()})`,
+          timeAgo: "Hace un momento",
+          group: "recientes",
+          read: false,
+          category: "caja",
+          actionLabel: "Ver Flujo",
+          actionLink: "/caja",
+        });
+      }
     } catch (err) {
       console.error("Error inside registerRealSale:", err);
     }
@@ -634,6 +795,31 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         persistBranches(updated);
         return updated;
       });
+
+      // Transmisión inmediata por WebSocket del movimiento de dinero
+      if (realtimeHub.broadcastCashMovement) {
+        realtimeHub.broadcastCashMovement(newMovement);
+      }
+
+      // Notificación automática e instantánea al celular
+      if (realtimeHub.broadcastNotification) {
+        const isEntrada = movement.type === "entrada";
+        realtimeHub.broadcastNotification({
+          id: `mov-notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          senderName: `💵 Caja ${branchName}`,
+          senderAvatar: isEntrada ? "📥" : "📤",
+          badgeIcon: isEntrada ? "dinero" : "alerta",
+          title: isEntrada ? "Ingreso a Caja" : "Salida de Dinero / Gasto",
+          highlightText: `${isEntrada ? "+" : "-"}$${movement.amount.toFixed(2)} MXN • ${branchName}`,
+          description: `${movement.categoryLabel}: ${movement.reason} • Autorizó: ${movement.authorizedBy}`,
+          timeAgo: "Hace un momento",
+          group: "recientes",
+          read: false,
+          category: "caja",
+          actionLabel: "Ver Flujo",
+          actionLink: "/caja",
+        });
+      }
     },
     [branches]
   );

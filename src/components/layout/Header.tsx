@@ -191,10 +191,11 @@ export default function Header() {
                 <Image
                   src="/logo.png"
                   alt="Panadería Brito Logo"
-                  width={36}
-                  height={36}
-                  className="w-full h-full object-contain group-hover:rotate-6 transition-transform duration-300"
+                  width={200}
+                  height={200}
+                  unoptimized
                   priority
+                  className="w-full h-full object-contain group-hover:rotate-6 transition-transform duration-300"
                 />
               </div>
             </div>

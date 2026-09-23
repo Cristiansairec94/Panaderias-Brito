@@ -1,5 +1,6 @@
 import { CustomOrder, OrderItem, OrderPayment, CashIncome } from "@/types";
 import { formatDateTimeSafe } from "@/lib/utils";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
 export const STORAGE_ORDERS_KEY = "brito_custom_orders";
 
@@ -301,6 +302,34 @@ export function saveStoredOrders(orders: CustomOrder[]): void {
   }
 }
 
+// Sincronizar reactivamente pedidos especiales recibidos de otros dispositivos
+if (typeof window !== "undefined" && realtimeHub?.onOrder) {
+  realtimeHub.onOrder(({ action, order }) => {
+    try {
+      if (!order) return;
+      const current = getStoredOrders();
+      if (action === "create") {
+        if (!current.some((o) => o.id === order.id || o.orderNumber === order.orderNumber)) {
+          saveStoredOrders([order, ...current]);
+        }
+      } else if (action === "payment" || action === "status") {
+        const idx = current.findIndex((o) => o.id === order.id || o.orderNumber === order.orderNumber);
+        if (idx !== -1) {
+          current[idx] = order;
+          saveStoredOrders(current);
+        } else {
+          saveStoredOrders([order, ...current]);
+        }
+      } else if (action === "delete") {
+        const filtered = current.filter((o) => o.id !== order.id && o.orderNumber !== order.orderNumber);
+        saveStoredOrders(filtered);
+      }
+    } catch (err) {
+      console.error("[OrdersRealtime] Error actualizando pedidos en memoria:", err);
+    }
+  });
+}
+
 /**
  * Registra un ingreso de dinero en brito_cash_incomes para que impacte en caja
  */
@@ -473,6 +502,31 @@ export function addCustomOrder(data: {
   };
 
   saveStoredOrders([newOrder, ...current]);
+
+  // Transmitir pedido en tiempo real a los celulares y computadoras
+  if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
+    realtimeHub.broadcastOrder("create", newOrder);
+  }
+
+  // Alerta sonora y visual inmediata en celular
+  if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
+    realtimeHub.broadcastNotification({
+      id: `order-create-${newOrder.id}-${Date.now()}`,
+      senderName: `🎂 ${newOrder.branchName}`,
+      senderAvatar: "🎂",
+      badgeIcon: "pastel",
+      title: "Nuevo Pedido Especial",
+      highlightText: `${newOrder.orderNumber}: ${newOrder.customerName}`,
+      description: `Entrega: ${newOrder.deliveryDate} ${newOrder.deliveryTime} • Anticipo: $${newOrder.deposit} MXN (Total: $${newOrder.total} MXN)`,
+      timeAgo: "Hace un momento",
+      group: "recientes",
+      read: false,
+      category: "pedidos",
+      actionLabel: "Ver Pedido",
+      actionLink: "/pedidos",
+    });
+  }
+
   return newOrder;
 }
 
@@ -538,6 +592,31 @@ export function addOrderPayment(
 
   current[idx] = order;
   saveStoredOrders(current);
+
+  // Transmitir abono / liquidación en tiempo real
+  if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
+    realtimeHub.broadcastOrder("payment", order);
+  }
+
+  // Notificación al celular
+  if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
+    realtimeHub.broadcastNotification({
+      id: `order-pay-${order.id}-${Date.now()}`,
+      senderName: `💰 ${order.branchName}`,
+      senderAvatar: isFullLiquidation ? "🎉" : "💵",
+      badgeIcon: "dinero",
+      title: isFullLiquidation ? "Pedido Especial Liquidado" : "Abono a Pedido Especial",
+      highlightText: `${order.orderNumber}: Cobro de $${paymentAmount} MXN`,
+      description: `Cliente: ${order.customerName} • Saldo restante: $${newRemaining} MXN`,
+      timeAgo: "Hace un momento",
+      group: "recientes",
+      read: false,
+      category: "pedidos",
+      actionLabel: "Ver Pedido",
+      actionLink: "/pedidos",
+    });
+  }
+
   return order;
 }
 
@@ -555,6 +634,37 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
   };
 
   saveStoredOrders(current);
+
+  // Transmitir cambio de estado operativo
+  if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
+    realtimeHub.broadcastOrder("status", current[idx]);
+  }
+
+  if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
+    const statusMap: Record<string, string> = {
+      pendiente: "Pendiente ⏳",
+      en_horno: "En Horno 🔥",
+      listo: "Listo para Entrega 🎂",
+      entregado: "Entregado al Cliente ✅",
+      cancelado: "Cancelado ❌",
+    };
+    realtimeHub.broadcastNotification({
+      id: `order-status-${current[idx].id}-${Date.now()}`,
+      senderName: `👨‍🍳 ${current[idx].branchName}`,
+      senderAvatar: "👨‍🍳",
+      badgeIcon: "horno",
+      title: "Estado de Pedido Actualizado",
+      highlightText: `${current[idx].orderNumber}: Ahora está "${statusMap[status] || status}"`,
+      description: `Cliente: ${current[idx].customerName} • Entrega: ${current[idx].deliveryDate} ${current[idx].deliveryTime}`,
+      timeAgo: "Hace un momento",
+      group: "recientes",
+      read: false,
+      category: "pedidos",
+      actionLabel: "Ver Pedido",
+      actionLink: "/pedidos",
+    });
+  }
+
   return current[idx];
 }
 
