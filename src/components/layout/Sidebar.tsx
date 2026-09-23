@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   Store,
   Users,
@@ -27,11 +27,12 @@ import {
   ShieldCheck,
   CalendarClock,
   Smartphone,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 import AnimatedLogo from "@/components/ui/AnimatedLogo";
 import { useSidebar } from "@/context/SidebarContext";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 
 interface NavItemSingle {
@@ -156,7 +157,8 @@ const navigationItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, canAccessRoute } = useAuth();
+  const router = useRouter();
+  const { user, loginAs, logout, canAccessRoute } = useAuth();
   const { currentBranch, isAllBranches, branches } = useBranch();
   const { 
     isCollapsed, 
@@ -168,6 +170,7 @@ export default function Sidebar() {
   } = useSidebar();
 
   const [currentSearch, setCurrentSearch] = useState("");
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -284,26 +287,91 @@ export default function Sidebar() {
             </button>
           </div>
 
-          {/* Mobile User Profile Card (Solo visible en drawer celular) */}
+          {/* Mobile User Profile Card (con selector de perfiles desplegable) */}
           {user && (
-            <div className="md:hidden mx-3 mb-3 p-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] flex items-center justify-center text-sm font-bold text-white shadow-md shadow-orange-500/20 overflow-hidden shrink-0">
-                  {user?.photoUrl || (user?.avatar && (user.avatar.startsWith("data:image") || user.avatar.startsWith("http"))) ? (
-                    <img src={user.photoUrl || user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                  ) : (
-                    user?.avatar || "👨‍🍳"
-                  )}
+            <div className="md:hidden mx-3 mb-3">
+              <button
+                type="button"
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="w-full p-2.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center justify-between transition-all cursor-pointer text-left"
+                title="Toca para cambiar de perfil"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] flex items-center justify-center text-sm font-bold text-white shadow-md shadow-orange-500/20 overflow-hidden shrink-0">
+                    {user?.photoUrl || (user?.avatar && (user.avatar.startsWith("data:image") || user.avatar.startsWith("http"))) ? (
+                      <img src={user.photoUrl || user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      user?.avatar || "👨‍🍳"
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black text-white leading-tight truncate">{user.name}</p>
+                    <p className="text-[10px] text-orange-400 font-bold tracking-wide truncate">{user.roleLabel}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-black text-white leading-tight truncate">{user.name}</p>
-                  <p className="text-[10px] text-orange-400 font-bold tracking-wide truncate">{user.roleLabel}</p>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[9px] font-bold text-stone-400 bg-white/[0.06] px-2 py-0.5 rounded-full border border-white/[0.06]">
+                    Cambiar
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-stone-400 transition-transform duration-200 ${showUserDropdown ? "rotate-180 text-orange-400" : ""}`} />
                 </div>
-              </div>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Activo
-              </span>
+              </button>
+
+              {/* Menú Desplegable de Perfiles en Móvil */}
+              {showUserDropdown && (
+                <div className="mt-2 p-2 rounded-2xl bg-[#13151f] border border-white/[0.1] shadow-2xl space-y-1 animate-in fade-in zoom-in-95">
+                  <p className="text-[9px] font-extrabold text-stone-400 uppercase tracking-wider px-2 py-1">
+                    Cambiar de Perfil (Demo):
+                  </p>
+                  {DEMO_USERS.map((demo) => (
+                    <button
+                      key={demo.id}
+                      type="button"
+                      onClick={() => {
+                        loginAs(demo);
+                        setShowUserDropdown(false);
+                        setMobileOpen(false);
+                        if (typeof window !== "undefined") {
+                          sessionStorage.setItem("brito_session_active", "true");
+                        }
+                        router.push("/");
+                      }}
+                      className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between font-semibold transition-all cursor-pointer ${
+                        user.id === demo.id
+                          ? "bg-gradient-to-r from-orange-500/20 to-rose-500/20 text-orange-300 font-bold border border-orange-500/30"
+                          : "text-stone-300 hover:bg-white/[0.06]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{demo.avatar}</span>
+                        <div>
+                          <p className="font-bold leading-tight text-white">{demo.name}</p>
+                          <p className="text-[10px] text-stone-400">{demo.roleLabel}</p>
+                        </div>
+                      </div>
+                      {user.id === demo.id && <UserCheck className="w-3.5 h-3.5 text-orange-400 shrink-0" />}
+                    </button>
+                  ))}
+
+                  <div className="pt-1.5 mt-1 border-t border-white/[0.08]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        logout();
+                        setShowUserDropdown(false);
+                        setMobileOpen(false);
+                        if (typeof window !== "undefined") {
+                          sessionStorage.removeItem("brito_session_active");
+                        }
+                        router.push("/");
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
