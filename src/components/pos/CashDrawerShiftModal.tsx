@@ -553,7 +553,7 @@ export default function CashDrawerShiftModal({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/90 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[94vh] border-2 border-amber-900/30">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-5xl lg:max-w-6xl w-full overflow-hidden flex flex-col max-h-[94vh] border-2 border-amber-900/30">
         
         {/* Cabecera Principal con Pestañas de Navegación */}
         <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-4 sm:p-5 px-5 sm:px-7 border-b border-amber-900/50 shadow-md">
@@ -1138,19 +1138,19 @@ export default function CashDrawerShiftModal({
                           <div
                             key={cut.id}
                             onClick={() => setSelectedHistoryTicket(cut)}
-                            className="bg-white hover:bg-amber-50/60 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-stone-200 hover:border-amber-400 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 group"
+                            className="bg-white hover:bg-amber-50/60 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border-2 border-stone-200 hover:border-amber-400 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4 group"
                           >
                             {/* 1. Folio y Fechas */}
-                            <div className="flex items-start sm:items-center gap-3 min-w-[210px]">
-                              <div className="w-11 h-11 rounded-2xl bg-amber-100/90 border border-amber-300 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-11 h-11 rounded-2xl bg-amber-100/90 border border-amber-300 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
                                 🧾
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-mono font-black text-xs sm:text-sm text-stone-950 bg-stone-100 group-hover:bg-amber-200 px-2 py-0.5 rounded-lg transition-colors">
+                                  <span className="font-mono font-black text-xs sm:text-sm text-stone-950 bg-stone-100 group-hover:bg-amber-200 px-2.5 py-0.5 rounded-lg transition-colors whitespace-nowrap">
                                     {cut.id}
                                   </span>
-                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide border md:hidden ${
+                                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide border lg:hidden whitespace-nowrap ${
                                     isSquare
                                       ? "bg-emerald-100 text-emerald-900 border-emerald-300"
                                       : isPositive
@@ -1161,42 +1161,54 @@ export default function CashDrawerShiftModal({
                                   </span>
                                 </div>
                                 <p className="text-xs text-stone-600 font-bold mt-1 flex items-center gap-1.5 flex-wrap">
-                                  <span>📅 {cut.date}</span>
+                                  <span className="whitespace-nowrap">📅 {cut.date}</span>
                                   <span className="text-stone-300">•</span>
-                                  <span className="text-stone-500 font-medium">🕒 {cut.shiftRange}</span>
+                                  <span className="text-stone-500 font-medium whitespace-nowrap">🕒 {cut.shiftRange}</span>
                                 </p>
                               </div>
                             </div>
 
                             {/* 2. Cifras Clave (Entregado, Ventas, Gastos) */}
-                            <div className="grid grid-cols-3 gap-2 sm:gap-3 flex-1 max-w-md bg-stone-50/90 group-hover:bg-white p-2.5 sm:px-3 rounded-2xl border border-stone-200 transition-colors text-center">
-                              <div>
-                                <span className="text-[10px] text-stone-500 font-bold block uppercase tracking-wider">Entregado</span>
-                                <span className="text-xs sm:text-sm font-black text-amber-950">{formatCurrency(cut.countedCash)}</span>
+                            <div className="grid grid-cols-3 divide-x divide-stone-200 bg-stone-50/90 group-hover:bg-white py-2 px-2 sm:px-3 rounded-2xl border border-stone-200 transition-colors shrink-0 w-full lg:w-auto min-w-[310px] sm:min-w-[350px] shadow-2xs">
+                              <div className="text-center px-1.5 sm:px-3">
+                                <span className="text-[10px] text-stone-500 font-extrabold uppercase tracking-wider block whitespace-nowrap">
+                                  Entregado
+                                </span>
+                                <span className="text-xs sm:text-sm font-black text-amber-950 font-mono block mt-0.5 whitespace-nowrap">
+                                  {formatCurrency(cut.countedCash)}
+                                </span>
                               </div>
-                              <div>
-                                <span className="text-[10px] text-emerald-700 font-bold block uppercase tracking-wider">Ventas</span>
-                                <span className="text-xs sm:text-sm font-black text-emerald-700">+{formatCurrency(totalSalesValue)}</span>
+                              <div className="text-center px-1.5 sm:px-3">
+                                <span className="text-[10px] text-emerald-700 font-extrabold uppercase tracking-wider block whitespace-nowrap">
+                                  Ventas
+                                </span>
+                                <span className="text-xs sm:text-sm font-black text-emerald-700 font-mono block mt-0.5 whitespace-nowrap">
+                                  +{formatCurrency(totalSalesValue)}
+                                </span>
                               </div>
-                              <div>
-                                <span className="text-[10px] text-rose-700 font-bold block uppercase tracking-wider">Gastos</span>
-                                <span className="text-xs sm:text-sm font-black text-rose-700">-{formatCurrency(cut.totalExpenses)}</span>
+                              <div className="text-center px-1.5 sm:px-3">
+                                <span className="text-[10px] text-rose-700 font-extrabold uppercase tracking-wider block whitespace-nowrap">
+                                  Gastos
+                                </span>
+                                <span className="text-xs sm:text-sm font-black text-rose-700 font-mono block mt-0.5 whitespace-nowrap">
+                                  -{formatCurrency(cut.totalExpenses)}
+                                </span>
                               </div>
                             </div>
 
                             {/* 3. Estado & Botón de Acción */}
-                            <div className="flex items-center justify-between md:justify-end gap-3 shrink-0">
-                              <span className={`hidden md:inline-flex px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wide border ${
+                            <div className="flex items-center justify-between lg:justify-end gap-2.5 sm:gap-3 shrink-0">
+                              <span className={`hidden lg:inline-flex px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wide border shadow-2xs whitespace-nowrap ${
                                 isSquare
-                                  ? "bg-emerald-100 text-emerald-900 border-emerald-300 shadow-2xs"
+                                  ? "bg-emerald-100 text-emerald-900 border-emerald-300"
                                   : isPositive
-                                  ? "bg-blue-100 text-blue-900 border-blue-300 shadow-2xs"
-                                  : "bg-rose-100 text-rose-900 border-rose-300 shadow-2xs"
+                                  ? "bg-blue-100 text-blue-900 border-blue-300"
+                                  : "bg-rose-100 text-rose-900 border-rose-300"
                               }`}>
                                 {isSquare ? "✓ Cuadrado" : isPositive ? `Sobrante +${formatCurrency(cut.difference)}` : `Faltante ${formatCurrency(cut.difference)}`}
                               </span>
 
-                              <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-950 text-amber-200 group-hover:bg-amber-900 group-hover:text-white font-black text-xs transition-all shadow-xs shrink-0">
+                              <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-950 text-amber-200 group-hover:bg-amber-900 group-hover:text-white font-black text-xs transition-all shadow-xs shrink-0 whitespace-nowrap">
                                 <Eye className="w-3.5 h-3.5" />
                                 <span>Ver Ticket ➔</span>
                               </div>
