@@ -1604,98 +1604,68 @@ export default function ExpensesModal({
           </div>
         </div>
 
-        {/* Live Cash Balances Bar - 5 Cuentas Base de Caja con leyenda Ver Historial */}
+        {/* Live Cash Balances Bar - 5 Cuentas Base de Caja */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 p-3 sm:p-4 bg-stone-50 border-b border-stone-200 text-center">
           
-          {/* 1. Fondo Inicial (Representa con cuánto dinero se inició la caja) */}
-          <button
-            type="button"
-            onClick={() => setActiveDetailModal("fondo")}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between bg-blue-50/70 border-blue-200/90 hover:bg-blue-100/70 hover:border-blue-400 shadow-2xs active:scale-98"
-            title="Abrir información detallada del Fondo Inicial"
+          {/* 1. Fondo Inicial */}
+          <div
+            className="p-2.5 sm:p-3 rounded-2xl border-2 text-center flex flex-col justify-center bg-blue-50/70 border-blue-200/90 shadow-2xs"
           >
             <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-blue-950 block leading-tight tracking-wide">
               🪙 Fondo Inicial
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-blue-800 block my-1 tracking-tight truncate">
+            <span className="text-base sm:text-lg md:text-xl font-black text-blue-800 block my-1 tracking-tight">
               +{formatCurrency(currentFund)}
             </span>
-            <span className="text-[11px] sm:text-xs font-black text-blue-700 block mt-0.5 opacity-90 group-hover:underline">
-              🧾 Ver Historial
-            </span>
-          </button>
+          </div>
 
           {/* 2. Ventas Efectivo */}
-          <button
-            type="button"
-            onClick={() => setActiveDetailModal("ventas")}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between bg-emerald-50/70 border-emerald-200/90 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs active:scale-98"
-            title="Abrir información detallada de Ventas en Efectivo"
+          <div
+            className="p-2.5 sm:p-3 rounded-2xl border-2 text-center flex flex-col justify-center bg-emerald-50/70 border-emerald-200/90 shadow-2xs"
           >
             <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-emerald-950 block leading-tight tracking-wide">
               Ventas Efectivo
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-emerald-700 block my-1 tracking-tight truncate">
+            <span className="text-base sm:text-lg md:text-xl font-black text-emerald-700 block my-1 tracking-tight">
               +{formatCurrency(totalShiftCashSales)}
             </span>
-            <span className="text-[11px] sm:text-xs font-black text-emerald-700 block mt-0.5 opacity-90 group-hover:underline">
-              🧾 Ver Historial
-            </span>
-          </button>
+          </div>
 
           {/* 3. Entradas / Cambio */}
-          <button
-            type="button"
-            onClick={() => setActiveDetailModal("entradas")}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between bg-teal-50/70 border-teal-200/90 hover:bg-teal-100/70 hover:border-teal-400 shadow-2xs active:scale-98"
-            title="Abrir información detallada de Entradas y Cambio"
+          <div
+            className="p-2.5 sm:p-3 rounded-2xl border-2 text-center flex flex-col justify-center bg-teal-50/70 border-teal-200/90 shadow-2xs"
           >
             <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-teal-950 block leading-tight tracking-wide">
               Entradas / Cambio
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-teal-700 block my-1 tracking-tight truncate">
+            <span className="text-base sm:text-lg md:text-xl font-black text-teal-700 block my-1 tracking-tight">
               +{formatCurrency(totalIncomesInCash)}
             </span>
-            <span className="text-[11px] sm:text-xs font-black text-teal-700 block mt-0.5 opacity-90 group-hover:underline">
-              🧾 Ver Historial
-            </span>
-          </button>
+          </div>
 
           {/* 4. Gastos / Retiros */}
-          <button
-            type="button"
-            onClick={() => setActiveDetailModal("gastos")}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between bg-rose-50/70 border-rose-200/90 hover:bg-rose-100/70 hover:border-rose-400 shadow-2xs active:scale-98"
-            title="Abrir información detallada de Gastos y Retiros"
+          <div
+            className="p-2.5 sm:p-3 rounded-2xl border-2 text-center flex flex-col justify-center bg-rose-50/70 border-rose-200/90 shadow-2xs"
           >
             <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-rose-950 block leading-tight tracking-wide">
               Gastos / Retiros
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-rose-700 block my-1 tracking-tight truncate">
+            <span className="text-base sm:text-lg md:text-xl font-black text-rose-700 block my-1 tracking-tight">
               -{formatCurrency(totalExpenses)}
             </span>
-            <span className="text-[11px] sm:text-xs font-black text-rose-700 block mt-0.5 opacity-90 group-hover:underline">
-              🧾 Ver Historial
-            </span>
-          </button>
+          </div>
 
           {/* 5. En Cajón Ahora */}
-          <button
-            type="button"
-            onClick={() => setActiveDetailModal("balance")}
-            className="col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between bg-amber-50/80 border-amber-300 hover:bg-amber-100/70 hover:border-amber-400 shadow-2xs active:scale-98"
-            title="Abrir balance contable del dinero que debe haber en caja"
+          <div
+            className="col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border-2 text-center flex flex-col justify-center bg-amber-50/80 border-amber-300 shadow-2xs"
           >
             <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-amber-950 block leading-tight tracking-wide">
               En Caja (Balance)
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-stone-950 block my-1 tracking-tight truncate">
+            <span className="text-base sm:text-lg md:text-xl font-black text-stone-950 block my-1 tracking-tight">
               {formatCurrency(netCashInDrawer)}
             </span>
-            <span className="text-[11px] sm:text-xs font-black text-amber-900 block mt-0.5 opacity-90 group-hover:underline">
-              🧾 Ver Historial
-            </span>
-          </button>
+          </div>
         </div>
 
         {/* 2 Tabs Principales de Operación */}
