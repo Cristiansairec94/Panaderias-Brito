@@ -191,7 +191,7 @@ const CUENTAS_ORIGEN = [
   { id: "banco_santander", name: "Santander Negocio Brito", tipo: "BANCO" },
 ];
 
-const QUICK_AMOUNTS = [1, 5, 10, 20, 50, 100, 200, 500];
+const QUICK_AMOUNTS = [50, 100, 200, 500, 1000];
 
 // ─── Datos Demo Iniciales Multicurcursal ────────────────────────────────────
 const INITIAL_GASTOS: ExpenseRecord[] = [
@@ -1509,13 +1509,13 @@ export default function GastosPage() {
                 </div>
 
                 {/* Botones rápidos de monto */}
-                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-1">
+                <div className="grid grid-cols-5 gap-1.5 sm:gap-2 pt-1">
                   {QUICK_AMOUNTS.map((amt) => (
                     <button
                       key={amt}
                       type="button"
                       onClick={() => setForm({ ...form, amount: amt.toString() })}
-                      className="py-1.5 bg-stone-100 hover:bg-rose-600 hover:text-white text-stone-800 font-extrabold text-xs rounded-xl border border-stone-200 transition-all active:scale-95"
+                      className="py-2 bg-stone-100 hover:bg-rose-600 hover:text-white text-stone-800 font-extrabold text-xs sm:text-sm rounded-xl border border-stone-200 transition-all active:scale-95"
                     >
                       ${amt}
                     </button>
