@@ -43,6 +43,7 @@ import {
   saveStoredIncomes, 
   syncMissingSalesToIncomes, 
   recordCashIncome, 
+  cleanDuplicateIncomes,
   INITIAL_INCOMES 
 } from "@/lib/incomes";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
@@ -280,6 +281,13 @@ export default function IngresosPage() {
     setIsReceiptModalOpen(true);
   };
 
+  const handlePurgeDuplicates = () => {
+    const raw = getStoredIncomes();
+    const cleaned = cleanDuplicateIncomes(raw);
+    saveStoredIncomes(cleaned);
+    setIncomes(cleaned);
+  };
+
   const handleExportCSV = () => {
     const headers = "Folio,Fecha,Categoria,Concepto,Cliente,Pedido,Metodo,Monto,Cajero,Sucursal\n";
     const rows = filteredIncomes
@@ -336,6 +344,13 @@ export default function IngresosPage() {
           >
             <Wallet className="w-4 h-4 text-emerald-600" /> Ver Caja
           </Link>
+          <button
+            onClick={handlePurgeDuplicates}
+            className="flex items-center gap-1.5 bg-white hover:bg-stone-50 text-stone-700 font-bold px-3 py-2.5 rounded-xl border border-stone-200 shadow-sm text-xs transition-all active:scale-95"
+            title="Limpiar cualquier registro repetido para conservar únicamente 1 por compra"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-emerald-600" /> Depurar Duplicados
+          </button>
           <button
             onClick={handleExportCSV}
             className="flex items-center gap-1.5 bg-white hover:bg-stone-50 text-stone-700 font-bold px-3.5 py-2.5 rounded-xl border border-stone-200 shadow-sm text-xs transition-all"

@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { Branch, BranchShift, BranchCashMovement } from "@/types";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
-import { recordPosSaleIncome } from "@/lib/incomes";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 
 export interface SimulatedSale {
@@ -561,20 +560,6 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
 
-      // Registrar ingreso automático en Historial de Ingresos sin límite
-      try {
-        recordPosSaleIncome({
-          saleId: saleLog.id,
-          total: amount,
-          paymentMethod,
-          itemsSummary: saleLog.itemsSummary,
-          cashier: saleLog.cashier,
-          branchId,
-          branchName: targetBranch?.name || saleLog.branchName,
-          date: `Hoy, ${timeStr}`,
-        });
-      } catch {}
-
       // Transmisión en tiempo real por WebSocket a celulares y computadoras
       if (realtimeHub.broadcastSale) {
         realtimeHub.broadcastSale({
@@ -713,20 +698,6 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       }
       return next;
     });
-
-    // Registrar ingreso automático en Historial de Ingresos sin límite
-    try {
-      recordPosSaleIncome({
-        saleId: newSale.id,
-        total: newSale.total,
-        paymentMethod: newSale.paymentMethod,
-        itemsSummary: newSale.itemsSummary,
-        cashier: newSale.cashier,
-        branchId: branch.id,
-        branchName: branch.name,
-        date: `Hoy, ${timeStr}`,
-      });
-    } catch {}
 
     // Transmitir en tiempo real
     if (realtimeHub.broadcastSale) {
