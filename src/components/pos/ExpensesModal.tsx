@@ -55,7 +55,6 @@ import { useSync } from "@/context/SyncContext";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { getStoredOrders } from "@/lib/orders";
 import { getStoredIncomes } from "@/lib/incomes";
-import { createInitialShiftSale } from "@/lib/products";
 
 interface DayGroup {
   dayKey: string;
@@ -254,10 +253,17 @@ function getStoredSalesWithFallback(propSales?: Sale[]): Sale[] {
   if (typeof window === "undefined") return propSales || [];
   const map = new Map<string, Sale>();
 
+  const isDummySale = (s: any) =>
+    s?.total === 74 &&
+    s?.cashGiven === 100 &&
+    s?.change === 26 &&
+    s?.items?.length === 3 &&
+    s?.customerType === "frecuente";
+
   // 1. Ventas activas en memoria pasadas por props (items completos y frescos)
   if (Array.isArray(propSales)) {
     propSales.forEach((s) => {
-      if (s && s.id) map.set(s.id, s);
+      if (s && s.id && !isDummySale(s)) map.set(s.id, s);
     });
   }
 
@@ -268,25 +274,11 @@ function getStoredSalesWithFallback(propSales?: Sale[]): Sale[] {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         parsed.forEach((s) => {
-          if (s && s.id && !map.has(s.id)) map.set(s.id, s);
+          if (s && s.id && !isDummySale(s) && !map.has(s.id)) map.set(s.id, s);
         });
       }
     }
   } catch (e) {}
-
-  // Si no hay ventas en memoria ni en el turno actual, asegurar la primera venta del turno
-  if (map.size === 0) {
-    const firstSale = createInitialShiftSale();
-    map.set(firstSale.id, firstSale);
-    try {
-      localStorage.setItem("brito_pos_current_sales", JSON.stringify([firstSale]));
-      const rawMaster = localStorage.getItem("brito_pos_master_sales");
-      const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
-      if (!prevMaster.some((s) => s.id === firstSale.id)) {
-        localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
-      }
-    } catch (e) {}
-  }
 
   // 3. Ventas del historial maestro de POS (persiste entre turnos y cortes)
   try {
@@ -295,7 +287,7 @@ function getStoredSalesWithFallback(propSales?: Sale[]): Sale[] {
       const parsed = JSON.parse(rawMaster);
       if (Array.isArray(parsed)) {
         parsed.forEach((s) => {
-          if (s && s.id && !map.has(s.id)) map.set(s.id, s);
+          if (s && s.id && !isDummySale(s) && !map.has(s.id)) map.set(s.id, s);
         });
       }
     }
@@ -547,36 +539,6 @@ export default function ExpensesModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [lastSubmittedText, setLastSubmittedText] = useState("");
-
-  const handleQuickRegisterFirstSale = () => {
-    const firstSale = createInitialShiftSale(cashierName);
-    try {
-      const rawCurrent = localStorage.getItem("brito_pos_current_sales");
-      const prevCurrent: Sale[] = rawCurrent ? JSON.parse(rawCurrent) : [];
-      const updated = [firstSale, ...prevCurrent.filter((s) => s.id !== firstSale.id)];
-      localStorage.setItem("brito_pos_current_sales", JSON.stringify(updated));
-      const rawMaster = localStorage.getItem("brito_pos_master_sales");
-      const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
-      if (!prevMaster.some((s) => s.id === firstSale.id)) {
-        localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
-      }
-      window.dispatchEvent(new Event("brito_sales_updated"));
-    } catch (e) {}
-
-    setInternalSales((prev) => [firstSale, ...prev.filter((s) => s.id !== firstSale.id)]);
-
-    addNotification({
-      senderName: `Venta Mostrador (${cashierName})`,
-      senderAvatar: "🥖",
-      badgeIcon: "dinero",
-      title: `Primera Venta Registrada: ${formatCurrency(firstSale.total)}`,
-      highlightText: "Mostrador iniciado con venta en efectivo",
-      description: `Se registró la primera venta del turno (${firstSale.items.map((i) => `${i.quantity}x ${i.product.name}`).join(", ")}) por ${formatCurrency(firstSale.total)} en efectivo.`,
-      category: "caja",
-      actionLabel: "Ver Caja",
-      actionLink: "/caja",
-    });
-  };
 
   if (!isOpen) return null;
 
@@ -1970,17 +1932,6 @@ export default function ExpensesModal({
                         ? `Aquí se concentran todas las ventas y pedidos de los turnos de ${cashierName} organizados día por día.`
                         : "Cada venta de mostrador o pedido especial completado aparecerá aquí automáticamente con folio, desglose y ticket imprimible."}
                     </p>
-                    {ticketScopeFilter === "turno" && (
-                      <div className="pt-2">
-                        <button
-                          type="button"
-                          onClick={handleQuickRegisterFirstSale}
-                          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-2 active:scale-95"
-                        >
-                          <span>⚡ Registrar Primera Venta del Turno ($74.00 MXN en Efectivo)</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 ) : ticketScopeFilter === "por_dia" ? (
                   /* VISTA AGRUPADA POR DÍA (HISTORIAL DIARIO DEL QUE OPERA) */
@@ -2665,15 +2616,6 @@ export default function ExpensesModal({
                           <p className="text-xs text-stone-500 max-w-sm mx-auto">
                             Al comenzar un nuevo turno, el contador inicia en $0.00. Conforme realices ventas de pan en mostrador se listarán automáticamente aquí con folio y desglose.
                           </p>
-                          <div className="pt-2">
-                            <button
-                              type="button"
-                              onClick={handleQuickRegisterFirstSale}
-                              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-2 active:scale-95"
-                            >
-                              <span>⚡ Registrar Primera Venta ($74.00 MXN en Efectivo)</span>
-                            </button>
-                          </div>
                         </div>
                       ) : (
                         <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">

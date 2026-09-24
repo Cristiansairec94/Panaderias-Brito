@@ -52,7 +52,7 @@ import {
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, createInitialShiftSale } from "@/lib/products";
+import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
 import { 
   DEFAULT_GENERAL_CUSTOMER, 
   getStoredCustomers, 
@@ -532,25 +532,27 @@ export default function POSPage() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            if (!localStorage.getItem("brito_pos_master_sales")) {
-              localStorage.setItem("brito_pos_master_sales", JSON.stringify(parsed));
+            // Filtrar cualquier venta ficticia previa generada automáticamente
+            const realSales = parsed.filter(
+              (s: any) =>
+                !(
+                  s?.total === 74 &&
+                  s?.cashGiven === 100 &&
+                  s?.change === 26 &&
+                  s?.items?.length === 3 &&
+                  s?.customerType === "frecuente"
+                )
+            );
+            if (realSales.length !== parsed.length) {
+              localStorage.setItem("brito_pos_current_sales", JSON.stringify(realSales));
             }
-            return parsed;
+            if (!localStorage.getItem("brito_pos_master_sales")) {
+              localStorage.setItem("brito_pos_master_sales", JSON.stringify(realSales));
+            }
+            return realSales;
           }
         }
       } catch (e) {}
-
-      // Si el turno está recién abierto o no tiene ventas, registrar y asegurar la primera venta del turno
-      const firstSale = createInitialShiftSale();
-      try {
-        localStorage.setItem("brito_pos_current_sales", JSON.stringify([firstSale]));
-        const rawMaster = localStorage.getItem("brito_pos_master_sales");
-        const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
-        if (!prevMaster.some((s) => s.id === firstSale.id)) {
-          localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
-        }
-      } catch (e) {}
-      return [firstSale];
     }
     return [];
   });
@@ -812,22 +814,16 @@ export default function POSPage() {
 
   const handleDirectUnlockShift = () => {
     setInitialCashFund(baseShiftFund);
-    const firstSale = createInitialShiftSale(cashierName);
-    setRecentSalesList([firstSale]);
+    setRecentSalesList([]);
     setExpensesList([]);
     setIncomesList([]);
     try {
       localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
       localStorage.removeItem("brito_pos_shift_locked");
-      localStorage.setItem("brito_pos_current_sales", JSON.stringify([firstSale]));
-      const rawMaster = localStorage.getItem("brito_pos_master_sales");
-      const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
-      if (!prevMaster.some((s) => s.id === firstSale.id)) {
-        localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
-      }
+      localStorage.removeItem("brito_pos_current_sales");
       localStorage.removeItem("brito_pos_current_expenses");
       localStorage.removeItem("brito_pos_current_incomes");
-      localStorage.setItem("brito_current_shift_start_timestamp", (Number(firstSale.timestamp) - 1000).toString());
+      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
       localStorage.setItem("brito_current_shift_cashier", cashierName);
       localStorage.setItem("brito_current_shift_name", shiftName);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
@@ -841,6 +837,47 @@ export default function POSPage() {
       const locked = localStorage.getItem("brito_pos_shift_locked");
       if (locked === "true") {
         setIsShiftLocked(true);
+      }
+
+      // Limpiar automáticamente cualquier venta de prueba ficticia previa de $74
+      const rawCurrent = localStorage.getItem("brito_pos_current_sales");
+      if (rawCurrent) {
+        const parsed = JSON.parse(rawCurrent);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(
+            (s: any) =>
+              !(
+                s?.total === 74 &&
+                s?.cashGiven === 100 &&
+                s?.change === 26 &&
+                s?.items?.length === 3 &&
+                s?.customerType === "frecuente"
+              )
+          );
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem("brito_pos_current_sales", JSON.stringify(cleaned));
+            setRecentSalesList(cleaned);
+          }
+        }
+      }
+      const rawMaster = localStorage.getItem("brito_pos_master_sales");
+      if (rawMaster) {
+        const parsedMaster = JSON.parse(rawMaster);
+        if (Array.isArray(parsedMaster)) {
+          const cleanedMaster = parsedMaster.filter(
+            (s: any) =>
+              !(
+                s?.total === 74 &&
+                s?.cashGiven === 100 &&
+                s?.change === 26 &&
+                s?.items?.length === 3 &&
+                s?.customerType === "frecuente"
+              )
+          );
+          if (cleanedMaster.length !== parsedMaster.length) {
+            localStorage.setItem("brito_pos_master_sales", JSON.stringify(cleanedMaster));
+          }
+        }
       }
     } catch (e) {}
   }, []);
@@ -1450,10 +1487,11 @@ export default function POSPage() {
     try {
       return (expensesList || []).filter((e) => {
         if (!e) return false;
-        if (!e.cashier || !matchesCashier(e.cashier, cashierName)) return false;
+        const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
+        if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary) return false;
+          if (!t || t < (shiftStartBoundary - 10000)) return false;
         }
         return true;
       });
@@ -1467,10 +1505,11 @@ export default function POSPage() {
     try {
       return (incomesList || []).filter((inc) => {
         if (!inc) return false;
-        if (!inc.cashier || !matchesCashier(inc.cashier, cashierName)) return false;
+        const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
+        if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary) return false;
+          if (!t || t < (shiftStartBoundary - 10000)) return false;
         }
         return true;
       });
@@ -1498,9 +1537,16 @@ export default function POSPage() {
     }
   }, [activeBranch?.id, cashierName, shiftStartBoundary, shiftVersion]);
 
-  const totalCashSales = (currentShiftSales || [])
-    .filter((s) => s && s.paymentMethod === "efectivo")
-    .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
+  const totalCashSales = useMemo(() => {
+    const posCash = (currentShiftSales || [])
+      .filter((s) => s && s.paymentMethod === "efectivo")
+      .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
+    const ordersCash = (currentShiftOrders || [])
+      .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id))
+      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+    return posCash + ordersCash;
+  }, [currentShiftSales, currentShiftOrders]);
+
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])
     .filter((i) => i && i.paymentMethod === "efectivo")
@@ -1517,7 +1563,14 @@ export default function POSPage() {
   };
 
   const handleAddExpense = (newExpense: CashExpense) => {
-    setExpensesList((prev) => [newExpense, ...prev]);
+    setExpensesList((prev) => {
+      const updated = [newExpense, ...prev];
+      try {
+        localStorage.setItem("brito_pos_current_expenses", JSON.stringify(updated));
+        window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      } catch (e) {}
+      return updated;
+    });
   };
 
   const handleAddIncome = (newIncome: CashIncome) => {
@@ -1528,6 +1581,7 @@ export default function POSPage() {
         const allRaw = localStorage.getItem("brito_cash_incomes");
         const allIncomes = allRaw ? JSON.parse(allRaw) : [];
         localStorage.setItem("brito_cash_incomes", JSON.stringify([newIncome, ...allIncomes]));
+        window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       } catch (e) {}
       return updated;
     });
