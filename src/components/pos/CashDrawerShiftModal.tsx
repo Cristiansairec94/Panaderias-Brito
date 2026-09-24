@@ -50,6 +50,7 @@ interface CashDrawerShiftModalProps {
   products: Product[];
   onCompleteShiftCut?: () => void;
   initialTab?: "cuentas" | "cambio" | "corte" | "historial";
+  lastCutTimestamp?: number;
 }
 
 const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [
@@ -118,6 +119,7 @@ export default function CashDrawerShiftModal({
   products,
   onCompleteShiftCut,
   initialTab = "cambio",
+  lastCutTimestamp,
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
 
@@ -220,34 +222,44 @@ export default function CashDrawerShiftModal({
 
   if (!isOpen) return null;
 
-  // 1. Cálculos de Ventas del Turno (filtradas por cajera para sincronización total con Movimientos de Caja)
+  // Límite temporal estricto del turno actual (timestamp en ms)
+  const shiftStartBoundary = lastCutTimestamp || getStoredShiftStartBoundary();
+
+  // 1. Cálculos de Ventas del Turno (filtradas estrictamente por cajera y horario del turno actual)
   const shiftSales = sales.filter((s) => {
-    if (!s.cashier) return true;
-    const cName = outgoingCashier.toLowerCase().trim();
-    const sCashier = s.cashier.toLowerCase().trim();
-    return sCashier === cName || cName.includes(sCashier) || sCashier.includes(cName);
+    if (!s.cashier || !matchesCashier(s.cashier, outgoingCashier)) return false;
+    const sTime = typeof s.timestamp === "number" 
+      ? s.timestamp 
+      : s.timestamp 
+      ? new Date(s.timestamp).getTime() 
+      : s.createdAt 
+      ? new Date(s.createdAt).getTime() 
+      : 0;
+    if (shiftStartBoundary > 0 && sTime > 0 && sTime < shiftStartBoundary) return false;
+    return true;
   });
-  const effectiveSales = shiftSales.length > 0 ? shiftSales : sales;
+  // No mezclar ventas entre turnos: si el turno empieza, inicia estrictamente en 0
+  const effectiveSales = shiftSales;
 
   const cashSales = effectiveSales.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
   const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
   const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
   const totalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0) || (cashSales + cardSales + transferSales) || 0;
 
-  // 2. Cálculos de Gastos y Entradas del Turno (filtrados por cajera para sincronización total con Movimientos de Caja)
+  // 2. Cálculos de Gastos y Entradas del Turno (filtrados estrictamente por cajera y horario del turno actual)
   const shiftExpenses = expenses.filter((e) => {
-    if (!e.cashier) return true;
-    const cName = outgoingCashier.toLowerCase().trim();
-    const expCashier = e.cashier.toLowerCase().trim();
-    return expCashier === cName || cName.includes(expCashier) || expCashier.includes(cName);
+    if (!e.cashier || !matchesCashier(e.cashier, outgoingCashier)) return false;
+    const expTime = typeof e.timestamp === "number" ? e.timestamp : (e.createdAt ? new Date(e.createdAt).getTime() : 0);
+    if (shiftStartBoundary > 0 && expTime > 0 && expTime < shiftStartBoundary) return false;
+    return true;
   });
   const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   const shiftIncomes = incomes.filter((inc) => {
-    if (!inc.cashier) return true;
-    const cName = outgoingCashier.toLowerCase().trim();
-    const incCashier = inc.cashier.toLowerCase().trim();
-    return incCashier === cName || cName.includes(incCashier) || incCashier.includes(cName);
+    if (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier)) return false;
+    const incTime = typeof inc.timestamp === "number" ? inc.timestamp : (inc.date ? new Date(inc.date).getTime() : 0);
+    if (shiftStartBoundary > 0 && incTime > 0 && incTime < shiftStartBoundary) return false;
+    return true;
   });
   const totalIncomesInCash = shiftIncomes
     .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
