@@ -31,8 +31,9 @@ import {
   ArrowLeft,
   FileText
 } from "lucide-react";
-import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord } from "@/types";
+import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
+import { getStoredOrders } from "@/lib/orders";
 import { useNotifications } from "@/context/NotificationContext";
 
 interface CashDrawerShiftModalProps {
@@ -51,6 +52,8 @@ interface CashDrawerShiftModalProps {
   onCompleteShiftCut?: () => void;
   initialTab?: "cuentas" | "cambio" | "corte" | "historial";
   lastCutTimestamp?: number;
+  orders?: CustomOrder[];
+  cashSalesTotal?: number;
 }
 
 const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [
@@ -120,8 +123,47 @@ export default function CashDrawerShiftModal({
   onCompleteShiftCut,
   initialTab = "cambio",
   lastCutTimestamp,
+  orders,
+  cashSalesTotal,
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
+
+  // Fondo Inicial Sincronizado en tiempo real
+  const [syncedFund, setSyncedFund] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("brito_pos_initial_fund");
+      if (saved !== null && !isNaN(Number(saved))) return Number(saved);
+    }
+    return initialFund || 0;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("brito_pos_initial_fund");
+      if (saved !== null && !isNaN(Number(saved))) {
+        setSyncedFund(Number(saved));
+        return;
+      }
+    }
+    setSyncedFund(initialFund || 0);
+  }, [initialFund, isOpen]);
+
+  useEffect(() => {
+    const handleSync = () => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("brito_pos_initial_fund");
+        if (saved !== null && !isNaN(Number(saved))) {
+          setSyncedFund(Number(saved));
+        }
+      }
+    };
+    window.addEventListener("brito_shift_cuts_updated", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("brito_shift_cuts_updated", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, []);
 
   // Navigation mode: "cut" (Cierre actual) or "history" (Historial de tickets)
   const [modalView, setModalView] = useState<"cut" | "history">(
@@ -242,36 +284,51 @@ export default function CashDrawerShiftModal({
   // Si shiftSales tiene registros se usan; si quedó en 0 por desfase pero existen ventas en sales, se usan sales
   const effectiveSales = shiftSales.length > 0 ? shiftSales : sales;
 
-  const cashSales = effectiveSales.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
+  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
+  const shiftOrders = (orders && orders.length > 0 ? orders : getStoredOrders()).filter((o) => {
+    if (!o) return false;
+    const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin");
+    if (!isOwnerOrAdmin && (!o.cashier || !matchesCashier(o.cashier, outgoingCashier))) return false;
+    const oTime = parseDateTimeSafe(o.createdAt || (o as any).date || o.deliveryDate);
+    if (shiftStartBoundary > 0 && oTime && oTime < (shiftStartBoundary - 10000)) return false;
+    return true;
+  });
+
+  const ordersCash = shiftOrders
+    .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
+    .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+
+  const posCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
+  const cashSales = Math.max(posCash + ordersCash, cashSalesTotal || 0);
   const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
   const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
   const totalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0) || (cashSales + cardSales + transferSales) || 0;
 
-  // 2. Cálculos de Gastos y Entradas del Turno (filtrados estrictamente por cajera y horario del turno actual)
+  // 2. Cálculos de Gastos y Entradas del Turno (incluyendo retiros de dueño tomados del cajón)
   const shiftExpenses = expenses.filter((e) => {
-    if (!e.cashier || !matchesCashier(e.cashier, outgoingCashier)) return false;
+    if (!e) return false;
+    const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
+    if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, outgoingCashier))) return false;
     const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
-    if (shiftStartBoundary > 0) {
-      if (!expTime || expTime < shiftStartBoundary) return false;
-    }
+    if (shiftStartBoundary > 0 && expTime && expTime < (shiftStartBoundary - 10000)) return false;
     return true;
   });
   const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const shiftIncomes = incomes.filter((inc) => {
-    if (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier)) return false;
+  const shiftIncomes = (incomes || []).filter((inc) => {
+    if (!inc) return false;
+    const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
+    if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier))) return false;
     const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
-    if (shiftStartBoundary > 0) {
-      if (!incTime || incTime < shiftStartBoundary) return false;
-    }
+    if (shiftStartBoundary > 0 && incTime && incTime < (shiftStartBoundary - 10000)) return false;
     return true;
   });
   const totalIncomesInCash = shiftIncomes
-    .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+    .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && typeof i.amount === "number" && i.amount > 0 && i.amount !== 902095.5)
     .reduce((sum, i) => sum + i.amount, 0);
 
   // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
-  const expectedCashInDrawer = Math.max(0, initialFund + cashSales + totalIncomesInCash - totalExpenses);
+  const expectedCashInDrawer = Math.max(0, syncedFund + cashSales + totalIncomesInCash - totalExpenses);
 
   // 4. Conteo y Diferencia (Arqueo)
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;
@@ -336,7 +393,7 @@ export default function CashDrawerShiftModal({
       branchName: "Sucursal Matriz Centro",
       previousShift: shiftName,
       nextShift: nextShiftName,
-      initialFund,
+      initialFund: syncedFund,
       cashSales,
       cardSales,
       transferSales,
@@ -764,7 +821,7 @@ export default function CashDrawerShiftModal({
                   <div className={`grid grid-cols-2 ${totalIncomesInCash > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
                       <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
-                      <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(initialFund)}</span>
+                      <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(syncedFund)}</span>
                     </div>
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
                       <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
@@ -819,7 +876,7 @@ export default function CashDrawerShiftModal({
                           <span className="text-xl">💵</span> Dinero que debe haber en caja:
                         </span>
                         <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
-                          Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)}{totalIncomesInCash > 0 ? ` • Entradas: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos: -{formatCurrency(totalExpenses)}
+                          Fondo: {formatCurrency(syncedFund)} • Ventas: {formatCurrency(cashSales)}{totalIncomesInCash > 0 ? ` • Entradas: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos: -{formatCurrency(totalExpenses)}
                         </span>
                       </div>
                       <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">

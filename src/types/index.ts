@@ -116,6 +116,8 @@ export interface CustomOrder {
   phone: string;
   branchId?: string;
   branchName: string;
+  operatingBranchId?: string;
+  operatingBranchName?: string;
   description: string;
   items?: OrderItem[];
   deliveryDate: string;

@@ -419,6 +419,8 @@ export default function SpecialOrdersDrawer({
         <CreateOrderModal
           isOpen={isCreateOpen}
           onClose={() => setIsCreateOpen(false)}
+          initialBranchId={branchId}
+          cashierName={cashierName}
           onOrderCreated={() => {
             setIsCreateOpen(false);
             loadOrders();

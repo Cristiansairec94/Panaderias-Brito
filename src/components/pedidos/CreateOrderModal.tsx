@@ -63,6 +63,7 @@ interface CreateOrderModalProps {
   initialCustomerId?: string;
   initialCustomerName?: string;
   initialCustomerPhone?: string;
+  cashierName?: string;
 }
 
 /**
@@ -136,6 +137,7 @@ export default function CreateOrderModal({
   initialCustomerId,
   initialCustomerName,
   initialCustomerPhone,
+  cashierName,
 }: CreateOrderModalProps) {
   const { branches, currentBranch, registerRealSale } = useBranch();
   const { user } = useAuth();
@@ -814,7 +816,7 @@ export default function CreateOrderModal({
           ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})`
           : undefined,
         paymentReference: paymentReference.trim() || undefined,
-        cashier: user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
+        cashier: cashierName || user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
       });
 
       // 3. REGISTRAR EL DINERO INGRESADO EN LA CAJA Y SUCURSAL (CON RESGUARDO)
@@ -824,7 +826,7 @@ export default function CreateOrderModal({
             activeBranch?.id || "branch-matriz",
             numericDeposit,
             paymentMethod,
-            user?.name || "Cajero en Turno",
+            cashierName || user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
             `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()} (${deliveryType === "sucursal" ? `Recoge en ${finalPickupBranch?.name}` : "A Domicilio"})`
           );
         } catch (saleErr) {

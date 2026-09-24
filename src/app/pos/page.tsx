@@ -3655,6 +3655,8 @@ export default function POSPage() {
           sales={currentShiftSales}
           expenses={currentShiftExpenses}
           incomes={currentShiftIncomes}
+          orders={currentShiftOrders}
+          cashSalesTotal={totalCashSales}
           products={products}
           initialTab={shiftModalTab}
           lastCutTimestamp={shiftStartBoundary}
@@ -3699,6 +3701,7 @@ export default function POSPage() {
             initialCustomerId={!isGeneral ? selectedCustomer.id : undefined}
             initialCustomerName={!isGeneral ? selectedCustomer.name : ""}
             initialCustomerPhone={!isGeneral && selectedCustomer.phone !== "N/A" ? selectedCustomer.phone : ""}
+            cashierName={cashierName}
           />
         );
       })()}
