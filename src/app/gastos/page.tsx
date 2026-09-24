@@ -188,7 +188,7 @@ const CUENTAS_ORIGEN = [
   { id: "banco_santander", name: "Santander Negocio Brito", tipo: "BANCO" },
 ];
 
-const QUICK_AMOUNTS = [50, 100, 200, 300, 500, 1000];
+const QUICK_AMOUNTS = [1, 5, 10, 20, 50, 100, 200, 500];
 
 // ─── Datos Demo Iniciales Multicurcursal ────────────────────────────────────
 const INITIAL_GASTOS: ExpenseRecord[] = [
@@ -374,8 +374,8 @@ export default function GastosPage() {
   const [motivoAnulacion, setMotivoAnulacion] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ── Cargar Gastos al Iniciar ──
-  useEffect(() => {
+  // ── Cargar Gastos al Iniciar y Sincronizar en Tiempo Real ──
+  const reloadGastosFromStorage = useCallback(() => {
     try {
       const saved = localStorage.getItem("brito_gastos_registro");
       if (saved) {
@@ -437,6 +437,41 @@ export default function GastosPage() {
     localStorage.setItem("brito_gastos_registro", JSON.stringify(INITIAL_GASTOS));
   }, []);
 
+  useEffect(() => {
+    reloadGastosFromStorage();
+
+    const handleGastosUpdated = (e: any) => {
+      if (e?.detail && Array.isArray(e.detail)) {
+        setGastos(e.detail);
+      } else {
+        reloadGastosFromStorage();
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key === "brito_gastos_registro") {
+        reloadGastosFromStorage();
+      }
+    };
+
+    window.addEventListener("brito_gastos_updated", handleGastosUpdated);
+    window.addEventListener("storage", handleStorage);
+
+    const unsubRealtime = realtimeHub.onCashMovement((payload) => {
+      if (payload && payload.type === "salida") {
+        setTimeout(() => {
+          reloadGastosFromStorage();
+        }, 150);
+      }
+    });
+
+    return () => {
+      window.removeEventListener("brito_gastos_updated", handleGastosUpdated);
+      window.removeEventListener("storage", handleStorage);
+      if (unsubRealtime) unsubRealtime();
+    };
+  }, [reloadGastosFromStorage]);
+
   // Actualizar sucursal por defecto si cambia en el contexto global
   useEffect(() => {
     if (currentBranch) {
@@ -451,14 +486,10 @@ export default function GastosPage() {
     return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
 
-  // Guardar gastos en LocalStorage
+  // Guardar gastos en LocalStorage y notificar a la app
   const persistGastos = (newGastos: ExpenseRecord[]) => {
     setGastos(newGastos);
-    try {
-      localStorage.setItem("brito_gastos_registro", JSON.stringify(newGastos));
-    } catch (e) {
-      console.error("Error persisting gastos:", e);
-    }
+    saveStoredExpenses(newGastos);
   };
 
   // ─── Helpers de Categoría ──────────────────────────────────────────────────
@@ -661,9 +692,9 @@ export default function GastosPage() {
       const supabase = createClient();
       await supabase.from("cash_movements").insert({
         type: "salida",
-        category: "compra_insumos",
+        category: form.categoriaId,
         amount: nuevoGasto.amount,
-        reason: `[GASTO] ${nuevoGasto.categoryLabel}: ${nuevoGasto.description} (${nuevoGasto.branchName})`,
+        reason: `[${nuevoGasto.id}] ${nuevoGasto.categoryLabel}: ${nuevoGasto.description} (${nuevoGasto.branchName})`,
         authorized_by: nuevoGasto.cashier,
       });
     } catch (err) {
@@ -672,6 +703,26 @@ export default function GastosPage() {
 
     const updated = [nuevoGasto, ...gastos];
     persistGastos(updated);
+
+    // Transmitir en tiempo real a las demás terminales
+    try {
+      if (realtimeHub?.broadcastCashMovement) {
+        realtimeHub.broadcastCashMovement({
+          id: nuevoGasto.id,
+          branchId: nuevoGasto.branchId,
+          branchName: nuevoGasto.branchName,
+          type: "salida",
+          category: nuevoGasto.category as any,
+          categoryLabel: nuevoGasto.categoryLabel,
+          amount: nuevoGasto.amount,
+          reason: nuevoGasto.description,
+          authorizedBy: nuevoGasto.cashier,
+          timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        });
+      }
+    } catch (err) {
+      console.log("Realtime broadcast error:", err);
+    }
 
     // Notificación al administrador
     addNotification({
@@ -1128,7 +1179,9 @@ export default function GastosPage() {
             </div>
             <div>
               <h3 className="font-black text-base text-stone-900">Historial Detallado de Gastos</h3>
-              <p className="text-[11px] text-stone-400">Orden cronológico más reciente primero • {filteredGastos.length} registros</p>
+              <p className="text-[11px] text-stone-500 font-medium">
+                Todas las salidas de dinero (desde $1.00) de cualquier sucursal registradas en tiempo real • {filteredGastos.length} registros
+              </p>
             </div>
           </div>
           <span className="text-xs font-mono font-bold text-stone-700 bg-stone-100 px-3 py-1.5 rounded-xl border border-stone-200 self-start sm:self-auto">
@@ -1379,9 +1432,14 @@ export default function GastosPage() {
             <form onSubmit={handleCrearGasto} className="space-y-4 text-xs">
               {/* 1. Monto Principal */}
               <div className="space-y-1.5">
-                <label className="font-black text-stone-900 text-xs">
-                  Monto Total del Gasto ($ MXN) *
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="font-black text-stone-900 text-xs">
+                    Monto Total del Gasto ($ MXN) *
+                  </label>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Acepta desde $1.00 MXN
+                  </span>
+                </div>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-2xl text-rose-600">$</span>
                   <input
@@ -1389,7 +1447,7 @@ export default function GastosPage() {
                     inputMode="decimal"
                     required
                     autoFocus
-                    placeholder="0.00"
+                    placeholder="1.00"
                     value={form.amount}
                     onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                     onChange={(e) => setForm({ ...form, amount: cleanDecimalNumbers(e.target.value) })}
@@ -1398,7 +1456,7 @@ export default function GastosPage() {
                 </div>
 
                 {/* Botones rápidos de monto */}
-                <div className="grid grid-cols-6 gap-1.5 pt-1">
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-1">
                   {QUICK_AMOUNTS.map((amt) => (
                     <button
                       key={amt}
