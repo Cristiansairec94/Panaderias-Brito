@@ -3369,6 +3369,13 @@ export default function POSPage() {
         }}
         cashSalesTotal={totalCashSales}
         initialFund={initialCashFund}
+        onUpdateInitialFund={(val) => {
+          setInitialCashFund(val);
+          try {
+            localStorage.setItem("brito_pos_initial_fund", val.toString());
+            window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+          } catch (e) {}
+        }}
         cashierName={cashierName}
         branchId={activeBranch?.id}
         branchName={activeBranch?.name}
