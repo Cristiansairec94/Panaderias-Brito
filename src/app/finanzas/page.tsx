@@ -157,20 +157,30 @@ export default function FinanzasPage() {
         </div>
       </div>
 
-      {/* ─── Barra de Filtros: Sucursales y Periodos ─────────────────────────────── */}
-      <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-3xl border border-stone-200/90 shadow-sm">
-        {/* Selector de Sucursal */}
-        <div className="flex items-center gap-2.5 overflow-x-auto pb-1 xl:pb-0">
-          <div className="flex items-center gap-1.5 text-stone-500 font-extrabold text-xs uppercase tracking-wider pl-1 shrink-0">
-            <Store className="w-4 h-4 text-brito-orange-600" />
-            <span>Sucursal:</span>
+      {/* ─── Barra de Filtros: Sucursales y Periodos (Espaciosa y Sin Amontonamiento) ─── */}
+      <div className="bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 shadow-sm space-y-4">
+        {/* Fila 1: Filtro de Sucursal */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-700 flex items-center justify-center shadow-xs">
+              <Store className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-black text-stone-900 uppercase tracking-wider block">
+                Sucursal
+              </span>
+              <span className="text-[11px] text-stone-500 font-medium">
+                Punto de venta a consultar
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setSelectedBranchId("todas")}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
                 selectedBranchId === "todas"
-                  ? "bg-stone-900 text-white shadow-md shadow-stone-900/15 ring-2 ring-stone-900/10 scale-[1.02]"
+                  ? "bg-stone-900 text-white shadow-md shadow-stone-900/20 ring-2 ring-stone-900/10 scale-[1.02]"
                   : "bg-stone-50 text-stone-700 hover:bg-stone-100 hover:text-stone-950 border border-stone-200/90 shadow-2xs hover:shadow-xs"
               }`}
             >
@@ -182,78 +192,97 @@ export default function FinanzasPage() {
                 onClick={() => setSelectedBranchId(b.id)}
                 className={`px-4 sm:px-4.5 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
                   selectedBranchId === b.id
-                    ? "bg-stone-900 text-white shadow-md shadow-stone-900/15 ring-2 ring-stone-900/10 scale-[1.02]"
+                    ? "bg-stone-900 text-white shadow-md shadow-stone-900/20 ring-2 ring-stone-900/10 scale-[1.02]"
                     : "bg-stone-50 text-stone-700 hover:bg-stone-100 hover:text-stone-950 border border-stone-200/90 shadow-2xs hover:shadow-xs"
                 }`}
               >
-                {b.shortName}
+                {b.name || b.shortName}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Selector de Periodo Extendido */}
-        <div className="flex items-center gap-1.5 bg-stone-100/90 p-1.5 sm:p-2 rounded-2xl border border-stone-200/80 overflow-x-auto shrink-0 shadow-inner">
-          <button
-            onClick={() => setPeriod("hoy")}
-            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
-              period === "hoy"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
-                : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
-            }`}
-          >
-            Hoy
-          </button>
-          <button
-            onClick={() => setPeriod("semana")}
-            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
-              period === "semana"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
-                : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
-            }`}
-          >
-            Esta Semana
-          </button>
-          <button
-            onClick={() => setPeriod("mes")}
-            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
-              period === "mes"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
-                : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
-            }`}
-          >
-            Este Mes
-          </button>
-          <button
-            onClick={() => setPeriod("mes_anterior")}
-            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
-              period === "mes_anterior"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
-                : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
-            }`}
-          >
-            Mes Anterior
-          </button>
-          <button
-            onClick={() => setPeriod("trimestre")}
-            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
-              period === "trimestre"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
-                : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
-            }`}
-          >
-            Trimestre
-          </button>
-          <button
-            onClick={() => setPeriod("anio")}
-            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
-              period === "anio"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
-                : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
-            }`}
-          >
-            Año 2026
-          </button>
+        {/* Separador fino */}
+        <div className="border-t border-stone-100" />
+
+        {/* Fila 2: Filtro de Periodo */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-emerald-700 flex items-center justify-center shadow-xs">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-black text-stone-900 uppercase tracking-wider block">
+                Periodo de Tiempo
+              </span>
+              <span className="text-[11px] text-stone-500 font-medium">
+                Rango temporal del balance
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-stone-100/90 p-1.5 sm:p-2 rounded-2xl border border-stone-200/80 flex-wrap sm:flex-nowrap shadow-inner">
+            <button
+              onClick={() => setPeriod("hoy")}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+                period === "hoy"
+                  ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
+                  : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
+              }`}
+            >
+              Hoy
+            </button>
+            <button
+              onClick={() => setPeriod("semana")}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+                period === "semana"
+                  ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
+                  : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
+              }`}
+            >
+              Esta Semana
+            </button>
+            <button
+              onClick={() => setPeriod("mes")}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+                period === "mes"
+                  ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
+                  : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
+              }`}
+            >
+              Este Mes
+            </button>
+            <button
+              onClick={() => setPeriod("mes_anterior")}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+                period === "mes_anterior"
+                  ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
+                  : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
+              }`}
+            >
+              Mes Anterior
+            </button>
+            <button
+              onClick={() => setPeriod("trimestre")}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+                period === "trimestre"
+                  ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
+                  : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
+              }`}
+            >
+              Trimestre
+            </button>
+            <button
+              onClick={() => setPeriod("anio")}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+                period === "anio"
+                  ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
+                  : "text-stone-600 hover:text-stone-950 hover:bg-white/80"
+              }`}
+            >
+              Año 2026
+            </button>
+          </div>
         </div>
       </div>
 
