@@ -375,8 +375,8 @@ export default function CajaPage() {
   const totalEntries = entryMovements.reduce((sum, m) => sum + m.amount, 0);
   const totalExpenses = movements.filter((m) => m.type === "salida").reduce((sum, m) => sum + m.amount, 0);
   const expectedCashInDrawer = initialCash + cashSales + totalEntries - totalExpenses;
-  const actualCount = Number(countedCash) || 0;
-  const cashDifference = actualCount - expectedCashInDrawer;
+  const actualCount = expectedCashInDrawer;
+  const cashDifference = 0;
 
   // Active shift responsible name
   const currentShiftResponsible = user?.name || "Lupita Brito (Cajera 1)";
@@ -594,19 +594,13 @@ export default function CajaPage() {
       return;
     }
 
-    // 2. Validar efectivo físico contado
-    if (countedCash === "") {
-      alert("Por favor ingresa o realiza el conteo del efectivo físico en caja.");
-      return;
-    }
-
-    const parsedCounted = Number(countedCash) || 0;
+    const parsedCounted = expectedCashInDrawer;
     const parsedNextFund = Number(nextFundAmount) || 0;
     if (parsedCounted > 0 && parsedNextFund > parsedCounted) {
-      alert(`El fondo para el siguiente turno (${formatCurrency(parsedNextFund)}) no puede ser mayor que el dinero físico en caja (${formatCurrency(parsedCounted)}).`);
+      alert(`El fondo para el siguiente turno (${formatCurrency(parsedNextFund)}) no puede ser mayor que el total en caja (${formatCurrency(parsedCounted)}).`);
       return;
     }
-    const diff = parsedCounted - expectedCashInDrawer;
+    const diff = 0;
     const newFolio = `CORTE-${Date.now().toString().slice(-6)}`;
     const nowStr = formatDateTimeSafe();
 
@@ -1580,58 +1574,6 @@ export default function CajaPage() {
                 )}
               </div>
 
-              {/* ARQUEO FÍSICO */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label className="font-black text-stone-900 text-xs">
-                    Efectivo Físico Contado en Caja ($ MXN) *
-                  </label>
-                  <span className="text-[10px] text-stone-500 font-medium">
-                    Total de billetes y monedas contados
-                  </span>
-                </div>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-stone-400 text-base">
-                    $
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    required
-                    placeholder="Total de billetes y monedas contados"
-                    value={countedCash}
-                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                    onChange={(e) => setCountedCash(cleanDecimalNumbers(e.target.value))}
-                    className="w-full pl-8 pr-4 py-2.5 bg-stone-50 rounded-xl border border-stone-300 text-base font-black text-stone-950 focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none transition-all placeholder:text-stone-400 placeholder:text-xs placeholder:font-normal"
-                  />
-                </div>
-
-                {/* Dictamen de Arqueo en Tiempo Real */}
-                {countedCash !== "" && (
-                  <div
-                    className={`p-2.5 rounded-xl border text-xs flex items-center justify-between font-bold shadow-2xs transition-all ${
-                      cashDifference === 0
-                        ? "bg-emerald-50 text-emerald-950 border-emerald-300"
-                        : cashDifference > 0
-                        ? "bg-blue-50 text-blue-950 border-blue-300"
-                        : "bg-rose-50 text-rose-950 border-rose-300"
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span>{cashDifference === 0 ? "✓" : cashDifference > 0 ? "↑" : "↓"}</span>
-                      <span>Dictamen de Arqueo:</span>
-                    </span>
-                    <span className="font-black">
-                      {cashDifference === 0
-                        ? "Caja Exacta ($0.00)"
-                        : cashDifference > 0
-                        ? `Sobrante: +${formatCurrency(cashDifference)}`
-                        : `Faltante: ${formatCurrency(cashDifference)}`}
-                    </span>
-                  </div>
-                )}
-              </div>
-
               {/* DISTRIBUCIÓN DEL DINERO */}
               <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-2 shadow-2xs">
                 <div className="flex items-center justify-between">
@@ -1674,17 +1616,15 @@ export default function CajaPage() {
                   className="w-full px-3 py-1.5 bg-white rounded-xl border border-stone-300 font-bold text-stone-900 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
 
-                {countedCash !== "" && (
-                  <div className="flex justify-between items-center text-xs pt-1.5 border-t border-stone-200">
-                    <div>
-                      <span className="text-stone-700 font-bold block text-[11px]">Efectivo entregado a Don Toño:</span>
-                      <span className="text-[10px] text-stone-500">Total contado menos fondo de cambio dejado</span>
-                    </div>
-                    <strong className="text-sm font-black text-emerald-950 bg-emerald-100/80 px-2.5 py-1 rounded-xl border border-emerald-300">
-                      {formatCurrency(Math.max(0, actualCount - (Number(nextFundAmount) || 0)))}
-                    </strong>
+                <div className="flex justify-between items-center text-xs pt-1.5 border-t border-stone-200">
+                  <div>
+                    <span className="text-stone-700 font-bold block text-[11px]">Efectivo entregado a Don Toño:</span>
+                    <span className="text-[10px] text-stone-500">Total en caja (${formatCurrency(expectedCashInDrawer)}) menos fondo dejado</span>
                   </div>
-                )}
+                  <strong className="text-sm font-black text-emerald-950 bg-emerald-100/80 px-2.5 py-1 rounded-xl border border-emerald-300">
+                    {formatCurrency(Math.max(0, expectedCashInDrawer - (Number(nextFundAmount) || 0)))}
+                  </strong>
+                </div>
               </div>
 
               {/* OBSERVACIONES */}
