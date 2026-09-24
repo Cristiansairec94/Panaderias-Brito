@@ -211,7 +211,7 @@ export default function ExpensesModal({
     initialTab || "register"
   );
   const [movementType, setMovementType] = useState<"salida" | "entrada">("salida");
-  const [historyFilter, setHistoryFilter] = useState<"todos" | "ventas" | "entradas" | "salidas" | "fondo">("todos");
+  const [historyFilter, setHistoryFilter] = useState<"todos" | "ventas" | "entradas" | "salidas">("todos");
   
   // Estado local para el Fondo Inicial de Caja
   const [currentFund, setCurrentFund] = useState<number>(initialFund || 0);
@@ -620,29 +620,8 @@ export default function ExpensesModal({
     }, 6000);
   };
 
-  // Historial unificado del turno ordenado cronológicamente (Fondo Base, Ventas, Entradas y Salidas en tiempo real)
+  // Historial unificado del turno ordenado cronológicamente (Ventas, Entradas y Salidas en tiempo real)
   const combinedHistory = [
-    ...(currentFund > 0
-      ? [
-          {
-            id: "FONDO-INICIAL-BASE",
-            type: "fondo" as const,
-            amount: currentFund,
-            category: "fondo_inicial",
-            description: `Fondo inicial base asignado para cambio en caja y apertura de turno`,
-            cashier: cashierName,
-            date: "Apertura de Turno",
-            isOwner: false,
-            isChange: true,
-            paymentMethod: "efectivo" as const,
-            customerName: undefined,
-            totalPieces: 0,
-            rawSale: undefined,
-            timestamp: "1970-01-01T00:00:00.000Z",
-            createdAt: "1970-01-01T00:00:00.000Z",
-          },
-        ]
-      : []),
     ...effectiveSales.map((sale) => {
       const totalPieces = (sale.items || []).reduce((sum, item) => sum + item.quantity, 0);
       const itemsList = (sale.items || []).map((i) => `${i.quantity}x ${i.product.name}`).join(", ");
@@ -704,7 +683,6 @@ export default function ExpensesModal({
     if (historyFilter === "ventas" && item.type !== "venta") return false;
     if (historyFilter === "entradas" && item.type !== "entrada") return false;
     if (historyFilter === "salidas" && item.type !== "salida") return false;
-    if (historyFilter === "fondo" && item.type !== "fondo") return false;
 
     if (historySearch.trim()) {
       const q = historySearch.toLowerCase().trim();
@@ -751,19 +729,10 @@ export default function ExpensesModal({
         {/* Live Cash Balances Bar - 5 Cuentas Base de Caja con leyenda Ver Historial */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 p-3 sm:p-4 bg-stone-50 border-b border-stone-200 text-center">
           
-          {/* 1. Fondo Inicial (Base Contable del Turno) */}
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("list");
-              setHistoryFilter("fondo");
-            }}
-            className={`p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between ${
-              activeTab === "list" && historyFilter === "fondo"
-                ? "bg-blue-100 border-blue-500 ring-2 ring-blue-500/25 shadow-sm scale-[1.02]"
-                : "bg-blue-50/70 border-blue-200/90 hover:bg-blue-100/60 hover:border-blue-300 shadow-2xs"
-            }`}
-            title="Con cuánto se inició en caja (Base para hacer cuentas del turno)"
+          {/* 1. Fondo Inicial (Representa con cuánto dinero se inició la caja) */}
+          <div
+            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center flex flex-col justify-between bg-blue-50/70 border-blue-200/90 shadow-2xs"
+            title="Con cuánto dinero se inició la caja en este turno"
           >
             <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-blue-950 block leading-tight tracking-wide">
               🪙 Fondo Inicial
@@ -771,10 +740,10 @@ export default function ExpensesModal({
             <span className="text-base sm:text-lg md:text-xl font-black text-blue-800 block my-1 tracking-tight truncate">
               +{formatCurrency(currentFund)}
             </span>
-            <span className="text-[11px] sm:text-xs font-black text-blue-700 block mt-0.5 opacity-90 group-hover:underline">
-              🧾 Ver Historial
+            <span className="text-[11px] sm:text-xs font-bold text-blue-700/80 block mt-0.5">
+              Inicio de Caja
             </span>
-          </button>
+          </div>
 
           {/* 2. Ventas Efectivo */}
           <button
@@ -1561,17 +1530,6 @@ export default function ExpensesModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setHistoryFilter("fondo")}
-                    className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-sm sm:text-base font-black shrink-0 transition-all border-2 cursor-pointer shadow-2xs active:scale-95 ${
-                      historyFilter === "fondo"
-                        ? "bg-blue-700 text-white border-blue-800 shadow-sm ring-2 ring-blue-500/30"
-                        : "bg-blue-50 text-blue-900 hover:bg-blue-100 border-blue-300 hover:border-blue-400"
-                    }`}
-                  >
-                    🪙 Fondo ({formatCurrency(currentFund)})
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setHistoryFilter("ventas")}
                     className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-sm sm:text-base font-black shrink-0 transition-all border-2 cursor-pointer shadow-2xs active:scale-95 ${
                       historyFilter === "ventas"
@@ -1722,8 +1680,6 @@ export default function ExpensesModal({
                     <p className="font-bold text-xs text-stone-700">
                       {historySearch
                         ? `Sin resultados para "${historySearch}"`
-                        : historyFilter === "fondo"
-                        ? `No se ha establecido un fondo inicial en el turno de ${cashierName} todavía.`
                         : historyFilter === "ventas"
                         ? `No hay ventas registradas en el turno de ${cashierName} todavía.`
                         : historyFilter === "entradas"
@@ -1740,7 +1696,6 @@ export default function ExpensesModal({
                   </div>
                 ) : (
                   filteredHistory.map((mov) => {
-                    const isFondo = mov.type === "fondo";
                     const isVenta = mov.type === "venta";
                     const isSalida = mov.type === "salida";
 
@@ -1748,9 +1703,7 @@ export default function ExpensesModal({
                       <div
                         key={mov.id}
                         className={`p-3.5 rounded-2xl border transition-all flex items-start justify-between gap-3 ${
-                          isFondo
-                            ? "bg-blue-50/40 hover:bg-blue-50/80 border-blue-200/80 shadow-2xs"
-                            : isVenta
+                          isVenta
                             ? "bg-emerald-50/30 hover:bg-emerald-50/70 border-emerald-200/80 shadow-2xs"
                             : isSalida
                             ? "bg-rose-50/30 hover:bg-rose-50/70 border-rose-200/80 shadow-2xs"
@@ -1762,9 +1715,7 @@ export default function ExpensesModal({
                             {/* Monto con color correspondiente */}
                             <span
                               className={`font-black text-sm sm:text-base ${
-                                isFondo
-                                  ? "text-blue-800"
-                                  : isVenta
+                                isVenta
                                   ? "text-emerald-700"
                                   : isSalida
                                   ? "text-rose-600"
@@ -1777,11 +1728,7 @@ export default function ExpensesModal({
                             </span>
 
                             {/* Badge Tipo de Movimiento */}
-                            {isFondo ? (
-                              <span className="text-[10px] bg-blue-100 text-blue-900 border border-blue-300 px-2 py-0.5 rounded-full font-black">
-                                🪙 Fondo Inicial (Base de Caja)
-                              </span>
-                            ) : isVenta ? (
+                            {isVenta ? (
                               <span className="text-[10px] bg-emerald-100 text-emerald-950 border border-emerald-300 px-2 py-0.5 rounded-full font-black">
                                 🥖 Venta Mostrador
                               </span>
@@ -1848,21 +1795,6 @@ export default function ExpensesModal({
 
                         {/* Acciones por tipo */}
                         <div className="flex items-center gap-1 shrink-0 self-center">
-                          {isFondo && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditFundInput(String(currentFund));
-                                setIsEditingFund(true);
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-900 font-bold rounded-xl text-xs border border-blue-300 shadow-2xs transition-all cursor-pointer"
-                              title="Modificar fondo inicial base"
-                            >
-                              <Edit3 className="w-3.5 h-3.5 text-blue-700" />
-                              <span>Editar</span>
-                            </button>
-                          )}
-
                           {isVenta && onSelectSaleForReprint && mov.rawSale && (
                             <button
                               type="button"
@@ -1886,7 +1818,7 @@ export default function ExpensesModal({
                             </button>
                           )}
 
-                          {!isSalida && !isVenta && !isFondo && onDeleteIncome && (
+                          {!isSalida && !isVenta && onDeleteIncome && (
                             <button
                               type="button"
                               onClick={() => onDeleteIncome(mov.id)}
