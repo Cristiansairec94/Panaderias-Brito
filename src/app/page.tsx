@@ -103,7 +103,7 @@ export default function Home() {
   const [activeChartTab, setActiveChartTab] = useState<"horas" | "dias">("horas");
   const [hoveredDataIndex, setHoveredDataIndex] = useState<number | null>(null);
   const [productCategoryFilter, setProductCategoryFilter] = useState<string>("todas");
-  const [orderStatusFilter, setOrderStatusFilter] = useState<"todos" | "pendiente" | "en_horno" | "listo">("todos");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<"todos" | "pendiente" | "listo">("todos");
   const [greeting, setGreeting] = useState("¡Bienvenido");
   const [currentTimeStr, setCurrentTimeStr] = useState("");
   const [saleAnimSuccess, setSaleAnimSuccess] = useState(false);
@@ -623,7 +623,7 @@ export default function Home() {
             <div>
               <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Cobros Pendientes</p>
               <p className="text-base sm:text-lg font-black text-emerald-950 mt-0.5">{formatCurrency(totalPendingCollection)}</p>
-              <p className="text-[10px] text-emerald-700 font-medium">{pendingOrdersCount + inOvenOrdersCount} encargos activos</p>
+              <p className="text-[10px] text-emerald-700 font-medium">{pendingOrdersCount + readyOrdersCount} encargos activos</p>
             </div>
             <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
               🎂
@@ -1238,7 +1238,7 @@ export default function Home() {
         </div>
 
         {/* Resumen Rápido de Estatus de Pedidos con Filtro Interactivo */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
             onClick={() => setOrderStatusFilter(orderStatusFilter === "pendiente" ? "todos" : "pendiente")}
             className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between ${
@@ -1251,21 +1251,6 @@ export default function Home() {
             </div>
             <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
               🕒
-            </span>
-          </button>
-
-          <button
-            onClick={() => setOrderStatusFilter(orderStatusFilter === "en_horno" ? "todos" : "en_horno")}
-            className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between ${
-              orderStatusFilter === "en_horno" ? "bg-orange-100/80 border-orange-400 ring-2 ring-orange-400/30" : "bg-orange-50/70 border-orange-200/80 hover:bg-orange-100/50"
-            }`}
-          >
-            <div>
-              <p className="text-[10px] font-bold text-orange-800 uppercase tracking-wider">En Horno</p>
-              <p className="text-lg font-black text-orange-950 mt-0.5">{inOvenOrdersCount}</p>
-            </div>
-            <span className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-xs">
-              🔥
             </span>
           </button>
 
