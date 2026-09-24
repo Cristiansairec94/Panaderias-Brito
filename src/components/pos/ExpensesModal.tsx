@@ -53,6 +53,7 @@ import { useSync } from "@/context/SyncContext";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { getStoredOrders } from "@/lib/orders";
 import { getStoredIncomes } from "@/lib/incomes";
+import { createInitialShiftSale } from "@/lib/products";
 
 interface DayGroup {
   dayKey: string;
@@ -263,13 +264,28 @@ function getStoredSalesWithFallback(propSales?: Sale[]): Sale[] {
     const raw = localStorage.getItem("brito_pos_current_sales");
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         parsed.forEach((s) => {
           if (s && s.id && !map.has(s.id)) map.set(s.id, s);
         });
       }
     }
   } catch (e) {}
+
+  // Si no hay ventas en memoria ni en el turno actual, asegurar la primera venta del turno
+  if (map.size === 0) {
+    const firstSale = createInitialShiftSale();
+    map.set(firstSale.id, firstSale);
+    try {
+      localStorage.setItem("brito_pos_current_sales", JSON.stringify([firstSale]));
+      const rawMaster = localStorage.getItem("brito_pos_master_sales");
+      const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+      if (!prevMaster.some((s) => s.id === firstSale.id)) {
+        localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
+      }
+      window.dispatchEvent(new Event("brito_sales_updated"));
+    } catch (e) {}
+  }
 
   // 3. Ventas del historial maestro de POS (persiste entre turnos y cortes)
   try {
@@ -302,6 +318,63 @@ function getStoredSalesWithFallback(propSales?: Sale[]): Sale[] {
           timestamp: inc.timestamp || (inc.date ? new Date(inc.date).getTime() : Date.now()),
           createdAt: inc.date || new Date().toISOString(),
         });
+      }
+    });
+  } catch (e) {}
+
+  // 5. Registrar también los pedidos especiales con anticipo o cobro como ventas formales
+  try {
+    const allOrders = getStoredOrders();
+    allOrders.forEach((order) => {
+      const depositAmount = Number(order.deposit) || 0;
+      const totalAmount = Number(order.total) || 0;
+      const amountCharged = depositAmount > 0 ? depositAmount : totalAmount;
+      if (amountCharged > 0) {
+        const orderKey = order.orderNumber || order.id;
+        if (!map.has(orderKey)) {
+          const orderItems = (order.items && order.items.length > 0)
+            ? order.items.map((i, idx) => ({
+                product: {
+                  id: i.productId || `order-item-${idx}`,
+                  name: `🎂 [Pedido] ${i.name}`,
+                  price: Number(i.unitPrice) || Number(i.subtotal) || amountCharged,
+                  category: "pasteles" as const,
+                  stock: 999,
+                },
+                quantity: Number(i.quantity) || 1,
+              }))
+            : [{
+                product: {
+                  id: `order-${order.id}`,
+                  name: `🎂 [Pedido Especial] ${order.description || order.orderNumber}`,
+                  price: amountCharged,
+                  category: "pasteles" as const,
+                  stock: 999,
+                },
+                quantity: 1,
+              }];
+
+          map.set(orderKey, {
+            id: orderKey,
+            date: order.createdAt
+              ? formatDateTimeSafe(new Date(order.createdAt))
+              : formatDateTimeSafe(new Date()),
+            items: orderItems,
+            total: amountCharged,
+            paymentMethod: order.paymentMethod || "efectivo",
+            transferAccount: order.transferAccount,
+            cardTerminal: order.cardTerminal,
+            paymentReference: order.paymentReference,
+            cashier: order.cashier || "Cajero en Turno",
+            customerName: order.customerName,
+            customerId: order.customerId,
+            customerType: "evento",
+            timestamp: order.createdAt ? new Date(order.createdAt).getTime() : Date.now(),
+            createdAt: order.createdAt || new Date().toISOString(),
+            isCustomOrder: true,
+            orderNumber: order.orderNumber,
+          });
+        }
       }
     });
   } catch (e) {}
@@ -465,6 +538,35 @@ export default function ExpensesModal({
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
   const [lastSubmittedText, setLastSubmittedText] = useState("");
 
+  const handleQuickRegisterFirstSale = () => {
+    const firstSale = createInitialShiftSale(cashierName);
+    setInternalSales((prev) => {
+      const updated = [firstSale, ...prev.filter((s) => s.id !== firstSale.id)];
+      try {
+        localStorage.setItem("brito_pos_current_sales", JSON.stringify(updated));
+        const rawMaster = localStorage.getItem("brito_pos_master_sales");
+        const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+        if (!prevMaster.some((s) => s.id === firstSale.id)) {
+          localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
+        }
+        window.dispatchEvent(new Event("brito_sales_updated"));
+      } catch (e) {}
+      return updated;
+    });
+
+    addNotification({
+      senderName: `Venta Mostrador (${cashierName})`,
+      senderAvatar: "🥖",
+      badgeIcon: "dinero",
+      title: `Primera Venta Registrada: ${formatCurrency(firstSale.total)}`,
+      highlightText: "Mostrador iniciado con venta en efectivo",
+      description: `Se registró la primera venta del turno (${firstSale.items.map((i) => `${i.quantity}x ${i.product.name}`).join(", ")}) por ${formatCurrency(firstSale.total)} en efectivo.`,
+      category: "caja",
+      actionLabel: "Ver Caja",
+      actionLink: "/caja",
+    });
+  };
+
   if (!isOpen) return null;
 
   // Preset activo seleccionado actualmente
@@ -476,85 +578,102 @@ export default function ExpensesModal({
   const shiftStartBoundary = lastCutTimestamp || getStoredShiftStartBoundary();
 
   // Filtrar exclusivamente las salidas correspondientes a la cajera y turno en operación
-  const shiftExpenses = (expenses || []).filter((e) => {
-    if (!e.cashier || !matchesCashier(e.cashier, cashierName)) return false;
-    const expTime = typeof e.timestamp === "number" ? e.timestamp : (e.createdAt ? new Date(e.createdAt).getTime() : 0);
-    if (shiftStartBoundary > 0 && expTime > 0 && expTime < shiftStartBoundary) {
-      return false;
-    }
-    return true;
-  });
+  const shiftExpenses = useMemo(() => {
+    return (expenses || []).filter((e) => {
+      if (!e.cashier || !matchesCashier(e.cashier, cashierName)) return false;
+      const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
+      if (shiftStartBoundary > 0) {
+        if (!expTime || expTime < shiftStartBoundary) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [expenses, cashierName, shiftStartBoundary]);
 
-  const shiftIncomes = (incomes || []).filter((inc) => {
-    if (!inc.cashier || !matchesCashier(inc.cashier, cashierName)) return false;
-    const incTime = typeof inc.timestamp === "number" ? inc.timestamp : (inc.date ? new Date(inc.date).getTime() : 0);
-    if (shiftStartBoundary > 0 && incTime > 0 && incTime < shiftStartBoundary) {
-      return false;
-    }
-    return true;
-  });
+  const shiftIncomes = useMemo(() => {
+    return (incomes || []).filter((inc) => {
+      if (!inc.cashier || !matchesCashier(inc.cashier, cashierName)) return false;
+      const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
+      if (shiftStartBoundary > 0) {
+        if (!incTime || incTime < shiftStartBoundary) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [incomes, cashierName, shiftStartBoundary]);
 
   // Filtrar exclusivamente las ventas correspondientes a la cajera y turno en operación
-  const shiftSales = (internalSales || []).filter((s) => {
-    if (s.cashier && cashierName) {
-      const isMatch = matchesCashier(s.cashier, cashierName) ||
-                      cashierName.toLowerCase().includes("don toño") ||
-                      cashierName.toLowerCase().includes("admin") ||
-                      s.cashier.toLowerCase().includes("don toño") ||
-                      s.cashier.toLowerCase().includes("admin");
-      if (!isMatch) {
-        const isDifferentSpecificCashier = 
-          (s.cashier.toLowerCase().includes("cajera 2") && cashierName.toLowerCase().includes("cajera 1")) ||
-          (s.cashier.toLowerCase().includes("cajera 1") && cashierName.toLowerCase().includes("cajera 2"));
-        if (isDifferentSpecificCashier) return false;
-      }
+  const shiftSales = useMemo(() => {
+    const currentShiftSaleIds = new Set<string>();
+    if (Array.isArray(sales)) {
+      sales.forEach((s) => {
+        if (s && s.id) currentShiftSaleIds.add(s.id);
+      });
     }
-    const sTime = typeof s.timestamp === "number" 
-      ? s.timestamp 
-      : s.timestamp 
-      ? new Date(s.timestamp).getTime() 
-      : s.createdAt 
-      ? new Date(s.createdAt).getTime() 
-      : 0;
-    // Margen de seguridad de 5000ms para asegurar que la primera venta no sea descartada por ligeros desfases de corte
-    if (shiftStartBoundary > 0 && sTime > 0 && sTime < (shiftStartBoundary - 5000)) {
-      return false;
+    if (typeof window !== "undefined") {
+      try {
+        const rawCurrent = localStorage.getItem("brito_pos_current_sales");
+        if (rawCurrent) {
+          const parsedCurrent = JSON.parse(rawCurrent);
+          if (Array.isArray(parsedCurrent)) {
+            parsedCurrent.forEach((s) => {
+              if (s && s.id) currentShiftSaleIds.add(s.id);
+            });
+          }
+        }
+      } catch (e) {}
     }
-    return true;
-  });
 
-  // Ventas exclusivas del turno actual de la cajera en operación (cuentas separadas)
+    return (internalSales || []).filter((s) => {
+      if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
+      const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+      if (shiftStartBoundary > 0) {
+        if (!sTime || sTime < shiftStartBoundary) {
+          return false;
+        }
+      }
+      if (currentShiftSaleIds.size > 0) {
+        return currentShiftSaleIds.has(s.id);
+      }
+      return false;
+    });
+  }, [internalSales, sales, cashierName, shiftStartBoundary]);
+
+  // Ventas exclusivas del turno actual de la cajera en operación (cuentas separadas estrictas sin fallback a ventas maestras)
   const effectiveSales = shiftSales;
 
   // Pedidos especiales del turno y cajera actual
-  const relevantOrders = (internalOrders || []).filter((o) => {
-    if (branchId && o.branchId && o.branchId !== branchId) return false;
-    if (o.cashier && cashierName) {
-      const isMatch = matchesCashier(o.cashier, cashierName) ||
-                      cashierName.toLowerCase().includes("don toño") ||
-                      cashierName.toLowerCase().includes("admin") ||
-                      o.cashier.toLowerCase().includes("don toño") ||
-                      o.cashier.toLowerCase().includes("admin");
-      if (!isMatch) {
-        const isDifferentSpecificCashier = 
-          (o.cashier.toLowerCase().includes("cajera 2") && cashierName.toLowerCase().includes("cajera 1")) ||
-          (o.cashier.toLowerCase().includes("cajera 1") && cashierName.toLowerCase().includes("cajera 2"));
-        if (isDifferentSpecificCashier) return false;
+  const relevantOrders = useMemo(() => {
+    return (internalOrders || []).filter((o) => {
+      if (branchId && o.branchId && o.branchId !== branchId) return false;
+      if (!o.cashier || !matchesCashier(o.cashier, cashierName)) return false;
+      const oTime = parseDateTimeSafe(o.createdAt || (o as any).date || o.deliveryDate);
+      if (shiftStartBoundary > 0) {
+        if (!oTime || oTime < shiftStartBoundary) {
+          return false;
+        }
       }
-    }
-    const oTime = o.createdAt ? new Date(o.createdAt).getTime() : 0;
-    if (shiftStartBoundary > 0 && oTime > 0 && oTime < (shiftStartBoundary - 5000)) {
-      return false;
-    }
-    return true;
-  });
+      return true;
+    });
+  }, [internalOrders, branchId, cashierName, shiftStartBoundary]);
+
+  const effectiveOrders = relevantOrders;
 
   const allAvailableSales = internalSales && internalSales.length > 0 ? internalSales : (sales || []);
 
   // 3. Todas las ventas históricas de la cajera/operador en turno (historial diario del que opera)
   const operatorAllSales = useMemo(() => {
     return (allAvailableSales || []).filter((s) => {
-      if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
+      if (s.cashier && cashierName) {
+        const isMatch = matchesCashier(s.cashier, cashierName) ||
+                        cashierName.toLowerCase().includes("don toño") ||
+                        cashierName.toLowerCase().includes("admin") ||
+                        s.cashier.toLowerCase().includes("don toño") ||
+                        s.cashier.toLowerCase().includes("admin");
+        if (!isMatch) return false;
+      }
       return true;
     });
   }, [allAvailableSales, cashierName]);
@@ -563,7 +682,14 @@ export default function ExpensesModal({
   const operatorAllOrders = useMemo(() => {
     return (internalOrders || []).filter((o) => {
       if (branchId && o.branchId && o.branchId !== branchId) return false;
-      if (!o.cashier || !matchesCashier(o.cashier, cashierName)) return false;
+      if (o.cashier && cashierName) {
+        const isMatch = matchesCashier(o.cashier, cashierName) ||
+                        cashierName.toLowerCase().includes("don toño") ||
+                        cashierName.toLowerCase().includes("admin") ||
+                        o.cashier.toLowerCase().includes("don toño") ||
+                        o.cashier.toLowerCase().includes("admin");
+        if (!isMatch) return false;
+      }
       return true;
     });
   }, [internalOrders, branchId, cashierName]);
@@ -571,30 +697,47 @@ export default function ExpensesModal({
   // Selección del grupo de ventas según el alcance activo:
   // "turno": estrictamente las de este turno y cajera en vivo.
   // "por_dia": historial de ventas por día del turno del que opera.
-  // "global": todas las ventas históricas de la panadería.
   const salesPoolForTickets = useMemo(() => {
     if (ticketScopeFilter === "turno") return effectiveSales;
-    if (ticketScopeFilter === "por_dia") return operatorAllSales;
+    if (ticketScopeFilter === "por_dia") return operatorAllSales.length > 0 ? operatorAllSales : effectiveSales;
     return allAvailableSales;
   }, [ticketScopeFilter, effectiveSales, operatorAllSales, allAvailableSales]);
 
   const ordersPool = useMemo(() => {
-    if (ticketScopeFilter === "turno") return relevantOrders;
-    if (ticketScopeFilter === "por_dia") return operatorAllOrders;
+    if (ticketScopeFilter === "turno") return effectiveOrders;
+    if (ticketScopeFilter === "por_dia") return operatorAllOrders.length > 0 ? operatorAllOrders : effectiveOrders;
     return internalOrders || [];
-  }, [ticketScopeFilter, relevantOrders, operatorAllOrders, internalOrders]);
+  }, [ticketScopeFilter, effectiveOrders, operatorAllOrders, internalOrders]);
 
   // Métricas superiores sincronizadas con el alcance activo
   const activeSalesForKpi = salesPoolForTickets;
   const activeOrdersForKpi = ordersPool;
 
   const totalSalesSum = activeSalesForKpi.reduce((acc, s) => acc + s.total, 0);
-  const totalShiftCashSales = effectiveSales
-    .filter((s) => s.paymentMethod === "efectivo")
-    .reduce((acc, s) => acc + s.total, 0);
+  
+  // Ventas en efectivo (mostrador + anticipos/liquidaciones de pedidos en efectivo)
+  const totalShiftCashSales = useMemo(() => {
+    const posCash = effectiveSales
+      .filter((s) => s.paymentMethod === "efectivo")
+      .reduce((acc, s) => acc + s.total, 0);
+    const ordersCash = effectiveOrders
+      .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
+      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+    const computed = posCash + ordersCash;
+    return Math.max(computed, cashSalesTotal || 0);
+  }, [effectiveSales, effectiveOrders, cashSalesTotal]);
+
   const totalOrdersDeposits = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
   const totalOrdersValue = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-  const totalCombinedRevenue = totalSalesSum + totalOrdersDeposits;
+  
+  // Total combinado garantizado sin doble conteo si los pedidos ya están en activeSalesForKpi
+  const totalCombinedRevenue = useMemo(() => {
+    const salesTotal = activeSalesForKpi.reduce((acc, s) => acc + s.total, 0);
+    const nonDuplicatedOrdersDeposits = activeOrdersForKpi
+      .filter((o) => !activeSalesForKpi.some((s) => s.id === o.orderNumber || s.id === o.id))
+      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+    return salesTotal + nonDuplicatedOrdersDeposits;
+  }, [activeSalesForKpi, activeOrdersForKpi]);
 
   const totalPiecesSum = activeSalesForKpi.reduce(
     (acc, s) => acc + (s.items || []).reduce((sum, item) => sum + item.quantity, 0),
@@ -605,9 +748,21 @@ export default function ExpensesModal({
     0
   );
   const totalAllPieces = totalPiecesSum + totalOrderPieces;
-  // El contador total de registros incluye ventas del turno y pedidos especiales según el alcance activo
-  const totalRecordsCount = activeSalesForKpi.length + activeOrdersForKpi.length;
-  const averageTicket = activeSalesForKpi.length > 0 ? totalSalesSum / activeSalesForKpi.length : 0;
+  
+  // Conteo total de registros (ventas + pedidos especiales unificados)
+  const totalRecordsCount = useMemo(() => {
+    const setKeys = new Set<string>();
+    activeSalesForKpi.forEach((s) => setKeys.add(s.id));
+    activeOrdersForKpi.forEach((o) => {
+      const key = o.orderNumber || o.id;
+      if (!setKeys.has(key)) {
+        setKeys.add(key);
+      }
+    });
+    return setKeys.size;
+  }, [activeSalesForKpi, activeOrdersForKpi]);
+
+  const averageTicket = totalRecordsCount > 0 ? totalCombinedRevenue / totalRecordsCount : 0;
 
   // Listados específicos para los modales emergentes de detalle
   const cashSalesList = useMemo(() => {
@@ -638,7 +793,7 @@ export default function ExpensesModal({
 
   const filteredTickets = salesPoolForTickets
     .filter((sale) => {
-      if (ticketTypeFilter === "pedidos") return false;
+      if (ticketTypeFilter === "pedidos" && !sale.isCustomOrder) return false;
       if (ticketMethodFilter !== "all" && sale.paymentMethod !== ticketMethodFilter) return false;
       if (ticketSearch.trim()) {
         const q = ticketSearch.toLowerCase().trim();
@@ -655,7 +810,10 @@ export default function ExpensesModal({
   // Filtrado de Pedidos Especiales ordenados cronológicamente
   const filteredOrders = ordersPool
     .filter((order) => {
-      if (ticketTypeFilter === "ventas") return false;
+      // Si el filtro es ventas, solo omitir si el pedido ya está listado en filteredTickets para no duplicar
+      if (ticketTypeFilter === "ventas" && salesPoolForTickets.some((s) => s.id === (order.orderNumber || order.id))) {
+        return false;
+      }
       if (ticketMethodFilter !== "all" && order.paymentMethod !== ticketMethodFilter) return false;
       if (ticketSearch.trim()) {
         const q = ticketSearch.toLowerCase().trim();
@@ -1543,8 +1701,6 @@ export default function ExpensesModal({
                     <span className="text-[10px] text-stone-500 font-bold">
                       {ticketScopeFilter === "por_dia"
                         ? `Historial por día de los turnos de ${cashierName}`
-                        : ticketScopeFilter === "global"
-                        ? "Historial global de todas las cajeras y turnos"
                         : `${shiftName} • Cuentas separadas por turno`}
                     </span>
                   </div>
@@ -1578,53 +1734,52 @@ export default function ExpensesModal({
                   >
                     📅 Historial por Día ({operatorAllSales.length})
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTicketScopeFilter("global");
-                      setSelectedDayKey("all");
-                    }}
-                    className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer whitespace-nowrap ${
-                      ticketScopeFilter === "global"
-                        ? "bg-stone-800 text-white shadow-xs ring-2 ring-stone-800/20"
-                        : "bg-white text-stone-600 hover:bg-stone-200/80 border border-stone-200"
-                    }`}
-                  >
-                    🌐 Todos ({allAvailableSales.length})
-                  </button>
                 </div>
               </div>
 
-              {/* Tarjetas KPI de Resumen de Ventas y Pedidos */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                <div className="bg-emerald-50/80 p-2.5 rounded-2xl border border-emerald-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase block">Total Cobrado</span>
-                  <span className="text-base sm:text-lg font-black text-emerald-950 block mt-0.5">
-                    {formatCurrency(totalCombinedRevenue)}
+              {/* Botones de Ventas Mostrador y Pedidos Especiales */}
+              <div className="grid grid-cols-2 gap-2.5 text-center">
+                <button
+                  type="button"
+                  onClick={() => setTicketTypeFilter(ticketTypeFilter === "ventas" ? "all" : "ventas")}
+                  className={`p-3 sm:p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 ${
+                    ticketTypeFilter === "ventas"
+                      ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/25 shadow-sm"
+                      : "bg-white hover:bg-emerald-50/50 border-stone-200 hover:border-emerald-300 shadow-2xs"
+                  }`}
+                  title="Ver ventas de mostrador"
+                >
+                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider block text-stone-700 group-hover:text-emerald-950">
+                    🥖 Ventas Mostrador
                   </span>
-                  <span className="text-[9px] text-emerald-700 font-semibold block mt-0.5 truncate">
-                    {formatCurrency(totalSalesSum)} vtas + {formatCurrency(totalOrdersDeposits)} pedidos
+                  <span className="text-2xl sm:text-3xl font-black text-stone-900 block my-0.5">
+                    {activeSalesForKpi.length}
                   </span>
-                </div>
-                <div className="bg-white p-2.5 rounded-2xl border border-stone-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-stone-500 uppercase block">Ventas Mostrador</span>
-                  <span className="text-base sm:text-lg font-black text-stone-900 block mt-0.5">{activeSalesForKpi.length}</span>
-                  <span className="text-[9px] text-stone-500 block mt-0.5">
+                  <span className="text-[10px] sm:text-xs text-stone-500 font-bold block">
                     {ticketScopeFilter === "turno" ? "tickets emitidos" : "tickets históricos"}
                   </span>
-                </div>
-                <div className="bg-amber-50/80 p-2.5 rounded-2xl border border-amber-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-amber-800 uppercase block">Pedidos Especiales</span>
-                  <span className="text-base sm:text-lg font-black text-amber-950 block mt-0.5">{activeOrdersForKpi.length}</span>
-                  <span className="text-[9px] text-amber-700 block mt-0.5">
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTicketTypeFilter(ticketTypeFilter === "pedidos" ? "all" : "pedidos")}
+                  className={`p-3 sm:p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 ${
+                    ticketTypeFilter === "pedidos"
+                      ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/25 shadow-sm"
+                      : "bg-white hover:bg-amber-50/50 border-stone-200 hover:border-amber-300 shadow-2xs"
+                  }`}
+                  title="Ver pedidos especiales"
+                >
+                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider block text-amber-900 group-hover:text-amber-950">
+                    🎂 Pedidos Especiales
+                  </span>
+                  <span className="text-2xl sm:text-3xl font-black text-amber-950 block my-0.5">
+                    {activeOrdersForKpi.length}
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-amber-700 font-bold block">
                     {ticketScopeFilter === "turno" ? "encargos del turno" : "encargos registrados"}
                   </span>
-                </div>
-                <div className="bg-white p-2.5 rounded-2xl border border-stone-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-stone-500 uppercase block">Piezas Totales</span>
-                  <span className="text-base sm:text-lg font-black text-stone-900 block mt-0.5">{totalAllPieces}</span>
-                  <span className="text-[9px] text-stone-500 block mt-0.5">pan y pastelería</span>
-                </div>
+                </button>
               </div>
 
               {/* Filtros por Tipo (Todos / Ventas / Pedidos) */}
@@ -1696,12 +1851,12 @@ export default function ExpensesModal({
                 ))}
               </div>
 
-              {/* Selector de Días en Historial por Día o Global */}
-              {ticketScopeFilter !== "turno" && dayGroups.length > 0 && (
+              {/* Selector de Días en Historial por Día */}
+              {ticketScopeFilter === "por_dia" && dayGroups.length > 0 && (
                 <div className="bg-amber-50/70 border border-amber-200/90 rounded-2xl p-2.5 sm:p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-black uppercase text-amber-950 flex items-center gap-1.5">
-                      📅 {ticketScopeFilter === "por_dia" ? `Días operados por ${cashierName}` : "Días registrados"} ({dayGroups.length} {dayGroups.length === 1 ? "día" : "días"}):
+                      📅 Historial de Ventas por Día de {cashierName} ({dayGroups.length} {dayGroups.length === 1 ? "día registrado" : "días registrados"}):
                     </span>
                     {selectedDayKey !== "all" && (
                       <button
@@ -1776,9 +1931,20 @@ export default function ExpensesModal({
                         ? `Aquí se concentran todas las ventas y pedidos de los turnos de ${cashierName} organizados día por día.`
                         : "Cada venta de mostrador o pedido especial completado aparecerá aquí automáticamente con folio, desglose y ticket imprimible."}
                     </p>
+                    {ticketScopeFilter === "turno" && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={handleQuickRegisterFirstSale}
+                          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-2 active:scale-95"
+                        >
+                          <span>⚡ Registrar Primera Venta del Turno ($74.00 MXN en Efectivo)</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ) : ticketScopeFilter !== "turno" ? (
-                  /* VISTA AGRUPADA POR DÍA (HISTORIAL DIARIO DEL QUE OPERA O GLOBAL) */
+                ) : ticketScopeFilter === "por_dia" ? (
+                  /* VISTA AGRUPADA POR DÍA (HISTORIAL DIARIO DEL QUE OPERA) */
                   <div className="space-y-6">
                     {visibleDayGroups.map((group) => (
                       <div key={group.dayKey} className="space-y-3">
@@ -1792,7 +1958,7 @@ export default function ExpensesModal({
                                   {group.dayLabel}
                                 </h4>
                                 <span className="bg-amber-400/20 text-amber-300 border border-amber-300/30 text-[10px] font-black px-2 py-0.5 rounded-md">
-                                  👤 {ticketScopeFilter === "por_dia" ? cashierName : "Todos"}
+                                  👤 {cashierName}
                                 </span>
                               </div>
                               <span className="text-[10px] text-stone-300 font-bold block mt-0.5">
@@ -2538,6 +2704,15 @@ export default function ExpensesModal({
                           <p className="text-xs text-stone-500 max-w-sm mx-auto">
                             Al comenzar un nuevo turno, el contador inicia en $0.00. Conforme realices ventas de pan en mostrador se listarán automáticamente aquí con folio y desglose.
                           </p>
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={handleQuickRegisterFirstSale}
+                              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-2 active:scale-95"
+                            >
+                              <span>⚡ Registrar Primera Venta ($74.00 MXN en Efectivo)</span>
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">

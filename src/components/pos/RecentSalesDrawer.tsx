@@ -31,7 +31,7 @@ export default function RecentSalesDrawer({
 
   if (!isOpen) return null;
 
-  const effectiveOrders = orders && orders.length > 0 ? orders : getStoredOrders();
+  const effectiveOrders = Array.isArray(orders) ? orders : getStoredOrders();
 
   const filteredSales = sales.filter((s) => {
     if (typeFilter === "pedidos") return false;

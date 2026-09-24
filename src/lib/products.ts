@@ -1,4 +1,5 @@
-import { Product } from "@/types";
+import { Product, Sale } from "@/types";
+import { formatDateTimeSafe } from "@/lib/utils";
 
 export function calculateEan13CheckDigit(digits12: string): number {
   const d = digits12.replace(/\D/g, "").slice(0, 12);
@@ -553,5 +554,38 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
 export function deleteProduct(id: string): void {
   const current = getStoredProducts();
   saveStoredProducts(current.filter((p) => p.id !== id));
+}
+
+/**
+ * Crea la primera venta oficial de arranque de turno (mostrador de pan caliente en efectivo)
+ * para asegurar que el corte, balance de caja e historial reflejen ventas desde el inicio del turno.
+ */
+export function createInitialShiftSale(cashier: string = "Don Toño Brito"): Sale {
+  const now = Date.now();
+  const concha = DEFAULT_PRODUCTS.find((p) => p.id === "prod-1") || DEFAULT_PRODUCTS[0];
+  const cuerno = DEFAULT_PRODUCTS.find((p) => p.id === "prod-3") || DEFAULT_PRODUCTS[2];
+  const bolillo = DEFAULT_PRODUCTS.find((p) => p.id === "prod-4") || DEFAULT_PRODUCTS[3];
+
+  const items = [
+    { product: { ...concha, price: 12 }, quantity: 2 },
+    { product: { ...cuerno, price: 15 }, quantity: 2 },
+    { product: { ...bolillo, price: 5 }, quantity: 4 },
+  ];
+  const total = 2 * 12 + 2 * 15 + 4 * 5; // 24 + 30 + 20 = $74 MXN
+
+  return {
+    id: `POS-${now.toString().slice(-6)}`,
+    date: formatDateTimeSafe(new Date(now)),
+    items,
+    total,
+    paymentMethod: "efectivo",
+    cashGiven: 100,
+    change: 26,
+    cashier: cashier || "Don Toño Brito",
+    customerName: "Público General",
+    customerType: "frecuente",
+    timestamp: now,
+    createdAt: new Date(now).toISOString(),
+  };
 }
 

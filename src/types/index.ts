@@ -60,6 +60,8 @@ export interface Sale {
   customerType?: "general" | "frecuente" | "mayoreo" | "evento";
   createdAt?: string;
   timestamp?: number | string;
+  isCustomOrder?: boolean;
+  orderNumber?: string;
 }
 
 export interface InventoryItem {

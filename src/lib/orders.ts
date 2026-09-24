@@ -1,4 +1,4 @@
-import { CustomOrder, OrderItem, OrderPayment, CashIncome } from "@/types";
+import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types";
 import { formatDateTimeSafe } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
@@ -381,6 +381,80 @@ function recordOrderCashIncome(params: {
 }
 
 /**
+ * Registra un pedido especial (anticipo o liquidación) como una venta formal en el historial de ventas del POS
+ */
+export function recordOrderAsPosSale(params: {
+  orderId: string;
+  orderNumber: string;
+  amount: number;
+  totalOrderAmount?: number;
+  customerName: string;
+  customerId?: string;
+  cashier: string;
+  paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  description?: string;
+  items?: OrderItem[];
+  isLiquidation?: boolean;
+}) {
+  if (typeof window === "undefined" || params.amount <= 0) return;
+  try {
+    const rawSales = localStorage.getItem("brito_pos_current_sales");
+    const currentSales: Sale[] = rawSales ? JSON.parse(rawSales) : [];
+
+    const saleId = params.isLiquidation 
+      ? `LIQ-${params.orderNumber}` 
+      : params.orderNumber || `PED-${params.orderId}`;
+
+    // Evitar registros duplicados con el mismo ID de venta
+    if (currentSales.some((s) => s.id === saleId)) return;
+
+    const saleItems = (params.items && params.items.length > 0)
+      ? params.items.map((i, idx) => ({
+          product: {
+            id: i.productId || `order-item-${idx}`,
+            name: `🎂 [Pedido] ${i.name}`,
+            price: Number(i.unitPrice) || Number(i.subtotal) || params.amount,
+            category: "pasteles" as const,
+            stock: 999,
+          },
+          quantity: Number(i.quantity) || 1,
+        }))
+      : [{
+          product: {
+            id: `order-item-${params.orderId}`,
+            name: `🎂 [Pedido ${params.isLiquidation ? "Liquidación" : "Anticipo"}] ${params.description || params.orderNumber}`,
+            price: params.amount,
+            category: "pasteles" as const,
+            stock: 999,
+          },
+          quantity: 1,
+        }];
+
+    const newSale: Sale = {
+      id: saleId,
+      date: formatDateTimeSafe(new Date()),
+      items: saleItems,
+      total: params.amount,
+      paymentMethod: params.paymentMethod,
+      cashier: params.cashier,
+      customerName: params.customerName,
+      customerId: params.customerId,
+      customerType: "evento",
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
+      isCustomOrder: true,
+      orderNumber: params.orderNumber,
+    };
+
+    const nextSales = [newSale, ...currentSales];
+    localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextSales));
+    window.dispatchEvent(new Event("brito_sales_updated"));
+  } catch (err) {
+    console.error("Error logging order as POS sale:", err);
+  }
+}
+
+/**
  * Genera el siguiente número de pedido único consecutivo (ej. PED-105)
  */
 export function generateNextOrderNumber(): string {
@@ -460,6 +534,21 @@ export function addCustomOrder(data: {
       branchId: data.operatingBranchId || data.branchId,
       branchName: data.operatingBranchName || data.branchName,
       paymentMethod: data.paymentMethod,
+      isLiquidation: remaining === 0,
+    });
+
+    // Registrar el anticipo del pedido como una venta en el historial de ventas del POS
+    recordOrderAsPosSale({
+      orderId,
+      orderNumber,
+      amount: deposit,
+      totalOrderAmount: data.total,
+      customerName: data.customerName,
+      customerId: data.customerId,
+      cashier: data.cashier,
+      paymentMethod: data.paymentMethod,
+      description: data.description,
+      items: data.items,
       isLiquidation: remaining === 0,
     });
   }
@@ -580,6 +669,21 @@ export function addOrderPayment(
     branchId: params.operatingBranchId || order.branchId,
     branchName: params.operatingBranchName || order.branchName,
     paymentMethod: params.paymentMethod,
+    isLiquidation: isFullLiquidation,
+  });
+
+  // Registrar el abono o liquidación como una venta en el historial de ventas del POS
+  recordOrderAsPosSale({
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    amount: paymentAmount,
+    totalOrderAmount: order.total,
+    customerName: order.customerName,
+    customerId: order.customerId,
+    cashier: params.cashier,
+    paymentMethod: params.paymentMethod,
+    description: order.description,
+    items: order.items,
     isLiquidation: isFullLiquidation,
   });
 

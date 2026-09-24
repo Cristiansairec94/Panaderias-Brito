@@ -50,9 +50,9 @@ import {
   WifiOff
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
+import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, createInitialShiftSale } from "@/lib/products";
 import { 
   DEFAULT_GENERAL_CUSTOMER, 
   getStoredCustomers, 
@@ -531,14 +531,27 @@ export default function POSPage() {
         const saved = localStorage.getItem("brito_pos_current_sales");
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            if (!localStorage.getItem("brito_pos_master_sales") && parsed.length > 0) {
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            if (!localStorage.getItem("brito_pos_master_sales")) {
               localStorage.setItem("brito_pos_master_sales", JSON.stringify(parsed));
             }
             return parsed;
           }
         }
       } catch (e) {}
+
+      // Si el turno está recién abierto o no tiene ventas, registrar y asegurar la primera venta del turno
+      const firstSale = createInitialShiftSale();
+      try {
+        localStorage.setItem("brito_pos_current_sales", JSON.stringify([firstSale]));
+        const rawMaster = localStorage.getItem("brito_pos_master_sales");
+        const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+        if (!prevMaster.some((s) => s.id === firstSale.id)) {
+          localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
+        }
+        window.dispatchEvent(new Event("brito_sales_updated"));
+      } catch (e) {}
+      return [firstSale];
     }
     return [];
   });
@@ -800,19 +813,26 @@ export default function POSPage() {
 
   const handleDirectUnlockShift = () => {
     setInitialCashFund(baseShiftFund);
-    setRecentSalesList([]);
+    const firstSale = createInitialShiftSale(cashierName);
+    setRecentSalesList([firstSale]);
     setExpensesList([]);
     setIncomesList([]);
     try {
       localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
       localStorage.removeItem("brito_pos_shift_locked");
-      localStorage.removeItem("brito_pos_current_sales");
+      localStorage.setItem("brito_pos_current_sales", JSON.stringify([firstSale]));
+      const rawMaster = localStorage.getItem("brito_pos_master_sales");
+      const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+      if (!prevMaster.some((s) => s.id === firstSale.id)) {
+        localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
+      }
       localStorage.removeItem("brito_pos_current_expenses");
       localStorage.removeItem("brito_pos_current_incomes");
-      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      localStorage.setItem("brito_current_shift_start_timestamp", (Number(firstSale.timestamp) - 1000).toString());
       localStorage.setItem("brito_current_shift_cashier", cashierName);
       localStorage.setItem("brito_current_shift_name", shiftName);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
     setIsShiftLocked(false);
   };
@@ -891,9 +911,36 @@ export default function POSPage() {
       localStorage.setItem("brito_pos_shift_locked", "true");
       localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
     setShowCashDrawerModal(false);
     setIsShiftLocked(true);
+  };
+
+  const handleCashierChange = (newCashier: string) => {
+    setCashierName(newCashier);
+    try {
+      localStorage.setItem("brito_current_shift_cashier", newCashier);
+      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      localStorage.removeItem("brito_pos_current_sales");
+      localStorage.removeItem("brito_pos_current_expenses");
+      localStorage.removeItem("brito_pos_current_incomes");
+      window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      window.dispatchEvent(new Event("brito_sales_updated"));
+    } catch (e) {}
+  };
+
+  const handleShiftChange = (newShift: string) => {
+    setShiftName(newShift);
+    try {
+      localStorage.setItem("brito_current_shift_name", newShift);
+      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      localStorage.removeItem("brito_pos_current_sales");
+      localStorage.removeItem("brito_pos_current_expenses");
+      localStorage.removeItem("brito_pos_current_incomes");
+      window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      window.dispatchEvent(new Event("brito_sales_updated"));
+    } catch (e) {}
   };
 
   // Carga y sincronización directa con el catálogo del apartado de productos (/productos)
@@ -1367,50 +1414,66 @@ export default function POSPage() {
   }, [lastCutInfo, shiftVersion]);
 
   const currentShiftSales = useMemo(() => {
-    const filtered = recentSalesList.filter((s) => {
-      if (s.cashier && cashierName) {
-        const isMatch = matchesCashier(s.cashier, cashierName) ||
-                        cashierName.toLowerCase().includes("don toño") ||
-                        cashierName.toLowerCase().includes("admin") ||
-                        s.cashier.toLowerCase().includes("don toño") ||
-                        s.cashier.toLowerCase().includes("admin");
-        if (!isMatch) {
-          const isDifferentSpecificCashier = 
-            (s.cashier.toLowerCase().includes("cajera 2") && cashierName.toLowerCase().includes("cajera 1")) ||
-            (s.cashier.toLowerCase().includes("cajera 1") && cashierName.toLowerCase().includes("cajera 2"));
-          if (isDifferentSpecificCashier) return false;
+    const currentShiftSaleIds = new Set<string>();
+    try {
+      const rawCurrent = localStorage.getItem("brito_pos_current_sales");
+      if (rawCurrent) {
+        const parsedCurrent = JSON.parse(rawCurrent);
+        if (Array.isArray(parsedCurrent)) {
+          parsedCurrent.forEach((s) => {
+            if (s && s.id) currentShiftSaleIds.add(s.id);
+          });
         }
       }
-      const t = typeof s.timestamp === "number"
-        ? s.timestamp
-        : s.timestamp
-        ? new Date(s.timestamp).getTime()
-        : s.createdAt
-        ? new Date(s.createdAt).getTime()
-        : 0;
-      if (shiftStartBoundary > 0 && t > 0 && t < (shiftStartBoundary - 5000)) return false;
-      return true;
+    } catch (e) {}
+
+    const filtered = recentSalesList.filter((s) => {
+      if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
+      const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+      if (shiftStartBoundary > 0) {
+        if (!t || t < shiftStartBoundary) return false;
+      }
+      if (currentShiftSaleIds.size > 0) {
+        return currentShiftSaleIds.has(s.id);
+      }
+      return false;
     });
     return filtered;
-  }, [recentSalesList, cashierName, shiftStartBoundary]);
+  }, [recentSalesList, cashierName, shiftStartBoundary, shiftVersion]);
 
   const currentShiftExpenses = useMemo(() => {
     return expensesList.filter((e) => {
       if (!e.cashier || !matchesCashier(e.cashier, cashierName)) return false;
-      const t = typeof e.timestamp === "number" ? e.timestamp : (e.createdAt ? new Date(e.createdAt).getTime() : 0);
-      if (shiftStartBoundary > 0 && t > 0 && t < shiftStartBoundary) return false;
+      const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
+      if (shiftStartBoundary > 0) {
+        if (!t || t < shiftStartBoundary) return false;
+      }
       return true;
     });
-  }, [expensesList, cashierName, shiftStartBoundary]);
+  }, [expensesList, cashierName, shiftStartBoundary, shiftVersion]);
 
   const currentShiftIncomes = useMemo(() => {
     return incomesList.filter((inc) => {
       if (!inc.cashier || !matchesCashier(inc.cashier, cashierName)) return false;
-      const t = typeof inc.timestamp === "number" ? inc.timestamp : (inc.date ? new Date(inc.date).getTime() : 0);
-      if (shiftStartBoundary > 0 && t > 0 && t < shiftStartBoundary) return false;
+      const t = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
+      if (shiftStartBoundary > 0) {
+        if (!t || t < shiftStartBoundary) return false;
+      }
       return true;
     });
-  }, [incomesList, cashierName, shiftStartBoundary]);
+  }, [incomesList, cashierName, shiftStartBoundary, shiftVersion]);
+
+  const currentShiftOrders = useMemo(() => {
+    return getStoredOrders().filter((o) => {
+      if (activeBranch && o.branchId && o.branchId !== activeBranch.id) return false;
+      if (!o.cashier || !matchesCashier(o.cashier, cashierName)) return false;
+      const t = parseDateTimeSafe(o.createdAt || (o as any).date);
+      if (shiftStartBoundary > 0) {
+        if (!t || t < shiftStartBoundary) return false;
+      }
+      return true;
+    });
+  }, [activeBranch?.id, cashierName, shiftStartBoundary, shiftVersion]);
 
   const totalCashSales = currentShiftSales
     .filter((s) => s.paymentMethod === "efectivo")
@@ -3422,7 +3485,7 @@ export default function POSPage() {
         onClose={() => setShowRecentSales(false)}
         sales={currentShiftSales}
         onSelectSaleForReprint={handleReprintSale}
-        orders={getStoredOrders()}
+        orders={currentShiftOrders}
         onSelectOrderForReceipt={(order) => {
           setShowRecentSales(false);
           setSelectedOrderForReceipt(order);
@@ -3437,13 +3500,13 @@ export default function POSPage() {
       <ExpensesModal
         isOpen={showExpensesModal}
         onClose={() => setShowExpensesModal(false)}
-        expenses={expensesList}
+        expenses={currentShiftExpenses}
         onAddExpense={handleAddExpense}
         onDeleteExpense={(id) => setExpensesList((prev) => prev.filter((e) => e.id !== id))}
-        incomes={incomesList}
+        incomes={currentShiftIncomes}
         onAddIncome={handleAddIncome}
         onDeleteIncome={handleDeleteIncome}
-        sales={recentSalesList}
+        sales={currentShiftSales}
         onSelectSaleForReprint={handleReprintSale}
         orders={getStoredOrders()}
         onSelectOrderForReceipt={(order) => {
@@ -3500,9 +3563,9 @@ export default function POSPage() {
           isOpen={showCashDrawerModal}
           onClose={() => setShowCashDrawerModal(false)}
           cashierName={cashierName}
-          onChangeCashier={setCashierName}
+          onChangeCashier={handleCashierChange}
           shiftName={shiftName}
-          onChangeShift={setShiftName}
+          onChangeShift={handleShiftChange}
           initialFund={initialCashFund}
           onChangeInitialFund={(val) => {
             setInitialCashFund(val);

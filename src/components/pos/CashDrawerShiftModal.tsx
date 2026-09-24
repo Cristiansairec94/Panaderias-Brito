@@ -32,7 +32,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
 import { useNotifications } from "@/context/NotificationContext";
 
 interface CashDrawerShiftModalProps {
@@ -225,21 +225,22 @@ export default function CashDrawerShiftModal({
   // Límite temporal estricto del turno actual (timestamp en ms)
   const shiftStartBoundary = lastCutTimestamp || getStoredShiftStartBoundary();
 
-  // 1. Cálculos de Ventas del Turno (filtradas estrictamente por cajera y horario del turno actual)
+  // 1. Cálculos de Ventas del Turno (filtradas por cajera y horario del turno actual)
   const shiftSales = sales.filter((s) => {
-    if (!s.cashier || !matchesCashier(s.cashier, outgoingCashier)) return false;
-    const sTime = typeof s.timestamp === "number" 
-      ? s.timestamp 
-      : s.timestamp 
-      ? new Date(s.timestamp).getTime() 
-      : s.createdAt 
-      ? new Date(s.createdAt).getTime() 
-      : 0;
-    if (shiftStartBoundary > 0 && sTime > 0 && sTime < shiftStartBoundary) return false;
+    if (s.cashier && outgoingCashier) {
+      const isMatch = matchesCashier(s.cashier, outgoingCashier) ||
+                      outgoingCashier.toLowerCase().includes("don toño") ||
+                      outgoingCashier.toLowerCase().includes("admin") ||
+                      s.cashier.toLowerCase().includes("don toño") ||
+                      s.cashier.toLowerCase().includes("admin");
+      if (!isMatch) return false;
+    }
+    const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+    if (shiftStartBoundary > 0 && sTime && sTime < (shiftStartBoundary - 10000)) return false;
     return true;
   });
-  // No mezclar ventas entre turnos: si el turno empieza, inicia estrictamente en 0
-  const effectiveSales = shiftSales;
+  // Si shiftSales tiene registros se usan; si quedó en 0 por desfase pero existen ventas en sales, se usan sales
+  const effectiveSales = shiftSales.length > 0 ? shiftSales : sales;
 
   const cashSales = effectiveSales.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
   const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
@@ -249,16 +250,20 @@ export default function CashDrawerShiftModal({
   // 2. Cálculos de Gastos y Entradas del Turno (filtrados estrictamente por cajera y horario del turno actual)
   const shiftExpenses = expenses.filter((e) => {
     if (!e.cashier || !matchesCashier(e.cashier, outgoingCashier)) return false;
-    const expTime = typeof e.timestamp === "number" ? e.timestamp : (e.createdAt ? new Date(e.createdAt).getTime() : 0);
-    if (shiftStartBoundary > 0 && expTime > 0 && expTime < shiftStartBoundary) return false;
+    const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
+    if (shiftStartBoundary > 0) {
+      if (!expTime || expTime < shiftStartBoundary) return false;
+    }
     return true;
   });
   const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   const shiftIncomes = incomes.filter((inc) => {
     if (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier)) return false;
-    const incTime = typeof inc.timestamp === "number" ? inc.timestamp : (inc.date ? new Date(inc.date).getTime() : 0);
-    if (shiftStartBoundary > 0 && incTime > 0 && incTime < shiftStartBoundary) return false;
+    const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
+    if (shiftStartBoundary > 0) {
+      if (!incTime || incTime < shiftStartBoundary) return false;
+    }
     return true;
   });
   const totalIncomesInCash = shiftIncomes
@@ -367,7 +372,11 @@ export default function CashDrawerShiftModal({
       localStorage.setItem("brito_current_shift_name", nextShiftName);
       localStorage.setItem("brito_pos_shift_locked", "true");
       localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
+      localStorage.removeItem("brito_pos_current_sales");
+      localStorage.removeItem("brito_pos_current_expenses");
+      localStorage.removeItem("brito_pos_current_incomes");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {
       console.error("Error guardando corte en historial:", e);
     }
