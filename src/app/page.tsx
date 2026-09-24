@@ -27,12 +27,8 @@ import {
   Award, 
   CreditCard, 
   Banknote, 
-  Eye, 
-  Boxes,
-  Timer,
-  Check,
-  Plus,
-  TrendingDown
+  Eye,
+  Plus
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
@@ -65,40 +61,6 @@ const ALL_TOP_BAKERY_PRODUCTS: TopProductItem[] = [
   { id: "6", name: "Rebanada Pastel Tres Leches", category: "pasteleria", categoryLabel: "Pastelería", icon: "🍰", price: 48, piecesSold: 46, revenue: 2208, share: 11, trend: "+18%", tag: "Gourmet" },
   { id: "7", name: "Oreja Caramelizada de Hojaldre", category: "hojaldre", categoryLabel: "Hojaldre", icon: "🥐", price: 16, piecesSold: 135, revenue: 2160, share: 10, trend: "+10%", tag: "Crujiente" },
   { id: "8", name: "Pay de Queso con Zarzamora", category: "pasteleria", categoryLabel: "Pastelería", icon: "🥧", price: 45, piecesSold: 38, revenue: 1710, share: 8, trend: "+14%", tag: "Especialidad" },
-];
-
-// Cronograma de Tandas y Horno
-interface BakingShiftSchedule {
-  id: string;
-  name: string;
-  hour: string;
-  bakingType: string;
-  pieces: number;
-  status: "completada" | "en_horno" | "programada";
-  baker: string;
-}
-
-const BAKING_SCHEDULE: BakingShiftSchedule[] = [
-  { id: "b1", name: "Tanda 1: Bolillos de Piso & Teleras", hour: "05:30 AM", bakingType: "Horno de Piso (Leña/Gas)", pieces: 1200, status: "completada", baker: "Maestro Juan" },
-  { id: "b2", name: "Tanda 2: Conchas, Donas & Bizcocho", hour: "07:00 AM", bakingType: "Hornos Rotativos", pieces: 850, status: "completada", baker: "Don Toño Brito" },
-  { id: "b3", name: "Tanda 3: Hojaldres & Repostería Fina", hour: "12:30 PM", bakingType: "Horno de Convección", pieces: 600, status: "completada", baker: "Maestro Juan" },
-  { id: "b4", name: "Tanda 4: Pan Caliente para la Merienda", hour: "17:30 PM", bakingType: "Hornos Rotativos", pieces: 800, status: "programada", baker: "Equipo Turno Tarde" },
-];
-
-// Insumos críticos del almacén
-interface CriticalRawMaterial {
-  name: string;
-  current: number;
-  min: number;
-  unit: string;
-  status: "ok" | "alerta" | "critico";
-}
-
-const CRITICAL_RAW_MATERIALS: CriticalRawMaterial[] = [
-  { name: "Harina de Trigo Extra Fina", current: 8, min: 10, unit: "bultos", status: "alerta" },
-  { name: "Mantequilla Pura de Vaca", current: 4, min: 12, unit: "kg", status: "critico" },
-  { name: "Gas LP Hornos Principales", current: 68, min: 25, unit: "% estac.", status: "ok" },
-  { name: "Azúcar Estándar", current: 14, min: 5, unit: "bultos", status: "ok" },
 ];
 
 interface ChartDataPoint {
@@ -999,209 +961,134 @@ export default function Home() {
       </div>
 
       {/* ========================================================= */}
-      {/* 5. FLOW CHART & HORNADAS DE PANADERÍA (Operaciones)      */}
+      {/* 5. FLOW CHART & HORAS PICO DE PANADERÍA                  */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Hourly Peak Flow */}
-        <div className="lg:col-span-2 bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-orange-600" />
-                  Flujo Horario & Horas Pico de Panadería
-                </h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
-                  {isAllBranches ? "Consolidado" : currentBranch?.shortName}
-                </span>
-              </div>
-              <p className="text-xs text-stone-500 mt-0.5">
-                Demanda de mostrador: picos matutino (bolillo/conchas) y vespertino (pan para café de la tarde).
-              </p>
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-orange-600" />
+                Flujo Horario & Horas Pico de Panadería
+              </h2>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
+                {isAllBranches ? "Consolidado" : currentBranch?.shortName}
+              </span>
             </div>
-
-            {/* Toggle between Hourly and Weekly */}
-            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
-              <button
-                onClick={() => setActiveChartTab("horas")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                  activeChartTab === "horas"
-                    ? "bg-white text-stone-900 shadow-sm"
-                    : "text-stone-500 hover:text-stone-900"
-                }`}
-              >
-                Horas del Día (Picos)
-              </button>
-              <button
-                onClick={() => setActiveChartTab("dias")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                  activeChartTab === "dias"
-                    ? "bg-white text-stone-900 shadow-sm"
-                    : "text-stone-500 hover:text-stone-900"
-                }`}
-              >
-                Días de la Semana
-              </button>
-            </div>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Demanda de mostrador: picos matutino (bolillo/conchas) y vespertino (pan para café de la tarde).
+            </p>
           </div>
 
-          {/* Dynamic Interactive Chart Bars */}
-          <div className="space-y-3 w-full">
-            <div className="w-full overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
-              <div className="h-44 sm:h-52 min-w-[480px] sm:min-w-0 w-full flex items-end gap-1.5 sm:gap-3 pt-6 pb-2 px-1">
-                {activeChartItems.map((d) => {
-                  const heightPercent = Math.max(12, Math.round((d.amount / maxChartAmount) * 100));
-                  const isPeak = d.isPeak;
-                  const isHovered = hoveredDataIndex === d.index;
-
-                  return (
-                    <div
-                      key={d.label}
-                      className="flex-1 h-full flex flex-col justify-end items-center group relative cursor-pointer"
-                      onMouseEnter={() => setHoveredDataIndex(d.index)}
-                      onMouseLeave={() => setHoveredDataIndex(null)}
-                    >
-                      {/* Tooltip Hover Bubble */}
-                      <div
-                        className={`absolute bottom-full mb-3 bg-stone-950 text-white rounded-2xl px-3.5 py-2.5 text-xs shadow-2xl border border-stone-800 pointer-events-none transition-all duration-150 z-30 whitespace-nowrap ${
-                          isHovered ? "opacity-100 scale-100 -translate-y-1" : "opacity-0 scale-95 pointer-events-none"
-                        }`}
-                      >
-                        <p className="font-black text-amber-300">
-                          {activeChartTab === "horas" ? `${d.label} hrs` : d.label}
-                        </p>
-                        <p className="font-black text-white text-sm">{formatCurrency(d.amount)}</p>
-                        <p className="text-[10px] text-stone-300">
-                          {d.tickets} tickets emitidos • ~{d.pieces} piezas
-                        </p>
-                        {isPeak && (
-                          <p className="text-[9px] font-black text-orange-400 uppercase mt-0.5">
-                            🔥 Pico de Mayor Venta
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Visual Bar with explicit height container */}
-                      <div className="w-full h-32 sm:h-40 relative flex items-end justify-center">
-                        <div className="absolute inset-x-0 bottom-0 top-0 mx-auto w-full max-w-[34px] sm:max-w-[40px] bg-stone-100 rounded-xl" />
-                        <div
-                          className={`w-full max-w-[34px] sm:max-w-[40px] rounded-xl relative z-10 transition-all duration-300 ${
-                            isPeak
-                              ? "bg-gradient-to-t from-orange-600 via-rose-500 to-amber-400 shadow-md shadow-orange-500/25"
-                              : "bg-gradient-to-t from-stone-300 via-stone-300 to-stone-400 hover:from-orange-400 hover:to-amber-400"
-                          } ${isHovered ? "ring-2 ring-orange-500 brightness-110 scale-105" : ""}`}
-                          style={{ height: `${heightPercent}%`, minHeight: "14px" }}
-                        />
-                      </div>
-
-                      <span className={`text-[10px] sm:text-[11px] font-bold mt-2 tracking-tight ${
-                        isPeak ? "text-orange-600 font-black" : "text-stone-400"
-                      }`}>
-                        {d.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Peak Bakery Insights Callouts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-stone-100">
-              <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-3">
-                <div className="p-2 rounded-xl bg-amber-100 text-amber-800 font-black text-sm">
-                  🌅
-                </div>
-                <div>
-                  <p className="text-xs font-black text-amber-950">Pico Matutino (07:00 - 09:30 AM)</p>
-                  <p className="text-[11px] text-amber-800/90 leading-relaxed">
-                    Alta demanda de <strong>Bolillo artesanal caliente</strong> para lonches/desayunos y conchas con café recién preparadas.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200/80 flex items-start gap-3">
-                <div className="p-2 rounded-xl bg-rose-100 text-rose-800 font-black text-sm">
-                  ☕
-                </div>
-                <div>
-                  <p className="text-xs font-black text-rose-950">Pico Vespertino (17:30 - 20:30 PM)</p>
-                  <p className="text-[11px] text-rose-800/90 leading-relaxed">
-                    Compra familiar de <strong>Pan Dulce surtido</strong> (cuernos, donas, orejas y pasteles) para la merienda o cena.
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* Toggle between Hourly and Weekly */}
+          <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
+            <button
+              onClick={() => setActiveChartTab("horas")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                activeChartTab === "horas"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Horas del Día (Picos)
+            </button>
+            <button
+              onClick={() => setActiveChartTab("dias")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                activeChartTab === "dias"
+                  ? "bg-white text-stone-900 shadow-sm"
+                  : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Días de la Semana
+            </button>
           </div>
         </div>
 
-        {/* Right 1 Col: Hornadas y Almacén Crítico */}
-        <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm flex flex-col justify-between space-y-5">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Flame className="w-5 h-5 text-rose-600" />
-                <h3 className="font-black text-base text-stone-900">Estado de Hornos & Tandas</h3>
-              </div>
-              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                Horneando
-              </span>
-            </div>
+        {/* Dynamic Interactive Chart Bars */}
+        <div className="space-y-3 w-full">
+          <div className="w-full overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+            <div className="h-44 sm:h-52 min-w-[480px] sm:min-w-0 w-full flex items-end gap-1.5 sm:gap-3 pt-6 pb-2 px-1">
+              {activeChartItems.map((d) => {
+                const heightPercent = Math.max(12, Math.round((d.amount / maxChartAmount) * 100));
+                const isPeak = d.isPeak;
+                const isHovered = hoveredDataIndex === d.index;
 
-            {/* Baking shifts timeline */}
-            <div className="space-y-2.5">
-              {BAKING_SCHEDULE.map((shift) => (
-                <div
-                  key={shift.id}
-                  className="p-3 rounded-2xl bg-stone-50/80 border border-stone-200/80 flex items-center justify-between gap-2"
-                >
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-black text-stone-900">{shift.name}</p>
-                    <p className="text-[10px] text-stone-500">
-                      {shift.hour} • {shift.pieces} pzas • {shift.baker}
-                    </p>
+                return (
+                  <div
+                    key={d.label}
+                    className="flex-1 h-full flex flex-col justify-end items-center group relative cursor-pointer"
+                    onMouseEnter={() => setHoveredDataIndex(d.index)}
+                    onMouseLeave={() => setHoveredDataIndex(null)}
+                  >
+                    {/* Tooltip Hover Bubble */}
+                    <div
+                      className={`absolute bottom-full mb-3 bg-stone-950 text-white rounded-2xl px-3.5 py-2.5 text-xs shadow-2xl border border-stone-800 pointer-events-none transition-all duration-150 z-30 whitespace-nowrap ${
+                        isHovered ? "opacity-100 scale-100 -translate-y-1" : "opacity-0 scale-95 pointer-events-none"
+                      }`}
+                    >
+                      <p className="font-black text-amber-300">
+                        {activeChartTab === "horas" ? `${d.label} hrs` : d.label}
+                      </p>
+                      <p className="font-black text-white text-sm">{formatCurrency(d.amount)}</p>
+                      <p className="text-[10px] text-stone-300">
+                        {d.tickets} tickets emitidos • ~{d.pieces} piezas
+                      </p>
+                      {isPeak && (
+                        <p className="text-[9px] font-black text-orange-400 uppercase mt-0.5">
+                          🔥 Pico de Mayor Venta
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Visual Bar with explicit height container */}
+                    <div className="w-full h-32 sm:h-40 relative flex items-end justify-center">
+                      <div className="absolute inset-x-0 bottom-0 top-0 mx-auto w-full max-w-[34px] sm:max-w-[40px] bg-stone-100 rounded-xl" />
+                      <div
+                        className={`w-full max-w-[34px] sm:max-w-[40px] rounded-xl relative z-10 transition-all duration-300 ${
+                          isPeak
+                            ? "bg-gradient-to-t from-orange-600 via-rose-500 to-amber-400 shadow-md shadow-orange-500/25"
+                            : "bg-gradient-to-t from-stone-300 via-stone-300 to-stone-400 hover:from-orange-400 hover:to-amber-400"
+                        } ${isHovered ? "ring-2 ring-orange-500 brightness-110 scale-105" : ""}`}
+                        style={{ height: `${heightPercent}%`, minHeight: "14px" }}
+                      />
+                    </div>
+
+                    <span className={`text-[10px] sm:text-[11px] font-bold mt-2 tracking-tight ${
+                      isPeak ? "text-orange-600 font-black" : "text-stone-400"
+                    }`}>
+                      {d.label}
+                    </span>
                   </div>
-                  <div>
-                    {shift.status === "completada" ? (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                        <Check className="w-2.5 h-2.5" /> Lista
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
-                        <Timer className="w-2.5 h-2.5 animate-spin" /> Programada
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* Insumos Críticos del Almacén */}
-          <div className="pt-3 border-t border-stone-100 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-                <Boxes className="w-4 h-4 text-orange-600" />
-                Insumos Clave en Almacén
-              </span>
-              <Link href="/inventario" className="text-[11px] font-bold text-orange-600 hover:underline">
-                Ver Todo
-              </Link>
+          {/* Peak Bakery Insights Callouts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-stone-100">
+            <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-amber-100 text-amber-800 font-black text-sm">
+                🌅
+              </div>
+              <div>
+                <p className="text-xs font-black text-amber-950">Pico Matutino (07:00 - 09:30 AM)</p>
+                <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                  Alta demanda de <strong>Bolillo artesanal caliente</strong> para lonches/desayunos y conchas con café recién preparadas.
+                </p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {CRITICAL_RAW_MATERIALS.map((m) => (
-                <div key={m.name} className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/70 space-y-1">
-                  <p className="font-extrabold text-[11px] text-stone-800 line-clamp-1">{m.name}</p>
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-stone-500">{m.current} / {m.min} {m.unit}</span>
-                    <span className={`font-black ${
-                      m.status === "critico" ? "text-rose-600" : m.status === "alerta" ? "text-amber-600" : "text-emerald-600"
-                    }`}>
-                      {m.status === "critico" ? "⚠️ Bajo" : m.status === "alerta" ? "Reorden" : "OK"}
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200/80 flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-rose-100 text-rose-800 font-black text-sm">
+                ☕
+              </div>
+              <div>
+                <p className="text-xs font-black text-rose-950">Pico Vespertino (17:30 - 20:30 PM)</p>
+                <p className="text-[11px] text-rose-800/90 leading-relaxed">
+                  Compra familiar de <strong>Pan Dulce surtido</strong> (cuernos, donas, orejas y pasteles) para la merienda o cena.
+                </p>
+              </div>
             </div>
           </div>
         </div>
