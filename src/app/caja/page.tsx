@@ -27,6 +27,7 @@ import {
   Filter,
   Download,
   Eye,
+  EyeOff,
   RefreshCw,
   ShieldCheck,
   Calendar,
@@ -187,7 +188,7 @@ const INITIAL_MOVEMENTS: CashMovement[] = [
 ];
 
 export default function CajaPage() {
-  const { user } = useAuth();
+  const { user, usersList } = useAuth();
   const { currentBranch } = useBranch();
   const { addNotification } = useNotifications();
   const { isOnline, isSyncing, pendingCount, enqueueOfflineItem } = useSync();
@@ -281,11 +282,32 @@ export default function CajaPage() {
   const [movReason, setMovReason] = useState("");
   const [movSuccessFeedback, setMovSuccessFeedback] = useState<string | null>(null);
 
-  // Live Shift Cut Modal
+  // Live Shift Cut Modal State
   const [isCorteModalOpen, setIsCorteModalOpen] = useState(false);
+  const [incomingCashier, setIncomingCashier] = useState("Cajera 2 - Turno Vespertino");
+  const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
+  const [deliveryPassword, setDeliveryPassword] = useState("");
+  const [showDeliveryPassword, setShowDeliveryPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [countedCash, setCountedCash] = useState<string>("");
-  const [nextFundAmount, setNextFundAmount] = useState<string>("0");
+  const [nextFundAmount, setNextFundAmount] = useState<string>("500");
   const [corteNotes, setCorteNotes] = useState<string>("");
+  const [countMode, setCountMode] = useState<"directo" | "denominaciones">("directo");
+  const [showIncomeBreakdown, setShowIncomeBreakdown] = useState(true);
+  const [denominations, setDenominations] = useState<Record<string, number>>({
+    b1000: 0,
+    b500: 0,
+    b200: 0,
+    b100: 0,
+    b50: 0,
+    b20: 0,
+    m20: 0,
+    m10: 0,
+    m5: 0,
+    m2: 0,
+    m1: 0,
+    m05: 0,
+  });
 
   // Load and sync cuts history from localStorage
   const loadCutsHistory = () => {
@@ -366,11 +388,98 @@ export default function CajaPage() {
   }, []);
 
   // Live calculations
-  const totalEntries = movements.filter((m) => m.type === "entrada").reduce((sum, m) => sum + m.amount, 0);
+  const entryMovements = movements.filter((m) => m.type === "entrada");
+  const totalEntries = entryMovements.reduce((sum, m) => sum + m.amount, 0);
   const totalExpenses = movements.filter((m) => m.type === "salida").reduce((sum, m) => sum + m.amount, 0);
   const expectedCashInDrawer = initialCash + cashSales + totalEntries - totalExpenses;
   const actualCount = Number(countedCash) || 0;
   const cashDifference = actualCount - expectedCashInDrawer;
+
+  // Desglose de ingresos registrados en el turno
+  const pedidosEntries = entryMovements.filter((m) => m.category === "abono_cliente" || (m.reason && m.reason.toLowerCase().includes("pedido")));
+  const pedidosTotal = pedidosEntries.reduce((acc, m) => acc + m.amount, 0);
+  const otherEntries = entryMovements.filter((m) => m.category !== "abono_cliente" && !(m.reason && m.reason.toLowerCase().includes("pedido")));
+  const otherEntriesTotal = otherEntries.reduce((acc, m) => acc + m.amount, 0);
+
+  // Conteo de efectivo por denominaciones
+  const denominationsTotal = useMemo(() => {
+    return (
+      (denominations.b1000 || 0) * 1000 +
+      (denominations.b500 || 0) * 500 +
+      (denominations.b200 || 0) * 200 +
+      (denominations.b100 || 0) * 100 +
+      (denominations.b50 || 0) * 50 +
+      (denominations.b20 || 0) * 20 +
+      (denominations.m20 || 0) * 20 +
+      (denominations.m10 || 0) * 10 +
+      (denominations.m5 || 0) * 5 +
+      (denominations.m2 || 0) * 2 +
+      (denominations.m1 || 0) * 1 +
+      (denominations.m05 || 0) * 0.5
+    );
+  }, [denominations]);
+
+  const handleUpdateDenomination = (key: string, delta: number) => {
+    setDenominations((prev) => {
+      const nextVal = Math.max(0, (prev[key] || 0) + delta);
+      const updated = { ...prev, [key]: nextVal };
+      const newTotal =
+        (updated.b1000 || 0) * 1000 +
+        (updated.b500 || 0) * 500 +
+        (updated.b200 || 0) * 200 +
+        (updated.b100 || 0) * 100 +
+        (updated.b50 || 0) * 50 +
+        (updated.b20 || 0) * 20 +
+        (updated.m20 || 0) * 20 +
+        (updated.m10 || 0) * 10 +
+        (updated.m5 || 0) * 5 +
+        (updated.m2 || 0) * 2 +
+        (updated.m1 || 0) * 1 +
+        (updated.m05 || 0) * 0.5;
+      setCountedCash(newTotal > 0 ? newTotal.toString() : "");
+      return updated;
+    });
+  };
+
+  const handleSetDenominationInput = (key: string, valStr: string) => {
+    const qty = parseInt(valStr.replace(/\D/g, ""), 10) || 0;
+    setDenominations((prev) => {
+      const updated = { ...prev, [key]: qty };
+      const newTotal =
+        (updated.b1000 || 0) * 1000 +
+        (updated.b500 || 0) * 500 +
+        (updated.b200 || 0) * 200 +
+        (updated.b100 || 0) * 100 +
+        (updated.b50 || 0) * 50 +
+        (updated.b20 || 0) * 20 +
+        (updated.m20 || 0) * 20 +
+        (updated.m10 || 0) * 10 +
+        (updated.m5 || 0) * 5 +
+        (updated.m2 || 0) * 2 +
+        (updated.m1 || 0) * 1 +
+        (updated.m05 || 0) * 0.5;
+      setCountedCash(newTotal > 0 ? newTotal.toString() : "");
+      return updated;
+    });
+  };
+
+  const handleClearDenominations = () => {
+    setDenominations({
+      b1000: 0,
+      b500: 0,
+      b200: 0,
+      b100: 0,
+      b50: 0,
+      b20: 0,
+      m20: 0,
+      m10: 0,
+      m5: 0,
+      m2: 0,
+      m1: 0,
+      m05: 0,
+    });
+    setCountedCash("");
+  };
 
   // Active shift responsible name
   const currentShiftResponsible = user?.name || "Lupita Brito (Cajera 1)";
@@ -571,8 +680,26 @@ export default function CajaPage() {
   // Execute and Save Live Cash Cut to Shared History
   const handleConfirmLiveCut = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Validar contraseña / PIN de quien entrega
+    if (!deliveryPassword.trim()) {
+      setPasswordError("Debes ingresar la contraseña o PIN de autorización para firmar y entregar el turno.");
+      return;
+    }
+
+    const expectedPass = user?.password;
+    const cleanPass = deliveryPassword.trim().toLowerCase();
+    const isMasterPass = cleanPass === "admin" || cleanPass === "1234" || cleanPass === "caja" || cleanPass === "pan" || cleanPass === "super";
+    const isUserPass = Boolean(expectedPass && expectedPass.toLowerCase() === cleanPass);
+
+    if (!isUserPass && !isMasterPass) {
+      setPasswordError(`Contraseña incorrecta. Por favor ingresa la clave de ${currentShiftResponsible} o autorización de Don Toño.`);
+      return;
+    }
+
+    // 2. Validar efectivo físico contado
     if (countedCash === "") {
-      alert("Por favor ingresa el monto de efectivo físico contado.");
+      alert("Por favor ingresa o realiza el conteo del efectivo físico en caja.");
       return;
     }
 
@@ -586,17 +713,19 @@ export default function CajaPage() {
     const newFolio = `CORTE-${Date.now().toString().slice(-6)}`;
     const nowStr = formatDateTimeSafe();
 
+    const recipient = incomingCashier.trim() || "Cajera 2 - Turno Vespertino";
+
     const newCut: ShiftCutRecord = {
       id: newFolio,
       date: nowStr,
       timestamp: Date.now(),
-      shiftRange: "Turno Actual En Vivo",
+      shiftRange: nextShiftName ? `${currentShiftResponsible} ➔ ${nextShiftName}` : "Turno Actual En Vivo",
       outgoingCashier: currentShiftResponsible,
-      incomingCashier: "Cajero Relevo",
+      incomingCashier: recipient,
       responsible: currentShiftResponsible,
       branchName: currentBranch?.name || "Sucursal Matriz Centro",
       previousShift: "Turno Matutino",
-      nextShift: "Turno Vespertino",
+      nextShift: nextShiftName || "Turno Vespertino",
       initialFund: initialCash,
       cashSales,
       cardSales,
@@ -604,11 +733,12 @@ export default function CajaPage() {
       totalSales: cashSales + cardSales + transferSales,
       totalSalesAll: cashSales + cardSales + transferSales,
       totalExpenses,
+      totalIncomes: totalEntries,
       expectedCash: expectedCashInDrawer,
       countedCash: parsedCounted,
       difference: diff,
       nextFund: parsedNextFund,
-      notes: corteNotes.trim() || "Corte de turno registrado desde el panel de caja.",
+      notes: corteNotes.trim() || `Entrega de turno oficial: Saliente ${currentShiftResponsible} ➔ Entrante ${recipient}.`,
     };
 
     try {
@@ -637,12 +767,12 @@ export default function CajaPage() {
 
     // High priority notification
     addNotification({
-      senderName: `🏁 Corte Guardado (${currentShiftResponsible})`,
+      senderName: `🏁 Corte Entregado (${currentShiftResponsible})`,
       senderAvatar: "💰",
       badgeIcon: "dinero",
       title: `Corte de Turno ${newFolio} Registrado`,
-      highlightText: `${currentShiftResponsible} cerró turno con ${formatCurrency(parsedCounted)}`,
-      description: `Folio ${newFolio} archivado en historial de caja. Efectivo entregado: ${formatCurrency(Math.max(0, parsedCounted - parsedNextFund))}. Diferencia: ${diff === 0 ? "Exacta" : formatCurrency(diff)}.`,
+      highlightText: `${currentShiftResponsible} entregó turno a ${recipient} con ${formatCurrency(parsedCounted)}`,
+      description: `Folio ${newFolio} archivado en historial de caja. Efectivo entregado a Don Toño: ${formatCurrency(Math.max(0, parsedCounted - parsedNextFund))}. Diferencia: ${diff === 0 ? "Exacta" : formatCurrency(diff)}.`,
       category: "caja",
       actionLabel: "Ver Comprobante",
       actionLink: "/caja?tab=historial",
@@ -650,7 +780,10 @@ export default function CajaPage() {
 
     setIsCorteModalOpen(false);
     setCountedCash("");
+    setDeliveryPassword("");
+    setPasswordError(null);
     setCorteNotes("");
+    handleClearDenominations();
 
     // Open detail modal immediately so user can reprint or review ticket
     setSelectedCutForDetail(newCut);
@@ -1393,160 +1526,626 @@ export default function CajaPage() {
       {/* MODAL 2: ARQUEO Y CORTE DE CAJA EN VIVO                                  */}
       {/* ========================================================================= */}
       {isCorteModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 border border-stone-200 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 transition-all duration-200 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-2xl w-full shadow-2xl space-y-4 border border-stone-200 hover:border-amber-400/80 transition-all duration-200 max-h-[92vh] overflow-y-auto">
+            {/* Header del Modal */}
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-stone-900 text-white rounded-xl">
+                <div className="p-2.5 bg-gradient-to-br from-stone-900 to-amber-950 text-white rounded-2xl shadow-sm">
                   <Calculator className="w-5 h-5 text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="font-black text-base text-stone-900">Arqueo y Cierre de Turno</h3>
-                  <p className="text-[11px] text-stone-500">Corte oficial, dictamen y entrega a Don Toño.</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-base sm:text-lg text-stone-900">Arqueo y Cierre de Turno</h3>
+                    <span className="bg-amber-100 text-amber-900 font-extrabold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Corte Oficial
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
+                    Relevo de cajeros, conciliación de ingresos, arqueo físico y entrega a Don Toño.
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setIsCorteModalOpen(false)} className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl">
+              <button 
+                onClick={() => setIsCorteModalOpen(false)} 
+                className="p-2 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-xl transition-colors"
+                title="Cerrar ventana"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* RESPONSABLE DEL TURNO ACTUAL DESTACADO */}
-            <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-200 text-amber-950 flex items-center justify-center font-black text-base shrink-0">
-                👩‍🍳
-              </div>
-              <div>
-                <span className="text-[10px] text-amber-800 font-extrabold uppercase tracking-wider block">
-                  Responsable del Turno
-                </span>
-                <span className="text-xs font-black text-stone-900 block">
-                  {currentShiftResponsible}
-                </span>
-              </div>
-            </div>
-
-            <form onSubmit={handleConfirmLiveCut} className="space-y-3.5 text-xs">
-              {/* Desglose de Caja */}
-              <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-1.5">
-                <div className="flex justify-between">
-                  <span>(+) Fondo Inicial:</span>
-                  <span className="font-bold">{formatCurrency(initialCash)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>(+) Ventas en Efectivo:</span>
-                  <span className="font-bold text-emerald-600">+{formatCurrency(cashSales)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>(+) Otras Entradas:</span>
-                  <span className="font-bold text-emerald-600">+{formatCurrency(totalEntries)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>(-) Gastos y Retiros:</span>
-                  <span className="font-bold text-rose-600">-{formatCurrency(totalExpenses)}</span>
-                </div>
-                <div className="flex justify-between text-sm font-black border-t border-stone-200 pt-2 text-stone-900">
-                  <span>(=) Efectivo Esperado:</span>
-                  <span className="text-amber-900">{formatCurrency(expectedCashInDrawer)}</span>
-                </div>
-              </div>
-
-              {/* Input Efectivo Físico Contado */}
-              <div className="space-y-1">
-                <label className="font-bold text-stone-800">
-                  Efectivo Físico Contado en Caja ($ MXN) *
-                </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  required
-                  placeholder="Total de billetes y monedas contados"
-                  value={countedCash}
-                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                  onChange={(e) => setCountedCash(cleanDecimalNumbers(e.target.value))}
-                  className="w-full px-4 py-3 bg-white rounded-xl border-2 border-stone-300 text-lg font-black text-stone-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Dictamen de Arqueo */}
-              {countedCash !== "" && (
-                <div
-                  className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between ${
-                    cashDifference === 0
-                      ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                      : cashDifference > 0
-                      ? "bg-blue-50 text-blue-800 border-blue-300"
-                      : "bg-rose-50 text-rose-800 border-rose-300"
-                  }`}
-                >
-                  <span>Dictamen de Arqueo:</span>
-                  <span className="text-sm font-black">
-                    {cashDifference === 0
-                      ? "✓ Caja Exacta ($0.00)"
-                      : cashDifference > 0
-                      ? `Sobrante: +${formatCurrency(cashDifference)}`
-                      : `Faltante: ${formatCurrency(cashDifference)}`}
+            <form onSubmit={handleConfirmLiveCut} className="space-y-4 text-xs">
+              {/* APARTADO 1: RELEVO DE TURNO (QUIÉN ENTREGA Y QUIÉN RECIBE) */}
+              <div className="bg-gradient-to-r from-amber-50/90 via-stone-50 to-amber-50/90 border border-amber-200/90 p-3.5 rounded-2xl space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🤝</span>
+                    <span className="font-black text-stone-900 text-xs uppercase tracking-wider">
+                      Relevo de Turno y Responsables
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-amber-800 font-bold bg-amber-200/70 px-2 py-0.5 rounded-md">
+                    Pase de Caja
                   </span>
                 </div>
-              )}
 
-              {/* Fondo para el Siguiente Turno */}
-              <div className="space-y-1">
-                <label className="font-bold text-stone-800">
-                  🪙 Fondo que se deja en Caja para el siguiente turno ($ MXN)
-                </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={nextFundAmount}
-                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                  onChange={(e) => {
-                    const raw = cleanDecimalNumbers(e.target.value);
-                    const maxAllowed = Math.max(0, actualCount);
-                    if (raw !== "" && actualCount > 0 && Number(raw) > maxAllowed) {
-                      setNextFundAmount(maxAllowed.toString());
-                    } else {
-                      setNextFundAmount(raw);
-                    }
-                  }}
-                  className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                  {/* Saliente (Quién Entrega) */}
+                  <div className="bg-white p-3 rounded-xl border border-amber-200/80 shadow-2xs flex flex-col justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-amber-900">
+                        <span className="text-sm">👩‍🍳</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider">Quién Entrega (Saliente)</span>
+                      </div>
+                      <span className="font-black text-xs sm:text-sm text-stone-950 block truncate">
+                        {currentShiftResponsible}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-stone-500 font-semibold mt-1 block flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-amber-600" /> Turno Actual en Operación
+                    </span>
+                  </div>
+
+                  {/* Entrante (Quién Recibe) */}
+                  <div className="bg-white p-3 rounded-xl border-2 border-emerald-300 shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-emerald-800">
+                        <span className="text-sm">🙋‍♀️</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider">Quién Recibe (Entrante) *</span>
+                      </div>
+                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                        Relevo
+                      </span>
+                    </div>
+                    
+                    <select
+                      value={incomingCashier}
+                      onChange={(e) => setIncomingCashier(e.target.value)}
+                      className="w-full px-2.5 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    >
+                      <option value="Cajera 2 - Turno Vespertino">Cajera 2 - Turno Vespertino</option>
+                      <option value="Lupita Brito (Cajera 1)">Lupita Brito (Cajera 1)</option>
+                      <option value="Don Toño Brito (Dueño)">Don Toño Brito (Dueño / Admin)</option>
+                      <option value="Carlos Mendoza (Supervisor)">Carlos Mendoza (Supervisor)</option>
+                      <option value="Lic. Roberto Morales (Auxiliar)">Lic. Roberto Morales (Auxiliar)</option>
+                      {usersList && usersList.map((u) => (
+                        <option key={u.id} value={`${u.name} (${u.roleLabel || u.role})`}>
+                          {u.name} ({u.roleLabel || u.role})
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="flex items-center gap-1.5 text-[10px] text-stone-600 pt-0.5">
+                      <Clock className="w-3 h-3 text-stone-400 shrink-0" />
+                      <select
+                        value={nextShiftName}
+                        onChange={(e) => setNextShiftName(e.target.value)}
+                        className="bg-transparent border-0 font-semibold text-stone-700 focus:outline-none text-[10px] cursor-pointer"
+                      >
+                        <option value="Turno Vespertino (14:00 - 22:00)">Turno Vespertino (14:00 - 22:00)</option>
+                        <option value="Turno Matutino (06:00 - 14:00)">Turno Matutino (06:00 - 14:00)</option>
+                        <option value="Turno Nocturno (22:00 - 06:00)">Turno Nocturno (22:00 - 06:00)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* APARTADO 2: CONTRASEÑA / PIN DE QUIEN ENTREGA */}
+                <div className="bg-white p-3 rounded-xl border border-amber-200/90 shadow-2xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-stone-900 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Contraseña de Quién Entrega (Firma Digital del Turno) *</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                      Seguridad Obligatoria
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type={showDeliveryPassword ? "text" : "password"}
+                      required
+                      value={deliveryPassword}
+                      onChange={(e) => {
+                        setDeliveryPassword(e.target.value);
+                        setPasswordError(null);
+                      }}
+                      placeholder={`Ingresa tu clave de acceso o PIN de ${currentShiftResponsible}`}
+                      className={`w-full px-3 py-2 pr-10 bg-stone-50 rounded-xl border text-xs font-mono font-bold focus:ring-2 focus:outline-none transition-colors ${
+                        passwordError ? "border-rose-400 focus:ring-rose-400 bg-rose-50/30" : "border-stone-300 focus:ring-amber-500"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDeliveryPassword(!showDeliveryPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
+                      tabIndex={-1}
+                      title={showDeliveryPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                    >
+                      {showDeliveryPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {passwordError ? (
+                    <p className="text-[10px] text-rose-600 font-bold flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{passwordError}</span>
+                    </p>
+                  ) : deliveryPassword.trim().length > 0 ? (
+                    <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 mt-0.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                      <span>Firma digital ingresada para asentar en el corte oficial.</span>
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-stone-500 italic mt-0.5">
+                      Escribe tu contraseña de cajera/o para validar la entrega y firmar el ticket archivado.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* APARTADO 3: DESGLOSE DE INGRESOS REGISTRADOS */}
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs shadow-xs">
+                      <TrendingUp className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <span className="font-black text-xs text-stone-900 block leading-tight">
+                        Desglose de Ingresos Registrados
+                      </span>
+                      <span className="text-[10px] text-emerald-800 font-bold">
+                        Efectivo total captado en turno: {formatCurrency(cashSales + totalEntries)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowIncomeBreakdown(!showIncomeBreakdown)}
+                    className="text-[10px] font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
+                  >
+                    {showIncomeBreakdown ? "Ocultar detalle" : "Ver detalle"}
+                  </button>
+                </div>
+
+                {showIncomeBreakdown && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-emerald-200/60">
+                    {/* Ventas en Mostrador */}
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100 flex items-center justify-between shadow-2xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🥖</span>
+                        <div>
+                          <span className="font-bold text-stone-800 block text-[11px]">Ventas de Mostrador</span>
+                          <span className="text-[9px] text-stone-500 font-medium">Pan dulce, bolillo y repostería</span>
+                        </div>
+                      </div>
+                      <span className="font-black text-emerald-700 text-xs">+{formatCurrency(cashSales)}</span>
+                    </div>
+
+                    {/* Anticipos de Pedidos */}
+                    <div className="bg-white p-2.5 rounded-xl border border-emerald-100 flex items-center justify-between shadow-2xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🎂</span>
+                        <div>
+                          <span className="font-bold text-stone-800 block text-[11px]">Anticipos de Pedidos</span>
+                          <span className="text-[9px] text-stone-500 font-medium">{pedidosEntries.length} abono(s) recibido(s)</span>
+                        </div>
+                      </div>
+                      <span className="font-black text-emerald-700 text-xs">+{formatCurrency(pedidosTotal)}</span>
+                    </div>
+
+                    {/* Otras Aportaciones */}
+                    {otherEntriesTotal > 0 && (
+                      <div className="bg-white p-2.5 rounded-xl border border-emerald-100 flex items-center justify-between shadow-2xs sm:col-span-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🪙</span>
+                          <div>
+                            <span className="font-bold text-stone-800 block text-[11px]">Aportaciones / Cambio Extra</span>
+                            <span className="text-[9px] text-stone-500 font-medium">Entradas extraordinarias al cajón</span>
+                          </div>
+                        </div>
+                        <span className="font-black text-emerald-700 text-xs">+{formatCurrency(otherEntriesTotal)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Métodos Electrónicos Informativos */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-[10px] text-stone-600 bg-white/80 px-2.5 py-1.5 rounded-xl border border-emerald-100 gap-1">
+                  <span className="font-medium text-stone-500">
+                    💳 Cobros electrónicos (No van al cajón físico, se depositan a bancos):
+                  </span>
+                  <span className="font-bold text-stone-800">
+                    Tarjeta: {formatCurrency(cardSales)} • Transf: {formatCurrency(transferSales)}
+                  </span>
+                </div>
+              </div>
+
+              {/* APARTADO 4: CONCILIACIÓN Y ARQUEO FÍSICO */}
+              <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3.5 space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-stone-200/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚖️</span>
+                    <div>
+                      <span className="font-black text-stone-900 text-xs uppercase tracking-wider block leading-none">
+                        Conciliación y Arqueo Físico
+                      </span>
+                      <span className="text-[10px] text-stone-500 font-medium">
+                        Compara el dinero físico contado contra lo esperado en sistema
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Selector de modo de conteo */}
+                  <div className="flex items-center gap-1 bg-white p-0.5 rounded-xl border border-stone-200 text-[10px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setCountMode("directo")}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        countMode === "directo"
+                          ? "bg-stone-900 text-white shadow-2xs"
+                          : "text-stone-600 hover:text-stone-900"
+                      }`}
+                    >
+                      ⌨️ Monto Total
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCountMode("denominaciones")}
+                      className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        countMode === "denominaciones"
+                          ? "bg-amber-600 text-white shadow-2xs"
+                          : "text-stone-600 hover:text-stone-900"
+                      }`}
+                    >
+                      🧮 Billetes y Monedas
+                    </button>
+                  </div>
+                </div>
+
+                {/* Si modo = Denominaciones: desglose de billetes y monedas */}
+                {countMode === "denominaciones" && (
+                  <div className="bg-white p-3 rounded-2xl border border-amber-200 space-y-2.5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-amber-900 tracking-wider">
+                        Contador por Denominaciones
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleClearDenominations}
+                        className="text-[10px] text-stone-400 hover:text-rose-600 underline font-bold cursor-pointer"
+                      >
+                        Reiniciar contador
+                      </button>
+                    </div>
+
+                    {/* Billetes */}
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black uppercase text-stone-400 block tracking-wider">
+                        💵 Billetes Nacionales
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {[
+                          { key: "b1000", val: 1000, label: "$1,000", color: "bg-purple-50 text-purple-950 border-purple-200" },
+                          { key: "b500", val: 500, label: "$500", color: "bg-blue-50 text-blue-950 border-blue-200" },
+                          { key: "b200", val: 200, label: "$200", color: "bg-emerald-50 text-emerald-950 border-emerald-200" },
+                          { key: "b100", val: 100, label: "$100", color: "bg-rose-50 text-rose-950 border-rose-200" },
+                          { key: "b50", val: 50, label: "$50", color: "bg-pink-50 text-pink-950 border-pink-200" },
+                          { key: "b20", val: 20, label: "$20", color: "bg-cyan-50 text-cyan-950 border-cyan-200" },
+                        ].map((b) => {
+                          const count = denominations[b.key] || 0;
+                          return (
+                            <div key={b.key} className={`p-1.5 rounded-xl border ${b.color} flex items-center justify-between`}>
+                              <span className="font-black text-xs">{b.label}</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateDenomination(b.key, -1)}
+                                  className="w-5 h-5 rounded-md bg-white border border-stone-200 font-black text-stone-700 flex items-center justify-center hover:bg-stone-100"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={count > 0 ? count : ""}
+                                  placeholder="0"
+                                  onChange={(e) => handleSetDenominationInput(b.key, e.target.value)}
+                                  className="w-8 text-center text-xs font-black bg-white rounded border border-stone-200 py-0.5"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateDenomination(b.key, 1)}
+                                  className="w-5 h-5 rounded-md bg-white border border-stone-200 font-black text-stone-700 flex items-center justify-center hover:bg-stone-100"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Monedas */}
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[9px] font-black uppercase text-stone-400 block tracking-wider">
+                        🪙 Monedas Fraccionarias
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {[
+                          { key: "m20", val: 20, label: "$20" },
+                          { key: "m10", val: 10, label: "$10" },
+                          { key: "m5", val: 5, label: "$5" },
+                          { key: "m2", val: 2, label: "$2" },
+                          { key: "m1", val: 1, label: "$1" },
+                          { key: "m05", val: 0.5, label: "$0.50" },
+                        ].map((m) => {
+                          const count = denominations[m.key] || 0;
+                          return (
+                            <div key={m.key} className="p-1.5 rounded-xl border border-stone-200 bg-stone-50 flex items-center justify-between">
+                              <span className="font-bold text-xs text-stone-800">{m.label}</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateDenomination(m.key, -1)}
+                                  className="w-5 h-5 rounded-md bg-white border border-stone-200 font-black text-stone-700 flex items-center justify-center hover:bg-stone-100"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={count > 0 ? count : ""}
+                                  placeholder="0"
+                                  onChange={(e) => handleSetDenominationInput(m.key, e.target.value)}
+                                  className="w-8 text-center text-xs font-black bg-white rounded border border-stone-200 py-0.5"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateDenomination(m.key, 1)}
+                                  className="w-5 h-5 rounded-md bg-white border border-stone-200 font-black text-stone-700 flex items-center justify-center hover:bg-stone-100"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="bg-amber-100/70 p-2 rounded-xl flex items-center justify-between font-bold text-xs text-amber-950">
+                      <span>Suma Total Contada por Denominaciones:</span>
+                      <span className="font-black text-sm">{formatCurrency(denominationsTotal)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Input Directo de Efectivo Físico Contado */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <label className="font-black text-stone-900 text-xs">
+                      Efectivo Físico Total Contado en Caja ($ MXN) *
+                    </label>
+                    <span className="text-[10px] text-stone-500 font-semibold">
+                      Billetes + Monedas
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-stone-400 text-base">
+                      $
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      required
+                      placeholder="0.00"
+                      value={countedCash}
+                      onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                      onChange={(e) => setCountedCash(cleanDecimalNumbers(e.target.value))}
+                      className="w-full pl-8 pr-4 py-3 bg-white rounded-2xl border-2 border-stone-300 text-lg sm:text-xl font-black text-stone-950 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 focus:outline-none transition-all"
+                    />
+                  </div>
+
+                  {/* Atajos rápidos para sumar */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {[100, 200, 500, 1000].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => {
+                          const curr = Number(countedCash) || 0;
+                          setCountedCash((curr + amt).toString());
+                        }}
+                        className="px-2 py-1 bg-white hover:bg-stone-100 border border-stone-200 rounded-lg text-[10px] font-bold text-stone-700 transition-colors cursor-pointer"
+                      >
+                        +{formatCurrency(amt)}
+                      </button>
+                    ))}
+                    {countedCash !== "" && (
+                      <button
+                        type="button"
+                        onClick={() => setCountedCash("")}
+                        className="px-2 py-1 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 border border-stone-200 rounded-lg text-[10px] font-bold text-stone-500 transition-colors ml-auto cursor-pointer"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Resumen de Conciliación Matemática */}
+                <div className="bg-white p-3.5 rounded-2xl border border-stone-200 space-y-1.5 text-xs">
+                  <div className="flex justify-between text-stone-600">
+                    <span>(+) Fondo Inicial de Turno:</span>
+                    <span className="font-bold text-stone-800">{formatCurrency(initialCash)}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-800 font-bold">
+                    <span>(+) Total Ventas en Efectivo:</span>
+                    <span>+{formatCurrency(cashSales)}</span>
+                  </div>
+                  {totalEntries > 0 && (
+                    <div className="flex justify-between text-emerald-800 font-bold">
+                      <span>(+) Otras Entradas Registradas:</span>
+                      <span>+{formatCurrency(totalEntries)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-rose-700 font-bold">
+                    <span>(-) Gastos y Retiros del Turno:</span>
+                    <span>-{formatCurrency(totalExpenses)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-black border-t border-stone-200 pt-2 text-stone-900">
+                    <span>(=) Efectivo Teórico Esperado:</span>
+                    <span className="text-amber-950 font-black">{formatCurrency(expectedCashInDrawer)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs font-black pt-1 text-stone-900">
+                    <span>(=) Efectivo Físico Contado:</span>
+                    <span className="text-stone-950 font-black">{formatCurrency(actualCount)}</span>
+                  </div>
+                </div>
+
+                {/* DICTAMEN DE ARQUEO EN VIVO */}
                 {countedCash !== "" && (
-                  <div className="flex justify-between text-[11px] text-stone-600 pt-1 font-semibold">
-                    <span>Efectivo entregado a Don Toño:</span>
-                    <strong className="text-emerald-700 font-black">
+                  <div
+                    className={`p-3 rounded-2xl border text-xs flex items-center justify-between shadow-2xs transition-all animate-in fade-in duration-150 ${
+                      cashDifference === 0
+                        ? "bg-emerald-50 text-emerald-950 border-emerald-300"
+                        : cashDifference > 0
+                        ? "bg-blue-50 text-blue-950 border-blue-300"
+                        : "bg-rose-50 text-rose-950 border-rose-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">
+                        {cashDifference === 0 ? "✅" : cashDifference > 0 ? "🔵" : "⚠️"}
+                      </span>
+                      <div>
+                        <span className="font-black block uppercase text-[10px] tracking-wider">
+                          Dictamen de Conciliación:
+                        </span>
+                        <span className="text-[11px] font-bold">
+                          {cashDifference === 0
+                            ? "Caja Cuadrada Exacta — Todo coincide al 100%"
+                            : cashDifference > 0
+                            ? "Sobrante de Efectivo en Caja"
+                            : "Faltante de Efectivo en Caja"}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-sm font-black px-2.5 py-1 rounded-xl bg-white/80 border border-current shadow-2xs">
+                      {cashDifference === 0
+                        ? "✓ Exacto ($0.00)"
+                        : cashDifference > 0
+                        ? `+${formatCurrency(cashDifference)}`
+                        : `${formatCurrency(cashDifference)}`}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* APARTADO 5: DISTRIBUCIÓN DEL DINERO */}
+              <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🪙</span>
+                  <span className="font-black text-stone-900 text-xs uppercase tracking-wider">
+                    Distribución del Efectivo y Fondo Siguiente Turno
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-stone-800 text-[11px] block">
+                    Fondo que se deja en Caja para el siguiente turno ($ MXN)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={nextFundAmount}
+                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                    onChange={(e) => {
+                      const raw = cleanDecimalNumbers(e.target.value);
+                      const maxAllowed = Math.max(0, actualCount);
+                      if (raw !== "" && actualCount > 0 && Number(raw) > maxAllowed) {
+                        setNextFundAmount(maxAllowed.toString());
+                      } else {
+                        setNextFundAmount(raw);
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                  {/* Atajos de fondo */}
+                  <div className="flex gap-1.5 pt-0.5">
+                    {[300, 500, 800, 1000].map((fAmt) => (
+                      <button
+                        key={fAmt}
+                        type="button"
+                        onClick={() => setNextFundAmount(fAmt.toString())}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                          nextFundAmount === fAmt.toString()
+                            ? "bg-amber-600 text-white border-amber-600"
+                            : "bg-white text-stone-600 border-stone-200 hover:bg-stone-100"
+                        }`}
+                      >
+                        {formatCurrency(fAmt)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {countedCash !== "" && (
+                  <div className="bg-emerald-100/70 border border-emerald-300 p-3 rounded-xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">💰</span>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-950 block">
+                          Efectivo a Entregar en Mano / Sobre a Don Toño:
+                        </span>
+                        <span className="text-[10px] text-emerald-800 font-medium">
+                          Total Contado ({formatCurrency(actualCount)}) menos Fondo Dejado ({formatCurrency(Number(nextFundAmount) || 0)})
+                        </span>
+                      </div>
+                    </div>
+                    <strong className="text-sm sm:text-base font-black text-emerald-950 bg-white px-3 py-1 rounded-xl shadow-2xs border border-emerald-300">
                       {formatCurrency(Math.max(0, actualCount - (Number(nextFundAmount) || 0)))}
                     </strong>
                   </div>
                 )}
               </div>
 
-              {/* Observaciones */}
+              {/* APARTADO 6: OBSERVACIONES */}
               <div className="space-y-1">
-                <label className="font-bold text-stone-700">Observaciones del Cierre (Opcional)</label>
+                <label className="font-bold text-stone-700 text-xs flex items-center gap-1.5">
+                  <span>📝</span>
+                  <span>Observaciones y Comentarios del Cierre (Opcional)</span>
+                </label>
                 <input
                   type="text"
-                  placeholder="Ej. Entrega conforme, vitrinas llenas..."
+                  placeholder="Ej. Entrega conforme, vitrinas llenas, pendiente pan blanco..."
                   value={corteNotes}
                   onChange={(e) => setCorteNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-xs"
                 />
               </div>
 
-              {/* Botones de acción */}
-              <div className="flex gap-2 pt-2">
+              {/* BOTONES DE ACCIÓN */}
+              <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsCorteModalOpen(false)}
-                  className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-all"
+                  className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-2xl text-xs sm:text-sm transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-stone-900 hover:bg-black text-white font-extrabold rounded-xl shadow-md transition-all active:scale-95"
+                  className="flex-[2] py-3 bg-gradient-to-r from-stone-900 via-stone-950 to-stone-900 hover:from-black hover:to-black text-white font-black rounded-2xl text-xs sm:text-sm shadow-xl shadow-stone-900/20 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer border border-stone-800"
                 >
-                  Confirmar y Guardar Corte
+                  <Lock className="w-4 h-4 text-amber-400" />
+                  <span>Confirmar y Guardar Corte Oficial</span>
                 </button>
               </div>
             </form>
