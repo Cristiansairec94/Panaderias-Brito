@@ -58,6 +58,8 @@ export interface Sale {
   customerId?: string;
   customerName?: string;
   customerType?: "general" | "frecuente" | "mayoreo" | "evento";
+  createdAt?: string;
+  timestamp?: number | string;
 }
 
 export interface InventoryItem {
@@ -231,6 +233,8 @@ export interface CashExpense {
   description: string;
   cashier: string;
   date: string;
+  createdAt?: string;
+  timestamp?: number | string;
 }
 
 export type CashIncomeCategory =

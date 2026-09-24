@@ -50,7 +50,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, compareMovementsDesc } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
 import { 
@@ -963,6 +963,8 @@ export default function POSPage() {
             total: Number(s.total),
             paymentMethod: (s.payment_method as any) || "efectivo",
             cashier: s.cashier || "Don Toño Brito",
+            createdAt: s.created_at,
+            timestamp: s.created_at ? new Date(s.created_at).getTime() : undefined,
             items: (s.sale_items || []).map((si: any) => ({
               product: {
                 id: si.product_id || "temp",
@@ -1006,6 +1008,8 @@ export default function POSPage() {
                   paymentMethod: (inc.paymentMethod as any) || "efectivo",
                   cashier: inc.cashier || "Don Toño Brito",
                   customerName: inc.customerName,
+                  createdAt: inc.timestamp,
+                  timestamp: inc.timestamp ? new Date(inc.timestamp).getTime() : undefined,
                   items: [
                     {
                       product: {
@@ -1023,7 +1027,7 @@ export default function POSPage() {
             }
           } catch {}
 
-          return combined;
+          return combined.sort((a, b) => compareMovementsDesc(a, b));
         });
 
         // 3. Load cash expenses from Supabase
@@ -1040,6 +1044,8 @@ export default function POSPage() {
             description: e.description,
             cashier: e.cashier || "Don Toño Brito",
             date: formatDateTimeSafe(e.created_at),
+            createdAt: e.created_at,
+            timestamp: e.created_at ? new Date(e.created_at).getTime() : undefined,
           }));
           if (typeof window !== "undefined" && localStorage.getItem("brito_pos_current_expenses") === null) {
             setExpensesList(mappedExp);
@@ -1514,6 +1520,8 @@ export default function POSPage() {
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.name,
         customerType: selectedCustomer.type,
+        timestamp: Date.now(),
+        createdAt: new Date().toISOString(),
       };
 
       const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");

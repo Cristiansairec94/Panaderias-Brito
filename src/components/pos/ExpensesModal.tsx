@@ -30,11 +30,12 @@ import {
   Cake,
   Phone,
   Clock,
-  Package
+  Package,
+  Edit3
 } from "lucide-react";
 import { CashExpense, CashIncome, Sale, CustomOrder } from "@/types";
 import { getStoredOrders } from "@/lib/orders";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, compareMovementsDesc } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
@@ -57,6 +58,7 @@ interface ExpensesModalProps {
   initialTab?: "tickets" | "register" | "list";
   cashSalesTotal: number;
   initialFund?: number;
+  onUpdateInitialFund?: (fund: number) => void;
   cashierName?: string;
   branchId?: string;
   branchName?: string;
@@ -199,6 +201,7 @@ export default function ExpensesModal({
   initialTab,
   cashSalesTotal,
   initialFund = 0,
+  onUpdateInitialFund,
   cashierName = "Don Toño Brito",
   branchId,
   branchName,
@@ -209,7 +212,46 @@ export default function ExpensesModal({
     initialTab || "register"
   );
   const [movementType, setMovementType] = useState<"salida" | "entrada">("salida");
-  const [historyFilter, setHistoryFilter] = useState<"todos" | "ventas" | "entradas" | "salidas">("todos");
+  const [historyFilter, setHistoryFilter] = useState<"todos" | "ventas" | "entradas" | "salidas" | "fondo">("todos");
+  
+  // Estado local para el Fondo Inicial de Caja
+  const [currentFund, setCurrentFund] = useState<number>(initialFund || 0);
+  const [editFundInput, setEditFundInput] = useState<string>(String(initialFund || 0));
+  const [isEditingFund, setIsEditingFund] = useState(false);
+
+  useEffect(() => {
+    if (typeof initialFund === "number") {
+      setCurrentFund(initialFund);
+      setEditFundInput(String(initialFund));
+    }
+  }, [initialFund, isOpen]);
+
+  const handleSaveInitialFund = () => {
+    const parsed = Number(editFundInput);
+    const validAmount = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    setCurrentFund(validAmount);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("brito_pos_initial_fund", validAmount.toString());
+        window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      } catch (e) {}
+    }
+    if (onUpdateInitialFund) {
+      onUpdateInitialFund(validAmount);
+    }
+    addNotification({
+      senderName: `Fondo de Caja (${cashierName})`,
+      senderAvatar: "🪙",
+      badgeIcon: "dinero",
+      title: `Fondo Inicial: ${formatCurrency(validAmount)}`,
+      highlightText: "Base de caja actualizada",
+      description: `Se fijó el fondo inicial del turno en ${formatCurrency(validAmount)} MXN como base para las cuentas.`,
+      category: "caja",
+      actionLabel: "Ver Caja",
+      actionLink: "/caja",
+    });
+    setIsEditingFund(false);
+  };
   const [historySearch, setHistorySearch] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
   const [ticketMethodFilter, setTicketMethodFilter] = useState<string>("all");
@@ -307,44 +349,53 @@ export default function ExpensesModal({
   const totalRecordsCount = effectiveSales.length + relevantOrders.length;
   const averageTicket = effectiveSales.length > 0 ? totalSalesSum / effectiveSales.length : 0;
 
-  // Filtrado de Tickets de Mostrador
-  const filteredTickets = effectiveSales.filter((sale) => {
-    if (ticketTypeFilter === "pedidos") return false;
-    if (ticketMethodFilter !== "all" && sale.paymentMethod !== ticketMethodFilter) return false;
-    if (ticketSearch.trim()) {
-      const q = ticketSearch.toLowerCase().trim();
-      const matchId = sale.id.toLowerCase().includes(q);
-      const matchCashier = (sale.cashier || "").toLowerCase().includes(q);
-      const matchCustomer = (sale.customerName || "").toLowerCase().includes(q);
-      const matchItems = (sale.items || []).some((i) => i.product.name.toLowerCase().includes(q));
-      return matchId || matchCashier || matchCustomer || matchItems;
-    }
-    return true;
-  });
+  // Filtrado de Tickets de Mostrador ordenados cronológicamente (más recientes primero)
+  const filteredTickets = effectiveSales
+    .filter((sale) => {
+      if (ticketTypeFilter === "pedidos") return false;
+      if (ticketMethodFilter !== "all" && sale.paymentMethod !== ticketMethodFilter) return false;
+      if (ticketSearch.trim()) {
+        const q = ticketSearch.toLowerCase().trim();
+        const matchId = sale.id.toLowerCase().includes(q);
+        const matchCashier = (sale.cashier || "").toLowerCase().includes(q);
+        const matchCustomer = (sale.customerName || "").toLowerCase().includes(q);
+        const matchItems = (sale.items || []).some((i) => i.product.name.toLowerCase().includes(q));
+        return matchId || matchCashier || matchCustomer || matchItems;
+      }
+      return true;
+    })
+    .sort((a, b) => compareMovementsDesc(a, b));
 
-  // Filtrado de Pedidos Especiales
-  const filteredOrders = relevantOrders.filter((order) => {
-    if (ticketTypeFilter === "ventas") return false;
-    if (ticketMethodFilter !== "all" && order.paymentMethod !== ticketMethodFilter) return false;
-    if (ticketSearch.trim()) {
-      const q = ticketSearch.toLowerCase().trim();
-      const matchNumber = (order.orderNumber || "").toLowerCase().includes(q);
-      const matchId = (order.id || "").toLowerCase().includes(q);
-      const matchCustomer = (order.customerName || "").toLowerCase().includes(q);
-      const matchCashier = (order.cashier || "").toLowerCase().includes(q);
-      const matchDesc = (order.description || "").toLowerCase().includes(q);
-      const matchItems = (order.items || []).some((i) => i.name.toLowerCase().includes(q));
-      return matchNumber || matchId || matchCustomer || matchCashier || matchDesc || matchItems;
-    }
-    return true;
-  });
+  // Filtrado de Pedidos Especiales ordenados cronológicamente
+  const filteredOrders = relevantOrders
+    .filter((order) => {
+      if (ticketTypeFilter === "ventas") return false;
+      if (ticketMethodFilter !== "all" && order.paymentMethod !== ticketMethodFilter) return false;
+      if (ticketSearch.trim()) {
+        const q = ticketSearch.toLowerCase().trim();
+        const matchNumber = (order.orderNumber || "").toLowerCase().includes(q);
+        const matchId = (order.id || "").toLowerCase().includes(q);
+        const matchCustomer = (order.customerName || "").toLowerCase().includes(q);
+        const matchCashier = (order.cashier || "").toLowerCase().includes(q);
+        const matchDesc = (order.description || "").toLowerCase().includes(q);
+        const matchItems = (order.items || []).some((i) => i.name.toLowerCase().includes(q));
+        return matchNumber || matchId || matchCustomer || matchCashier || matchDesc || matchItems;
+      }
+      return true;
+    })
+    .sort((a, b) =>
+      compareMovementsDesc(
+        { id: a.id, date: a.createdAt || a.deliveryDate, timestamp: a.createdAt },
+        { id: b.id, date: b.createdAt || b.deliveryDate, timestamp: b.createdAt }
+      )
+    );
 
   const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalIncomesInCash = shiftIncomes
     .filter((i) => i.paymentMethod === "efectivo" || !i.paymentMethod)
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const netCashInDrawer = Math.max(0, initialFund + cashSalesTotal + totalIncomesInCash - totalExpenses);
+  const netCashInDrawer = Math.max(0, currentFund + cashSalesTotal + totalIncomesInCash - totalExpenses);
 
   // Cambiar de Salida a Entrada o viceversa
   const handleToggleMovementType = (type: "salida" | "entrada") => {
@@ -385,6 +436,8 @@ export default function ExpensesModal({
         description: finalDescription,
         cashier: cashierName,
         date: nowDateTime,
+        timestamp: Date.now(),
+        createdAt: new Date().toISOString(),
       };
 
       let savedToDb = false;
@@ -568,8 +621,29 @@ export default function ExpensesModal({
     }, 6000);
   };
 
-  // Historial unificado del turno ordenado (Ventas, Entradas y Salidas)
+  // Historial unificado del turno ordenado cronológicamente (Fondo Base, Ventas, Entradas y Salidas en tiempo real)
   const combinedHistory = [
+    ...(currentFund > 0
+      ? [
+          {
+            id: "FONDO-INICIAL-BASE",
+            type: "fondo" as const,
+            amount: currentFund,
+            category: "fondo_inicial",
+            description: `Fondo inicial base asignado para cambio en caja y apertura de turno`,
+            cashier: cashierName,
+            date: "Apertura de Turno",
+            isOwner: false,
+            isChange: true,
+            paymentMethod: "efectivo" as const,
+            customerName: undefined,
+            totalPieces: 0,
+            rawSale: undefined,
+            timestamp: "1970-01-01T00:00:00.000Z",
+            createdAt: "1970-01-01T00:00:00.000Z",
+          },
+        ]
+      : []),
     ...effectiveSales.map((sale) => {
       const totalPieces = (sale.items || []).reduce((sum, item) => sum + item.quantity, 0);
       const itemsList = (sale.items || []).map((i) => `${i.quantity}x ${i.product.name}`).join(", ");
@@ -587,6 +661,8 @@ export default function ExpensesModal({
         customerName: sale.customerName,
         totalPieces,
         rawSale: sale,
+        timestamp: sale.timestamp || sale.createdAt,
+        createdAt: sale.createdAt,
       };
     }),
     ...shiftExpenses.map((exp) => ({
@@ -603,6 +679,8 @@ export default function ExpensesModal({
       customerName: undefined,
       totalPieces: 0,
       rawSale: undefined,
+      timestamp: exp.timestamp || exp.createdAt,
+      createdAt: exp.createdAt,
     })),
     ...shiftIncomes.map((inc) => ({
       id: inc.id,
@@ -618,13 +696,16 @@ export default function ExpensesModal({
       customerName: inc.customerName,
       totalPieces: 0,
       rawSale: undefined,
+      timestamp: inc.timestamp,
+      createdAt: inc.timestamp,
     })),
-  ];
+  ].sort((a, b) => compareMovementsDesc(a, b));
 
   const filteredHistory = combinedHistory.filter((item) => {
     if (historyFilter === "ventas" && item.type !== "venta") return false;
     if (historyFilter === "entradas" && item.type !== "entrada") return false;
     if (historyFilter === "salidas" && item.type !== "salida") return false;
+    if (historyFilter === "fondo" && item.type !== "fondo") return false;
 
     if (historySearch.trim()) {
       const q = historySearch.toLowerCase().trim();
@@ -668,8 +749,34 @@ export default function ExpensesModal({
           </button>
         </div>
 
-        {/* Live Cash Balances Bar - Clickeable para acceder directamente */}
-        <div className="grid grid-cols-4 gap-1.5 p-3 sm:p-4 bg-stone-50 border-b border-stone-200 text-center">
+        {/* Live Cash Balances Bar - 5 Cuentas Base de Caja con leyenda Ver Historial */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 sm:gap-2 p-2.5 sm:p-3.5 bg-stone-50 border-b border-stone-200 text-center">
+          
+          {/* 1. Fondo Inicial (Base Contable del Turno) */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("register");
+            }}
+            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer group ${
+              activeTab === "register"
+                ? "bg-blue-50 border-blue-400 ring-2 ring-blue-500/20 shadow-xs scale-[1.01]"
+                : "bg-blue-50/60 border-blue-200 hover:bg-blue-100/70 shadow-xs"
+            }`}
+            title="Con cuánto se inició en caja (Base para hacer cuentas del turno)"
+          >
+            <span className="text-[9px] sm:text-[10px] uppercase font-black text-blue-900 block leading-tight group-hover:text-blue-950">
+              🪙 Fondo Inicial
+            </span>
+            <span className="text-xs sm:text-sm font-black text-blue-800 block mt-0.5">
+              +{formatCurrency(currentFund)}
+            </span>
+            <span className="text-[9px] font-bold text-blue-600 block mt-0.5 opacity-90 group-hover:underline">
+              Base de Caja
+            </span>
+          </button>
+
+          {/* 2. Ventas Efectivo */}
           <button
             type="button"
             onClick={() => setActiveTab("tickets")}
@@ -678,72 +785,95 @@ export default function ExpensesModal({
                 ? "bg-emerald-50 border-emerald-400 ring-2 ring-emerald-500/20 shadow-xs scale-[1.01]"
                 : "bg-white border-stone-200/80 hover:bg-emerald-50/50 hover:border-emerald-300 shadow-xs"
             }`}
-            title="Ver listado detallado de historial de ventas"
+            title="Ver listado detallado de historial de ventas y tickets"
           >
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-stone-500 block leading-tight group-hover:text-emerald-800">
+            <span className="text-[9px] sm:text-[10px] uppercase font-black text-emerald-900 block leading-tight group-hover:text-emerald-950">
               Ventas Efectivo
             </span>
             <span className="text-xs sm:text-sm font-black text-emerald-700 block mt-0.5">
-              {formatCurrency(cashSalesTotal > 0 ? cashSalesTotal : totalSalesSum)}
+              +{formatCurrency(cashSalesTotal > 0 ? cashSalesTotal : totalSalesSum)}
             </span>
             <span className="text-[9px] font-bold text-emerald-600 block mt-0.5 opacity-90 group-hover:underline">
               🧾 Ver Historial
             </span>
           </button>
 
+          {/* 3. Entradas / Cambio */}
           <button
             type="button"
             onClick={() => {
-              setActiveTab("list");
-              setHistoryFilter("entradas");
+              setActiveTab("register");
+              setMovementType("entrada");
             }}
-            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer ${
-              activeTab === "list" && historyFilter === "entradas"
+            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer group ${
+              activeTab === "register" && movementType === "entrada"
                 ? "bg-teal-50 border-teal-400 ring-2 ring-teal-500/20 shadow-xs scale-[1.01]"
                 : "bg-teal-50/60 border-teal-200 hover:bg-teal-100/70 shadow-xs"
             }`}
-            title="Ver entradas de dinero para cambio y abonos"
+            title="Registrar entrada de dinero para cambio y abonos"
           >
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-teal-800 block leading-tight">Entradas / Cambio</span>
-            <span className="text-xs sm:text-sm font-black text-teal-700 block mt-0.5">+{formatCurrency(totalIncomesInCash)}</span>
+            <span className="text-[9px] sm:text-[10px] uppercase font-black text-teal-800 block leading-tight group-hover:text-teal-950">
+              Entradas / Cambio
+            </span>
+            <span className="text-xs sm:text-sm font-black text-teal-700 block mt-0.5">
+              +{formatCurrency(totalIncomesInCash)}
+            </span>
+            <span className="text-[9px] font-bold text-teal-600 block mt-0.5 opacity-90 group-hover:underline">
+              ➕ Registrar Entrada
+            </span>
           </button>
 
+          {/* 4. Gastos / Retiros */}
           <button
             type="button"
             onClick={() => {
-              setActiveTab("list");
-              setHistoryFilter("salidas");
+              setActiveTab("register");
+              setMovementType("salida");
             }}
-            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer ${
-              activeTab === "list" && historyFilter === "salidas"
+            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer group ${
+              activeTab === "register" && movementType === "salida"
                 ? "bg-rose-50 border-rose-400 ring-2 ring-rose-500/20 shadow-xs scale-[1.01]"
                 : "bg-rose-50/60 border-rose-200 hover:bg-rose-100/70 shadow-xs"
             }`}
-            title="Ver salidas por gastos operativos y retiros"
+            title="Registrar salida por gastos operativos y retiros"
           >
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-rose-800 block leading-tight">Gastos / Retiros</span>
-            <span className="text-xs sm:text-sm font-black text-rose-700 block mt-0.5">-{formatCurrency(totalExpenses)}</span>
+            <span className="text-[9px] sm:text-[10px] uppercase font-black text-rose-800 block leading-tight group-hover:text-rose-950">
+              Gastos / Retiros
+            </span>
+            <span className="text-xs sm:text-sm font-black text-rose-700 block mt-0.5">
+              -{formatCurrency(totalExpenses)}
+            </span>
+            <span className="text-[9px] font-bold text-rose-600 block mt-0.5 opacity-90 group-hover:underline">
+              ➖ Registrar Salida
+            </span>
           </button>
 
+          {/* 5. En Cajón Ahora */}
           <button
             type="button"
             onClick={() => {
-              setActiveTab("list");
-              setHistoryFilter("todos");
+              setActiveTab("register");
             }}
-            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer ${
-              activeTab === "list" && historyFilter === "todos"
+            className={`col-span-2 sm:col-span-1 p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer group ${
+              activeTab === "register"
                 ? "bg-amber-100 border-amber-400 ring-2 ring-amber-500/20 shadow-xs scale-[1.01]"
                 : "bg-amber-50 border-amber-300 hover:bg-amber-100/70 shadow-xs"
             }`}
-            title="Efectivo neto en cajón"
+            title="Efectivo total en cajón ahora (Base + Ventas + Entradas - Salidas)"
           >
-            <span className="text-[9px] sm:text-[10px] uppercase font-bold text-amber-900 block leading-tight">En Cajón Ahora</span>
-            <span className="text-xs sm:text-sm font-black text-stone-900 block mt-0.5">{formatCurrency(netCashInDrawer)}</span>
+            <span className="text-[9px] sm:text-[10px] uppercase font-black text-amber-900 block leading-tight group-hover:text-amber-950">
+              En Cajón Ahora
+            </span>
+            <span className="text-xs sm:text-sm font-black text-stone-900 block mt-0.5">
+              {formatCurrency(netCashInDrawer)}
+            </span>
+            <span className="text-[9px] font-bold text-amber-800 block mt-0.5 opacity-90 group-hover:underline">
+              💵 Balance Actual
+            </span>
           </button>
         </div>
 
-        {/* 3 Tabs Principales de Operación */}
+        {/* 2 Tabs Principales de Operación */}
         <div className="flex border-b border-stone-200 bg-stone-100/80 p-1.5 gap-1.5">
           <button
             type="button"
@@ -769,19 +899,6 @@ export default function ExpensesModal({
           >
             <Receipt className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>Historial de Ventas ({totalRecordsCount})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("list")}
-            className={`flex-1 py-2.5 px-2.5 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === "list"
-                ? "bg-white text-stone-900 shadow-sm border border-stone-300 ring-2 ring-stone-900/10"
-                : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
-            }`}
-          >
-            <Coins className="w-4 h-4 text-amber-700 shrink-0" />
-            <span>Historial del Turno ({combinedHistory.length})</span>
           </button>
         </div>
 
@@ -1466,14 +1583,14 @@ export default function ExpensesModal({
             <div className="space-y-3.5">
               {/* Filtros de Historial (Todos, Ventas, Entradas, Salidas) */}
               <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between pb-1">
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
                   <button
                     type="button"
                     onClick={() => setHistoryFilter("todos")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                    className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-sm sm:text-base font-black shrink-0 transition-all border-2 cursor-pointer shadow-2xs active:scale-95 ${
                       historyFilter === "todos"
-                        ? "bg-stone-900 text-white border-stone-900 shadow-xs"
-                        : "bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200"
+                        ? "bg-stone-900 text-white border-stone-900 shadow-sm ring-2 ring-stone-900/20"
+                        : "bg-white text-stone-700 hover:bg-stone-100 border-stone-300 hover:border-stone-400"
                     }`}
                   >
                     Todos ({combinedHistory.length})
@@ -1481,10 +1598,10 @@ export default function ExpensesModal({
                   <button
                     type="button"
                     onClick={() => setHistoryFilter("ventas")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                    className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-sm sm:text-base font-black shrink-0 transition-all border-2 cursor-pointer shadow-2xs active:scale-95 ${
                       historyFilter === "ventas"
-                        ? "bg-emerald-700 text-white border-emerald-800 shadow-xs ring-2 ring-emerald-500/30"
-                        : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-emerald-200"
+                        ? "bg-emerald-700 text-white border-emerald-800 shadow-sm ring-2 ring-emerald-500/30"
+                        : "bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border-emerald-300 hover:border-emerald-400"
                     }`}
                   >
                     🥖 Ventas ({effectiveSales.length})
@@ -1492,10 +1609,10 @@ export default function ExpensesModal({
                   <button
                     type="button"
                     onClick={() => setHistoryFilter("entradas")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                    className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-sm sm:text-base font-black shrink-0 transition-all border-2 cursor-pointer shadow-2xs active:scale-95 ${
                       historyFilter === "entradas"
-                        ? "bg-teal-700 text-white border-teal-800 shadow-xs ring-2 ring-teal-500/30"
-                        : "bg-teal-50 text-teal-800 hover:bg-teal-100 border-teal-200"
+                        ? "bg-teal-700 text-white border-teal-800 shadow-sm ring-2 ring-teal-500/30"
+                        : "bg-teal-50 text-teal-900 hover:bg-teal-100 border-teal-300 hover:border-teal-400"
                     }`}
                   >
                     🪙 Entradas ({shiftIncomes.length})
@@ -1503,10 +1620,10 @@ export default function ExpensesModal({
                   <button
                     type="button"
                     onClick={() => setHistoryFilter("salidas")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                    className={`px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-sm sm:text-base font-black shrink-0 transition-all border-2 cursor-pointer shadow-2xs active:scale-95 ${
                       historyFilter === "salidas"
-                        ? "bg-rose-700 text-white border-rose-800 shadow-xs ring-2 ring-rose-500/30"
-                        : "bg-rose-50 text-rose-800 hover:bg-rose-100 border-rose-200"
+                        ? "bg-rose-700 text-white border-rose-800 shadow-sm ring-2 ring-rose-500/30"
+                        : "bg-rose-50 text-rose-900 hover:bg-rose-100 border-rose-300 hover:border-rose-400"
                     }`}
                   >
                     💸 Salidas ({shiftExpenses.length})
@@ -1514,20 +1631,20 @@ export default function ExpensesModal({
                 </div>
 
                 {/* Buscador de Movimientos */}
-                <div className="relative flex-1 max-w-xs">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <div className="relative flex-1 max-w-xs sm:max-w-sm">
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
                   <input
                     type="text"
                     placeholder="Buscar ticket, pan o persona..."
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    className="w-full pl-8 pr-7 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium text-stone-900 focus:outline-none focus:border-amber-600 transition-colors placeholder:text-stone-400"
+                    className="w-full pl-10 pr-8 py-2.5 sm:py-3 bg-stone-50 border-2 border-stone-200 rounded-2xl text-xs sm:text-sm font-semibold text-stone-900 focus:outline-none focus:border-amber-600 focus:bg-white transition-colors placeholder:text-stone-400"
                   />
                   {historySearch && (
                     <button
                       type="button"
                       onClick={() => setHistorySearch("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs sm:text-sm font-bold"
                     >
                       ✕
                     </button>

@@ -124,3 +124,149 @@ export function formatDateTimeSafe(inputDate?: Date | string | number): string {
   const hoursStr = String(hours).padStart(2, "0");
   return `${day}/${month}/${year}, ${hoursStr}:${minutes} ${ampm}`;
 }
+
+/**
+ * Parsea fechas en cualquier formato (ISO, timestamp numérico, formato DD/MM/YYYY hh:mm a. m., "Hoy, hh:mm AM", etc.)
+ * y devuelve el valor numérico en milisegundos (timestamp) para ordenamiento cronológico preciso.
+ */
+export function parseDateTimeSafe(input?: Date | string | number | null): number {
+  if (input === null || input === undefined || input === "") return 0;
+  if (input instanceof Date) return isNaN(input.getTime()) ? 0 : input.getTime();
+  if (typeof input === "number") return isNaN(input) ? 0 : input;
+
+  const str = String(input).trim();
+  if (!str) return 0;
+
+  // 1. Número puro en string (ej. "1727195160000")
+  if (/^\d{10,13}$/.test(str)) {
+    const num = Number(str);
+    if (!isNaN(num)) return num;
+  }
+
+  // 2. Si empieza con "Hoy" o "Ayer"
+  const relMatch = str.match(/^(hoy|ayer),?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(a\.?\s*m\.?|p\.?\s*m\.?|am|pm)?/i);
+  if (relMatch) {
+    const [, relWord, hoursStr, minStr, secStr, ampm] = relMatch;
+    const d = new Date();
+    if (relWord.toLowerCase() === "ayer") {
+      d.setDate(d.getDate() - 1);
+    }
+    let hours = parseInt(hoursStr, 10);
+    if (ampm) {
+      const isPm = ampm.toLowerCase().includes("p");
+      if (isPm && hours < 12) hours += 12;
+      if (!isPm && hours === 12) hours = 0;
+    }
+    d.setHours(hours, parseInt(minStr, 10), secStr ? parseInt(secStr, 10) : 0, 0);
+    return d.getTime();
+  }
+
+  // 3. Formato DD/MM/YYYY o DD-MM-YYYY con hora (generado por formatDateTimeSafe)
+  const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4}),?\s*(?:at\s*)?(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(a\.?\s*m\.?|p\.?\s*m\.?|am|pm)?/i);
+  if (dmyMatch) {
+    const [, day, month, year, hoursStr, minStr, secStr, ampm] = dmyMatch;
+    let hours = parseInt(hoursStr, 10);
+    if (ampm) {
+      const isPm = ampm.toLowerCase().includes("p");
+      if (isPm && hours < 12) hours += 12;
+      if (!isPm && hours === 12) hours = 0;
+    }
+    const d = new Date(
+      parseInt(year, 10),
+      parseInt(month, 10) - 1,
+      parseInt(day, 10),
+      hours,
+      parseInt(minStr, 10),
+      secStr ? parseInt(secStr, 10) : 0
+    );
+    const ts = d.getTime();
+    if (!isNaN(ts)) return ts;
+  }
+
+  // 4. Formato YYYY-MM-DD
+  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (ymdMatch) {
+    const [, year, month, day, hoursStr, minStr, secStr] = ymdMatch;
+    const d = new Date(
+      parseInt(year, 10),
+      parseInt(month, 10) - 1,
+      parseInt(day, 10),
+      hoursStr ? parseInt(hoursStr, 10) : 0,
+      minStr ? parseInt(minStr, 10) : 0,
+      secStr ? parseInt(secStr, 10) : 0
+    );
+    const ts = d.getTime();
+    if (!isNaN(ts)) return ts;
+  }
+
+  // 5. Fallback a Date.parse nativo (para ISO 8601 u otros formatos estándar)
+  const directParse = Date.parse(str);
+  if (!isNaN(directParse)) {
+    return directParse;
+  }
+
+  return 0;
+}
+
+/**
+ * Extrae la clave de ordenamiento (timestamp numérico y secuencia de ID) de cualquier movimiento.
+ */
+export function getMovementSortKey(item: {
+  id?: string;
+  date?: string;
+  timestamp?: string | number;
+  createdAt?: string;
+}): { timestamp: number; seq: number } {
+  let ts = 0;
+  if (item.timestamp) {
+    ts = parseDateTimeSafe(item.timestamp);
+  }
+  if (!ts && item.createdAt) {
+    ts = parseDateTimeSafe(item.createdAt);
+  }
+  if (!ts && item.date) {
+    ts = parseDateTimeSafe(item.date);
+  }
+
+  // Extraer secuencia numérica final del ID (ej. POS-160358 -> 160358)
+  let seq = 0;
+  if (item.id) {
+    const idMatch = item.id.match(/\d+/g);
+    if (idMatch && idMatch.length > 0) {
+      const lastDigits = idMatch[idMatch.length - 1];
+      seq = Number(lastDigits) || 0;
+    }
+  }
+
+  return { timestamp: ts, seq };
+}
+
+/**
+ * Comparador descendente para ordenar movimientos cronológicamente: los más recientes arriba.
+ */
+export function compareMovementsDesc(
+  a: { id?: string; date?: string; timestamp?: string | number; createdAt?: string },
+  b: { id?: string; date?: string; timestamp?: string | number; createdAt?: string }
+): number {
+  const keyA = getMovementSortKey(a);
+  const keyB = getMovementSortKey(b);
+
+  const diff = keyB.timestamp - keyA.timestamp;
+  // Si la diferencia es de 1 minuto o más, priorizar el timestamp real
+  if (Math.abs(diff) >= 60000) {
+    return diff;
+  }
+
+  // Si están en el mismo minuto y ambos tienen secuencia numérica de ID, desempatar por secuencia
+  if (keyB.seq && keyA.seq && keyB.seq !== keyA.seq) {
+    return keyB.seq - keyA.seq;
+  }
+
+  // Si hay alguna diferencia de timestamp (sub-minuto)
+  if (diff !== 0) {
+    return diff;
+  }
+
+  return 0;
+}
+
