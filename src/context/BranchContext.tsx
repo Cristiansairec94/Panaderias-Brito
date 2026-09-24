@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { Branch, BranchShift, BranchCashMovement } from "@/types";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { recordCashOutflowAsExpense } from "@/lib/expenses";
 
 export interface SimulatedSale {
   id: string;
@@ -698,6 +699,20 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
+    // Transmitir en tiempo real
+    if (realtimeHub.broadcastSale) {
+      realtimeHub.broadcastSale({
+        id: newSale.id,
+        branchId: newSale.branchId,
+        branchName: newSale.branchName,
+        total: newSale.total,
+        paymentMethod: newSale.paymentMethod,
+        cashier: newSale.cashier,
+        itemsSummary: newSale.itemsSummary,
+        timestamp: timeStr,
+      });
+    }
+
     return newSale;
   }, [branches, currentBranchId]);
 
@@ -780,6 +795,20 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         } catch {}
         return next;
       });
+
+      // Si es una salida de dinero, registrar automáticamente en el Historial Detallado de Gastos
+      if (movement.type === "salida") {
+        recordCashOutflowAsExpense({
+          amount: movement.amount,
+          description: movement.reason,
+          category: movement.category,
+          branchId,
+          branchName: targetBranch ? targetBranch.name : branchName,
+          cashier: movement.authorizedBy,
+          accountOrigin: "Caja Mostrador (Efectivo Turno)",
+          paymentMethod: "efectivo",
+        });
+      }
 
       // Update cash in drawer for that branch
       setBranches((prev) => {

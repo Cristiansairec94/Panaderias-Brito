@@ -422,11 +422,17 @@ export function addQuickCustomer(customerData: {
   const current = getStoredCustomers();
   const cleanName = customerData.name.trim();
   const normalizedNew = normalizeCustomerName(cleanName);
+  const cleanPhone = (customerData.phone || "").replace(/\D/g, "");
 
-  // Si ya existe un cliente con el mismo nombre, reutilizarlo y actualizarlo en lugar de duplicarlo
-  const existingIdx = current.findIndex(
-    (c) => normalizeCustomerName(c.name) === normalizedNew && c.id !== "cli-0"
-  );
+  // Verificar si ya existe un cliente con el mismo nombre o teléfono para NUNCA duplicar
+  const existingIdx = current.findIndex((c) => {
+    if (c.id === "cli-0") return false;
+    const sameName = normalizeCustomerName(c.name) === normalizedNew;
+    const cPhone = (c.phone || "").replace(/\D/g, "");
+    const samePhone = cleanPhone.length >= 7 && cPhone.length >= 7 && cPhone === cleanPhone;
+    return sameName || samePhone;
+  });
+
   if (existingIdx !== -1) {
     const existing = current[existingIdx];
     const updatedCustomer: Customer = {
@@ -464,6 +470,122 @@ export function addQuickCustomer(customerData: {
   const updated = [newCustomer, ...current];
   saveStoredCustomers(updated);
   return newCustomer;
+}
+
+export interface CustomerDuplicateGroup {
+  name: string;
+  phone: string;
+  count: number;
+  ids: string[];
+  customers: Customer[];
+}
+
+/**
+ * Identifica todos los clientes repetidos por nombre o teléfono en el catálogo
+ */
+export function identifyDuplicateCustomers(): CustomerDuplicateGroup[] {
+  const customers = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
+  const nameMap = new Map<string, Customer[]>();
+
+  for (const c of customers) {
+    const key = c.name ? c.name.trim().toLowerCase() : "";
+    if (!key) continue;
+    if (!nameMap.has(key)) {
+      nameMap.set(key, []);
+    }
+    nameMap.get(key)!.push(c);
+  }
+
+  const groups: CustomerDuplicateGroup[] = [];
+  for (const [key, list] of nameMap.entries()) {
+    if (list.length > 1) {
+      groups.push({
+        name: list[0].name.trim(),
+        phone: list[0].phone || "N/A",
+        count: list.length,
+        ids: list.map((c) => c.id),
+        customers: list,
+      });
+    }
+  }
+
+  return groups;
+}
+
+/**
+ * Elimina por completo todos los contactos que estén repetidos en el catálogo
+ */
+export function purgeAllDuplicateCustomers(): { deletedCount: number; names: string[] } {
+  const current = getStoredCustomers();
+  const groups = identifyDuplicateCustomers();
+  if (groups.length === 0) return { deletedCount: 0, names: [] };
+
+  const idsToDelete = new Set<string>();
+  const namesToDelete = new Set<string>();
+
+  for (const g of groups) {
+    namesToDelete.add(g.name.toLowerCase());
+    g.ids.forEach((id) => idsToDelete.add(id));
+  }
+
+  const filtered = current.filter((c) => {
+    if (idsToDelete.has(c.id)) return false;
+    if (c.name && namesToDelete.has(c.name.trim().toLowerCase())) return false;
+    return true;
+  });
+
+  const deletedCount = current.length - filtered.length;
+  saveStoredCustomers(filtered);
+
+  return {
+    deletedCount,
+    names: groups.map((g) => g.name),
+  };
+}
+
+/**
+ * Unifica los contactos repetidos dejando únicamente 1 registro limpio por cliente
+ */
+export function deduplicateKeepOneCustomers(): { unifiedCount: number; names: string[] } {
+  const current = getStoredCustomers();
+  const groups = identifyDuplicateCustomers();
+  if (groups.length === 0) return { unifiedCount: 0, names: [] };
+
+  const seen = new Set<string>();
+  const unified: Customer[] = [];
+
+  for (const c of current) {
+    const key = c.name ? c.name.trim().toLowerCase() : "";
+    if (!key) {
+      unified.push(c);
+      continue;
+    }
+
+    if (seen.has(key)) {
+      const existing = unified.find((u) => u.name.trim().toLowerCase() === key);
+      if (existing) {
+        if ((!existing.phone || existing.phone === "N/A") && c.phone && c.phone !== "N/A") {
+          existing.phone = c.phone;
+        }
+        if (!existing.notes && c.notes) {
+          existing.notes = c.notes;
+        }
+        if (c.purchaseHistory && c.purchaseHistory.length > 0) {
+          existing.purchaseHistory = [...(existing.purchaseHistory || []), ...c.purchaseHistory];
+        }
+      }
+      continue;
+    }
+
+    seen.add(key);
+    unified.push(c);
+  }
+
+  saveStoredCustomers(unified);
+  return {
+    unifiedCount: groups.length,
+    names: groups.map((g) => g.name),
+  };
 }
 
 /**
@@ -770,10 +892,15 @@ export async function updateCustomerInDb(
  */
 export async function deleteCustomerInDb(id: string, name?: string): Promise<boolean> {
   const current = getStoredCustomers();
-  const cleanNorm = name ? normalizeCustomerName(name) : "";
-  const filtered = current.filter(
-    (c) => c.id !== id && (!cleanNorm || normalizeCustomerName(c.name) !== cleanNorm)
-  );
+  const target = current.find((c) => c.id === id);
+  const targetName = name || target?.name || "";
+  const cleanNorm = targetName ? normalizeCustomerName(targetName) : "";
+
+  const filtered = current.filter((c) => {
+    if (c.id === id) return false;
+    if (cleanNorm && normalizeCustomerName(c.name) === cleanNorm) return false;
+    return true;
+  });
   saveStoredCustomers(filtered);
 
   try {
@@ -781,8 +908,8 @@ export async function deleteCustomerInDb(id: string, name?: string): Promise<boo
     if (!id.startsWith("cli-")) {
       await supabase.from("customers").delete().eq("id", id);
     }
-    if (name) {
-      await supabase.from("customers").delete().ilike("name", name.trim());
+    if (targetName) {
+      await supabase.from("customers").delete().ilike("name", targetName.trim());
     }
     return true;
   } catch (err) {

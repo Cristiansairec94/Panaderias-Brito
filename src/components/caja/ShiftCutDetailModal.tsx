@@ -44,6 +44,155 @@ export default function ShiftCutDetailModal({
   const responsibleName = cut.responsible || cut.outgoingCashier || "Responsable de Caja";
 
   const handlePrint = () => {
+    if (!ticketRef.current) {
+      window.print();
+      return;
+    }
+
+    try {
+      // Eliminar iframe previo si existiera
+      const oldFrame = document.getElementById("brito-print-frame");
+      if (oldFrame) {
+        oldFrame.remove();
+      }
+
+      // Crear iframe con dimensiones reales fuera de pantalla para que Chromium renderice el lienzo completo
+      const iframe = document.createElement("iframe");
+      iframe.id = "brito-print-frame";
+      iframe.style.position = "fixed";
+      iframe.style.top = "-9999px";
+      iframe.style.left = "-9999px";
+      iframe.style.width = "400px";
+      iframe.style.height = "800px";
+      iframe.style.border = "none";
+      iframe.style.zIndex = "-9999";
+      iframe.style.visibility = "visible";
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        const ticketHtml = ticketRef.current.innerHTML;
+
+        // Recolectar estilos del documento actual (Tailwind + CSS)
+        const parentStyles = Array.from(document.querySelectorAll("link[rel='stylesheet'], style"))
+          .map((node) => node.outerHTML)
+          .join("\n");
+
+        doc.open();
+        doc.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comprobante de Corte - ${cut.id}</title>
+  ${parentStyles}
+  <style>
+    @page {
+      size: auto;
+      margin: 4mm 6mm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #ffffff !important;
+      color: #000000 !important;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+      visibility: visible !important;
+      display: block !important;
+      width: 100% !important;
+      height: auto !important;
+    }
+    body * {
+      visibility: visible !important;
+    }
+    .print-ticket-box {
+      width: 100% !important;
+      max-width: 360px !important;
+      margin: 0 auto !important;
+      padding: 16px !important;
+      background: #ffffff !important;
+      color: #000000 !important;
+      box-shadow: none !important;
+      border: 2px dashed #000000 !important;
+      border-radius: 8px !important;
+    }
+    .flex { display: flex !important; }
+    .justify-between { justify-content: space-between !important; }
+    .justify-center { justify-content: center !important; }
+    .items-center { align-items: center !important; }
+    .text-center { text-align: center !important; }
+    .space-y-1 > * + * { margin-top: 3px !important; }
+    .space-y-1\\.5 > * + * { margin-top: 5px !important; }
+    .space-y-4 > * + * { margin-top: 12px !important; }
+    .font-black, .font-bold { font-weight: 900 !important; }
+    .border-b-2 { border-bottom: 2px dashed #000000 !important; }
+    .border-t-2 { border-top: 2px dashed #000000 !important; }
+    .border-dashed { border-style: dashed !important; }
+    .border-dotted { border-style: dotted !important; }
+    .border-b { border-bottom: 1px dashed #555555 !important; }
+    .border-t { border-top: 1px dashed #555555 !important; }
+    .pb-3 { padding-bottom: 8px !important; }
+    .pt-1 { padding-top: 3px !important; }
+    .pt-2 { padding-top: 6px !important; }
+    .pt-4 { padding-top: 12px !important; }
+    .p-2 { padding: 5px !important; }
+    .p-3 { padding: 8px !important; }
+    .grid { display: grid !important; }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .gap-4 { gap: 12px !important; }
+    .bg-stone-900 { background-color: #000000 !important; color: #ffffff !important; }
+    .text-white { color: #ffffff !important; }
+    .bg-stone-50, .bg-amber-50, .bg-amber-50\\/70, .bg-emerald-100, .bg-blue-100, .bg-rose-100 {
+      background-color: #f2f2f2 !important;
+    }
+    .rounded-md, .rounded-xl, .rounded-2xl, .rounded-3xl { border-radius: 6px !important; }
+    .border { border: 1px solid #cccccc !important; }
+    .text-emerald-800, .text-emerald-900, .text-emerald-950, .text-amber-950, .text-amber-900, .text-rose-800, .text-rose-950, .text-blue-950 {
+      color: #000000 !important;
+    }
+    .text-stone-500, .text-stone-600, .text-stone-400 {
+      color: #333333 !important;
+    }
+    svg { display: inline-block !important; vertical-align: middle !important; }
+  </style>
+</head>
+<body>
+  <div class="print-ticket-box">
+    ${ticketHtml}
+  </div>
+</body>
+</html>`);
+        doc.close();
+
+        // Limpiar el iframe unicamente despues de que el usuario cierre el dialogo de impresion
+        if (iframe.contentWindow) {
+          iframe.contentWindow.onafterprint = () => {
+            try {
+              iframe.remove();
+            } catch {}
+          };
+        }
+
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch (e) {
+            console.warn("Error en print:", e);
+            window.print();
+          }
+        }, 350);
+        return;
+      }
+    } catch (e) {
+      console.warn("Fallback to window.print():", e);
+    }
+
     window.print();
   };
 
@@ -72,35 +221,6 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/80 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
-      {/* Estilos para impresión limpia de ticket térmico */}
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #thermal-ticket-print,
-          #thermal-ticket-print * {
-            visibility: visible;
-          }
-          #thermal-ticket-print {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 80mm !important;
-            max-width: 80mm !important;
-            margin: 0 auto;
-            padding: 4mm !important;
-            background: white !important;
-            color: black !important;
-            font-size: 11px !important;
-            box-shadow: none !important;
-            border: none !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-        }
-      `}</style>
 
       <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[92vh] border-2 border-stone-200 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 transition-all duration-200">
         {/* Cabecera del Modal */}
@@ -177,9 +297,10 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
         {/* Cuerpo del Modal con el Ticket Térmico Oficial */}
         <div className="p-4 sm:p-6 overflow-y-auto bg-stone-100 flex justify-center">
           <div
-            id="thermal-ticket-print"
+            id="thermal-receipt"
+            data-paper-width="80mm"
             ref={ticketRef}
-            className="w-full max-w-[370px] bg-white p-5 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-dashed border-stone-300 shadow-lg space-y-4 font-mono text-stone-900"
+            className="w-full max-w-[370px] bg-white p-5 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-dashed border-stone-300 shadow-lg space-y-4 font-mono text-stone-900 paper-80mm"
           >
             {/* Header del Ticket */}
             <div className="text-center space-y-1 border-b-2 border-dashed border-stone-300 pb-3">

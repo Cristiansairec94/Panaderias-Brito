@@ -234,6 +234,7 @@ export interface CashExpense {
 }
 
 export type CashIncomeCategory =
+  | "venta_mostrador"
   | "cambio_billetes"
   | "abono_pedido"
   | "abono_cliente"
@@ -254,12 +255,24 @@ export interface CashIncome {
   customerName?: string;
   orderId?: string;
   orderNumber?: string;
+  saleId?: string;
   cashier: string;
   branchId?: string;
   branchName?: string;
   date: string;
   timestamp?: string;
   referenceNumber?: string;
+}
+
+export interface SimulatedSale {
+  id: string;
+  branchId: string;
+  branchName: string;
+  itemsSummary: string;
+  total: number;
+  paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  cashier: string;
+  timestamp: string;
 }
 
 export type UserRole = "admin" | "auxiliar_admin" | "cajero" | "panadero" | "supervisor" | (string & {});
@@ -346,7 +359,7 @@ export interface BranchCashMovement {
   branchId: string;
   branchName: string;
   type: "entrada" | "salida";
-  category: "gasto_gas" | "compra_insumos" | "pago_proveedor" | "retiro_seguridad" | "abono_cliente" | "otro";
+  category: "gasto_gas" | "compra_insumos" | "pago_proveedor" | "retiro_seguridad" | "abono_cliente" | "otro" | (string & {});
   categoryLabel: string;
   amount: number;
   reason: string;

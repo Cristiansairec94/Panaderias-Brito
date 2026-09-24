@@ -868,7 +868,7 @@ export default function CreateOrderModal({
     }
   };
 
-  // Confirmar y registrar nuevo cliente en el catálogo
+  // Confirmar y registrar nuevo cliente en el catálogo (una sola vez)
   const handleConfirmSaveCustomer = async () => {
     let newCustId: string | undefined = undefined;
     try {

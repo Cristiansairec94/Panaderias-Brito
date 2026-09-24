@@ -27,7 +27,10 @@ import {
   BellRing,
   Send,
   Check,
-  Building2
+  Building2,
+  Sparkles,
+  RefreshCw,
+  Radio
 } from "lucide-react";
 import { CashIncome, CashIncomeCategory, Customer, CustomOrder } from "@/types";
 import { formatCurrency, formatDateTimeSafe, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
@@ -35,158 +38,19 @@ import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { createClient } from "@/lib/supabase/client";
+import { 
+  getStoredIncomes, 
+  saveStoredIncomes, 
+  syncMissingSalesToIncomes, 
+  recordCashIncome, 
+  cleanDuplicateIncomes,
+  INITIAL_INCOMES 
+} from "@/lib/incomes";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import IncomeReceiptModal from "@/components/ingresos/IncomeReceiptModal";
 
-// Componente Gráfico SVG: Símbolo de gráfica hacia arriba que representa ingresos
-function IncomeUpwardChartSymbol({ className = "w-8 h-8" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 36 36"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="Gráfica de ingresos en tendencia alcista"
-    >
-      <defs>
-        <linearGradient id="incBarGrad1" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#34d399" />
-          <stop offset="100%" stopColor="#059669" stopOpacity="0.4" />
-        </linearGradient>
-        <linearGradient id="incBarGrad2" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#6ee7b7" />
-          <stop offset="100%" stopColor="#047857" stopOpacity="0.5" />
-        </linearGradient>
-        <linearGradient id="incBarGrad3" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#a7f3d0" />
-          <stop offset="100%" stopColor="#065f46" stopOpacity="0.6" />
-        </linearGradient>
-        <linearGradient id="incCoinGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#fde047" />
-          <stop offset="100%" stopColor="#d97706" />
-        </linearGradient>
-      </defs>
-
-      {/* Línea base horizontal de la gráfica */}
-      <line x1="3" y1="31" x2="33" y2="31" stroke="#047857" strokeWidth="1.5" strokeLinecap="round" />
-
-      {/* Barras de gráfica en ascenso */}
-      <rect x="4" y="21" width="5" height="10" rx="1.5" fill="url(#incBarGrad1)" />
-      <rect x="11.5" y="15" width="5" height="16" rx="1.5" fill="url(#incBarGrad2)" />
-      <rect x="19" y="9" width="5" height="22" rx="1.5" fill="url(#incBarGrad3)" />
-
-      {/* Línea de tendencia alcista con flecha que sube */}
-      <path
-        d="M4 22 L 12 16 L 19.5 11 L 30 3.5"
-        stroke="#ecfdf5"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M24 3.5 H 30 V 9.5"
-        stroke="#ecfdf5"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Punto brillante de meta en la cima */}
-      <circle cx="30" cy="3.5" r="2" fill="#ffffff" />
-
-      {/* Moneda / Insignia de Dinero/Ingresos ($) */}
-      <g transform="translate(21, 18)">
-        <circle cx="6" cy="6" r="5.5" fill="url(#incCoinGrad)" stroke="#fef08a" strokeWidth="1" />
-        <text
-          x="6"
-          y="8.8"
-          textAnchor="middle"
-          fill="#78350f"
-          fontSize="7.5"
-          fontWeight="900"
-          fontFamily="system-ui, sans-serif"
-        >
-          $
-        </text>
-      </g>
-    </svg>
-  );
-}
-
-const INITIAL_INCOMES: CashIncome[] = [
-  {
-    id: "ING-849102",
-    amount: 500,
-    category: "abono_pedido",
-    categoryLabel: "Abono a Pedido Especial",
-    paymentMethod: "efectivo",
-    concept: "Anticipo de pastel 3 leches XV años para Sra. María González (PED-101)",
-    customerId: "cli-3",
-    customerName: "Sra. María González",
-    orderId: "PED-101",
-    orderNumber: "PED-101",
-    cashier: "Lupita Brito",
-    branchName: "Sucursal Matriz Centro",
-    date: "Hoy, 08:45 AM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849103",
-    amount: 850,
-    category: "abono_cliente",
-    categoryLabel: "Cobro a Mayorista / Tiendita",
-    paymentMethod: "transferencia",
-    referenceNumber: "SPEI-774921",
-    concept: "Liquidación semanal de 150 bolillos y teleras",
-    customerId: "cli-1",
-    customerName: "Abarrotes La Guadalupana (Don Pepe)",
-    cashier: "Don Toño Brito",
-    branchName: "Sucursal Matriz Centro",
-    date: "Hoy, 10:15 AM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849104",
-    amount: 300,
-    category: "abono_pedido",
-    categoryLabel: "Abono a Pedido Especial",
-    paymentMethod: "efectivo",
-    concept: "Anticipo pastel mil hojas de chocolate y café para cumpleaños",
-    customerId: "cli-4",
-    customerName: "Familia Brito",
-    orderId: "PED-103",
-    orderNumber: "PED-103",
-    cashier: "Lupita Brito",
-    branchName: "Sucursal Norte",
-    date: "Hoy, 11:30 AM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849105",
-    amount: 250,
-    category: "venta_costales",
-    categoryLabel: "Venta de Costales / Reciclaje",
-    paymentMethod: "efectivo",
-    concept: "Venta de 50 costales de harina vacíos a forrajera local",
-    cashier: "Maestro Juan",
-    branchName: "Sucursal Matriz Centro",
-    date: "Hoy, 12:45 PM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849106",
-    amount: 1000,
-    category: "fondo_cambio",
-    categoryLabel: "Aportación de Cambio a Caja",
-    paymentMethod: "efectivo",
-    concept: "Inyección de morralla y billetes de $20 y $50 para cambio del turno vespertino",
-    cashier: "Don Toño Brito",
-    branchName: "Sucursal Mercado",
-    date: "Hoy, 01:20 PM",
-    timestamp: new Date().toISOString(),
-  },
-];
-
 const CATEGORY_OPTIONS: { id: CashIncomeCategory; label: string; shortLabel: string; icon: string }[] = [
+  { id: "venta_mostrador", label: "Ventas de Mostrador (Panadería / POS)", shortLabel: "Ventas Mostrador", icon: "🥖" },
   { id: "abono_pedido", label: "Abono a Pedido Especial (Pasteles/Eventos)", shortLabel: "Abono a Pedido", icon: "🎂" },
   { id: "abono_cliente", label: "Cobro a Cliente Mayorista / Tiendita", shortLabel: "Cobro a Cliente", icon: "🏪" },
   { id: "fondo_cambio", label: "Aportación de Cambio / Fondo Adicional", shortLabel: "Fondo de Cambio", icon: "🪙" },
@@ -195,7 +59,7 @@ const CATEGORY_OPTIONS: { id: CashIncomeCategory; label: string; shortLabel: str
   { id: "otro", label: "Otro Concepto", shortLabel: "Otro Concepto", icon: "💵" },
 ];
 
-const QUICK_AMOUNTS = [50, 100, 200, 300, 500, 1000];
+const QUICK_AMOUNTS = [50, 100, 200, 500, 1000, 2000];
 
 export default function IngresosPage() {
   const { user } = useAuth();
@@ -207,6 +71,7 @@ export default function IngresosPage() {
   const [selectedCategory, setSelectedCategory] = useState<"all" | CashIncomeCategory>("all");
   const [selectedMethod, setSelectedMethod] = useState<"all" | "efectivo" | "tarjeta" | "transferencia">("all");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
+  const [lastSyncTime, setLastSyncTime] = useState<string>("En vivo");
   
   // Modals state
   const [isNewIncomeModalOpen, setIsNewIncomeModalOpen] = useState(false);
@@ -224,28 +89,54 @@ export default function IngresosPage() {
   const [branchName, setBranchName] = useState(currentBranch ? currentBranch.name : "Sucursal Matriz Centro");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load incomes on mount with localStorage caching
+  // Cargar ingresos con sincronización inmediata de compras POS y tiempo real
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("brito_cash_incomes");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const sanitized = parsed.filter(
-            (i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5
-          );
-          setIncomes(sanitized);
-          if (sanitized.length !== parsed.length) {
-            localStorage.setItem("brito_cash_incomes", JSON.stringify(sanitized));
-          }
-          return;
-        }
+    // 1. Sincronizar todas las ventas previas de mostrador para que entren aquí directamente
+    syncMissingSalesToIncomes();
+    const loaded = getStoredIncomes();
+    setIncomes(loaded);
+
+    // 2. Escuchar evento de actualización local
+    const handleLocalUpdate = () => {
+      setIncomes(getStoredIncomes());
+      setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    };
+    window.addEventListener("brito_incomes_updated", handleLocalUpdate);
+    window.addEventListener("storage", handleLocalUpdate);
+
+    // 3. Suscribirse a ventas en tiempo real de cualquier sucursal (WebSocket)
+    const unsubSale = realtimeHub.onSale(() => {
+      setTimeout(() => {
+        setIncomes(getStoredIncomes());
+        setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      }, 60);
+    });
+
+    // 4. Suscribirse a entradas de caja de cualquier sucursal
+    const unsubCash = realtimeHub.onCashMovement((mov) => {
+      if (mov.type === "entrada") {
+        setTimeout(() => {
+          setIncomes(getStoredIncomes());
+          setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+        }, 60);
       }
-    } catch (e) {
-      console.error("Error reading saved incomes", e);
-    }
-    setIncomes(INITIAL_INCOMES);
-    localStorage.setItem("brito_cash_incomes", JSON.stringify(INITIAL_INCOMES));
+    });
+
+    // 5. Suscribirse a pagos y anticipos de pedidos especiales
+    const unsubOrder = realtimeHub.onOrder(() => {
+      setTimeout(() => {
+        setIncomes(getStoredIncomes());
+        setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      }, 60);
+    });
+
+    return () => {
+      window.removeEventListener("brito_incomes_updated", handleLocalUpdate);
+      window.removeEventListener("storage", handleLocalUpdate);
+      unsubSale();
+      unsubCash();
+      unsubOrder();
+    };
   }, []);
 
   // Update default branch when context updates
@@ -255,18 +146,23 @@ export default function IngresosPage() {
     }
   }, [currentBranch]);
 
-  // Save to localStorage when incomes changes
+  // Guardar en almacenamiento sin límite de monto
   const saveIncomes = (newIncomes: CashIncome[]) => {
+    saveStoredIncomes(newIncomes);
     setIncomes(newIncomes);
-    try {
-      localStorage.setItem("brito_cash_incomes", JSON.stringify(newIncomes));
-    } catch (e) {
-      console.error("Error persisting incomes", e);
-    }
   };
 
-  // KPIs Calculations
+  // KPIs Calculations - Sin ningún límite artificial de dinero
   const totalAmount = incomes.reduce((sum, inc) => sum + inc.amount, 0);
+  const posSalesAmount = incomes
+    .filter((inc) => inc.category === "venta_mostrador")
+    .reduce((sum, inc) => sum + inc.amount, 0);
+  const ordersDepositsAmount = incomes
+    .filter((inc) => inc.category === "abono_pedido")
+    .reduce((sum, inc) => sum + inc.amount, 0);
+  const wholesaleRecovered = incomes
+    .filter((inc) => inc.category === "abono_cliente")
+    .reduce((sum, inc) => sum + inc.amount, 0);
   const cashAmount = incomes
     .filter((inc) => inc.paymentMethod === "efectivo")
     .reduce((sum, inc) => sum + inc.amount, 0);
@@ -276,12 +172,6 @@ export default function IngresosPage() {
   const transferAmount = incomes
     .filter((inc) => inc.paymentMethod === "transferencia")
     .reduce((sum, inc) => sum + inc.amount, 0);
-  const ordersDepositsAmount = incomes
-    .filter((inc) => inc.category === "abono_pedido")
-    .reduce((sum, inc) => sum + inc.amount, 0);
-  const wholesaleRecovered = incomes
-    .filter((inc) => inc.category === "abono_cliente")
-    .reduce((sum, inc) => sum + inc.amount, 0);
 
   // Filtered List
   const filteredIncomes = incomes.filter((inc) => {
@@ -290,6 +180,7 @@ export default function IngresosPage() {
       inc.id.toLowerCase().includes(search.toLowerCase()) ||
       (inc.customerName && inc.customerName.toLowerCase().includes(search.toLowerCase())) ||
       (inc.orderNumber && inc.orderNumber.toLowerCase().includes(search.toLowerCase())) ||
+      (inc.saleId && inc.saleId.toLowerCase().includes(search.toLowerCase())) ||
       inc.cashier.toLowerCase().includes(search.toLowerCase());
 
     const matchesCategory = selectedCategory === "all" || inc.category === selectedCategory;
@@ -307,8 +198,7 @@ export default function IngresosPage() {
     setIsSubmitting(true);
     const catObj = CATEGORY_OPTIONS.find((c) => c.id === category);
 
-    const newIncome: CashIncome = {
-      id: `ING-${Math.floor(100000 + Math.random() * 900000)}`,
+    const newIncome = recordCashIncome({
       amount: parsedAmount,
       category,
       categoryLabel: catObj ? catObj.label : "Ingreso",
@@ -319,9 +209,7 @@ export default function IngresosPage() {
       referenceNumber: referenceNumber.trim() || undefined,
       cashier: user?.name || "Don Toño Brito",
       branchName,
-      date: formatDateTimeSafe(new Date()),
-      timestamp: new Date().toISOString(),
-    };
+    });
 
     // Try Supabase insert
     try {
@@ -337,8 +225,21 @@ export default function IngresosPage() {
       console.log("Offline mode, saved locally", err);
     }
 
-    const updated = [newIncome, ...incomes];
-    saveIncomes(updated);
+    // Transmitir por WebSocket a todas las computadoras y celulares
+    if (realtimeHub.broadcastCashMovement) {
+      realtimeHub.broadcastCashMovement({
+        id: newIncome.id,
+        branchId: branches.find((b) => b.name === newIncome.branchName)?.id || "branch-matriz",
+        branchName: newIncome.branchName || "Matriz",
+        type: "entrada",
+        category: newIncome.category as any,
+        categoryLabel: newIncome.categoryLabel,
+        amount: newIncome.amount,
+        reason: newIncome.concept,
+        authorizedBy: newIncome.cashier,
+        timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+      });
+    }
 
     // Enviar notificación al Administrador Don Toño
     addNotification({
@@ -380,12 +281,19 @@ export default function IngresosPage() {
     setIsReceiptModalOpen(true);
   };
 
+  const handlePurgeDuplicates = () => {
+    const raw = getStoredIncomes();
+    const cleaned = cleanDuplicateIncomes(raw);
+    saveStoredIncomes(cleaned);
+    setIncomes(cleaned);
+  };
+
   const handleExportCSV = () => {
     const headers = "Folio,Fecha,Categoria,Concepto,Cliente,Pedido,Metodo,Monto,Cajero,Sucursal\n";
     const rows = filteredIncomes
       .map(
         (i) =>
-          `"${i.id}","${i.date}","${i.categoryLabel}","${i.concept.replace(/"/g, '""')}","${i.customerName || ""}","${i.orderNumber || ""}","${i.paymentMethod}",${i.amount},"${i.cashier}","${i.branchName || ""}"`
+          `"${i.id}","${i.date}","${i.categoryLabel}","${i.concept.replace(/"/g, '""')}","${i.customerName || ""}","${i.orderNumber || i.saleId || ""}","${i.paymentMethod}",${i.amount},"${i.cashier}","${i.branchName || ""}"`
       )
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
@@ -408,9 +316,15 @@ export default function IngresosPage() {
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-stone-900 tracking-tight">Registro de Ingresos</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-black text-stone-900 tracking-tight">Registro de Ingresos</h2>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Tiempo Real Multi-Sucursal
+                </span>
+              </div>
               <p className="text-xs text-stone-500 mt-0.5">
-                Control de abonos a pedidos especiales, cobros a clientes mayoristas y entradas a caja.
+                Todas las compras desde 1 solo pan en mostrador hasta pedidos especiales y cobros de mayoreo de cualquier sucursal, sin límite de monto.
               </p>
             </div>
           </div>
@@ -431,6 +345,13 @@ export default function IngresosPage() {
             <Wallet className="w-4 h-4 text-emerald-600" /> Ver Caja
           </Link>
           <button
+            onClick={handlePurgeDuplicates}
+            className="flex items-center gap-1.5 bg-white hover:bg-stone-50 text-stone-700 font-bold px-3 py-2.5 rounded-xl border border-stone-200 shadow-sm text-xs transition-all active:scale-95"
+            title="Limpiar cualquier registro repetido para conservar únicamente 1 por compra"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-emerald-600" /> Depurar Duplicados
+          </button>
+          <button
             onClick={handleExportCSV}
             className="flex items-center gap-1.5 bg-white hover:bg-stone-50 text-stone-700 font-bold px-3.5 py-2.5 rounded-xl border border-stone-200 shadow-sm text-xs transition-all"
             title="Exportar listado a archivo CSV Excel"
@@ -449,105 +370,66 @@ export default function IngresosPage() {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total General de Ingresos */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-950 to-stone-950 p-5 rounded-3xl border border-emerald-800/60 shadow-xl text-white transition-all duration-200 hover:border-emerald-400 hover:shadow-2xl hover:shadow-emerald-900/30 hover:ring-2 hover:ring-emerald-400/30 hover:-translate-y-0.5 cursor-default group">
-          {/* Resplandor decorativo de fondo */}
-          <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-emerald-500/20 transition-all duration-300" />
-
+        <div className="bg-gradient-to-br from-emerald-900 via-emerald-950 to-stone-950 p-5 rounded-3xl border border-emerald-800/60 shadow-xl text-white transition-all duration-200 hover:border-emerald-400 hover:shadow-2xl hover:shadow-emerald-900/30 hover:ring-2 hover:ring-emerald-400/30 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Total Entradas Hoy</span>
-            {/* Símbolo Gráfico de Ingresos Alcistas */}
-            <div 
-              className="p-2 bg-gradient-to-br from-emerald-800/60 via-emerald-900/80 to-stone-950 text-emerald-300 rounded-2xl border border-emerald-500/40 shadow-lg shadow-emerald-950/50 hover:border-emerald-300 transition-all flex items-center justify-center shrink-0"
-              title="Gráfica de ingresos en tendencia alcista"
-            >
-              <IncomeUpwardChartSymbol className="w-8 h-8" />
+            <div className="p-2 bg-emerald-600/40 text-emerald-300 rounded-xl border border-emerald-500/30">
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-
-          <div className="flex items-end justify-between gap-3 mt-1">
-            <div>
-              <p className="text-3xl font-black text-emerald-300 tracking-tight font-mono">
-                {formatCurrency(totalAmount)}
-              </p>
-              <p className="text-[11px] text-emerald-200/80 font-medium mt-1">
-                {incomes.length} movimientos de ingreso registrados
-              </p>
-            </div>
-
-            {/* Mini gráfica visual de curva ascendente de ingresos */}
-            <div className="flex flex-col items-end shrink-0 pl-2">
-              <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/30 mb-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>En alza</span>
-              </div>
-              <svg className="w-20 h-7 overflow-visible" viewBox="0 0 76 26" fill="none">
-                <defs>
-                  <linearGradient id="cardIncomeSparkline" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#34d399" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M2 22 C 16 20, 26 16, 38 14 C 50 12, 60 6, 74 3"
-                  stroke="#34d399"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M2 22 C 16 20, 26 16, 38 14 C 50 12, 60 6, 74 3 L 74 26 L 2 26 Z"
-                  fill="url(#cardIncomeSparkline)"
-                />
-                <circle cx="74" cy="3" r="2.5" fill="#a7f3d0" />
-              </svg>
-            </div>
-          </div>
+          <p className="text-3xl font-black text-emerald-300 tracking-tight font-mono">
+            {formatCurrency(totalAmount)}
+          </p>
+          <p className="text-[11px] text-emerald-200/80 font-medium mt-1">
+            {incomes.length} movimientos registrados (Sin límite de monto)
+          </p>
         </div>
 
-        {/* Efectivo en Cajón */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20 hover:-translate-y-0.5 cursor-default">
+        {/* Ventas Mostrador (Desde 1 pan) */}
+        <div className="bg-white p-5 rounded-3xl border border-amber-200/80 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Efectivo a Cajón</span>
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
-              <Wallet className="w-4 h-4" />
+            <span className="text-xs font-bold text-amber-800">Compras Mostrador (POS)</span>
+            <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
+              <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-emerald-700 tracking-tight font-mono">
-            +{formatCurrency(cashAmount)}
+          <p className="text-2xl font-black text-amber-700 tracking-tight font-mono">
+            +{formatCurrency(posSalesAmount)}
           </p>
           <p className="text-[11px] text-stone-400 font-semibold mt-1">
-            Suma directamente a caja física
+            Desde 1 solo pan hasta charolas completas
           </p>
         </div>
 
-        {/* Tarjeta & Transferencia */}
+        {/* Pedidos Especiales & Mayoreo */}
+        <div className="bg-white p-5 rounded-3xl border border-rose-200/80 shadow-sm transition-all duration-200 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20 hover:-translate-y-0.5 cursor-default">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-rose-800">Pedidos & Mayoreo</span>
+            <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
+              <Cake className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-black text-rose-700 tracking-tight font-mono">
+            +{formatCurrency(ordersDepositsAmount + wholesaleRecovered)}
+          </p>
+          <p className="text-[11px] text-stone-400 font-semibold mt-1">
+            Pasteles: {formatCurrency(ordersDepositsAmount)} • Mayoreo: {formatCurrency(wholesaleRecovered)}
+          </p>
+        </div>
+
+        {/* Efectivo vs Bancos */}
         <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Bancos (Tarjeta & SPEI)</span>
+            <span className="text-xs font-bold text-stone-500">Caja vs Bancos</span>
             <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
               <CreditCard className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-black text-blue-700 tracking-tight font-mono">
-            {formatCurrency(cardAmount + transferAmount)}
+            {formatCurrency(cashAmount)}
           </p>
           <p className="text-[11px] text-stone-400 font-semibold mt-1">
-            Tarjeta: {formatCurrency(cardAmount)} • SPEI: {formatCurrency(transferAmount)}
-          </p>
-        </div>
-
-        {/* Abonos y Deudas Recuperadas */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Anticipos & Deudas</span>
-            <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
-              <Cake className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-amber-800 tracking-tight font-mono">
-            {formatCurrency(ordersDepositsAmount + wholesaleRecovered)}
-          </p>
-          <p className="text-[11px] text-stone-400 font-semibold mt-1">
-            Pasteles: {formatCurrency(ordersDepositsAmount)} • Mayoreo: {formatCurrency(wholesaleRecovered)}
+            Efectivo: {formatCurrency(cashAmount)} • Bancos: {formatCurrency(cardAmount + transferAmount)}
           </p>
         </div>
       </div>
@@ -563,7 +445,7 @@ export default function IngresosPage() {
               placeholder="Buscar por folio ING-XXXX, ticket, cliente, concepto o cajero..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-stone-50 rounded-2xl border border-stone-200 text-sm sm:text-base font-semibold text-stone-800 placeholder:text-stone-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-stone-50 rounded-2xl border border-stone-200 text-sm sm:text-base font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none placeholder:text-stone-400 text-stone-900"
             />
           </div>
 
@@ -573,7 +455,7 @@ export default function IngresosPage() {
             <select
               value={selectedMethod}
               onChange={(e) => setSelectedMethod(e.target.value as any)}
-              className="bg-stone-50 px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+              className="bg-stone-50 px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold text-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
             >
               <option value="all">Todas las Formas de Pago</option>
               <option value="efectivo">💵 Solo Efectivo</option>
@@ -585,7 +467,7 @@ export default function IngresosPage() {
             <select
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
-              className="bg-stone-50 px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+              className="bg-stone-50 px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold text-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
             >
               <option value="all">Todas las Sucursales</option>
               {branches.map((b) => (
@@ -598,12 +480,12 @@ export default function IngresosPage() {
         </div>
 
         {/* Category Filter Pills */}
-        <div className="flex gap-2.5 overflow-x-auto pb-1.5 text-sm">
+        <div className="flex gap-2 overflow-x-auto pb-1 text-sm">
           <button
             onClick={() => setSelectedCategory("all")}
-            className={`px-4 py-2 rounded-xl font-black text-sm whitespace-nowrap transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl font-black text-sm whitespace-nowrap transition-all ${
               selectedCategory === "all"
-                ? "bg-emerald-700 text-white shadow-md ring-2 ring-emerald-500/30"
+                ? "bg-emerald-700 text-white shadow-sm"
                 : "bg-stone-100 text-stone-700 hover:bg-stone-200"
             }`}
           >
@@ -613,13 +495,14 @@ export default function IngresosPage() {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all flex items-center gap-1.5 ${
                 selectedCategory === cat.id
-                  ? "bg-emerald-700 text-white shadow-md ring-2 ring-emerald-500/30 font-black"
+                  ? "bg-emerald-700 text-white shadow-sm"
                   : "bg-stone-100 text-stone-700 hover:bg-stone-200"
               }`}
             >
-              {cat.icon} {cat.shortLabel || cat.label}
+              <span>{cat.icon}</span>
+              <span>{cat.shortLabel || cat.label}</span>
             </button>
           ))}
         </div>
@@ -631,7 +514,7 @@ export default function IngresosPage() {
           <div className="flex items-center gap-2.5">
             <Receipt className="w-6 h-6 text-emerald-600" />
             <h3 className="font-black text-lg sm:text-xl text-stone-900">Historial de Ingresos Registrados</h3>
-            <span className="text-xs font-bold bg-emerald-100/70 text-emerald-800 px-3 py-1 rounded-full border border-emerald-200/60 hidden sm:inline-block">
+            <span className="text-xs font-bold text-emerald-800 bg-emerald-100/80 px-3 py-1 rounded-full border border-emerald-200 hidden sm:inline-block">
               Entrada Directa de Sucursales
             </span>
           </div>
@@ -675,7 +558,18 @@ export default function IngresosPage() {
                       {inc.date}
                     </td>
                     <td className="p-4">
-                      <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap block w-fit">
+                      <span className={`px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap block w-fit border ${
+                        inc.category === "venta_mostrador"
+                          ? "bg-amber-50 text-amber-900 border-amber-300 font-extrabold"
+                          : inc.category === "abono_pedido"
+                          ? "bg-rose-50 text-rose-800 border-rose-200"
+                          : inc.category === "abono_cliente"
+                          ? "bg-blue-50 text-blue-800 border-blue-200"
+                          : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      }`}>
+                        {inc.category === "venta_mostrador" && "🥖 "}
+                        {inc.category === "abono_pedido" && "🎂 "}
+                        {inc.category === "abono_cliente" && "🏪 "}
                         {inc.categoryLabel}
                       </span>
                     </td>
@@ -694,8 +588,13 @@ export default function IngresosPage() {
                         <span className="text-stone-400 italic font-medium">Público general</span>
                       )}
                       {inc.orderNumber && (
-                        <span className="text-xs font-black text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300 inline-block mt-1">
+                        <span className="text-xs font-black text-rose-800 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 inline-block mt-1">
                           Pedido: {inc.orderNumber}
+                        </span>
+                      )}
+                      {inc.saleId && (
+                        <span className="text-xs font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 inline-block mt-1">
+                          Ticket #{inc.saleId}
                         </span>
                       )}
                     </td>
@@ -761,7 +660,7 @@ export default function IngresosPage() {
                 </div>
                 <div>
                   <h3 className="font-black text-base text-stone-900">Registrar Entrada de Dinero</h3>
-                  <p className="text-[11px] text-stone-500">Abono de pedido, cobro a mayorista o aportación a caja.</p>
+                  <p className="text-[11px] text-stone-500">Cualquier monto sin límite de dinero (Efectivo, Tarjeta o Transferencia).</p>
                 </div>
               </div>
               <button

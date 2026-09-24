@@ -42,6 +42,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
+import { recordCashOutflowAsExpense } from "@/lib/expenses";
+import { recordCashIncome } from "@/lib/incomes";
 import ShiftCutDetailModal from "@/components/caja/ShiftCutDetailModal";
 
 const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
@@ -471,6 +473,33 @@ export default function CajaPage() {
     };
 
     setMovements((prev) => [newMov, ...prev]);
+
+    // Si es salida, registrar automáticamente en el Historial Detallado de Gastos
+    if (movementType === "salida") {
+      recordCashOutflowAsExpense({
+        amount: Number(movAmount),
+        description: movReason || "Salida de caja",
+        category: movCategory,
+        branchId: currentBranch?.id,
+        branchName: currentBranch?.name,
+        cashier: user?.name || "Don Toño Brito",
+        accountOrigin: "Caja Mostrador (Efectivo Turno)",
+        paymentMethod: "efectivo",
+      });
+    } else if (movementType === "entrada") {
+      // Registrar automáticamente en el Historial de Ingresos sin límite de dinero
+      recordCashIncome({
+        amount: Number(movAmount),
+        concept: movReason || "Entrada de dinero a caja (Aportación/Fondo)",
+        category: "fondo_cambio",
+        categoryLabel: "Aportación de Cambio / Entrada",
+        paymentMethod: "efectivo",
+        branchId: currentBranch?.id,
+        branchName: currentBranch?.name || "Sucursal Matriz Centro",
+        cashier: user?.name || "Don Toño Brito",
+      });
+    }
+
     setIsMovementModalOpen(false);
     setMovAmount("");
     setMovReason("");
