@@ -34,7 +34,9 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  Info
+  Info,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import { CashExpense, CashIncome, Sale, CustomOrder } from "@/types";
 import { 
@@ -411,6 +413,15 @@ export default function ExpensesModal({
   const [activeTab, setActiveTab] = useState<"tickets" | "register" | "list">(
     initialTab || "register"
   );
+  // Estado para pantalla desplegable amplia que ocupe gran parte de la pantalla
+  const [isMaximized, setIsMaximized] = useState(false);
+  const isExpandedView = isMaximized || activeTab === "tickets";
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, isOpen]);
   const [movementType, setMovementType] = useState<"salida" | "entrada">("salida");
   const [historyFilter, setHistoryFilter] = useState<"todos" | "ventas" | "entradas" | "salidas">("todos");
   const [ticketScopeFilter, setTicketScopeFilter] = useState<"turno" | "por_dia" | "global">("turno");
@@ -1528,34 +1539,69 @@ export default function ExpensesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/65 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-2xl sm:max-w-3xl w-full overflow-hidden flex flex-col max-h-[94vh] border-2 border-stone-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200">
+      <div 
+        className={`bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col border-2 border-stone-200 transition-all duration-300 ease-in-out ${
+          isExpandedView
+            ? "w-[96vw] max-w-7xl h-[92vh] sm:h-[94vh] max-h-[96vh]"
+            : "w-full max-w-2xl sm:max-w-3xl max-h-[94vh]"
+        }`}
+      >
         
         {/* Header Principal con $ destacado */}
-        <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-4 sm:p-5 px-5 sm:px-7 flex items-center justify-between border-b border-amber-900/50 shadow-sm">
+        <div className="bg-gradient-to-r from-amber-950 via-stone-900 to-amber-950 text-white p-4 sm:p-5 px-5 sm:px-7 flex items-center justify-between border-b border-amber-900/50 shadow-sm shrink-0">
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black text-2xl shadow-md border-2 border-amber-300 shrink-0">
               $
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-black text-lg sm:text-xl leading-tight">Movimientos de Dinero en Caja</h3>
+                <h3 className="font-black text-lg sm:text-xl leading-tight">
+                  {activeTab === "tickets" ? "Historial Completo de Ventas y Pedidos" : "Movimientos de Dinero en Caja"}
+                </h3>
                 <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-xs font-black px-2.5 py-0.5 rounded-full">
                   👤 {cashierName}
                 </span>
+                {activeTab === "tickets" && (
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-xs font-black px-2.5 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1">
+                    <span>🧾</span> {totalRecordsCount} registros
+                  </span>
+                )}
               </div>
               <p className="text-xs sm:text-sm text-amber-200/80 font-medium mt-0.5">
-                Retiros de dueños, gastos operativos y entradas para cambio de billetes
+                {activeTab === "tickets"
+                  ? "Consulta detallada de tickets emitidos, encargos especiales, desglose de pan y reimpresión"
+                  : "Retiros de dueños, gastos operativos y entradas para cambio de billetes"}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Cerrar ventana"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="p-2 sm:px-3 sm:py-2 rounded-xl text-stone-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-white/10 hover:border-white/20"
+              title={isExpandedView ? "Reducir tamaño" : "Desplegar a pantalla completa"}
+            >
+              {isExpandedView ? (
+                <>
+                  <Minimize2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
+                  <span className="hidden md:inline">Reducir</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
+                  <span className="hidden md:inline">Pantalla Completa</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              title="Cerrar ventana"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Live Cash Balances Bar - 5 Cuentas Base de Caja con leyenda Ver Historial */}
@@ -1673,19 +1719,22 @@ export default function ExpensesModal({
               setActiveTab("tickets");
               setTicketTypeFilter("all");
             }}
-            className={`flex-1 py-3 px-3 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 py-3 px-4 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === "tickets" || activeTab === "list"
-                ? "bg-white text-emerald-950 shadow-sm border border-emerald-400 ring-2 ring-emerald-500/25"
+                ? "bg-white text-emerald-950 shadow-md border-2 border-emerald-500 ring-2 ring-emerald-500/25"
                 : "text-emerald-800 hover:text-emerald-950 hover:bg-emerald-50/80 border border-emerald-200/80 bg-emerald-50/40"
             }`}
           >
             <Receipt className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>Historial de Ventas ({totalRecordsCount})</span>
+            <span className="text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider hidden sm:inline">
+              Vista Amplia
+            </span>
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
 
           {activeTab === "tickets" ? (
             /* VISTA DEDICADA: HISTORIAL COMPLETO DE VENTAS Y PEDIDOS ESPECIALES */
@@ -1738,47 +1787,67 @@ export default function ExpensesModal({
               </div>
 
               {/* Botones de Ventas Mostrador y Pedidos Especiales */}
-              <div className="grid grid-cols-2 gap-2.5 text-center">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center">
                 <button
                   type="button"
                   onClick={() => setTicketTypeFilter(ticketTypeFilter === "ventas" ? "all" : "ventas")}
-                  className={`p-3 sm:p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 ${
+                  className={`p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 relative overflow-hidden ${
                     ticketTypeFilter === "ventas"
-                      ? "bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/25 shadow-sm"
+                      ? "bg-emerald-50 border-emerald-500 ring-4 ring-emerald-500/20 shadow-md scale-[1.01]"
                       : "bg-white hover:bg-emerald-50/50 border-stone-200 hover:border-emerald-300 shadow-2xs"
                   }`}
-                  title="Ver ventas de mostrador"
+                  title="Filtrar y ver únicamente ventas de mostrador"
                 >
-                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider block text-stone-700 group-hover:text-emerald-950">
-                    🥖 Ventas Mostrador
-                  </span>
-                  <span className="text-2xl sm:text-3xl font-black text-stone-900 block my-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl sm:text-2xl">🥖</span>
+                    <span className="text-xs sm:text-sm font-black uppercase tracking-wider block text-stone-800 group-hover:text-emerald-950">
+                      Ventas Mostrador
+                    </span>
+                  </div>
+                  <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-stone-900 block my-1">
                     {activeSalesForKpi.length}
                   </span>
-                  <span className="text-[10px] sm:text-xs text-stone-500 font-bold block">
-                    {ticketScopeFilter === "turno" ? "tickets emitidos" : "tickets históricos"}
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap justify-center">
+                    <span className="text-xs text-stone-500 font-bold block">
+                      {ticketScopeFilter === "turno" ? "tickets emitidos en el turno" : "tickets históricos de mostrador"}
+                    </span>
+                    {ticketTypeFilter === "ventas" && (
+                      <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
+                        ✓ Filtro Activo
+                      </span>
+                    )}
+                  </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setTicketTypeFilter(ticketTypeFilter === "pedidos" ? "all" : "pedidos")}
-                  className={`p-3 sm:p-3.5 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 ${
+                  className={`p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 relative overflow-hidden ${
                     ticketTypeFilter === "pedidos"
-                      ? "bg-amber-50 border-amber-500 ring-2 ring-amber-500/25 shadow-sm"
+                      ? "bg-amber-50 border-amber-500 ring-4 ring-amber-500/20 shadow-md scale-[1.01]"
                       : "bg-white hover:bg-amber-50/50 border-stone-200 hover:border-amber-300 shadow-2xs"
                   }`}
-                  title="Ver pedidos especiales"
+                  title="Filtrar y ver únicamente pedidos especiales"
                 >
-                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider block text-amber-900 group-hover:text-amber-950">
-                    🎂 Pedidos Especiales
-                  </span>
-                  <span className="text-2xl sm:text-3xl font-black text-amber-950 block my-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl sm:text-2xl">🎂</span>
+                    <span className="text-xs sm:text-sm font-black uppercase tracking-wider block text-amber-950 group-hover:text-amber-950">
+                      Pedidos Especiales
+                    </span>
+                  </div>
+                  <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-amber-950 block my-1">
                     {activeOrdersForKpi.length}
                   </span>
-                  <span className="text-[10px] sm:text-xs text-amber-700 font-bold block">
-                    {ticketScopeFilter === "turno" ? "encargos del turno" : "encargos registrados"}
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap justify-center">
+                    <span className="text-xs text-amber-700 font-bold block">
+                      {ticketScopeFilter === "turno" ? "encargos del turno" : "encargos registrados"}
+                    </span>
+                    {ticketTypeFilter === "pedidos" && (
+                      <span className="text-[10px] font-black bg-amber-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
+                        ✓ Filtro Activo
+                      </span>
+                    )}
+                  </div>
                 </button>
               </div>
 
@@ -1992,7 +2061,9 @@ export default function ExpensesModal({
                                 <div className="flex-1 h-px bg-amber-200/70" />
                               </div>
                             )}
-                            {group.orders.map(renderOrderCard)}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
+                              {group.orders.map(renderOrderCard)}
+                            </div>
                           </div>
                         )}
 
@@ -2007,7 +2078,9 @@ export default function ExpensesModal({
                                 <div className="flex-1 h-px bg-stone-200" />
                               </div>
                             )}
-                            {group.sales.map(renderSaleCard)}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
+                              {group.sales.map(renderSaleCard)}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -2027,7 +2100,9 @@ export default function ExpensesModal({
                             <div className="flex-1 h-px bg-amber-200/70" />
                           </div>
                         )}
-                        {filteredOrders.map(renderOrderCard)}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
+                          {filteredOrders.map(renderOrderCard)}
+                        </div>
                       </div>
                     )}
 
@@ -2042,7 +2117,9 @@ export default function ExpensesModal({
                             <div className="flex-1 h-px bg-stone-200" />
                           </div>
                         )}
-                        {filteredTickets.map(renderSaleCard)}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
+                          {filteredTickets.map(renderSaleCard)}
+                        </div>
                       </div>
                     )}
                   </>
