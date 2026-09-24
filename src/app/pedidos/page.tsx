@@ -182,9 +182,11 @@ export default function PedidosPage() {
     }
   };
 
-  const handleDeletePermanent = (orderId: string) => {
-    if (confirm("¿Eliminar este pedido permanentemente del registro?")) {
+  const handleDeletePermanent = (orderId: string, orderNumber?: string, customerName?: string) => {
+    const label = orderNumber ? `el pedido ${orderNumber}${customerName ? ` de "${customerName}"` : ""}` : "este pedido";
+    if (confirm(`¿Estás seguro de ELIMINAR PERMANENTEMENTE ${label}?\n\nEsta acción borrará el pedido por completo del registro y no se podrá recuperar.`)) {
       deleteCustomOrder(orderId);
+      loadOrders();
     }
   };
 
@@ -689,6 +691,18 @@ export default function PedidosPage() {
                               <Edit3 className="w-4 h-4" />
                             </button>
 
+                            {/* Eliminar Pedido (Marcado en Rojo) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePermanent(order.id, order.orderNumber, order.customerName);
+                              }}
+                              className="p-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-xl transition-all border border-rose-300 hover:border-rose-600 shadow-2xs group"
+                              title="Eliminar Pedido"
+                            >
+                              <Trash2 className="w-4 h-4 transition-transform group-hover:scale-110" />
+                            </button>
+
                             {/* Desplegable chevron */}
                             <button
                               onClick={() => setExpandedRowId(isExpanded ? null : order.id)}
@@ -784,23 +798,30 @@ export default function PedidosPage() {
                                   )}
                                 </div>
 
-                                <div className="pt-2.5 border-t border-stone-100 flex items-center justify-between mt-2">
-                                  <span className="text-[10px] text-stone-400">Atendió: {order.cashier}</span>
-                                  {order.status !== "cancelado" ? (
+                                <div className="pt-3 flex flex-wrap items-center justify-between gap-2 border-t-2 border-stone-200 mt-2.5">
+                                  <span className="text-xs font-semibold text-stone-500">Atendió: {order.cashier}</span>
+                                  <div className="flex items-center gap-2">
+                                    {order.status !== "cancelado" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCancelOrder(order.id)}
+                                        className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                                        title="Marcar pedido como cancelado"
+                                      >
+                                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                                        <span>Cancelar Pedido</span>
+                                      </button>
+                                    )}
                                     <button
-                                      onClick={() => handleCancelOrder(order.id)}
-                                      className="text-[11px] text-rose-600 hover:underline font-bold"
+                                      type="button"
+                                      onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
+                                      className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs sm:text-sm rounded-xl shadow-md border-2 border-rose-700 flex items-center gap-2 transition-all cursor-pointer ring-2 ring-rose-300/50"
+                                      title="Eliminar este pedido permanentemente"
                                     >
-                                      Cancelar Pedido
+                                      <Trash2 className="w-4 h-4 text-white" />
+                                      <span>ELIMINAR PEDIDO</span>
                                     </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleDeletePermanent(order.id)}
-                                      className="text-[11px] text-rose-700 hover:underline font-bold"
-                                    >
-                                      Eliminar Definitivamente
-                                    </button>
-                                  )}
+                                  </div>
                                 </div>
                               </div>
                             </div>

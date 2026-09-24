@@ -16,11 +16,12 @@ import {
   CalendarClock,
   ShieldCheck,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-import { getStoredOrders, updateOrderStatus } from "@/lib/orders";
+import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 
 interface PosOrdersDrawerProps {
   isOpen: boolean;
@@ -117,6 +118,13 @@ export default function PosOrdersDrawer({
       onSelectOrderForPayment(order);
     } else {
       updateOrderStatus(order.id, "entregado");
+      refreshOrders();
+    }
+  };
+
+  const handleDeleteOrder = (order: CustomOrder) => {
+    if (confirm(`¿Estás seguro de ELIMINAR el pedido ${order.orderNumber} (${order.customerName})?\n\nEsta acción borrará el pedido por completo del registro.`)) {
+      deleteCustomOrder(order.id);
       refreshOrders();
     }
   };
@@ -348,6 +356,15 @@ export default function PosOrdersDrawer({
                         title="Enviar mensaje de WhatsApp"
                       >
                         <Send className="w-3.5 h-3.5" /> WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteOrder(order)}
+                        className="p-1.5 px-2.5 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 hover:border-rose-600 rounded-xl text-xs font-black flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                        title="Eliminar Pedido Definitivamente"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Eliminar</span>
                       </button>
                     </div>
 

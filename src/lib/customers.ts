@@ -232,6 +232,81 @@ export const INITIAL_CUSTOMERS: Customer[] = [
   },
 ];
 
+/**
+ * Normaliza nombres de clientes para comparaciones infalibles:
+ * remueve espacios superfluos, convierte a minúsculas y elimina acentos/diacríticos.
+ */
+export function normalizeCustomerName(name: string): string {
+  return (name || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * Purgador explícito y exhaustivo de clientes duplicados en almacenamiento local.
+ * Fusiona historial de compras, teléfonos, notas, productos favoritos y direcciones,
+ * eliminando definitivamente las filas repetidas y guardando el catálogo limpio.
+ */
+export function purgeDuplicateCustomers(): { totalBefore: number; totalAfter: number; removedCount: number } {
+  if (typeof window === "undefined") return { totalBefore: 0, totalAfter: 0, removedCount: 0 };
+  try {
+    const raw = localStorage.getItem(STORAGE_CUSTOMERS_KEY);
+    if (!raw) return { totalBefore: 0, totalAfter: 0, removedCount: 0 };
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return { totalBefore: 0, totalAfter: 0, removedCount: 0 };
+
+    const totalBefore = parsed.length;
+    const seenMap = new Map<string, Customer>();
+
+    for (const c of parsed) {
+      if (!c || c.id === "cli-0" || c.type === "general") continue;
+      const norm = normalizeCustomerName(c.name);
+      if (!norm) continue;
+
+      if (!seenMap.has(norm)) {
+        seenMap.set(norm, { ...c });
+      } else {
+        const existing = seenMap.get(norm)!;
+        if (existing.id.startsWith("cli-") && !c.id.startsWith("cli-")) {
+          existing.id = c.id;
+        }
+        if ((!existing.phone || existing.phone === "N/A" || existing.phone === "Sin teléfono") && c.phone && c.phone !== "N/A" && c.phone !== "Sin teléfono") {
+          existing.phone = c.phone;
+        }
+        if (!existing.notes && c.notes) existing.notes = c.notes;
+        if (!existing.address && c.address) existing.address = c.address;
+        if (!existing.email && c.email) existing.email = c.email;
+        if (!existing.favoriteProduct && c.favoriteProduct) existing.favoriteProduct = c.favoriteProduct;
+        existing.totalPurchases = Math.max(existing.totalPurchases || 0, c.totalPurchases || 0);
+
+        if (c.purchaseCounts && Object.keys(c.purchaseCounts).length > 0) {
+          existing.purchaseCounts = { ...(existing.purchaseCounts || {}), ...c.purchaseCounts };
+        }
+        if (Array.isArray(c.purchaseHistory) && c.purchaseHistory.length > 0) {
+          const histIds = new Set((existing.purchaseHistory || []).map((h: CustomerPurchase) => h.id));
+          const toAdd = c.purchaseHistory.filter((h: CustomerPurchase) => !histIds.has(h.id));
+          existing.purchaseHistory = [...(existing.purchaseHistory || []), ...toAdd];
+        }
+      }
+    }
+
+    const uniqueList = Array.from(seenMap.values());
+    const totalAfter = uniqueList.length;
+    const removedCount = totalBefore - totalAfter;
+
+    localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(uniqueList));
+    window.dispatchEvent(new Event("brito_customers_updated"));
+
+    return { totalBefore, totalAfter, removedCount };
+  } catch (err) {
+    console.error("Error al purgar clientes duplicados:", err);
+    return { totalBefore: 0, totalAfter: 0, removedCount: 0 };
+  }
+}
+
 export function getStoredCustomers(): Customer[] {
   if (typeof window === "undefined") return INITIAL_CUSTOMERS;
   try {
@@ -246,12 +321,49 @@ export function getStoredCustomers(): Customer[] {
       return INITIAL_CUSTOMERS;
     }
     // Depurar y eliminar cualquier cliente virtual de mostrador (cli-0 / general) del listado guardado
-    const cleaned = parsed.filter((c: Customer) => c.id !== "cli-0" && c.type !== "general");
+    const cleaned = parsed.filter((c: Customer) => c && c.id !== "cli-0" && c.type !== "general");
+
+    // Desduplicar clientes existentes por nombre normalizado (sin acentos, minúsculas, espacios colapsados)
+    const seenNames = new Map<string, Customer>();
+    const deduplicated: Customer[] = [];
+
+    for (const c of cleaned) {
+      const normalizedName = normalizeCustomerName(c.name);
+      if (!normalizedName) continue;
+
+      if (!seenNames.has(normalizedName)) {
+        seenNames.set(normalizedName, c);
+        deduplicated.push(c);
+      } else {
+        const existing = seenNames.get(normalizedName)!;
+        // Si el duplicado tiene ID de Supabase y el existente tiene ID temporal cli-, preferir el de Supabase
+        if (existing.id.startsWith("cli-") && !c.id.startsWith("cli-")) {
+          existing.id = c.id;
+        }
+        // Fusionar datos complementarios en el registro principal
+        if ((!existing.phone || existing.phone === "N/A" || existing.phone === "Sin teléfono") && c.phone && c.phone !== "N/A" && c.phone !== "Sin teléfono") {
+          existing.phone = c.phone;
+        }
+        if (!existing.notes && c.notes) existing.notes = c.notes;
+        if (!existing.address && c.address) existing.address = c.address;
+        if (!existing.email && c.email) existing.email = c.email;
+        if (!existing.favoriteProduct && c.favoriteProduct) existing.favoriteProduct = c.favoriteProduct;
+        existing.totalPurchases = Math.max(existing.totalPurchases || 0, c.totalPurchases || 0);
+        if (c.purchaseCounts && Object.keys(c.purchaseCounts).length > 0) {
+          existing.purchaseCounts = { ...(existing.purchaseCounts || {}), ...c.purchaseCounts };
+        }
+        if (Array.isArray(c.purchaseHistory) && c.purchaseHistory.length > 0) {
+          const histIds = new Set((existing.purchaseHistory || []).map((h: CustomerPurchase) => h.id));
+          const toAdd = c.purchaseHistory.filter((h: CustomerPurchase) => !histIds.has(h.id));
+          existing.purchaseHistory = [...(existing.purchaseHistory || []), ...toAdd];
+        }
+      }
+    }
 
     // Retrocompatibilidad: Asignar producto habitual (moda) e historial a los clientes por defecto si les falta
     let updatedNeeded = false;
-    cleaned.forEach((c: Customer) => {
-      const defaultMatch = INITIAL_CUSTOMERS.find((init) => init.id === c.id);
+    deduplicated.forEach((c: Customer) => {
+      const defaultMatch = INITIAL_CUSTOMERS.find((init) => init.id === c.id || normalizeCustomerName(init.name) === normalizeCustomerName(c.name));
       if (defaultMatch) {
         if (!c.favoriteProduct) {
           c.favoriteProduct = defaultMatch.favoriteProduct;
@@ -268,10 +380,10 @@ export function getStoredCustomers(): Customer[] {
       }
     });
 
-    if (cleaned.length !== parsed.length || updatedNeeded) {
-      localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(cleaned));
+    if (deduplicated.length !== parsed.length || updatedNeeded) {
+      localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(deduplicated));
     }
-    return cleaned;
+    return deduplicated;
   } catch {
     return INITIAL_CUSTOMERS;
   }
@@ -280,7 +392,17 @@ export function getStoredCustomers(): Customer[] {
 export function saveStoredCustomers(customers: Customer[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(customers));
+    // Desduplicar siempre antes de guardar con nombre normalizado
+    const seen = new Set<string>();
+    const unique: Customer[] = [];
+    for (const c of customers) {
+      const norm = normalizeCustomerName(c.name);
+      if (!seen.has(norm)) {
+        seen.add(norm);
+        unique.push(c);
+      }
+    }
+    localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(unique));
     window.dispatchEvent(new Event("brito_customers_updated"));
   } catch (e) {
     console.error("Error saving customers to localStorage", e);
@@ -298,9 +420,32 @@ export function addQuickCustomer(customerData: {
   favoriteProduct?: string;
 }): Customer {
   const current = getStoredCustomers();
+  const cleanName = customerData.name.trim();
+  const normalizedNew = normalizeCustomerName(cleanName);
+
+  // Si ya existe un cliente con el mismo nombre, reutilizarlo y actualizarlo en lugar de duplicarlo
+  const existingIdx = current.findIndex(
+    (c) => normalizeCustomerName(c.name) === normalizedNew && c.id !== "cli-0"
+  );
+  if (existingIdx !== -1) {
+    const existing = current[existingIdx];
+    const updatedCustomer: Customer = {
+      ...existing,
+      phone: (customerData.phone && customerData.phone !== "N/A" && customerData.phone !== "Sin teléfono") 
+        ? customerData.phone.trim() 
+        : existing.phone,
+      address: customerData.address?.trim() || existing.address,
+      notes: customerData.notes?.trim() || existing.notes,
+      favoriteProduct: customerData.favoriteProduct?.trim() || existing.favoriteProduct,
+    };
+    current[existingIdx] = updatedCustomer;
+    saveStoredCustomers(current);
+    return updatedCustomer;
+  }
+
   const newCustomer: Customer = {
     id: `cli-${Date.now()}`,
-    name: customerData.name.trim(),
+    name: cleanName,
     phone: customerData.phone?.trim() || "N/A",
     type: customerData.type || "frecuente",
     creditLimit: customerData.creditLimit || 0,
@@ -422,36 +567,57 @@ export async function fetchCustomersFromDb(): Promise<{ customers: Customer[]; f
       .order("created_at", { ascending: false });
 
     if (!error && data && Array.isArray(data) && data.length > 0) {
-      const dbMapped: Customer[] = data
-        .filter((row: any) => row.id !== "cli-0" && row.type !== "general")
-        .map((row: any) => {
-          const localMatch = local.find(
-            (c) => c.id === row.id || (c.name.trim().toLowerCase() === row.name.trim().toLowerCase())
-          );
-          return {
+      const seenNames = new Map<string, Customer>();
+      const dbMapped: Customer[] = [];
+
+      for (const row of data) {
+        if (row.id === "cli-0" || row.type === "general") continue;
+        const normName = (row.name || "").trim().toLowerCase();
+        if (!normName) continue;
+
+        const localMatch = local.find(
+          (c) => c.id === row.id || c.name.trim().toLowerCase() === normName
+        );
+
+        if (!seenNames.has(normName)) {
+          const item: Customer = {
             id: row.id,
-            name: row.name,
-            phone: row.phone || "N/A",
-            email: row.email || undefined,
-            address: row.address || undefined,
-            type: (row.type as Customer["type"]) || "frecuente",
-            creditLimit: Number(row.credit_limit || 0),
-            currentDebt: Number(row.current_debt || 0),
+            name: (row.name || "").trim(),
+            phone: row.phone || localMatch?.phone || "N/A",
+            email: row.email || localMatch?.email || undefined,
+            address: row.address || localMatch?.address || undefined,
+            type: (row.type as Customer["type"]) || localMatch?.type || "frecuente",
+            creditLimit: Number(row.credit_limit || localMatch?.creditLimit || 0),
+            currentDebt: Number(row.current_debt || localMatch?.currentDebt || 0),
             totalPurchases: Number(row.total_purchases || localMatch?.totalPurchases || 0),
-            notes: row.notes || undefined,
+            notes: row.notes || localMatch?.notes || undefined,
             registeredAt: row.created_at || localMatch?.registeredAt || new Date().toISOString(),
             createdAt: row.created_at ? new Date(row.created_at).getTime() : localMatch?.createdAt || Date.now(),
             favoriteProduct: localMatch?.favoriteProduct,
             purchaseCounts: localMatch?.purchaseCounts || {},
             purchaseHistory: localMatch?.purchaseHistory || [],
           };
-        });
+          seenNames.set(normName, item);
+          dbMapped.push(item);
+        } else {
+          // Si Supabase devuelve registros duplicados para el mismo nombre, consolidar datos
+          const existing = seenNames.get(normName)!;
+          if ((!existing.phone || existing.phone === "N/A" || existing.phone === "Sin teléfono") && row.phone && row.phone !== "N/A" && row.phone !== "Sin teléfono") {
+            existing.phone = row.phone;
+          }
+          if (!existing.notes && row.notes) existing.notes = row.notes;
+          if (!existing.address && row.address) existing.address = row.address;
+          if (!existing.email && row.email) existing.email = row.email;
+          existing.totalPurchases = Math.max(existing.totalPurchases || 0, Number(row.total_purchases || 0));
+        }
+      }
 
       // Conservar clientes locales que aún no se hayan sincronizado
       const dbIds = new Set(dbMapped.map((c) => c.id));
-      const dbNames = new Set(dbMapped.map((c) => c.name.trim().toLowerCase()));
       for (const loc of local) {
-        if (!dbIds.has(loc.id) && !dbNames.has(loc.name.trim().toLowerCase())) {
+        const normLocName = (loc.name || "").trim().toLowerCase();
+        if (!dbIds.has(loc.id) && !seenNames.has(normLocName)) {
+          seenNames.set(normLocName, loc);
           dbMapped.push(loc);
         }
       }
@@ -468,6 +634,7 @@ export async function fetchCustomersFromDb(): Promise<{ customers: Customer[]; f
 
 /**
  * Inserta un nuevo cliente directamente en Supabase y lo almacena localmente.
+ * Evita registrar dos veces el mismo cliente garantizando registro único.
  */
 export async function createCustomerInDb(customerData: {
   name: string;
@@ -479,14 +646,55 @@ export async function createCustomerInDb(customerData: {
   email?: string;
   favoriteProduct?: string;
 }): Promise<Customer> {
+  const cleanName = customerData.name.trim();
+  const normalizedNew = normalizeCustomerName(cleanName);
+  const current = getStoredCustomers();
+
+  // 1. Si ya existe un cliente con ese nombre en local, actualizarlo y reutilizarlo
+  const existingLocal = current.find(
+    (c) => normalizeCustomerName(c.name) === normalizedNew && c.id !== "cli-0"
+  );
+
+  if (existingLocal) {
+    const updated = addQuickCustomer(customerData);
+    if (!updated.id.startsWith("cli-")) {
+      updateCustomerInDb(updated.id, customerData).catch(() => {});
+    }
+    return updated;
+  }
+
+  // 2. Registrar en local de inmediato para una experiencia de usuario instantánea
   const localCustomer = addQuickCustomer(customerData);
 
   try {
     const supabase = createClient();
+
+    // Comprobar si ya existe en Supabase por nombre para evitar duplicar registros en base de datos
+    const { data: existingDb } = await supabase
+      .from("customers")
+      .select("*")
+      .ilike("name", cleanName)
+      .limit(1);
+
+    if (existingDb && existingDb.length > 0) {
+      const dbRow = existingDb[0];
+      const cur = getStoredCustomers();
+      const idx = cur.findIndex(
+        (c) => c.id === localCustomer.id || c.name.trim().toLowerCase() === cleanName.toLowerCase()
+      );
+      if (idx !== -1) {
+        cur[idx] = { ...cur[idx], id: dbRow.id };
+        saveStoredCustomers(cur);
+        return cur[idx];
+      }
+      return { ...localCustomer, id: dbRow.id };
+    }
+
+    // Insertar nuevo registro en Supabase
     const { data, error } = await supabase
       .from("customers")
       .insert({
-        name: customerData.name.trim(),
+        name: cleanName,
         phone: customerData.phone?.trim() || null,
         type: customerData.type || "frecuente",
         credit_limit: customerData.creditLimit || 0,
@@ -500,12 +708,14 @@ export async function createCustomerInDb(customerData: {
       .single();
 
     if (data && !error) {
-      const current = getStoredCustomers();
-      const idx = current.findIndex((c) => c.id === localCustomer.id);
+      const cur = getStoredCustomers();
+      const idx = cur.findIndex(
+        (c) => c.id === localCustomer.id || c.name.trim().toLowerCase() === cleanName.toLowerCase()
+      );
       if (idx !== -1) {
-        current[idx] = { ...localCustomer, id: data.id };
-        saveStoredCustomers(current);
-        return current[idx];
+        cur[idx] = { ...cur[idx], id: data.id };
+        saveStoredCustomers(cur);
+        return cur[idx];
       }
     }
   } catch (err) {
@@ -556,18 +766,23 @@ export async function updateCustomerInDb(
 
 /**
  * Elimina un cliente en Supabase y localmente.
+ * Elimina tanto por ID como por nombre para purgar posibles duplicados previos.
  */
 export async function deleteCustomerInDb(id: string, name?: string): Promise<boolean> {
   const current = getStoredCustomers();
-  const filtered = current.filter((c) => c.id !== id);
+  const cleanNorm = name ? normalizeCustomerName(name) : "";
+  const filtered = current.filter(
+    (c) => c.id !== id && (!cleanNorm || normalizeCustomerName(c.name) !== cleanNorm)
+  );
   saveStoredCustomers(filtered);
 
   try {
     const supabase = createClient();
     if (!id.startsWith("cli-")) {
       await supabase.from("customers").delete().eq("id", id);
-    } else if (name) {
-      await supabase.from("customers").delete().eq("name", name);
+    }
+    if (name) {
+      await supabase.from("customers").delete().ilike("name", name.trim());
     }
     return true;
   } catch (err) {

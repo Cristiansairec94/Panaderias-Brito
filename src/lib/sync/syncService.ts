@@ -461,7 +461,7 @@ export async function downloadAllDataToLocalPc(): Promise<{
 
     // 4. Asegurar parámetros de fondo de caja y cuentas
     if (!localStorage.getItem("brito_pos_initial_fund")) {
-      localStorage.setItem("brito_pos_initial_fund", "1000");
+      localStorage.setItem("brito_pos_initial_fund", "0");
     }
 
     const stats = getLocalDataStats();

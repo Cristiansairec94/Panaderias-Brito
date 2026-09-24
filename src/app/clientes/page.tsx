@@ -32,7 +32,9 @@ import {
   fetchCustomersFromDb, 
   createCustomerInDb, 
   updateCustomerInDb, 
-  deleteCustomerInDb 
+  deleteCustomerInDb,
+  purgeDuplicateCustomers,
+  normalizeCustomerName
 } from "@/lib/customers";
 
 // Ícono SVG oficial y ordenado de WhatsApp
@@ -138,7 +140,8 @@ export default function ClientesPage() {
   };
 
   useEffect(() => {
-    // 1. Carga inmediata de caché local para respuesta instantánea
+    // 1. Limpieza y purga automática inmediata de duplicados en caché local
+    purgeDuplicateCustomers();
     const loaded = getStoredCustomers();
     const cleaned = loaded.filter((c) => c.id !== "cli-0" && c.type !== "general");
     setCustomers(cleaned);
@@ -197,11 +200,24 @@ export default function ClientesPage() {
   // Filtrado por búsqueda y ordenamiento (predeterminado: del más reciente al más antiguo)
   const filteredCustomers = useMemo(() => {
     const validCustomers = customers.filter((c) => c.id !== "cli-0" && c.type !== "general");
+
+    // Deduplicación defensiva por nombre normalizado (sin acentos, minúsculas, espacios)
+    const seenNames = new Set<string>();
+    const deduplicatedCustomers: Customer[] = [];
+    for (const c of validCustomers) {
+      const norm = normalizeCustomerName(c.name);
+      if (!norm) continue;
+      if (!seenNames.has(norm)) {
+        seenNames.add(norm);
+        deduplicatedCustomers.push(c);
+      }
+    }
+
     const q = search.toLowerCase().trim();
     const qClean = q.replace(/\D/g, "");
     const matched = !q
-      ? validCustomers
-      : validCustomers.filter((c) => {
+      ? deduplicatedCustomers
+      : deduplicatedCustomers.filter((c) => {
           const cClean = c.phone ? c.phone.replace(/\D/g, "") : "";
           return (
             c.name.toLowerCase().includes(q) ||
@@ -251,8 +267,14 @@ export default function ClientesPage() {
     e.preventDefault();
     if (!name.trim()) return;
 
+    const cleanName = name.trim();
+    const targetNorm = normalizeCustomerName(cleanName);
+    const existing = customers.find(
+      (c) => normalizeCustomerName(c.name) === targetNorm && c.id !== "cli-0"
+    );
+
     const newCustomerData = {
-      name: name.trim(),
+      name: cleanName,
       phone: phone.trim() ? formatPhoneNumber(phone.trim()) : "N/A",
       type: "frecuente" as const,
       creditLimit: 0,
@@ -260,11 +282,28 @@ export default function ClientesPage() {
     };
 
     const created = await createCustomerInDb(newCustomerData);
-    const updated = [created, ...customers.filter((c) => c.id !== created.id)];
-    setCustomers(updated);
+    const fresh = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
+    setCustomers(fresh);
     setCurrentPage(1); // Muestra la primera página donde aparece el nuevo cliente recién creado
     setIsModalOpen(false);
-    showNotification(`¡Cliente "${created.name}" registrado en el servidor correctamente!`);
+
+    if (existing) {
+      showNotification(`¡Cliente "${created.name}" actualizado correctamente!`);
+    } else {
+      showNotification(`¡Cliente "${created.name}" registrado en el servidor correctamente!`);
+    }
+  };
+
+  // Purgar y eliminar manualmente clientes duplicados en almacenamiento
+  const handlePurgeDuplicates = () => {
+    const result = purgeDuplicateCustomers();
+    const fresh = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
+    setCustomers(fresh);
+    if (result.removedCount > 0) {
+      showNotification(`¡Listo! Se eliminaron ${result.removedCount} registros repetidos. Directorio limpio.`);
+    } else {
+      showNotification("¡Excelente! No hay clientes repetidos en tu catálogo.");
+    }
   };
 
   // Apertura modal editar
@@ -280,24 +319,25 @@ export default function ClientesPage() {
     e.preventDefault();
     if (!editingCustomer || !editName.trim()) return;
 
+    const cleanEditName = editName.trim();
+    const targetNorm = normalizeCustomerName(cleanEditName);
+    const existingOther = customers.find(
+      (c) => c.id !== editingCustomer.id && normalizeCustomerName(c.name) === targetNorm && c.id !== "cli-0"
+    );
+    if (existingOther) {
+      alert(`Ya existe otro cliente registrado con el nombre "${cleanEditName}". Por favor ingresa un nombre o apellido que lo diferencie.`);
+      return;
+    }
+
     const updates = {
-      name: editName.trim(),
+      name: cleanEditName,
       phone: editPhone.trim() ? formatPhoneNumber(editPhone.trim()) : "N/A",
       notes: editNotes.trim() || undefined,
     };
 
     await updateCustomerInDb(editingCustomer.id, updates);
-    const updated = customers.map((c) => {
-      if (c.id === editingCustomer.id) {
-        return {
-          ...c,
-          ...updates,
-        };
-      }
-      return c;
-    });
-
-    setCustomers(updated);
+    const fresh = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
+    setCustomers(fresh);
     setEditingCustomer(null);
     showNotification(`¡Cliente "${editName.trim()}" actualizado en el servidor con éxito!`);
   };
@@ -311,8 +351,8 @@ export default function ClientesPage() {
     setDeleteConfirm(null);
 
     await deleteCustomerInDb(deletedId, deletedName);
-    const updated = customers.filter((c) => c.id !== deletedId);
-    setCustomers(updated);
+    const fresh = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
+    setCustomers(fresh);
     showNotification(`Cliente "${deletedName}" eliminado del servidor.`);
   };
 
@@ -359,6 +399,17 @@ export default function ClientesPage() {
               <RefreshCw className={`w-4 h-4 text-stone-600 ${isSyncing ? "animate-spin text-amber-700" : ""}`} />
             </button>
           </div>
+
+          {/* Botón para Eliminar Clientes Repetidos */}
+          <button
+            type="button"
+            onClick={handlePurgeDuplicates}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border-2 border-rose-300 font-black px-4 py-3.5 rounded-2xl shadow-sm text-sm sm:text-base transition-all active:scale-95 cursor-pointer"
+            title="Eliminar y fusionar automáticamente clientes repetidos"
+          >
+            <Sparkles className="w-5 h-5 text-rose-600" />
+            <span>Eliminar Clientes Repetidos</span>
+          </button>
 
           <button
             type="button"

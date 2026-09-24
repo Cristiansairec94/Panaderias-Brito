@@ -93,8 +93,9 @@ body {
   .paper-58mm {
     width: 48mm !important;
     max-width: 48mm !important;
-    font-size: 10px !important;
+    font-size: 9.5px !important;
     padding: 1mm 1.5mm !important;
+    line-height: 1.25 !important;
   }
 
   #thermal-receipt img,

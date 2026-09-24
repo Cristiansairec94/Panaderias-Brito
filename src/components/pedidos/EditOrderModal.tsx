@@ -13,12 +13,13 @@ import {
   Save,
   CheckCircle2,
   FileText,
-  Lock
+  Lock,
+  Trash2
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
-import { updateCustomOrder } from "@/lib/orders";
+import { updateCustomOrder, deleteCustomOrder } from "@/lib/orders";
 
 interface EditOrderModalProps {
   isOpen: boolean;
@@ -95,6 +96,15 @@ export default function EditOrderModal({
       alert("Error al actualizar los datos del pedido.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteOrder = () => {
+    if (!order) return;
+    if (confirm(`¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} (${order.customerName})?\n\nEsta acción borrará el pedido por completo del registro y no se podrá recuperar.`)) {
+      deleteCustomOrder(order.id);
+      onOrderUpdated();
+      onClose();
     }
   };
 
@@ -269,23 +279,35 @@ export default function EditOrderModal({
         </div>
 
         {/* Footer */}
-        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex items-center justify-end gap-3">
+        <div className="bg-stone-100 border-t border-stone-200 p-4 px-6 flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={onClose}
-            className="px-5 py-2.5 text-xs font-bold text-stone-600 hover:bg-stone-200 rounded-xl transition-colors"
+            onClick={handleDeleteOrder}
+            className="px-4 py-2.5 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border-2 border-rose-300 hover:border-rose-600 font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            title="Eliminar este pedido permanentemente"
           >
-            Cancelar
+            <Trash2 className="w-4 h-4" />
+            <span>Eliminar Pedido</span>
           </button>
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleSave}
-            className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            {isSubmitting ? "Guardando..." : "Guardar Cambios"}
-          </button>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2.5 text-xs font-bold text-stone-600 hover:bg-stone-200 rounded-xl transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleSave}
+              className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {isSubmitting ? "Guardando..." : "Guardar Cambios"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

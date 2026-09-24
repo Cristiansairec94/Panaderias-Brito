@@ -11,11 +11,12 @@ import {
   Receipt,
   Send,
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-import { getStoredOrders, updateOrderStatus } from "@/lib/orders";
+import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
@@ -112,6 +113,13 @@ export default function SpecialOrdersDrawer({
   const handleQuickDeliver = (order: CustomOrder) => {
     updateOrderStatus(order.id, "entregado");
     loadOrders();
+  };
+
+  const handleDeleteOrder = (order: CustomOrder) => {
+    if (confirm(`¿Estás seguro de ELIMINAR el pedido #${order.orderNumber} (${order.customerName})?\n\nEsta acción borrará el pedido por completo del registro.`)) {
+      deleteCustomOrder(order.id);
+      loadOrders();
+    }
   };
 
   if (!isOpen) return null;
@@ -336,6 +344,17 @@ export default function SpecialOrdersDrawer({
                       >
                         <Receipt className="w-3 h-3 text-amber-400" />
                         <span>Ticket</span>
+                      </button>
+
+                      {/* Eliminar Pedido */}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteOrder(order)}
+                        className="px-2.5 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-600 text-rose-300 hover:text-white text-[11px] font-bold border border-rose-800 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Eliminar Pedido"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Eliminar</span>
                       </button>
                     </div>
 

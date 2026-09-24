@@ -952,19 +952,36 @@ export default function GastosPage() {
       {/* ── KPI Cards Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gastos de Hoy */}
-        <div className="bg-gradient-to-br from-rose-900 via-rose-950 to-stone-950 p-5 rounded-3xl border border-rose-800/60 shadow-xl text-white transition-all duration-200 hover:border-rose-400 hover:shadow-2xl hover:shadow-rose-950/50 hover:ring-2 hover:ring-rose-400/30 hover:-translate-y-0.5 cursor-default">
+        <div className="bg-gradient-to-br from-rose-900 via-rose-950 to-stone-950 p-5 rounded-3xl border border-rose-800/60 shadow-xl text-white transition-all duration-200 hover:border-rose-400 hover:shadow-2xl hover:shadow-rose-950/50 hover:ring-2 hover:ring-rose-400/30 hover:-translate-y-0.5 cursor-default relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-rose-200 uppercase tracking-wider">Gastos de Hoy</span>
-            <div className="p-2 bg-rose-600/40 text-rose-300 rounded-xl border border-rose-500/30">
-              <TrendingDown className="w-4 h-4" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-600/40 text-rose-200 rounded-xl border border-rose-500/30 shadow-sm" title="Símbolo de gastos: Gráfica en caída">
+              <TrendingDown className="w-3.5 h-3.5 text-rose-300" />
+              <span className="text-[10px] font-black uppercase tracking-wider">En caída</span>
             </div>
           </div>
-          <p className="text-3xl font-black text-rose-300 tracking-tight font-mono">
-            {formatCurrency(totalHoy)}
-          </p>
-          <p className="text-[11px] text-rose-200/80 font-medium mt-1">
-            {cantidadHoy} gasto{cantidadHoy !== 1 ? "s" : ""} registrado{cantidadHoy !== 1 ? "s" : ""} hoy
-          </p>
+
+          <div className="flex items-end justify-between gap-2 mt-1">
+            <div>
+              <p className="text-3xl font-black text-rose-300 tracking-tight font-mono">
+                {formatCurrency(totalHoy)}
+              </p>
+              <p className="text-[11px] text-rose-200/80 font-medium mt-1">
+                {cantidadHoy} gasto{cantidadHoy !== 1 ? "s" : ""} registrado{cantidadHoy !== 1 ? "s" : ""} hoy
+              </p>
+            </div>
+
+            {/* Símbolo de gastos: Pequeña gráfica donde dice que va en caída */}
+            <div className="shrink-0 pb-0.5" title="Símbolo de gastos: Gráfica en caída">
+              <img
+                src="/images/grafica-caida-gastos.svg"
+                alt="Gráfica en caída - Símbolo de gastos"
+                width={112}
+                height={42}
+                className="w-24 sm:w-28 h-auto object-contain filter drop-shadow-[0_2px_8px_rgba(225,29,72,0.45)] transition-transform duration-200 hover:scale-105 select-none pointer-events-none"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Gastos de la Semana */}
@@ -1021,18 +1038,18 @@ export default function GastosPage() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Buscador de Texto Libre */}
           <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+            <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
               placeholder="Buscar por folio GST-XXXX, concepto, sucursal, proveedor o cajero..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-stone-50 rounded-2xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-stone-50 rounded-2xl border border-stone-200 text-sm sm:text-base font-semibold text-stone-900 placeholder:text-stone-400 focus:ring-2 focus:ring-rose-500 focus:outline-none"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-sm font-black p-1"
               >
                 ✕
               </button>
@@ -1040,14 +1057,14 @@ export default function GastosPage() {
           </div>
 
           {/* Selectores de Filtro */}
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
             {/* ⭐ FILTRO POR SUCURSAL (REQUISITO PRINCIPAL DEL USUARIO) */}
-            <div className="flex items-center gap-1 bg-amber-50/70 border border-amber-200/80 px-2 py-1 rounded-xl">
-              <Building2 className="w-3.5 h-3.5 text-amber-700 ml-1" />
+            <div className="flex items-center gap-1.5 bg-amber-50/90 border-2 border-amber-300 px-3 py-1.5 rounded-2xl shadow-xs">
+              <Building2 className="w-4 h-4 text-amber-800 shrink-0" />
               <select
                 value={filtroSucursal}
                 onChange={(e) => setFiltroSucursal(e.target.value)}
-                className="bg-transparent py-1.5 px-2 text-xs font-black text-amber-900 focus:outline-none cursor-pointer"
+                className="bg-transparent py-1 px-1 text-sm sm:text-base font-black text-amber-950 focus:outline-none cursor-pointer"
               >
                 <option value="all">🏪 Todas las Sucursales</option>
                 {branches.map((b) => (
@@ -1062,7 +1079,7 @@ export default function GastosPage() {
             <select
               value={filtroCategoria}
               onChange={(e) => setFiltroCategoria(e.target.value)}
-              className="bg-stone-50 px-3 py-2 rounded-xl border border-stone-200 text-xs font-bold text-stone-700 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
+              className="bg-stone-50 px-3.5 py-2.5 rounded-2xl border-2 border-stone-200 text-sm sm:text-base font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer shadow-xs"
             >
               <option value="all">Todas las Categorías</option>
               {GASTO_CATEGORIAS.map((c) => (
@@ -1076,7 +1093,7 @@ export default function GastosPage() {
             <select
               value={filtroTipoPago}
               onChange={(e) => setFiltroTipoPago(e.target.value)}
-              className="bg-stone-50 px-3 py-2 rounded-xl border border-stone-200 text-xs font-bold text-stone-700 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer"
+              className="bg-stone-50 px-3.5 py-2.5 rounded-2xl border-2 border-stone-200 text-sm sm:text-base font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer shadow-xs"
             >
               <option value="all">Todos los Métodos</option>
               <option value="efectivo">💵 Solo Efectivo</option>
@@ -1093,7 +1110,7 @@ export default function GastosPage() {
                   setFiltroCategoria("all");
                   setFiltroTipoPago("all");
                 }}
-                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors"
+                className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border-2 border-rose-200 rounded-2xl text-sm font-black transition-colors shadow-xs"
               >
                 ✕ Limpiar
               </button>
@@ -1102,17 +1119,20 @@ export default function GastosPage() {
         </div>
 
         {/* Resumen de Resultados */}
-        <div className="flex items-center justify-between text-xs text-stone-500 font-medium pt-1 border-t border-stone-100">
-          <span>
-            Mostrando <strong>{filteredGastos.length}</strong> de {gastos.length} gastos
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm sm:text-base text-stone-600 font-medium pt-2 border-t border-stone-100">
+          <span className="flex items-center gap-1.5 flex-wrap">
+            <span>Mostrando <strong className="text-stone-900 font-black">{filteredGastos.length}</strong> de <strong className="text-stone-900 font-bold">{gastos.length}</strong> gastos</span>
             {filtroSucursal !== "all" && (
-              <span className="ml-1 text-amber-800 font-bold">
+              <span className="bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded-lg text-xs sm:text-sm border border-amber-300">
                 en {branches.find((b) => b.id === filtroSucursal)?.name}
               </span>
             )}
           </span>
-          <span className="font-mono text-stone-700 font-bold">
-            Suma filtrada: {formatCurrency(filteredGastos.filter(g => g.status !== "anulado").reduce((sum, g) => sum + g.amount, 0))}
+          <span className="font-mono text-stone-800 font-bold text-sm sm:text-base flex items-center gap-1.5">
+            <span className="text-stone-500 font-semibold">Suma filtrada:</span>
+            <span className="text-rose-700 font-black text-base sm:text-lg bg-rose-50 px-2.5 py-0.5 rounded-xl border border-rose-200">
+              {formatCurrency(filteredGastos.filter(g => g.status !== "anulado").reduce((sum, g) => sum + g.amount, 0))}
+            </span>
           </span>
         </div>
       </div>

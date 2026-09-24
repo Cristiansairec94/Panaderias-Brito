@@ -432,7 +432,7 @@ export default function POSPage() {
   // Shift & Cashier state
   const [cashierName, setCashierName] = useState(activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino");
   const [shiftName, setShiftName] = useState(activeBranch ? activeBranch.currentShift.name : "Turno Matutino (06:00 - 14:00)");
-  const getStoredShiftFund = (fallback: number = 500): number => {
+  const getStoredShiftFund = (fallback: number = 0): number => {
     if (typeof window === "undefined") return fallback;
     try {
       const raw = localStorage.getItem("brito_shift_cuts_history");
@@ -449,7 +449,7 @@ export default function POSPage() {
   };
 
   const [initialCashFund, setInitialCashFund] = useState<number>(() => {
-    return getStoredShiftFund(activeBranch ? activeBranch.currentShift.initialFund : 500);
+    return getStoredShiftFund(0);
   });
 
   // Configuración de Impresora Directa para Tickets

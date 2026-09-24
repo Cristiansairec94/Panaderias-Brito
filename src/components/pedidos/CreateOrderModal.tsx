@@ -33,8 +33,8 @@ import {
   Copy
 } from "lucide-react";
 import { Product, Customer, OrderItem } from "@/types";
+import { getStoredCustomers, createCustomerInDb, normalizeCustomerName } from "@/lib/customers";
 import { getStoredProducts, findProductByBarcodeOrCode } from "@/lib/products";
-import { getStoredCustomers, addQuickCustomer, createCustomerInDb } from "@/lib/customers";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -191,12 +191,13 @@ export default function CreateOrderModal({
   // Determinar si el cliente ya existe en el catálogo registrado
   const isCustomerInCatalog = useMemo(() => {
     if (!customerName.trim()) return false;
+    const norm = normalizeCustomerName(customerName);
     return customers.some(
       (c) =>
         (selectedCustomerId && c.id === selectedCustomerId) ||
         (c.id !== "cli-0" &&
           c.id !== "cli-general" &&
-          c.name.trim().toLowerCase() === customerName.trim().toLowerCase())
+          normalizeCustomerName(c.name) === norm)
     );
   }, [customers, selectedCustomerId, customerName]);
 
@@ -871,26 +872,31 @@ export default function CreateOrderModal({
   const handleConfirmSaveCustomer = async () => {
     let newCustId: string | undefined = undefined;
     try {
-      const created = addQuickCustomer({
-        name: customerName.trim(),
-        phone: customerPhone.trim() || undefined,
-        address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
-        type: "evento",
-        notes: "Cliente registrado desde Pedido Especial",
-      });
-      newCustId = created.id;
-      setCustomers(getStoredCustomers());
-      setSelectedCustomerId(created.id);
+      const cleanName = customerName.trim();
+      const normName = normalizeCustomerName(cleanName);
+      const existing = customers.find(
+        (c) =>
+          (selectedCustomerId && c.id === selectedCustomerId) ||
+          (c.id !== "cli-0" &&
+            c.id !== "cli-general" &&
+            normalizeCustomerName(c.name) === normName)
+      );
 
-      try {
-        createCustomerInDb({
-          name: customerName.trim(),
+      if (existing) {
+        newCustId = existing.id;
+        setSelectedCustomerId(existing.id);
+      } else {
+        const created = await createCustomerInDb({
+          name: cleanName,
           phone: customerPhone.trim() || undefined,
           address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
           type: "evento",
           notes: "Cliente registrado desde Pedido Especial",
-        }).catch((e) => console.warn("Supabase background customer sync:", e));
-      } catch {}
+        });
+        newCustId = created.id;
+        setCustomers(getStoredCustomers());
+        setSelectedCustomerId(created.id);
+      }
     } catch (custErr) {
       console.warn("Could not register quick customer:", custErr);
     }
@@ -929,12 +935,13 @@ export default function CreateOrderModal({
     }
 
     // Verificar si el cliente ya está registrado en el catálogo
+    const norm = normalizeCustomerName(customerName);
     const existing = customers.find(
       (c) =>
         (selectedCustomerId && c.id === selectedCustomerId) ||
         (c.id !== "cli-0" &&
           c.id !== "cli-general" &&
-          c.name.trim().toLowerCase() === customerName.trim().toLowerCase())
+          normalizeCustomerName(c.name) === norm)
     );
 
     if (existing) {
@@ -1323,7 +1330,7 @@ export default function CreateOrderModal({
                   <button
                     type="button"
                     onClick={() => setItems([])}
-                    className="text-[10px] font-bold text-rose-600 hover:underline"
+                    className="px-2.5 py-1 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white rounded-lg border border-rose-300 font-extrabold text-[11px] transition-colors"
                   >
                     Vaciar lista
                   </button>
@@ -1380,10 +1387,10 @@ export default function CreateOrderModal({
                         <button
                           type="button"
                           onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                          className="text-stone-400 hover:text-rose-600 p-1 transition-colors"
-                          title="Quitar"
+                          className="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg border border-rose-200 transition-colors shadow-2xs"
+                          title="Quitar de la lista"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>

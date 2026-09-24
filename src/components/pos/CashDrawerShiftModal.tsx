@@ -62,7 +62,7 @@ const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [
     incomingCashier: "Cajera 2 - Turno Vespertino",
     previousShift: "Turno Matutino (06:00 - 14:00)",
     nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 500,
+    initialFund: 0,
     cashSales: 1850,
     cardSales: 420,
     transferSales: 150,
@@ -72,7 +72,7 @@ const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [
     expectedCash: 2150,
     countedCash: 2150,
     difference: 0,
-    nextFund: 500,
+    nextFund: 0,
     notes: "Entrega de turno matutino sin ninguna incidencia. Todo cuadrado al 100%.",
     stockPieces: 140,
     stockValue: 1820,
@@ -86,7 +86,7 @@ const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [
     incomingCashier: "Cajera 1 - Turno Matutino",
     previousShift: "Turno Vespertino (14:00 - 22:00)",
     nextShift: "Turno Matutino (06:00 - 14:00)",
-    initialFund: 500,
+    initialFund: 0,
     cashSales: 2450,
     cardSales: 680,
     transferSales: 230,
@@ -96,7 +96,7 @@ const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [
     expectedCash: 2800,
     countedCash: 2800,
     difference: 0,
-    nextFund: 500,
+    nextFund: 0,
     notes: "Cierre vespertino completado, pan dulce agotado en vitrina principal.",
     stockPieces: 15,
     stockValue: 195,
@@ -196,11 +196,10 @@ export default function CashDrawerShiftModal({
 
   useEffect(() => {
     if (isOpen) {
-      const defaultFund = initialFund > 0 ? initialFund : 500;
-      setNextInitialFund(defaultFund.toString());
+      setNextInitialFund("");
       setCountedCash("");
     }
-  }, [isOpen, initialFund]);
+  }, [isOpen]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -233,24 +232,18 @@ export default function CashDrawerShiftModal({
     .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
     .reduce((sum, i) => sum + i.amount, 0);
 
-  // 3. Dinero esperado en caja (Cajón)
-  const expectedCashInDrawer = initialFund + cashSales + totalIncomesInCash - totalExpenses;
+  // 3. Dinero esperado en caja (Cajón: Fondo + Ventas - Gastos)
+  const expectedCashInDrawer = initialFund + cashSales - totalExpenses;
 
   // 4. Conteo y Diferencia (Arqueo)
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;
   const cashDifference = parsedCountedCash - expectedCashInDrawer;
 
-  // 5. Fondo Siguiente y Retiro a Administración (No puede exceder el dinero disponible en caja)
-  const maxAllowedFund = Math.max(0, parsedCountedCash);
-  const parsedNextFund = nextInitialFund === "" ? 0 : Math.min(maxAllowedFund, Math.max(0, Number(nextInitialFund) || 0));
-  const isNextFundValid = nextInitialFund.trim() !== "" && !isNaN(Number(nextInitialFund)) && Number(nextInitialFund) >= 0;
+  // 5. Fondo Siguiente y Retiro a Administración
+  // El resultado siempre está en $0.00 por defecto a menos que se escriba una cifra, cambiando la constante de fondo
+  const parsedNextFund = nextInitialFund === "" ? 0 : Math.max(0, Number(nextInitialFund) || 0);
+  const isNextFundValid = nextInitialFund.trim() === "" || (!isNaN(Number(nextInitialFund)) && Number(nextInitialFund) >= 0);
   const cashToWithdraw = Math.max(0, parsedCountedCash - parsedNextFund);
-
-  useEffect(() => {
-    if (nextInitialFund !== "" && Number(nextInitialFund) > maxAllowedFund) {
-      setNextInitialFund(maxAllowedFund > 0 ? maxAllowedFund.toString() : "");
-    }
-  }, [maxAllowedFund, nextInitialFund]);
 
   // 5. Existencias en mostrador
   const totalPiecesInStock = products.reduce((sum, p) => sum + p.stock, 0);
@@ -698,7 +691,7 @@ export default function CashDrawerShiftModal({
                 /* Formulario Directo de Arqueo y Relevo */
                 <div className="space-y-3.5">
                   {/* 1. Resumen Financiero del Turno */}
-                  <div className={`grid ${totalIncomesInCash > 0 ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"} gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs">
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
                       <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
                       <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(initialFund)}</span>
@@ -707,19 +700,13 @@ export default function CashDrawerShiftModal({
                       <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
                       <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(cashSales)}</span>
                     </div>
-                    {totalIncomesInCash > 0 && (
-                      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-amber-300/80 shadow-xs transition-transform hover:scale-105 duration-200">
-                        <span className="text-[11px] sm:text-xs text-amber-800 font-black block uppercase tracking-wider">(+) Entradas Extra</span>
-                        <span className="text-xl sm:text-2xl font-black text-amber-800 mt-0.5 block">+{formatCurrency(totalIncomesInCash)}</span>
-                      </div>
-                    )}
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
                       <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos / Retiros</span>
                       <span className="text-xl sm:text-2xl font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
                     </div>
                     <div className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20">
                       <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">
-                        {cashSales === 0 && totalExpenses === 0 && totalIncomesInCash === 0 ? "En Caja (Fondo)" : "En Caja"}
+                        {cashSales === 0 && totalExpenses === 0 ? "En Caja (Fondo)" : "En Caja"}
                       </span>
                       <span className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(expectedCashInDrawer)}</span>
                     </div>
@@ -756,7 +743,7 @@ export default function CashDrawerShiftModal({
                           <span className="text-xl">💵</span> Dinero que debe haber en caja:
                         </span>
                         <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
-                          Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)}{totalIncomesInCash > 0 ? ` • Entradas/Cambio: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos/Retiros: -{formatCurrency(totalExpenses)}
+                          Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)} • Gastos/Retiros: -{formatCurrency(totalExpenses)}
                         </span>
                       </div>
                       <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">
@@ -847,12 +834,12 @@ export default function CashDrawerShiftModal({
                       <div>
                         <span className="text-sm sm:text-base font-black text-stone-900 uppercase flex items-center gap-2 flex-wrap">
                           <span className="text-xl">🪙</span> ¿Cuánto dinero se dejará en caja para el siguiente turno?
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                            !isNextFundValid
-                              ? "bg-rose-100 text-rose-700 border border-rose-300 animate-pulse"
+                          <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                            nextInitialFund.trim() === ""
+                              ? "bg-stone-100 text-stone-600 border border-stone-300"
                               : "bg-emerald-100 text-emerald-800 border border-emerald-300"
                           }`}>
-                            {!isNextFundValid ? "* Escribe un número obligatorio" : "✓ Listo"}
+                            {nextInitialFund.trim() === "" ? "En blanco ($0.00)" : `Fondo: ${formatCurrency(parsedNextFund)}`}
                           </span>
                         </span>
                         <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
@@ -862,39 +849,28 @@ export default function CashDrawerShiftModal({
                       <div className="text-right shrink-0 bg-amber-100/90 px-3.5 py-1.5 rounded-2xl border border-amber-300 shadow-2xs">
                         <span className="text-[10px] font-black uppercase text-amber-800 block">Fondo Siguiente Turno</span>
                         <span className="text-xl sm:text-2xl font-black text-amber-950">
-                          {isNextFundValid ? formatCurrency(parsedNextFund) : "$0.00"}
+                          {formatCurrency(parsedNextFund)}
                         </span>
                       </div>
                     </div>
 
-                    {/* Input Manual de Fondo Siguiente (Limitado al efectivo físico en caja) */}
+                    {/* Input Manual de Fondo Siguiente */}
                     <div className="space-y-1.5">
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-stone-500">$</span>
                         <input
                           type="text"
                           inputMode="decimal"
-                          placeholder="0.00 (Escribe obligatoriamente el monto para el nuevo turno)"
+                          placeholder="0.00 (En blanco por defecto: $0.00. Escribe una cifra si deseas dejar fondo)"
                           value={nextInitialFund}
                           onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                           onChange={(e) => {
                             const raw = cleanDecimalNumbers(e.target.value);
-                            if (raw === "") {
-                              setNextInitialFund("");
-                              return;
-                            }
-                            const num = parseFloat(raw);
-                            if (!isNaN(num)) {
-                              if (num > maxAllowedFund) {
-                                setNextInitialFund(maxAllowedFund.toString());
-                                return;
-                              }
-                            }
                             setNextInitialFund(raw);
                           }}
                           className={`w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400 ${
                             !isNextFundValid
-                              ? "border-amber-400 focus:border-amber-600 ring-2 ring-amber-400/20"
+                              ? "border-rose-400 focus:border-rose-600 ring-2 ring-rose-400/20"
                               : "border-stone-300 focus:border-amber-600"
                           }`}
                         />
@@ -902,19 +878,19 @@ export default function CashDrawerShiftModal({
 
                       <div className="flex items-center justify-between text-xs px-1 text-stone-500 font-medium">
                         <span>
-                          Máximo permitido a dejar: <strong className="text-stone-800">{formatCurrency(maxAllowedFund)}</strong>
+                          {nextInitialFund.trim() === "" ? (
+                            <span className="text-stone-500 font-semibold">
+                              ⚪ En blanco por defecto: <strong>$0.00</strong> (el siguiente turno empezará sin fondo)
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 font-bold">
+                              ✓ Fondo asignado para siguiente turno: <strong>{formatCurrency(parsedNextFund)}</strong>
+                            </span>
+                          )}
                         </span>
-                        {!isNextFundValid ? (
+                        {!isNextFundValid && (
                           <span className="text-rose-600 font-bold flex items-center gap-1">
-                            ⚠️ Campo obligatorio para poder cerrar turno
-                          </span>
-                        ) : Number(nextInitialFund) >= maxAllowedFund && maxAllowedFund > 0 ? (
-                          <span className="text-amber-700 font-bold">
-                            ⚠️ Límite total en caja alcanzado
-                          </span>
-                        ) : (
-                          <span className="text-emerald-700 font-bold">
-                            ✓ Monto válido
+                            ⚠️ Monto inválido
                           </span>
                         )}
                       </div>
@@ -922,32 +898,42 @@ export default function CashDrawerShiftModal({
                       {/* Botones de Atajo Rápido para Fondo Siguiente */}
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         <span className="text-[10px] text-stone-500 font-bold self-center mr-1">Atajos:</span>
-                        {initialFund > 0 && initialFund <= maxAllowedFund && (
-                          <button
-                            type="button"
-                            onClick={() => setNextInitialFund(initialFund.toString())}
-                            className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-black rounded-lg border border-amber-300 transition-colors cursor-pointer"
-                          >
-                            Mismo fondo ({formatCurrency(initialFund)})
-                          </button>
-                        )}
-                        {[300, 500, 800, 1000].filter((val) => val <= maxAllowedFund && val !== initialFund).map((val) => (
+                        <button
+                          type="button"
+                          onClick={() => setNextInitialFund("")}
+                          className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-colors cursor-pointer ${
+                            nextInitialFund.trim() === ""
+                              ? "bg-amber-200 text-amber-900 border-amber-400 font-black shadow-2xs"
+                              : "bg-stone-100 hover:bg-stone-200 text-stone-700 border-stone-300"
+                          }`}
+                        >
+                          En blanco ($0.00)
+                        </button>
+                        {[200, 300, 500, 800, 1000].map((val) => (
                           <button
                             key={val}
                             type="button"
                             onClick={() => setNextInitialFund(val.toString())}
-                            className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-black rounded-lg border border-stone-300 transition-colors cursor-pointer"
+                            className={`px-2.5 py-1 text-xs font-black rounded-lg border transition-colors cursor-pointer ${
+                              nextInitialFund === val.toString()
+                                ? "bg-amber-200 text-amber-900 border-amber-400 shadow-2xs"
+                                : "bg-stone-100 hover:bg-stone-200 text-stone-800 border-stone-300"
+                            }`}
                           >
                             {formatCurrency(val)}
                           </button>
                         ))}
-                        {maxAllowedFund > 0 && (
+                        {parsedCountedCash > 0 && (
                           <button
                             type="button"
-                            onClick={() => setNextInitialFund(maxAllowedFund.toString())}
-                            className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-black rounded-lg border border-emerald-300 transition-colors cursor-pointer"
+                            onClick={() => setNextInitialFund(parsedCountedCash.toString())}
+                            className={`px-2.5 py-1 text-xs font-black rounded-lg border transition-colors cursor-pointer ${
+                              nextInitialFund === parsedCountedCash.toString()
+                                ? "bg-emerald-200 text-emerald-950 border-emerald-400 shadow-2xs"
+                                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300"
+                            }`}
                           >
-                            Todo ({formatCurrency(maxAllowedFund)})
+                            Todo en caja ({formatCurrency(parsedCountedCash)})
                           </button>
                         )}
                       </div>
@@ -984,7 +970,7 @@ export default function CashDrawerShiftModal({
                         className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg accent-emerald-600 cursor-pointer shrink-0 transition-transform active:scale-90"
                       />
                       <span className="text-sm sm:text-base font-black text-stone-900 leading-snug">
-                        Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}), se dejan <strong className="text-amber-950">{isNextFundValid ? formatCurrency(parsedNextFund) : "$0.00 (pendiente escribir número)"}</strong> de fondo en caja para comenzar con {incomingCashier}, y se entregan <strong className="text-emerald-900">{formatCurrency(cashToWithdraw)}</strong> a administración.
+                        Confirmo el <strong className="text-amber-900">Cierre de Turno</strong>: conté el dinero ({countedCash ? formatCurrency(parsedCountedCash) : "$0.00"}), se dejan <strong className="text-amber-950">{formatCurrency(parsedNextFund)}</strong> de fondo en caja para comenzar con {incomingCashier}, y se entregan <strong className="text-emerald-900">{formatCurrency(cashToWithdraw)}</strong> a administración.
                       </span>
                     </label>
 
@@ -1005,7 +991,7 @@ export default function CashDrawerShiftModal({
                           : !countedCash
                           ? "⚠️ Ingresa el Efectivo Físico Contado"
                           : !isNextFundValid
-                          ? "⚠️ Escribe el Fondo para el Siguiente Turno (Obligatorio)"
+                          ? "⚠️ Monto de Fondo Inválido"
                           : !hasAcceptedCash
                           ? "⚠️ Marca la Casilla de Confirmación para Continuar"
                           : `🔒 CERRAR TURNO Y GENERAR COMPROBANTE (${incomingCashier}) ➔`}

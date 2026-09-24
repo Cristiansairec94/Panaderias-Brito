@@ -37,6 +37,81 @@ import { useNotifications } from "@/context/NotificationContext";
 import { createClient } from "@/lib/supabase/client";
 import IncomeReceiptModal from "@/components/ingresos/IncomeReceiptModal";
 
+// Componente Gráfico SVG: Símbolo de gráfica hacia arriba que representa ingresos
+function IncomeUpwardChartSymbol({ className = "w-8 h-8" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 36 36"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="Gráfica de ingresos en tendencia alcista"
+    >
+      <defs>
+        <linearGradient id="incBarGrad1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#34d399" />
+          <stop offset="100%" stopColor="#059669" stopOpacity="0.4" />
+        </linearGradient>
+        <linearGradient id="incBarGrad2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#6ee7b7" />
+          <stop offset="100%" stopColor="#047857" stopOpacity="0.5" />
+        </linearGradient>
+        <linearGradient id="incBarGrad3" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#a7f3d0" />
+          <stop offset="100%" stopColor="#065f46" stopOpacity="0.6" />
+        </linearGradient>
+        <linearGradient id="incCoinGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#fde047" />
+          <stop offset="100%" stopColor="#d97706" />
+        </linearGradient>
+      </defs>
+
+      {/* Línea base horizontal de la gráfica */}
+      <line x1="3" y1="31" x2="33" y2="31" stroke="#047857" strokeWidth="1.5" strokeLinecap="round" />
+
+      {/* Barras de gráfica en ascenso */}
+      <rect x="4" y="21" width="5" height="10" rx="1.5" fill="url(#incBarGrad1)" />
+      <rect x="11.5" y="15" width="5" height="16" rx="1.5" fill="url(#incBarGrad2)" />
+      <rect x="19" y="9" width="5" height="22" rx="1.5" fill="url(#incBarGrad3)" />
+
+      {/* Línea de tendencia alcista con flecha que sube */}
+      <path
+        d="M4 22 L 12 16 L 19.5 11 L 30 3.5"
+        stroke="#ecfdf5"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M24 3.5 H 30 V 9.5"
+        stroke="#ecfdf5"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* Punto brillante de meta en la cima */}
+      <circle cx="30" cy="3.5" r="2" fill="#ffffff" />
+
+      {/* Moneda / Insignia de Dinero/Ingresos ($) */}
+      <g transform="translate(21, 18)">
+        <circle cx="6" cy="6" r="5.5" fill="url(#incCoinGrad)" stroke="#fef08a" strokeWidth="1" />
+        <text
+          x="6"
+          y="8.8"
+          textAnchor="middle"
+          fill="#78350f"
+          fontSize="7.5"
+          fontWeight="900"
+          fontFamily="system-ui, sans-serif"
+        >
+          $
+        </text>
+      </g>
+    </svg>
+  );
+}
+
 const INITIAL_INCOMES: CashIncome[] = [
   {
     id: "ING-849102",
@@ -111,13 +186,13 @@ const INITIAL_INCOMES: CashIncome[] = [
   },
 ];
 
-const CATEGORY_OPTIONS: { id: CashIncomeCategory; label: string; icon: string }[] = [
-  { id: "abono_pedido", label: "Abono a Pedido Especial (Pasteles/Eventos)", icon: "🎂" },
-  { id: "abono_cliente", label: "Cobro a Cliente Mayorista / Tiendita", icon: "🏪" },
-  { id: "fondo_cambio", label: "Aportación de Cambio / Fondo Adicional", icon: "🪙" },
-  { id: "venta_costales", label: "Venta de Costales de Harina / Reciclaje", icon: "🌾" },
-  { id: "ingreso_extraordinario", label: "Ingreso Extraordinario / Varios", icon: "✨" },
-  { id: "otro", label: "Otro Concepto", icon: "💵" },
+const CATEGORY_OPTIONS: { id: CashIncomeCategory; label: string; shortLabel: string; icon: string }[] = [
+  { id: "abono_pedido", label: "Abono a Pedido Especial (Pasteles/Eventos)", shortLabel: "Abono a Pedido", icon: "🎂" },
+  { id: "abono_cliente", label: "Cobro a Cliente Mayorista / Tiendita", shortLabel: "Cobro a Cliente", icon: "🏪" },
+  { id: "fondo_cambio", label: "Aportación de Cambio / Fondo Adicional", shortLabel: "Fondo de Cambio", icon: "🪙" },
+  { id: "venta_costales", label: "Venta de Costales de Harina / Reciclaje", shortLabel: "Venta de Costales", icon: "🌾" },
+  { id: "ingreso_extraordinario", label: "Ingreso Extraordinario / Varios", shortLabel: "Ingreso Extra", icon: "✨" },
+  { id: "otro", label: "Otro Concepto", shortLabel: "Otro Concepto", icon: "💵" },
 ];
 
 const QUICK_AMOUNTS = [50, 100, 200, 300, 500, 1000];
@@ -374,19 +449,58 @@ export default function IngresosPage() {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total General de Ingresos */}
-        <div className="bg-gradient-to-br from-emerald-900 via-emerald-950 to-stone-950 p-5 rounded-3xl border border-emerald-800/60 shadow-xl text-white transition-all duration-200 hover:border-emerald-400 hover:shadow-2xl hover:shadow-emerald-900/30 hover:ring-2 hover:ring-emerald-400/30 hover:-translate-y-0.5 cursor-default">
+        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-950 to-stone-950 p-5 rounded-3xl border border-emerald-800/60 shadow-xl text-white transition-all duration-200 hover:border-emerald-400 hover:shadow-2xl hover:shadow-emerald-900/30 hover:ring-2 hover:ring-emerald-400/30 hover:-translate-y-0.5 cursor-default group">
+          {/* Resplandor decorativo de fondo */}
+          <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-emerald-500/20 transition-all duration-300" />
+
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Total Entradas Hoy</span>
-            <div className="p-2 bg-emerald-600/40 text-emerald-300 rounded-xl border border-emerald-500/30">
-              <TrendingUp className="w-4 h-4" />
+            {/* Símbolo Gráfico de Ingresos Alcistas */}
+            <div 
+              className="p-2 bg-gradient-to-br from-emerald-800/60 via-emerald-900/80 to-stone-950 text-emerald-300 rounded-2xl border border-emerald-500/40 shadow-lg shadow-emerald-950/50 hover:border-emerald-300 transition-all flex items-center justify-center shrink-0"
+              title="Gráfica de ingresos en tendencia alcista"
+            >
+              <IncomeUpwardChartSymbol className="w-8 h-8" />
             </div>
           </div>
-          <p className="text-3xl font-black text-emerald-300 tracking-tight font-mono">
-            {formatCurrency(totalAmount)}
-          </p>
-          <p className="text-[11px] text-emerald-200/80 font-medium mt-1">
-            {incomes.length} movimientos de ingreso registrados
-          </p>
+
+          <div className="flex items-end justify-between gap-3 mt-1">
+            <div>
+              <p className="text-3xl font-black text-emerald-300 tracking-tight font-mono">
+                {formatCurrency(totalAmount)}
+              </p>
+              <p className="text-[11px] text-emerald-200/80 font-medium mt-1">
+                {incomes.length} movimientos de ingreso registrados
+              </p>
+            </div>
+
+            {/* Mini gráfica visual de curva ascendente de ingresos */}
+            <div className="flex flex-col items-end shrink-0 pl-2">
+              <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/30 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>En alza</span>
+              </div>
+              <svg className="w-20 h-7 overflow-visible" viewBox="0 0 76 26" fill="none">
+                <defs>
+                  <linearGradient id="cardIncomeSparkline" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34d399" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M2 22 C 16 20, 26 16, 38 14 C 50 12, 60 6, 74 3"
+                  stroke="#34d399"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M2 22 C 16 20, 26 16, 38 14 C 50 12, 60 6, 74 3 L 74 26 L 2 26 Z"
+                  fill="url(#cardIncomeSparkline)"
+                />
+                <circle cx="74" cy="3" r="2.5" fill="#a7f3d0" />
+              </svg>
+            </div>
+          </div>
         </div>
 
         {/* Efectivo en Cajón */}
@@ -443,23 +557,23 @@ export default function IngresosPage() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Search Box */}
           <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+            <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
-              placeholder="Buscar por folio ING-XXXX, cliente, concepto o cajero..."
+              placeholder="Buscar por folio ING-XXXX, ticket, cliente, concepto o cajero..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-stone-50 rounded-2xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-stone-50 rounded-2xl border border-stone-200 text-sm sm:text-base font-semibold text-stone-800 placeholder:text-stone-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             />
           </div>
 
           {/* Quick Filters */}
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
             {/* Payment Method Filter */}
             <select
               value={selectedMethod}
               onChange={(e) => setSelectedMethod(e.target.value as any)}
-              className="bg-stone-50 px-3 py-2 rounded-xl border border-stone-200 text-xs font-bold text-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              className="bg-stone-50 px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs"
             >
               <option value="all">Todas las Formas de Pago</option>
               <option value="efectivo">💵 Solo Efectivo</option>
@@ -471,7 +585,7 @@ export default function IngresosPage() {
             <select
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
-              className="bg-stone-50 px-3 py-2 rounded-xl border border-stone-200 text-xs font-bold text-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              className="bg-stone-50 px-4 py-2.5 rounded-xl border border-stone-200 text-sm font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs"
             >
               <option value="all">Todas las Sucursales</option>
               {branches.map((b) => (
@@ -484,13 +598,13 @@ export default function IngresosPage() {
         </div>
 
         {/* Category Filter Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 text-xs">
+        <div className="flex gap-2.5 overflow-x-auto pb-1.5 text-sm">
           <button
             onClick={() => setSelectedCategory("all")}
-            className={`px-3.5 py-1.5 rounded-xl font-black transition-all ${
+            className={`px-4 py-2 rounded-xl font-black text-sm whitespace-nowrap transition-all cursor-pointer ${
               selectedCategory === "all"
-                ? "bg-emerald-700 text-white shadow-sm"
-                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                ? "bg-emerald-700 text-white shadow-md ring-2 ring-emerald-500/30"
+                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
             }`}
           >
             Todos ({incomes.length})
@@ -499,13 +613,13 @@ export default function IngresosPage() {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all ${
+              className={`px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === cat.id
-                  ? "bg-emerald-700 text-white shadow-sm"
-                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                  ? "bg-emerald-700 text-white shadow-md ring-2 ring-emerald-500/30 font-black"
+                  : "bg-stone-100 text-stone-700 hover:bg-stone-200"
               }`}
             >
-              {cat.icon} {cat.label.split(" ")[0]} {cat.label.split(" ")[1] || ""}
+              {cat.icon} {cat.shortLabel || cat.label}
             </button>
           ))}
         </div>

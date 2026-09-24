@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { CustomOrder, Customer } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-import { getStoredCustomers, createCustomerInDb } from "@/lib/customers";
+import { getStoredCustomers, createCustomerInDb, normalizeCustomerName } from "@/lib/customers";
 import { updateCustomOrder } from "@/lib/orders";
 
 interface OrderReceiptModalProps {
@@ -43,8 +43,9 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
       if (byId) return byId;
     }
     const cleanPhone = order.phone?.replace(/\D/g, "");
+    const orderNormName = normalizeCustomerName(order.customerName);
     return all.find((c) => {
-      const matchName = c.name.toLowerCase().trim() === order.customerName.toLowerCase().trim();
+      const matchName = normalizeCustomerName(c.name) === orderNormName;
       const matchPhone = cleanPhone && cleanPhone.length >= 7 && c.phone.replace(/\D/g, "").includes(cleanPhone);
       return matchName || matchPhone;
     }) || null;

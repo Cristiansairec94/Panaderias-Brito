@@ -66,7 +66,7 @@ const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
     expectedCash: 4080,
     countedCash: 4080,
     difference: 0,
-    nextFund: 600,
+    nextFund: 0,
     notes: "Entrega de turno matutino sin ninguna anomalía. Vitrina de conchas y bolillo surtida.",
     stockPieces: 180,
     stockValue: 2340,
@@ -202,7 +202,7 @@ export default function CajaPage() {
   const [filterResponsible, setFilterResponsible] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "cuadrado" | "sobrante" | "faltante">("all");
 
-  const getStoredCajaInitialFund = (fallback: number = 500): number => {
+  const getStoredCajaInitialFund = (fallback: number = 0): number => {
     try {
       const raw = localStorage.getItem("brito_shift_cuts_history");
       if (raw) {
@@ -221,9 +221,9 @@ export default function CajaPage() {
   const [movements, setMovements] = useState<CashMovement[]>(INITIAL_MOVEMENTS);
   const [initialCash, setInitialCash] = useState<number>(() => {
     if (typeof window !== "undefined") {
-      return getStoredCajaInitialFund(500);
+      return getStoredCajaInitialFund(0);
     }
-    return 500;
+    return 0;
   });
   const [cashSales] = useState(4150);
   const [cardSales] = useState(700);
@@ -271,7 +271,7 @@ export default function CajaPage() {
     loadCutsHistory();
     const handleSync = () => {
       loadCutsHistory();
-      setInitialCash(getStoredCajaInitialFund(500));
+      setInitialCash(getStoredCajaInitialFund(0));
     };
     window.addEventListener("brito_shift_cuts_updated", handleSync);
     window.addEventListener("storage", handleSync);
