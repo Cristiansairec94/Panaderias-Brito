@@ -750,50 +750,54 @@ export default function ExpensesModal({
         </div>
 
         {/* Live Cash Balances Bar - 5 Cuentas Base de Caja con leyenda Ver Historial */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 sm:gap-2 p-2.5 sm:p-3.5 bg-stone-50 border-b border-stone-200 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 p-3 sm:p-4 bg-stone-50 border-b border-stone-200 text-center">
           
           {/* 1. Fondo Inicial (Base Contable del Turno) */}
           <button
             type="button"
             onClick={() => {
-              setActiveTab("register");
+              setActiveTab("list");
+              setHistoryFilter("fondo");
             }}
-            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer group ${
-              activeTab === "register"
-                ? "bg-blue-50 border-blue-400 ring-2 ring-blue-500/20 shadow-xs scale-[1.01]"
-                : "bg-blue-50/60 border-blue-200 hover:bg-blue-100/70 shadow-xs"
+            className={`p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between ${
+              activeTab === "list" && historyFilter === "fondo"
+                ? "bg-blue-100 border-blue-500 ring-2 ring-blue-500/25 shadow-sm scale-[1.02]"
+                : "bg-blue-50/70 border-blue-200/90 hover:bg-blue-100/60 hover:border-blue-300 shadow-2xs"
             }`}
             title="Con cuánto se inició en caja (Base para hacer cuentas del turno)"
           >
-            <span className="text-[9px] sm:text-[10px] uppercase font-black text-blue-900 block leading-tight group-hover:text-blue-950">
+            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-blue-950 block leading-tight tracking-wide">
               🪙 Fondo Inicial
             </span>
-            <span className="text-xs sm:text-sm font-black text-blue-800 block mt-0.5">
+            <span className="text-base sm:text-lg md:text-xl font-black text-blue-800 block my-1 tracking-tight truncate">
               +{formatCurrency(currentFund)}
             </span>
-            <span className="text-[9px] font-bold text-blue-600 block mt-0.5 opacity-90 group-hover:underline">
-              Base de Caja
+            <span className="text-[11px] sm:text-xs font-black text-blue-700 block mt-0.5 opacity-90 group-hover:underline">
+              🧾 Ver Historial
             </span>
           </button>
 
           {/* 2. Ventas Efectivo */}
           <button
             type="button"
-            onClick={() => setActiveTab("tickets")}
-            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer group ${
-              activeTab === "tickets"
-                ? "bg-emerald-50 border-emerald-400 ring-2 ring-emerald-500/20 shadow-xs scale-[1.01]"
-                : "bg-white border-stone-200/80 hover:bg-emerald-50/50 hover:border-emerald-300 shadow-xs"
+            onClick={() => {
+              setActiveTab("tickets");
+              setTicketTypeFilter("ventas");
+            }}
+            className={`p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between ${
+              activeTab === "tickets" && ticketTypeFilter === "ventas"
+                ? "bg-emerald-100 border-emerald-500 ring-2 ring-emerald-500/25 shadow-sm scale-[1.02]"
+                : "bg-emerald-50/70 border-emerald-200/90 hover:bg-emerald-100/60 hover:border-emerald-300 shadow-2xs"
             }`}
             title="Ver listado detallado de historial de ventas y tickets"
           >
-            <span className="text-[9px] sm:text-[10px] uppercase font-black text-emerald-900 block leading-tight group-hover:text-emerald-950">
+            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-emerald-950 block leading-tight tracking-wide">
               Ventas Efectivo
             </span>
-            <span className="text-xs sm:text-sm font-black text-emerald-700 block mt-0.5">
+            <span className="text-base sm:text-lg md:text-xl font-black text-emerald-700 block my-1 tracking-tight truncate">
               +{formatCurrency(cashSalesTotal > 0 ? cashSalesTotal : totalSalesSum)}
             </span>
-            <span className="text-[9px] font-bold text-emerald-600 block mt-0.5 opacity-90 group-hover:underline">
+            <span className="text-[11px] sm:text-xs font-black text-emerald-700 block mt-0.5 opacity-90 group-hover:underline">
               🧾 Ver Historial
             </span>
           </button>
@@ -802,24 +806,24 @@ export default function ExpensesModal({
           <button
             type="button"
             onClick={() => {
-              setActiveTab("register");
-              setMovementType("entrada");
+              setActiveTab("list");
+              setHistoryFilter("entradas");
             }}
-            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer group ${
-              activeTab === "register" && movementType === "entrada"
-                ? "bg-teal-50 border-teal-400 ring-2 ring-teal-500/20 shadow-xs scale-[1.01]"
-                : "bg-teal-50/60 border-teal-200 hover:bg-teal-100/70 shadow-xs"
+            className={`p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between ${
+              activeTab === "list" && historyFilter === "entradas"
+                ? "bg-teal-100 border-teal-500 ring-2 ring-teal-500/25 shadow-sm scale-[1.02]"
+                : "bg-teal-50/70 border-teal-200/90 hover:bg-teal-100/60 hover:border-teal-300 shadow-2xs"
             }`}
-            title="Registrar entrada de dinero para cambio y abonos"
+            title="Ver entradas de dinero para cambio y abonos"
           >
-            <span className="text-[9px] sm:text-[10px] uppercase font-black text-teal-800 block leading-tight group-hover:text-teal-950">
+            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-teal-950 block leading-tight tracking-wide">
               Entradas / Cambio
             </span>
-            <span className="text-xs sm:text-sm font-black text-teal-700 block mt-0.5">
+            <span className="text-base sm:text-lg md:text-xl font-black text-teal-700 block my-1 tracking-tight truncate">
               +{formatCurrency(totalIncomesInCash)}
             </span>
-            <span className="text-[9px] font-bold text-teal-600 block mt-0.5 opacity-90 group-hover:underline">
-              ➕ Registrar Entrada
+            <span className="text-[11px] sm:text-xs font-black text-teal-700 block mt-0.5 opacity-90 group-hover:underline">
+              🧾 Ver Historial
             </span>
           </button>
 
@@ -827,24 +831,24 @@ export default function ExpensesModal({
           <button
             type="button"
             onClick={() => {
-              setActiveTab("register");
-              setMovementType("salida");
+              setActiveTab("list");
+              setHistoryFilter("salidas");
             }}
-            className={`p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer group ${
-              activeTab === "register" && movementType === "salida"
-                ? "bg-rose-50 border-rose-400 ring-2 ring-rose-500/20 shadow-xs scale-[1.01]"
-                : "bg-rose-50/60 border-rose-200 hover:bg-rose-100/70 shadow-xs"
+            className={`p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between ${
+              activeTab === "list" && historyFilter === "salidas"
+                ? "bg-rose-100 border-rose-500 ring-2 ring-rose-500/25 shadow-sm scale-[1.02]"
+                : "bg-rose-50/70 border-rose-200/90 hover:bg-rose-100/60 hover:border-rose-300 shadow-2xs"
             }`}
-            title="Registrar salida por gastos operativos y retiros"
+            title="Ver salidas por gastos operativos y retiros"
           >
-            <span className="text-[9px] sm:text-[10px] uppercase font-black text-rose-800 block leading-tight group-hover:text-rose-950">
+            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-rose-950 block leading-tight tracking-wide">
               Gastos / Retiros
             </span>
-            <span className="text-xs sm:text-sm font-black text-rose-700 block mt-0.5">
+            <span className="text-base sm:text-lg md:text-xl font-black text-rose-700 block my-1 tracking-tight truncate">
               -{formatCurrency(totalExpenses)}
             </span>
-            <span className="text-[9px] font-bold text-rose-600 block mt-0.5 opacity-90 group-hover:underline">
-              ➖ Registrar Salida
+            <span className="text-[11px] sm:text-xs font-black text-rose-700 block mt-0.5 opacity-90 group-hover:underline">
+              🧾 Ver Historial
             </span>
           </button>
 
@@ -852,23 +856,24 @@ export default function ExpensesModal({
           <button
             type="button"
             onClick={() => {
-              setActiveTab("register");
+              setActiveTab("list");
+              setHistoryFilter("todos");
             }}
-            className={`col-span-2 sm:col-span-1 p-2 sm:p-2.5 rounded-2xl border transition-all text-center cursor-pointer group ${
-              activeTab === "register"
-                ? "bg-amber-100 border-amber-400 ring-2 ring-amber-500/20 shadow-xs scale-[1.01]"
-                : "bg-amber-50 border-amber-300 hover:bg-amber-100/70 shadow-xs"
+            className={`col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between ${
+              activeTab === "list" && historyFilter === "todos"
+                ? "bg-amber-100 border-amber-500 ring-2 ring-amber-500/25 shadow-sm scale-[1.02]"
+                : "bg-amber-50/80 border-amber-300 hover:bg-amber-100/70 hover:border-amber-400 shadow-2xs"
             }`}
             title="Efectivo total en cajón ahora (Base + Ventas + Entradas - Salidas)"
           >
-            <span className="text-[9px] sm:text-[10px] uppercase font-black text-amber-900 block leading-tight group-hover:text-amber-950">
+            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-amber-950 block leading-tight tracking-wide">
               En Cajón Ahora
             </span>
-            <span className="text-xs sm:text-sm font-black text-stone-900 block mt-0.5">
+            <span className="text-base sm:text-lg md:text-xl font-black text-stone-950 block my-1 tracking-tight truncate">
               {formatCurrency(netCashInDrawer)}
             </span>
-            <span className="text-[9px] font-bold text-amber-800 block mt-0.5 opacity-90 group-hover:underline">
-              💵 Balance Actual
+            <span className="text-[11px] sm:text-xs font-black text-amber-900 block mt-0.5 opacity-90 group-hover:underline">
+              🧾 Ver Historial
             </span>
           </button>
         </div>
@@ -878,7 +883,7 @@ export default function ExpensesModal({
           <button
             type="button"
             onClick={() => setActiveTab("register")}
-            className={`flex-1 py-2.5 px-2.5 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 py-3 px-3 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === "register"
                 ? "bg-white text-stone-900 shadow-sm border border-stone-300 ring-2 ring-stone-900/10"
                 : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
@@ -890,9 +895,12 @@ export default function ExpensesModal({
 
           <button
             type="button"
-            onClick={() => setActiveTab("tickets")}
-            className={`flex-1 py-2.5 px-2.5 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === "tickets"
+            onClick={() => {
+              setActiveTab("tickets");
+              setTicketTypeFilter("all");
+            }}
+            className={`flex-1 py-3 px-3 rounded-xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === "tickets" || activeTab === "list"
                 ? "bg-white text-emerald-950 shadow-sm border border-emerald-400 ring-2 ring-emerald-500/25"
                 : "text-emerald-800 hover:text-emerald-950 hover:bg-emerald-50/80 border border-emerald-200/80 bg-emerald-50/40"
             }`}
