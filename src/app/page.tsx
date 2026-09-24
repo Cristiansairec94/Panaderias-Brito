@@ -10,47 +10,95 @@ import {
   Users, 
   ShieldCheck, 
   Package, 
-  Building2,
-  Zap,
-  Store,
-  Clock,
-  ShoppingBag,
-  TrendingUp,
-  Receipt,
-  Flame,
-  Play,
-  Pause,
-  CheckCircle2,
-  ArrowUpRight,
-  Sparkles,
-  RefreshCw,
-  Croissant,
-  Calendar,
-  CalendarClock,
-  Phone,
-  Layers,
-  ChevronRight,
-  ExternalLink,
-  Award,
-  CreditCard,
-  Banknote,
-  ArrowDownRight,
-  Eye
+  Zap, 
+  Store, 
+  Clock, 
+  ShoppingBag, 
+  TrendingUp, 
+  Receipt, 
+  Flame, 
+  CheckCircle2, 
+  ArrowUpRight, 
+  Sparkles, 
+  RefreshCw, 
+  Croissant, 
+  CalendarClock, 
+  Phone, 
+  Award, 
+  CreditCard, 
+  Banknote, 
+  Eye, 
+  Boxes,
+  Timer,
+  Check,
+  Plus,
+  TrendingDown
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
-import { useBranch } from "@/context/BranchContext";
+import { useBranch, SimulatedSale } from "@/context/BranchContext";
 import { getStoredOrders } from "@/lib/orders";
 import { CustomOrder } from "@/types";
 
-// Top bakery products data
-const TOP_BAKERY_PRODUCTS = [
-  { id: "1", name: "Concha de Vainilla Artesanal", category: "Pan Dulce", icon: "🥖", price: 14, piecesSold: 342, revenue: 4788, share: 24, trend: "+15%", tag: "Más Vendido" },
-  { id: "2", name: "Bolillo Tradicional de Horno", category: "Pan Salado", icon: "🥖", price: 6, piecesSold: 580, revenue: 3480, share: 18, trend: "+22%", tag: "Alta Rotación" },
-  { id: "3", name: "Cuerno de Mantequilla Francés", category: "Hojaldre", icon: "🥐", price: 18, piecesSold: 165, revenue: 2970, share: 15, trend: "+8%", tag: "Favorito" },
-  { id: "4", name: "Dona Glaseada de Azúcar", category: "Pan Dulce", icon: "🍩", price: 15, piecesSold: 180, revenue: 2700, share: 14, trend: "+6%", tag: "Popular" },
-  { id: "5", name: "Rebanada Pastel Tres Leches", category: "Pastelería", icon: "🍰", price: 48, piecesSold: 46, revenue: 2208, share: 11, trend: "+18%", tag: "Gourmet" },
+// Catálogo enriquecido de productos estrella de Panadería Brito con clasificación por categoría
+interface TopProductItem {
+  id: string;
+  name: string;
+  category: "pan_salado" | "pan_dulce" | "hojaldre" | "pasteleria";
+  categoryLabel: string;
+  icon: string;
+  price: number;
+  piecesSold: number;
+  revenue: number;
+  share: number;
+  trend: string;
+  tag: string;
+}
+
+const ALL_TOP_BAKERY_PRODUCTS: TopProductItem[] = [
+  { id: "1", name: "Concha de Vainilla Artesanal", category: "pan_dulce", categoryLabel: "Pan Dulce", icon: "🥖", price: 14, piecesSold: 342, revenue: 4788, share: 24, trend: "+15%", tag: "Más Vendido" },
+  { id: "2", name: "Bolillo Tradicional de Horno", category: "pan_salado", categoryLabel: "Pan Salado", icon: "🥖", price: 6, piecesSold: 580, revenue: 3480, share: 18, trend: "+22%", tag: "Alta Rotación" },
+  { id: "3", name: "Cuerno de Mantequilla Francés", category: "hojaldre", categoryLabel: "Hojaldre", icon: "🥐", price: 18, piecesSold: 165, revenue: 2970, share: 15, trend: "+8%", tag: "Favorito" },
+  { id: "4", name: "Telera Dorada de Piso", category: "pan_salado", categoryLabel: "Pan Salado", icon: "🥖", price: 7, piecesSold: 410, revenue: 2870, share: 14, trend: "+12%", tag: "Mayoreo Loncherías" },
+  { id: "5", name: "Dona Glaseada de Azúcar", category: "pan_dulce", categoryLabel: "Pan Dulce", icon: "🍩", price: 15, piecesSold: 180, revenue: 2700, share: 14, trend: "+6%", tag: "Popular" },
+  { id: "6", name: "Rebanada Pastel Tres Leches", category: "pasteleria", categoryLabel: "Pastelería", icon: "🍰", price: 48, piecesSold: 46, revenue: 2208, share: 11, trend: "+18%", tag: "Gourmet" },
+  { id: "7", name: "Oreja Caramelizada de Hojaldre", category: "hojaldre", categoryLabel: "Hojaldre", icon: "🥐", price: 16, piecesSold: 135, revenue: 2160, share: 10, trend: "+10%", tag: "Crujiente" },
+  { id: "8", name: "Pay de Queso con Zarzamora", category: "pasteleria", categoryLabel: "Pastelería", icon: "🥧", price: 45, piecesSold: 38, revenue: 1710, share: 8, trend: "+14%", tag: "Especialidad" },
+];
+
+// Cronograma de Tandas y Horno
+interface BakingShiftSchedule {
+  id: string;
+  name: string;
+  hour: string;
+  bakingType: string;
+  pieces: number;
+  status: "completada" | "en_horno" | "programada";
+  baker: string;
+}
+
+const BAKING_SCHEDULE: BakingShiftSchedule[] = [
+  { id: "b1", name: "Tanda 1: Bolillos de Piso & Teleras", hour: "05:30 AM", bakingType: "Horno de Piso (Leña/Gas)", pieces: 1200, status: "completada", baker: "Maestro Juan" },
+  { id: "b2", name: "Tanda 2: Conchas, Donas & Bizcocho", hour: "07:00 AM", bakingType: "Hornos Rotativos", pieces: 850, status: "completada", baker: "Don Toño Brito" },
+  { id: "b3", name: "Tanda 3: Hojaldres & Repostería Fina", hour: "12:30 PM", bakingType: "Horno de Convección", pieces: 600, status: "completada", baker: "Maestro Juan" },
+  { id: "b4", name: "Tanda 4: Pan Caliente para la Merienda", hour: "17:30 PM", bakingType: "Hornos Rotativos", pieces: 800, status: "programada", baker: "Equipo Turno Tarde" },
+];
+
+// Insumos críticos del almacén
+interface CriticalRawMaterial {
+  name: string;
+  current: number;
+  min: number;
+  unit: string;
+  status: "ok" | "alerta" | "critico";
+}
+
+const CRITICAL_RAW_MATERIALS: CriticalRawMaterial[] = [
+  { name: "Harina de Trigo Extra Fina", current: 8, min: 10, unit: "bultos", status: "alerta" },
+  { name: "Mantequilla Pura de Vaca", current: 4, min: 12, unit: "kg", status: "critico" },
+  { name: "Gas LP Hornos Principales", current: 68, min: 25, unit: "% estac.", status: "ok" },
+  { name: "Azúcar Estándar", current: 14, min: 5, unit: "bultos", status: "ok" },
 ];
 
 interface ChartDataPoint {
@@ -69,12 +117,11 @@ export default function Home() {
     branches, 
     currentBranch, 
     isAllBranches, 
-    switchBranch,
+    switchBranch, 
     consolidatedMetrics,
     simulateSale,
-    simulateBulkSales,
-    isLiveSimulating,
-    toggleLiveSimulation
+    recentSimulatedSales,
+    cashMovements
   } = useBranch();
 
   // Orders state (Pedidos de mostrador levantados por cajeros)
@@ -93,21 +140,32 @@ export default function Home() {
   const [selectedPeriod, setSelectedPeriod] = useState<"hoy" | "semana" | "mes">("hoy");
   const [activeChartTab, setActiveChartTab] = useState<"horas" | "dias">("horas");
   const [hoveredDataIndex, setHoveredDataIndex] = useState<number | null>(null);
+  const [productCategoryFilter, setProductCategoryFilter] = useState<string>("todas");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<"todos" | "pendiente" | "en_horno" | "listo">("todos");
   const [greeting, setGreeting] = useState("¡Bienvenido");
+  const [currentTimeStr, setCurrentTimeStr] = useState("");
+  const [saleAnimSuccess, setSaleAnimSuccess] = useState(false);
 
-  // Dynamic greeting by local hour
+  // Dynamic greeting & clock
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) {
-      setGreeting("¡Buenos días");
-    } else if (hour >= 12 && hour < 19) {
-      setGreeting("¡Buenas tardes");
-    } else {
-      setGreeting("¡Buenas noches");
-    }
+    const updateTime = () => {
+      const now = new Date();
+      const hour = now.getHours();
+      if (hour >= 5 && hour < 12) {
+        setGreeting("¡Buenos días");
+      } else if (hour >= 12 && hour < 19) {
+        setGreeting("¡Buenas tardes");
+      } else {
+        setGreeting("¡Buenas noches");
+      }
+      setCurrentTimeStr(now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Period multiplier
+  // Multiplicador por período seleccionado
   const periodMultiplier = selectedPeriod === "hoy" ? 1 : selectedPeriod === "semana" ? 6.2 : 24.5;
 
   const baseSales = isAllBranches 
@@ -115,7 +173,7 @@ export default function Home() {
     : currentBranch?.todaySales || 5480;
 
   const baseTickets = isAllBranches
-    ? consolidatedMetrics.totalTickets
+    ? consolidatedMetrics.totalTickets 
     : currentBranch?.todayTickets || 46;
 
   const activeSales = Math.round(baseSales * periodMultiplier);
@@ -133,16 +191,37 @@ export default function Home() {
   const avgTicket = Math.round(activeSales / Math.max(1, activeTickets));
   const estimatedPieces = Math.round(activeTickets * 8.6);
 
+  // Margen bruto estimado de panadería (~44% sobre ventas)
+  const estimatedGrossProfit = Math.round(activeSales * 0.442);
+
+  // Gastos registrados hoy desde el flujo de caja
+  const todayCashExpenses = useMemo(() => {
+    return cashMovements
+      .filter((m) => m.type === "salida")
+      .reduce((sum, m) => sum + m.amount, 0);
+  }, [cashMovements]);
+
   // Filtered orders for active branch
   const filteredOrders = useMemo(() => {
+    let result = orders;
+    if (!isAllBranches && currentBranch) {
+      result = result.filter((o) => !o.branchId || o.branchId === currentBranch.id);
+    }
+    if (orderStatusFilter !== "todos") {
+      result = result.filter((o) => o.status === orderStatusFilter);
+    }
+    return result;
+  }, [orders, isAllBranches, currentBranch, orderStatusFilter]);
+
+  const allBranchOrders = useMemo(() => {
     if (isAllBranches) return orders;
     return orders.filter((o) => !o.branchId || o.branchId === currentBranch?.id);
   }, [orders, isAllBranches, currentBranch]);
 
-  const pendingOrdersCount = filteredOrders.filter((o) => o.status === "pendiente").length;
-  const inOvenOrdersCount = filteredOrders.filter((o) => o.status === "en_horno").length;
-  const readyOrdersCount = filteredOrders.filter((o) => o.status === "listo").length;
-  const totalPendingCollection = filteredOrders.reduce((sum, o) => sum + (o.remainingBalance || 0), 0);
+  const pendingOrdersCount = allBranchOrders.filter((o) => o.status === "pendiente").length;
+  const inOvenOrdersCount = allBranchOrders.filter((o) => o.status === "en_horno").length;
+  const readyOrdersCount = allBranchOrders.filter((o) => o.status === "listo").length;
+  const totalPendingCollection = allBranchOrders.reduce((sum, o) => sum + (o.remainingBalance || 0), 0);
 
   // Method breakdowns
   const cashShare = isAllBranches ? 0.70 : (currentBranch ? currentBranch.currentShift.cashSales / Math.max(1, currentBranch.currentShift.totalSales) : 0.70);
@@ -216,24 +295,37 @@ export default function Home() {
   const activeChartItems = activeChartTab === "horas" ? hourlyData : weeklyData;
   const maxChartAmount = Math.max(...activeChartItems.map((d) => d.amount), 1);
 
-
-
   // Ranked branches by today sales
   const sortedBranches = useMemo(() => {
     return [...branches].sort((a, b) => b.todaySales - a.todaySales);
   }, [branches]);
 
+  // Filtrado de productos estrella por categoría
+  const displayedTopProducts = useMemo(() => {
+    if (productCategoryFilter === "todas") return ALL_TOP_BAKERY_PRODUCTS;
+    return ALL_TOP_BAKERY_PRODUCTS.filter((p) => p.category === productCategoryFilter);
+  }, [productCategoryFilter]);
+
+  // Trigger quick simulated sale with animation
+  const handleTriggerSale = () => {
+    simulateSale();
+    setSaleAnimSuccess(true);
+    setTimeout(() => setSaleAnimSuccess(false), 2000);
+  };
+
   return (
-    <div className="w-full max-w-full space-y-5 sm:space-y-6 overflow-x-hidden">
-      {/* Top Hero: Official Deep Charcoal & Onyx with Warm Brito Orange & Crimson Accents */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#0c0d14] via-[#12141f] to-[#090a0f] rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-white/[0.08]">
-        {/* Glow ambient spots */}
-        <div className="absolute -right-12 -top-12 w-96 h-96 bg-orange-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -left-12 -bottom-12 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl pointer-events-none" />
+    <div className="w-full max-w-full space-y-6 sm:space-y-7 overflow-x-hidden pb-10">
+      {/* ========================================================= */}
+      {/* 1. TOP EXECUTIVE HERO BANNER                             */}
+      {/* ========================================================= */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#0b0c12] via-[#141624] to-[#090a0f] rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-white/[0.08]">
+        {/* Glowing atmospheric spots */}
+        <div className="absolute -right-16 -top-16 w-96 h-96 bg-orange-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -left-16 -bottom-16 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          {/* Brand Welcome & Context */}
-          <div className="space-y-3 max-w-2xl">
+          {/* Welcome & Context */}
+          <div className="space-y-3.5 max-w-2xl">
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-3 py-1 bg-gradient-to-r from-orange-500 to-rose-600 text-white rounded-full text-[10px] font-black tracking-wider uppercase shadow-md flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3 text-amber-200" />
@@ -245,7 +337,7 @@ export default function Home() {
               </span>
               <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />
-                Operación en Tiempo Real
+                Operación en Vivo • {currentTimeStr || "Hora Local"}
               </span>
             </div>
 
@@ -255,7 +347,7 @@ export default function Home() {
                   {greeting} {getFriendlyName(user?.name)}!
                 </h1>
                 <span
-                  className="font-brito-script text-3xl sm:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-rose-400 select-none inline-block -rotate-2"
+                  className="font-brito-script text-3xl sm:text-4xl text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-rose-400 select-none inline-block -rotate-2"
                   style={{
                     fontFamily: "var(--font-satisfy), 'Satisfy', var(--font-dancing), 'Dancing Script', cursive",
                   }}
@@ -264,13 +356,13 @@ export default function Home() {
                 </span>
               </div>
               <p className="text-stone-300 text-xs sm:text-sm mt-1 leading-relaxed">
-                Control central de <strong className="text-orange-400">ventas, cajas y hornadas</strong> en tiempo real. Supervisa el flujo por tienda y agiliza el cobro en mostrador.
+                Control central de <strong className="text-orange-400">ventas, hornadas, gavetas de efectivo y pedidos especiales</strong> en tiempo real. Supervisa el flujo integral del negocio.
               </p>
             </div>
 
-            {/* Branch Switcher Pills */}
+            {/* Branch Selector Pills */}
             <div className="pt-1 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mr-1">Tienda:</span>
+              <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mr-1">Sucursal:</span>
               <button
                 onClick={() => switchBranch("all")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
@@ -302,7 +394,7 @@ export default function Home() {
           </div>
 
           {/* Quick Real-Time Operations Action Bar */}
-          <div className="relative z-10 flex flex-col gap-2.5 self-start lg:self-center w-full lg:w-auto lg:min-w-[280px]">
+          <div className="relative z-10 flex flex-col gap-2.5 self-start lg:self-center w-full lg:w-auto lg:min-w-[310px]">
             {/* Live Operational Status Badge */}
             <div className="flex items-center justify-between gap-3 bg-white/[0.06] border border-white/10 px-4 py-2.5 rounded-2xl backdrop-blur-md">
               <div className="flex items-center gap-2">
@@ -314,60 +406,96 @@ export default function Home() {
                   Mostrador & Cajas Activas
                 </span>
               </div>
-              <span className="text-[10px] font-bold text-stone-300 bg-white/10 px-2 py-0.5 rounded-full">
-                En Vivo
+              <span className="text-[10px] font-bold text-stone-300 bg-white/10 px-2.5 py-0.5 rounded-full">
+                {isAllBranches ? "3 Tiendas" : currentBranch?.shortName}
               </span>
             </div>
 
-            {/* Quick Real Cash Flow Actions */}
+            {/* Quick Navigation & POS Shortcuts */}
+            <div className="grid grid-cols-3 gap-2 w-full">
+              <Link
+                href="/pos"
+                className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-orange-500 to-rose-600 hover:brightness-110 text-white font-extrabold px-3 py-2.5 rounded-xl transition-all text-xs shadow-md shadow-orange-500/20 active:scale-95 text-center"
+                title="Abrir Punto de Venta en Mostrador"
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>Abrir POS</span>
+              </Link>
+              <Link
+                href="/pedidos"
+                className="flex items-center justify-center gap-1.5 bg-white/[0.09] hover:bg-white/[0.16] text-amber-300 font-extrabold px-3 py-2.5 rounded-xl border border-white/15 transition-all text-xs active:scale-95 text-center"
+                title="Encargos y pedidos especiales de pasteles"
+              >
+                <CalendarClock className="w-3.5 h-3.5" />
+                <span>+ Pedido</span>
+              </Link>
+              <Link
+                href="/caja"
+                className="flex items-center justify-center gap-1.5 bg-white/[0.09] hover:bg-white/[0.16] text-white font-extrabold px-3 py-2.5 rounded-xl border border-white/15 transition-all text-xs active:scale-95 text-center"
+                title="Corte y Arqueo de Caja"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                <span>Corte</span>
+              </Link>
+            </div>
+
+            {/* Quick Flow Actions (+Abono, -Gasto, +Venta Rápida Demo) */}
             <div className="flex items-center gap-2 w-full">
               <Link
                 href="/ingresos"
-                className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 font-bold px-3 py-2.5 rounded-xl border border-emerald-500/30 transition-all text-xs active:scale-95 shadow-sm"
+                className="flex-1 flex items-center justify-center gap-1 bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 font-bold px-2.5 py-2 rounded-xl border border-emerald-500/30 transition-all text-xs active:scale-95"
                 title="Registrar abonos y cobros"
               >
                 <span>+ Abono</span>
               </Link>
               <Link
                 href="/gastos"
-                className="flex-1 flex items-center justify-center gap-1.5 bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 font-bold px-3 py-2.5 rounded-xl border border-rose-500/30 transition-all text-xs active:scale-95 shadow-sm"
+                className="flex-1 flex items-center justify-center gap-1 bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 font-bold px-2.5 py-2 rounded-xl border border-rose-500/30 transition-all text-xs active:scale-95"
                 title="Registrar gastos menores de caja"
               >
                 <span>- Gasto</span>
               </Link>
-              <Link
-                href="/caja"
-                className="flex-1 flex items-center justify-center gap-1.5 bg-white/[0.08] hover:bg-white/[0.14] text-white font-bold px-3 py-2.5 rounded-xl border border-white/15 transition-all text-xs active:scale-95 shadow-sm"
-                title="Corte y Arqueo de Caja"
+              <button
+                onClick={handleTriggerSale}
+                className={`flex-1 flex items-center justify-center gap-1 font-bold px-2.5 py-2 rounded-xl border transition-all text-xs active:scale-95 ${
+                  saleAnimSuccess
+                    ? "bg-amber-400 text-stone-950 border-amber-300 scale-95"
+                    : "bg-white/[0.06] hover:bg-white/[0.12] text-amber-200 border-amber-500/30"
+                }`}
+                title="Simular una venta rápida en vivo para verificar actualización en tiempo real"
               >
-                <span>Corte</span>
-              </Link>
+                <Zap className={`w-3.5 h-3.5 ${saleAnimSuccess ? "animate-bounce text-stone-900" : "text-amber-400"}`} />
+                <span>{saleAnimSuccess ? "¡Cobrado!" : "+Venta"}</span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Period Filter Bar & Live Sync Status */}
-      {/* Live Global Quick Stats Hub (Métricas de Rendimiento en Tiempo Real) */}
-      <div className="bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-5">
+      {/* ========================================================= */}
+      {/* 2. KPI COMMAND CENTER (Métricas en Tiempo Real)          */}
+      {/* ========================================================= */}
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
           <div className="flex items-center gap-2.5">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
             </span>
-            <h2 className="text-xs sm:text-sm font-black text-stone-900 uppercase tracking-wider">
-              Métricas de Rendimiento en Tiempo Real
-            </h2>
-            <span className="text-xs text-stone-400 hidden md:inline">
-              • {isAllBranches ? "Consolidando las 3 sucursales de Brito" : `Filtrando sucursal ${currentBranch?.name}`}
-            </span>
+            <div>
+              <h2 className="text-xs sm:text-sm font-black text-stone-900 uppercase tracking-wider">
+                Métricas de Rendimiento & Flujo Financiero
+              </h2>
+              <p className="text-[11px] text-stone-500">
+                {isAllBranches ? "Consolidando las 3 sucursales de Brito" : `Filtrando sucursal ${currentBranch?.name}`}
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto max-w-full">
             <button
               onClick={() => setSelectedPeriod("hoy")}
-              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
                 selectedPeriod === "hoy"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-500 hover:text-stone-900"
@@ -377,7 +505,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setSelectedPeriod("semana")}
-              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
                 selectedPeriod === "semana"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-500 hover:text-stone-900"
@@ -387,7 +515,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setSelectedPeriod("mes")}
-              className={`px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
                 selectedPeriod === "mes"
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-500 hover:text-stone-900"
@@ -398,10 +526,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 4 Hero KPI Cards: Ventas, Caja, Ticket Promedio, Piezas Horneadas */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {/* 4 Hero KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           {/* Card 1: Ventas Totales */}
-          <div className="bg-stone-50/60 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
+          <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Ventas Totales</span>
               <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200">
@@ -413,15 +541,15 @@ export default function Home() {
                 {formatCurrency(activeSales)}
               </p>
               <div className="flex items-center justify-between text-xs text-stone-500 mt-1 font-semibold">
-                <span className="flex items-center gap-1 text-emerald-700">
+                <span className="flex items-center gap-1 text-emerald-700 font-bold">
                   <ArrowUpRight className="w-3.5 h-3.5" />
                   {activeTickets} tickets
                 </span>
-                <span>{percentGoal}% de meta</span>
+                <span className="text-stone-700 font-bold">{percentGoal}% de meta</span>
               </div>
 
               {/* Goal Progress bar */}
-              <div className="w-full bg-stone-100 rounded-full h-2 mt-2 overflow-hidden border border-stone-200/60">
+              <div className="w-full bg-stone-200/70 rounded-full h-2 mt-2 overflow-hidden border border-stone-200/60">
                 <div
                   className="bg-gradient-to-r from-orange-500 via-rose-500 to-emerald-500 h-full rounded-full transition-all duration-500"
                   style={{ width: `${percentGoal}%` }}
@@ -429,18 +557,24 @@ export default function Home() {
               </div>
 
               {/* Payment method pills */}
-              <div className="flex items-center justify-between text-[10px] text-stone-500 pt-2 font-medium">
-                <span title={`Efectivo: ${formatCurrency(cashAmount)}`}>💵 {Math.round(cashShare * 100)}% Efec.</span>
-                <span title={`Tarjeta: ${formatCurrency(cardAmount)}`}>💳 {Math.round(cardShare * 100)}% Tarj.</span>
-                <span title={`Transferencia: ${formatCurrency(transferAmount)}`}>📱 {Math.round(transferShare * 100)}% Transf.</span>
+              <div className="flex items-center justify-between text-[10px] text-stone-600 pt-2 font-semibold">
+                <span className="bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 text-emerald-800" title={`Efectivo: ${formatCurrency(cashAmount)}`}>
+                  💵 {Math.round(cashShare * 100)}% Efec.
+                </span>
+                <span className="bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 text-blue-800" title={`Tarjeta: ${formatCurrency(cardAmount)}`}>
+                  💳 {Math.round(cardShare * 100)}% Tarj.
+                </span>
+                <span className="bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 text-purple-800" title={`Transferencia: ${formatCurrency(transferAmount)}`}>
+                  📱 {Math.round(transferShare * 100)}% Transf.
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Efectivo Neto en Caja */}
-          <div className="bg-stone-50/60 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
+          {/* Card 2: Efectivo Neto en Gaveta */}
+          <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Efectivo en Caja</span>
+              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Efectivo en Gaveta</span>
               <div className="p-2.5 rounded-2xl bg-orange-50 text-orange-600 border border-orange-200">
                 <Wallet className="w-5 h-5" />
               </div>
@@ -450,11 +584,11 @@ export default function Home() {
                 {formatCurrency(activeCash)}
               </p>
               <p className="text-xs text-stone-600 mt-1 font-semibold">
-                {isAllBranches ? "3 gavetas activas" : `${currentBranch?.currentShift.name.split("(")[0]}`}
+                {isAllBranches ? "3 gavetas de mostrador activas" : `${currentBranch?.currentShift.name.split("(")[0]}`}
               </p>
               <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-                <span>{isAllBranches ? "Total consolidado" : `Cajero: ${currentBranch?.currentShift.cashier}`}</span>
-                <Link href="/caja" className="text-orange-600 font-bold hover:underline flex items-center gap-0.5">
+                <span>{isAllBranches ? "Total disponible" : `Cajero: ${currentBranch?.currentShift.cashier}`}</span>
+                <Link href="/caja" className="text-orange-600 font-black hover:underline flex items-center gap-0.5">
                   Arqueo <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
@@ -462,7 +596,7 @@ export default function Home() {
           </div>
 
           {/* Card 3: Ticket Promedio */}
-          <div className="bg-stone-50/60 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
+          <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Ticket Promedio</span>
               <div className="p-2.5 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
@@ -478,16 +612,16 @@ export default function Home() {
                 +8.4% vs semana previa
               </p>
               <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-                <span>Gasto medio por cliente</span>
-                <span className="font-bold text-stone-700">~8.5 pzas/ticket</span>
+                <span>Canasta estimada</span>
+                <span className="font-extrabold text-stone-800">~8.5 pzas / ticket</span>
               </div>
             </div>
           </div>
 
           {/* Card 4: Piezas Horneadas & Vendidas */}
-          <div className="bg-stone-50/60 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
+          <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Piezas de Pan</span>
+              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Piezas de Pan Salidas</span>
               <div className="p-2.5 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200">
                 <Flame className="w-5 h-5" />
               </div>
@@ -498,41 +632,189 @@ export default function Home() {
               </p>
               <p className="text-xs text-stone-600 mt-1 font-semibold flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                5 tandas horneadas hoy
+                4 tandas de horneado hoy
               </p>
               <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-                <span>Horno Leña & Gas</span>
-                <Link href="/inventario" className="text-rose-600 font-bold hover:underline flex items-center gap-0.5">
+                <span>Hornos Leña & Gas</span>
+                <Link href="/inventario" className="text-rose-600 font-black hover:underline flex items-center gap-0.5">
                   Almacén <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Secondary Operational Strip: Margen Bruto, Cobros Pendientes, Gastos Menores */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+          <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/70 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Margen Bruto Est.</p>
+              <p className="text-base sm:text-lg font-black text-amber-950 mt-0.5">{formatCurrency(estimatedGrossProfit)}</p>
+              <p className="text-[10px] text-amber-700 font-medium">~44.2% del volumen</p>
+            </div>
+            <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
+              📈
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/70 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Cobros Pendientes</p>
+              <p className="text-base sm:text-lg font-black text-emerald-950 mt-0.5">{formatCurrency(totalPendingCollection)}</p>
+              <p className="text-[10px] text-emerald-700 font-medium">{pendingOrdersCount + inOvenOrdersCount} encargos activos</p>
+            </div>
+            <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+              🎂
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200/70 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Gastos de Caja Hoy</p>
+              <p className="text-base sm:text-lg font-black text-rose-950 mt-0.5">{formatCurrency(todayCashExpenses)}</p>
+              <p className="text-[10px] text-rose-700 font-medium">Gas, bolsas, insumos</p>
+            </div>
+            <span className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xs">
+              📉
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/70 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Clientes Atendidos</p>
+              <p className="text-base sm:text-lg font-black text-blue-950 mt-0.5">~{activeTickets} personas</p>
+              <p className="text-[10px] text-blue-700 font-medium">Mostrador general</p>
+            </div>
+            <span className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+              👥
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Main Sucursales Hub (Rendimiento en Vivo por Sucursal) */}
-      <div className="bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-5">
+      {/* ========================================================= */}
+      {/* 3. LIVE TICKETS FEED (Ventas en Mostrador en Vivo)       */}
+      {/* ========================================================= */}
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+            </span>
+            <div>
+              <h2 className="text-sm font-black text-stone-900 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-orange-600" />
+                Flujo de Ventas en Vivo (Últimos Tickets Emitidos)
+              </h2>
+              <p className="text-xs text-stone-500">
+                Monitoreo en tiempo real de transacciones registradas en mostrador por las cajeras.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTriggerSale}
+              className="text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 active:scale-95"
+            >
+              <Zap className="w-3.5 h-3.5 text-orange-500" />
+              Simular Ticket
+            </button>
+            <Link
+              href="/pos"
+              className="text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1"
+            >
+              Ir a POS <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {recentSimulatedSales.length === 0 ? (
+          <div className="p-6 text-center bg-stone-50/70 rounded-2xl border border-dashed border-stone-200 space-y-2">
+            <Receipt className="w-8 h-8 text-stone-300 mx-auto" />
+            <p className="text-xs font-bold text-stone-600">Aún no hay tickets registrados en esta sesión de mostrador</p>
+            <p className="text-[11px] text-stone-400">
+              Presiona el botón <strong className="text-orange-600">Simular Ticket</strong> o cobra en el <strong className="text-orange-600">POS</strong> para ver transacciones en vivo.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {recentSimulatedSales.slice(0, 4).map((sale) => {
+              const isCash = sale.paymentMethod === "efectivo";
+              const isCard = sale.paymentMethod === "tarjeta";
+
+              return (
+                <div
+                  key={sale.id}
+                  className="p-3.5 rounded-2xl bg-stone-50/70 hover:bg-white border border-stone-200/80 hover:border-orange-300 transition-all flex flex-col justify-between space-y-2 shadow-xs group"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-stone-200/80 text-stone-800">
+                        {sale.branchName}
+                      </span>
+                      <span className="text-[11px] font-semibold text-stone-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-stone-400" />
+                        {sale.timestamp}
+                      </span>
+                    </div>
+
+                    <p className="font-extrabold text-xs text-stone-900 line-clamp-1 group-hover:text-orange-600 transition-colors">
+                      {sale.itemsSummary}
+                    </p>
+
+                    <p className="text-[10px] text-stone-500">
+                      Cajera: <strong className="text-stone-700">{sale.cashier}</strong>
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between">
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      isCash 
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                        : isCard 
+                        ? "bg-blue-50 text-blue-800 border-blue-200"
+                        : "bg-purple-50 text-purple-800 border-purple-200"
+                    }`}>
+                      {isCash ? "💵 Efectivo" : isCard ? "💳 Tarjeta" : "📱 Transf."}
+                    </span>
+
+                    <span className="font-black text-sm text-stone-900">
+                      {formatCurrency(sale.total)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================= */}
+      {/* 4. SUCURSALES MATRIX (Desempeño Comparativo)             */}
+      {/* ========================================================= */}
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black text-stone-900 flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
                 <Store className="w-5 h-5 text-orange-600" />
                 Matriz de Desempeño por Sucursal
               </h2>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800">
                 3 Tiendas Activas
               </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Comparativa de ventas, producto más vendido, método de pago predominante y métricas en vivo por sucursal.
+              Comparativa de ventas, producto más vendido, método de pago predominante y gavetas de efectivo.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <Link
               href="/sucursales"
-              className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-2 rounded-xl transition-all flex items-center gap-1"
+              className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5"
             >
               <Eye className="w-3.5 h-3.5" />
               Panel de Sucursales
@@ -547,7 +829,7 @@ export default function Home() {
             const isSelected = !isAllBranches && currentBranch?.id === b.id;
             const isTopRank = idx === 0;
 
-            // Producto más vendido de la sucursal (con respaldo dinámico)
+            // Producto más vendido de la sucursal
             const topProd = b.topProduct || (
               b.id?.includes("matriz") || b.code?.includes("MAT")
                 ? { name: "Bolillo Tradicional", piecesSold: 185, category: "Pan Salado", icon: "🥖" }
@@ -558,16 +840,16 @@ export default function Home() {
                 : { name: "Concha de Vainilla", piecesSold: 120, category: "Pan Dulce", icon: "🥖" }
             );
 
-            // Método de pago predominante (Efectivo vs Tarjeta)
+            // Método de pago predominante
             const cashSales = b.currentShift?.cashSales || 0;
             const cardSales = b.currentShift?.cardSales || 0;
             const transferSales = b.currentShift?.transferSales || 0;
             const totalShiftSales = Math.max(1, cashSales + cardSales + transferSales);
 
             const isCashDominant = cashSales >= cardSales;
-            const cashShare = Math.round((cashSales / totalShiftSales) * 100);
-            const cardShare = Math.round((cardSales / totalShiftSales) * 100);
-            const dominantPct = isCashDominant ? cashShare : cardShare;
+            const cashSharePct = Math.round((cashSales / totalShiftSales) * 100);
+            const cardSharePct = Math.round((cardSales / totalShiftSales) * 100);
+            const dominantPct = isCashDominant ? cashSharePct : cardSharePct;
 
             return (
               <div 
@@ -575,7 +857,7 @@ export default function Home() {
                 className={`p-5 rounded-3xl transition-all border flex flex-col justify-between space-y-4 ${
                   isSelected 
                     ? "bg-gradient-to-br from-orange-50/60 via-white to-rose-50/40 border-orange-400 shadow-lg ring-2 ring-orange-400/40" 
-                    : "bg-stone-50/60 hover:bg-white border-stone-200/90 hover:border-orange-400 hover:shadow-md"
+                    : "bg-stone-50/70 hover:bg-white border-stone-200/90 hover:border-orange-400 hover:shadow-md"
                 }`}
               >
                 <div>
@@ -666,7 +948,7 @@ export default function Home() {
                       </span>
                     </div>
 
-                    {/* Método de pago predominante (Efectivo vs Tarjeta) */}
+                    {/* Método de pago predominante */}
                     <div className="flex items-center justify-between text-stone-600">
                       <span className="flex items-center gap-1.5 font-medium text-stone-500">
                         {isCashDominant ? (
@@ -716,27 +998,30 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Hourly Flow Chart & Peak Bakery Rushes */}
-      <div className="bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-orange-600" />
-                Flujo Horario & Horas Pico de Panadería
-              </h2>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
-                {isAllBranches ? "Consolidado" : currentBranch?.shortName}
-              </span>
+      {/* ========================================================= */}
+      {/* 5. FLOW CHART & HORNADAS DE PANADERÍA (Operaciones)      */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2 Cols: Hourly Peak Flow */}
+        <div className="lg:col-span-2 bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-orange-600" />
+                  Flujo Horario & Horas Pico de Panadería
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
+                  {isAllBranches ? "Consolidado" : currentBranch?.shortName}
+                </span>
+              </div>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Demanda de mostrador: picos matutino (bolillo/conchas) y vespertino (pan para café de la tarde).
+              </p>
             </div>
-            <p className="text-xs text-stone-500 mt-0.5">
-              Demanda de mostrador: picos matutino (bolillo/conchas) y vespertino (pan para café de la tarde).
-            </p>
-          </div>
 
-          {/* Toggle between Hourly and Weekly */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl">
+            {/* Toggle between Hourly and Weekly */}
+            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
               <button
                 onClick={() => setActiveChartTab("horas")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
@@ -759,139 +1044,250 @@ export default function Home() {
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Dynamic Interactive Chart Bars */}
-        <div className="space-y-3 w-full">
-          <div className="w-full overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
-            <div className="h-48 sm:h-56 min-w-[480px] sm:min-w-0 w-full flex items-end gap-1.5 sm:gap-3 pt-6 pb-2 px-1">
-            {activeChartItems.map((d) => {
-              const heightPercent = Math.max(12, Math.round((d.amount / maxChartAmount) * 100));
-              const isPeak = d.isPeak;
-              const isHovered = hoveredDataIndex === d.index;
+          {/* Dynamic Interactive Chart Bars */}
+          <div className="space-y-3 w-full">
+            <div className="w-full overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+              <div className="h-44 sm:h-52 min-w-[480px] sm:min-w-0 w-full flex items-end gap-1.5 sm:gap-3 pt-6 pb-2 px-1">
+                {activeChartItems.map((d) => {
+                  const heightPercent = Math.max(12, Math.round((d.amount / maxChartAmount) * 100));
+                  const isPeak = d.isPeak;
+                  const isHovered = hoveredDataIndex === d.index;
 
-              return (
-                <div
-                  key={d.label}
-                  className="flex-1 h-full flex flex-col justify-end items-center group relative cursor-pointer"
-                  onMouseEnter={() => setHoveredDataIndex(d.index)}
-                  onMouseLeave={() => setHoveredDataIndex(null)}
-                >
-                  {/* Tooltip Hover Bubble */}
-                  <div
-                    className={`absolute bottom-full mb-3 bg-stone-950 text-white rounded-2xl px-3.5 py-2.5 text-xs shadow-2xl border border-stone-800 pointer-events-none transition-all duration-150 z-30 whitespace-nowrap ${
-                      isHovered ? "opacity-100 scale-100 -translate-y-1" : "opacity-0 scale-95 pointer-events-none"
-                    }`}
-                  >
-                    <p className="font-black text-amber-300">
-                      {activeChartTab === "horas" ? `${d.label} hrs` : d.label}
-                    </p>
-                    <p className="font-black text-white text-sm">{formatCurrency(d.amount)}</p>
-                    <p className="text-[10px] text-stone-300">
-                      {d.tickets} tickets emitidos • ~{d.pieces} piezas
-                    </p>
-                    {isPeak && (
-                      <p className="text-[9px] font-black text-orange-400 uppercase mt-0.5">
-                        🔥 Pico de Mayor Venta
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Visual Bar with explicit height container */}
-                  <div className="w-full h-36 sm:h-44 relative flex items-end justify-center">
-                    {/* Background track */}
-                    <div className="absolute inset-x-0 bottom-0 top-0 mx-auto w-full max-w-[34px] sm:max-w-[40px] bg-stone-100/80 rounded-xl" />
-
-                    {/* Colored bar */}
+                  return (
                     <div
-                      className={`w-full max-w-[34px] sm:max-w-[40px] rounded-xl relative z-10 transition-all duration-300 ${
-                        isPeak
-                          ? "bg-gradient-to-t from-orange-600 via-rose-500 to-amber-400 shadow-md shadow-orange-500/25"
-                          : "bg-gradient-to-t from-stone-300 via-stone-300 to-stone-400 hover:from-orange-400 hover:to-amber-400"
-                      } ${isHovered ? "ring-2 ring-orange-500 brightness-110 scale-105" : ""}`}
-                      style={{ height: `${heightPercent}%`, minHeight: "14px" }}
-                    />
-                  </div>
+                      key={d.label}
+                      className="flex-1 h-full flex flex-col justify-end items-center group relative cursor-pointer"
+                      onMouseEnter={() => setHoveredDataIndex(d.index)}
+                      onMouseLeave={() => setHoveredDataIndex(null)}
+                    >
+                      {/* Tooltip Hover Bubble */}
+                      <div
+                        className={`absolute bottom-full mb-3 bg-stone-950 text-white rounded-2xl px-3.5 py-2.5 text-xs shadow-2xl border border-stone-800 pointer-events-none transition-all duration-150 z-30 whitespace-nowrap ${
+                          isHovered ? "opacity-100 scale-100 -translate-y-1" : "opacity-0 scale-95 pointer-events-none"
+                        }`}
+                      >
+                        <p className="font-black text-amber-300">
+                          {activeChartTab === "horas" ? `${d.label} hrs` : d.label}
+                        </p>
+                        <p className="font-black text-white text-sm">{formatCurrency(d.amount)}</p>
+                        <p className="text-[10px] text-stone-300">
+                          {d.tickets} tickets emitidos • ~{d.pieces} piezas
+                        </p>
+                        {isPeak && (
+                          <p className="text-[9px] font-black text-orange-400 uppercase mt-0.5">
+                            🔥 Pico de Mayor Venta
+                          </p>
+                        )}
+                      </div>
 
-                  {/* Label */}
-                  <span className={`text-[10px] sm:text-[11px] font-bold mt-2 tracking-tight ${
-                    isPeak ? "text-orange-600 font-black" : "text-stone-400"
-                  }`}>
-                    {d.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          </div>
+                      {/* Visual Bar with explicit height container */}
+                      <div className="w-full h-32 sm:h-40 relative flex items-end justify-center">
+                        <div className="absolute inset-x-0 bottom-0 top-0 mx-auto w-full max-w-[34px] sm:max-w-[40px] bg-stone-100 rounded-xl" />
+                        <div
+                          className={`w-full max-w-[34px] sm:max-w-[40px] rounded-xl relative z-10 transition-all duration-300 ${
+                            isPeak
+                              ? "bg-gradient-to-t from-orange-600 via-rose-500 to-amber-400 shadow-md shadow-orange-500/25"
+                              : "bg-gradient-to-t from-stone-300 via-stone-300 to-stone-400 hover:from-orange-400 hover:to-amber-400"
+                          } ${isHovered ? "ring-2 ring-orange-500 brightness-110 scale-105" : ""}`}
+                          style={{ height: `${heightPercent}%`, minHeight: "14px" }}
+                        />
+                      </div>
 
-          {/* Peak Bakery Insights Callouts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-stone-100">
-            <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-amber-100 text-amber-800 font-black text-sm">
-                🌅
-              </div>
-              <div>
-                <p className="text-xs font-black text-amber-950">Pico Matutino (07:00 - 09:30 AM)</p>
-                <p className="text-[11px] text-amber-800/90 leading-relaxed">
-                  Alta salida de <strong>Bolillo artesanal caliente</strong> para lonches/desayunos y conchas recién horneadas con café.
-                </p>
+                      <span className={`text-[10px] sm:text-[11px] font-bold mt-2 tracking-tight ${
+                        isPeak ? "text-orange-600 font-black" : "text-stone-400"
+                      }`}>
+                        {d.label}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200/80 flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-rose-100 text-rose-800 font-black text-sm">
-                ☕
+            {/* Peak Bakery Insights Callouts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-stone-100">
+              <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-amber-100 text-amber-800 font-black text-sm">
+                  🌅
+                </div>
+                <div>
+                  <p className="text-xs font-black text-amber-950">Pico Matutino (07:00 - 09:30 AM)</p>
+                  <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                    Alta demanda de <strong>Bolillo artesanal caliente</strong> para lonches/desayunos y conchas con café recién preparadas.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-black text-rose-950">Pico Vespertino (17:30 - 20:30 PM)</p>
-                <p className="text-[11px] text-rose-800/90 leading-relaxed">
-                  Compra familiar de <strong>Pan Dulce surtido</strong> (cuernos, donas, orejas y pasteles) para la merienda o cena.
-                </p>
+
+              <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200/80 flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-rose-100 text-rose-800 font-black text-sm">
+                  ☕
+                </div>
+                <div>
+                  <p className="text-xs font-black text-rose-950">Pico Vespertino (17:30 - 20:30 PM)</p>
+                  <p className="text-[11px] text-rose-800/90 leading-relaxed">
+                    Compra familiar de <strong>Pan Dulce surtido</strong> (cuernos, donas, orejas y pasteles) para la merienda o cena.
+                  </p>
+                </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right 1 Col: Hornadas y Almacén Crítico */}
+        <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm flex flex-col justify-between space-y-5">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-rose-600" />
+                <h3 className="font-black text-base text-stone-900">Estado de Hornos & Tandas</h3>
+              </div>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                Horneando
+              </span>
+            </div>
+
+            {/* Baking shifts timeline */}
+            <div className="space-y-2.5">
+              {BAKING_SCHEDULE.map((shift) => (
+                <div
+                  key={shift.id}
+                  className="p-3 rounded-2xl bg-stone-50/80 border border-stone-200/80 flex items-center justify-between gap-2"
+                >
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-black text-stone-900">{shift.name}</p>
+                    <p className="text-[10px] text-stone-500">
+                      {shift.hour} • {shift.pieces} pzas • {shift.baker}
+                    </p>
+                  </div>
+                  <div>
+                    {shift.status === "completada" ? (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" /> Lista
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+                        <Timer className="w-2.5 h-2.5 animate-spin" /> Programada
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Insumos Críticos del Almacén */}
+          <div className="pt-3 border-t border-stone-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-stone-900 flex items-center gap-1.5">
+                <Boxes className="w-4 h-4 text-orange-600" />
+                Insumos Clave en Almacén
+              </span>
+              <Link href="/inventario" className="text-[11px] font-bold text-orange-600 hover:underline">
+                Ver Todo
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {CRITICAL_RAW_MATERIALS.map((m) => (
+                <div key={m.name} className="p-2.5 rounded-xl bg-stone-50 border border-stone-200/70 space-y-1">
+                  <p className="font-extrabold text-[11px] text-stone-800 line-clamp-1">{m.name}</p>
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-stone-500">{m.current} / {m.min} {m.unit}</span>
+                    <span className={`font-black ${
+                      m.status === "critico" ? "text-rose-600" : m.status === "alerta" ? "text-amber-600" : "text-emerald-600"
+                    }`}>
+                      {m.status === "critico" ? "⚠️ Bajo" : m.status === "alerta" ? "Reorden" : "OK"}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Top Bakery Products Ranking */}
-      <div className="bg-white rounded-3xl border border-stone-200/90 p-6 shadow-sm space-y-5">
-        <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+      {/* ========================================================= */}
+      {/* 6. TOP BAKERY PRODUCTS WITH CATEGORY FILTERS             */}
+      {/* ========================================================= */}
+      <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
           <div>
             <h2 className="text-base font-black text-stone-900 flex items-center gap-2">
               <Croissant className="w-5 h-5 text-orange-600" />
-              Los Panes Más Vendidos Hoy
+              Los Panes Más Vendidos en Mostrador
             </h2>
             <p className="text-xs text-stone-500">
-              Ranking de salida de piezas en mostrador y aporte a ingresos
+              Ranking de salida de piezas en mostrador y aporte a ingresos del día.
             </p>
           </div>
-          <Link
-            href="/productos"
-            className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1"
-          >
-            Ver Catálogo <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+
+          {/* Category filter pills */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
+            <button
+              onClick={() => setProductCategoryFilter("todas")}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                productCategoryFilter === "todas" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setProductCategoryFilter("pan_salado")}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                productCategoryFilter === "pan_salado" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Bolillo/Salado
+            </button>
+            <button
+              onClick={() => setProductCategoryFilter("pan_dulce")}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                productCategoryFilter === "pan_dulce" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Pan Dulce
+            </button>
+            <button
+              onClick={() => setProductCategoryFilter("hojaldre")}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                productCategoryFilter === "hojaldre" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Hojaldre
+            </button>
+            <button
+              onClick={() => setProductCategoryFilter("pasteleria")}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                productCategoryFilter === "pasteleria" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              Pastelería
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-          {TOP_BAKERY_PRODUCTS.map((prod, idx) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {displayedTopProducts.map((prod, idx) => (
             <div 
               key={prod.id} 
-              className="p-4 rounded-2xl bg-stone-50/70 border border-stone-200/80 hover:border-orange-300 hover:bg-orange-50/20 transition-all flex flex-col justify-between space-y-3"
+              className="p-4 rounded-2xl bg-stone-50/70 border border-stone-200/80 hover:border-orange-300 hover:bg-orange-50/20 transition-all flex flex-col justify-between space-y-3 group"
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="w-7 h-7 rounded-xl bg-stone-200 text-stone-800 flex items-center justify-center font-black text-xs">
-                    #{idx + 1}
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-7 h-7 rounded-xl bg-stone-200 text-stone-800 flex items-center justify-center font-black text-xs">
+                      #{idx + 1}
+                    </span>
+                    <span className="text-base">{prod.icon}</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     {prod.trend} hoy
                   </span>
                 </div>
 
                 <div>
-                  <p className="font-black text-sm text-stone-900 leading-snug">
+                  <p className="font-black text-sm text-stone-900 leading-snug group-hover:text-orange-600 transition-colors">
                     {prod.name}
                   </p>
                   <p className="text-[11px] text-stone-500 mt-0.5">
@@ -902,7 +1298,7 @@ export default function Home() {
 
               <div>
                 <div className="flex items-baseline justify-between text-xs mb-1">
-                  <span className="text-[10px] text-stone-400 font-bold uppercase">{prod.category}</span>
+                  <span className="text-[10px] text-stone-500 font-bold uppercase">{prod.categoryLabel}</span>
                   <span className="font-black text-stone-900">{formatCurrency(prod.revenue)}</span>
                 </div>
                 <div className="w-full bg-stone-200 rounded-full h-1.5 overflow-hidden">
@@ -917,7 +1313,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Apartado Especial: Pedidos y Encargos de Mostrador (Levantados por Cajeros) */}
+      {/* ========================================================= */}
+      {/* 7. PEDIDOS Y ENCARGOS DE MOSTRADOR                      */}
+      {/* ========================================================= */}
       <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-7 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-4">
           <div className="space-y-1">
@@ -937,7 +1335,7 @@ export default function Home() {
               </div>
             </div>
             <p className="text-xs text-stone-500">
-              Encargos especiales y pasteles levantados por cajeros en mostrador con anticipo del 50%.
+              Encargos especiales y pasteles levantados por cajeras en mostrador con anticipo del 50%.
             </p>
           </div>
 
@@ -952,9 +1350,14 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Resumen Rápido de Estatus de Pedidos */}
+        {/* Resumen Rápido de Estatus de Pedidos con Filtro Interactivo */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between">
+          <button
+            onClick={() => setOrderStatusFilter(orderStatusFilter === "pendiente" ? "todos" : "pendiente")}
+            className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between ${
+              orderStatusFilter === "pendiente" ? "bg-amber-100/80 border-amber-400 ring-2 ring-amber-400/30" : "bg-amber-50/70 border-amber-200/80 hover:bg-amber-100/50"
+            }`}
+          >
             <div>
               <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Por Preparar</p>
               <p className="text-lg font-black text-amber-950 mt-0.5">{pendingOrdersCount}</p>
@@ -962,9 +1365,14 @@ export default function Home() {
             <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
               🕒
             </span>
-          </div>
+          </button>
 
-          <div className="p-3.5 rounded-2xl bg-orange-50/70 border border-orange-200/80 flex items-center justify-between">
+          <button
+            onClick={() => setOrderStatusFilter(orderStatusFilter === "en_horno" ? "todos" : "en_horno")}
+            className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between ${
+              orderStatusFilter === "en_horno" ? "bg-orange-100/80 border-orange-400 ring-2 ring-orange-400/30" : "bg-orange-50/70 border-orange-200/80 hover:bg-orange-100/50"
+            }`}
+          >
             <div>
               <p className="text-[10px] font-bold text-orange-800 uppercase tracking-wider">En Horno</p>
               <p className="text-lg font-black text-orange-950 mt-0.5">{inOvenOrdersCount}</p>
@@ -972,9 +1380,14 @@ export default function Home() {
             <span className="w-8 h-8 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-xs">
               🔥
             </span>
-          </div>
+          </button>
 
-          <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between">
+          <button
+            onClick={() => setOrderStatusFilter(orderStatusFilter === "listo" ? "todos" : "listo")}
+            className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between ${
+              orderStatusFilter === "listo" ? "bg-emerald-100/80 border-emerald-400 ring-2 ring-emerald-400/30" : "bg-emerald-50/70 border-emerald-200/80 hover:bg-emerald-100/50"
+            }`}
+          >
             <div>
               <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Listos p/ Entrega</p>
               <p className="text-lg font-black text-emerald-950 mt-0.5">{readyOrdersCount}</p>
@@ -982,7 +1395,7 @@ export default function Home() {
             <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
               ✅
             </span>
-          </div>
+          </button>
 
           <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200/80 flex items-center justify-between">
             <div>
@@ -999,9 +1412,9 @@ export default function Home() {
         {filteredOrders.length === 0 ? (
           <div className="p-8 text-center bg-stone-50 rounded-2xl border border-dashed border-stone-200 space-y-2">
             <CalendarClock className="w-10 h-10 text-stone-300 mx-auto" />
-            <p className="font-bold text-sm text-stone-700">No hay pedidos pendientes en esta sucursal</p>
+            <p className="font-bold text-sm text-stone-700">No hay pedidos con el filtro seleccionado</p>
             <p className="text-xs text-stone-400 max-w-sm mx-auto">
-              Cuando los cajeros capturen pedidos especiales de pasteles o pan en el mostrador, aparecerán aquí de inmediato.
+              Cuando las cajeras capturen pedidos especiales de pasteles o pan en el mostrador, aparecerán aquí de inmediato.
             </p>
           </div>
         ) : (
@@ -1069,7 +1482,6 @@ export default function Home() {
 
                   {/* Bottom: Fechas y Finanzas */}
                   <div className="space-y-3 pt-2 border-t border-stone-200/60">
-                    {/* Fecha de entrega */}
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-[11px] font-bold text-stone-400">Entrega:</span>
                       <span className="font-extrabold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200/60">
@@ -1111,8 +1523,10 @@ export default function Home() {
         )}
       </div>
 
-      {/* Quick Direct ERP Links Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* ========================================================= */}
+      {/* 8. DIRECT ERP CORE LINKS                                */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Clientes Card */}
         <Link 
           href="/clientes" 
@@ -1143,7 +1557,7 @@ export default function Home() {
             </div>
             <h3 className="font-extrabold text-base text-stone-900">Caja & Flujo de Dinero</h3>
             <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
-              Control de turnos, gastos menores (gas, insumos), retiros de Don Toño y arqueo de caja.
+              Control de turnos, gastos menores (gas, bolsas kraft), retiros de Don Toño y arqueo de caja.
             </p>
           </div>
           <div className="mt-6 flex items-center gap-2 text-xs font-black text-emerald-600 group-hover:translate-x-1 transition-transform">
@@ -1162,7 +1576,7 @@ export default function Home() {
             </div>
             <h3 className="font-extrabold text-base text-stone-900">Inventario & Materia Prima</h3>
             <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
-              Registro de compras a proveedores, sacos de harina, azúcar, mantequilla y control de mermas.
+              Registro de compras a proveedores, bultos de harina, azúcar, mantequilla pura y mermas.
             </p>
           </div>
           <div className="mt-6 flex items-center gap-2 text-xs font-black text-rose-600 group-hover:translate-x-1 transition-transform">
