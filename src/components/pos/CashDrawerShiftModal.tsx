@@ -360,15 +360,17 @@ export default function CashDrawerShiftModal({
       const updatedHistory = [cutRecord, ...existingHistory];
       localStorage.setItem("brito_shift_cuts_history", JSON.stringify(updatedHistory));
       setCutsHistory(updatedHistory);
+
+      // Reiniciar inicio de turno y cajero entrante para que ventas/gastos inicien estrictamente en 0
+      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      localStorage.setItem("brito_current_shift_cashier", incomingCashier);
+      localStorage.setItem("brito_current_shift_name", nextShiftName);
+      localStorage.setItem("brito_pos_shift_locked", "true");
+      localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
     } catch (e) {
       console.error("Error guardando corte en historial:", e);
     }
-
-    // Guardar nuevo fondo inicial en localStorage
-    try {
-      localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
-    } catch (e) {}
 
     // NOTIFICACIÓN DIRECTA AL ADMINISTRADOR / SISTEMA CON ALTA PRIORIDAD
     addNotification({
@@ -401,20 +403,14 @@ export default function CashDrawerShiftModal({
 
 
   // Filtrado exclusivo para la cajera del turno actual
-  const currentCashierKey = cashierName.includes("Cajera 1") 
-    ? "Cajera 1" 
-    : cashierName.includes("Cajera 2") 
-    ? "Cajera 2" 
-    : cashierName;
-
   const currentCashierCuts = useMemo(() => {
     return cutsHistory.filter((cut) => {
       return (
-        cut.outgoingCashier.toLowerCase().includes(currentCashierKey.toLowerCase()) ||
-        cut.incomingCashier.toLowerCase().includes(currentCashierKey.toLowerCase())
+        matchesCashier(cut.outgoingCashier, cashierName) ||
+        matchesCashier(cut.incomingCashier, cashierName)
       );
     });
-  }, [cutsHistory, currentCashierKey]);
+  }, [cutsHistory, cashierName]);
 
   const filteredHistory = useMemo(() => {
     return currentCashierCuts.filter((cut) => {
