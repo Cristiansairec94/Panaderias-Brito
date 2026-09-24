@@ -32,7 +32,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
 import { useNotifications } from "@/context/NotificationContext";
 
 interface CashDrawerShiftModalProps {
@@ -220,20 +220,41 @@ export default function CashDrawerShiftModal({
 
   if (!isOpen) return null;
 
-  // 1. Cálculos de Ventas del Turno
-  const cashSales = sales.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
-  const cardSales = sales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
-  const transferSales = sales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
-  const totalSalesAll = sales.reduce((sum, s) => sum + s.total, 0) || (cashSales + cardSales + transferSales) || 0;
+  // 1. Cálculos de Ventas del Turno (filtradas por cajera para sincronización total con Movimientos de Caja)
+  const shiftSales = sales.filter((s) => {
+    if (!s.cashier) return true;
+    const cName = outgoingCashier.toLowerCase().trim();
+    const sCashier = s.cashier.toLowerCase().trim();
+    return sCashier === cName || cName.includes(sCashier) || sCashier.includes(cName);
+  });
+  const effectiveSales = shiftSales.length > 0 ? shiftSales : sales;
 
-  // 2. Cálculos de Gastos y Entradas del Turno
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalIncomesInCash = incomes
+  const cashSales = effectiveSales.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
+  const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
+  const totalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0) || (cashSales + cardSales + transferSales) || 0;
+
+  // 2. Cálculos de Gastos y Entradas del Turno (filtrados por cajera para sincronización total con Movimientos de Caja)
+  const shiftExpenses = expenses.filter((e) => {
+    if (!e.cashier) return true;
+    const cName = outgoingCashier.toLowerCase().trim();
+    const expCashier = e.cashier.toLowerCase().trim();
+    return expCashier === cName || cName.includes(expCashier) || expCashier.includes(cName);
+  });
+  const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+  const shiftIncomes = incomes.filter((inc) => {
+    if (!inc.cashier) return true;
+    const cName = outgoingCashier.toLowerCase().trim();
+    const incCashier = inc.cashier.toLowerCase().trim();
+    return incCashier === cName || cName.includes(incCashier) || incCashier.includes(cName);
+  });
+  const totalIncomesInCash = shiftIncomes
     .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
     .reduce((sum, i) => sum + i.amount, 0);
 
-  // 3. Dinero esperado en caja (Cajón: Fondo + Ventas - Gastos)
-  const expectedCashInDrawer = initialFund + cashSales - totalExpenses;
+  // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
+  const expectedCashInDrawer = Math.max(0, initialFund + cashSales + totalIncomesInCash - totalExpenses);
 
   // 4. Conteo y Diferencia (Arqueo)
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;
@@ -720,8 +741,8 @@ export default function CashDrawerShiftModal({
               ) : (
                 /* Formulario Directo de Arqueo y Relevo */
                 <div className="space-y-3.5">
-                  {/* 1. Resumen Financiero del Turno */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs">
+                  {/* 1. Resumen Financiero del Turno (coincide con Movimientos de Caja) */}
+                  <div className={`grid grid-cols-2 ${totalIncomesInCash > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
                       <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
                       <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(initialFund)}</span>
@@ -730,13 +751,19 @@ export default function CashDrawerShiftModal({
                       <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
                       <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(cashSales)}</span>
                     </div>
+                    {totalIncomesInCash > 0 && (
+                      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-teal-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                        <span className="text-[11px] sm:text-xs text-teal-700 font-black block uppercase tracking-wider">(+) Entradas</span>
+                        <span className="text-xl sm:text-2xl font-black text-teal-700 mt-0.5 block">+{formatCurrency(totalIncomesInCash)}</span>
+                      </div>
+                    )}
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
-                      <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos / Retiros</span>
+                      <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos</span>
                       <span className="text-xl sm:text-2xl font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
                     </div>
                     <div className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20">
                       <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">
-                        {cashSales === 0 && totalExpenses === 0 ? "En Caja (Fondo)" : "En Caja"}
+                        {cashSales === 0 && totalExpenses === 0 && totalIncomesInCash === 0 ? "En Caja (Fondo)" : "En Caja"}
                       </span>
                       <span className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(expectedCashInDrawer)}</span>
                     </div>
@@ -773,7 +800,7 @@ export default function CashDrawerShiftModal({
                           <span className="text-xl">💵</span> Dinero que debe haber en caja:
                         </span>
                         <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
-                          Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)} • Gastos/Retiros: -{formatCurrency(totalExpenses)}
+                          Fondo: {formatCurrency(initialFund)} • Ventas: {formatCurrency(cashSales)}{totalIncomesInCash > 0 ? ` • Entradas: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos: -{formatCurrency(totalExpenses)}
                         </span>
                       </div>
                       <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">

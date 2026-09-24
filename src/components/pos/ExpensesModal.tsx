@@ -33,12 +33,20 @@ import {
   Edit3
 } from "lucide-react";
 import { CashExpense, CashIncome, Sale, CustomOrder } from "@/types";
-import { getStoredOrders } from "@/lib/orders";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, compareMovementsDesc } from "@/lib/utils";
+import { 
+  formatCurrency, 
+  onlyNumbersKeyDown, 
+  cleanDecimalNumbers, 
+  formatDateTimeSafe, 
+  compareMovementsDesc,
+  matchesCashier,
+  getStoredShiftStartBoundary
+} from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
+import { getStoredOrders } from "@/lib/orders";
 
 interface ExpensesModalProps {
   isOpen: boolean;
@@ -59,6 +67,8 @@ interface ExpensesModalProps {
   initialFund?: number;
   onUpdateInitialFund?: (fund: number) => void;
   cashierName?: string;
+  shiftName?: string;
+  lastCutTimestamp?: number;
   branchId?: string;
   branchName?: string;
 }
@@ -202,6 +212,8 @@ export default function ExpensesModal({
   initialFund = 0,
   onUpdateInitialFund,
   cashierName = "Don Toño Brito",
+  shiftName = "Turno Matutino",
+  lastCutTimestamp,
   branchId,
   branchName,
 }: ExpensesModalProps) {
@@ -212,6 +224,7 @@ export default function ExpensesModal({
   );
   const [movementType, setMovementType] = useState<"salida" | "entrada">("salida");
   const [historyFilter, setHistoryFilter] = useState<"todos" | "ventas" | "entradas" | "salidas">("todos");
+  const [ticketScopeFilter, setTicketScopeFilter] = useState<"turno" | "global">("turno");
   
   // Estado local para el Fondo Inicial de Caja
   const [currentFund, setCurrentFund] = useState<number>(initialFund || 0);
@@ -301,37 +314,62 @@ export default function ExpensesModal({
     (p) => p.id === selectedPresetId
   );
 
+  // Límite temporal estricto del turno actual (timestamp en ms)
+  const shiftStartBoundary = lastCutTimestamp || getStoredShiftStartBoundary();
+
   // Filtrar exclusivamente las salidas correspondientes a la cajera y turno en operación
-  const shiftExpenses = expenses.filter((e) => {
-    if (!e.cashier) return true;
-    const cName = cashierName.toLowerCase().trim();
-    const expCashier = e.cashier.toLowerCase().trim();
-    return expCashier === cName || cName.includes(expCashier) || expCashier.includes(cName);
+  const shiftExpenses = (expenses || []).filter((e) => {
+    if (!e.cashier || !matchesCashier(e.cashier, cashierName)) return false;
+    const expTime = typeof e.timestamp === "number" ? e.timestamp : (e.createdAt ? new Date(e.createdAt).getTime() : 0);
+    if (shiftStartBoundary > 0 && expTime > 0 && expTime < shiftStartBoundary) {
+      return false;
+    }
+    return true;
   });
 
-  const shiftIncomes = incomes.filter((inc) => {
-    if (!inc.cashier) return true;
-    const cName = cashierName.toLowerCase().trim();
-    const incCashier = inc.cashier.toLowerCase().trim();
-    return incCashier === cName || cName.includes(incCashier) || incCashier.includes(cName);
+  const shiftIncomes = (incomes || []).filter((inc) => {
+    if (!inc.cashier || !matchesCashier(inc.cashier, cashierName)) return false;
+    const incTime = typeof inc.timestamp === "number" ? inc.timestamp : (inc.date ? new Date(inc.date).getTime() : 0);
+    if (shiftStartBoundary > 0 && incTime > 0 && incTime < shiftStartBoundary) {
+      return false;
+    }
+    return true;
   });
 
   // Filtrar exclusivamente las ventas correspondientes a la cajera y turno en operación
-  const shiftSales = sales.filter((s) => {
-    if (!s.cashier) return true;
-    const cName = cashierName.toLowerCase().trim();
-    const sCashier = s.cashier.toLowerCase().trim();
-    return sCashier === cName || cName.includes(sCashier) || sCashier.includes(cName);
+  const shiftSales = (sales || []).filter((s) => {
+    if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
+    const sTime = typeof s.timestamp === "number" 
+      ? s.timestamp 
+      : s.timestamp 
+      ? new Date(s.timestamp).getTime() 
+      : s.createdAt 
+      ? new Date(s.createdAt).getTime() 
+      : 0;
+    if (shiftStartBoundary > 0 && sTime > 0 && sTime < shiftStartBoundary) {
+      return false;
+    }
+    return true;
   });
-  const effectiveSales = shiftSales.length > 0 ? shiftSales : sales;
 
-  // Pedidos especiales de la sucursal actual
-  const relevantOrders = internalOrders.filter((o) => {
+  // ¡EL CONTADOR DEL TURNO NUNCA SE MEZCLA CON VENTAS GLOBALES! Si no hay ventas en este turno, es estrictamente 0.
+  const effectiveSales = shiftSales;
+
+  // Pedidos especiales del turno y cajera actual
+  const relevantOrders = (internalOrders || []).filter((o) => {
     if (branchId && o.branchId && o.branchId !== branchId) return false;
+    if (!o.cashier || !matchesCashier(o.cashier, cashierName)) return false;
+    const oTime = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+    if (shiftStartBoundary > 0 && oTime > 0 && oTime < shiftStartBoundary) {
+      return false;
+    }
     return true;
   });
 
   const totalSalesSum = effectiveSales.reduce((acc, s) => acc + s.total, 0);
+  const totalShiftCashSales = effectiveSales
+    .filter((s) => s.paymentMethod === "efectivo")
+    .reduce((acc, s) => acc + s.total, 0);
   const totalOrdersDeposits = relevantOrders.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
   const totalOrdersValue = relevantOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
   const totalCombinedRevenue = totalSalesSum + totalOrdersDeposits;
@@ -345,11 +383,16 @@ export default function ExpensesModal({
     0
   );
   const totalAllPieces = totalPiecesSum + totalOrderPieces;
-  const totalRecordsCount = effectiveSales.length + relevantOrders.length;
+  // El contador de ventas del turno refleja estrictamente las ventas de este turno
+  const totalRecordsCount = effectiveSales.length;
   const averageTicket = effectiveSales.length > 0 ? totalSalesSum / effectiveSales.length : 0;
 
-  // Filtrado de Tickets de Mostrador ordenados cronológicamente (más recientes primero)
-  const filteredTickets = effectiveSales
+  // Ventas disponibles para la pestaña de tickets:
+  // Modo "turno": estrictamente las de este turno y cajera.
+  // Modo "global": todas las ventas históricas para consulta o reimpresión de tickets anteriores.
+  const salesPoolForTickets = ticketScopeFilter === "turno" ? effectiveSales : (sales || []);
+
+  const filteredTickets = salesPoolForTickets
     .filter((sale) => {
       if (ticketTypeFilter === "pedidos") return false;
       if (ticketMethodFilter !== "all" && sale.paymentMethod !== ticketMethodFilter) return false;
@@ -366,7 +409,8 @@ export default function ExpensesModal({
     .sort((a, b) => compareMovementsDesc(a, b));
 
   // Filtrado de Pedidos Especiales ordenados cronológicamente
-  const filteredOrders = relevantOrders
+  const ordersPool = ticketScopeFilter === "turno" ? relevantOrders : (internalOrders || []);
+  const filteredOrders = ordersPool
     .filter((order) => {
       if (ticketTypeFilter === "ventas") return false;
       if (ticketMethodFilter !== "all" && order.paymentMethod !== ticketMethodFilter) return false;
@@ -394,7 +438,7 @@ export default function ExpensesModal({
     .filter((i) => i.paymentMethod === "efectivo" || !i.paymentMethod)
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const netCashInDrawer = Math.max(0, currentFund + cashSalesTotal + totalIncomesInCash - totalExpenses);
+  const netCashInDrawer = Math.max(0, currentFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);
 
   // Cambiar de Salida a Entrada o viceversa
   const handleToggleMovementType = (type: "salida" | "entrada") => {
@@ -763,7 +807,7 @@ export default function ExpensesModal({
               Ventas Efectivo
             </span>
             <span className="text-base sm:text-lg md:text-xl font-black text-emerald-700 block my-1 tracking-tight truncate">
-              +{formatCurrency(cashSalesTotal > 0 ? cashSalesTotal : totalSalesSum)}
+              +{formatCurrency(totalShiftCashSales)}
             </span>
             <span className="text-[11px] sm:text-xs font-black text-emerald-700 block mt-0.5 opacity-90 group-hover:underline">
               🧾 Ver Historial
@@ -835,13 +879,13 @@ export default function ExpensesModal({
             title="Efectivo total en cajón ahora (Base + Ventas + Entradas - Salidas)"
           >
             <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-amber-950 block leading-tight tracking-wide">
-              En Cajón Ahora
+              En Caja (Balance)
             </span>
             <span className="text-base sm:text-lg md:text-xl font-black text-stone-950 block my-1 tracking-tight truncate">
               {formatCurrency(netCashInDrawer)}
             </span>
             <span className="text-[11px] sm:text-xs font-black text-amber-900 block mt-0.5 opacity-90 group-hover:underline">
-              🧾 Ver Historial
+              💵 Balance Actual
             </span>
           </button>
         </div>
@@ -884,6 +928,45 @@ export default function ExpensesModal({
           {activeTab === "tickets" ? (
             /* VISTA DEDICADA: HISTORIAL COMPLETO DE VENTAS Y PEDIDOS ESPECIALES */
             <div className="space-y-4">
+              {/* Selector de Alcance: Turno Actual vs Historial Global */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 p-3 bg-stone-100 rounded-2xl border border-stone-200 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">👩‍🍳</span>
+                  <div className="leading-tight">
+                    <span className="font-black text-stone-900 block">
+                      {cashierName}
+                    </span>
+                    <span className="text-[10px] text-stone-500 font-bold">
+                      {shiftName} • Cuentas separadas por turno
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 self-stretch sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setTicketScopeFilter("turno")}
+                    className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                      ticketScopeFilter === "turno"
+                        ? "bg-emerald-700 text-white shadow-xs"
+                        : "bg-white text-stone-600 hover:bg-stone-200/80 border border-stone-200"
+                    }`}
+                  >
+                    👤 Turno Actual ({effectiveSales.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTicketScopeFilter("global")}
+                    className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer ${
+                      ticketScopeFilter === "global"
+                        ? "bg-stone-800 text-white shadow-xs"
+                        : "bg-white text-stone-600 hover:bg-stone-200/80 border border-stone-200"
+                    }`}
+                  >
+                    🌐 Todos los Turnos ({(sales || []).length})
+                  </button>
+                </div>
+              </div>
+
               {/* Tarjetas KPI de Resumen de Ventas y Pedidos */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 <div className="bg-emerald-50/80 p-2.5 rounded-2xl border border-emerald-200 shadow-2xs">
@@ -989,10 +1072,14 @@ export default function ExpensesModal({
                     <p className="font-black text-sm text-stone-700">
                       {ticketSearch
                         ? `Sin resultados para "${ticketSearch}"`
+                        : ticketScopeFilter === "turno"
+                        ? `No hay ventas registradas aún en el turno de ${cashierName} (0 ventas).`
                         : "No hay ventas ni pedidos registrados con los filtros seleccionados."}
                     </p>
                     <p className="text-xs text-stone-500 max-w-xs mx-auto">
-                      Cada venta de mostrador o pedido especial completado aparecerá aquí automáticamente con folio, desglose y ticket imprimible.
+                      {ticketScopeFilter === "turno"
+                        ? "Al comenzar un nuevo turno o cambiar de cajera, el contador inicia en 0 para mantener las cuentas e historial separados por empleado."
+                        : "Cada venta de mostrador o pedido especial completado aparecerá aquí automáticamente con folio, desglose y ticket imprimible."}
                     </p>
                   </div>
                 ) : (

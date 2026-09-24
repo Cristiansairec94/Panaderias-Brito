@@ -3633,22 +3633,26 @@
                 </div>
 
                 <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
-                  {/* Summary bar de 4 columnas */}
-                  <div className="grid grid-cols-4 bg-stone-50 border p-2.5 sm:p-3 rounded-2xl text-center text-xs gap-1">
+                  {/* Summary bar de 5 columnas alineada con Cierre de Turno */}
+                  <div className="grid grid-cols-5 bg-stone-50 border p-2.5 sm:p-3 rounded-2xl text-center text-xs gap-1">
                     <div>
-                      <span className="text-[9px] text-stone-500 font-bold block leading-tight">Ventas Efectivo</span>
+                      <span className="text-[9px] text-stone-500 font-bold block leading-tight">Fondo Inicial</span>
+                      <span className="font-black text-stone-900 text-xs sm:text-sm">{formatCurrency(initialCashFund)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-emerald-700 font-bold block leading-tight">Ventas Efectivo</span>
                       <span className="font-black text-emerald-700 text-xs sm:text-sm">{formatCurrency(totalCashSales)}</span>
                     </div>
                     <div>
-                      <span className="text-[9px] text-emerald-700 font-bold block leading-tight">Entradas/Cambio</span>
-                      <span className="font-black text-emerald-700 text-xs sm:text-sm">+{formatCurrency(totalIncomesInCash)}</span>
+                      <span className="text-[9px] text-teal-700 font-bold block leading-tight">Entradas/Cambio</span>
+                      <span className="font-black text-teal-700 text-xs sm:text-sm">+{formatCurrency(totalIncomesInCash)}</span>
                     </div>
                     <div>
                       <span className="text-[9px] text-rose-700 font-bold block leading-tight">Gastos/Retiros</span>
                       <span className="font-black text-rose-700 text-xs sm:text-sm">-{formatCurrency(totalExpenses)}</span>
                     </div>
                     <div>
-                      <span className="text-[9px] text-amber-900 font-black block leading-tight">En Cajón Ahora</span>
+                      <span className="text-[9px] text-amber-900 font-black block leading-tight">En Caja (Balance)</span>
                       <span className="font-black text-stone-900 text-xs sm:text-sm">{formatCurrency(cashInDrawer)}</span>
                     </div>
                   </div>
@@ -4090,7 +4094,7 @@
                       /* Formulario de Cierre de Turno */
                       <div className="space-y-3">
                         {/* 1. Resumen Financiero del Turno en 1 Sola Franja */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs">
+                        <div className={`grid grid-cols-2 ${totalIncomesInCash > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
                           <div className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
                             <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
                             <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(initialCashFund)}</span>
@@ -4099,12 +4103,20 @@
                             <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
                             <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(totalCashSales)}</span>
                           </div>
+                          {totalIncomesInCash > 0 && (
+                            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-teal-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                              <span className="text-[11px] sm:text-xs text-teal-700 font-black block uppercase tracking-wider">(+) Entradas</span>
+                              <span className="text-xl sm:text-2xl font-black text-teal-700 mt-0.5 block">+{formatCurrency(totalIncomesInCash)}</span>
+                            </div>
+                          )}
                           <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
                             <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos</span>
                             <span className="text-xl sm:text-2xl font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
                           </div>
                           <div className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20">
-                            <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">En Caja</span>
+                            <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">
+                              {totalCashSales === 0 && totalExpenses === 0 && totalIncomesInCash === 0 ? "En Caja (Fondo)" : "En Caja"}
+                            </span>
                             <span className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(cashInDrawer)}</span>
                           </div>
                         </div>
@@ -4140,7 +4152,7 @@
                                 <span className="text-xl">💵</span> Dinero que debe haber en caja:
                               </span>
                               <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
-                                Fondo: {formatCurrency(initialCashFund)} • Ventas: {formatCurrency(totalCashSales)} • Gastos: -{formatCurrency(totalExpenses)}
+                                Fondo: {formatCurrency(initialCashFund)} • Ventas: {formatCurrency(totalCashSales)}{totalIncomesInCash > 0 ? ` • Entradas: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos: -{formatCurrency(totalExpenses)}
                               </span>
                             </div>
                             <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">

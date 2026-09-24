@@ -411,6 +411,13 @@ export default function CreateOrderModal({
     return total > 0 ? Math.round(total * 0.5 * 100) / 100 : 0;
   }, [total]);
 
+  // Sugerir 50% de anticipo por defecto si el total es positivo y no se ha establecido
+  useEffect(() => {
+    if (total > 0 && (deposit === "" || deposit === "0")) {
+      setDeposit(minRequiredDeposit.toString());
+    }
+  }, [total, minRequiredDeposit]);
+
   // Si el anticipo ingresado supera el total del pedido, ajustarlo al total
   useEffect(() => {
     if (total > 0 && deposit !== "") {
@@ -1860,7 +1867,7 @@ export default function CreateOrderModal({
                   <h3 className="font-black text-sm text-white uppercase tracking-wide">
                     Anticipo para Apartar
                   </h3>
-                  <p className="text-[11px] text-amber-300">Editable libremente • Siempre marca $0.00 por defecto</p>
+                  <p className="text-[11px] text-amber-300">Editable libremente • Selecciona 50% sugerido, 100% o escribe otra cantidad</p>
                 </div>
               </div>
               <div className="text-right">
@@ -1869,39 +1876,24 @@ export default function CreateOrderModal({
               </div>
             </div>
 
-            {/* Tres Botones Táctiles para el Cajero: $0.00, 50% y 100% */}
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setDeposit("0")}
-                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                  numericDeposit === 0
-                    ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-lg scale-[1.02]"
-                    : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
-                }`}
-              >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">🪙 $0.00</span>
-                </div>
-                <span className="text-xs sm:text-sm font-black">Sin Anticipo</span>
-              </button>
-
+            {/* Dos Botones Táctiles para el Cajero: 50% y 100% */}
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => setDeposit(minRequiredDeposit.toString())}
-                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === minRequiredDeposit && total > 0 && numericDeposit > 0
                     ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-lg scale-[1.02]"
                     : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
                 }`}
               >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">💵 50%</span>
-                  <span className="text-[9px] bg-stone-950 text-amber-300 px-1 py-0.2 rounded font-black">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm font-black">💵 50%</span>
+                  <span className="text-[10px] bg-stone-950 text-amber-300 px-1.5 py-0.5 rounded font-black">
                     Sugerido
                   </span>
                 </div>
-                <span className="text-xs sm:text-sm font-black">
+                <span className="text-sm sm:text-base font-black">
                   {formatCurrency(minRequiredDeposit)}
                 </span>
               </button>
@@ -1909,19 +1901,19 @@ export default function CreateOrderModal({
               <button
                 type="button"
                 onClick={() => setDeposit(total.toString())}
-                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === total && total > 0
                     ? "bg-emerald-500 text-stone-950 border-emerald-400 font-black shadow-lg scale-[1.02]"
                     : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
                 }`}
               >
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">💳 100%</span>
-                  <span className="text-[9px] bg-stone-950 text-emerald-300 px-1 py-0.2 rounded font-black">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm font-black">💳 100%</span>
+                  <span className="text-[10px] bg-stone-950 text-emerald-300 px-1.5 py-0.5 rounded font-black">
                     Liquidado
                   </span>
                 </div>
-                <span className="text-xs sm:text-sm font-black">
+                <span className="text-sm sm:text-base font-black">
                   {formatCurrency(total)}
                 </span>
               </button>

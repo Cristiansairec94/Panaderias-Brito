@@ -50,7 +50,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, compareMovementsDesc } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
 import { 
@@ -436,6 +436,8 @@ export default function POSPage() {
   const getStoredShiftFund = (fallback: number = 0): number => {
     if (typeof window === "undefined") return fallback;
     try {
+      const saved = localStorage.getItem("brito_pos_initial_fund");
+      if (saved !== null && saved !== "" && !isNaN(Number(saved))) return Number(saved);
       const raw = localStorage.getItem("brito_shift_cuts_history");
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -443,8 +445,6 @@ export default function POSPage() {
           return parsed[0].nextFund;
         }
       }
-      const saved = localStorage.getItem("brito_pos_initial_fund");
-      if (saved && !isNaN(Number(saved))) return Number(saved);
     } catch (e) {}
     return fallback;
   };
@@ -776,11 +776,8 @@ export default function POSPage() {
   }, [isShiftLocked]);
 
   const baseShiftFund = useMemo(() => {
-    if (lastCutInfo && typeof lastCutInfo.nextFund === "number") {
-      return lastCutInfo.nextFund;
-    }
     return initialCashFund;
-  }, [lastCutInfo, initialCashFund]);
+  }, [initialCashFund]);
 
   const handleDirectUnlockShift = () => {
     setInitialCashFund(baseShiftFund);
@@ -793,6 +790,10 @@ export default function POSPage() {
       localStorage.removeItem("brito_pos_current_sales");
       localStorage.removeItem("brito_pos_current_expenses");
       localStorage.removeItem("brito_pos_current_incomes");
+      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      localStorage.setItem("brito_current_shift_cashier", cashierName);
+      localStorage.setItem("brito_current_shift_name", shiftName);
+      window.dispatchEvent(new Event("brito_shift_cuts_updated"));
     } catch (e) {}
     setIsShiftLocked(false);
   };
@@ -869,6 +870,8 @@ export default function POSPage() {
       localStorage.removeItem("brito_pos_current_expenses");
       localStorage.removeItem("brito_pos_current_incomes");
       localStorage.setItem("brito_pos_shift_locked", "true");
+      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      window.dispatchEvent(new Event("brito_shift_cuts_updated"));
     } catch (e) {}
     setShowCashDrawerModal(false);
     setIsShiftLocked(true);
@@ -3414,7 +3417,7 @@ export default function POSPage() {
           onChangeCashier={setCashierName}
           shiftName={shiftName}
           onChangeShift={setShiftName}
-          initialFund={baseShiftFund}
+          initialFund={initialCashFund}
           onChangeInitialFund={(val) => {
             setInitialCashFund(val);
             try {

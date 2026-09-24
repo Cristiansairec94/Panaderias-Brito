@@ -270,3 +270,47 @@ export function compareMovementsDesc(
   return 0;
 }
 
+/**
+ * Normaliza nombres de cajera/empleado para comparación estricta sin mezclar turnos
+ */
+export function normalizeCashierName(name?: string): string {
+  if (!name) return "";
+  const lower = name.toLowerCase().trim();
+  if (lower.includes("cajera 1") || lower.includes("cajero 1")) return "cajera 1";
+  if (lower.includes("cajera 2") || lower.includes("cajero 2")) return "cajera 2";
+  return lower;
+}
+
+/**
+ * Determina si dos nombres de cajera corresponden al mismo empleado
+ */
+export function matchesCashier(itemCashier?: string, targetCashier?: string): boolean {
+  if (!itemCashier || !targetCashier) return false;
+  const a = normalizeCashierName(itemCashier);
+  const b = normalizeCashierName(targetCashier);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+/**
+ * Obtiene el timestamp de inicio del turno actual a partir del último corte cerrado
+ * o de la clave almacenada de inicio de turno.
+ */
+export function getStoredShiftStartBoundary(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const stored = localStorage.getItem("brito_current_shift_start_timestamp");
+    if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
+      return Number(stored);
+    }
+    const rawCuts = localStorage.getItem("brito_shift_cuts_history");
+    if (rawCuts) {
+      const parsed = JSON.parse(rawCuts);
+      if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0].timestamp === "number") {
+        return parsed[0].timestamp;
+      }
+    }
+  } catch (e) {}
+  return 0;
+}
+
