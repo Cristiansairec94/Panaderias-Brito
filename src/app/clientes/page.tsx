@@ -297,17 +297,6 @@ export default function ClientesPage() {
     }
   };
 
-  // Purgar y eliminar manualmente clientes duplicados en almacenamiento
-  const handlePurgeDuplicates = () => {
-    const result = purgeDuplicateCustomers();
-    const fresh = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
-    setCustomers(fresh);
-    if (result.removedCount > 0) {
-      showNotification(`¡Listo! Se eliminaron ${result.removedCount} registros repetidos. Directorio limpio.`);
-    } else {
-      showNotification("¡Excelente! No hay clientes repetidos en tu catálogo.");
-    }
-  };
 
   // Apertura modal editar
   const handleOpenEdit = (c: Customer) => {
@@ -421,17 +410,6 @@ export default function ClientesPage() {
               <RefreshCw className={`w-4 h-4 text-stone-600 ${isSyncing ? "animate-spin text-amber-700" : ""}`} />
             </button>
           </div>
-
-          {/* Botón para Eliminar Clientes Repetidos */}
-          <button
-            type="button"
-            onClick={handlePurgeDuplicates}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border-2 border-rose-300 font-black px-4 py-3.5 rounded-2xl shadow-sm text-sm sm:text-base transition-all active:scale-95 cursor-pointer"
-            title="Eliminar y fusionar automáticamente clientes repetidos"
-          >
-            <Sparkles className="w-5 h-5 text-rose-600" />
-            <span>Eliminar Clientes Repetidos</span>
-          </button>
 
           <button
             type="button"
