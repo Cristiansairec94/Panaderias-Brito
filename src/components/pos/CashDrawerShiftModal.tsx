@@ -242,6 +242,7 @@ export default function CashDrawerShiftModal({
     if (isOpen) {
       setNextInitialFund("");
       setCountedCash("");
+      setHasAcceptedCash(false);
     }
   }, [isOpen]);
 
@@ -464,6 +465,7 @@ export default function CashDrawerShiftModal({
     if (showCutSuccess && onCompleteShiftCut) {
       onCompleteShiftCut();
     }
+    setHasAcceptedCash(false);
     onClose();
   };
 
@@ -890,10 +892,9 @@ export default function CashDrawerShiftModal({
                         type="button"
                         onClick={() => {
                           setCountedCash(expectedCashInDrawer.toString());
-                          setHasAcceptedCash(true);
                         }}
                         className={`py-4 px-5 rounded-2xl font-black text-sm sm:text-base transition-all duration-300 flex items-center justify-center gap-2.5 shadow-md active:scale-95 group relative overflow-hidden ${
-                          countedCash === expectedCashInDrawer.toString() && hasAcceptedCash
+                          countedCash === expectedCashInDrawer.toString()
                             ? "bg-gradient-to-r from-amber-700 to-orange-700 text-white ring-4 ring-amber-400/40 shadow-lg scale-[1.01]"
                             : "bg-gradient-to-r from-amber-600 via-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white hover:scale-[1.02] hover:shadow-lg"
                         }`}
@@ -913,7 +914,6 @@ export default function CashDrawerShiftModal({
                           onChange={(e) => {
                             const val = cleanDecimalNumbers(e.target.value);
                             setCountedCash(val);
-                            setHasAcceptedCash(true);
                           }}
                           className="w-full pl-9 pr-4 py-4 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 font-black text-base sm:text-lg text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400"
                         />
