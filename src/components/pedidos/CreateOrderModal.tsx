@@ -406,17 +406,10 @@ export default function CreateOrderModal({
     return 0;
   }, [items, customTotal]);
 
-  // Anticipo sugerido del 50% (para botón de atajo rápido)
+  // Anticipo sugerido del 50% (para botón de atajo rápido opcional)
   const minRequiredDeposit = useMemo(() => {
     return total > 0 ? Math.round(total * 0.5 * 100) / 100 : 0;
   }, [total]);
-
-  // Sugerir 50% de anticipo por defecto si el total es positivo y no se ha establecido
-  useEffect(() => {
-    if (total > 0 && (deposit === "" || deposit === "0")) {
-      setDeposit(minRequiredDeposit.toString());
-    }
-  }, [total, minRequiredDeposit]);
 
   // Si el anticipo ingresado supera el total del pedido, ajustarlo al total
   useEffect(() => {
@@ -1876,24 +1869,44 @@ export default function CreateOrderModal({
               </div>
             </div>
 
-            {/* Dos Botones Táctiles para el Cajero: 50% y 100% */}
-            <div className="grid grid-cols-2 gap-2.5">
+            {/* Botones Táctiles para el Cajero: $0 Sin Anticipo, 50% y 100% */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setDeposit("0")}
+                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                  numericDeposit === 0
+                    ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-lg scale-[1.02]"
+                    : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs sm:text-sm font-black">🪙 $0</span>
+                  <span className="text-[9px] bg-stone-950 text-amber-300 px-1 py-0.5 rounded font-black">
+                    Sin Anticipo
+                  </span>
+                </div>
+                <span className="text-xs sm:text-sm font-black">
+                  $0.00
+                </span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setDeposit(minRequiredDeposit.toString())}
-                className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === minRequiredDeposit && total > 0 && numericDeposit > 0
                     ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-lg scale-[1.02]"
                     : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
                 }`}
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <span className="text-xs sm:text-sm font-black">💵 50%</span>
-                  <span className="text-[10px] bg-stone-950 text-amber-300 px-1.5 py-0.5 rounded font-black">
+                  <span className="text-[9px] bg-stone-950 text-amber-300 px-1 py-0.5 rounded font-black">
                     Sugerido
                   </span>
                 </div>
-                <span className="text-sm sm:text-base font-black">
+                <span className="text-xs sm:text-sm font-black">
                   {formatCurrency(minRequiredDeposit)}
                 </span>
               </button>
@@ -1901,19 +1914,19 @@ export default function CreateOrderModal({
               <button
                 type="button"
                 onClick={() => setDeposit(total.toString())}
-                className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === total && total > 0
                     ? "bg-emerald-500 text-stone-950 border-emerald-400 font-black shadow-lg scale-[1.02]"
                     : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
                 }`}
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   <span className="text-xs sm:text-sm font-black">💳 100%</span>
-                  <span className="text-[10px] bg-stone-950 text-emerald-300 px-1.5 py-0.5 rounded font-black">
+                  <span className="text-[9px] bg-stone-950 text-emerald-300 px-1 py-0.5 rounded font-black">
                     Liquidado
                   </span>
                 </div>
-                <span className="text-sm sm:text-base font-black">
+                <span className="text-xs sm:text-sm font-black">
                   {formatCurrency(total)}
                 </span>
               </button>
@@ -1931,6 +1944,11 @@ export default function CreateOrderModal({
                   inputMode="decimal"
                   placeholder="0"
                   value={deposit}
+                  onFocus={() => {
+                    if (deposit === "0") {
+                      setDeposit("");
+                    }
+                  }}
                   onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                   onChange={(e) => {
                     const val = cleanDecimalNumbers(e.target.value);
