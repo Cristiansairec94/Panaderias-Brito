@@ -627,19 +627,22 @@ export default function IngresosPage() {
 
       {/* Incomes History Table */}
       <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-stone-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-emerald-600" />
-            <h3 className="font-black text-base text-stone-900">Historial de Ingresos Registrados</h3>
+        <div className="p-5 border-b border-stone-100 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Receipt className="w-6 h-6 text-emerald-600" />
+            <h3 className="font-black text-lg sm:text-xl text-stone-900">Historial de Ingresos Registrados</h3>
+            <span className="text-xs font-bold bg-emerald-100/70 text-emerald-800 px-3 py-1 rounded-full border border-emerald-200/60 hidden sm:inline-block">
+              Entrada Directa de Sucursales
+            </span>
           </div>
-          <span className="text-xs text-stone-500 font-bold">
+          <span className="text-sm font-bold text-stone-600 bg-stone-100 px-3 py-1 rounded-xl">
             Mostrando {filteredIncomes.length} de {incomes.length} movimientos
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-stone-50 text-stone-500 font-extrabold border-b border-stone-200 uppercase tracking-wider text-[10px]">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-stone-100/90 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-xs sm:text-sm">
               <tr>
                 <th className="p-4">Folio</th>
                 <th className="p-4">Fecha/Hora</th>
@@ -653,52 +656,52 @@ export default function IngresosPage() {
                 <th className="p-4 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-stone-100 text-sm">
               {filteredIncomes.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-12 text-stone-400">
-                    <Receipt className="w-10 h-10 mx-auto text-stone-300 mb-2" />
-                    <p className="font-bold text-sm text-stone-600">No se encontraron registros de ingreso</p>
-                    <p className="text-xs">Prueba cambiando los filtros o registra uno nuevo.</p>
+                  <td colSpan={10} className="text-center py-14 text-stone-400">
+                    <Receipt className="w-12 h-12 mx-auto text-stone-300 mb-2.5" />
+                    <p className="font-black text-base text-stone-700">No se encontraron registros de ingreso</p>
+                    <p className="text-sm text-stone-500 mt-1">Prueba cambiando los filtros o registra uno nuevo.</p>
                   </td>
                 </tr>
               ) : (
                 filteredIncomes.map((inc) => (
                   <tr key={inc.id} className="hover:bg-stone-50/70 transition-colors">
-                    <td className="p-4 font-mono font-bold text-stone-900">
+                    <td className="p-4 font-mono font-black text-sm sm:text-base text-stone-900">
                       #{inc.id}
                     </td>
-                    <td className="p-4 text-stone-500 font-medium whitespace-nowrap">
+                    <td className="p-4 text-stone-600 font-semibold text-xs sm:text-sm whitespace-nowrap">
                       {inc.date}
                     </td>
                     <td className="p-4">
-                      <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold text-[10px] whitespace-nowrap block w-fit">
+                      <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap block w-fit">
                         {inc.categoryLabel}
                       </span>
                     </td>
-                    <td className="p-4 font-bold text-stone-900 max-w-xs">
+                    <td className="p-4 font-bold text-stone-950 text-sm sm:text-base max-w-xs">
                       {inc.concept}
                       {inc.referenceNumber && (
-                        <span className="block font-mono text-[10px] text-blue-600 font-semibold mt-0.5">
+                        <span className="block font-mono text-xs text-blue-600 font-bold mt-1">
                           Ref: {inc.referenceNumber}
                         </span>
                       )}
                     </td>
-                    <td className="p-4 text-stone-700">
+                    <td className="p-4 text-stone-800 text-sm sm:text-base">
                       {inc.customerName ? (
-                        <div className="font-bold text-stone-900">{inc.customerName}</div>
+                        <div className="font-black text-stone-950">{inc.customerName}</div>
                       ) : (
-                        <span className="text-stone-400 italic">Público general</span>
+                        <span className="text-stone-400 italic font-medium">Público general</span>
                       )}
                       {inc.orderNumber && (
-                        <span className="text-[10px] font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
-                          {inc.orderNumber}
+                        <span className="text-xs font-black text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300 inline-block mt-1">
+                          Pedido: {inc.orderNumber}
                         </span>
                       )}
                     </td>
                     <td className="p-4">
                       <span
-                        className={`px-2.5 py-1 rounded-lg font-black text-[10px] uppercase inline-flex items-center gap-1 ${
+                        className={`px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm uppercase inline-flex items-center gap-1.5 ${
                           inc.paymentMethod === "efectivo"
                             ? "bg-emerald-100 text-emerald-800"
                             : inc.paymentMethod === "tarjeta"
@@ -706,36 +709,36 @@ export default function IngresosPage() {
                             : "bg-purple-100 text-purple-800"
                         }`}
                       >
-                        {inc.paymentMethod === "efectivo" && <Wallet className="w-3 h-3" />}
-                        {inc.paymentMethod === "tarjeta" && <CreditCard className="w-3 h-3" />}
-                        {inc.paymentMethod === "transferencia" && <Building className="w-3 h-3" />}
+                        {inc.paymentMethod === "efectivo" && <Wallet className="w-4 h-4" />}
+                        {inc.paymentMethod === "tarjeta" && <CreditCard className="w-4 h-4" />}
+                        {inc.paymentMethod === "transferencia" && <Building className="w-4 h-4" />}
                         {inc.paymentMethod}
                       </span>
                     </td>
-                    <td className="p-4 text-stone-600 font-medium whitespace-nowrap">
+                    <td className="p-4 text-stone-700 font-bold text-xs sm:text-sm whitespace-nowrap">
                       {inc.branchName || "Matriz"}
                     </td>
-                    <td className="p-4 text-stone-600 font-medium whitespace-nowrap">
+                    <td className="p-4 text-stone-700 font-bold text-xs sm:text-sm whitespace-nowrap">
                       {inc.cashier}
                     </td>
-                    <td className="p-4 text-right font-mono font-black text-base text-emerald-700 whitespace-nowrap">
+                    <td className="p-4 text-right font-mono font-black text-base sm:text-lg text-emerald-700 whitespace-nowrap">
                       +{formatCurrency(inc.amount)}
                     </td>
                     <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => handlePrintReceipt(inc)}
-                          className="p-1.5 text-stone-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
+                          className="p-2 text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
                           title="Imprimir Comprobante de Ingreso (80mm)"
                         >
-                          <Printer className="w-4 h-4" />
+                          <Printer className="w-5 h-5" />
                         </button>
                         <button
                           onClick={() => handleDeleteIncome(inc.id)}
-                          className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                          className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                           title="Eliminar registro"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
                     </td>
