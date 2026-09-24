@@ -2027,18 +2027,8 @@ export default function POSPage() {
 
             </div>
 
-            {/* Grupo Caja y Turno: Historial de Ventas + Movimientos de Caja + Cerrar Turno */}
+            {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
             <div className="flex items-center gap-2 shrink-0">
-              {/* Botón Historial de Ventas / Tickets Emitidos */}
-              <button
-                type="button"
-                onClick={() => setShowRecentSales(true)}
-                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-stone-200 hover:border-amber-400 bg-white hover:bg-amber-50/70 text-stone-900 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
-                title="Ver el historial completo de ventas, tickets emitidos y reimpresión"
-              >
-                <Receipt className="w-5 h-5 text-amber-700 shrink-0" />
-                <span>Historial de Ventas ({recentSalesList.length})</span>
-              </button>
 
               {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
               <button
