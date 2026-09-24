@@ -12,7 +12,6 @@ import {
   Zap, 
   Store, 
   Clock, 
-  ShoppingBag, 
   Receipt, 
   Flame, 
   CheckCircle2, 
@@ -92,7 +91,6 @@ export default function Home() {
   const [orderStatusFilter, setOrderStatusFilter] = useState<"todos" | "pendiente" | "listo">("todos");
   const [greeting, setGreeting] = useState("¡Bienvenido");
   const [currentTimeStr, setCurrentTimeStr] = useState("");
-  const [saleAnimSuccess, setSaleAnimSuccess] = useState(false);
 
   // Dynamic greeting & clock
   useEffect(() => {
@@ -181,13 +179,6 @@ export default function Home() {
     return ALL_TOP_BAKERY_PRODUCTS.filter((p) => p.category === productCategoryFilter);
   }, [productCategoryFilter]);
 
-  // Trigger quick simulated sale with animation
-  const handleTriggerSale = () => {
-    simulateSale();
-    setSaleAnimSuccess(true);
-    setTimeout(() => setSaleAnimSuccess(false), 2000);
-  };
-
   return (
     <div className="w-full max-w-full space-y-6 sm:space-y-7 overflow-x-hidden pb-10">
       {/* ========================================================= */}
@@ -200,7 +191,7 @@ export default function Home() {
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           {/* Welcome & Context */}
-          <div className="space-y-3.5 max-w-2xl">
+          <div className="space-y-3.5 max-w-4xl">
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-3 py-1 bg-gradient-to-r from-orange-500 to-rose-600 text-white rounded-full text-[10px] font-black tracking-wider uppercase shadow-md flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3 text-amber-200" />
@@ -268,82 +259,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Quick Real-Time Operations Action Bar */}
-          <div className="relative z-10 flex flex-col gap-2.5 self-start lg:self-center w-full lg:w-auto lg:min-w-[310px]">
-            {/* Live Operational Status Badge */}
-            <div className="flex items-center justify-between gap-3 bg-white/[0.06] border border-white/10 px-4 py-2.5 rounded-2xl backdrop-blur-md">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                </span>
-                <span className="text-xs font-black text-emerald-300 tracking-wide">
-                  Mostrador & Cajas Activas
-                </span>
-              </div>
-              <span className="text-[10px] font-bold text-stone-300 bg-white/10 px-2.5 py-0.5 rounded-full">
-                {isAllBranches ? "3 Tiendas" : currentBranch?.shortName}
-              </span>
-            </div>
-
-            {/* Quick Navigation & POS Shortcuts */}
-            <div className="grid grid-cols-3 gap-2 w-full">
-              <Link
-                href="/pos"
-                className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-orange-500 to-rose-600 hover:brightness-110 text-white font-extrabold px-3 py-2.5 rounded-xl transition-all text-xs shadow-md shadow-orange-500/20 active:scale-95 text-center"
-                title="Abrir Punto de Venta en Mostrador"
-              >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>Abrir POS</span>
-              </Link>
-              <Link
-                href="/pedidos"
-                className="flex items-center justify-center gap-1.5 bg-white/[0.09] hover:bg-white/[0.16] text-amber-300 font-extrabold px-3 py-2.5 rounded-xl border border-white/15 transition-all text-xs active:scale-95 text-center"
-                title="Encargos y pedidos especiales de pasteles"
-              >
-                <CalendarClock className="w-3.5 h-3.5" />
-                <span>+ Pedido</span>
-              </Link>
-              <Link
-                href="/caja"
-                className="flex items-center justify-center gap-1.5 bg-white/[0.09] hover:bg-white/[0.16] text-white font-extrabold px-3 py-2.5 rounded-xl border border-white/15 transition-all text-xs active:scale-95 text-center"
-                title="Corte y Arqueo de Caja"
-              >
-                <Wallet className="w-3.5 h-3.5" />
-                <span>Corte</span>
-              </Link>
-            </div>
-
-            {/* Quick Flow Actions (+Abono, -Gasto, +Venta Rápida Demo) */}
-            <div className="flex items-center gap-2 w-full">
-              <Link
-                href="/ingresos"
-                className="flex-1 flex items-center justify-center gap-1 bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-300 font-bold px-2.5 py-2 rounded-xl border border-emerald-500/30 transition-all text-xs active:scale-95"
-                title="Registrar abonos y cobros"
-              >
-                <span>+ Abono</span>
-              </Link>
-              <Link
-                href="/gastos"
-                className="flex-1 flex items-center justify-center gap-1 bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 font-bold px-2.5 py-2 rounded-xl border border-rose-500/30 transition-all text-xs active:scale-95"
-                title="Registrar gastos menores de caja"
-              >
-                <span>- Gasto</span>
-              </Link>
-              <button
-                onClick={handleTriggerSale}
-                className={`flex-1 flex items-center justify-center gap-1 font-bold px-2.5 py-2 rounded-xl border transition-all text-xs active:scale-95 ${
-                  saleAnimSuccess
-                    ? "bg-amber-400 text-stone-950 border-amber-300 scale-95"
-                    : "bg-white/[0.06] hover:bg-white/[0.12] text-amber-200 border-amber-500/30"
-                }`}
-                title="Simular una venta rápida en vivo para verificar actualización en tiempo real"
-              >
-                <Zap className={`w-3.5 h-3.5 ${saleAnimSuccess ? "animate-bounce text-stone-900" : "text-amber-400"}`} />
-                <span>{saleAnimSuccess ? "¡Cobrado!" : "+Venta"}</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -544,7 +459,7 @@ export default function Home() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleTriggerSale}
+              onClick={() => simulateSale()}
               className="text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 active:scale-95"
             >
               <Zap className="w-3.5 h-3.5 text-orange-500" />
