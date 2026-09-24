@@ -67,12 +67,12 @@ interface DayGroup {
   totalPieces: number;
 }
 
-function getMovementDayInfo(item: { timestamp?: number | string; createdAt?: string; date?: string }): {
+function getMovementDayInfo(item?: { timestamp?: number | string; createdAt?: string; date?: string }): {
   dayKey: string;
   dayLabel: string;
   timestamp: number;
 } {
-  const ts = parseDateTimeSafe(item.timestamp || item.createdAt || item.date) || Date.now();
+  const ts = parseDateTimeSafe(item?.timestamp || item?.createdAt || item?.date) || Date.now();
   const d = new Date(ts);
   
   const year = d.getFullYear();
@@ -285,7 +285,6 @@ function getStoredSalesWithFallback(propSales?: Sale[]): Sale[] {
       if (!prevMaster.some((s) => s.id === firstSale.id)) {
         localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
       }
-      window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
   }
 
@@ -551,19 +550,20 @@ export default function ExpensesModal({
 
   const handleQuickRegisterFirstSale = () => {
     const firstSale = createInitialShiftSale(cashierName);
-    setInternalSales((prev) => {
-      const updated = [firstSale, ...prev.filter((s) => s.id !== firstSale.id)];
-      try {
-        localStorage.setItem("brito_pos_current_sales", JSON.stringify(updated));
-        const rawMaster = localStorage.getItem("brito_pos_master_sales");
-        const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
-        if (!prevMaster.some((s) => s.id === firstSale.id)) {
-          localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
-        }
-        window.dispatchEvent(new Event("brito_sales_updated"));
-      } catch (e) {}
-      return updated;
-    });
+    try {
+      const rawCurrent = localStorage.getItem("brito_pos_current_sales");
+      const prevCurrent: Sale[] = rawCurrent ? JSON.parse(rawCurrent) : [];
+      const updated = [firstSale, ...prevCurrent.filter((s) => s.id !== firstSale.id)];
+      localStorage.setItem("brito_pos_current_sales", JSON.stringify(updated));
+      const rawMaster = localStorage.getItem("brito_pos_master_sales");
+      const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+      if (!prevMaster.some((s) => s.id === firstSale.id)) {
+        localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
+      }
+      window.dispatchEvent(new Event("brito_sales_updated"));
+    } catch (e) {}
+
+    setInternalSales((prev) => [firstSale, ...prev.filter((s) => s.id !== firstSale.id)]);
 
     addNotification({
       senderName: `Venta Mostrador (${cashierName})`,

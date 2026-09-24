@@ -549,7 +549,6 @@ export default function POSPage() {
         if (!prevMaster.some((s) => s.id === firstSale.id)) {
           localStorage.setItem("brito_pos_master_sales", JSON.stringify([firstSale, ...prevMaster]));
         }
-        window.dispatchEvent(new Event("brito_sales_updated"));
       } catch (e) {}
       return [firstSale];
     }
@@ -1414,76 +1413,100 @@ export default function POSPage() {
   }, [lastCutInfo, shiftVersion]);
 
   const currentShiftSales = useMemo(() => {
-    const currentShiftSaleIds = new Set<string>();
     try {
-      const rawCurrent = localStorage.getItem("brito_pos_current_sales");
-      if (rawCurrent) {
-        const parsedCurrent = JSON.parse(rawCurrent);
-        if (Array.isArray(parsedCurrent)) {
-          parsedCurrent.forEach((s) => {
-            if (s && s.id) currentShiftSaleIds.add(s.id);
-          });
+      const currentShiftSaleIds = new Set<string>();
+      try {
+        const rawCurrent = localStorage.getItem("brito_pos_current_sales");
+        if (rawCurrent) {
+          const parsedCurrent = JSON.parse(rawCurrent);
+          if (Array.isArray(parsedCurrent)) {
+            parsedCurrent.forEach((s) => {
+              if (s && s.id) currentShiftSaleIds.add(s.id);
+            });
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
 
-    const filtered = recentSalesList.filter((s) => {
-      if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
-      const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      if (shiftStartBoundary > 0) {
-        if (!t || t < shiftStartBoundary) return false;
-      }
-      if (currentShiftSaleIds.size > 0) {
-        return currentShiftSaleIds.has(s.id);
-      }
-      return false;
-    });
-    return filtered;
+      const filtered = (recentSalesList || []).filter((s) => {
+        if (!s) return false;
+        if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
+        const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+        if (shiftStartBoundary > 0) {
+          if (!t || t < shiftStartBoundary) return false;
+        }
+        if (currentShiftSaleIds.size > 0) {
+          return currentShiftSaleIds.has(s.id);
+        }
+        return true;
+      });
+      return filtered;
+    } catch (e) {
+      console.error("Error filtering currentShiftSales:", e);
+      return [];
+    }
   }, [recentSalesList, cashierName, shiftStartBoundary, shiftVersion]);
 
   const currentShiftExpenses = useMemo(() => {
-    return expensesList.filter((e) => {
-      if (!e.cashier || !matchesCashier(e.cashier, cashierName)) return false;
-      const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
-      if (shiftStartBoundary > 0) {
-        if (!t || t < shiftStartBoundary) return false;
-      }
-      return true;
-    });
+    try {
+      return (expensesList || []).filter((e) => {
+        if (!e) return false;
+        if (!e.cashier || !matchesCashier(e.cashier, cashierName)) return false;
+        const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
+        if (shiftStartBoundary > 0) {
+          if (!t || t < shiftStartBoundary) return false;
+        }
+        return true;
+      });
+    } catch (e) {
+      console.error("Error filtering currentShiftExpenses:", e);
+      return [];
+    }
   }, [expensesList, cashierName, shiftStartBoundary, shiftVersion]);
 
   const currentShiftIncomes = useMemo(() => {
-    return incomesList.filter((inc) => {
-      if (!inc.cashier || !matchesCashier(inc.cashier, cashierName)) return false;
-      const t = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
-      if (shiftStartBoundary > 0) {
-        if (!t || t < shiftStartBoundary) return false;
-      }
-      return true;
-    });
+    try {
+      return (incomesList || []).filter((inc) => {
+        if (!inc) return false;
+        if (!inc.cashier || !matchesCashier(inc.cashier, cashierName)) return false;
+        const t = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
+        if (shiftStartBoundary > 0) {
+          if (!t || t < shiftStartBoundary) return false;
+        }
+        return true;
+      });
+    } catch (e) {
+      console.error("Error filtering currentShiftIncomes:", e);
+      return [];
+    }
   }, [incomesList, cashierName, shiftStartBoundary, shiftVersion]);
 
   const currentShiftOrders = useMemo(() => {
-    return getStoredOrders().filter((o) => {
-      if (activeBranch && o.branchId && o.branchId !== activeBranch.id) return false;
-      if (!o.cashier || !matchesCashier(o.cashier, cashierName)) return false;
-      const t = parseDateTimeSafe(o.createdAt || (o as any).date);
-      if (shiftStartBoundary > 0) {
-        if (!t || t < shiftStartBoundary) return false;
-      }
-      return true;
-    });
+    try {
+      return getStoredOrders().filter((o) => {
+        if (!o) return false;
+        if (activeBranch && o.branchId && o.branchId !== activeBranch.id) return false;
+        if (!o.cashier || !matchesCashier(o.cashier, cashierName)) return false;
+        const t = parseDateTimeSafe(o.createdAt || (o as any).date);
+        if (shiftStartBoundary > 0) {
+          if (!t || t < shiftStartBoundary) return false;
+        }
+        return true;
+      });
+    } catch (e) {
+      console.error("Error filtering currentShiftOrders:", e);
+      return [];
+    }
   }, [activeBranch?.id, cashierName, shiftStartBoundary, shiftVersion]);
 
-  const totalCashSales = currentShiftSales
-    .filter((s) => s.paymentMethod === "efectivo")
-    .reduce((sum, s) => sum + s.total, 0);
-  const totalExpenses = currentShiftExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalExtraInCash = currentShiftIncomes
-    .filter((i) => i.paymentMethod === "efectivo")
-    .reduce((sum, i) => sum + i.amount, 0);
-  const netCashInDrawer = initialCashFund + totalCashSales + totalExtraInCash - totalExpenses;
-  const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
+  const totalCashSales = (currentShiftSales || [])
+    .filter((s) => s && s.paymentMethod === "efectivo")
+    .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
+  const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
+  const totalExtraInCash = (currentShiftIncomes || [])
+    .filter((i) => i && i.paymentMethod === "efectivo")
+    .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+  const netCashInDrawer = (Number(initialCashFund) || 0) + totalCashSales + totalExtraInCash - totalExpenses;
+  const totalStockValue = (products || []).reduce((sum, p) => sum + ((Number(p?.stock) || 0) * (Number(p?.price) || 0)), 0);
 
   const handleQuickCash = (amount: number) => {
     setCashGiven(amount.toString());
@@ -1692,18 +1715,16 @@ export default function POSPage() {
       }
 
       setCompletedSale(newSaleRecord);
-      setRecentSalesList((prev) => {
-        const nextList = [newSaleRecord, ...prev];
-        try {
-          localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextList));
-          const rawMaster = localStorage.getItem("brito_pos_master_sales");
-          const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
-          const nextMaster = [newSaleRecord, ...prevMaster.filter((s) => s.id !== newSaleRecord.id)].slice(0, 1000);
-          localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
-          window.dispatchEvent(new Event("brito_sales_updated"));
-        } catch (e) {}
-        return nextList;
-      });
+      try {
+        const nextList = [newSaleRecord, ...recentSalesList];
+        localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextList));
+        const rawMaster = localStorage.getItem("brito_pos_master_sales");
+        const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+        const nextMaster = [newSaleRecord, ...prevMaster.filter((s) => s.id !== newSaleRecord.id)].slice(0, 1000);
+        localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
+        window.dispatchEvent(new Event("brito_sales_updated"));
+      } catch (e) {}
+      setRecentSalesList((prev) => [newSaleRecord, ...prev]);
       setIsSubmitting(false);
       setShowReceiptModal(true);
 
@@ -1835,20 +1856,18 @@ export default function POSPage() {
     }
 
     // 3. Eliminar la venta de recentSalesList (no se cobrará el dinero ni afectará el corte)
-    setRecentSalesList((prev) => {
-      const nextList = prev.filter((s) => s.id !== sale.id);
-      try {
-        localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextList));
-        const rawMaster = localStorage.getItem("brito_pos_master_sales");
-        if (rawMaster) {
-          const prevMaster: Sale[] = JSON.parse(rawMaster);
-          const nextMaster = prevMaster.filter((s) => s.id !== sale.id);
-          localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
-        }
-        window.dispatchEvent(new Event("brito_sales_updated"));
-      } catch (e) {}
-      return nextList;
-    });
+    const nextList = recentSalesList.filter((s) => s.id !== sale.id);
+    try {
+      localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextList));
+      const rawMaster = localStorage.getItem("brito_pos_master_sales");
+      if (rawMaster) {
+        const prevMaster: Sale[] = JSON.parse(rawMaster);
+        const nextMaster = prevMaster.filter((s) => s.id !== sale.id);
+        localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
+      }
+      window.dispatchEvent(new Event("brito_sales_updated"));
+    } catch (e) {}
+    setRecentSalesList(nextList);
 
     // 4. Notificación en el sistema de Panaderías Brito
     addNotification({
@@ -3497,65 +3516,71 @@ export default function POSPage() {
       />
 
       {/* Movimientos de Dinero en Caja Modal (Salidas/Gastos/Retiros y Entradas/Cambio) */}
-      <ExpensesModal
-        isOpen={showExpensesModal}
-        onClose={() => setShowExpensesModal(false)}
-        expenses={currentShiftExpenses}
-        onAddExpense={handleAddExpense}
-        onDeleteExpense={(id) => setExpensesList((prev) => prev.filter((e) => e.id !== id))}
-        incomes={currentShiftIncomes}
-        onAddIncome={handleAddIncome}
-        onDeleteIncome={handleDeleteIncome}
-        sales={currentShiftSales}
-        onSelectSaleForReprint={handleReprintSale}
-        orders={getStoredOrders()}
-        onSelectOrderForReceipt={(order) => {
-          setShowExpensesModal(false);
-          setSelectedOrderForReceipt(order);
-        }}
-        onSelectOrderForPayment={(order) => {
-          setShowExpensesModal(false);
-          setSelectedOrderForPayment(order);
-        }}
-        cashSalesTotal={totalCashSales}
-        initialFund={initialCashFund}
-        onUpdateInitialFund={(val) => {
-          setInitialCashFund(val);
-          try {
-            localStorage.setItem("brito_pos_initial_fund", val.toString());
-            window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-          } catch (e) {}
-        }}
-        cashierName={cashierName}
-        shiftName={shiftName}
-        lastCutTimestamp={shiftStartBoundary}
-        branchId={activeBranch?.id}
-        branchName={activeBranch?.name}
-      />
+      {showExpensesModal && (
+        <ExpensesModal
+          isOpen={showExpensesModal}
+          onClose={() => setShowExpensesModal(false)}
+          expenses={currentShiftExpenses}
+          onAddExpense={handleAddExpense}
+          onDeleteExpense={(id) => setExpensesList((prev) => prev.filter((e) => e.id !== id))}
+          incomes={currentShiftIncomes}
+          onAddIncome={handleAddIncome}
+          onDeleteIncome={handleDeleteIncome}
+          sales={currentShiftSales}
+          onSelectSaleForReprint={handleReprintSale}
+          orders={getStoredOrders()}
+          onSelectOrderForReceipt={(order) => {
+            setShowExpensesModal(false);
+            setSelectedOrderForReceipt(order);
+          }}
+          onSelectOrderForPayment={(order) => {
+            setShowExpensesModal(false);
+            setSelectedOrderForPayment(order);
+          }}
+          cashSalesTotal={totalCashSales}
+          initialFund={initialCashFund}
+          onUpdateInitialFund={(val) => {
+            setInitialCashFund(val);
+            try {
+              localStorage.setItem("brito_pos_initial_fund", val.toString());
+              window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+            } catch (e) {}
+          }}
+          cashierName={cashierName}
+          shiftName={shiftName}
+          lastCutTimestamp={shiftStartBoundary}
+          branchId={activeBranch?.id}
+          branchName={activeBranch?.name}
+        />
+      )}
 
       {/* Incomes & Cash In Modal */}
-      <IncomesModal
-        isOpen={showIncomesModal}
-        onClose={() => setShowIncomesModal(false)}
-        incomes={currentShiftIncomes}
-        onAddIncome={handleAddIncome}
-        onDeleteIncome={handleDeleteIncome}
-        cashSalesTotal={totalCashSales}
-        totalExpenses={totalExpenses}
-        initialFund={initialCashFund}
-        branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
-        defaultCashier={cashierName}
-        onOpenReceipt={handleOpenIncomeReceipt}
-      />
+      {showIncomesModal && (
+        <IncomesModal
+          isOpen={showIncomesModal}
+          onClose={() => setShowIncomesModal(false)}
+          incomes={currentShiftIncomes}
+          onAddIncome={handleAddIncome}
+          onDeleteIncome={handleDeleteIncome}
+          cashSalesTotal={totalCashSales}
+          totalExpenses={totalExpenses}
+          initialFund={initialCashFund}
+          branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
+          defaultCashier={cashierName}
+          onOpenReceipt={handleOpenIncomeReceipt}
+        />
+      )}
 
       {/* Income Receipt Thermal Ticket Modal */}
-      <IncomeReceiptModal
-        isOpen={showIncomeReceiptModal}
-        onClose={() => setShowIncomeReceiptModal(false)}
-        income={receiptIncome}
-        branchAddress={activeBranch?.address}
-        branchPhone={activeBranch?.phone}
-      />
+      {showIncomeReceiptModal && (
+        <IncomeReceiptModal
+          isOpen={showIncomeReceiptModal}
+          onClose={() => setShowIncomeReceiptModal(false)}
+          income={receiptIncome}
+          branchAddress={activeBranch?.address}
+          branchPhone={activeBranch?.phone}
+        />
+      )}
 
       {/* Cash Drawer & Shift Control Modal */}
       {showCashDrawerModal && (
