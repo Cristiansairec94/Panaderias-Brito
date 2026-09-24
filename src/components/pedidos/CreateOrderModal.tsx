@@ -38,7 +38,7 @@ import { getStoredProducts, findProductByBarcodeOrCode } from "@/lib/products";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, playScanBeep } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep } from "@/lib/utils";
 import { addCustomOrder } from "@/lib/orders";
 import { DEFAULT_TRANSFER_ACCOUNTS, DEFAULT_CARD_TERMINALS, ExtendedTransferAccount } from "@/lib/paymentAccounts";
 
@@ -312,8 +312,8 @@ export default function CreateOrderModal({
     );
   }, [branches, pickupBranchId, activeBranch]);
 
-  // 4. Cobro del Anticipo (50% obligatorio)
-  const [deposit, setDeposit] = useState<number | "">("");
+  // 4. Cobro del Anticipo (Editable y siempre por defecto en 0)
+  const [deposit, setDeposit] = useState<string>("0");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [selectedTransferAccountId, setSelectedTransferAccountId] = useState<string>(DEFAULT_TRANSFER_ACCOUNTS[0].id);
   const [selectedCardTerminalId, setSelectedCardTerminalId] = useState<string>(DEFAULT_CARD_TERMINALS[0].id);
@@ -391,6 +391,7 @@ export default function CreateOrderModal({
       keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
       setSaveCustomerDecision("ask");
       setMustChooseCustomerAlert(false);
+      setDeposit("0");
     }
   }, [isOpen, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone, tomorrowStr, initialBranchId, activeBranch, branches]);
 
@@ -405,27 +406,23 @@ export default function CreateOrderModal({
     return 0;
   }, [items, customTotal]);
 
-  // Anticipo mínimo obligatorio del 50%
+  // Anticipo sugerido del 50% (para botón de atajo rápido)
   const minRequiredDeposit = useMemo(() => {
     return total > 0 ? Math.round(total * 0.5 * 100) / 100 : 0;
   }, [total]);
 
-  // Si cambia el total y el anticipo estaba vacío o era menor al 50%, fijar el 50% en automático
+  // Si el anticipo ingresado supera el total del pedido, ajustarlo al total
   useEffect(() => {
-    if (total > 0) {
-      setDeposit((prev) => {
-        if (typeof prev !== "number" || prev < minRequiredDeposit) {
-          return minRequiredDeposit;
-        }
-        return prev;
-      });
-    } else {
-      setDeposit("");
+    if (total > 0 && deposit !== "") {
+      const num = Number(deposit) || 0;
+      if (num > total) {
+        setDeposit(total.toString());
+      }
     }
-  }, [total, minRequiredDeposit]);
+  }, [total, deposit]);
 
-  const numericDeposit = typeof deposit === "number" ? deposit : (deposit === "" ? 0 : Number(deposit) || 0);
-  const isDepositSufficient = total > 0 && numericDeposit >= minRequiredDeposit;
+  const numericDeposit = deposit === "" ? 0 : Math.max(0, Number(deposit) || 0);
+  const isDepositSufficient = true; // El anticipo es editable libremente y puede ser $0.00
   const remainingBalance = Math.max(0, total - numericDeposit);
 
   // Sugerencias de clientes existentes
@@ -924,13 +921,8 @@ export default function CreateOrderModal({
       return;
     }
 
-    if (!isDepositSufficient) {
-      alert(
-        `Para apartar el pedido se necesita mínimo el 50% de anticipo (${formatCurrency(
-          minRequiredDeposit
-        )}).\n\nActualmente ingresaste: ${formatCurrency(numericDeposit)}`
-      );
-      setDeposit(minRequiredDeposit);
+    if (numericDeposit > total && total > 0) {
+      alert(`El anticipo no puede ser mayor al total del pedido (${formatCurrency(total)}).`);
       return;
     }
 
@@ -1857,7 +1849,7 @@ export default function CreateOrderModal({
             </div>
           </div>
 
-          {/* PASO 4: ANTICIPO OBLIGATORIO DEL 50% (SÚPER CLARO Y VISUAL) */}
+          {/* PASO 4: ANTICIPO (EDITABLE Y CON VALOR POR DEFECTO EN 0) */}
           <div className="bg-gradient-to-br from-stone-900 via-stone-900 to-amber-950 text-white rounded-2xl p-4 sm:p-5 space-y-4 border-2 border-amber-600/60 shadow-lg">
             <div className="flex items-center justify-between pb-2 border-b border-stone-800">
               <div className="flex items-center gap-2">
@@ -1868,7 +1860,7 @@ export default function CreateOrderModal({
                   <h3 className="font-black text-sm text-white uppercase tracking-wide">
                     Anticipo para Apartar
                   </h3>
-                  <p className="text-[11px] text-amber-300">Regla estricta: Mínimo 50% para asegurar el pedido</p>
+                  <p className="text-[11px] text-amber-300">Editable libremente • Siempre marca $0.00 por defecto</p>
                 </div>
               </div>
               <div className="text-right">
@@ -1877,50 +1869,65 @@ export default function CreateOrderModal({
               </div>
             </div>
 
-            {/* Dos Botones Grandes Táctiles para el Cajero */}
-            <div className="grid grid-cols-2 gap-2.5">
+            {/* Tres Botones Táctiles para el Cajero: $0.00, 50% y 100% */}
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => setDeposit(minRequiredDeposit)}
-                className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                  numericDeposit === minRequiredDeposit && total > 0
+                onClick={() => setDeposit("0")}
+                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                  numericDeposit === 0
                     ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-lg scale-[1.02]"
                     : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
                 }`}
               >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs">💵 Dejó el 50%</span>
-                  <span className="text-[9px] bg-stone-950 text-amber-300 px-1.5 py-0.2 rounded font-black">
-                    Obligatorio
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">🪙 $0.00</span>
+                </div>
+                <span className="text-xs sm:text-sm font-black">Sin Anticipo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeposit(minRequiredDeposit.toString())}
+                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                  numericDeposit === minRequiredDeposit && total > 0 && numericDeposit > 0
+                    ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-lg scale-[1.02]"
+                    : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">💵 50%</span>
+                  <span className="text-[9px] bg-stone-950 text-amber-300 px-1 py-0.2 rounded font-black">
+                    Sugerido
                   </span>
                 </div>
-                <span className="text-base font-black">
+                <span className="text-xs sm:text-sm font-black">
                   {formatCurrency(minRequiredDeposit)}
                 </span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setDeposit(total)}
-                className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                onClick={() => setDeposit(total.toString())}
+                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
                   numericDeposit === total && total > 0
                     ? "bg-emerald-500 text-stone-950 border-emerald-400 font-black shadow-lg scale-[1.02]"
                     : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
                 }`}
               >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs">💳 Pagó Todo el 100%</span>
-                  <span className="text-[9px] bg-stone-950 text-emerald-300 px-1.5 py-0.2 rounded font-black">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">💳 100%</span>
+                  <span className="text-[9px] bg-stone-950 text-emerald-300 px-1 py-0.2 rounded font-black">
                     Liquidado
                   </span>
                 </div>
-                <span className="text-base font-black">
+                <span className="text-xs sm:text-sm font-black">
                   {formatCurrency(total)}
                 </span>
               </button>
             </div>
 
-            {/* Input personalizado si dejó otra cantidad */}
+            {/* Input personalizado editable */}
             <div className="flex items-center justify-between gap-3 pt-1">
               <label className="text-xs font-bold text-stone-300">
                 O escribe otra cantidad dejada:
@@ -1928,46 +1935,45 @@ export default function CreateOrderModal({
               <div className="relative w-36">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 font-black">$</span>
                 <input
-                  type="number"
-                  min={minRequiredDeposit}
-                  max={total}
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
                   value={deposit}
                   onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                  onChange={(e) => setDeposit(e.target.value === "" ? "" : Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = cleanDecimalNumbers(e.target.value);
+                    if (val !== "" && total > 0 && Number(val) > total) {
+                      setDeposit(total.toString());
+                    } else {
+                      setDeposit(val);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (deposit.trim() === "") {
+                      setDeposit("0");
+                    }
+                  }}
                   className="w-full pl-7 pr-3 py-1.5 bg-stone-950 border border-stone-700 rounded-xl text-right text-sm font-black text-white focus:outline-none focus:border-amber-400"
                 />
               </div>
             </div>
 
-            {/* Aviso si es insuficiente el anticipo */}
-            {total > 0 && !isDepositSufficient ? (
-              <div className="p-3 bg-rose-500/20 border-2 border-rose-500/70 rounded-xl flex items-center justify-between gap-2 text-rose-200 text-xs">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-                  <span className="font-bold">
-                    Anticipo insuficiente: Para apartar se necesita al menos el 50% ({formatCurrency(minRequiredDeposit)}). Faltan {formatCurrency(minRequiredDeposit - numericDeposit)}.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setDeposit(minRequiredDeposit)}
-                  className="px-2.5 py-1 bg-rose-600 text-white rounded-lg font-black text-xs shrink-0"
-                >
-                  Fijar 50%
-                </button>
-              </div>
-            ) : total > 0 ? (
+            {/* Resumen del Anticipo y Saldo Pendiente */}
+            {total > 0 && (
               <div className="flex items-center justify-between text-xs pt-1 border-t border-stone-800">
-                <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                <span className="text-amber-300 font-bold flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  Anticipo cubierto correctamente
+                  {numericDeposit === 0
+                    ? "Sin anticipo — Se cobrará completo al entregar"
+                    : numericDeposit >= total
+                    ? "Pedido liquidado al 100%"
+                    : `Anticipo de ${formatCurrency(numericDeposit)} registrado`}
                 </span>
                 <span className="text-stone-300">
-                  Resta al entregar: <strong className="text-amber-400 text-sm">{formatCurrency(remainingBalance)}</strong>
+                  Resta al entregar: <strong className="text-amber-400 text-sm font-mono font-black">{formatCurrency(remainingBalance)}</strong>
                 </span>
               </div>
-            ) : null}
+            )}
 
             {/* Forma de pago del anticipo */}
             <div className="pt-2 border-t border-stone-800 space-y-1.5">
@@ -2394,12 +2400,8 @@ export default function CreateOrderModal({
               className={`w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
                 isSubmitting
                   ? "bg-stone-400 text-stone-700 cursor-wait"
-                  : !customerName.trim()
+                  : !customerName.trim() || total <= 0
                   ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-amber-900/20 active:scale-98"
-                  : total <= 0
-                  ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-amber-900/20 active:scale-98"
-                  : !isDepositSufficient
-                  ? "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-900/20 active:scale-98"
                   : isCustomerDecisionPending
                   ? "bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-stone-950 shadow-amber-900/30 ring-4 ring-amber-400/40 active:scale-98"
                   : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-emerald-950/30 active:scale-98 ring-4 ring-emerald-500/20"
@@ -2412,8 +2414,6 @@ export default function CreateOrderModal({
                   ? "👤"
                   : total <= 0
                   ? "🎂"
-                  : !isDepositSufficient
-                  ? "💵"
                   : isCustomerDecisionPending
                   ? "👥"
                   : "✅"}
@@ -2425,10 +2425,10 @@ export default function CreateOrderModal({
                   ? "Escribe el nombre del cliente para apartar"
                   : total <= 0
                   ? "Indica el monto total del encargo"
-                  : !isDepositSufficient
-                  ? `Falta anticipo mínimo del 50% (${formatCurrency(minRequiredDeposit)})`
                   : isCustomerDecisionPending
                   ? `Elige si guardar o no al cliente antes de apartar`
+                  : numericDeposit === 0
+                  ? `GUARDAR Y APARTAR PEDIDO (Sin anticipo - $0.00)`
                   : `GUARDAR Y APARTAR PEDIDO (${formatCurrency(numericDeposit)} Recibidos)`}
               </span>
             </button>
