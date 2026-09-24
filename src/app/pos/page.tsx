@@ -759,6 +759,19 @@ export default function POSPage() {
 
   // Shift Lock State (Candado de Seguridad por Cierre de Turno)
   const [isShiftLocked, setIsShiftLocked] = useState(false);
+  const [shiftVersion, setShiftVersion] = useState(0);
+
+  useEffect(() => {
+    const handleShiftUpdated = () => {
+      setShiftVersion((v) => v + 1);
+    };
+    window.addEventListener("brito_shift_cuts_updated", handleShiftUpdated);
+    window.addEventListener("storage", handleShiftUpdated);
+    return () => {
+      window.removeEventListener("brito_shift_cuts_updated", handleShiftUpdated);
+      window.removeEventListener("storage", handleShiftUpdated);
+    };
+  }, []);
 
   const lastCutInfo = useMemo(() => {
     if (typeof window !== "undefined") {
@@ -773,7 +786,7 @@ export default function POSPage() {
       } catch (e) {}
     }
     return null;
-  }, [isShiftLocked]);
+  }, [isShiftLocked, shiftVersion]);
 
   const baseShiftFund = useMemo(() => {
     return initialCashFund;
@@ -1343,20 +1356,48 @@ export default function POSPage() {
   const isPaymentValid = paymentMethod !== "efectivo" || parsedCashGiven >= total;
 
   // Financial calculations strictly for the current operating cashier's shift
+  const shiftStartBoundary = useMemo(() => {
+    return lastCutInfo?.timestamp || getStoredShiftStartBoundary();
+  }, [lastCutInfo, shiftVersion]);
+
+  const currentShiftSales = useMemo(() => {
+    return recentSalesList.filter((s) => {
+      if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
+      const t = typeof s.timestamp === "number"
+        ? s.timestamp
+        : s.timestamp
+        ? new Date(s.timestamp).getTime()
+        : s.createdAt
+        ? new Date(s.createdAt).getTime()
+        : 0;
+      if (shiftStartBoundary > 0 && t > 0 && t < shiftStartBoundary) return false;
+      return true;
+    });
+  }, [recentSalesList, cashierName, shiftStartBoundary]);
+
   const currentShiftExpenses = useMemo(() => {
     return expensesList.filter((e) => {
-      if (!e.cashier) return true;
-      const cName = cashierName.toLowerCase().trim();
-      const expCashier = e.cashier.toLowerCase().trim();
-      return expCashier === cName || cName.includes(expCashier) || expCashier.includes(cName);
+      if (!e.cashier || !matchesCashier(e.cashier, cashierName)) return false;
+      const t = typeof e.timestamp === "number" ? e.timestamp : (e.createdAt ? new Date(e.createdAt).getTime() : 0);
+      if (shiftStartBoundary > 0 && t > 0 && t < shiftStartBoundary) return false;
+      return true;
     });
-  }, [expensesList, cashierName]);
+  }, [expensesList, cashierName, shiftStartBoundary]);
 
-  const totalCashSales = recentSalesList
+  const currentShiftIncomes = useMemo(() => {
+    return incomesList.filter((inc) => {
+      if (!inc.cashier || !matchesCashier(inc.cashier, cashierName)) return false;
+      const t = typeof inc.timestamp === "number" ? inc.timestamp : (inc.date ? new Date(inc.date).getTime() : 0);
+      if (shiftStartBoundary > 0 && t > 0 && t < shiftStartBoundary) return false;
+      return true;
+    });
+  }, [incomesList, cashierName, shiftStartBoundary]);
+
+  const totalCashSales = currentShiftSales
     .filter((s) => s.paymentMethod === "efectivo")
     .reduce((sum, s) => sum + s.total, 0);
   const totalExpenses = currentShiftExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalExtraInCash = incomesList
+  const totalExtraInCash = currentShiftIncomes
     .filter((i) => i.paymentMethod === "efectivo")
     .reduce((sum, i) => sum + i.amount, 0);
   const netCashInDrawer = initialCashFund + totalCashSales + totalExtraInCash - totalExpenses;
@@ -3336,7 +3377,7 @@ export default function POSPage() {
       <RecentSalesDrawer
         isOpen={showRecentSales}
         onClose={() => setShowRecentSales(false)}
-        sales={recentSalesList}
+        sales={currentShiftSales}
         onSelectSaleForReprint={handleReprintSale}
         orders={getStoredOrders()}
         onSelectOrderForReceipt={(order) => {
@@ -3380,6 +3421,8 @@ export default function POSPage() {
           } catch (e) {}
         }}
         cashierName={cashierName}
+        shiftName={shiftName}
+        lastCutTimestamp={shiftStartBoundary}
         branchId={activeBranch?.id}
         branchName={activeBranch?.name}
       />
@@ -3388,7 +3431,7 @@ export default function POSPage() {
       <IncomesModal
         isOpen={showIncomesModal}
         onClose={() => setShowIncomesModal(false)}
-        incomes={incomesList}
+        incomes={currentShiftIncomes}
         onAddIncome={handleAddIncome}
         onDeleteIncome={handleDeleteIncome}
         cashSalesTotal={totalCashSales}
@@ -3424,11 +3467,12 @@ export default function POSPage() {
               localStorage.setItem("brito_pos_initial_fund", val.toString());
             } catch (e) {}
           }}
-          sales={recentSalesList}
-          expenses={expensesList}
-          incomes={incomesList}
+          sales={currentShiftSales}
+          expenses={currentShiftExpenses}
+          incomes={currentShiftIncomes}
           products={products}
           initialTab={shiftModalTab}
+          lastCutTimestamp={shiftStartBoundary}
           onCompleteShiftCut={handleCompleteShiftCut}
         />
       )}
