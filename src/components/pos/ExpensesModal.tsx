@@ -430,9 +430,11 @@ export default function ExpensesModal({
 
   // Modal emergente de información detallada para cada opción de balance
   const [activeDetailModal, setActiveDetailModal] = useState<"fondo" | "ventas" | "entradas" | "gastos" | "balance" | null>(null);
+  const [cashDetailFilter, setCashDetailFilter] = useState<"all" | "ventas" | "pedidos">("all");
 
   const handleCloseDetailModal = () => {
     setActiveDetailModal(null);
+    setCashDetailFilter("all");
     setActiveTab("register");
   };
 
@@ -578,6 +580,19 @@ export default function ExpensesModal({
       setActiveTab(initialTab);
     }
   }, [isOpen, initialTab]);
+
+  // Siempre que se abra el modal o se ingrese al Historial de Ventas, mostrar siempre "Todos" por defecto
+  useEffect(() => {
+    if (isOpen) {
+      setTicketTypeFilter("all");
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (activeTab === "tickets") {
+      setTicketTypeFilter("all");
+    }
+  }, [activeTab]);
   
   // Form fields
   const [amount, setAmount] = useState("");
@@ -832,6 +847,71 @@ export default function ExpensesModal({
       return acc + (s.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
     }, 0);
   }, [cashSalesList]);
+
+  // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones)
+  const cashOrdersList = useMemo(() => {
+    return effectiveOrders.filter((o) => {
+      const isCash = o.paymentMethod === "efectivo" || !o.paymentMethod ||
+        (o.payments && o.payments.some((p) => p.paymentMethod === "efectivo"));
+      const hasCashAmount = (Number(o.deposit) || 0) > 0 || (o.payments && o.payments.some((p) => p.paymentMethod === "efectivo" && p.amount > 0));
+      const notInSales = !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id);
+      return isCash && hasCashAmount && notInSales;
+    });
+  }, [effectiveOrders, effectiveSales]);
+
+  const cashOrdersPieces = useMemo(() => {
+    return cashOrdersList.reduce((acc, o) => {
+      return acc + (o.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+    }, 0);
+  }, [cashOrdersList]);
+
+  const totalCashRecordsCount = cashSalesList.length + cashOrdersList.length;
+  const totalCashPiecesCount = cashSalesPieces + cashOrdersPieces;
+
+  // Lista unificada cronológica de ventas y pedidos en efectivo
+  const unifiedCashMovements = useMemo(() => {
+    const list: Array<{
+      id: string;
+      type: "venta" | "pedido";
+      timestamp: number;
+      sale?: Sale;
+      order?: CustomOrder;
+    }> = [];
+
+    cashSalesList.forEach((s) => {
+      list.push({
+        id: `sale-${s.id}`,
+        type: "venta",
+        timestamp: parseDateTimeSafe(s.timestamp || s.createdAt || s.date) || 0,
+        sale: s,
+      });
+    });
+
+    cashOrdersList.forEach((o) => {
+      list.push({
+        id: `order-${o.id}`,
+        type: "pedido",
+        timestamp: parseDateTimeSafe(o.createdAt || (o as any).date || o.deliveryDate) || 0,
+        order: o,
+      });
+    });
+
+    return list.sort((a, b) => {
+      const itemA = a.type === "venta"
+        ? a.sale!
+        : { id: a.order!.orderNumber || a.order!.id, date: a.order!.createdAt || a.order!.deliveryDate, timestamp: a.order!.createdAt, createdAt: a.order!.createdAt };
+      const itemB = b.type === "venta"
+        ? b.sale!
+        : { id: b.order!.orderNumber || b.order!.id, date: b.order!.createdAt || b.order!.deliveryDate, timestamp: b.order!.createdAt, createdAt: b.order!.createdAt };
+      return compareMovementsDesc(itemA, itemB);
+    });
+  }, [cashSalesList, cashOrdersList]);
+
+  const visibleCashMovements = useMemo(() => {
+    if (cashDetailFilter === "ventas") return unifiedCashMovements.filter((m) => m.type === "venta");
+    if (cashDetailFilter === "pedidos") return unifiedCashMovements.filter((m) => m.type === "pedido");
+    return unifiedCashMovements;
+  }, [unifiedCashMovements, cashDetailFilter]);
 
   const ownerExpensesList = useMemo(() => {
     return shiftExpenses.filter((e) => e.isOwner || e.category === "retiro_dueno");
@@ -1768,15 +1848,18 @@ export default function ExpensesModal({
             </span>
           </button>
 
-          {/* 2. Ventas Efectivo */}
+          {/* 2. Ventas y Pedidos Efectivo */}
           <button
             type="button"
-            onClick={() => setActiveDetailModal("ventas")}
+            onClick={() => {
+              setActiveDetailModal("ventas");
+              setCashDetailFilter("all");
+            }}
             className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-between bg-emerald-50/70 border-emerald-200/90 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs active:scale-98"
-            title="Abrir información detallada de Ventas en Efectivo"
+            title="Abrir información detallada de Ventas y Pedidos en Efectivo"
           >
             <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-emerald-950 block leading-tight tracking-wide">
-              Ventas Efectivo
+              Ventas y Pedidos Efectivo
             </span>
             <span className="text-base sm:text-lg md:text-xl font-black text-emerald-700 block my-1 tracking-tight truncate">
               +{formatCurrency(totalShiftCashSales)}
@@ -1929,103 +2012,122 @@ export default function ExpensesModal({
                 </div>
               </div>
 
-              {/* Botones de Ventas en Caja y Pedidos Especiales */}
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center">
+              {/* 3 Botones Compactos de Filtro KPI: Todos / Ventas en Caja / Pedidos Especiales */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
+                {/* 1. Botón TODOS (Ventas y Pedidos Juntos) */}
                 <button
                   type="button"
-                  onClick={() => setTicketTypeFilter(ticketTypeFilter === "ventas" ? "all" : "ventas")}
-                  className={`p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 relative overflow-hidden ${
-                    ticketTypeFilter === "ventas"
-                      ? "bg-emerald-50 border-emerald-500 ring-4 ring-emerald-500/20 shadow-md scale-[1.01]"
-                      : "bg-white hover:bg-emerald-50/50 border-stone-200 hover:border-emerald-300 shadow-2xs"
+                  onClick={() => setTicketTypeFilter("all")}
+                  className={`p-2 sm:p-2.5 md:p-3 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 relative overflow-hidden ${
+                    ticketTypeFilter === "all"
+                      ? "bg-stone-900 text-white border-stone-950 ring-2 sm:ring-4 ring-stone-900/20 shadow-md scale-[1.01]"
+                      : "bg-white hover:bg-stone-50 border-stone-200 hover:border-stone-300 text-stone-800 shadow-2xs"
                   }`}
-                  title="Filtrar y ver únicamente ventas en caja"
+                  title="Ver todas las ventas de mostrador y pedidos juntos"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl sm:text-2xl">🥖</span>
-                    <span className="text-xs sm:text-sm font-black uppercase tracking-wider block text-stone-800 group-hover:text-emerald-950">
-                      Ventas en Caja
+                  <div className="flex items-center gap-1 sm:gap-1.5 justify-center max-w-full">
+                    <span className="text-sm sm:text-base">📑</span>
+                    <span className={`text-[10px] sm:text-xs font-black uppercase tracking-wider block truncate ${
+                      ticketTypeFilter === "all" ? "text-stone-100" : "text-stone-800"
+                    }`}>
+                      Todos
                     </span>
                   </div>
-                  <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-stone-900 block my-1">
-                    {activeSalesForKpi.length}
+                  <span className={`text-xl sm:text-2xl md:text-3xl font-black block my-0.5 sm:my-1 ${
+                    ticketTypeFilter === "all" ? "text-white" : "text-stone-900"
+                  }`}>
+                    {totalRecordsCount}
                   </span>
-                  <div className="flex items-center gap-2 flex-wrap justify-center">
-                    <span className="text-xs text-stone-500 font-bold block">
-                      {ticketScopeFilter === "turno" ? "tickets emitidos en el turno" : "tickets históricos de caja"}
+                  <div className="flex items-center gap-1 flex-wrap justify-center">
+                    <span className={`text-[9px] sm:text-[10px] font-bold block leading-tight ${
+                      ticketTypeFilter === "all" ? "text-stone-300" : "text-stone-500"
+                    }`}>
+                      ventas y pedidos
                     </span>
-                    {ticketTypeFilter === "ventas" && (
-                      <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
-                        ✓ Filtro Activo
+                    {ticketTypeFilter === "all" && (
+                      <span className="text-[9px] font-black bg-amber-500 text-stone-950 px-1.5 py-0.2 rounded-full shadow-2xs">
+                        ✓ Activo
                       </span>
                     )}
                   </div>
                 </button>
 
+                {/* 2. Botón VENTAS EN CAJA */}
                 <button
                   type="button"
-                  onClick={() => setTicketTypeFilter(ticketTypeFilter === "pedidos" ? "all" : "pedidos")}
-                  className={`p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 relative overflow-hidden ${
+                  onClick={() => setTicketTypeFilter("ventas")}
+                  className={`p-2 sm:p-2.5 md:p-3 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 relative overflow-hidden ${
+                    ticketTypeFilter === "ventas"
+                      ? "bg-emerald-50 border-emerald-500 ring-2 sm:ring-4 ring-emerald-500/20 shadow-md scale-[1.01] text-emerald-950"
+                      : "bg-white hover:bg-emerald-50/50 border-stone-200 hover:border-emerald-300 text-stone-800 shadow-2xs"
+                  }`}
+                  title="Filtrar y ver únicamente ventas en caja"
+                >
+                  <div className="flex items-center gap-1 sm:gap-1.5 justify-center max-w-full">
+                    <span className="text-sm sm:text-base">🥖</span>
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider block text-stone-800 group-hover:text-emerald-950 truncate">
+                      Ventas en Caja
+                    </span>
+                  </div>
+                  <span className="text-xl sm:text-2xl md:text-3xl font-black text-stone-900 block my-0.5 sm:my-1">
+                    {activeSalesForKpi.length}
+                  </span>
+                  <div className="flex items-center gap-1 flex-wrap justify-center">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-stone-500 block leading-tight">
+                      {ticketScopeFilter === "turno" ? "del turno" : "en caja"}
+                    </span>
+                    {ticketTypeFilter === "ventas" && (
+                      <span className="text-[9px] font-black bg-emerald-600 text-white px-1.5 py-0.2 rounded-full shadow-2xs">
+                        ✓ Activo
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {/* 3. Botón PEDIDOS ESPECIALES */}
+                <button
+                  type="button"
+                  onClick={() => setTicketTypeFilter("pedidos")}
+                  className={`p-2 sm:p-2.5 md:p-3 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 relative overflow-hidden ${
                     ticketTypeFilter === "pedidos"
-                      ? "bg-amber-50 border-amber-500 ring-4 ring-amber-500/20 shadow-md scale-[1.01]"
-                      : "bg-white hover:bg-amber-50/50 border-stone-200 hover:border-amber-300 shadow-2xs"
+                      ? "bg-amber-50 border-amber-500 ring-2 sm:ring-4 ring-amber-500/20 shadow-md scale-[1.01] text-amber-950"
+                      : "bg-white hover:bg-amber-50/50 border-stone-200 hover:border-amber-300 text-stone-800 shadow-2xs"
                   }`}
                   title="Filtrar y ver únicamente pedidos especiales"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl sm:text-2xl">🎂</span>
-                    <span className="text-xs sm:text-sm font-black uppercase tracking-wider block text-amber-950 group-hover:text-amber-950">
+                  <div className="flex items-center gap-1 sm:gap-1.5 justify-center max-w-full">
+                    <span className="text-sm sm:text-base">🎂</span>
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider block text-amber-950 group-hover:text-amber-950 truncate">
                       Pedidos Especiales
                     </span>
                   </div>
-                  <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-amber-950 block my-1">
+                  <span className="text-xl sm:text-2xl md:text-3xl font-black text-amber-950 block my-0.5 sm:my-1">
                     {activeOrdersForKpi.length}
                   </span>
-                  <div className="flex items-center gap-2 flex-wrap justify-center">
-                    <span className="text-xs text-amber-700 font-bold block">
-                      {ticketScopeFilter === "turno" ? "encargos del turno" : "encargos registrados"}
+                  <div className="flex items-center gap-1 flex-wrap justify-center">
+                    <span className="text-[9px] sm:text-[10px] font-bold text-amber-700 block leading-tight">
+                      {ticketScopeFilter === "turno" ? "del turno" : "registrados"}
                     </span>
                     {ticketTypeFilter === "pedidos" && (
-                      <span className="text-[10px] font-black bg-amber-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
-                        ✓ Filtro Activo
+                      <span className="text-[9px] font-black bg-amber-600 text-white px-1.5 py-0.2 rounded-full shadow-2xs">
+                        ✓ Activo
                       </span>
                     )}
                   </div>
                 </button>
               </div>
 
-              {/* Filtros por Tipo (Todos / Ventas en Caja / Pedidos Especiales) */}
-              <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between pb-1">
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-                  {[
-                    { id: "all", label: `Todos (${totalRecordsCount})` },
-                    { id: "ventas", label: `🥖 Ventas en Caja (${activeSalesForKpi.length})` },
-                    { id: "pedidos", label: `🎂 Pedidos Especiales (${activeOrdersForKpi.length})` },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setTicketTypeFilter(tab.id as any)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
-                        ticketTypeFilter === tab.id
-                          ? "bg-stone-900 text-white border-stone-950 shadow-xs ring-2 ring-stone-900/10"
-                          : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
+              {/* Barra de Filtros Rápidos, Búsqueda y Alternador de Diseño */}
+              <div className="flex flex-col md:flex-row gap-2.5 items-stretch md:items-center justify-between pb-1">
                 {/* Buscador Rápido */}
-                <div className="relative flex-1 max-w-xs">
+                <div className="relative flex-1">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                   <input
                     type="text"
                     placeholder="Buscar ticket #, PED-..., pan, cliente..."
                     value={ticketSearch}
                     onChange={(e) => setTicketSearch(e.target.value)}
-                    className="w-full pl-8 pr-7 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium text-stone-900 focus:outline-none focus:border-amber-600 transition-colors placeholder:text-stone-400"
+                    className="w-full pl-8 pr-7 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium text-stone-900 focus:outline-none focus:border-amber-600 transition-colors placeholder:text-stone-400"
                   />
                   {ticketSearch && (
                     <button
@@ -2037,17 +2139,15 @@ export default function ExpensesModal({
                     </button>
                   )}
                 </div>
-              </div>
 
-              {/* Subfiltros por Método de Pago y Selector de Vista */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pb-1 text-xs">
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-                  <span className="text-[10px] font-bold uppercase text-stone-400 mr-1">Método:</span>
+                {/* Subfiltros por Método de Pago */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
+                  <span className="text-[10px] font-bold uppercase text-stone-400 mr-1 shrink-0">Método:</span>
                   {[
-                    { id: "all", label: "Todos los métodos" },
+                    { id: "all", label: "Todos" },
                     { id: "efectivo", label: "🪙 Efectivo" },
                     { id: "tarjeta", label: "💳 Tarjeta" },
-                    { id: "transferencia", label: "📲 Transferencia" },
+                    { id: "transferencia", label: "📲 Transf." },
                   ].map((m) => (
                     <button
                       key={m.id}
@@ -2065,7 +2165,7 @@ export default function ExpensesModal({
                 </div>
 
                 {/* Alternador de Diseño: Lista (1 columna corrida) vs Cuadrícula */}
-                <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl border border-stone-200 shrink-0 self-start sm:self-auto">
+                <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl border border-stone-200 shrink-0 self-start md:self-auto">
                   <button
                     type="button"
                     onClick={() => setTicketLayoutMode("lista")}
@@ -2664,7 +2764,7 @@ export default function ExpensesModal({
                   <div>
                     <h3 className="font-black text-base sm:text-lg leading-tight">
                       {activeDetailModal === "fondo" && "Fondo Inicial de Caja"}
-                      {activeDetailModal === "ventas" && "Historial de Ventas en Efectivo"}
+                      {activeDetailModal === "ventas" && "Historial de Ventas y Pedidos en Efectivo"}
                       {activeDetailModal === "entradas" && "Historial de Entradas / Cambio"}
                       {activeDetailModal === "gastos" && "Historial de Gastos y Salidas"}
                       {activeDetailModal === "balance" && "Dinero que Debe Haber en Caja (Balance)"}
@@ -2766,103 +2866,231 @@ export default function ExpensesModal({
                   </div>
                 )}
 
-                {/* 2. MODAL: VENTAS EN EFECTIVO */}
+                {/* 2. MODAL: VENTAS Y PEDIDOS EN EFECTIVO */}
                 {activeDetailModal === "ventas" && (
                   <div className="space-y-4">
                     <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white p-5 sm:p-6 rounded-3xl shadow-lg border-2 border-emerald-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div>
                         <span className="text-xs uppercase font-black tracking-widest text-emerald-200 block">
-                          🥖 Ventas en Efectivo del Turno
+                          🥖 Ventas y Pedidos en Efectivo del Turno
                         </span>
                         <h2 className="text-3xl sm:text-4xl font-black tracking-tight mt-1 text-white">
                           +{formatCurrency(totalShiftCashSales)}
                         </h2>
                         <p className="text-xs text-emerald-100 font-medium mt-1">
-                          Cobrado en efectivo en mostrador por {cashierName}
+                          Cobrado en efectivo en mostrador y anticipos de pedidos por {cashierName}
                         </p>
                       </div>
                       <div className="flex sm:flex-col gap-2 shrink-0 self-stretch sm:self-auto">
                         <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-white/20 text-center">
-                          <span className="text-[10px] text-emerald-200 font-bold block uppercase">Tickets</span>
-                          <span className="text-base sm:text-lg font-black text-white">{cashSalesList.length}</span>
+                          <span className="text-[10px] text-emerald-200 font-bold block uppercase">Registros</span>
+                          <span className="text-base sm:text-lg font-black text-white">{totalCashRecordsCount}</span>
                         </div>
                         <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-white/20 text-center">
                           <span className="text-[10px] text-emerald-200 font-bold block uppercase">Piezas Pan</span>
-                          <span className="text-base sm:text-lg font-black text-white">{cashSalesPieces}</span>
+                          <span className="text-base sm:text-lg font-black text-white">{totalCashPiecesCount}</span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Botones de Clasificación (Todos / Ventas en Caja / Pedidos Especiales) */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                      {[
+                        { id: "all", label: `Todos (${totalCashRecordsCount})` },
+                        { id: "ventas", label: `🥖 Ventas en Caja (${cashSalesList.length})` },
+                        { id: "pedidos", label: `🎂 Pedidos Especiales (${cashOrdersList.length})` },
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setCashDetailFilter(tab.id as any)}
+                          className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all border cursor-pointer ${
+                            cashDetailFilter === tab.id
+                              ? "bg-emerald-800 text-white border-emerald-900 shadow-xs ring-2 ring-emerald-700/20"
+                              : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
                     </div>
 
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between text-xs px-1">
                         <span className="font-black text-stone-700 uppercase tracking-wide">
-                          Tickets Cobrados en Efectivo ({cashSalesList.length})
+                          {cashDetailFilter === "ventas"
+                            ? `Tickets de Mostrador en Efectivo (${cashSalesList.length})`
+                            : cashDetailFilter === "pedidos"
+                            ? `Pedidos con Cobro en Efectivo (${cashOrdersList.length})`
+                            : `Historial de Ventas y Pedidos en Efectivo (${visibleCashMovements.length})`}
                         </span>
                         <span className="text-stone-500 font-medium text-[11px]">
                           {shiftName}
                         </span>
                       </div>
 
-                      {cashSalesList.length === 0 ? (
+                      {visibleCashMovements.length === 0 ? (
                         <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-3xl p-8 text-center space-y-2">
-                          <div className="text-4xl">🥖</div>
+                          <div className="text-4xl">
+                            {cashDetailFilter === "pedidos" ? "🎂" : "🥖"}
+                          </div>
                           <h4 className="font-black text-stone-800 text-sm sm:text-base">
-                            No hay ventas en efectivo registradas aún
+                            {cashDetailFilter === "pedidos"
+                              ? "No hay pedidos especiales cobrados en efectivo en este turno"
+                              : cashDetailFilter === "ventas"
+                              ? "No hay ventas en efectivo registradas aún"
+                              : "No hay ventas ni pedidos en efectivo registrados aún"}
                           </h4>
                           <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                            Al comenzar un nuevo turno, el contador inicia en $0.00. Conforme realices ventas de pan en mostrador se listarán automáticamente aquí con folio y desglose.
+                            {cashDetailFilter === "pedidos"
+                              ? "Los apartados o anticipos de pedidos especiales cobrados en efectivo aparecerán aquí con su folio y monto."
+                              : "Al comenzar un nuevo turno, el contador inicia en $0.00. Conforme realices cobros en efectivo se listarán automáticamente aquí."}
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
-                          {cashSalesList.map((sale) => {
-                            const pieces = (sale.items || []).reduce((sum, item) => sum + item.quantity, 0);
-                            const summary = (sale.items || []).map((i) => `${i.quantity}x ${i.product.name}`).join(", ");
-                            return (
-                              <div
-                                key={sale.id}
-                                className="bg-white border-2 border-stone-200 hover:border-emerald-400 p-3.5 rounded-2xl shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all"
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-mono font-black text-xs bg-stone-900 text-amber-300 px-2 py-0.5 rounded-lg">
-                                      #{sale.id}
-                                    </span>
-                                    <span className="text-xs text-stone-500 font-bold">
-                                      🕒 {sale.date}
-                                    </span>
-                                    <span className="text-[11px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                                      🪙 {pieces} {pieces === 1 ? "pieza" : "piezas"}
-                                    </span>
-                                    <span className="text-xs text-stone-600 font-semibold">
-                                      👤 {sale.customerName || "Público General"}
-                                    </span>
+                        <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
+                          {visibleCashMovements.map((item) => {
+                            if (item.type === "venta" && item.sale) {
+                              const sale = item.sale;
+                              const pieces = (sale.items || []).reduce((sum, i) => sum + i.quantity, 0);
+                              const summary = (sale.items || []).map((i) => `${i.quantity}x ${i.product.name}`).join(", ");
+                              return (
+                                <div
+                                  key={sale.id}
+                                  className="bg-white border-2 border-stone-200 hover:border-emerald-400 p-3.5 rounded-2xl shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-[10px] bg-emerald-100 text-emerald-950 border border-emerald-300 px-2 py-0.5 rounded-md font-black">
+                                        🥖 Venta en Caja
+                                      </span>
+                                      <span className="font-mono font-black text-xs bg-stone-900 text-amber-300 px-2 py-0.5 rounded-lg">
+                                        #{sale.id.slice(-6).toUpperCase()}
+                                      </span>
+                                      <span className="text-xs text-stone-500 font-bold">
+                                        🕒 {sale.date}
+                                      </span>
+                                      <span className="text-[11px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                                        🪙 {pieces} {pieces === 1 ? "pieza" : "piezas"}
+                                      </span>
+                                      <span className="text-xs text-stone-600 font-semibold">
+                                        👤 {sale.customerName || "Público General"}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-stone-700 font-medium mt-1 line-clamp-1">
+                                      {summary || "Venta de mostrador"}
+                                    </p>
                                   </div>
-                                  <p className="text-xs text-stone-700 font-medium mt-1 line-clamp-1">
-                                    {summary || "Venta de mostrador"}
-                                  </p>
+                                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100">
+                                    <span className="text-base sm:text-lg font-black text-emerald-700">
+                                      +{formatCurrency(sale.total)}
+                                    </span>
+                                    {onSelectSaleForReprint && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleCloseDetailModal();
+                                          onSelectSaleForReprint(sale);
+                                        }}
+                                        className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                                        title="Reimprimir comprobante"
+                                      >
+                                        <Printer className="w-3.5 h-3.5 text-stone-600" />
+                                        <span className="hidden sm:inline">Ticket</span>
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100">
-                                  <span className="text-base sm:text-lg font-black text-emerald-700">
-                                    +{formatCurrency(sale.total)}
-                                  </span>
-                                  {onSelectSaleForReprint && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        handleCloseDetailModal();
-                                        onSelectSaleForReprint(sale);
-                                      }}
-                                      className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
-                                      title="Reimprimir comprobante"
-                                    >
-                                      <Printer className="w-3.5 h-3.5 text-stone-600" />
-                                      <span className="hidden sm:inline">Ticket</span>
-                                    </button>
-                                  )}
+                              );
+                            }
+
+                            if (item.type === "pedido" && item.order) {
+                              const order = item.order;
+                              const orderPieces = (order.items || []).reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
+                              return (
+                                <div
+                                  key={order.id}
+                                  className="bg-white border-2 border-amber-200 hover:border-amber-400 p-3.5 rounded-2xl shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-[10px] bg-amber-100 text-amber-950 border border-amber-300 px-2 py-0.5 rounded-md font-black">
+                                        🎂 Pedido Especial
+                                      </span>
+                                      <span className="font-mono font-black text-xs bg-stone-900 text-amber-300 px-2 py-0.5 rounded-lg">
+                                        #{order.orderNumber}
+                                      </span>
+                                      <span className="text-xs text-stone-500 font-bold">
+                                        🕒 {order.createdAt || order.deliveryDate}
+                                      </span>
+                                      <span
+                                        className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                                          order.paymentStatus === "liquidado"
+                                            ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                            : "bg-amber-100 text-amber-900 border-amber-300"
+                                        }`}
+                                      >
+                                        {order.paymentStatus === "liquidado" ? "✅ Liquidado" : "💵 Con Anticipo"}
+                                      </span>
+                                      <span className="text-[11px] font-black text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                        🎂 {orderPieces} {orderPieces === 1 ? "artículo" : "artículos"}
+                                      </span>
+                                      <span className="text-xs text-stone-900 font-black">
+                                        👤 {order.customerName} {order.phone && order.phone !== "N/A" ? `(${order.phone})` : ""}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-stone-700 font-medium mt-1 line-clamp-1">
+                                      {order.description || (order.items || []).map((i) => `${i.quantity}x ${i.name}`).join(", ") || "Encargo especial de pastelería"}
+                                    </p>
+                                    <div className="text-[11px] text-stone-500 font-medium mt-0.5">
+                                      📅 Entrega: {order.deliveryDate} {order.deliveryTime || ""} ({order.deliveryType === "domicilio" ? "🛵 Domicilio" : "🏪 Sucursal"})
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100">
+                                    <div className="text-right">
+                                      <span className="text-base sm:text-lg font-black text-emerald-700 block">
+                                        +{formatCurrency(order.deposit)}
+                                      </span>
+                                      <span className="text-[10px] text-stone-400 font-bold block">
+                                        Total: {formatCurrency(order.total)}
+                                        {order.remainingBalance > 0 && ` • Resta: ${formatCurrency(order.remainingBalance)}`}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      {onSelectOrderForPayment && order.remainingBalance > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleCloseDetailModal();
+                                            onSelectOrderForPayment(order);
+                                          }}
+                                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
+                                          title="Cobrar saldo restante"
+                                        >
+                                          Cobrar
+                                        </button>
+                                      )}
+                                      {onSelectOrderForReceipt && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleCloseDetailModal();
+                                            onSelectOrderForReceipt(order);
+                                          }}
+                                          className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                                          title="Ver comprobante de pedido"
+                                        >
+                                          <Printer className="w-3.5 h-3.5 text-amber-800" />
+                                          <span className="hidden sm:inline">Ticket</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            );
+                              );
+                            }
+
+                            return null;
                           })}
                         </div>
                       )}
@@ -3071,7 +3299,7 @@ export default function ExpensesModal({
 
                         <div className="flex items-center justify-between p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl">
                           <span className="text-emerald-950 flex items-center gap-1.5">
-                            <span>🥖</span> (+) Ventas en Efectivo del Turno
+                            <span>🥖</span> (+) Ventas y Pedidos en Efectivo
                           </span>
                           <span className="font-black text-emerald-700">+{formatCurrency(totalShiftCashSales)}</span>
                         </div>

@@ -824,7 +824,7 @@ export default function CashDrawerShiftModal({
                       <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(syncedFund)}</span>
                     </div>
                     <div className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
-                      <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
+                      <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas y Pedidos</span>
                       <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(cashSales)}</span>
                     </div>
                     {totalIncomesInCash > 0 && (
@@ -876,7 +876,7 @@ export default function CashDrawerShiftModal({
                           <span className="text-xl">💵</span> Dinero que debe haber en caja:
                         </span>
                         <span className="text-xs sm:text-sm text-stone-600 font-bold mt-0.5 block">
-                          Fondo: {formatCurrency(syncedFund)} • Ventas: {formatCurrency(cashSales)}{totalIncomesInCash > 0 ? ` • Entradas: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos: -{formatCurrency(totalExpenses)}
+                          Fondo: {formatCurrency(syncedFund)} • Ventas y Pedidos: {formatCurrency(cashSales)}{totalIncomesInCash > 0 ? ` • Entradas: +${formatCurrency(totalIncomesInCash)}` : ""} • Gastos: -{formatCurrency(totalExpenses)}
                         </span>
                       </div>
                       <span className="text-3xl sm:text-4xl font-black text-amber-950 bg-gradient-to-r from-amber-200 to-amber-300 px-5 py-2 rounded-2xl shadow-md border-2 border-amber-400">
