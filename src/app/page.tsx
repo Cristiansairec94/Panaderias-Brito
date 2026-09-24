@@ -693,7 +693,7 @@ export default function Home() {
               </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Comparativa de ventas, producto más vendido, método de pago predominante y gavetas de efectivo.
+              Comparativa de ventas en tiempo real, cumplimiento de metas, ticket promedio, arqueo y métodos de cobro.
             </p>
           </div>
 
@@ -711,9 +711,16 @@ export default function Home() {
         {/* 3 Branch Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {sortedBranches.map((b, idx) => {
-            const pct = Math.min(100, Math.round((b.todaySales / Math.max(1, b.dailyGoal)) * 100));
+            // Cálculos precisos y sin truncar
+            const isGoalAchieved = b.todaySales >= b.dailyGoal;
+            const realPct = Math.round((b.todaySales / Math.max(1, b.dailyGoal)) * 100);
+            const barPct = Math.min(100, realPct);
+            const diffGoal = Math.abs(b.todaySales - b.dailyGoal);
             const isSelected = !isAllBranches && currentBranch?.id === b.id;
             const isTopRank = idx === 0;
+
+            // Ticket promedio exacto
+            const avgTicket = b.todayTickets > 0 ? b.todaySales / b.todayTickets : 0;
 
             // Producto más vendido de la sucursal
             const topProd = b.topProduct || (
@@ -726,150 +733,223 @@ export default function Home() {
                 : { name: "Concha de Vainilla", piecesSold: 120, category: "Pan Dulce", icon: "🥖" }
             );
 
-            // Método de pago predominante
+            // Desglose exacto de cobros
             const cashSales = b.currentShift?.cashSales || 0;
             const cardSales = b.currentShift?.cardSales || 0;
             const transferSales = b.currentShift?.transferSales || 0;
             const totalShiftSales = Math.max(1, cashSales + cardSales + transferSales);
 
-            const isCashDominant = cashSales >= cardSales;
-            const cashSharePct = Math.round((cashSales / totalShiftSales) * 100);
-            const cardSharePct = Math.round((cardSales / totalShiftSales) * 100);
-            const dominantPct = isCashDominant ? cashSharePct : cardSharePct;
+            const cashPct = Math.round((cashSales / totalShiftSales) * 100);
+            const cardPct = Math.round((cardSales / totalShiftSales) * 100);
+            const transferPct = Math.max(0, 100 - cashPct - cardPct);
 
             return (
               <div 
                 key={b.id} 
-                className={`p-5 rounded-3xl transition-all border flex flex-col justify-between space-y-4 ${
+                className={`p-5 rounded-3xl transition-all border flex flex-col justify-between space-y-4 relative ${
                   isSelected 
-                    ? "bg-gradient-to-br from-orange-50/60 via-white to-rose-50/40 border-orange-400 shadow-lg ring-2 ring-orange-400/40" 
-                    : "bg-stone-50/70 hover:bg-white border-stone-200/90 hover:border-orange-400 hover:shadow-md"
+                    ? "bg-gradient-to-br from-orange-50/70 via-white to-amber-50/40 border-orange-400 shadow-xl ring-2 ring-orange-400/40" 
+                    : "bg-white hover:bg-stone-50/50 border-stone-200/90 hover:border-orange-300 hover:shadow-lg"
                 }`}
               >
-                <div>
-                  {/* Top Header */}
+                <div className="space-y-4">
+                  {/* Cabecera: Rango, Sucursal, Estatus y Filtro */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black text-xs ${
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs shrink-0 shadow-xs ${
                         isTopRank 
-                          ? "bg-amber-100 text-amber-800 border border-amber-300" 
-                          : "bg-stone-200 text-stone-700"
+                          ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-amber-200/50" 
+                          : idx === 1
+                          ? "bg-stone-200 text-stone-700 font-bold"
+                          : "bg-stone-100 text-stone-600 font-bold"
                       }`}>
-                        {isTopRank ? <Award className="w-5 h-5 text-amber-600" /> : `#${idx + 1}`}
+                        {isTopRank ? <Award className="w-5 h-5 text-white" /> : `#${idx + 1}`}
                       </div>
                       <div>
-                        <p className="font-black text-sm text-stone-900 leading-tight flex items-center gap-1.5">
-                          {b.name}
-                          {isTopRank && (
-                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
-                              Líder
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-[11px] text-stone-400">{b.address.split(",")[0]}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-stone-100 text-stone-600 border border-stone-200">
+                            {b.code}
+                          </span>
+                          <p className="font-black text-sm text-stone-900 leading-tight">
+                            {b.name}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-stone-500">
+                          <span className="truncate max-w-[155px]" title={b.address}>{b.address.split(",")[0]}</span>
+                          <span className="text-stone-300">•</span>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Abierta
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     <button
                       onClick={() => switchBranch(b.id)}
-                      className={`text-[10px] font-black px-2.5 py-1 rounded-xl transition-all ${
+                      title={isSelected ? "Sucursal activa actualmente" : "Hacer clic para filtrar el dashboard con esta sucursal"}
+                      className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl transition-all shrink-0 active:scale-95 ${
                         isSelected
-                          ? "bg-orange-600 text-white shadow-sm"
-                          : "bg-white text-stone-700 border border-stone-200 hover:bg-orange-50 hover:text-orange-700"
+                          ? "bg-orange-600 text-white shadow-sm ring-2 ring-orange-200"
+                          : "bg-stone-100 hover:bg-orange-50 text-stone-600 hover:text-orange-700 border border-stone-200"
                       }`}
                     >
-                      {isSelected ? "Seleccionada" : "Filtrar"}
+                      {isSelected ? "Activa ✓" : "Filtrar"}
                     </button>
                   </div>
 
-                  {/* Sales & Target */}
-                  <div className="mt-4 space-y-1.5">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs text-stone-500 font-medium">Venta de hoy:</span>
-                      <span className="font-black text-lg text-stone-900">{formatCurrency(b.todaySales)}</span>
+                  {/* Venta Acumulada y Meta Exacta */}
+                  <div className="bg-stone-50/80 rounded-2xl p-3.5 border border-stone-100 space-y-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Venta de hoy</span>
+                        <span className="text-2xl font-black text-stone-900 tracking-tight">{formatCurrency(b.todaySales)}</span>
+                      </div>
+                      <div className="text-right">
+                        {isGoalAchieved ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            {realPct}% (+{formatCurrency(diffGoal)})
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200">
+                            {realPct}% (Faltan {formatCurrency(diffGoal)})
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-orange-500 via-rose-500 to-emerald-500 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-stone-500">
-                      <span>{b.todayTickets} tickets</span>
-                      <span className="font-bold text-stone-700">{pct}% de meta ({formatCurrency(b.dailyGoal)})</span>
+                    {/* Barra de progreso visual */}
+                    <div className="space-y-1">
+                      <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden shadow-inner">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ${
+                            isGoalAchieved
+                              ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                              : "bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500"
+                          }`}
+                          style={{ width: `${barPct}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-stone-500 font-semibold">
+                        <span>{b.todayTickets} tickets cobrados</span>
+                        <span>Meta: <strong className="text-stone-700">{formatCurrency(b.dailyGoal)}</strong></span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Cashier, Drawer & Key Store Metrics */}
-                  <div className="mt-3 pt-3 border-t border-stone-200/70 space-y-2 text-xs">
-                    <div className="flex items-center justify-between text-stone-600">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-stone-400" />
-                        {b.currentShift.name.split("(")[0]}
-                      </span>
-                      <span className="font-bold text-stone-800">{b.currentShift.cashier}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-stone-600">
-                      <span>Efectivo en gaveta:</span>
-                      <span className="font-black text-emerald-700">{formatCurrency(b.cashInDrawer)}</span>
+                  {/* Métricas Precisas: Ticket Promedio & Gaveta de Efectivo */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-stone-50/60 rounded-xl p-2.5 border border-stone-200/70">
+                      <span className="text-[10px] font-semibold text-stone-400 block">Ticket Promedio</span>
+                      <span className="font-black text-stone-900 text-sm">{formatCurrency(avgTicket)}</span>
+                      <span className="text-[10px] text-stone-500 block mt-0.5">Por transacción</span>
                     </div>
 
-                    {/* Producto más vendido */}
-                    <div className="flex items-center justify-between text-stone-600 pt-1.5 border-t border-stone-100">
-                      <span className="flex items-center gap-1.5 font-medium text-stone-500">
-                        <Award className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <div className="bg-stone-50/60 rounded-xl p-2.5 border border-stone-200/70">
+                      <span className="text-[10px] font-semibold text-stone-400 block">Efectivo en Gaveta</span>
+                      <span className="font-black text-emerald-700 text-sm">{formatCurrency(b.cashInDrawer)}</span>
+                      <span className="text-[10px] text-stone-500 block mt-0.5">Fondo ini: {formatCurrency(b.currentShift?.initialFund || 1000)}</span>
+                    </div>
+                  </div>
+
+                  {/* Desglose Exacto y Proporcional de Cobros */}
+                  <div className="bg-stone-50/60 rounded-xl p-2.5 border border-stone-200/70 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-stone-700">
+                      <span className="flex items-center gap-1">
+                        <Receipt className="w-3.5 h-3.5 text-stone-400" />
+                        Desglose de Formas de Pago
+                      </span>
+                      <span className="text-[10px] font-normal text-stone-400">{formatCurrency(totalShiftSales)}</span>
+                    </div>
+
+                    {/* Barra proporcional de 3 métodos */}
+                    <div className="w-full h-2 rounded-full overflow-hidden flex bg-stone-200 shadow-inner">
+                      <div 
+                        style={{ width: `${cashPct}%` }} 
+                        className="bg-emerald-500 h-full transition-all duration-500" 
+                        title={`Efectivo: ${formatCurrency(cashSales)} (${cashPct}%)`} 
+                      />
+                      <div 
+                        style={{ width: `${cardPct}%` }} 
+                        className="bg-blue-500 h-full transition-all duration-500" 
+                        title={`Tarjeta: ${formatCurrency(cardSales)} (${cardPct}%)`} 
+                      />
+                      <div 
+                        style={{ width: `${transferPct}%` }} 
+                        className="bg-purple-500 h-full transition-all duration-500" 
+                        title={`Transferencia: ${formatCurrency(transferSales)} (${transferPct}%)`} 
+                      />
+                    </div>
+
+                    {/* Valores exactos */}
+                    <div className="grid grid-cols-3 gap-1 pt-0.5 text-[10px]">
+                      <div className="flex flex-col">
+                        <span className="text-emerald-700 font-bold flex items-center gap-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Efectivo
+                        </span>
+                        <span className="font-extrabold text-stone-800">{formatCurrency(cashSales)}</span>
+                        <span className="text-[9px] text-stone-400 font-semibold">{cashPct}%</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-blue-700 font-bold flex items-center gap-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          Tarjeta
+                        </span>
+                        <span className="font-extrabold text-stone-800">{formatCurrency(cardSales)}</span>
+                        <span className="text-[9px] text-stone-400 font-semibold">{cardPct}%</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-purple-700 font-bold flex items-center gap-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                          Transf.
+                        </span>
+                        <span className="font-extrabold text-stone-800">{formatCurrency(transferSales)}</span>
+                        <span className="text-[9px] text-stone-400 font-semibold">{transferPct}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Más Vendido & Operación del Turno */}
+                  <div className="pt-2 border-t border-stone-100 space-y-2 text-xs">
+                    {/* Producto Más Vendido */}
+                    <div className="flex items-center justify-between text-stone-600 bg-amber-50/60 rounded-xl px-2.5 py-1.5 border border-amber-200/60">
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-amber-900">
+                        <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                         <span>Más vendido:</span>
                       </span>
-                      <span
-                        className="font-bold text-stone-900 flex items-center gap-1 text-right truncate max-w-[175px]"
-                        title={`${topProd.name} (${topProd.piecesSold} piezas vendidas)`}
-                      >
+                      <span className="font-bold text-stone-900 flex items-center gap-1.5 text-right truncate">
                         <span className="text-xs">{topProd.icon || "🥖"}</span>
-                        <span className="truncate">{topProd.name}</span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                        <span className="truncate max-w-[130px] text-[11px]">{topProd.name}</span>
+                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 shrink-0">
                           {topProd.piecesSold} pz
                         </span>
                       </span>
                     </div>
 
-                    {/* Método de pago predominante */}
-                    <div className="flex items-center justify-between text-stone-600">
-                      <span className="flex items-center gap-1.5 font-medium text-stone-500">
-                        {isCashDominant ? (
-                          <Banknote className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        ) : (
-                          <CreditCard className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                        )}
-                        <span>Pago habitual:</span>
+                    {/* Turno y Cajero */}
+                    <div className="flex items-center justify-between text-[11px] text-stone-500 px-1">
+                      <span className="flex items-center gap-1 truncate" title={`Turno: ${b.currentShift.name}`}>
+                        <Clock className="w-3 h-3 text-stone-400 shrink-0" />
+                        <span>{b.currentShift.name.split("(")[0]} ({b.currentShift.openedAt})</span>
                       </span>
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`text-[11px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs ${
-                            isCashDominant
-                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                              : "bg-blue-50 text-blue-800 border border-blue-200"
-                          }`}
-                        >
-                          {isCashDominant ? "💵 Efectivo" : "💳 Tarjeta"}
-                          <span className="font-semibold text-[10px] opacity-80">({dominantPct}%)</span>
-                        </span>
-                      </div>
+                      <span className="font-semibold text-stone-700 truncate max-w-[120px]" title={`Cajero: ${b.currentShift.cashier}`}>
+                        {b.currentShift.cashier}
+                      </span>
+                    </div>
+
+                    {/* Responsable y Teléfono */}
+                    <div className="flex items-center justify-between text-[11px] text-stone-400 px-1">
+                      <span className="truncate max-w-[140px]" title={`Responsable: ${b.manager}`}>
+                        Resp: <strong className="text-stone-600 font-medium">{b.manager}</strong>
+                      </span>
+                      <span className="flex items-center gap-1 text-stone-500 font-medium">
+                        <Phone className="w-3 h-3 text-stone-400" />
+                        {b.phone}
+                      </span>
                     </div>
                   </div>
-                </div>
-
-                {/* Card footer actions */}
-                <div className="pt-3 border-t border-stone-200/70">
-                  <Link
-                    href="/pos"
-                    onClick={() => switchBranch(b.id)}
-                    className="w-full py-2 rounded-xl bg-gradient-to-r from-orange-600 to-rose-600 hover:brightness-110 text-white text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                  >
-                    <ShoppingBag className="w-3.5 h-3.5 text-amber-200" />
-                    Abrir POS
-                  </Link>
                 </div>
               </div>
             );
