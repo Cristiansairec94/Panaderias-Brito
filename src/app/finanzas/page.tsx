@@ -23,7 +23,6 @@ import {
   AlertTriangle,
   Users,
   Flame,
-  Wheat,
   Clock,
   HelpCircle,
   Eye,
@@ -47,7 +46,7 @@ import {
 import FinancialReportModal from "@/components/finanzas/FinancialReportModal";
 import OperationsIncomeChart from "@/components/finanzas/OperationsIncomeChart";
 
-type FinanzasTab = "pl" | "tesoreria" | "panaderia";
+type FinanzasTab = "pl" | "tesoreria";
 
 export default function FinanzasPage() {
   const { branches, currentBranch, isAllBranches, switchBranch } = useBranch();
@@ -311,18 +310,6 @@ export default function FinanzasPage() {
           <Wallet className="w-4 h-4 text-emerald-600" />
           <span>Tesorería & Cuentas</span>
         </button>
-
-        <button
-          onClick={() => setActiveTab("panaderia")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
-            activeTab === "panaderia"
-              ? "bg-white text-stone-900 shadow-sm border border-stone-200/80 ring-2 ring-orange-400/20"
-              : "text-stone-600 hover:text-stone-900 hover:bg-white/60"
-          }`}
-        >
-          <Wheat className="w-4 h-4 text-amber-600" />
-          <span>Eficiencia & Panadería</span>
-        </button>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════════ */}
@@ -561,47 +548,6 @@ export default function FinanzasPage() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {/* TAB 4: EFICIENCIA DE PANADERÍA, MERMAS & CRÉDITO                            */}
-      {/* ═══════════════════════════════════════════════════════════════════════════ */}
-      {activeTab === "panaderia" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Métricas Operativas de Panadería Tradicional */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm transition-all duration-200 space-y-1">
-              <span className="text-xs font-bold text-stone-500 block">Punto de Equilibrio Diario</span>
-              <p className="text-2xl font-black text-brito-orange-700">{formatCurrency(kpis.dailyBreakEven)}</p>
-              <p className="text-[11px] text-stone-500 font-medium">
-                Venta diaria mínima para cubrir costos fijos y nóminas
-              </p>
-            </div>
-
-            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm transition-all duration-200 space-y-1">
-              <span className="text-xs font-bold text-stone-500 block">Equivalente en Piezas de Pan</span>
-              <p className="text-2xl font-black text-amber-800">~{kpis.breakEvenPieces.toLocaleString()} pzas</p>
-              <p className="text-[11px] text-stone-500 font-medium">
-                Bolillos y pan dulce al día para operar en ganancias
-              </p>
-            </div>
-
-            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm transition-all duration-200 space-y-1">
-              <span className="text-xs font-bold text-stone-500 block">Ticket Promedio Mostrador</span>
-              <p className="text-2xl font-black text-stone-900">{formatCurrency(kpis.ticketAverage)}</p>
-              <p className="text-[11px] text-stone-500 font-medium">
-                Compra promedio por cliente en panadería
-              </p>
-            </div>
-
-            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm transition-all duration-200 space-y-1">
-              <span className="text-xs font-bold text-stone-500 block">Costo de Mermas de Horno</span>
-              <p className="text-2xl font-black text-rose-700">{formatCurrency(pl.wasteLoss)}</p>
-              <p className="text-[11px] text-rose-700 font-bold">
-                {kpis.wasteCostShare}% de pérdida sobre la producción
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─── Modal de Reporte Financiero Imprimible ────────────────────────────── */}
       <FinancialReportModal
