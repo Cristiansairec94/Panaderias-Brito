@@ -235,6 +235,8 @@ export interface CashExpense {
   date: string;
   createdAt?: string;
   timestamp?: number | string;
+  isOwner?: boolean;
+  authorizedBy?: string;
 }
 
 export type CashIncomeCategory =

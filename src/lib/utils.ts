@@ -289,7 +289,18 @@ export function matchesCashier(itemCashier?: string, targetCashier?: string): bo
   const a = normalizeCashierName(itemCashier);
   const b = normalizeCashierName(targetCashier);
   if (!a || !b) return false;
-  return a === b || a.includes(b) || b.includes(a);
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+
+  // Comparación simplificada sin espacios ni números (ej. cristiansairec94 vs cristian saire brito)
+  const cleanA = a.replace(/[^a-zñáéíóú]/gi, "");
+  const cleanB = b.replace(/[^a-zñáéíóú]/gi, "");
+  if (cleanA && cleanB) {
+    if (cleanA === cleanB || cleanA.includes(cleanB) || cleanB.includes(cleanA)) return true;
+    const wordsA = a.split(/\s+/).filter((w) => w.length > 2);
+    const wordsB = b.split(/\s+/).filter((w) => w.length > 2);
+    if (wordsA.length > 0 && wordsB.length > 0 && wordsA[0] === wordsB[0]) return true;
+  }
+  return false;
 }
 
 /**

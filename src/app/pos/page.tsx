@@ -531,7 +531,12 @@ export default function POSPage() {
         const saved = localStorage.getItem("brito_pos_current_sales");
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed)) {
+            if (!localStorage.getItem("brito_pos_master_sales") && parsed.length > 0) {
+              localStorage.setItem("brito_pos_master_sales", JSON.stringify(parsed));
+            }
+            return parsed;
+          }
         }
       } catch (e) {}
     }
@@ -553,6 +558,7 @@ export default function POSPage() {
   useEffect(() => {
     try {
       localStorage.setItem("brito_pos_current_sales", JSON.stringify(recentSalesList));
+      window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
   }, [recentSalesList]);
 
@@ -1361,8 +1367,20 @@ export default function POSPage() {
   }, [lastCutInfo, shiftVersion]);
 
   const currentShiftSales = useMemo(() => {
-    return recentSalesList.filter((s) => {
-      if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
+    const filtered = recentSalesList.filter((s) => {
+      if (s.cashier && cashierName) {
+        const isMatch = matchesCashier(s.cashier, cashierName) ||
+                        cashierName.toLowerCase().includes("don toño") ||
+                        cashierName.toLowerCase().includes("admin") ||
+                        s.cashier.toLowerCase().includes("don toño") ||
+                        s.cashier.toLowerCase().includes("admin");
+        if (!isMatch) {
+          const isDifferentSpecificCashier = 
+            (s.cashier.toLowerCase().includes("cajera 2") && cashierName.toLowerCase().includes("cajera 1")) ||
+            (s.cashier.toLowerCase().includes("cajera 1") && cashierName.toLowerCase().includes("cajera 2"));
+          if (isDifferentSpecificCashier) return false;
+        }
+      }
       const t = typeof s.timestamp === "number"
         ? s.timestamp
         : s.timestamp
@@ -1370,9 +1388,10 @@ export default function POSPage() {
         : s.createdAt
         ? new Date(s.createdAt).getTime()
         : 0;
-      if (shiftStartBoundary > 0 && t > 0 && t < shiftStartBoundary) return false;
+      if (shiftStartBoundary > 0 && t > 0 && t < (shiftStartBoundary - 5000)) return false;
       return true;
     });
+    return filtered;
   }, [recentSalesList, cashierName, shiftStartBoundary]);
 
   const currentShiftExpenses = useMemo(() => {
@@ -1610,7 +1629,18 @@ export default function POSPage() {
       }
 
       setCompletedSale(newSaleRecord);
-      setRecentSalesList((prev) => [newSaleRecord, ...prev]);
+      setRecentSalesList((prev) => {
+        const nextList = [newSaleRecord, ...prev];
+        try {
+          localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextList));
+          const rawMaster = localStorage.getItem("brito_pos_master_sales");
+          const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+          const nextMaster = [newSaleRecord, ...prevMaster.filter((s) => s.id !== newSaleRecord.id)].slice(0, 1000);
+          localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
+          window.dispatchEvent(new Event("brito_sales_updated"));
+        } catch (e) {}
+        return nextList;
+      });
       setIsSubmitting(false);
       setShowReceiptModal(true);
 
@@ -1742,7 +1772,20 @@ export default function POSPage() {
     }
 
     // 3. Eliminar la venta de recentSalesList (no se cobrará el dinero ni afectará el corte)
-    setRecentSalesList((prev) => prev.filter((s) => s.id !== sale.id));
+    setRecentSalesList((prev) => {
+      const nextList = prev.filter((s) => s.id !== sale.id);
+      try {
+        localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextList));
+        const rawMaster = localStorage.getItem("brito_pos_master_sales");
+        if (rawMaster) {
+          const prevMaster: Sale[] = JSON.parse(rawMaster);
+          const nextMaster = prevMaster.filter((s) => s.id !== sale.id);
+          localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
+        }
+        window.dispatchEvent(new Event("brito_sales_updated"));
+      } catch (e) {}
+      return nextList;
+    });
 
     // 4. Notificación en el sistema de Panaderías Brito
     addNotification({
