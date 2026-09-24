@@ -4,7 +4,6 @@ import React, { useRef, useState, useMemo } from "react";
 import {
   Printer,
   X,
-  Send,
   Calendar,
   Clock,
   User,
@@ -110,38 +109,6 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
     window.print();
   };
 
-  // Generate WhatsApp message
-  const handleWhatsApp = () => {
-    const cleanPhone = order.phone.replace(/\D/g, "");
-    const formattedPhone = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
-    
-    const itemsText = (order.items || [])
-      .map((it) => {
-        const uPrice = it.unitPrice || (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0);
-        return `• *${it.quantity} pza(s)* - *${it.name}*\n   └ P. Unit: ${formatCurrency(uPrice)} | Subtotal: ${formatCurrency(it.subtotal)}`;
-      })
-      .join("\n");
-
-    const message = `🥖 *PANADERÍA BRITO - COMPROBANTE DE PEDIDO*\n` +
-      `Estimado/a *${order.customerName}*,\n\n` +
-      `¡Hemos registrado tu pedido con éxito!\n` +
-      `📌 *Folio:* ${order.orderNumber}\n` +
-      `🏬 *Sucursal:* ${order.branchName}\n` +
-      `📅 *Fecha de entrega:* ${order.deliveryDate} a las ${order.deliveryTime || "16:00"} hrs\n` +
-      (order.deliveryType === "domicilio" ? `📍 *Entrega a domicilio:* ${order.deliveryAddress}\n` : `📍 *Recoger en:* Mostrador de sucursal\n`) +
-      (order.dedication ? `📝 *Observaciones:* "${order.dedication}"\n` : "") +
-      `\n*Detalle del pedido:*\n${itemsText}\n\n` +
-      `💰 *Total:* ${formatCurrency(order.total)}\n` +
-      `💵 *Anticipo Pagado:* ${formatCurrency(order.deposit)} (${order.paymentMethod === "transferencia" ? "Transferencia SPEI" : order.paymentMethod === "tarjeta" ? "Tarjeta" : "Efectivo"})\n` +
-      (order.transferAccount ? `💳 *Cuenta/Tarjeta:* ${order.transferAccount}\n` : "") +
-      (order.cardTerminal ? `🏢 *Terminal:* ${order.cardTerminal}\n` : "") +
-      (order.paymentReference ? `🧾 *Comprobante/Ref:* ${order.paymentReference}\n` : "") +
-      `⚠️ *Resta por liquidar:* ${formatCurrency(order.remainingBalance)}\n\n` +
-      `¡Muchas gracias por tu preferencia! Cualquier duda comunícate con nosotros.`;
-
-    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
-  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
@@ -366,13 +333,13 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
           )}
 
           {/* Fila de Acciones */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {/* 1. Botón Añadir Cliente */}
             <button
               type="button"
               onClick={handleAddCustomer}
               disabled={isCustomerRegistered || isSaving}
-              className={`text-xs font-black py-2.5 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`text-xs sm:text-sm font-black py-2.5 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 isCustomerRegistered
                   ? "bg-emerald-50 text-emerald-700 border border-emerald-300/80 cursor-default"
                   : "bg-blue-600 hover:bg-blue-700 text-white shadow-md active:scale-95"
@@ -392,21 +359,11 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
               )}
             </button>
 
-            {/* 2. Enviar por WhatsApp */}
-            <button
-              type="button"
-              onClick={handleWhatsApp}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-            >
-              <Send className="w-4 h-4 shrink-0" />
-              <span className="truncate">Enviar por WhatsApp</span>
-            </button>
-
-            {/* 3. Imprimir Comprobante */}
+            {/* 2. Imprimir Comprobante */}
             <button
               type="button"
               onClick={handlePrint}
-              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+              className="bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-black py-2.5 px-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
             >
               <Printer className="w-4 h-4 shrink-0" />
               <span className="truncate">Imprimir Comprobante</span>
