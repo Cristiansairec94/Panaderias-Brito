@@ -861,20 +861,13 @@ export default function Home() {
                 </div>
 
                 {/* Card footer actions */}
-                <div className="pt-3 border-t border-stone-200/70 flex gap-2">
-                  <button
-                    onClick={() => simulateSale(b.id)}
-                    className="flex-1 py-1.5 rounded-xl bg-white hover:bg-orange-50 text-stone-700 hover:text-orange-700 border border-stone-200/90 text-[11px] font-bold transition-all flex items-center justify-center gap-1 active:scale-95"
-                  >
-                    <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
-                    +Venta
-                  </button>
+                <div className="pt-3 border-t border-stone-200/70">
                   <Link
                     href="/pos"
                     onClick={() => switchBranch(b.id)}
-                    className="flex-1 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-rose-600 hover:brightness-110 text-white text-[11px] font-black transition-all flex items-center justify-center gap-1 shadow-sm active:scale-95"
+                    className="w-full py-2 rounded-xl bg-gradient-to-r from-orange-600 to-rose-600 hover:brightness-110 text-white text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
                   >
-                    <ShoppingBag className="w-3 h-3 text-amber-200" />
+                    <ShoppingBag className="w-3.5 h-3.5 text-amber-200" />
                     Abrir POS
                   </Link>
                 </div>
