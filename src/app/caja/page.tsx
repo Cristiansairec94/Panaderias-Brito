@@ -223,6 +223,61 @@ function getShiftSuggestionByCurrentTime(date = new Date()) {
   }
 }
 
+function parseCutTimestamp(cut: ShiftCutRecord): number {
+  if (typeof cut.timestamp === "number" && !isNaN(cut.timestamp) && cut.timestamp > 0) {
+    return cut.timestamp;
+  }
+  if (cut.date) {
+    const dLower = cut.date.toLowerCase();
+    if (dLower.includes("hoy")) {
+      return Date.now();
+    }
+    if (dLower.includes("ayer")) {
+      return Date.now() - 86400000;
+    }
+    const matchAgoDays = dLower.match(/hace\s+(\d+)\s+d[ií]as/);
+    if (matchAgoDays) {
+      const days = parseInt(matchAgoDays[1], 10);
+      return Date.now() - days * 86400000;
+    }
+    const m = cut.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (m) {
+      return new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10)).getTime();
+    }
+    const mIso = cut.date.match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
+    if (mIso) {
+      return new Date(parseInt(mIso[1], 10), parseInt(mIso[2], 10) - 1, parseInt(mIso[3], 10)).getTime();
+    }
+  }
+  return Date.now();
+}
+
+function getCutDateParts(cut: ShiftCutRecord) {
+  const ts = parseCutTimestamp(cut);
+  const d = new Date(ts);
+  const year = d.getFullYear().toString();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return {
+    year,
+    yearMonth: `${year}-${month}`,
+    dateStr: `${year}-${month}-${day}`,
+  };
+}
+
+function formatLocalDate(d = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatLocalMonth(d = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
 export default function CajaPage() {
   const { user, usersList } = useAuth();
   const { currentBranch } = useBranch();
@@ -237,6 +292,10 @@ export default function CajaPage() {
   const [selectedCutForDetail, setSelectedCutForDetail] = useState<ShiftCutRecord | null>(null);
 
   // Filters for history
+  const [filterPeriod, setFilterPeriod] = useState<"dia" | "mes" | "ano" | "todos">("dia");
+  const [selectedDayDate, setSelectedDayDate] = useState<string>(() => formatLocalDate());
+  const [selectedMonthStr, setSelectedMonthStr] = useState<string>(() => formatLocalMonth());
+  const [selectedYearStr, setSelectedYearStr] = useState<string>(() => new Date().getFullYear().toString());
   const [searchQuery, setSearchQuery] = useState("");
   const [filterResponsible, setFilterResponsible] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "cuadrado" | "sobrante" | "faltante">("all");
@@ -429,9 +488,42 @@ export default function CajaPage() {
   // Active shift responsible name
   const currentShiftResponsible = user?.name || "Lupita Brito (Cajera 1)";
 
-  // Filtered cuts history
-  const filteredCuts = useMemo(() => {
+  // Cuts filtered primarily by Period (Día, Mes, Año, Todos)
+  const periodCuts = useMemo(() => {
+    if (filterPeriod === "todos") return cutsHistory;
     return cutsHistory.filter((cut) => {
+      const parts = getCutDateParts(cut);
+      if (filterPeriod === "dia") return parts.dateStr === selectedDayDate;
+      if (filterPeriod === "mes") return parts.yearMonth === selectedMonthStr;
+      if (filterPeriod === "ano") return parts.year === selectedYearStr;
+      return true;
+    });
+  }, [cutsHistory, filterPeriod, selectedDayDate, selectedMonthStr, selectedYearStr]);
+
+  // Counts by period for pill badges
+  const countsByPeriod = useMemo(() => {
+    let day = 0;
+    let month = 0;
+    let year = 0;
+
+    cutsHistory.forEach((c) => {
+      const parts = getCutDateParts(c);
+      if (parts.dateStr === selectedDayDate) day++;
+      if (parts.yearMonth === selectedMonthStr) month++;
+      if (parts.year === selectedYearStr) year++;
+    });
+
+    return {
+      day,
+      month,
+      year,
+      all: cutsHistory.length,
+    };
+  }, [cutsHistory, selectedDayDate, selectedMonthStr, selectedYearStr]);
+
+  // Filtered cuts history (Period + Search + Responsible + Status)
+  const filteredCuts = useMemo(() => {
+    return periodCuts.filter((cut) => {
       // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -461,7 +553,7 @@ export default function CajaPage() {
 
       return true;
     });
-  }, [cutsHistory, searchQuery, filterResponsible, filterStatus]);
+  }, [periodCuts, searchQuery, filterResponsible, filterStatus]);
 
   // Distinct Responsibles list for filter dropdown
   const uniqueResponsibles = useMemo(() => {
@@ -473,19 +565,19 @@ export default function CajaPage() {
     return Array.from(set);
   }, [cutsHistory]);
 
-  // Overall Historical Audit Metrics
+  // Overall Historical Audit Metrics (reflects filtered cuts of active period)
   const auditMetrics = useMemo(() => {
-    const totalCutsCount = cutsHistory.length;
-    const totalDeliveredCash = cutsHistory.reduce((sum, c) => {
+    const totalCutsCount = filteredCuts.length;
+    const totalDeliveredCash = filteredCuts.reduce((sum, c) => {
       const fund = c.nextFund ?? 0;
       return sum + Math.max(0, c.countedCash - fund);
     }, 0);
-    const totalSalesAudit = cutsHistory.reduce((sum, c) => {
+    const totalSalesAudit = filteredCuts.reduce((sum, c) => {
       const val = c.totalSalesAll || c.totalSales || (c.cashSales + c.cardSales + c.transferSales) || 0;
       return sum + val;
     }, 0);
-    const squareCutsCount = cutsHistory.filter((c) => c.difference === 0).length;
-    const diffCutsCount = cutsHistory.filter((c) => c.difference !== 0).length;
+    const squareCutsCount = filteredCuts.filter((c) => c.difference === 0).length;
+    const diffCutsCount = filteredCuts.filter((c) => c.difference !== 0).length;
 
     return {
       totalCutsCount,
@@ -494,7 +586,7 @@ export default function CajaPage() {
       squareCutsCount,
       diffCutsCount,
     };
-  }, [cutsHistory]);
+  }, [filteredCuts]);
 
   // Export History to CSV
   const handleExportCSV = () => {
@@ -851,7 +943,13 @@ export default function CajaPage() {
                   {auditMetrics.totalCutsCount} Turnos
                 </span>
                 <span className="text-[11px] text-stone-500 font-medium mt-0.5 block">
-                  Archivados en historial
+                  {filterPeriod === "dia"
+                    ? "En el día seleccionado"
+                    : filterPeriod === "mes"
+                    ? "En el mes seleccionado"
+                    : filterPeriod === "ano"
+                    ? "En el año seleccionado"
+                    : "Archivados en historial"}
                 </span>
               </div>
               <div className="p-3 bg-amber-50 text-amber-700 rounded-2xl border border-amber-200/60">
@@ -868,7 +966,13 @@ export default function CajaPage() {
                   {formatCurrency(auditMetrics.totalDeliveredCash)}
                 </span>
                 <span className="text-[11px] text-emerald-800 font-bold mt-0.5 block">
-                  Retirado de caja al cierre
+                  {filterPeriod === "dia"
+                    ? "Entregado en este día"
+                    : filterPeriod === "mes"
+                    ? "Entregado en el mes"
+                    : filterPeriod === "ano"
+                    ? "Entregado en el año"
+                    : "Retirado de caja al cierre"}
                 </span>
               </div>
               <div className="p-3 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-200/60">
@@ -919,7 +1023,208 @@ export default function CajaPage() {
           </div>
 
           {/* Barra de Búsqueda y Filtros de Auditoría */}
-          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 space-y-3">
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 space-y-4">
+            {/* 1. Selector Principal de Período (Día, Mes, Año, Todos) */}
+            <div className="bg-gradient-to-r from-stone-50 via-amber-50/20 to-stone-50 p-3 sm:p-4 rounded-2xl border border-stone-200/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black text-stone-600 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                  <Calendar className="w-4 h-4 text-amber-600" />
+                  Filtrar Por:
+                </span>
+                
+                <div className="inline-flex p-1 bg-white rounded-2xl border border-stone-200 shadow-2xs gap-1 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setFilterPeriod("dia")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      filterPeriod === "dia"
+                        ? "bg-amber-500 text-stone-900 shadow-xs"
+                        : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                    }`}
+                  >
+                    <span>📅</span>
+                    <span>Por Día</span>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                      filterPeriod === "dia" ? "bg-amber-600/30 text-stone-950" : "bg-stone-100 text-stone-500"
+                    }`}>
+                      {countsByPeriod.day}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterPeriod("mes")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      filterPeriod === "mes"
+                        ? "bg-amber-500 text-stone-900 shadow-xs"
+                        : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                    }`}
+                  >
+                    <span>🗓️</span>
+                    <span>Por Mes</span>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                      filterPeriod === "mes" ? "bg-amber-600/30 text-stone-950" : "bg-stone-100 text-stone-500"
+                    }`}>
+                      {countsByPeriod.month}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterPeriod("ano")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      filterPeriod === "ano"
+                        ? "bg-amber-500 text-stone-900 shadow-xs"
+                        : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                    }`}
+                  >
+                    <span>📆</span>
+                    <span>Por Año</span>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                      filterPeriod === "ano" ? "bg-amber-600/30 text-stone-950" : "bg-stone-100 text-stone-500"
+                    }`}>
+                      {countsByPeriod.year}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterPeriod("todos")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      filterPeriod === "todos"
+                        ? "bg-stone-900 text-white shadow-xs"
+                        : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+                    }`}
+                  >
+                    <span>📂</span>
+                    <span>Ver Todos</span>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                      filterPeriod === "todos" ? "bg-stone-700 text-white" : "bg-stone-100 text-stone-500"
+                    }`}>
+                      {cutsHistory.length}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Selector Dinámico de Fecha / Mes / Año */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {filterPeriod === "dia" && (
+                  <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
+                    <span className="text-[11px] font-black text-stone-400">Fecha:</span>
+                    <input
+                      type="date"
+                      value={selectedDayDate}
+                      onChange={(e) => setSelectedDayDate(e.target.value)}
+                      className="text-xs font-black text-stone-800 bg-transparent focus:outline-none cursor-pointer"
+                    />
+                    <div className="flex items-center gap-1 pl-1 border-l border-stone-200">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDayDate(formatLocalDate(new Date()))}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
+                          selectedDayDate === formatLocalDate(new Date())
+                            ? "bg-amber-500 text-stone-900"
+                            : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        }`}
+                      >
+                        Hoy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const y = new Date();
+                          y.setDate(y.getDate() - 1);
+                          setSelectedDayDate(formatLocalDate(y));
+                        }}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
+                          selectedDayDate === formatLocalDate(new Date(Date.now() - 86400000))
+                            ? "bg-amber-500 text-stone-900"
+                            : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        }`}
+                      >
+                        Ayer
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {filterPeriod === "mes" && (
+                  <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
+                    <span className="text-[11px] font-black text-stone-400">Mes:</span>
+                    <input
+                      type="month"
+                      value={selectedMonthStr}
+                      onChange={(e) => setSelectedMonthStr(e.target.value)}
+                      className="text-xs font-black text-stone-800 bg-transparent focus:outline-none cursor-pointer"
+                    />
+                    <div className="flex items-center gap-1 pl-1 border-l border-stone-200">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMonthStr(formatLocalMonth(new Date()))}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
+                          selectedMonthStr === formatLocalMonth(new Date())
+                            ? "bg-amber-500 text-stone-900"
+                            : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        }`}
+                      >
+                        Mes Actual
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {filterPeriod === "ano" && (
+                  <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
+                    <span className="text-[11px] font-black text-stone-400">Año:</span>
+                    <select
+                      value={selectedYearStr}
+                      onChange={(e) => setSelectedYearStr(e.target.value)}
+                      className="text-xs font-black text-stone-800 bg-transparent focus:outline-none cursor-pointer"
+                    >
+                      {Array.from(
+                        new Set([
+                          new Date().getFullYear().toString(),
+                          (new Date().getFullYear() - 1).toString(),
+                          (new Date().getFullYear() - 2).toString(),
+                          "2026",
+                          "2025",
+                          "2024",
+                        ])
+                      )
+                        .sort((a, b) => Number(b) - Number(a))
+                        .map((y) => (
+                          <option key={y} value={y}>
+                            Año {y}
+                          </option>
+                        ))}
+                    </select>
+                    <div className="flex items-center gap-1 pl-1 border-l border-stone-200">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedYearStr(new Date().getFullYear().toString())}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
+                          selectedYearStr === new Date().getFullYear().toString()
+                            ? "bg-amber-500 text-stone-900"
+                            : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        }`}
+                      >
+                        Año Actual
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {filterPeriod === "todos" && (
+                  <div className="text-xs font-bold text-stone-600 bg-white px-3 py-1.5 rounded-2xl border border-stone-200 shadow-2xs flex items-center gap-1.5">
+                    <span>📜</span>
+                    <span>Mostrando todo el historial sin límite de fecha</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Buscador de Texto, Filtro de Responsable y Estado de Arqueo */}
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
               {/* Buscador de texto */}
               <div className="relative flex-1">
@@ -934,7 +1239,7 @@ export default function CajaPage() {
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold cursor-pointer"
                   >
                     ✕
                   </button>
@@ -965,54 +1270,63 @@ export default function CajaPage() {
                 <button
                   type="button"
                   onClick={() => setFilterStatus("all")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
                     filterStatus === "all"
                       ? "bg-stone-900 text-white border-stone-900 shadow-xs"
                       : "bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200"
                   }`}
                 >
-                  Todos ({cutsHistory.length})
+                  Todos ({periodCuts.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setFilterStatus("cuadrado")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
                     filterStatus === "cuadrado"
                       ? "bg-emerald-900 text-emerald-100 border-emerald-950 shadow-xs ring-2 ring-emerald-500/20"
                       : "bg-stone-50 text-stone-700 hover:bg-emerald-50 border-stone-200"
                   }`}
                 >
-                  🟢 Exactos ({cutsHistory.filter((c) => c.difference === 0).length})
+                  🟢 Exactos ({periodCuts.filter((c) => c.difference === 0).length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setFilterStatus("sobrante")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
                     filterStatus === "sobrante"
                       ? "bg-blue-900 text-blue-100 border-blue-950 shadow-xs ring-2 ring-blue-500/20"
                       : "bg-stone-50 text-stone-700 hover:bg-blue-50 border-stone-200"
                   }`}
                 >
-                  🔵 Sobrantes ({cutsHistory.filter((c) => c.difference > 0).length})
+                  🔵 Sobrantes ({periodCuts.filter((c) => c.difference > 0).length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setFilterStatus("faltante")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
                     filterStatus === "faltante"
                       ? "bg-rose-900 text-rose-100 border-rose-950 shadow-xs ring-2 ring-rose-500/20"
                       : "bg-stone-50 text-stone-700 hover:bg-rose-50 border-stone-200"
                   }`}
                 >
-                  🔴 Faltantes ({cutsHistory.filter((c) => c.difference < 0).length})
+                  🔴 Faltantes ({periodCuts.filter((c) => c.difference < 0).length})
                 </button>
               </div>
             </div>
 
-            {/* Sub-barra informativa */}
+            {/* 3. Sub-barra informativa */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 pt-1 border-t border-stone-100">
-              <span className="font-bold text-stone-700">
-                Mostrando <strong className="text-amber-950">{filteredCuts.length}</strong> comprobante(s) de corte
+              <span className="font-bold text-stone-700 flex items-center gap-1.5 flex-wrap">
+                <span>Mostrando <strong className="text-amber-950">{filteredCuts.length}</strong> de {cutsHistory.length} comprobante(s)</span>
+                <span className="text-[11px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-extrabold">
+                  {filterPeriod === "dia"
+                    ? `Día: ${selectedDayDate}`
+                    : filterPeriod === "mes"
+                    ? `Mes: ${selectedMonthStr}`
+                    : filterPeriod === "ano"
+                    ? `Año: ${selectedYearStr}`
+                    : "Histórico Completo"}
+                </span>
               </span>
               <span className="text-[11px] text-stone-400">
                 Haz clic en <strong>"🖨️ Reimprimir Ticket"</strong> en cualquier corte para imprimir el comprobante térmico oficial.
@@ -1027,22 +1341,32 @@ export default function CajaPage() {
                 <div className="text-5xl">📜</div>
                 <h4 className="font-black text-base text-stone-800">No se encontraron cortes de caja</h4>
                 <p className="text-xs text-stone-500 max-w-md mx-auto">
-                  {searchQuery || filterResponsible !== "all" || filterStatus !== "all"
-                    ? "Ningún corte coincide con los filtros aplicados. Prueba limpiando la búsqueda."
+                  {filterPeriod !== "todos" || searchQuery || filterResponsible !== "all" || filterStatus !== "all"
+                    ? "Ningún corte coincide con el período o filtros seleccionados. Puedes cambiar de fecha, mes o ver todos los registros."
                     : "No hay registros de cortes de caja archivados aún."}
                 </p>
-                {(searchQuery || filterResponsible !== "all" || filterStatus !== "all") && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setFilterResponsible("all");
-                      setFilterStatus("all");
-                    }}
-                    className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors"
-                  >
-                    Restablecer Filtros
-                  </button>
-                )}
+                <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+                  {filterPeriod !== "todos" && (
+                    <button
+                      onClick={() => setFilterPeriod("todos")}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 font-black rounded-xl text-xs transition-colors shadow-xs cursor-pointer"
+                    >
+                      Ver Todos los Cortes ({cutsHistory.length})
+                    </button>
+                  )}
+                  {(searchQuery || filterResponsible !== "all" || filterStatus !== "all") && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setFilterResponsible("all");
+                        setFilterStatus("all");
+                      }}
+                      className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                    >
+                      Restablecer Filtros
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto">
