@@ -279,6 +279,7 @@ export default function CajaPage() {
   const [movCategory, setMovCategory] = useState<CashMovement["category"]>("compra_insumos");
   const [movAmount, setMovAmount] = useState<string>("");
   const [movReason, setMovReason] = useState("");
+  const [movSuccessFeedback, setMovSuccessFeedback] = useState<string | null>(null);
 
   // Live Shift Cut Modal
   const [isCorteModalOpen, setIsCorteModalOpen] = useState(false);
@@ -558,9 +559,13 @@ export default function CajaPage() {
       });
     }
 
-    setIsMovementModalOpen(false);
+    const savedAmount = Number(movAmount);
+    const savedType = movementType;
     setMovAmount("");
     setMovReason("");
+    setMovSuccessFeedback(
+      `✓ ${savedType === "salida" ? "Salida/Gasto" : "Entrada"} por ${formatCurrency(savedAmount)} registrado en caja. Puedes registrar otro movimiento o cerrar la ventana.`
+    );
   };
 
   // Execute and Save Live Cash Cut to Shared History
@@ -1290,10 +1295,26 @@ export default function CajaPage() {
                   {movementType === "entrada" ? "Registrar Entrada de Dinero" : "Registrar Salida / Gasto de Caja"}
                 </h3>
               </div>
-              <button onClick={() => setIsMovementModalOpen(false)} className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl">
+              <button onClick={() => { setIsMovementModalOpen(false); setMovSuccessFeedback(null); }} className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {movSuccessFeedback && (
+              <div className="p-3.5 bg-emerald-50 border-2 border-emerald-400 rounded-2xl text-xs font-bold text-emerald-950 flex items-center justify-between gap-2 shadow-xs animate-in slide-in-from-top-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-600 text-base">✓</span>
+                  <span>{movSuccessFeedback}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMovSuccessFeedback(null)}
+                  className="text-stone-400 hover:text-stone-700 p-1 cursor-pointer font-bold shrink-0"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             <form onSubmit={handleCreateMovement} className="space-y-3.5 text-xs">
               <div className="space-y-1">
@@ -1349,10 +1370,10 @@ export default function CajaPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsMovementModalOpen(false)}
-                  className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-all"
+                  onClick={() => { setIsMovementModalOpen(false); setMovSuccessFeedback(null); }}
+                  className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-all cursor-pointer"
                 >
-                  Cancelar
+                  Cerrar ventana
                 </button>
                 <button
                   type="submit"

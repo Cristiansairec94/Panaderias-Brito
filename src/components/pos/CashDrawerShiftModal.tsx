@@ -932,56 +932,6 @@ export default function CashDrawerShiftModal({
                           ⚠️ El fondo no puede sobrepasar el dinero que hay en caja ({formatCurrency(maxAvailableCash)})
                         </div>
                       )}
-
-                      {/* Botones de Atajo Rápido para Fondo Siguiente */}
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        <span className="text-[10px] text-stone-500 font-bold self-center mr-1">Atajos:</span>
-                        <button
-                          type="button"
-                          onClick={() => setNextInitialFund("")}
-                          className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-colors cursor-pointer ${
-                            nextInitialFund.trim() === ""
-                              ? "bg-amber-200 text-amber-900 border-amber-400 font-black shadow-2xs"
-                              : "bg-stone-100 hover:bg-stone-200 text-stone-700 border-stone-300"
-                          }`}
-                        >
-                          En blanco ($0.00)
-                        </button>
-                        {[200, 300, 500, 800, 1000].map((val) => {
-                          const isExceeded = val > maxAvailableCash;
-                          return (
-                            <button
-                              key={val}
-                              type="button"
-                              disabled={isExceeded}
-                              onClick={() => setNextInitialFund(val.toString())}
-                              className={`px-2.5 py-1 text-xs font-black rounded-lg border transition-colors ${
-                                isExceeded
-                                  ? "bg-stone-100 text-stone-300 border-stone-200 cursor-not-allowed opacity-50"
-                                  : nextInitialFund === val.toString()
-                                  ? "bg-amber-200 text-amber-900 border-amber-400 shadow-2xs cursor-pointer"
-                                  : "bg-stone-100 hover:bg-stone-200 text-stone-800 border-stone-300 cursor-pointer"
-                              }`}
-                              title={isExceeded ? `Supera el dinero en caja (${formatCurrency(maxAvailableCash)})` : undefined}
-                            >
-                              {formatCurrency(val)}
-                            </button>
-                          );
-                        })}
-                        {maxAvailableCash > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setNextInitialFund(maxAvailableCash.toString())}
-                            className={`px-2.5 py-1 text-xs font-black rounded-lg border transition-colors cursor-pointer ${
-                              nextInitialFund === maxAvailableCash.toString()
-                                ? "bg-emerald-200 text-emerald-950 border-emerald-400 shadow-2xs"
-                                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300"
-                            }`}
-                          >
-                            Todo en caja ({formatCurrency(maxAvailableCash)})
-                          </button>
-                        )}
-                      </div>
                     </div>
 
                     {/* Resumen de Entrega: Total Contado, Fondo que Queda, Efectivo a Entregar */}
