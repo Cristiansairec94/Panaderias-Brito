@@ -71,8 +71,7 @@ export default function Home() {
     switchBranch, 
     consolidatedMetrics,
     simulateSale,
-    recentSimulatedSales,
-    cashMovements
+    recentSimulatedSales
   } = useBranch();
 
   // Orders state (Pedidos de mostrador levantados por cajeros)
@@ -139,16 +138,6 @@ export default function Home() {
   const percentGoal = Math.min(100, Math.round((activeSales / Math.max(1, activeGoal)) * 100));
   const avgTicket = Math.round(activeSales / Math.max(1, activeTickets));
   const estimatedPieces = Math.round(activeTickets * 8.6);
-
-  // Margen bruto estimado de panadería (~44% sobre ventas)
-  const estimatedGrossProfit = Math.round(activeSales * 0.442);
-
-  // Gastos registrados hoy desde el flujo de caja
-  const todayCashExpenses = useMemo(() => {
-    return cashMovements
-      .filter((m) => m.type === "salida")
-      .reduce((sum, m) => sum + m.amount, 0);
-  }, [cashMovements]);
 
   // Filtered orders for active branch
   const filteredOrders = useMemo(() => {
@@ -530,52 +519,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Secondary Operational Strip: Margen Bruto, Cobros Pendientes, Gastos Menores */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-          <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/70 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Margen Bruto Est.</p>
-              <p className="text-base sm:text-lg font-black text-amber-950 mt-0.5">{formatCurrency(estimatedGrossProfit)}</p>
-              <p className="text-[10px] text-amber-700 font-medium">~44.2% del volumen</p>
-            </div>
-            <span className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs">
-              📈
-            </span>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/70 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Cobros Pendientes</p>
-              <p className="text-base sm:text-lg font-black text-emerald-950 mt-0.5">{formatCurrency(totalPendingCollection)}</p>
-              <p className="text-[10px] text-emerald-700 font-medium">{pendingOrdersCount + readyOrdersCount} encargos activos</p>
-            </div>
-            <span className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
-              🎂
-            </span>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200/70 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wider">Gastos de Caja Hoy</p>
-              <p className="text-base sm:text-lg font-black text-rose-950 mt-0.5">{formatCurrency(todayCashExpenses)}</p>
-              <p className="text-[10px] text-rose-700 font-medium">Gas, bolsas, insumos</p>
-            </div>
-            <span className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xs">
-              📉
-            </span>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/70 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Clientes Atendidos</p>
-              <p className="text-base sm:text-lg font-black text-blue-950 mt-0.5">~{activeTickets} personas</p>
-              <p className="text-[10px] text-blue-700 font-medium">Mostrador general</p>
-            </div>
-            <span className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-              👥
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* ========================================================= */}
