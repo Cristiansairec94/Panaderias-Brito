@@ -239,18 +239,48 @@ export default function CashDrawerShiftModal({
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;
   const cashDifference = parsedCountedCash - expectedCashInDrawer;
 
+  // Dinero físico máximo disponible en caja
+  const maxAvailableCash = Math.max(0, parsedCountedCash);
+
   // 5. Fondo Siguiente y Retiro a Administración
   // El resultado siempre está en $0.00 por defecto a menos que se escriba una cifra, cambiando la constante de fondo
   const parsedNextFund = nextInitialFund === "" ? 0 : Math.max(0, Number(nextInitialFund) || 0);
-  const isNextFundValid = nextInitialFund.trim() === "" || (!isNaN(Number(nextInitialFund)) && Number(nextInitialFund) >= 0);
+  const isNextFundValid =
+    nextInitialFund.trim() === "" ||
+    (!isNaN(Number(nextInitialFund)) && Number(nextInitialFund) >= 0 && Number(nextInitialFund) <= maxAvailableCash);
   const cashToWithdraw = Math.max(0, parsedCountedCash - parsedNextFund);
+
+  // Manejar cambio en el input para que nunca sobrepase el dinero que hay en caja
+  const handleNextFundChange = (value: string) => {
+    const raw = cleanDecimalNumbers(value);
+    if (raw === "") {
+      setNextInitialFund("");
+      return;
+    }
+    const num = Number(raw);
+    if (!isNaN(num) && num > maxAvailableCash) {
+      setNextInitialFund(maxAvailableCash > 0 ? maxAvailableCash.toString() : "");
+    } else {
+      setNextInitialFund(raw);
+    }
+  };
+
+  // Si cambia el conteo de caja y el fondo que se había escrito excede el nuevo monto en caja, ajustar de inmediato
+  useEffect(() => {
+    if (nextInitialFund !== "") {
+      const num = Number(nextInitialFund);
+      if (!isNaN(num) && num > maxAvailableCash) {
+        setNextInitialFund(maxAvailableCash > 0 ? maxAvailableCash.toString() : "");
+      }
+    }
+  }, [maxAvailableCash]);
 
   // 5. Existencias en mostrador
   const totalPiecesInStock = products.reduce((sum, p) => sum + p.stock, 0);
   const totalStockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
 
   const handleExecuteShiftCut = () => {
-    if (!isNextFundValid) return;
+    if (!isNextFundValid || parsedNextFund > maxAvailableCash) return;
     setIsFinalizing(true);
 
     const nowDateTime = formatDateTimeSafe();
@@ -864,10 +894,7 @@ export default function CashDrawerShiftModal({
                           placeholder="0.00 (En blanco por defecto: $0.00. Escribe una cifra si deseas dejar fondo)"
                           value={nextInitialFund}
                           onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                          onChange={(e) => {
-                            const raw = cleanDecimalNumbers(e.target.value);
-                            setNextInitialFund(raw);
-                          }}
+                          onChange={(e) => handleNextFundChange(e.target.value)}
                           className={`w-full pl-9 pr-4 py-3.5 bg-white rounded-2xl border-2 font-black text-base text-stone-900 focus:outline-none shadow-sm transition-all placeholder:text-stone-400 ${
                             !isNextFundValid
                               ? "border-rose-400 focus:border-rose-600 ring-2 ring-rose-400/20"
@@ -876,11 +903,15 @@ export default function CashDrawerShiftModal({
                         />
                       </div>
 
-                      <div className="flex items-center justify-between text-xs px-1 text-stone-500 font-medium">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs px-1 text-stone-500 font-medium gap-1">
                         <span>
                           {nextInitialFund.trim() === "" ? (
                             <span className="text-stone-500 font-semibold">
                               ⚪ En blanco por defecto: <strong>$0.00</strong> (el siguiente turno empezará sin fondo)
+                            </span>
+                          ) : parsedNextFund === maxAvailableCash && maxAvailableCash > 0 ? (
+                            <span className="text-amber-800 font-bold">
+                              ⚡ Tope alcanzado: <strong>{formatCurrency(parsedNextFund)}</strong> (todo el dinero en caja)
                             </span>
                           ) : (
                             <span className="text-emerald-700 font-bold">
@@ -888,12 +919,19 @@ export default function CashDrawerShiftModal({
                             </span>
                           )}
                         </span>
-                        {!isNextFundValid && (
-                          <span className="text-rose-600 font-bold flex items-center gap-1">
-                            ⚠️ Monto inválido
+                        <span className="text-stone-600 font-bold flex items-center gap-1 text-[11px] sm:text-xs">
+                          <span>Máximo en caja:</span>
+                          <span className="text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-md font-black">
+                            {formatCurrency(maxAvailableCash)}
                           </span>
-                        )}
+                        </span>
                       </div>
+
+                      {!isNextFundValid && (
+                        <div className="text-xs text-rose-600 font-bold flex items-center gap-1 px-1">
+                          ⚠️ El fondo no puede sobrepasar el dinero que hay en caja ({formatCurrency(maxAvailableCash)})
+                        </div>
+                      )}
 
                       {/* Botones de Atajo Rápido para Fondo Siguiente */}
                       <div className="flex flex-wrap gap-1.5 pt-1">
@@ -909,31 +947,38 @@ export default function CashDrawerShiftModal({
                         >
                           En blanco ($0.00)
                         </button>
-                        {[200, 300, 500, 800, 1000].map((val) => (
+                        {[200, 300, 500, 800, 1000].map((val) => {
+                          const isExceeded = val > maxAvailableCash;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              disabled={isExceeded}
+                              onClick={() => setNextInitialFund(val.toString())}
+                              className={`px-2.5 py-1 text-xs font-black rounded-lg border transition-colors ${
+                                isExceeded
+                                  ? "bg-stone-100 text-stone-300 border-stone-200 cursor-not-allowed opacity-50"
+                                  : nextInitialFund === val.toString()
+                                  ? "bg-amber-200 text-amber-900 border-amber-400 shadow-2xs cursor-pointer"
+                                  : "bg-stone-100 hover:bg-stone-200 text-stone-800 border-stone-300 cursor-pointer"
+                              }`}
+                              title={isExceeded ? `Supera el dinero en caja (${formatCurrency(maxAvailableCash)})` : undefined}
+                            >
+                              {formatCurrency(val)}
+                            </button>
+                          );
+                        })}
+                        {maxAvailableCash > 0 && (
                           <button
-                            key={val}
                             type="button"
-                            onClick={() => setNextInitialFund(val.toString())}
+                            onClick={() => setNextInitialFund(maxAvailableCash.toString())}
                             className={`px-2.5 py-1 text-xs font-black rounded-lg border transition-colors cursor-pointer ${
-                              nextInitialFund === val.toString()
-                                ? "bg-amber-200 text-amber-900 border-amber-400 shadow-2xs"
-                                : "bg-stone-100 hover:bg-stone-200 text-stone-800 border-stone-300"
-                            }`}
-                          >
-                            {formatCurrency(val)}
-                          </button>
-                        ))}
-                        {parsedCountedCash > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setNextInitialFund(parsedCountedCash.toString())}
-                            className={`px-2.5 py-1 text-xs font-black rounded-lg border transition-colors cursor-pointer ${
-                              nextInitialFund === parsedCountedCash.toString()
+                              nextInitialFund === maxAvailableCash.toString()
                                 ? "bg-emerald-200 text-emerald-950 border-emerald-400 shadow-2xs"
                                 : "bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300"
                             }`}
                           >
-                            Todo en caja ({formatCurrency(parsedCountedCash)})
+                            Todo en caja ({formatCurrency(maxAvailableCash)})
                           </button>
                         )}
                       </div>
@@ -991,7 +1036,7 @@ export default function CashDrawerShiftModal({
                           : !countedCash
                           ? "⚠️ Ingresa el Efectivo Físico Contado"
                           : !isNextFundValid
-                          ? "⚠️ Monto de Fondo Inválido"
+                          ? `⚠️ El Fondo no puede superar ${formatCurrency(maxAvailableCash)}`
                           : !hasAcceptedCash
                           ? "⚠️ Marca la Casilla de Confirmación para Continuar"
                           : `🔒 CERRAR TURNO Y GENERAR COMPROBANTE (${incomingCashier}) ➔`}
