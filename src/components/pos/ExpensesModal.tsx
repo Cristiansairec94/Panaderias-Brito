@@ -26,9 +26,14 @@ import {
   ChevronUp,
   Eye,
   Calendar,
-  Sparkles
+  Sparkles,
+  Cake,
+  Phone,
+  Clock,
+  Package
 } from "lucide-react";
-import { CashExpense, CashIncome, Sale } from "@/types";
+import { CashExpense, CashIncome, Sale, CustomOrder } from "@/types";
+import { getStoredOrders } from "@/lib/orders";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
@@ -46,6 +51,9 @@ interface ExpensesModalProps {
   onDeleteIncome?: (id: string) => void;
   sales?: Sale[];
   onSelectSaleForReprint?: (sale: Sale) => void;
+  orders?: CustomOrder[];
+  onSelectOrderForReceipt?: (order: CustomOrder) => void;
+  onSelectOrderForPayment?: (order: CustomOrder) => void;
   initialTab?: "tickets" | "register" | "list";
   cashSalesTotal: number;
   initialFund?: number;
@@ -185,6 +193,9 @@ export default function ExpensesModal({
   onDeleteIncome,
   sales = [],
   onSelectSaleForReprint,
+  orders = [],
+  onSelectOrderForReceipt,
+  onSelectOrderForPayment,
   initialTab,
   cashSalesTotal,
   initialFund = 0,
@@ -202,7 +213,30 @@ export default function ExpensesModal({
   const [historySearch, setHistorySearch] = useState("");
   const [ticketSearch, setTicketSearch] = useState("");
   const [ticketMethodFilter, setTicketMethodFilter] = useState<string>("all");
+  const [ticketTypeFilter, setTicketTypeFilter] = useState<"all" | "ventas" | "pedidos">("all");
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  // Sincronizar pedidos especiales en memoria y desde almacenamiento
+  const [internalOrders, setInternalOrders] = useState<CustomOrder[]>(() => {
+    return orders && orders.length > 0 ? orders : getStoredOrders();
+  });
+
+  useEffect(() => {
+    if (orders && orders.length > 0) {
+      setInternalOrders(orders);
+    } else {
+      setInternalOrders(getStoredOrders());
+    }
+  }, [orders, isOpen]);
+
+  useEffect(() => {
+    const handleOrdersUpdated = () => {
+      setInternalOrders(getStoredOrders());
+    };
+    window.addEventListener("brito_orders_updated", handleOrdersUpdated);
+    return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
+  }, []);
 
   useEffect(() => {
     if (isOpen && initialTab) {
@@ -250,14 +284,32 @@ export default function ExpensesModal({
   });
   const effectiveSales = shiftSales.length > 0 ? shiftSales : sales;
 
+  // Pedidos especiales de la sucursal actual
+  const relevantOrders = internalOrders.filter((o) => {
+    if (branchId && o.branchId && o.branchId !== branchId) return false;
+    return true;
+  });
+
   const totalSalesSum = effectiveSales.reduce((acc, s) => acc + s.total, 0);
+  const totalOrdersDeposits = relevantOrders.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+  const totalOrdersValue = relevantOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const totalCombinedRevenue = totalSalesSum + totalOrdersDeposits;
+
   const totalPiecesSum = effectiveSales.reduce(
     (acc, s) => acc + (s.items || []).reduce((sum, item) => sum + item.quantity, 0),
     0
   );
+  const totalOrderPieces = relevantOrders.reduce(
+    (acc, o) => acc + (o.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0),
+    0
+  );
+  const totalAllPieces = totalPiecesSum + totalOrderPieces;
+  const totalRecordsCount = effectiveSales.length + relevantOrders.length;
   const averageTicket = effectiveSales.length > 0 ? totalSalesSum / effectiveSales.length : 0;
 
+  // Filtrado de Tickets de Mostrador
   const filteredTickets = effectiveSales.filter((sale) => {
+    if (ticketTypeFilter === "pedidos") return false;
     if (ticketMethodFilter !== "all" && sale.paymentMethod !== ticketMethodFilter) return false;
     if (ticketSearch.trim()) {
       const q = ticketSearch.toLowerCase().trim();
@@ -266,6 +318,23 @@ export default function ExpensesModal({
       const matchCustomer = (sale.customerName || "").toLowerCase().includes(q);
       const matchItems = (sale.items || []).some((i) => i.product.name.toLowerCase().includes(q));
       return matchId || matchCashier || matchCustomer || matchItems;
+    }
+    return true;
+  });
+
+  // Filtrado de Pedidos Especiales
+  const filteredOrders = relevantOrders.filter((order) => {
+    if (ticketTypeFilter === "ventas") return false;
+    if (ticketMethodFilter !== "all" && order.paymentMethod !== ticketMethodFilter) return false;
+    if (ticketSearch.trim()) {
+      const q = ticketSearch.toLowerCase().trim();
+      const matchNumber = (order.orderNumber || "").toLowerCase().includes(q);
+      const matchId = (order.id || "").toLowerCase().includes(q);
+      const matchCustomer = (order.customerName || "").toLowerCase().includes(q);
+      const matchCashier = (order.cashier || "").toLowerCase().includes(q);
+      const matchDesc = (order.description || "").toLowerCase().includes(q);
+      const matchItems = (order.items || []).some((i) => i.name.toLowerCase().includes(q));
+      return matchNumber || matchId || matchCustomer || matchCashier || matchDesc || matchItems;
     }
     return true;
   });
@@ -699,7 +768,7 @@ export default function ExpensesModal({
             }`}
           >
             <Receipt className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Historial de Ventas ({effectiveSales.length})</span>
+            <span>Historial de Ventas ({totalRecordsCount})</span>
           </button>
 
           <button
@@ -763,45 +832,52 @@ export default function ExpensesModal({
           )}
 
           {activeTab === "tickets" ? (
-            /* VISTA DEDICADA: HISTORIAL COMPLETO DE TICKETS DE VENTA */
+            /* VISTA DEDICADA: HISTORIAL COMPLETO DE VENTAS Y PEDIDOS ESPECIALES */
             <div className="space-y-4">
-              {/* Tarjetas KPI de Resumen de Ventas */}
+              {/* Tarjetas KPI de Resumen de Ventas y Pedidos */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 <div className="bg-emerald-50/80 p-2.5 rounded-2xl border border-emerald-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase block">Total Vendido</span>
-                  <span className="text-base sm:text-lg font-black text-emerald-950 block mt-0.5">{formatCurrency(totalSalesSum)}</span>
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase block">Total Cobrado</span>
+                  <span className="text-base sm:text-lg font-black text-emerald-950 block mt-0.5">
+                    {formatCurrency(totalCombinedRevenue)}
+                  </span>
+                  <span className="text-[9px] text-emerald-700 font-semibold block mt-0.5 truncate">
+                    {formatCurrency(totalSalesSum)} vtas + {formatCurrency(totalOrdersDeposits)} pedidos
+                  </span>
                 </div>
                 <div className="bg-white p-2.5 rounded-2xl border border-stone-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-stone-500 uppercase block">Tickets Emitidos</span>
+                  <span className="text-[10px] font-bold text-stone-500 uppercase block">Ventas Mostrador</span>
                   <span className="text-base sm:text-lg font-black text-stone-900 block mt-0.5">{effectiveSales.length}</span>
+                  <span className="text-[9px] text-stone-500 block mt-0.5">tickets emitidos</span>
                 </div>
                 <div className="bg-amber-50/80 p-2.5 rounded-2xl border border-amber-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-amber-800 uppercase block">Piezas de Pan</span>
-                  <span className="text-base sm:text-lg font-black text-amber-950 block mt-0.5">{totalPiecesSum}</span>
+                  <span className="text-[10px] font-bold text-amber-800 uppercase block">Pedidos Especiales</span>
+                  <span className="text-base sm:text-lg font-black text-amber-950 block mt-0.5">{relevantOrders.length}</span>
+                  <span className="text-[9px] text-amber-700 block mt-0.5">encargos del turno</span>
                 </div>
                 <div className="bg-white p-2.5 rounded-2xl border border-stone-200 shadow-2xs">
-                  <span className="text-[10px] font-bold text-stone-500 uppercase block">Ticket Promedio</span>
-                  <span className="text-base sm:text-lg font-black text-stone-900 block mt-0.5">{formatCurrency(averageTicket)}</span>
+                  <span className="text-[10px] font-bold text-stone-500 uppercase block">Piezas Totales</span>
+                  <span className="text-base sm:text-lg font-black text-stone-900 block mt-0.5">{totalAllPieces}</span>
+                  <span className="text-[9px] text-stone-500 block mt-0.5">pan y pastelería</span>
                 </div>
               </div>
 
-              {/* Filtros por Método de Pago & Buscador de Tickets */}
+              {/* Filtros por Tipo (Todos / Ventas / Pedidos) */}
               <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between pb-1">
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                   {[
-                    { id: "all", label: `Todos (${effectiveSales.length})` },
-                    { id: "efectivo", label: `🪙 Efectivo (${effectiveSales.filter(s => s.paymentMethod === "efectivo").length})` },
-                    { id: "tarjeta", label: `💳 Tarjeta (${effectiveSales.filter(s => s.paymentMethod === "tarjeta").length})` },
-                    { id: "transferencia", label: `📲 Transf. (${effectiveSales.filter(s => s.paymentMethod === "transferencia").length})` },
+                    { id: "all", label: `Todos (${totalRecordsCount})` },
+                    { id: "ventas", label: `🥖 Ventas Mostrador (${effectiveSales.length})` },
+                    { id: "pedidos", label: `🎂 Pedidos Especiales (${relevantOrders.length})` },
                   ].map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setTicketMethodFilter(tab.id)}
+                      onClick={() => setTicketTypeFilter(tab.id as any)}
                       className={`px-3 py-1.5 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
-                        ticketMethodFilter === tab.id
-                          ? "bg-emerald-700 text-white border-emerald-800 shadow-xs ring-2 ring-emerald-500/20"
-                          : "bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200"
+                        ticketTypeFilter === tab.id
+                          ? "bg-stone-900 text-white border-stone-950 shadow-xs ring-2 ring-stone-900/10"
+                          : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
                       }`}
                     >
                       {tab.label}
@@ -809,11 +885,12 @@ export default function ExpensesModal({
                   ))}
                 </div>
 
+                {/* Buscador Rápido */}
                 <div className="relative flex-1 max-w-xs">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                   <input
                     type="text"
-                    placeholder="Buscar ticket #, pan o cliente..."
+                    placeholder="Buscar ticket #, PED-..., pan, cliente..."
                     value={ticketSearch}
                     onChange={(e) => setTicketSearch(e.target.value)}
                     className="w-full pl-8 pr-7 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium text-stone-900 focus:outline-none focus:border-amber-600 transition-colors placeholder:text-stone-400"
@@ -830,187 +907,407 @@ export default function ExpensesModal({
                 </div>
               </div>
 
-              {/* Listado de Tickets Emitidos */}
+              {/* Subfiltros por Método de Pago */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <span className="text-[10px] font-bold uppercase text-stone-400 mr-1">Método:</span>
+                {[
+                  { id: "all", label: "Todos los métodos" },
+                  { id: "efectivo", label: "🪙 Efectivo" },
+                  { id: "tarjeta", label: "💳 Tarjeta" },
+                  { id: "transferencia", label: "📲 Transferencia" },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setTicketMethodFilter(m.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all border cursor-pointer ${
+                      ticketMethodFilter === m.id
+                        ? "bg-emerald-700 text-white border-emerald-800 shadow-2xs"
+                        : "bg-stone-50 text-stone-600 hover:bg-stone-100 border-stone-200"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Listado Unificado de Ventas y Pedidos */}
               <div className="space-y-3">
-                {filteredTickets.length === 0 ? (
+                {filteredTickets.length === 0 && filteredOrders.length === 0 ? (
                   <div className="text-center py-12 text-stone-400 space-y-2 bg-stone-50/60 rounded-3xl border border-stone-200/80 p-8">
                     <Receipt className="w-12 h-12 mx-auto text-stone-300 stroke-1" />
                     <p className="font-black text-sm text-stone-700">
                       {ticketSearch
-                        ? `Sin tickets para "${ticketSearch}"`
-                        : "No hay tickets de venta registrados en este turno."}
+                        ? `Sin resultados para "${ticketSearch}"`
+                        : "No hay ventas ni pedidos registrados con los filtros seleccionados."}
                     </p>
                     <p className="text-xs text-stone-500 max-w-xs mx-auto">
-                      Cada venta completada en el punto de venta aparecerá aquí automáticamente con folio, desglose de pan y opción de impresión.
+                      Cada venta de mostrador o pedido especial completado aparecerá aquí automáticamente con folio, desglose y ticket imprimible.
                     </p>
                   </div>
                 ) : (
-                  filteredTickets.map((sale) => {
-                    const totalPieces = (sale.items || []).reduce((sum, item) => sum + item.quantity, 0);
-                    const isExpanded = expandedSaleId === sale.id;
-
-                    return (
-                      <div
-                        key={sale.id}
-                        className="bg-white hover:bg-stone-50/80 rounded-2xl border-2 border-stone-200/90 shadow-2xs overflow-hidden transition-all"
-                      >
-                        {/* Cabecera del Ticket */}
-                        <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono font-black text-xs sm:text-sm bg-stone-900 text-amber-300 px-2.5 py-0.5 rounded-lg shadow-2xs">
-                                #{sale.id.slice(-6).toUpperCase()}
-                              </span>
-                              <span className="text-[11px] font-bold text-stone-500">
-                                {sale.date}
-                              </span>
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700 flex items-center gap-1">
-                                {sale.paymentMethod === "efectivo"
-                                  ? "🪙 Efectivo"
-                                  : sale.paymentMethod === "tarjeta"
-                                  ? "💳 Tarjeta"
-                                  : "📲 Transferencia"}
-                              </span>
-                              {sale.customerName && sale.customerName !== "Público General" && sale.customerName !== "Público general" && (
-                                <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md">
-                                  👤 {sale.customerName}
-                                </span>
-                              )}
-                              <span className="text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200 px-1.5 py-0.5 rounded-md ml-auto sm:ml-0">
-                                👤 {sale.cashier}
-                              </span>
-                            </div>
-
-                            {/* Resumen de Panes */}
-                            <div className="mt-2 flex items-baseline gap-2 flex-wrap">
-                              <span className="text-xs font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md shrink-0">
-                                {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
-                              </span>
-                              <p className="text-xs font-semibold text-stone-700 line-clamp-1">
-                                {(sale.items || []).map((i) => `${i.quantity}x ${i.product.name}`).join(", ")}
-                              </p>
-                            </div>
-
-                            {/* Detalle de efectivo pagado y cambio si aplica */}
-                            {sale.paymentMethod === "efectivo" && sale.cashGiven !== undefined && sale.cashGiven > 0 && (
-                              <div className="text-[11px] text-stone-500 font-medium mt-1 flex items-center gap-2">
-                                <span>Pagó: <strong>{formatCurrency(sale.cashGiven)}</strong></span>
-                                {sale.change !== undefined && (
-                                  <span>• Cambio: <strong>{formatCurrency(sale.change)}</strong></span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Monto y Botones de Acción */}
-                          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100 gap-2 shrink-0">
-                            <span className="text-base sm:text-lg font-black text-emerald-700">
-                              +{formatCurrency(sale.total)}
+                  <>
+                    {/* 1. SECCIÓN DE PEDIDOS ESPECIALES */}
+                    {filteredOrders.length > 0 && (
+                      <div className="space-y-2.5">
+                        {ticketTypeFilter === "all" && (
+                          <div className="flex items-center gap-2 pt-1">
+                            <span className="text-xs font-black uppercase text-amber-900 bg-amber-100/80 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                              🎂 Pedidos Especiales ({filteredOrders.length})
                             </span>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => setExpandedSaleId(isExpanded ? null : sale.id)}
-                                className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                title={isExpanded ? "Ocultar desglose" : "Ver desglose de panes"}
-                              >
-                                <Eye className="w-3.5 h-3.5 text-stone-500" />
-                                <span>{isExpanded ? "Ocultar" : "Detalle"}</span>
-                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                              </button>
-
-                              {onSelectSaleForReprint && (
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectSaleForReprint(sale)}
-                                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-                                  title="Ver ticket digital y mandar a imprimir en impresora térmica"
-                                >
-                                  <Printer className="w-3.5 h-3.5" />
-                                  <span>Ticket</span>
-                                </button>
-                              )}
-                            </div>
+                            <div className="flex-1 h-px bg-amber-200/70" />
                           </div>
-                        </div>
+                        )}
 
-                        {/* Acordeón de Desglose de Productos */}
-                        {isExpanded && (
-                          <div className="border-t border-stone-200 bg-stone-50/80 p-3.5 sm:p-4 space-y-2.5 animate-in slide-in-from-top-2 duration-150">
-                            <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider block">
-                              Desglose de Productos en el Ticket:
-                            </span>
-                            <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-2xs divide-y divide-stone-100">
-                              {(sale.items || []).map((item, idx) => (
-                                <div key={idx} className="p-2 sm:p-2.5 flex items-center justify-between text-xs">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-900 font-black flex items-center justify-center text-xs shrink-0">
-                                      {item.quantity}
+                        {filteredOrders.map((order) => {
+                          const isExpanded = expandedOrderId === order.id;
+                          const orderItemsCount = (order.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+
+                          return (
+                            <div
+                              key={order.id}
+                              className="bg-white hover:bg-stone-50/80 rounded-2xl border-2 border-amber-300/80 shadow-2xs overflow-hidden transition-all"
+                            >
+                              {/* Cabecera del Pedido */}
+                              <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/20">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[10px] bg-amber-500 text-stone-950 font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                                      🎂 Pedido Especial
                                     </span>
-                                    <span className="font-bold text-stone-900 truncate">
-                                      {item.product.name}
+                                    <span className="font-mono font-black text-xs sm:text-sm bg-stone-900 text-amber-300 px-2.5 py-0.5 rounded-lg shadow-2xs">
+                                      #{order.orderNumber}
+                                    </span>
+                                    <span
+                                      className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                                        order.paymentStatus === "liquidado"
+                                          ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                          : order.paymentStatus === "anticipo"
+                                          ? "bg-amber-100 text-amber-900 border-amber-300"
+                                          : "bg-rose-100 text-rose-900 border-rose-300"
+                                      }`}
+                                    >
+                                      {order.paymentStatus === "liquidado"
+                                        ? "✅ Liquidado"
+                                        : order.paymentStatus === "anticipo"
+                                        ? "💵 Con Anticipo"
+                                        : "⚠️ Sin Anticipo"}
+                                    </span>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700">
+                                      {order.status === "listo"
+                                        ? "🎂 Listo"
+                                        : order.status === "en_horno"
+                                        ? "🔥 En Horno"
+                                        : order.status === "entregado"
+                                        ? "📦 Entregado"
+                                        : "⏳ Pendiente"}
+                                    </span>
+                                    {order.paymentMethod && (
+                                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-white border border-stone-200 text-stone-700">
+                                        {order.paymentMethod === "efectivo"
+                                          ? "🪙 Efectivo"
+                                          : order.paymentMethod === "tarjeta"
+                                          ? "💳 Tarjeta"
+                                          : "📲 Transferencia"}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200 px-1.5 py-0.5 rounded-md ml-auto sm:ml-0">
+                                      👤 {order.cashier}
                                     </span>
                                   </div>
-                                  <div className="text-right shrink-0">
-                                    <span className="text-stone-400 text-[10px] mr-2">
-                                      ${Number(item.product.price || 0).toFixed(2)} c/u
-                                    </span>
+
+                                  {/* Cliente y Detalles de Entrega */}
+                                  <div className="mt-2 flex items-center gap-2 flex-wrap text-xs text-stone-700">
                                     <span className="font-black text-stone-900">
-                                      {formatCurrency((item.product.price || 0) * item.quantity)}
+                                      👤 {order.customerName} {order.phone && order.phone !== "N/A" ? `(${order.phone})` : ""}
+                                    </span>
+                                    <span className="text-stone-300">•</span>
+                                    <span className="text-stone-600 font-medium">
+                                      📅 Entrega: {order.deliveryDate} {order.deliveryTime || ""} ({order.deliveryType === "domicilio" ? "🛵 Domicilio" : "🏪 Sucursal"})
+                                    </span>
+                                  </div>
+
+                                  {/* Resumen de Productos */}
+                                  <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
+                                    <span className="text-xs font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md shrink-0">
+                                      {orderItemsCount} {orderItemsCount === 1 ? "artículo" : "artículos"}
+                                    </span>
+                                    <p className="text-xs font-semibold text-stone-700 line-clamp-1">
+                                      {order.description || (order.items || []).map((i) => `${i.quantity}x ${i.name}`).join(", ")}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Montos y Acciones */}
+                                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100 gap-2 shrink-0">
+                                  <div className="text-right">
+                                    <span className="text-base sm:text-lg font-black text-stone-900 block leading-tight">
+                                      {formatCurrency(order.total)}
+                                    </span>
+                                    <span className="text-[11px] font-bold text-emerald-700 block">
+                                      Cobrado: {formatCurrency(order.deposit)}
+                                    </span>
+                                    {order.remainingBalance > 0 && (
+                                      <span className="text-[10px] font-black text-rose-600 block">
+                                        Resta: {formatCurrency(order.remainingBalance)}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                                      className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                      title={isExpanded ? "Ocultar desglose" : "Ver detalle del pedido"}
+                                    >
+                                      <Eye className="w-3.5 h-3.5 text-stone-500" />
+                                      <span>{isExpanded ? "Ocultar" : "Detalle"}</span>
+                                      {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                    </button>
+
+                                    {order.remainingBalance > 0 && onSelectOrderForPayment && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onSelectOrderForPayment(order)}
+                                        className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95"
+                                        title="Cobrar saldo restante de este pedido"
+                                      >
+                                        Cobrar
+                                      </button>
+                                    )}
+
+                                    {onSelectOrderForReceipt && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onSelectOrderForReceipt(order)}
+                                        className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                        title="Ver ticket de pedido especial y reimprimir"
+                                      >
+                                        <Printer className="w-3.5 h-3.5" />
+                                        <span>Ticket</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Desglose desplegable del Pedido */}
+                              {isExpanded && (
+                                <div className="border-t border-amber-200/80 bg-stone-50/80 p-3.5 sm:p-4 space-y-2.5 animate-in slide-in-from-top-2 duration-150">
+                                  {order.dedication && (
+                                    <div className="bg-amber-100/70 border border-amber-300 rounded-xl p-2 px-3 text-xs text-amber-950 font-medium">
+                                      ✍️ <span className="font-bold">Dedicatoria:</span> "{order.dedication}"
+                                    </div>
+                                  )}
+                                  {order.notes && (
+                                    <div className="bg-stone-100 rounded-xl p-2 px-3 text-xs text-stone-700 font-medium">
+                                      📝 <span className="font-bold">Notas de elaboración:</span> {order.notes}
+                                    </div>
+                                  )}
+
+                                  <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider block">
+                                    Artículos / Panes del Pedido:
+                                  </span>
+                                  <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-2xs divide-y divide-stone-100">
+                                    {(order.items || []).map((item, idx) => (
+                                      <div key={idx} className="p-2 sm:p-2.5 flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-900 font-black flex items-center justify-center text-xs shrink-0">
+                                            {item.quantity}
+                                          </span>
+                                          <div>
+                                            <span className="font-bold text-stone-900">{item.name}</span>
+                                            {item.notes && <p className="text-[10px] text-stone-500">{item.notes}</p>}
+                                          </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                          <span className="text-stone-400 text-[10px] mr-2">
+                                            ${Number(item.unitPrice || 0).toFixed(2)} c/u
+                                          </span>
+                                          <span className="font-black text-stone-900">
+                                            {formatCurrency((item.unitPrice || 0) * item.quantity)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Historial de Abonos / Pagos */}
+                                  {order.payments && order.payments.length > 0 && (
+                                    <div className="bg-white rounded-xl border border-stone-200 p-2.5 px-3 space-y-1 text-xs">
+                                      <span className="text-[10px] font-black uppercase text-stone-500 block">
+                                        Historial de Abonos Registrados:
+                                      </span>
+                                      {order.payments.map((p, pIdx) => (
+                                        <div key={p.id || pIdx} className="flex justify-between items-center text-[11px] text-stone-700">
+                                          <span>📅 {p.date} • {p.notes || "Abono"} ({p.paymentMethod})</span>
+                                          <span className="font-bold text-emerald-700">+{formatCurrency(p.amount)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* 2. SECCIÓN DE VENTAS DE MOSTRADOR */}
+                    {filteredTickets.length > 0 && (
+                      <div className="space-y-2.5">
+                        {ticketTypeFilter === "all" && filteredOrders.length > 0 && (
+                          <div className="flex items-center gap-2 pt-2">
+                            <span className="text-xs font-black uppercase text-stone-800 bg-stone-200/90 border border-stone-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                              🥖 Ventas Mostrador ({filteredTickets.length})
+                            </span>
+                            <div className="flex-1 h-px bg-stone-200" />
+                          </div>
+                        )}
+
+                        {filteredTickets.map((sale) => {
+                          const totalPieces = (sale.items || []).reduce((sum, item) => sum + item.quantity, 0);
+                          const isExpanded = expandedSaleId === sale.id;
+
+                          return (
+                            <div
+                              key={sale.id}
+                              className="bg-white hover:bg-stone-50/80 rounded-2xl border-2 border-stone-200/90 shadow-2xs overflow-hidden transition-all"
+                            >
+                              {/* Cabecera del Ticket */}
+                              <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[10px] bg-emerald-100 text-emerald-950 border border-emerald-300 px-2 py-0.5 rounded-md font-black">
+                                      🥖 Venta Mostrador
+                                    </span>
+                                    <span className="font-mono font-black text-xs sm:text-sm bg-stone-900 text-amber-300 px-2.5 py-0.5 rounded-lg shadow-2xs">
+                                      #{sale.id.slice(-6).toUpperCase()}
+                                    </span>
+                                    <span className="text-[11px] font-bold text-stone-500">
+                                      {sale.date}
+                                    </span>
+                                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700 flex items-center gap-1">
+                                      {sale.paymentMethod === "efectivo"
+                                        ? "🪙 Efectivo"
+                                        : sale.paymentMethod === "tarjeta"
+                                        ? "💳 Tarjeta"
+                                        : "📲 Transferencia"}
+                                    </span>
+                                    {sale.customerName && sale.customerName !== "Público General" && sale.customerName !== "Público general" && (
+                                      <span className="text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md">
+                                        👤 {sale.customerName}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200 px-1.5 py-0.5 rounded-md ml-auto sm:ml-0">
+                                      👤 {sale.cashier}
+                                    </span>
+                                  </div>
+
+                                  {/* Resumen de Panes */}
+                                  <div className="mt-2 flex items-baseline gap-2 flex-wrap">
+                                    <span className="text-xs font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md shrink-0">
+                                      {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
+                                    </span>
+                                    <p className="text-xs font-semibold text-stone-700 line-clamp-1">
+                                      {(sale.items || []).map((i) => `${i.quantity}x ${i.product.name}`).join(", ")}
+                                    </p>
+                                  </div>
+
+                                  {/* Detalle de efectivo pagado y cambio si aplica */}
+                                  {sale.paymentMethod === "efectivo" && sale.cashGiven !== undefined && sale.cashGiven > 0 && (
+                                    <div className="text-[11px] text-stone-500 font-medium mt-1 flex items-center gap-2">
+                                      <span>Pagó: <strong>{formatCurrency(sale.cashGiven)}</strong></span>
+                                      {sale.change !== undefined && (
+                                        <span>• Cambio: <strong>{formatCurrency(sale.change)}</strong></span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Monto y Botones de Acción */}
+                                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100 gap-2 shrink-0">
+                                  <span className="text-base sm:text-lg font-black text-emerald-700">
+                                    +{formatCurrency(sale.total)}
+                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedSaleId(isExpanded ? null : sale.id)}
+                                      className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                      title={isExpanded ? "Ocultar desglose" : "Ver desglose de panes"}
+                                    >
+                                      <Eye className="w-3.5 h-3.5 text-stone-500" />
+                                      <span>{isExpanded ? "Ocultar" : "Detalle"}</span>
+                                      {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                    </button>
+
+                                    {onSelectSaleForReprint && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onSelectSaleForReprint(sale)}
+                                        className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                        title="Ver ticket digital y mandar a imprimir en impresora térmica"
+                                      >
+                                        <Printer className="w-3.5 h-3.5" />
+                                        <span>Ticket</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Acordeón de Desglose de Productos */}
+                              {isExpanded && (
+                                <div className="border-t border-stone-200 bg-stone-50/80 p-3.5 sm:p-4 space-y-2.5 animate-in slide-in-from-top-2 duration-150">
+                                  <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider block">
+                                    Desglose de Productos en el Ticket:
+                                  </span>
+                                  <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-2xs divide-y divide-stone-100">
+                                    {(sale.items || []).map((item, idx) => (
+                                      <div key={idx} className="p-2 sm:p-2.5 flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-900 font-black flex items-center justify-center text-xs shrink-0">
+                                            {item.quantity}
+                                          </span>
+                                          <span className="font-bold text-stone-900 truncate">
+                                            {item.product.name}
+                                          </span>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                          <span className="text-stone-400 text-[10px] mr-2">
+                                            ${Number(item.product.price || 0).toFixed(2)} c/u
+                                          </span>
+                                          <span className="font-black text-stone-900">
+                                            {formatCurrency((item.product.price || 0) * item.quantity)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <div className="flex items-center justify-between pt-1 text-xs px-1">
+                                    <span className="font-bold text-stone-500">Total Liquidado:</span>
+                                    <span className="text-sm font-black text-emerald-700">
+                                      {formatCurrency(sale.total)} ({sale.paymentMethod.toUpperCase()})
                                     </span>
                                   </div>
                                 </div>
-                              ))}
+                              )}
                             </div>
-
-                            <div className="flex items-center justify-between pt-1 text-xs px-1">
-                              <span className="font-bold text-stone-500">Total Liquidado:</span>
-                              <span className="text-sm font-black text-emerald-700">
-                                {formatCurrency(sale.total)} ({sale.paymentMethod.toUpperCase()})
-                              </span>
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })}
                       </div>
-                    );
-                  })
+                    )}
+                  </>
                 )}
               </div>
             </div>
           ) : activeTab === "register" ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               
-              {/* Acceso Rápido y Notorio a Historial de Ventas */}
-              <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-300/80 rounded-2xl p-2.5 sm:p-3 px-3.5 sm:px-4 flex items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                    <Receipt className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs sm:text-sm font-black text-emerald-950 truncate">
-                        Historial de Ventas y Tickets
-                      </p>
-                      <span className="text-[10px] bg-emerald-200/80 text-emerald-900 font-black px-2 py-0.2 rounded-full">
-                        {effectiveSales.length} {effectiveSales.length === 1 ? "ticket" : "tickets"}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-emerald-800 font-medium truncate mt-0.5">
-                      Consulta folios, piezas de pan y reimprime tickets del turno
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("tickets")}
-                  className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl font-black text-xs shrink-0 shadow-xs cursor-pointer transition-all flex items-center gap-1.5 border border-emerald-600"
-                  title="Ver todos los tickets de venta emitidos en este turno"
-                >
-                  <Receipt className="w-3.5 h-3.5" />
-                  <span>Ver Historial</span>
-                  <span>→</span>
-                </button>
-              </div>
 
               {/* SWITCH PROMINENTE: Salida (-) vs Entrada (+) */}
               <div>

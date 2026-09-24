@@ -3327,6 +3327,15 @@ export default function POSPage() {
         onClose={() => setShowRecentSales(false)}
         sales={recentSalesList}
         onSelectSaleForReprint={handleReprintSale}
+        orders={getStoredOrders()}
+        onSelectOrderForReceipt={(order) => {
+          setShowRecentSales(false);
+          setSelectedOrderForReceipt(order);
+        }}
+        onSelectOrderForPayment={(order) => {
+          setShowRecentSales(false);
+          setSelectedOrderForPayment(order);
+        }}
       />
 
       {/* Movimientos de Dinero en Caja Modal (Salidas/Gastos/Retiros y Entradas/Cambio) */}
@@ -3341,6 +3350,15 @@ export default function POSPage() {
         onDeleteIncome={handleDeleteIncome}
         sales={recentSalesList}
         onSelectSaleForReprint={handleReprintSale}
+        orders={getStoredOrders()}
+        onSelectOrderForReceipt={(order) => {
+          setShowExpensesModal(false);
+          setSelectedOrderForReceipt(order);
+        }}
+        onSelectOrderForPayment={(order) => {
+          setShowExpensesModal(false);
+          setSelectedOrderForPayment(order);
+        }}
         cashSalesTotal={totalCashSales}
         initialFund={initialCashFund}
         cashierName={cashierName}
