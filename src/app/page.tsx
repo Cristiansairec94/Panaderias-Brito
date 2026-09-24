@@ -9,7 +9,6 @@ import {
   Wallet, 
   Users, 
   ShieldCheck, 
-  Package, 
   Zap, 
   Store, 
   Clock, 
@@ -1398,7 +1397,7 @@ export default function Home() {
       {/* ========================================================= */}
       {/* 8. DIRECT ERP CORE LINKS                                */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Clientes Card */}
         <Link 
           href="/clientes" 
@@ -1434,25 +1433,6 @@ export default function Home() {
           </div>
           <div className="mt-6 flex items-center gap-2 text-xs font-black text-emerald-600 group-hover:translate-x-1 transition-transform">
             Administrar Caja <ArrowRight className="w-4 h-4" />
-          </div>
-        </Link>
-
-        {/* Inventario Card */}
-        <Link 
-          href="/inventario" 
-          className="group bg-white p-6 rounded-3xl border border-stone-200/90 shadow-sm hover:border-rose-500 hover:shadow-xl transition-all flex flex-col justify-between"
-        >
-          <div>
-            <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 mb-4 group-hover:scale-110 transition-transform">
-              <Package className="w-6 h-6" />
-            </div>
-            <h3 className="font-extrabold text-base text-stone-900">Inventario & Materia Prima</h3>
-            <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">
-              Registro de compras a proveedores, bultos de harina, azúcar, mantequilla pura y mermas.
-            </p>
-          </div>
-          <div className="mt-6 flex items-center gap-2 text-xs font-black text-rose-600 group-hover:translate-x-1 transition-transform">
-            Ver Almacén <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
       </div>
