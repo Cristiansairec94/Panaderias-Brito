@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { History, X, Receipt, RefreshCw, Printer, DollarSign, CreditCard, Send } from "lucide-react";
+import { History, X, Receipt, RefreshCw, Printer, DollarSign, CreditCard, Send, Search } from "lucide-react";
 import { Sale } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 
@@ -19,15 +19,28 @@ export default function RecentSalesDrawer({
   onSelectSaleForReprint,
 }: RecentSalesDrawerProps) {
   const [filterMethod, setFilterMethod] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (!isOpen) return null;
 
   const filteredSales = sales.filter((s) => {
-    if (filterMethod === "all") return true;
-    return s.paymentMethod === filterMethod;
+    if (filterMethod !== "all" && s.paymentMethod !== filterMethod) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchId = s.id.toLowerCase().includes(q);
+      const matchCashier = (s.cashier || "").toLowerCase().includes(q);
+      const matchCustomer = (s.customerName || "").toLowerCase().includes(q);
+      const matchItems = (s.items || []).some((i) => i.product.name.toLowerCase().includes(q));
+      return matchId || matchCashier || matchCustomer || matchItems;
+    }
+    return true;
   });
 
   const totalSalesAmount = sales.reduce((sum, s) => sum + s.total, 0);
+  const totalPiecesSold = sales.reduce(
+    (sum, s) => sum + (s.items || []).reduce((iSum, i) => iSum + i.quantity, 0),
+    0
+  );
 
   const getMethodIcon = (method: string) => {
     switch (method) {
@@ -44,56 +57,82 @@ export default function RecentSalesDrawer({
 
   return (
     <div className="fixed inset-0 z-[200] flex justify-end bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
         {/* Drawer Header */}
         <div className="p-5 border-b border-stone-200 bg-amber-950 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <History className="w-5 h-5 text-amber-400" />
             <div>
-              <h3 className="font-bold text-sm">Ventas Recientes del Turno</h3>
-              <p className="text-[11px] text-amber-200/80">Historial y reimpresión de tickets</p>
+              <h3 className="font-bold text-sm">Historial de Ventas del Turno</h3>
+              <p className="text-[11px] text-amber-200/80">Tickets emitidos, resumen y reimpresión</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-amber-900 rounded-xl text-amber-200 hover:text-white transition-colors"
+            className="p-1.5 hover:bg-amber-900 rounded-xl text-amber-200 hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Sales Summary Banner */}
-        <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold text-stone-500">Acumulado en Turno</span>
-            <p className="text-xl font-black text-stone-900">{formatCurrency(totalSalesAmount)}</p>
+        <div className="grid grid-cols-3 gap-2 p-3.5 bg-amber-50/80 border-b border-amber-200 text-center">
+          <div className="bg-white p-2 rounded-xl border border-amber-200/80 shadow-2xs">
+            <span className="text-[10px] font-bold text-stone-500 block uppercase">Total Ventas</span>
+            <p className="text-base sm:text-lg font-black text-stone-900 mt-0.5">{formatCurrency(totalSalesAmount)}</p>
           </div>
-          <div className="text-right">
-            <span className="text-[11px] font-semibold text-stone-500">Tickets Emitidos</span>
-            <p className="text-xl font-bold text-amber-800">{sales.length}</p>
+          <div className="bg-white p-2 rounded-xl border border-amber-200/80 shadow-2xs">
+            <span className="text-[10px] font-bold text-stone-500 block uppercase">Tickets</span>
+            <p className="text-base sm:text-lg font-black text-amber-800 mt-0.5">{sales.length}</p>
+          </div>
+          <div className="bg-white p-2 rounded-xl border border-amber-200/80 shadow-2xs">
+            <span className="text-[10px] font-bold text-stone-500 block uppercase">Piezas Pan</span>
+            <p className="text-base sm:text-lg font-black text-emerald-800 mt-0.5">{totalPiecesSold}</p>
           </div>
         </div>
 
-        {/* Filter Pills */}
-        <div className="p-3 border-b border-stone-100 flex gap-2 bg-stone-50">
-          {[
-            { id: "all", label: "Todos" },
-            { id: "efectivo", label: "Efectivo" },
-            { id: "tarjeta", label: "Tarjeta" },
-            { id: "transferencia", label: "Transferencia" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setFilterMethod(tab.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                filterMethod === tab.id
-                  ? "bg-amber-600 text-white shadow-sm"
-                  : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-100"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Filter Pills & Search */}
+        <div className="p-3 border-b border-stone-100 space-y-2 bg-stone-50">
+          <div className="flex gap-1.5 overflow-x-auto">
+            {[
+              { id: "all", label: `Todos (${sales.length})` },
+              { id: "efectivo", label: "Efectivo" },
+              { id: "tarjeta", label: "Tarjeta" },
+              { id: "transferencia", label: "Transf." },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setFilterMethod(tab.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filterMethod === tab.id
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-100"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+            <input
+              type="text"
+              placeholder="Buscar por # ticket, producto, cajero o cliente..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-7 py-2 bg-white border border-stone-200 rounded-xl text-xs font-medium text-stone-900 focus:outline-none focus:border-amber-600 transition-colors placeholder:text-stone-400 shadow-2xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Sales List */}
@@ -113,9 +152,21 @@ export default function RecentSalesDrawer({
                   className="bg-stone-50 hover:bg-amber-50/50 p-4 rounded-2xl border border-stone-200/80 transition-all space-y-2.5"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-stone-800 font-mono">
-                      #{sale.id.slice(-6).toUpperCase()}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold text-stone-800 font-mono bg-white px-1.5 py-0.5 rounded border border-stone-200">
+                        #{sale.id.slice(-6).toUpperCase()}
+                      </span>
+                      {sale.customerName && sale.customerName !== "Público General" && sale.customerName !== "Público general" && (
+                        <span className="text-[10px] font-bold text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded">
+                          👤 {sale.customerName}
+                        </span>
+                      )}
+                      {sale.cashier && (
+                        <span className="text-[10px] text-stone-500">
+                          ({sale.cashier})
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[11px] text-stone-500">{sale.date}</span>
                   </div>
 

@@ -81,7 +81,7 @@ import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import PosOrdersDrawer from "@/components/pos/PosOrdersDrawer";
 import { getStoredOrders } from "@/lib/orders";
-import { recordPosSaleIncome } from "@/lib/incomes";
+import { recordPosSaleIncome, getStoredIncomes } from "@/lib/incomes";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
@@ -935,7 +935,7 @@ export default function POSPage() {
           setIsDbConnected(true);
         }
 
-        // 2. Load recent sales
+        // 2. Load recent sales (historial completo de ventas)
         const { data: salesData, error: salesErr } = await supabase
           .from("sales")
           .select(`
@@ -953,10 +953,11 @@ export default function POSPage() {
             )
           `)
           .order("created_at", { ascending: false })
-          .limit(20);
+          .limit(100);
 
-        if (salesData && !salesErr) {
-          const mappedSales: Sale[] = salesData.map((s: any) => ({
+        let mappedSales: Sale[] = [];
+        if (salesData && !salesErr && salesData.length > 0) {
+          mappedSales = salesData.map((s: any) => ({
             id: s.id,
             date: formatDateTimeSafe(s.created_at),
             total: Number(s.total),
@@ -973,10 +974,57 @@ export default function POSPage() {
               quantity: si.quantity,
             })),
           }));
-          if (typeof window !== "undefined" && localStorage.getItem("brito_pos_current_sales") === null) {
-            setRecentSalesList(mappedSales);
-          }
         }
+
+        // Recuperar y fusionar ventas tanto de la base de datos como del historial local
+        setRecentSalesList((prev) => {
+          const combined = [...prev];
+          const existingIds = new Set(combined.map((s) => s.id));
+
+          // 1. Agregar ventas de Supabase que no estén en combined
+          for (const s of mappedSales) {
+            if (!existingIds.has(s.id)) {
+              existingIds.add(s.id);
+              combined.push(s);
+            }
+          }
+
+          // 2. Si faltan ventas o está vacío, recuperar ventas registradas en el historial de ingresos
+          try {
+            const storedIncomes = getStoredIncomes();
+            const posIncomes = storedIncomes.filter(
+              (i) => i.category === "venta_mostrador" && i.amount > 0
+            );
+            for (const inc of posIncomes) {
+              const saleId = inc.saleId || inc.id.replace(/^ING-/, "POS-");
+              if (!existingIds.has(saleId)) {
+                existingIds.add(saleId);
+                combined.push({
+                  id: saleId,
+                  date: inc.date || "Hoy",
+                  total: inc.amount,
+                  paymentMethod: (inc.paymentMethod as any) || "efectivo",
+                  cashier: inc.cashier || "Don Toño Brito",
+                  customerName: inc.customerName,
+                  items: [
+                    {
+                      product: {
+                        id: "rec",
+                        name: inc.concept?.replace(/^Compra de mostrador:\s*/i, "") || "Venta de pan",
+                        price: inc.amount,
+                        category: "pan_dulce",
+                        stock: 0,
+                      },
+                      quantity: 1,
+                    },
+                  ],
+                });
+              }
+            }
+          } catch {}
+
+          return combined;
+        });
 
         // 3. Load cash expenses from Supabase
         const { data: expData, error: expErr } = await supabase
@@ -1586,6 +1634,7 @@ export default function POSPage() {
   const handleReprintSale = (sale: Sale) => {
     setCompletedSale(sale);
     setShowRecentSales(false);
+    setShowExpensesModal(false);
     setShowReceiptModal(true);
   };
 
@@ -1978,8 +2027,19 @@ export default function POSPage() {
 
             </div>
 
-            {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
+            {/* Grupo Caja y Turno: Historial de Ventas + Movimientos de Caja + Cerrar Turno */}
             <div className="flex items-center gap-2 shrink-0">
+              {/* Botón Historial de Ventas / Tickets Emitidos */}
+              <button
+                type="button"
+                onClick={() => setShowRecentSales(true)}
+                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-stone-200 hover:border-amber-400 bg-white hover:bg-amber-50/70 text-stone-900 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
+                title="Ver el historial completo de ventas, tickets emitidos y reimpresión"
+              >
+                <Receipt className="w-5 h-5 text-amber-700 shrink-0" />
+                <span>Historial de Ventas ({recentSalesList.length})</span>
+              </button>
+
               {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
               <button
                 type="button"
@@ -3289,6 +3349,8 @@ export default function POSPage() {
         incomes={incomesList}
         onAddIncome={handleAddIncome}
         onDeleteIncome={handleDeleteIncome}
+        sales={recentSalesList}
+        onSelectSaleForReprint={handleReprintSale}
         cashSalesTotal={totalCashSales}
         initialFund={initialCashFund}
         cashierName={cashierName}

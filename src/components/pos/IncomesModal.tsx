@@ -36,7 +36,7 @@ interface IncomesModalProps {
   onOpenReceipt?: (income: CashIncome) => void;
 }
 
-const QUICK_AMOUNTS = [50, 100, 200, 300, 500, 1000];
+const QUICK_AMOUNTS = [50, 100, 200, 500, 1000];
 
 const INCOME_CATEGORIES: { id: CashIncomeCategory; label: string; icon: string }[] = [
   { id: "abono_pedido", label: "Abono a Pedido Especial (Pastel/Evento)", icon: "🎂" },
@@ -264,18 +264,25 @@ export default function IncomesModal({
                   />
                 </div>
 
-                {/* Botones rápidos de monto */}
-                <div className="grid grid-cols-6 gap-1.5 pt-0.5">
-                  {QUICK_AMOUNTS.map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setAmount(amt.toString())}
-                      className="py-1.5 bg-stone-100 hover:bg-emerald-600 hover:text-white text-stone-800 font-extrabold text-xs rounded-xl border border-stone-200 transition-all active:scale-95"
-                    >
-                      ${amt}
-                    </button>
-                  ))}
+                {/* Nominaciones rápidas en cuadros */}
+                <div className="grid grid-cols-5 gap-2 pt-1">
+                  {QUICK_AMOUNTS.map((amt) => {
+                    const isSelected = amount === amt.toString();
+                    return (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setAmount(amt.toString())}
+                        className={`py-2.5 sm:py-3 rounded-2xl border-2 font-black text-xs sm:text-sm transition-all active:scale-95 shadow-xs cursor-pointer flex items-center justify-center ${
+                          isSelected
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-md scale-102 ring-2 ring-emerald-400/30"
+                            : "bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 text-stone-900 border-stone-200"
+                        }`}
+                      >
+                        ${amt >= 1000 ? amt.toLocaleString("es-MX") : amt}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

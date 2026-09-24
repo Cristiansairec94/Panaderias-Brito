@@ -227,9 +227,51 @@ export default function CajaPage() {
     }
     return 0;
   });
-  const [cashSales] = useState(4150);
-  const [cardSales] = useState(700);
-  const [transferSales] = useState(350);
+  const [cashSales, setCashSales] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("brito_pos_current_sales");
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list) && list.length > 0) {
+            const sum = list.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            if (sum > 0) return sum;
+          }
+        }
+      } catch {}
+    }
+    return 4150;
+  });
+  const [cardSales, setCardSales] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("brito_pos_current_sales");
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list) && list.length > 0) {
+            const sum = list.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            if (sum > 0) return sum;
+          }
+        }
+      } catch {}
+    }
+    return 700;
+  });
+  const [transferSales, setTransferSales] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("brito_pos_current_sales");
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list) && list.length > 0) {
+            const sum = list.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            if (sum > 0) return sum;
+          }
+        }
+      } catch {}
+    }
+    return 350;
+  });
 
   // Live Movement Modal
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
@@ -274,12 +316,28 @@ export default function CajaPage() {
     const handleSync = () => {
       loadCutsHistory();
       setInitialCash(getStoredCajaInitialFund(0));
+      try {
+        const raw = localStorage.getItem("brito_pos_current_sales");
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list) && list.length > 0) {
+            const cSum = list.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            const kSum = list.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            const tSum = list.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            if (cSum > 0) setCashSales(cSum);
+            if (kSum > 0) setCardSales(kSum);
+            if (tSum > 0) setTransferSales(tSum);
+          }
+        }
+      } catch {}
     };
     window.addEventListener("brito_shift_cuts_updated", handleSync);
     window.addEventListener("storage", handleSync);
+    window.addEventListener("brito_incomes_updated", handleSync);
     return () => {
       window.removeEventListener("brito_shift_cuts_updated", handleSync);
       window.removeEventListener("storage", handleSync);
+      window.removeEventListener("brito_incomes_updated", handleSync);
     };
   }, []);
 

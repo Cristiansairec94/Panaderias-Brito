@@ -1508,18 +1508,25 @@ export default function GastosPage() {
                   />
                 </div>
 
-                {/* Botones rápidos de monto */}
-                <div className="grid grid-cols-5 gap-1.5 sm:gap-2 pt-1">
-                  {QUICK_AMOUNTS.map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setForm({ ...form, amount: amt.toString() })}
-                      className="py-2 bg-stone-100 hover:bg-rose-600 hover:text-white text-stone-800 font-extrabold text-xs sm:text-sm rounded-xl border border-stone-200 transition-all active:scale-95"
-                    >
-                      ${amt}
-                    </button>
-                  ))}
+                {/* Nominaciones rápidas en cuadros */}
+                <div className="grid grid-cols-5 gap-2 pt-1.5">
+                  {QUICK_AMOUNTS.map((amt) => {
+                    const isSelected = form.amount === amt.toString();
+                    return (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setForm({ ...form, amount: amt.toString() })}
+                        className={`py-3 sm:py-3.5 rounded-2xl border-2 font-black text-sm sm:text-base transition-all active:scale-95 shadow-xs cursor-pointer flex items-center justify-center ${
+                          isSelected
+                            ? "bg-rose-600 text-white border-rose-600 shadow-md scale-102 ring-2 ring-rose-400/30"
+                            : "bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 text-stone-900 border-stone-200"
+                        }`}
+                      >
+                        ${amt >= 1000 ? amt.toLocaleString("es-MX") : amt}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

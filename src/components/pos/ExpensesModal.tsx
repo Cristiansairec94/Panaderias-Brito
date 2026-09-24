@@ -1043,8 +1043,8 @@ export default function ExpensesModal({
                   />
                 </div>
 
-                {/* Botones rápidos de monto */}
-                <div className="grid grid-cols-5 gap-1.5 sm:gap-2 pt-1">
+                {/* Nominaciones rápidas en cuadros */}
+                <div className="grid grid-cols-5 gap-2 pt-1.5">
                   {QUICK_AMOUNTS.map((amt) => {
                     const isSelectedAmt = amount === amt.toString();
                     return (
@@ -1052,15 +1052,15 @@ export default function ExpensesModal({
                         key={amt}
                         type="button"
                         onClick={() => setAmount(amt.toString())}
-                        className={`py-2.5 sm:py-3 rounded-2xl border-2 font-black text-sm sm:text-base transition-all active:scale-95 shadow-2xs cursor-pointer ${
+                        className={`py-3 sm:py-3.5 rounded-2xl border-2 font-black text-sm sm:text-base transition-all active:scale-95 shadow-xs cursor-pointer flex items-center justify-center ${
                           isSelectedAmt
                             ? movementType === "salida"
-                              ? "bg-rose-600 text-white border-rose-600 shadow-md scale-102"
-                              : "bg-emerald-600 text-white border-emerald-600 shadow-md scale-102"
-                            : "bg-stone-100 hover:bg-stone-200/90 text-stone-800 border-stone-300"
+                              ? "bg-rose-600 text-white border-rose-600 shadow-md scale-102 ring-2 ring-rose-400/30"
+                              : "bg-emerald-600 text-white border-emerald-600 shadow-md scale-102 ring-2 ring-emerald-400/30"
+                            : "bg-white hover:bg-stone-100 text-stone-900 border-stone-200"
                         }`}
                       >
-                        ${amt}
+                        ${amt >= 1000 ? amt.toLocaleString("es-MX") : amt}
                       </button>
                     );
                   })}
