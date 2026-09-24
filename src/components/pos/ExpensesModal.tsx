@@ -426,6 +426,7 @@ export default function ExpensesModal({
   const [historyFilter, setHistoryFilter] = useState<"todos" | "ventas" | "entradas" | "salidas">("todos");
   const [ticketScopeFilter, setTicketScopeFilter] = useState<"turno" | "por_dia" | "global">("turno");
   const [selectedDayKey, setSelectedDayKey] = useState<string>("all");
+  const [ticketLayoutMode, setTicketLayoutMode] = useState<"lista" | "cuadricula">("lista");
 
   // Modal emergente de información detallada para cada opción de balance
   const [activeDetailModal, setActiveDetailModal] = useState<"fondo" | "ventas" | "entradas" | "gastos" | "balance" | null>(null);
@@ -1433,7 +1434,7 @@ export default function ExpensesModal({
           </div>
 
           {/* Montos y Acciones */}
-          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100 gap-2 shrink-0">
+          <div className="flex flex-row items-center justify-between sm:justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100 gap-3 sm:gap-4 shrink-0">
             <div className="text-right">
               <span className="text-base sm:text-lg font-black text-stone-900 block leading-tight">
                 {formatCurrency(order.total)}
@@ -1608,7 +1609,7 @@ export default function ExpensesModal({
           </div>
 
           {/* Monto y Botones de Acción */}
-          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100 gap-2 shrink-0">
+          <div className="flex flex-row items-center justify-between sm:justify-end border-t sm:border-t-0 pt-2 sm:pt-0 border-stone-100 gap-3 sm:gap-4 shrink-0">
             <span className="text-base sm:text-lg font-black text-emerald-700">
               +{formatCurrency(sale.total)}
             </span>
@@ -2038,28 +2039,58 @@ export default function ExpensesModal({
                 </div>
               </div>
 
-              {/* Subfiltros por Método de Pago */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                <span className="text-[10px] font-bold uppercase text-stone-400 mr-1">Método:</span>
-                {[
-                  { id: "all", label: "Todos los métodos" },
-                  { id: "efectivo", label: "🪙 Efectivo" },
-                  { id: "tarjeta", label: "💳 Tarjeta" },
-                  { id: "transferencia", label: "📲 Transferencia" },
-                ].map((m) => (
+              {/* Subfiltros por Método de Pago y Selector de Vista */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pb-1 text-xs">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                  <span className="text-[10px] font-bold uppercase text-stone-400 mr-1">Método:</span>
+                  {[
+                    { id: "all", label: "Todos los métodos" },
+                    { id: "efectivo", label: "🪙 Efectivo" },
+                    { id: "tarjeta", label: "💳 Tarjeta" },
+                    { id: "transferencia", label: "📲 Transferencia" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setTicketMethodFilter(m.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all border cursor-pointer ${
+                        ticketMethodFilter === m.id
+                          ? "bg-emerald-700 text-white border-emerald-800 shadow-2xs"
+                          : "bg-stone-50 text-stone-600 hover:bg-stone-100 border-stone-200"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Alternador de Diseño: Lista (1 columna corrida) vs Cuadrícula */}
+                <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl border border-stone-200 shrink-0 self-start sm:self-auto">
                   <button
-                    key={m.id}
                     type="button"
-                    onClick={() => setTicketMethodFilter(m.id)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-all border cursor-pointer ${
-                      ticketMethodFilter === m.id
-                        ? "bg-emerald-700 text-white border-emerald-800 shadow-2xs"
-                        : "bg-stone-50 text-stone-600 hover:bg-stone-100 border-stone-200"
+                    onClick={() => setTicketLayoutMode("lista")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      ticketLayoutMode === "lista"
+                        ? "bg-stone-900 text-white shadow-2xs border border-stone-900"
+                        : "text-stone-600 hover:text-stone-900"
                     }`}
+                    title="Ver en formato de lista (1 por fila)"
                   >
-                    {m.label}
+                    <span>☰ Lista</span>
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setTicketLayoutMode("cuadricula")}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                      ticketLayoutMode === "cuadricula"
+                        ? "bg-stone-900 text-white shadow-2xs border border-stone-900"
+                        : "text-stone-600 hover:text-stone-900"
+                    }`}
+                    title="Ver en formato cuadrícula de 2 columnas"
+                  >
+                    <span>⊞ Cuadrícula</span>
+                  </button>
+                </div>
               </div>
 
               {/* Selector de Días en Historial por Día */}
@@ -2189,7 +2220,7 @@ export default function ExpensesModal({
 
                         {/* Listado cronológico unificado de tickets y pedidos del día */}
                         {group.unifiedTickets.length > 0 && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5 pl-0 sm:pl-2">
+                          <div className={ticketLayoutMode === "lista" ? "flex flex-col gap-2.5 sm:gap-3 pl-0 sm:pl-2" : "grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5 pl-0 sm:pl-2"}>
                             {group.unifiedTickets.map((item) =>
                               item.type === "pedido"
                                 ? renderOrderCard(item.order!)
@@ -2202,7 +2233,7 @@ export default function ExpensesModal({
                   </div>
                 ) : (
                   /* VISTA DIRECTA DE TURNO ACTUAL: FLUJO CRONOLÓGICO UNIFICADO SEGÚN SE EMITEN LOS TICKETS */
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
+                  <div className={ticketLayoutMode === "lista" ? "flex flex-col gap-2.5 sm:gap-3" : "grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5"}>
                     {unifiedTickets.map((item) =>
                       item.type === "pedido"
                         ? renderOrderCard(item.order!)
