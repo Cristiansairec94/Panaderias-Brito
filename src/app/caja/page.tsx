@@ -185,6 +185,44 @@ const INITIAL_MOVEMENTS: CashMovement[] = [
   { id: "mov-4", shiftId: "shift-101", type: "salida", category: "retiro_dueno", categoryLabel: "Retiro Don Toño", amount: 1000, reason: "Retiro parcial de efectivo por seguridad", authorizedBy: "Don Toño Brito", timestamp: "02:00 PM" },
 ];
 
+function getShiftSuggestionByCurrentTime(date = new Date()) {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const decimal = hours + minutes / 60;
+
+  const cutTimeStr = date.toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  if (decimal >= 5 && decimal < 14.5) {
+    // Corte matutino (05:00 a 14:30) -> Entra el turno vespertino
+    return {
+      currentShift: "Turno Matutino (06:00 - 14:00)",
+      nextShift: "Turno Vespertino (14:00 - 22:00)",
+      suggestedRecipient: "Cajera 2 - Turno Vespertino",
+      cutTimeStr,
+    };
+  } else if (decimal >= 14.5 && decimal < 22) {
+    // Corte vespertino (14:30 a 22:00) -> Entra el turno matutino para apertura de mañana
+    return {
+      currentShift: "Turno Vespertino (14:00 - 22:00)",
+      nextShift: "Turno Matutino (06:00 - 14:00)",
+      suggestedRecipient: "Cajera 1 - Turno Matutino",
+      cutTimeStr,
+    };
+  } else {
+    // Corte nocturno o de madrugada (22:00 a 05:00) -> Entra el turno matutino
+    return {
+      currentShift: "Turno Nocturno (22:00 - 06:00)",
+      nextShift: "Turno Matutino (06:00 - 14:00)",
+      suggestedRecipient: "Cajera 1 - Turno Matutino",
+      cutTimeStr,
+    };
+  }
+}
+
 export default function CajaPage() {
   const { user, usersList } = useAuth();
   const { currentBranch } = useBranch();
@@ -282,8 +320,9 @@ export default function CajaPage() {
 
   // Live Shift Cut Modal State
   const [isCorteModalOpen, setIsCorteModalOpen] = useState(false);
-  const [incomingCashier, setIncomingCashier] = useState("Cajera 2 - Turno Vespertino");
-  const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
+  const [incomingCashier, setIncomingCashier] = useState(() => getShiftSuggestionByCurrentTime().suggestedRecipient);
+  const [nextShiftName, setNextShiftName] = useState(() => getShiftSuggestionByCurrentTime().nextShift);
+  const autoShiftData = useMemo(() => getShiftSuggestionByCurrentTime(), [isCorteModalOpen]);
   const [deliveryPassword, setDeliveryPassword] = useState("");
   const [showDeliveryPassword, setShowDeliveryPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -291,6 +330,15 @@ export default function CajaPage() {
   const [nextFundAmount, setNextFundAmount] = useState<string>("500");
   const [corteNotes, setCorteNotes] = useState<string>("");
 
+
+  const handleOpenCorteModal = () => {
+    const auto = getShiftSuggestionByCurrentTime();
+    setNextShiftName(auto.nextShift);
+    setIncomingCashier(auto.suggestedRecipient);
+    setPasswordError(null);
+    setDeliveryPassword("");
+    setIsCorteModalOpen(true);
+  };
 
   // Load and sync cuts history from localStorage
   const loadCutsHistory = () => {
@@ -615,7 +663,7 @@ export default function CajaPage() {
       incomingCashier: recipient,
       responsible: currentShiftResponsible,
       branchName: currentBranch?.name || "Sucursal Matriz Centro",
-      previousShift: "Turno Matutino",
+      previousShift: getShiftSuggestionByCurrentTime().currentShift,
       nextShift: nextShiftName || "Turno Vespertino",
       initialFund: initialCash,
       cashSales,
@@ -733,7 +781,7 @@ export default function CajaPage() {
           <button
             onClick={() => {
               setActiveTab("turno");
-              setIsCorteModalOpen(true);
+              handleOpenCorteModal();
             }}
             className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-black px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95 border border-stone-800 cursor-pointer"
           >
@@ -1228,7 +1276,7 @@ export default function CajaPage() {
                 <Minus className="w-4 h-4" /> - Registrar Gasto / Retiro
               </button>
               <button
-                onClick={() => setIsCorteModalOpen(true)}
+                onClick={handleOpenCorteModal}
                 className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black px-5 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
               >
                 <Lock className="w-4 h-4" /> Cerrar Turno & Realizar Corte
@@ -1480,18 +1528,31 @@ export default function CajaPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-stone-600 px-1 pt-0.5">
-                  <span className="font-semibold flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-stone-400" /> Siguiente Turno a Iniciar:
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-stone-600 px-1 pt-0.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="font-semibold text-stone-800">Siguiente Turno a Iniciar:</span>
+                    <span className="text-[10px] font-bold text-amber-900 bg-amber-200/70 px-1.5 py-0.2 rounded">
+                      ⚡ Automático según corte ({autoShiftData.cutTimeStr})
+                    </span>
+                  </div>
                   <select
                     value={nextShiftName}
                     onChange={(e) => setNextShiftName(e.target.value)}
-                    className="bg-white border border-stone-200 rounded-lg px-2 py-0.5 font-bold text-stone-800 text-[11px] cursor-pointer"
+                    className="bg-white border border-stone-300 rounded-lg px-2.5 py-1 font-bold text-stone-900 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
                   >
-                    <option value="Turno Vespertino (14:00 - 22:00)">Turno Vespertino (14:00 - 22:00)</option>
-                    <option value="Turno Matutino (06:00 - 14:00)">Turno Matutino (06:00 - 14:00)</option>
-                    <option value="Turno Nocturno (22:00 - 06:00)">Turno Nocturno (22:00 - 06:00)</option>
+                    <option value="Turno Vespertino (14:00 - 22:00)">
+                      Turno Vespertino (14:00 - 22:00)
+                    </option>
+                    <option value="Turno Matutino (06:00 - 14:00)">
+                      Turno Matutino (06:00 - 14:00) — Apertura
+                    </option>
+                    <option value="Turno Nocturno (22:00 - 06:00)">
+                      Turno Nocturno (22:00 - 06:00) — Noche
+                    </option>
+                    <option value={`Turno Continuo (${autoShiftData.cutTimeStr})`}>
+                      Turno Inmediato (A partir de las ${autoShiftData.cutTimeStr})
+                    </option>
                   </select>
                 </div>
               </div>
