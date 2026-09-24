@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import { 
-  ShoppingBag,
   Wallet, 
   ArrowUpRight, 
   ArrowDownRight, 
@@ -840,24 +838,12 @@ export default function CajaPage() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/pos"
-            className="flex items-center gap-1.5 bg-gradient-to-r from-brito-orange-600 to-brito-crimson-600 hover:from-brito-orange-500 hover:to-brito-crimson-500 text-white font-black px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
-          >
-            <ShoppingBag className="w-4 h-4" /> Ir a Punto de Venta (POS)
-          </Link>
-          <Link
-            href="/ingresos"
-            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
-          >
-            <TrendingUp className="w-4 h-4" /> Registro de Ingresos
-          </Link>
           <button
             onClick={() => {
               setActiveTab("turno");
               setIsCorteModalOpen(true);
             }}
-            className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-black px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95 border border-stone-800"
+            className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-black px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95 border border-stone-800 cursor-pointer"
           >
             <Lock className="w-4 h-4 text-amber-400" /> + Realizar Corte de Turno
           </button>
