@@ -646,79 +646,48 @@ export default function ExpensesModal({
 
   // Filtrar exclusivamente las ventas correspondientes a la cajera y turno en operación
   const shiftSales = useMemo(() => {
-    const currentShiftSaleIds = new Set<string>();
-    if (Array.isArray(sales)) {
-      sales.forEach((s) => {
-        if (s && s.id) currentShiftSaleIds.add(s.id);
-      });
+    const source = Array.isArray(sales) && sales.length > 0 ? sales : [];
+    if (source.length === 0) {
+      return [];
     }
-    if (typeof window !== "undefined") {
-      try {
-        const rawCurrent = localStorage.getItem("brito_pos_current_sales");
-        if (rawCurrent) {
-          const parsedCurrent = JSON.parse(rawCurrent);
-          if (Array.isArray(parsedCurrent)) {
-            parsedCurrent.forEach((s) => {
-              if (s && s.id) currentShiftSaleIds.add(s.id);
-            });
-          }
-        }
-      } catch (e) {}
-    }
-
-    return (internalSales || []).filter((s) => {
+    return source.filter((s) => {
+      if (!s) return false;
       if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
       const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      if (shiftStartBoundary > 0) {
-        if (!sTime || sTime < shiftStartBoundary) {
-          return false;
-        }
+      if (shiftStartBoundary > 0 && sTime > 0) {
+        if (sTime < shiftStartBoundary) return false;
       }
-      if (currentShiftSaleIds.size > 0) {
-        return currentShiftSaleIds.has(s.id);
-      }
-      return false;
+      return true;
     });
-  }, [internalSales, sales, cashierName, shiftStartBoundary]);
+  }, [sales, cashierName, shiftStartBoundary]);
 
   // Ventas exclusivas del turno actual de la cajera en operación (cuentas separadas estrictas sin fallback a ventas maestras)
   const effectiveSales = shiftSales;
 
-  // Pedidos especiales del turno y cajera actual
+  // Pedidos especiales del turno y cajera actual (únicamente los creados dentro del turno activo)
   const relevantOrders = useMemo(() => {
+    if (!shiftStartBoundary || shiftStartBoundary <= 0) return [];
     return (internalOrders || []).filter((o) => {
+      if (!o) return false;
       if (branchId) {
         const orderBranch = (o as any).operatingBranchId || o.branchId;
         if (orderBranch && orderBranch !== branchId && o.branchId !== branchId) {
           return false;
         }
       }
-      const oTime = parseDateTimeSafe(o.createdAt || (o as any).date || o.deliveryDate);
-      if (shiftStartBoundary > 0) {
-        if (!oTime || oTime < (shiftStartBoundary - 5000)) {
-          return false;
-        }
-        // Creado durante el turno actual de esta sucursal:
-        if (o.cashier && cashierName) {
-          return (
-            matchesCashier(o.cashier, cashierName) ||
-            o.cashier.toLowerCase().includes("admin") ||
-            cashierName.toLowerCase().includes("admin") ||
-            o.cashier.toLowerCase().includes("cajer") ||
-            cashierName.toLowerCase().includes("cajer") ||
-            o.cashier.toLowerCase().includes("don toño")
-          );
-        }
-        return true;
+      const oTime = parseDateTimeSafe(o.createdAt || (o as any).date);
+      // Solo pedidos creados dentro de la ventana de tiempo del turno actual
+      if (!oTime || oTime < shiftStartBoundary) {
+        return false;
       }
       if (o.cashier && cashierName) {
-        return (
+        const isMatch =
           matchesCashier(o.cashier, cashierName) ||
+          cashierName.toLowerCase().includes("don toño") ||
           cashierName.toLowerCase().includes("admin") ||
-          o.cashier.toLowerCase().includes("admin") ||
-          o.cashier.toLowerCase().includes("cajer") ||
-          cashierName.toLowerCase().includes("cajer")
-        );
+          o.cashier.toLowerCase().includes("don toño") ||
+          o.cashier.toLowerCase().includes("admin");
+        if (!isMatch) return false;
       }
       return true;
     });
@@ -758,9 +727,7 @@ export default function ExpensesModal({
           cashierName.toLowerCase().includes("don toño") ||
           cashierName.toLowerCase().includes("admin") ||
           o.cashier.toLowerCase().includes("don toño") ||
-          o.cashier.toLowerCase().includes("admin") ||
-          o.cashier.toLowerCase().includes("cajer") ||
-          cashierName.toLowerCase().includes("cajer");
+          o.cashier.toLowerCase().includes("admin");
         if (!isMatch) return false;
       }
       return true;
@@ -796,9 +763,8 @@ export default function ExpensesModal({
     const ordersCash = effectiveOrders
       .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
       .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
-    const computed = posCash + ordersCash;
-    return Math.max(computed, cashSalesTotal || 0);
-  }, [effectiveSales, effectiveOrders, cashSalesTotal]);
+    return posCash + ordersCash;
+  }, [effectiveSales, effectiveOrders]);
 
   const totalOrdersDeposits = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
   const totalOrdersValue = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
@@ -2020,28 +1986,22 @@ export default function ExpensesModal({
                   onClick={() => setTicketTypeFilter("all")}
                   className={`p-2 sm:p-2.5 md:p-3 rounded-2xl border-2 transition-all cursor-pointer text-center flex flex-col items-center justify-center group active:scale-98 relative overflow-hidden ${
                     ticketTypeFilter === "all"
-                      ? "bg-stone-900 text-white border-stone-950 ring-2 sm:ring-4 ring-stone-900/20 shadow-md scale-[1.01]"
+                      ? "bg-white border-stone-800 ring-2 sm:ring-4 ring-stone-900/10 shadow-md scale-[1.01]"
                       : "bg-white hover:bg-stone-50 border-stone-200 hover:border-stone-300 text-stone-800 shadow-2xs"
                   }`}
                   title="Ver todas las ventas de mostrador y pedidos juntos"
                 >
                   <div className="flex items-center gap-1 sm:gap-1.5 justify-center max-w-full">
                     <span className="text-sm sm:text-base">📑</span>
-                    <span className={`text-[10px] sm:text-xs font-black uppercase tracking-wider block truncate ${
-                      ticketTypeFilter === "all" ? "text-stone-100" : "text-stone-800"
-                    }`}>
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider block text-stone-800 truncate">
                       Todos
                     </span>
                   </div>
-                  <span className={`text-xl sm:text-2xl md:text-3xl font-black block my-0.5 sm:my-1 ${
-                    ticketTypeFilter === "all" ? "text-white" : "text-stone-900"
-                  }`}>
+                  <span className="text-xl sm:text-2xl md:text-3xl font-black block my-0.5 sm:my-1 text-stone-900">
                     {totalRecordsCount}
                   </span>
                   <div className="flex items-center gap-1 flex-wrap justify-center">
-                    <span className={`text-[9px] sm:text-[10px] font-bold block leading-tight ${
-                      ticketTypeFilter === "all" ? "text-stone-300" : "text-stone-500"
-                    }`}>
+                    <span className="text-[9px] sm:text-[10px] font-bold block leading-tight text-stone-500">
                       ventas y pedidos
                     </span>
                     {ticketTypeFilter === "all" && (

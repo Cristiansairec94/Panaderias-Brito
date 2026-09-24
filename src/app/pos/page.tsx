@@ -839,6 +839,11 @@ export default function POSPage() {
         setIsShiftLocked(true);
       }
 
+      const shiftStartTs = localStorage.getItem("brito_current_shift_start_timestamp");
+      if (!shiftStartTs) {
+        localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      }
+
       // Limpiar automáticamente cualquier venta de prueba ficticia previa de $74
       const rawCurrent = localStorage.getItem("brito_pos_current_sales");
       if (rawCurrent) {
@@ -955,6 +960,11 @@ export default function POSPage() {
 
   const handleCashierChange = (newCashier: string) => {
     setCashierName(newCashier);
+    setRecentSalesList([]);
+    setExpensesList([]);
+    setIncomesList([]);
+    setCart([]);
+    setCashGiven("");
     try {
       localStorage.setItem("brito_current_shift_cashier", newCashier);
       localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
@@ -968,6 +978,11 @@ export default function POSPage() {
 
   const handleShiftChange = (newShift: string) => {
     setShiftName(newShift);
+    setRecentSalesList([]);
+    setExpensesList([]);
+    setIncomesList([]);
+    setCart([]);
+    setCashGiven("");
     try {
       localStorage.setItem("brito_current_shift_name", newShift);
       localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
@@ -1446,37 +1461,23 @@ export default function POSPage() {
 
   // Financial calculations strictly for the current operating cashier's shift
   const shiftStartBoundary = useMemo(() => {
-    return lastCutInfo?.timestamp || getStoredShiftStartBoundary();
+    return Math.max(getStoredShiftStartBoundary(), lastCutInfo?.timestamp || 0);
   }, [lastCutInfo, shiftVersion]);
 
   const currentShiftSales = useMemo(() => {
     try {
-      const currentShiftSaleIds = new Set<string>();
-      try {
-        const rawCurrent = localStorage.getItem("brito_pos_current_sales");
-        if (rawCurrent) {
-          const parsedCurrent = JSON.parse(rawCurrent);
-          if (Array.isArray(parsedCurrent)) {
-            parsedCurrent.forEach((s) => {
-              if (s && s.id) currentShiftSaleIds.add(s.id);
-            });
-          }
-        }
-      } catch (e) {}
-
-      const filtered = (recentSalesList || []).filter((s) => {
+      if (!recentSalesList || recentSalesList.length === 0) {
+        return [];
+      }
+      return recentSalesList.filter((s) => {
         if (!s) return false;
         if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-        if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary) return false;
-        }
-        if (currentShiftSaleIds.size > 0) {
-          return currentShiftSaleIds.has(s.id);
+        if (shiftStartBoundary > 0 && t > 0) {
+          if (t < shiftStartBoundary) return false;
         }
         return true;
       });
-      return filtered;
     } catch (e) {
       console.error("Error filtering currentShiftSales:", e);
       return [];
@@ -1485,13 +1486,14 @@ export default function POSPage() {
 
   const currentShiftExpenses = useMemo(() => {
     try {
-      return (expensesList || []).filter((e) => {
+      if (!expensesList || expensesList.length === 0) return [];
+      return expensesList.filter((e) => {
         if (!e) return false;
         const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
         if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
-        if (shiftStartBoundary > 0) {
-          if (!t || t < (shiftStartBoundary - 10000)) return false;
+        if (shiftStartBoundary > 0 && t > 0) {
+          if (t < (shiftStartBoundary - 10000)) return false;
         }
         return true;
       });
@@ -1503,13 +1505,14 @@ export default function POSPage() {
 
   const currentShiftIncomes = useMemo(() => {
     try {
-      return (incomesList || []).filter((inc) => {
+      if (!incomesList || incomesList.length === 0) return [];
+      return incomesList.filter((inc) => {
         if (!inc) return false;
         const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
         if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
-        if (shiftStartBoundary > 0) {
-          if (!t || t < (shiftStartBoundary - 10000)) return false;
+        if (shiftStartBoundary > 0 && t > 0) {
+          if (t < (shiftStartBoundary - 10000)) return false;
         }
         return true;
       });
@@ -1521,14 +1524,15 @@ export default function POSPage() {
 
   const currentShiftOrders = useMemo(() => {
     try {
+      if (!shiftStartBoundary || shiftStartBoundary <= 0) {
+        return [];
+      }
       return getStoredOrders().filter((o) => {
         if (!o) return false;
         if (activeBranch && o.branchId && o.branchId !== activeBranch.id) return false;
         if (!o.cashier || !matchesCashier(o.cashier, cashierName)) return false;
         const t = parseDateTimeSafe(o.createdAt || (o as any).date);
-        if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary) return false;
-        }
+        if (!t || t < shiftStartBoundary) return false;
         return true;
       });
     } catch (e) {

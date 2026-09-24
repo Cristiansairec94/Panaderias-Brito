@@ -310,17 +310,19 @@ export function matchesCashier(itemCashier?: string, targetCashier?: string): bo
 export function getStoredShiftStartBoundary(): number {
   if (typeof window === "undefined") return 0;
   try {
+    let startTs = 0;
     const stored = localStorage.getItem("brito_current_shift_start_timestamp");
     if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
-      return Number(stored);
+      startTs = Number(stored);
     }
     const rawCuts = localStorage.getItem("brito_shift_cuts_history");
     if (rawCuts) {
       const parsed = JSON.parse(rawCuts);
       if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0].timestamp === "number") {
-        return parsed[0].timestamp;
+        startTs = Math.max(startTs, parsed[0].timestamp);
       }
     }
+    return startTs;
   } catch (e) {}
   return 0;
 }

@@ -269,7 +269,7 @@ export default function CashDrawerShiftModal({
   const shiftStartBoundary = lastCutTimestamp || getStoredShiftStartBoundary();
 
   // 1. Cálculos de Ventas del Turno (filtradas por cajera y horario del turno actual)
-  const shiftSales = sales.filter((s) => {
+  const shiftSales = (sales || []).filter((s) => {
     if (s.cashier && outgoingCashier) {
       const isMatch = matchesCashier(s.cashier, outgoingCashier) ||
                       outgoingCashier.toLowerCase().includes("don toño") ||
@@ -279,19 +279,19 @@ export default function CashDrawerShiftModal({
       if (!isMatch) return false;
     }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-    if (shiftStartBoundary > 0 && sTime && sTime < (shiftStartBoundary - 10000)) return false;
+    if (shiftStartBoundary > 0 && sTime > 0 && sTime < (shiftStartBoundary - 10000)) return false;
     return true;
   });
-  // Si shiftSales tiene registros se usan; si quedó en 0 por desfase pero existen ventas en sales, se usan sales
-  const effectiveSales = shiftSales.length > 0 ? shiftSales : sales;
+  const effectiveSales = shiftSales;
 
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
-  const shiftOrders = (orders && orders.length > 0 ? orders : getStoredOrders()).filter((o) => {
+  const shiftOrders = (orders || []).filter((o) => {
     if (!o) return false;
     const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin");
     if (!isOwnerOrAdmin && (!o.cashier || !matchesCashier(o.cashier, outgoingCashier))) return false;
-    const oTime = parseDateTimeSafe(o.createdAt || (o as any).date || o.deliveryDate);
-    if (shiftStartBoundary > 0 && oTime && oTime < (shiftStartBoundary - 10000)) return false;
+    const oTime = parseDateTimeSafe(o.createdAt || (o as any).date);
+    if (!shiftStartBoundary || shiftStartBoundary <= 0) return false;
+    if (!oTime || oTime < shiftStartBoundary) return false;
     return true;
   });
 
@@ -300,10 +300,10 @@ export default function CashDrawerShiftModal({
     .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
 
   const posCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
-  const cashSales = Math.max(posCash + ordersCash, cashSalesTotal || 0);
+  const cashSales = posCash + ordersCash;
   const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
   const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
-  const totalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0) || (cashSales + cardSales + transferSales) || 0;
+  const totalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0);
 
   // 2. Cálculos de Gastos y Entradas del Turno (incluyendo retiros de dueño tomados del cajón)
   const shiftExpenses = expenses.filter((e) => {
