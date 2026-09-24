@@ -322,8 +322,12 @@ export function getStoredShiftStartBoundary(): number {
         startTs = Math.max(startTs, parsed[0].timestamp);
       }
     }
+    if (startTs === 0) {
+      startTs = Date.now();
+      localStorage.setItem("brito_current_shift_start_timestamp", startTs.toString());
+    }
     return startTs;
   } catch (e) {}
-  return 0;
+  return Date.now();
 }
 

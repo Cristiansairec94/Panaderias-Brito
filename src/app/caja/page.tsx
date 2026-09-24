@@ -779,8 +779,14 @@ export default function CajaPage() {
       const updated = [newCut, ...existing];
       localStorage.setItem("brito_shift_cuts_history", JSON.stringify(updated));
       localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
+      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      localStorage.setItem("brito_current_shift_cashier", recipient);
+      localStorage.removeItem("brito_pos_current_sales");
+      localStorage.removeItem("brito_pos_current_expenses");
+      localStorage.removeItem("brito_pos_current_incomes");
       setCutsHistory(updated);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (err) {
       console.error("Error guardando corte:", err);
     }

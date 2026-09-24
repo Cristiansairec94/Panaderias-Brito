@@ -532,23 +532,22 @@ export default function POSPage() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Filtrar cualquier venta ficticia previa generada automáticamente
+            const shiftStart = getStoredShiftStartBoundary();
             const realSales = parsed.filter(
-              (s: any) =>
-                !(
+              (s: any) => {
+                if (!s) return false;
+                if (
                   s?.total === 74 &&
                   s?.cashGiven === 100 &&
                   s?.change === 26 &&
                   s?.items?.length === 3 &&
                   s?.customerType === "frecuente"
-                )
+                ) return false;
+                const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
+                if (shiftStart > 0 && (!t || t < shiftStart)) return false;
+                return true;
+              }
             );
-            if (realSales.length !== parsed.length) {
-              localStorage.setItem("brito_pos_current_sales", JSON.stringify(realSales));
-            }
-            if (!localStorage.getItem("brito_pos_master_sales")) {
-              localStorage.setItem("brito_pos_master_sales", JSON.stringify(realSales));
-            }
             return realSales;
           }
         }
@@ -1098,57 +1097,61 @@ export default function POSPage() {
           }));
         }
 
-        // Recuperar y fusionar ventas tanto de la base de datos como del historial local
-        setRecentSalesList((prev) => {
-          const combined = [...prev];
-          const existingIds = new Set(combined.map((s) => s.id));
+        // Guardar ventas de Supabase y de ingresos en el historial maestro (brito_pos_master_sales)
+        // para reimpresión y consultas históricas SIN contaminar las ventas del turno en vivo (recentSalesList)
+        try {
+          const rawMaster = localStorage.getItem("brito_pos_master_sales");
+          const masterList: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+          const existingIds = new Set(masterList.map((s) => s.id));
+          let changed = false;
 
-          // 1. Agregar ventas de Supabase que no estén en combined
           for (const s of mappedSales) {
             if (!existingIds.has(s.id)) {
               existingIds.add(s.id);
-              combined.push(s);
+              masterList.push(s);
+              changed = true;
             }
           }
 
-          // 2. Si faltan ventas o está vacío, recuperar ventas registradas en el historial de ingresos
-          try {
-            const storedIncomes = getStoredIncomes();
-            const posIncomes = storedIncomes.filter(
-              (i) => i.category === "venta_mostrador" && i.amount > 0
-            );
-            for (const inc of posIncomes) {
-              const saleId = inc.saleId || inc.id.replace(/^ING-/, "POS-");
-              if (!existingIds.has(saleId)) {
-                existingIds.add(saleId);
-                combined.push({
-                  id: saleId,
-                  date: inc.date || "Hoy",
-                  total: inc.amount,
-                  paymentMethod: (inc.paymentMethod as any) || "efectivo",
-                  cashier: inc.cashier || "Don Toño Brito",
-                  customerName: inc.customerName,
-                  createdAt: inc.timestamp,
-                  timestamp: inc.timestamp ? new Date(inc.timestamp).getTime() : undefined,
-                  items: [
-                    {
-                      product: {
-                        id: "rec",
-                        name: inc.concept?.replace(/^Compra de mostrador:\s*/i, "") || "Venta de pan",
-                        price: inc.amount,
-                        category: "pan_dulce",
-                        stock: 0,
-                      },
-                      quantity: 1,
+          const storedIncomes = getStoredIncomes();
+          const posIncomes = storedIncomes.filter(
+            (i) => i.category === "venta_mostrador" && i.amount > 0
+          );
+          for (const inc of posIncomes) {
+            const saleId = inc.saleId || inc.id.replace(/^ING-/, "POS-");
+            if (!existingIds.has(saleId)) {
+              existingIds.add(saleId);
+              masterList.push({
+                id: saleId,
+                date: inc.date || "Hoy",
+                total: inc.amount,
+                paymentMethod: (inc.paymentMethod as any) || "efectivo",
+                cashier: inc.cashier || "Don Toño Brito",
+                customerName: inc.customerName,
+                createdAt: inc.timestamp,
+                timestamp: inc.timestamp ? new Date(inc.timestamp).getTime() : undefined,
+                items: [
+                  {
+                    product: {
+                      id: "rec",
+                      name: inc.concept?.replace(/^Compra de mostrador:\s*/i, "") || "Venta de pan",
+                      price: inc.amount,
+                      category: "pan_dulce",
+                      stock: 0,
                     },
-                  ],
-                });
-              }
+                    quantity: 1,
+                  },
+                ],
+              });
+              changed = true;
             }
-          } catch {}
+          }
 
-          return combined.sort((a, b) => compareMovementsDesc(a, b));
-        });
+          if (changed) {
+            masterList.sort((a, b) => compareMovementsDesc(a, b));
+            localStorage.setItem("brito_pos_master_sales", JSON.stringify(masterList));
+          }
+        } catch (e) {}
 
         // 3. Load cash expenses from Supabase
         const { data: expData, error: expErr } = await supabase
@@ -1473,8 +1476,8 @@ export default function POSPage() {
         if (!s) return false;
         if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-        if (shiftStartBoundary > 0 && t > 0) {
-          if (t < shiftStartBoundary) return false;
+        if (shiftStartBoundary > 0) {
+          if (!t || t < shiftStartBoundary) return false;
         }
         return true;
       });
@@ -1492,8 +1495,8 @@ export default function POSPage() {
         const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
         if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
-        if (shiftStartBoundary > 0 && t > 0) {
-          if (t < (shiftStartBoundary - 10000)) return false;
+        if (shiftStartBoundary > 0) {
+          if (!t || t < (shiftStartBoundary - 10000)) return false;
         }
         return true;
       });
@@ -1511,8 +1514,8 @@ export default function POSPage() {
         const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
         if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
-        if (shiftStartBoundary > 0 && t > 0) {
-          if (t < (shiftStartBoundary - 10000)) return false;
+        if (shiftStartBoundary > 0) {
+          if (!t || t < (shiftStartBoundary - 10000)) return false;
         }
         return true;
       });
@@ -3586,7 +3589,7 @@ export default function POSPage() {
           onDeleteIncome={handleDeleteIncome}
           sales={currentShiftSales}
           onSelectSaleForReprint={handleReprintSale}
-          orders={getStoredOrders()}
+          orders={currentShiftOrders}
           onSelectOrderForReceipt={(order) => {
             setShowExpensesModal(false);
             setSelectedOrderForReceipt(order);

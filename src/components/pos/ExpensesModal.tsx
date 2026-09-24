@@ -535,11 +535,11 @@ export default function ExpensesModal({
 
   // Sincronizar pedidos especiales en memoria y desde almacenamiento
   const [internalOrders, setInternalOrders] = useState<CustomOrder[]>(() => {
-    return orders && orders.length > 0 ? orders : getStoredOrders();
+    return Array.isArray(orders) ? orders : getStoredOrders();
   });
 
   useEffect(() => {
-    if (orders && orders.length > 0) {
+    if (Array.isArray(orders)) {
       setInternalOrders(orders);
     } else {
       setInternalOrders(getStoredOrders());
@@ -548,11 +548,13 @@ export default function ExpensesModal({
 
   useEffect(() => {
     const handleOrdersUpdated = () => {
-      setInternalOrders(getStoredOrders());
+      if (!Array.isArray(orders)) {
+        setInternalOrders(getStoredOrders());
+      }
     };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
     return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
-  }, []);
+  }, [orders]);
 
   // Sincronizar ventas de mostrador en memoria y desde almacenamiento local
   const [internalSales, setInternalSales] = useState<Sale[]>(() => {
@@ -611,7 +613,7 @@ export default function ExpensesModal({
   );
 
   // Límite temporal estricto del turno actual (timestamp en ms)
-  const shiftStartBoundary = lastCutTimestamp || getStoredShiftStartBoundary();
+  const shiftStartBoundary = Math.max(lastCutTimestamp || 0, getStoredShiftStartBoundary());
 
   // Filtrar exclusivamente las salidas correspondientes a la cajera y turno en operación (incluyendo retiros de dueño del cajón)
   const shiftExpenses = useMemo(() => {
@@ -654,8 +656,8 @@ export default function ExpensesModal({
       if (!s) return false;
       if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
       const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      if (shiftStartBoundary > 0 && sTime > 0) {
-        if (sTime < shiftStartBoundary) return false;
+      if (shiftStartBoundary > 0) {
+        if (!sTime || sTime < shiftStartBoundary) return false;
       }
       return true;
     });
@@ -681,12 +683,7 @@ export default function ExpensesModal({
         return false;
       }
       if (o.cashier && cashierName) {
-        const isMatch =
-          matchesCashier(o.cashier, cashierName) ||
-          cashierName.toLowerCase().includes("don toño") ||
-          cashierName.toLowerCase().includes("admin") ||
-          o.cashier.toLowerCase().includes("don toño") ||
-          o.cashier.toLowerCase().includes("admin");
+        const isMatch = matchesCashier(o.cashier, cashierName);
         if (!isMatch) return false;
       }
       return true;
@@ -746,8 +743,8 @@ export default function ExpensesModal({
   const ordersPool = useMemo(() => {
     if (ticketScopeFilter === "turno") return effectiveOrders;
     if (ticketScopeFilter === "por_dia") return operatorAllOrders.length > 0 ? operatorAllOrders : effectiveOrders;
-    return internalOrders || [];
-  }, [ticketScopeFilter, effectiveOrders, operatorAllOrders, internalOrders]);
+    return getStoredOrders();
+  }, [ticketScopeFilter, effectiveOrders, operatorAllOrders]);
 
   // Métricas superiores sincronizadas con el alcance activo
   const activeSalesForKpi = salesPoolForTickets;
