@@ -27,7 +27,10 @@ import {
   BellRing,
   Send,
   Check,
-  Building2
+  Building2,
+  Sparkles,
+  RefreshCw,
+  Radio
 } from "lucide-react";
 import { CashIncome, CashIncomeCategory, Customer, CustomOrder } from "@/types";
 import { formatCurrency, formatDateTimeSafe, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
@@ -35,83 +38,18 @@ import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { createClient } from "@/lib/supabase/client";
+import { 
+  getStoredIncomes, 
+  saveStoredIncomes, 
+  syncMissingSalesToIncomes, 
+  recordCashIncome, 
+  INITIAL_INCOMES 
+} from "@/lib/incomes";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import IncomeReceiptModal from "@/components/ingresos/IncomeReceiptModal";
 
-const INITIAL_INCOMES: CashIncome[] = [
-  {
-    id: "ING-849102",
-    amount: 500,
-    category: "abono_pedido",
-    categoryLabel: "Abono a Pedido Especial",
-    paymentMethod: "efectivo",
-    concept: "Anticipo de pastel 3 leches XV años para Sra. María González (PED-101)",
-    customerId: "cli-3",
-    customerName: "Sra. María González",
-    orderId: "PED-101",
-    orderNumber: "PED-101",
-    cashier: "Lupita Brito",
-    branchName: "Sucursal Matriz Centro",
-    date: "Hoy, 08:45 AM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849103",
-    amount: 850,
-    category: "abono_cliente",
-    categoryLabel: "Cobro a Mayorista / Tiendita",
-    paymentMethod: "transferencia",
-    referenceNumber: "SPEI-774921",
-    concept: "Liquidación semanal de 150 bolillos y teleras",
-    customerId: "cli-1",
-    customerName: "Abarrotes La Guadalupana (Don Pepe)",
-    cashier: "Don Toño Brito",
-    branchName: "Sucursal Matriz Centro",
-    date: "Hoy, 10:15 AM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849104",
-    amount: 300,
-    category: "abono_pedido",
-    categoryLabel: "Abono a Pedido Especial",
-    paymentMethod: "efectivo",
-    concept: "Anticipo pastel mil hojas de chocolate y café para cumpleaños",
-    customerId: "cli-4",
-    customerName: "Familia Brito",
-    orderId: "PED-103",
-    orderNumber: "PED-103",
-    cashier: "Lupita Brito",
-    branchName: "Sucursal Norte",
-    date: "Hoy, 11:30 AM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849105",
-    amount: 250,
-    category: "venta_costales",
-    categoryLabel: "Venta de Costales / Reciclaje",
-    paymentMethod: "efectivo",
-    concept: "Venta de 50 costales de harina vacíos a forrajera local",
-    cashier: "Maestro Juan",
-    branchName: "Sucursal Matriz Centro",
-    date: "Hoy, 12:45 PM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849106",
-    amount: 1000,
-    category: "fondo_cambio",
-    categoryLabel: "Aportación de Cambio a Caja",
-    paymentMethod: "efectivo",
-    concept: "Inyección de morralla y billetes de $20 y $50 para cambio del turno vespertino",
-    cashier: "Don Toño Brito",
-    branchName: "Sucursal Mercado",
-    date: "Hoy, 01:20 PM",
-    timestamp: new Date().toISOString(),
-  },
-];
-
 const CATEGORY_OPTIONS: { id: CashIncomeCategory; label: string; icon: string }[] = [
+  { id: "venta_mostrador", label: "Ventas de Mostrador (Panadería / POS)", icon: "🥖" },
   { id: "abono_pedido", label: "Abono a Pedido Especial (Pasteles/Eventos)", icon: "🎂" },
   { id: "abono_cliente", label: "Cobro a Cliente Mayorista / Tiendita", icon: "🏪" },
   { id: "fondo_cambio", label: "Aportación de Cambio / Fondo Adicional", icon: "🪙" },
@@ -120,7 +58,7 @@ const CATEGORY_OPTIONS: { id: CashIncomeCategory; label: string; icon: string }[
   { id: "otro", label: "Otro Concepto", icon: "💵" },
 ];
 
-const QUICK_AMOUNTS = [50, 100, 200, 300, 500, 1000];
+const QUICK_AMOUNTS = [50, 100, 200, 500, 1000, 2000];
 
 export default function IngresosPage() {
   const { user } = useAuth();
@@ -132,6 +70,7 @@ export default function IngresosPage() {
   const [selectedCategory, setSelectedCategory] = useState<"all" | CashIncomeCategory>("all");
   const [selectedMethod, setSelectedMethod] = useState<"all" | "efectivo" | "tarjeta" | "transferencia">("all");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
+  const [lastSyncTime, setLastSyncTime] = useState<string>("En vivo");
   
   // Modals state
   const [isNewIncomeModalOpen, setIsNewIncomeModalOpen] = useState(false);
@@ -149,28 +88,54 @@ export default function IngresosPage() {
   const [branchName, setBranchName] = useState(currentBranch ? currentBranch.name : "Sucursal Matriz Centro");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load incomes on mount with localStorage caching
+  // Cargar ingresos con sincronización inmediata de compras POS y tiempo real
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("brito_cash_incomes");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const sanitized = parsed.filter(
-            (i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5
-          );
-          setIncomes(sanitized);
-          if (sanitized.length !== parsed.length) {
-            localStorage.setItem("brito_cash_incomes", JSON.stringify(sanitized));
-          }
-          return;
-        }
+    // 1. Sincronizar todas las ventas previas de mostrador para que entren aquí directamente
+    syncMissingSalesToIncomes();
+    const loaded = getStoredIncomes();
+    setIncomes(loaded);
+
+    // 2. Escuchar evento de actualización local
+    const handleLocalUpdate = () => {
+      setIncomes(getStoredIncomes());
+      setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    };
+    window.addEventListener("brito_incomes_updated", handleLocalUpdate);
+    window.addEventListener("storage", handleLocalUpdate);
+
+    // 3. Suscribirse a ventas en tiempo real de cualquier sucursal (WebSocket)
+    const unsubSale = realtimeHub.onSale(() => {
+      setTimeout(() => {
+        setIncomes(getStoredIncomes());
+        setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      }, 60);
+    });
+
+    // 4. Suscribirse a entradas de caja de cualquier sucursal
+    const unsubCash = realtimeHub.onCashMovement((mov) => {
+      if (mov.type === "entrada") {
+        setTimeout(() => {
+          setIncomes(getStoredIncomes());
+          setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+        }, 60);
       }
-    } catch (e) {
-      console.error("Error reading saved incomes", e);
-    }
-    setIncomes(INITIAL_INCOMES);
-    localStorage.setItem("brito_cash_incomes", JSON.stringify(INITIAL_INCOMES));
+    });
+
+    // 5. Suscribirse a pagos y anticipos de pedidos especiales
+    const unsubOrder = realtimeHub.onOrder(() => {
+      setTimeout(() => {
+        setIncomes(getStoredIncomes());
+        setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      }, 60);
+    });
+
+    return () => {
+      window.removeEventListener("brito_incomes_updated", handleLocalUpdate);
+      window.removeEventListener("storage", handleLocalUpdate);
+      unsubSale();
+      unsubCash();
+      unsubOrder();
+    };
   }, []);
 
   // Update default branch when context updates
@@ -180,18 +145,23 @@ export default function IngresosPage() {
     }
   }, [currentBranch]);
 
-  // Save to localStorage when incomes changes
+  // Guardar en almacenamiento sin límite de monto
   const saveIncomes = (newIncomes: CashIncome[]) => {
+    saveStoredIncomes(newIncomes);
     setIncomes(newIncomes);
-    try {
-      localStorage.setItem("brito_cash_incomes", JSON.stringify(newIncomes));
-    } catch (e) {
-      console.error("Error persisting incomes", e);
-    }
   };
 
-  // KPIs Calculations
+  // KPIs Calculations - Sin ningún límite artificial de dinero
   const totalAmount = incomes.reduce((sum, inc) => sum + inc.amount, 0);
+  const posSalesAmount = incomes
+    .filter((inc) => inc.category === "venta_mostrador")
+    .reduce((sum, inc) => sum + inc.amount, 0);
+  const ordersDepositsAmount = incomes
+    .filter((inc) => inc.category === "abono_pedido")
+    .reduce((sum, inc) => sum + inc.amount, 0);
+  const wholesaleRecovered = incomes
+    .filter((inc) => inc.category === "abono_cliente")
+    .reduce((sum, inc) => sum + inc.amount, 0);
   const cashAmount = incomes
     .filter((inc) => inc.paymentMethod === "efectivo")
     .reduce((sum, inc) => sum + inc.amount, 0);
@@ -201,12 +171,6 @@ export default function IngresosPage() {
   const transferAmount = incomes
     .filter((inc) => inc.paymentMethod === "transferencia")
     .reduce((sum, inc) => sum + inc.amount, 0);
-  const ordersDepositsAmount = incomes
-    .filter((inc) => inc.category === "abono_pedido")
-    .reduce((sum, inc) => sum + inc.amount, 0);
-  const wholesaleRecovered = incomes
-    .filter((inc) => inc.category === "abono_cliente")
-    .reduce((sum, inc) => sum + inc.amount, 0);
 
   // Filtered List
   const filteredIncomes = incomes.filter((inc) => {
@@ -215,6 +179,7 @@ export default function IngresosPage() {
       inc.id.toLowerCase().includes(search.toLowerCase()) ||
       (inc.customerName && inc.customerName.toLowerCase().includes(search.toLowerCase())) ||
       (inc.orderNumber && inc.orderNumber.toLowerCase().includes(search.toLowerCase())) ||
+      (inc.saleId && inc.saleId.toLowerCase().includes(search.toLowerCase())) ||
       inc.cashier.toLowerCase().includes(search.toLowerCase());
 
     const matchesCategory = selectedCategory === "all" || inc.category === selectedCategory;
@@ -232,8 +197,7 @@ export default function IngresosPage() {
     setIsSubmitting(true);
     const catObj = CATEGORY_OPTIONS.find((c) => c.id === category);
 
-    const newIncome: CashIncome = {
-      id: `ING-${Math.floor(100000 + Math.random() * 900000)}`,
+    const newIncome = recordCashIncome({
       amount: parsedAmount,
       category,
       categoryLabel: catObj ? catObj.label : "Ingreso",
@@ -244,9 +208,7 @@ export default function IngresosPage() {
       referenceNumber: referenceNumber.trim() || undefined,
       cashier: user?.name || "Don Toño Brito",
       branchName,
-      date: formatDateTimeSafe(new Date()),
-      timestamp: new Date().toISOString(),
-    };
+    });
 
     // Try Supabase insert
     try {
@@ -262,8 +224,21 @@ export default function IngresosPage() {
       console.log("Offline mode, saved locally", err);
     }
 
-    const updated = [newIncome, ...incomes];
-    saveIncomes(updated);
+    // Transmitir por WebSocket a todas las computadoras y celulares
+    if (realtimeHub.broadcastCashMovement) {
+      realtimeHub.broadcastCashMovement({
+        id: newIncome.id,
+        branchId: branches.find((b) => b.name === newIncome.branchName)?.id || "branch-matriz",
+        branchName: newIncome.branchName || "Matriz",
+        type: "entrada",
+        category: newIncome.category as any,
+        categoryLabel: newIncome.categoryLabel,
+        amount: newIncome.amount,
+        reason: newIncome.concept,
+        authorizedBy: newIncome.cashier,
+        timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+      });
+    }
 
     // Enviar notificación al Administrador Don Toño
     addNotification({
@@ -310,7 +285,7 @@ export default function IngresosPage() {
     const rows = filteredIncomes
       .map(
         (i) =>
-          `"${i.id}","${i.date}","${i.categoryLabel}","${i.concept.replace(/"/g, '""')}","${i.customerName || ""}","${i.orderNumber || ""}","${i.paymentMethod}",${i.amount},"${i.cashier}","${i.branchName || ""}"`
+          `"${i.id}","${i.date}","${i.categoryLabel}","${i.concept.replace(/"/g, '""')}","${i.customerName || ""}","${i.orderNumber || i.saleId || ""}","${i.paymentMethod}",${i.amount},"${i.cashier}","${i.branchName || ""}"`
       )
       .join("\n");
     const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
@@ -333,9 +308,15 @@ export default function IngresosPage() {
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-stone-900 tracking-tight">Registro de Ingresos</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-black text-stone-900 tracking-tight">Registro de Ingresos</h2>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Tiempo Real Multi-Sucursal
+                </span>
+              </div>
               <p className="text-xs text-stone-500 mt-0.5">
-                Control de abonos a pedidos especiales, cobros a clientes mayoristas y entradas a caja.
+                Todas las compras desde 1 solo pan en mostrador hasta pedidos especiales y cobros de mayoreo de cualquier sucursal, sin límite de monto.
               </p>
             </div>
           </div>
@@ -385,55 +366,55 @@ export default function IngresosPage() {
             {formatCurrency(totalAmount)}
           </p>
           <p className="text-[11px] text-emerald-200/80 font-medium mt-1">
-            {incomes.length} movimientos de ingreso registrados
+            {incomes.length} movimientos registrados (Sin límite de monto)
           </p>
         </div>
 
-        {/* Efectivo en Cajón */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20 hover:-translate-y-0.5 cursor-default">
+        {/* Ventas Mostrador (Desde 1 pan) */}
+        <div className="bg-white p-5 rounded-3xl border border-amber-200/80 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Efectivo a Cajón</span>
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
-              <Wallet className="w-4 h-4" />
+            <span className="text-xs font-bold text-amber-800">Compras Mostrador (POS)</span>
+            <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
+              <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-emerald-700 tracking-tight font-mono">
-            +{formatCurrency(cashAmount)}
+          <p className="text-2xl font-black text-amber-700 tracking-tight font-mono">
+            +{formatCurrency(posSalesAmount)}
           </p>
           <p className="text-[11px] text-stone-400 font-semibold mt-1">
-            Suma directamente a caja física
+            Desde 1 solo pan hasta charolas completas
           </p>
         </div>
 
-        {/* Tarjeta & Transferencia */}
+        {/* Pedidos Especiales & Mayoreo */}
+        <div className="bg-white p-5 rounded-3xl border border-rose-200/80 shadow-sm transition-all duration-200 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20 hover:-translate-y-0.5 cursor-default">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-rose-800">Pedidos & Mayoreo</span>
+            <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
+              <Cake className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-black text-rose-700 tracking-tight font-mono">
+            +{formatCurrency(ordersDepositsAmount + wholesaleRecovered)}
+          </p>
+          <p className="text-[11px] text-stone-400 font-semibold mt-1">
+            Pasteles: {formatCurrency(ordersDepositsAmount)} • Mayoreo: {formatCurrency(wholesaleRecovered)}
+          </p>
+        </div>
+
+        {/* Efectivo vs Bancos */}
         <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20 hover:-translate-y-0.5 cursor-default">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Bancos (Tarjeta & SPEI)</span>
+            <span className="text-xs font-bold text-stone-500">Caja vs Bancos</span>
             <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
               <CreditCard className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-black text-blue-700 tracking-tight font-mono">
-            {formatCurrency(cardAmount + transferAmount)}
+            {formatCurrency(cashAmount)}
           </p>
           <p className="text-[11px] text-stone-400 font-semibold mt-1">
-            Tarjeta: {formatCurrency(cardAmount)} • SPEI: {formatCurrency(transferAmount)}
-          </p>
-        </div>
-
-        {/* Abonos y Deudas Recuperadas */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Anticipos & Deudas</span>
-            <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
-              <Cake className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-2xl font-black text-amber-800 tracking-tight font-mono">
-            {formatCurrency(ordersDepositsAmount + wholesaleRecovered)}
-          </p>
-          <p className="text-[11px] text-stone-400 font-semibold mt-1">
-            Pasteles: {formatCurrency(ordersDepositsAmount)} • Mayoreo: {formatCurrency(wholesaleRecovered)}
+            Efectivo: {formatCurrency(cashAmount)} • Bancos: {formatCurrency(cardAmount + transferAmount)}
           </p>
         </div>
       </div>
@@ -446,7 +427,7 @@ export default function IngresosPage() {
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
-              placeholder="Buscar por folio ING-XXXX, cliente, concepto o cajero..."
+              placeholder="Buscar por folio ING-XXXX, ticket, cliente, concepto o cajero..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-stone-50 rounded-2xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
@@ -517,6 +498,9 @@ export default function IngresosPage() {
           <div className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-emerald-600" />
             <h3 className="font-black text-base text-stone-900">Historial de Ingresos Registrados</h3>
+            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 hidden sm:inline-block">
+              Entrada Directa de Sucursales
+            </span>
           </div>
           <span className="text-xs text-stone-500 font-bold">
             Mostrando {filteredIncomes.length} de {incomes.length} movimientos
@@ -558,7 +542,18 @@ export default function IngresosPage() {
                       {inc.date}
                     </td>
                     <td className="p-4">
-                      <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold text-[10px] whitespace-nowrap block w-fit">
+                      <span className={`px-2.5 py-1 rounded-lg font-bold text-[10px] whitespace-nowrap block w-fit border ${
+                        inc.category === "venta_mostrador"
+                          ? "bg-amber-50 text-amber-900 border-amber-300 font-extrabold"
+                          : inc.category === "abono_pedido"
+                          ? "bg-rose-50 text-rose-800 border-rose-200"
+                          : inc.category === "abono_cliente"
+                          ? "bg-blue-50 text-blue-800 border-blue-200"
+                          : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      }`}>
+                        {inc.category === "venta_mostrador" && "🥖 "}
+                        {inc.category === "abono_pedido" && "🎂 "}
+                        {inc.category === "abono_cliente" && "🏪 "}
                         {inc.categoryLabel}
                       </span>
                     </td>
@@ -577,8 +572,13 @@ export default function IngresosPage() {
                         <span className="text-stone-400 italic">Público general</span>
                       )}
                       {inc.orderNumber && (
-                        <span className="text-[10px] font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
+                        <span className="text-[10px] font-black text-rose-800 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-block mt-0.5">
                           {inc.orderNumber}
+                        </span>
+                      )}
+                      {inc.saleId && (
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
+                          Ticket #{inc.saleId}
                         </span>
                       )}
                     </td>
@@ -644,7 +644,7 @@ export default function IngresosPage() {
                 </div>
                 <div>
                   <h3 className="font-black text-base text-stone-900">Registrar Entrada de Dinero</h3>
-                  <p className="text-[11px] text-stone-500">Abono de pedido, cobro a mayorista o aportación a caja.</p>
+                  <p className="text-[11px] text-stone-500">Cualquier monto sin límite de dinero (Efectivo, Tarjeta o Transferencia).</p>
                 </div>
               </div>
               <button

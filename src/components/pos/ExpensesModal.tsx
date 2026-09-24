@@ -24,6 +24,7 @@ import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTime
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
+import { recordCashOutflowAsExpense } from "@/lib/expenses";
 
 interface ExpensesModalProps {
   isOpen: boolean;
@@ -37,9 +38,11 @@ interface ExpensesModalProps {
   cashSalesTotal: number;
   initialFund?: number;
   cashierName?: string;
+  branchId?: string;
+  branchName?: string;
 }
 
-const QUICK_AMOUNTS = [50, 100, 200, 300, 500, 1000];
+const QUICK_AMOUNTS = [1, 5, 10, 20, 50, 100, 200, 500];
 
 // Categorías rápidas para Salidas (Gastos y Retiros de Dueños)
 const SALIDA_PRESETS = [
@@ -171,6 +174,8 @@ export default function ExpensesModal({
   cashSalesTotal,
   initialFund = 0,
   cashierName = "Don Toño Brito",
+  branchId,
+  branchName,
 }: ExpensesModalProps) {
   const { addNotification } = useNotifications();
   const { enqueueOfflineItem, isOnline } = useSync();
@@ -295,6 +300,18 @@ export default function ExpensesModal({
           });
         }
         onAddExpense(newExpense);
+
+        // Registrar automáticamente en el Historial Detallado de Gastos
+        recordCashOutflowAsExpense({
+          amount: newExpense.amount,
+          description: newExpense.description,
+          category: selectedPresetId || newExpense.category,
+          branchId,
+          branchName,
+          cashier: cashierName,
+          accountOrigin: "Caja Mostrador (Efectivo Turno)",
+          paymentMethod: "efectivo",
+        });
 
         // Notificación para la administración y Don Toño
         if (isOwnerWithdrawal) {

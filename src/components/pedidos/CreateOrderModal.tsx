@@ -867,11 +867,11 @@ export default function CreateOrderModal({
     }
   };
 
-  // Confirmar y registrar nuevo cliente en el catálogo
+  // Confirmar y registrar nuevo cliente en el catálogo (una sola vez)
   const handleConfirmSaveCustomer = async () => {
     let newCustId: string | undefined = undefined;
     try {
-      const created = addQuickCustomer({
+      const created = await createCustomerInDb({
         name: customerName.trim(),
         phone: customerPhone.trim() || undefined,
         address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
@@ -881,16 +881,6 @@ export default function CreateOrderModal({
       newCustId = created.id;
       setCustomers(getStoredCustomers());
       setSelectedCustomerId(created.id);
-
-      try {
-        createCustomerInDb({
-          name: customerName.trim(),
-          phone: customerPhone.trim() || undefined,
-          address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
-          type: "evento",
-          notes: "Cliente registrado desde Pedido Especial",
-        }).catch((e) => console.warn("Supabase background customer sync:", e));
-      } catch {}
     } catch (custErr) {
       console.warn("Could not register quick customer:", custErr);
     }

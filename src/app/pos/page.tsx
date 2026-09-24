@@ -81,6 +81,7 @@ import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import PosOrdersDrawer from "@/components/pos/PosOrdersDrawer";
 import { getStoredOrders } from "@/lib/orders";
+import { recordPosSaleIncome } from "@/lib/incomes";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
@@ -1467,9 +1468,28 @@ export default function POSPage() {
         customerType: selectedCustomer.type,
       };
 
+      const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");
       if (activeBranch) {
-        const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");
         registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary);
+      }
+
+      // Registrar automáticamente en el Historial de Ingresos sin límite de dinero
+      try {
+        recordPosSaleIncome({
+          saleId: createdSaleId,
+          total: currentTotal,
+          paymentMethod: currentPaymentMethod,
+          itemsSummary,
+          cashier: cashierName,
+          branchId: activeBranch?.id,
+          branchName: activeBranch?.name || "Sucursal Matriz Centro",
+          customerId: selectedCustomer.id !== "cli-0" ? selectedCustomer.id : undefined,
+          customerName: selectedCustomer.name !== "Público General" ? selectedCustomer.name : undefined,
+          referenceNumber: paymentReference.trim() || undefined,
+          date: newSaleRecord.date,
+        });
+      } catch (err) {
+        console.error("Error al registrar ingreso de venta POS:", err);
       }
 
       // Registrar la compra en el cliente para calcular automáticamente su MODA de compra
@@ -3272,6 +3292,8 @@ export default function POSPage() {
         cashSalesTotal={totalCashSales}
         initialFund={initialCashFund}
         cashierName={cashierName}
+        branchId={activeBranch?.id}
+        branchName={activeBranch?.name}
       />
 
       {/* Incomes & Cash In Modal */}

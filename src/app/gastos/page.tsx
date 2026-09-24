@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { 
   TrendingDown, 
@@ -44,6 +44,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { createClient } from "@/lib/supabase/client";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { saveStoredExpenses, recordCashOutflowAsExpense } from "@/lib/expenses";
 import ExpenseReceiptModal from "@/components/gastos/ExpenseReceiptModal";
 
 // ─── Helpers de Fecha ────────────────────────────────────────────────────────

@@ -32,7 +32,10 @@ import {
   fetchCustomersFromDb, 
   createCustomerInDb, 
   updateCustomerInDb, 
-  deleteCustomerInDb 
+  deleteCustomerInDb,
+  identifyDuplicateCustomers,
+  purgeAllDuplicateCustomers,
+  deduplicateKeepOneCustomers
 } from "@/lib/customers";
 
 // Ícono SVG oficial y ordenado de WhatsApp
@@ -302,6 +305,25 @@ export default function ClientesPage() {
     showNotification(`¡Cliente "${editName.trim()}" actualizado en el servidor con éxito!`);
   };
 
+  // Detección de contactos repetidos
+  const duplicateGroups = useMemo(() => {
+    return identifyDuplicateCustomers();
+  }, [customers]);
+
+  const handlePurgeAllDuplicates = () => {
+    const result = purgeAllDuplicateCustomers();
+    const updated = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
+    setCustomers(updated);
+    showNotification(`¡Se eliminaron por completo ${result.deletedCount} contactos repetidos (${result.names.join(", ")})!`);
+  };
+
+  const handleUnifyDuplicates = () => {
+    const result = deduplicateKeepOneCustomers();
+    const updated = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
+    setCustomers(updated);
+    showNotification(`¡Contactos unificados! Ahora cada cliente aparece exactamente una sola vez.`);
+  };
+
   // Confirmar eliminación
   const handleConfirmDelete = async () => {
     if (!deleteConfirm) return;
@@ -311,9 +333,9 @@ export default function ClientesPage() {
     setDeleteConfirm(null);
 
     await deleteCustomerInDb(deletedId, deletedName);
-    const updated = customers.filter((c) => c.id !== deletedId);
+    const updated = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
     setCustomers(updated);
-    showNotification(`Cliente "${deletedName}" eliminado del servidor.`);
+    showNotification(`Cliente "${deletedName}" eliminado por completo del directorio.`);
   };
 
   return (
@@ -370,6 +392,54 @@ export default function ClientesPage() {
           </button>
         </div>
       </div>
+
+      {/* BANNER DE DETECCIÓN Y ELIMINACIÓN DE CONTACTOS REPETIDOS */}
+      {duplicateGroups.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/15 border-2 border-amber-500/50 rounded-3xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-in slide-in-from-top-2 duration-200">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center text-xl shrink-0 font-black shadow-md shadow-amber-500/20">
+              ⚠️
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base sm:text-lg font-black text-stone-900 leading-tight">
+                  Contactos Repetidos Identificados
+                </h3>
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                  {duplicateGroups.length} nombre{duplicateGroups.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-stone-700 font-semibold mt-1">
+                Se detectaron duplicados para:{" "}
+                <span className="font-black text-stone-950">
+                  {duplicateGroups.map((g) => `${g.name} (${g.count})`).join(", ")}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto shrink-0 flex-wrap sm:flex-nowrap">
+            <button
+              type="button"
+              onClick={handlePurgeAllDuplicates}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs sm:text-sm font-black rounded-2xl shadow-md shadow-rose-600/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              title="Elimina por completo del directorio a todos los clientes que tienen nombres repetidos"
+            >
+              <Trash2 className="w-4 h-4 shrink-0" />
+              <span>Eliminar contactos repetidos por completo</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleUnifyDuplicates}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-stone-950 text-xs sm:text-sm font-black rounded-2xl shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              title="Conserva 1 sola ficha limpia por cliente y borra las copias sobrantes"
+            >
+              <Sparkles className="w-4 h-4 shrink-0" />
+              <span>Dejar solo 1 de cada uno</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* BUSCADOR SIMPLE */}
       <div className="bg-white p-4 sm:p-5 rounded-3xl border-2 border-stone-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -932,10 +1002,15 @@ export default function ClientesPage() {
               <AlertTriangle className="w-7 h-7" />
             </div>
             <div>
-              <h3 className="text-xl font-black text-stone-900">¿Eliminar este cliente?</h3>
-              <p className="text-sm text-stone-500 font-bold mt-1">
+              <h3 className="text-xl font-black text-stone-900">¿Eliminar este contacto?</h3>
+              <p className="text-sm text-stone-600 font-bold mt-1">
                 Se eliminará a <strong className="text-stone-900">{deleteConfirm.name}</strong> del directorio.
               </p>
+              {customers.filter((c) => c.name.trim().toLowerCase() === deleteConfirm.name.trim().toLowerCase()).length > 1 && (
+                <div className="mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-black text-rose-700">
+                  ⚠️ Se eliminarán por completo las {customers.filter((c) => c.name.trim().toLowerCase() === deleteConfirm.name.trim().toLowerCase()).length} repeticiones registradas con este nombre.
+                </div>
+              )}
             </div>
             <div className="flex gap-3 pt-2">
               <button
