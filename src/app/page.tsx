@@ -222,7 +222,7 @@ export default function Home() {
                 </span>
               </div>
               <p className="text-stone-300 text-xs sm:text-sm mt-1 leading-relaxed">
-                Control central de <strong className="text-orange-400">ventas, hornadas, gavetas de efectivo y pedidos especiales</strong> en tiempo real. Supervisa el flujo integral del negocio.
+                Tradición artesanal y gestión inteligente. Monitorea en tiempo real el <strong className="text-orange-400">rendimiento de tus sucursales, ventas de mostrador y flujo financiero</strong> con total claridad y precisión.
               </p>
             </div>
 
