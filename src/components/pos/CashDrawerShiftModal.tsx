@@ -403,6 +403,8 @@ export default function CashDrawerShiftModal({
 
 
   // Filtrado exclusivo para la cajera del turno actual
+  const currentCashierKey = cashierName;
+
   const currentCashierCuts = useMemo(() => {
     return cutsHistory.filter((cut) => {
       return (
