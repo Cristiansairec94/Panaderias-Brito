@@ -284,7 +284,7 @@ export default function CajaPage() {
   // Live Shift Cut Modal
   const [isCorteModalOpen, setIsCorteModalOpen] = useState(false);
   const [countedCash, setCountedCash] = useState<string>("");
-  const [nextFundAmount, setNextFundAmount] = useState<string>("500");
+  const [nextFundAmount, setNextFundAmount] = useState<string>("0");
   const [corteNotes, setCorteNotes] = useState<string>("");
 
   // Load and sync cuts history from localStorage
@@ -1497,7 +1497,7 @@ export default function CajaPage() {
                 <input
                   type="text"
                   inputMode="decimal"
-                  placeholder="1000"
+                  placeholder="0.00"
                   value={nextFundAmount}
                   onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                   onChange={(e) => {

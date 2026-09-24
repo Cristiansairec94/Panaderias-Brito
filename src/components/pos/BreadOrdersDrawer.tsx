@@ -71,8 +71,8 @@ export default function BreadOrdersDrawer({
   const [customDescription, setCustomDescription] = useState("");
   const [customTotalAmount, setCustomTotalAmount] = useState<number | "">("");
 
-  // Deposit (Anticipo)
-  const [depositInput, setDepositInput] = useState<number | "">("");
+  // Deposit (Anticipo - editable, siempre marca 0 por defecto)
+  const [depositInput, setDepositInput] = useState<number | "">(0);
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [notes, setNotes] = useState("");
 
@@ -85,6 +85,7 @@ export default function BreadOrdersDrawer({
     if (isOpen) {
       setProducts(getStoredProducts());
       setOrders(getStoredOrders());
+      setDepositInput(0);
     }
   }, [isOpen]);
 
@@ -104,18 +105,18 @@ export default function BreadOrdersDrawer({
     return 0;
   }, [orderItems, customTotalAmount]);
 
-  // Minimum 50% deposit rule
+  // Sugerencia de anticipo 50% para botón de atajo
   const minRequiredDeposit = useMemo(() => {
     return total > 0 ? Math.ceil((total * 0.5) * 100) / 100 : 0;
   }, [total]);
 
   const numericDeposit = typeof depositInput === "number" ? depositInput : (depositInput === "" ? 0 : Number(depositInput) || 0);
 
-  // Validation: deposit MUST be at least 50% of the total
+  // Validation: deposit can be 0 or any amount up to total
   const isDepositValid = useMemo(() => {
     if (total <= 0) return false;
-    return numericDeposit >= minRequiredDeposit;
-  }, [total, numericDeposit, minRequiredDeposit]);
+    return numericDeposit >= 0 && numericDeposit <= total;
+  }, [total, numericDeposit]);
 
   const remainingBalance = useMemo(() => {
     return Math.max(0, total - numericDeposit);
@@ -186,8 +187,8 @@ export default function BreadOrdersDrawer({
       alert("Por favor agrega panes al pedido o especifica el monto total acordado.");
       return;
     }
-    if (numericDeposit < minRequiredDeposit) {
-      alert(`Regla obligatoria: Se requiere un anticipo mínimo del 50% (${formatCurrency(minRequiredDeposit)}) para registrar y hornear el pedido sin contratiempos.`);
+    if (numericDeposit > total && total > 0) {
+      alert(`El anticipo no puede ser mayor al total del pedido (${formatCurrency(total)}).`);
       return;
     }
 
@@ -632,7 +633,7 @@ export default function BreadOrdersDrawer({
                       min="0"
                       step="1"
                       required
-                      placeholder={`Mínimo ${formatCurrency(minRequiredDeposit)}`}
+                      placeholder="0"
                       value={depositInput}
                       onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                       onChange={(e) => setDepositInput(e.target.value === "" ? "" : Number(e.target.value))}
@@ -643,6 +644,13 @@ export default function BreadOrdersDrawer({
                   {/* Botones de Atajo Rápido de Anticipo */}
                   <div className="flex items-center gap-2 pt-1">
                     <span className="text-[10px] text-amber-300 font-bold uppercase">Atajos:</span>
+                    <button
+                      type="button"
+                      onClick={() => setDepositInput(0)}
+                      className="py-1.5 px-3 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-xl text-[11px] font-black transition-all text-amber-200"
+                    >
+                      $0.00
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleSetQuickDeposit(50)}
@@ -662,7 +670,7 @@ export default function BreadOrdersDrawer({
                       onClick={() => handleSetQuickDeposit(100)}
                       className="flex-1 py-1.5 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-xl text-[11px] font-black transition-all text-amber-200"
                     >
-                      100% Total ({formatCurrency(total)})
+                      100% ({formatCurrency(total)})
                     </button>
                   </div>
                 </div>
@@ -678,22 +686,20 @@ export default function BreadOrdersDrawer({
 
                   {/* Mensaje de Validación de Anticipo */}
                   {total > 0 && (
-                    <div>
-                      {!isDepositValid ? (
-                        <div className="p-3 bg-rose-500/20 border border-rose-400/60 rounded-xl flex items-center gap-2 text-rose-200 text-xs font-bold animate-pulse">
-                          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                          <span>
-                            Anticipo insuficiente: Faltan {formatCurrency(minRequiredDeposit - numericDeposit)} para alcanzar el 50% mínimo requerido.
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="p-3 bg-emerald-500/20 border border-emerald-400/60 rounded-xl flex items-center gap-2 text-emerald-200 text-xs font-bold">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span>
-                            ¡Anticipo del 50%+ cubierto! El pedido se puede agendar y mandar al horno sin contratiempos.
-                          </span>
-                        </div>
-                      )}
+                    <div className="p-3 bg-stone-900/60 border border-stone-700/60 rounded-xl flex items-center justify-between gap-2 text-stone-200 text-xs font-bold">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>
+                          {numericDeposit === 0
+                            ? "Sin anticipo — Se cobrará completo al entregar"
+                            : numericDeposit >= total
+                            ? "Pedido liquidado al 100%"
+                            : `Anticipo de ${formatCurrency(numericDeposit)} registrado`}
+                        </span>
+                      </div>
+                      <span className="text-amber-300 font-mono">
+                        Resta: {formatCurrency(remainingBalance)}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -746,7 +752,7 @@ export default function BreadOrdersDrawer({
                 />
               </div>
 
-              {/* Botón de Confirmación con Bloqueo de 50% */}
+              {/* Botón de Confirmación */}
               <button
                 type="submit"
                 disabled={!isDepositValid || !customerName.trim() || !customerPhone.trim()}
@@ -758,11 +764,15 @@ export default function BreadOrdersDrawer({
               >
                 <span>🥖</span>
                 <span>
-                  {!isDepositValid
-                    ? `Requiere Mínimo 50% de Anticipo (${formatCurrency(minRequiredDeposit)})`
+                  {!customerName.trim() || !customerPhone.trim()
+                    ? "Completa los datos del cliente para continuar"
+                    : numericDeposit === 0
+                    ? "Confirmar Pedido de Pan (Sin anticipo - $0.00)"
                     : `Confirmar Pedido de Pan con Anticipo de ${formatCurrency(numericDeposit)}`}
                 </span>
-                {isDepositValid && <ChevronRight className="w-4 h-4 text-amber-400" />}
+                {isDepositValid && customerName.trim() && customerPhone.trim() && (
+                  <ChevronRight className="w-4 h-4 text-amber-400" />
+                )}
               </button>
 
             </form>

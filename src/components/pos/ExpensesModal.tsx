@@ -6,7 +6,6 @@ import {
   DollarSign, 
   PlusCircle, 
   Trash2, 
-  CheckCircle,
   Receipt,
   Wallet,
   TrendingDown,
@@ -912,49 +911,6 @@ export default function ExpensesModal({
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-          {feedbackSuccess && (
-            <div className="bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-4 flex items-center justify-between gap-3 text-emerald-950 shadow-md animate-in slide-in-from-top-2 duration-200">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <CheckCircle className="w-6 h-6" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h5 className="font-black text-sm sm:text-base text-emerald-950">
-                      ¡Movimiento Registrado en Caja!
-                    </h5>
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 border border-emerald-300">
-                      Guardado
-                    </span>
-                  </div>
-                  <p className="text-xs sm:text-sm text-emerald-800 font-bold truncate mt-0.5">
-                    {lastSubmittedText}
-                  </p>
-                  <p className="text-[11px] text-stone-600 font-medium">
-                    El dinero en cajón se actualizó en vivo arriba. Esta ventana permanecerá abierta hasta que la cierres.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-3.5 py-2 bg-stone-900 hover:bg-black text-white text-xs font-black rounded-xl transition-all cursor-pointer shadow-xs active:scale-95"
-                  title="Cerrar ventana ahora"
-                >
-                  Cerrar ventana
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFeedbackSuccess(false)}
-                  className="p-1.5 text-stone-400 hover:text-stone-700 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer"
-                  title="Ocultar aviso"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
 
           {activeTab === "tickets" ? (
             /* VISTA DEDICADA: HISTORIAL COMPLETO DE VENTAS Y PEDIDOS ESPECIALES */
