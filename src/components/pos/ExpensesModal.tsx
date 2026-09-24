@@ -1776,6 +1776,7 @@ export default function ExpensesModal({
                   </div>
                 ) : (
                   filteredHistory.map((mov) => {
+                    const isFondo = mov.type === "fondo";
                     const isVenta = mov.type === "venta";
                     const isSalida = mov.type === "salida";
 
@@ -1783,7 +1784,9 @@ export default function ExpensesModal({
                       <div
                         key={mov.id}
                         className={`p-3.5 rounded-2xl border transition-all flex items-start justify-between gap-3 ${
-                          isVenta
+                          isFondo
+                            ? "bg-blue-50/40 hover:bg-blue-50/80 border-blue-200/80 shadow-2xs"
+                            : isVenta
                             ? "bg-emerald-50/30 hover:bg-emerald-50/70 border-emerald-200/80 shadow-2xs"
                             : isSalida
                             ? "bg-rose-50/30 hover:bg-rose-50/70 border-rose-200/80 shadow-2xs"
@@ -1795,7 +1798,9 @@ export default function ExpensesModal({
                             {/* Monto con color correspondiente */}
                             <span
                               className={`font-black text-sm sm:text-base ${
-                                isVenta
+                                isFondo
+                                  ? "text-blue-800"
+                                  : isVenta
                                   ? "text-emerald-700"
                                   : isSalida
                                   ? "text-rose-600"
@@ -1808,7 +1813,11 @@ export default function ExpensesModal({
                             </span>
 
                             {/* Badge Tipo de Movimiento */}
-                            {isVenta ? (
+                            {isFondo ? (
+                              <span className="text-[10px] bg-blue-100 text-blue-900 border border-blue-300 px-2 py-0.5 rounded-full font-black">
+                                🪙 Fondo Inicial (Base de Caja)
+                              </span>
+                            ) : isVenta ? (
                               <span className="text-[10px] bg-emerald-100 text-emerald-950 border border-emerald-300 px-2 py-0.5 rounded-full font-black">
                                 🥖 Venta Mostrador
                               </span>
@@ -1875,6 +1884,21 @@ export default function ExpensesModal({
 
                         {/* Acciones por tipo */}
                         <div className="flex items-center gap-1 shrink-0 self-center">
+                          {isFondo && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditFundInput(String(currentFund));
+                                setIsEditingFund(true);
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-900 font-bold rounded-xl text-xs border border-blue-300 shadow-2xs transition-all cursor-pointer"
+                              title="Modificar fondo inicial base"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-blue-700" />
+                              <span>Editar</span>
+                            </button>
+                          )}
+
                           {isVenta && onSelectSaleForReprint && mov.rawSale && (
                             <button
                               type="button"
@@ -1898,7 +1922,7 @@ export default function ExpensesModal({
                             </button>
                           )}
 
-                          {!isSalida && !isVenta && onDeleteIncome && (
+                          {!isSalida && !isVenta && !isFondo && onDeleteIncome && (
                             <button
                               type="button"
                               onClick={() => onDeleteIncome(mov.id)}
