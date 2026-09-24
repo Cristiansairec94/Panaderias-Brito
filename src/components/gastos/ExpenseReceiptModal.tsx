@@ -28,7 +28,7 @@ export default function ExpenseReceiptModal({
     window.print();
   };
 
-  const getMethodBadge = (method: ExpenseRecord["paymentMethod"]) => {
+  const getMethodBadge = (method?: ExpenseRecord["paymentMethod"]) => {
     switch (method) {
       case "efectivo":
         return "Efectivo en Caja";
@@ -36,6 +36,8 @@ export default function ExpenseReceiptModal({
         return "Tarjeta Bancaria";
       case "transferencia":
         return "Transferencia / SPEI";
+      default:
+        return "Efectivo en Caja";
     }
   };
 

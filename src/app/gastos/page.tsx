@@ -64,23 +64,24 @@ const getPastDateISO = (daysAgo: number): string => {
   return getLocalDateISO(d);
 };
 
-const parseExpenseDate = (raw: string | Date | undefined): Date | null => {
+const parseExpenseDate = (raw: string | Date | undefined | null): Date | null => {
   if (!raw) return null;
-  if (raw instanceof Date && !isNaN(raw.getTime())) return raw;
+  if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
 
   const text = String(raw).trim();
+  if (!text) return null;
   const mISO = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (mISO) {
     const dt = new Date(Number(mISO[1]), Number(mISO[2]) - 1, Number(mISO[3]), 12, 0, 0);
     return isNaN(dt.getTime()) ? null : dt;
   }
-  const parsed = new Date(raw);
+  const parsed = new Date(text);
   return isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const formatExpenseDisplayDate = (raw: string | undefined): string => {
+const formatExpenseDisplayDate = (raw: string | undefined | null): string => {
   const d = parseExpenseDate(raw);
-  if (!d) return raw || "-";
+  if (!d) return (raw && String(raw)) || "-";
   return d.toLocaleDateString("es-MX", {
     day: "2-digit",
     month: "2-digit",
@@ -88,14 +89,15 @@ const formatExpenseDisplayDate = (raw: string | undefined): string => {
   });
 };
 
-const getExpenseTimestamp = (g: ExpenseRecord): number => {
+const getExpenseTimestamp = (g: Partial<ExpenseRecord> | null | undefined): number => {
+  if (!g) return 0;
   if (g.timestamp) {
     const t = new Date(g.timestamp).getTime();
     if (!isNaN(t)) return t;
   }
   const d = parseExpenseDate(g.date);
   if (d) {
-    if (g.displayDate) {
+    if (typeof g.displayDate === "string") {
       const match = g.displayDate.match(/(\d{1,2}):(\d{2})(?:\s*([ap]\.?\s*m\.?|[AP]M))?/i);
       if (match) {
         let hours = parseInt(match[1], 10);
@@ -113,16 +115,17 @@ const getExpenseTimestamp = (g: ExpenseRecord): number => {
   return 0;
 };
 
-const getExpenseDateTimeInfo = (g: { date: string; timestamp?: string; displayDate?: string }) => {
+const getExpenseDateTimeInfo = (g: { date?: string; timestamp?: string; displayDate?: string } | null | undefined) => {
+  if (!g) return { isHoy: false, isAyer: false, formattedDate: "-" };
   const todayStr = getLocalDateISO(new Date());
   const yest = new Date();
   yest.setDate(yest.getDate() - 1);
   const yesterdayStr = getLocalDateISO(yest);
 
-  const rawDate = g.date ? g.date.split("T")[0] : "";
+  const rawDate = typeof g.date === "string" ? g.date.split("T")[0] : "";
   const timestampDateStr = g.timestamp ? getLocalDateISO(new Date(g.timestamp)) : "";
-  const isHoy = rawDate === todayStr || timestampDateStr === todayStr;
-  const isAyer = !isHoy && (rawDate === yesterdayStr || timestampDateStr === yesterdayStr);
+  const isHoy = Boolean((rawDate && rawDate === todayStr) || (timestampDateStr && timestampDateStr === todayStr));
+  const isAyer = !isHoy && Boolean((rawDate && rawDate === yesterdayStr) || (timestampDateStr && timestampDateStr === yesterdayStr));
 
   let timeStr = "";
   if (g.timestamp) {
@@ -131,7 +134,7 @@ const getExpenseDateTimeInfo = (g: { date: string; timestamp?: string; displayDa
       timeStr = dt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
     }
   }
-  if (!timeStr && g.displayDate) {
+  if (!timeStr && typeof g.displayDate === "string") {
     const match = g.displayDate.match(/(\d{1,2}:\d{2}(?:\s*(?:[ap]\.?\s*m\.?|[AP]M))?)/i);
     if (match) {
       timeStr = match[1];
@@ -379,10 +382,28 @@ export default function GastosPage() {
     try {
       const saved = localStorage.getItem("brito_gastos_registro");
       if (saved) {
-        let parsed: ExpenseRecord[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        let rawParsed = JSON.parse(saved);
+        if (Array.isArray(rawParsed) && rawParsed.length > 0) {
           const todayStr = getLocalDateISO(new Date());
           let needsUpdate = false;
+
+          let parsed: ExpenseRecord[] = rawParsed
+            .filter((item): item is ExpenseRecord => Boolean(item && typeof item === "object"))
+            .map((item) => ({
+              ...item,
+              id: item.id || `GST-${Math.floor(1000 + Math.random() * 9000)}`,
+              date: item.date || TODAY_ISO(),
+              category: item.category || "otros",
+              categoryLabel: item.categoryLabel || "Gastos Menores / Varios",
+              branchId: item.branchId || "branch-matriz",
+              branchName: item.branchName || "Sucursal Matriz (Centro)",
+              description: item.description || "Gasto sin concepto",
+              amount: Number(item.amount) || 0,
+              paymentMethod: item.paymentMethod || "efectivo",
+              accountOrigin: item.accountOrigin || "Caja Mostrador (Efectivo Turno)",
+              cashier: item.cashier || "Cajero de Turno",
+              status: item.status || "activo",
+            }));
 
           parsed = parsed.map((item) => {
             // #GST-2460 fue registrado antes de hoy
@@ -493,14 +514,25 @@ export default function GastosPage() {
   };
 
   // ─── Helpers de Categoría ──────────────────────────────────────────────────
-  const getCategoryInfo = (catIdOrLabel: string): GastoCategoriaDef => {
+  const getCategoryInfo = (catIdOrLabel?: string | null): GastoCategoriaDef => {
+    if (!catIdOrLabel) {
+      return {
+        id: "otros",
+        label: "Gastos Menores / Varios",
+        icon: "🧾",
+        bg: "bg-stone-50",
+        text: "text-stone-700",
+        border: "border-stone-200",
+      };
+    }
+    const catLower = String(catIdOrLabel).toLowerCase();
     const found = GASTO_CATEGORIAS.find(
-      (c) => c.id === catIdOrLabel || c.label.toLowerCase() === catIdOrLabel.toLowerCase()
+      (c) => c.id === catIdOrLabel || c.label.toLowerCase() === catLower
     );
     return (
       found || {
         id: "otros",
-        label: catIdOrLabel || "Otros Gastos",
+        label: String(catIdOrLabel) || "Otros Gastos",
         icon: "🧾",
         bg: "bg-stone-50",
         text: "text-stone-700",
@@ -511,8 +543,9 @@ export default function GastosPage() {
 
   // ─── Filtrado Principal y Ordenamiento Cronológico (Más reciente primero) ─
   const filteredGastos = useMemo(() => {
-    return gastos
+    return (gastos || [])
       .filter((g) => {
+        if (!g) return false;
         // 1. Filtro por Sucursal
         if (filtroSucursal !== "all" && g.branchId !== filtroSucursal) {
           return false;
@@ -528,7 +561,7 @@ export default function GastosPage() {
         // 4. Búsqueda libre
         if (search.trim()) {
           const query = search.toLowerCase();
-          const haystack = `${g.id} ${g.date} ${g.categoryLabel} ${g.branchName} ${g.description} ${g.paymentMethod} ${g.accountOrigin} ${g.cashier} ${g.supplier || ""}`.toLowerCase();
+          const haystack = `${g.id || ""} ${g.date || ""} ${g.categoryLabel || ""} ${g.branchName || ""} ${g.description || ""} ${g.paymentMethod || ""} ${g.accountOrigin || ""} ${g.cashier || ""} ${g.supplier || ""}`.toLowerCase();
           if (!haystack.includes(query)) return false;
         }
         return true;
@@ -663,7 +696,7 @@ export default function GastosPage() {
 
     setIsSubmitting(true);
     const catInfo = getCategoryInfo(form.categoriaId);
-    const targetBranch = branches.find((b) => b.id === form.branchId) || branches[0];
+    const targetBranch = branches.find((b) => b.id === form.branchId) || (branches.length > 0 ? branches[0] : { id: "branch-matriz", name: "Sucursal Matriz (Centro)" });
 
     const nextNum = Math.floor(1000 + Math.random() * 9000);
     const nuevoGasto: ExpenseRecord = {
@@ -768,7 +801,7 @@ export default function GastosPage() {
     if (!parsedAmount || parsedAmount <= 0 || !form.description.trim()) return;
 
     const catInfo = getCategoryInfo(form.categoriaId);
-    const targetBranch = branches.find((b) => b.id === form.branchId) || branches[0];
+    const targetBranch = branches.find((b) => b.id === form.branchId) || (branches.length > 0 ? branches[0] : { id: "branch-matriz", name: "Sucursal Matriz (Centro)" });
 
     const updatedList = gastos.map((item) => {
       if (item.id !== gastoSeleccionado.id) return item;
@@ -834,8 +867,8 @@ export default function GastosPage() {
     const headers = "Folio,Fecha,Sucursal,Categoria,Concepto,Monto,Metodo,CuentaOrigen,Proveedor,Cajero,Estado\n";
     const rows = filteredGastos
       .map((g) => {
-        const descClean = g.description.replace(/"/g, '""');
-        return `"${g.id}","${g.date}","${g.branchName}","${g.categoryLabel}","${descClean}",${g.amount},"${g.paymentMethod}","${g.accountOrigin}","${g.supplier || ""}","${g.cashier}","${g.status}"`;
+        const descClean = (g.description || "").replace(/"/g, '""');
+        return `"${g.id || ""}","${g.date || ""}","${g.branchName || ""}","${g.categoryLabel || ""}","${descClean}",${g.amount || 0},"${g.paymentMethod || ""}","${g.accountOrigin || ""}","${g.supplier || ""}","${g.cashier || ""}","${g.status || ""}"`;
       })
       .join("\n");
 
@@ -1272,7 +1305,7 @@ export default function GastosPage() {
                       <td className="py-3.5 px-4 align-middle whitespace-nowrap">
                         <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-stone-800 bg-stone-100 px-3 py-1.5 rounded-xl border border-stone-200/80">
                           <Store className="w-4 h-4 text-brito-orange-600" />
-                          <span>{g.branchName.replace("Sucursal ", "")}</span>
+                          <span>{(g.branchName || "Matriz (Centro)").replace("Sucursal ", "")}</span>
                         </span>
                       </td>
 
