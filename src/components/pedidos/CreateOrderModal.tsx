@@ -168,8 +168,8 @@ export default function CreateOrderModal({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
-  // Pregunta obligatoria sobre registrar al cliente en el catálogo
-  const [saveCustomerDecision, setSaveCustomerDecision] = useState<"ask" | "yes" | "no">("ask");
+  // Pregunta sobre registrar al cliente en el catálogo (por defecto sí para agilidad)
+  const [saveCustomerDecision, setSaveCustomerDecision] = useState<"ask" | "yes" | "no">("yes");
 
   // Modal de Añadir / Seleccionar Cliente
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -391,7 +391,7 @@ export default function CreateOrderModal({
       setBarcodeInput("");
       setLastScannedAlert(null);
       keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
-      setSaveCustomerDecision("ask");
+      setSaveCustomerDecision("yes");
       setMustChooseCustomerAlert(false);
       setDeposit("0");
     }
@@ -944,24 +944,14 @@ export default function CreateOrderModal({
       return;
     }
 
-    // Si el cliente no está en el catálogo, ES OBLIGATORIO elegir una opción antes de guardar
-    if (isCustomerDecisionPending) {
-      setMustChooseCustomerAlert(true);
-      customerDecisionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-
-    // Si el usuario ya marcó su preferencia en el formulario:
-    if (saveCustomerDecision === "yes") {
-      handleConfirmSaveCustomer();
-      return;
-    } else if (saveCustomerDecision === "no") {
+    // Si el cliente no está en el catálogo y seleccionó explícitamente no registrarlo:
+    if (saveCustomerDecision === "no") {
       handleDeclineSaveCustomer();
       return;
     }
 
-    // Fallback de seguridad
-    handleDeclineSaveCustomer();
+    // Por defecto, registrar al cliente en el catálogo de clientes y guardar el pedido
+    handleConfirmSaveCustomer();
   };
 
   if (!isOpen) return null;

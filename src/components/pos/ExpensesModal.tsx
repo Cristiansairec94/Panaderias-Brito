@@ -1872,15 +1872,53 @@ export default function ExpensesModal({
           </button>
         </div>
 
-        {/* Cabecera de Operación */}
-        <div className="flex border-b border-stone-200 bg-stone-100/80 p-2.5 px-4 items-center justify-between">
-          <div className="flex items-center gap-2 font-black text-xs sm:text-sm text-stone-900">
-            <PlusCircle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>Registrar Movimiento ($)</span>
+        {/* Apartados Principales de Operación (Registrar Movimiento vs Ver Historial) */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2.5 sm:p-3 bg-stone-100/90 border-b border-stone-200">
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-1">
+            {/* 1. Apartado / Pestaña: Registrar Movimiento */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("register")}
+              className={`flex-1 py-3 sm:py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                activeTab === "register"
+                  ? "bg-white text-stone-900 shadow-sm border-2 border-stone-300 ring-2 ring-stone-900/5 scale-[1.01]"
+                  : "bg-stone-50/70 text-stone-600 hover:bg-white hover:text-stone-900 border border-stone-200 shadow-2xs hover:shadow-xs"
+              }`}
+            >
+              <PlusCircle className={`w-4 h-4 sm:w-4.5 sm:h-4.5 ${activeTab === "register" ? "text-amber-600" : "text-stone-400"}`} />
+              <span>Registrar Movimiento ($)</span>
+            </button>
+
+            {/* 2. Apartado / Pestaña: Ver Historial (Un poco grande pero discreto) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("tickets");
+                setTicketTypeFilter("all");
+              }}
+              className={`flex-1 py-3 sm:py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm md:text-base transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+                activeTab === "tickets" || activeTab === "list"
+                  ? "bg-white text-amber-950 shadow-sm border-2 border-amber-500 ring-2 ring-amber-500/10 scale-[1.01]"
+                  : "bg-stone-50/80 text-stone-700 hover:bg-white hover:text-stone-950 border border-stone-200 shadow-2xs hover:shadow-xs"
+              }`}
+              title="Abrir apartado de historial de ventas, pedidos y comprobantes"
+            >
+              <Receipt className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "tickets" || activeTab === "list" ? "text-amber-700" : "text-stone-500"}`} />
+              <span>Ver Historial</span>
+              <span className={`text-[11px] sm:text-xs px-2.5 py-0.5 rounded-full font-black tracking-tight transition-colors ${
+                activeTab === "tickets" || activeTab === "list"
+                  ? "bg-amber-100 text-amber-950 border border-amber-300"
+                  : "bg-stone-200/80 text-stone-600"
+              }`}>
+                {totalRecordsCount}
+              </span>
+            </button>
           </div>
-          <span className="text-[11px] sm:text-xs font-bold text-stone-500">
-            {shiftName} • {cashierName}
-          </span>
+
+          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-white/70 rounded-xl border border-stone-200/80 text-[11px] font-bold text-stone-500 shrink-0">
+            <span>👩‍🍳</span>
+            <span>{shiftName} • {cashierName}</span>
+          </div>
         </div>
 
         {/* Modal Body */}

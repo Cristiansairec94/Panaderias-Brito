@@ -395,6 +395,8 @@ export function recordOrderAsPosSale(params: {
   description?: string;
   items?: OrderItem[];
   isLiquidation?: boolean;
+  branchId?: string;
+  operatingBranchId?: string;
 }) {
   if (typeof window === "undefined" || params.amount <= 0) return;
   try {
@@ -446,8 +448,19 @@ export function recordOrderAsPosSale(params: {
       orderNumber: params.orderNumber,
     };
 
+    (newSale as any).branchId = params.operatingBranchId || params.branchId;
+    (newSale as any).operatingBranchId = params.operatingBranchId;
+
     const nextSales = [newSale, ...currentSales];
     localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextSales));
+
+    try {
+      const rawMaster = localStorage.getItem("brito_pos_master_sales");
+      const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+      const nextMaster = [newSale, ...prevMaster.filter((s) => s.id !== newSale.id)].slice(0, 1000);
+      localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
+    } catch (e) {}
+
     window.dispatchEvent(new Event("brito_sales_updated"));
   } catch (err) {
     console.error("Error logging order as POS sale:", err);
@@ -550,6 +563,8 @@ export function addCustomOrder(data: {
       description: data.description,
       items: data.items,
       isLiquidation: remaining === 0,
+      branchId: data.branchId,
+      operatingBranchId: data.operatingBranchId || data.branchId,
     });
   }
 
@@ -685,6 +700,8 @@ export function addOrderPayment(
     description: order.description,
     items: order.items,
     isLiquidation: isFullLiquidation,
+    branchId: order.branchId,
+    operatingBranchId: params.operatingBranchId || order.branchId,
   });
 
   current[idx] = order;

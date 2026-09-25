@@ -632,7 +632,10 @@ export default function POSPage() {
 
   useEffect(() => {
     updatePendingOrdersCount();
-    const handleOrdersUpdated = () => updatePendingOrdersCount();
+    const handleOrdersUpdated = () => {
+      updatePendingOrdersCount();
+      setShiftVersion((v) => v + 1);
+    };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
     return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
   }, [activeBranch?.id]);
@@ -659,6 +662,40 @@ export default function POSPage() {
     handleIncomesUpdated();
     window.addEventListener("brito_incomes_updated", handleIncomesUpdated);
     return () => window.removeEventListener("brito_incomes_updated", handleIncomesUpdated);
+  }, []);
+
+  // Sincronizar en tiempo real las ventas del turno (incluyendo pedidos especiales registrados como venta)
+  useEffect(() => {
+    const handleSalesUpdated = () => {
+      try {
+        const saved = localStorage.getItem("brito_pos_current_sales");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const shiftStart = getStoredShiftStartBoundary();
+            const realSales = parsed.filter((s: any) => {
+              if (!s) return false;
+              if (
+                s?.total === 74 &&
+                s?.cashGiven === 100 &&
+                s?.change === 26 &&
+                s?.items?.length === 3 &&
+                s?.customerType === "frecuente"
+              ) return false;
+              const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
+              if (shiftStart > 0 && (!t || t < (shiftStart - 10000))) return false;
+              return true;
+            });
+            setRecentSalesList(realSales);
+          }
+        }
+        setShiftVersion((v) => v + 1);
+      } catch (e) {
+        console.error("Error al sincronizar ventas en POS:", e);
+      }
+    };
+    window.addEventListener("brito_sales_updated", handleSalesUpdated);
+    return () => window.removeEventListener("brito_sales_updated", handleSalesUpdated);
   }, []);
 
   // Sanitización de seguridad: eliminar registros corruptos o atípicos de localStorage
@@ -728,6 +765,19 @@ export default function POSPage() {
         }
       }
     } catch (e) {}
+
+    // Actualizar inmediatamente las ventas en caja del turno de la terminal POS
+    try {
+      const savedSales = localStorage.getItem("brito_pos_current_sales");
+      if (savedSales) {
+        const parsedSales = JSON.parse(savedSales);
+        if (Array.isArray(parsedSales)) {
+          setRecentSalesList(parsedSales);
+        }
+      }
+    } catch (e) {}
+
+    setShiftVersion((v) => v + 1);
 
     // Si se apartó desde la charola del POS, limpiamos la charola
     if (specialOrderInitialItems.length > 0) {

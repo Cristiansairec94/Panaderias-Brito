@@ -101,9 +101,11 @@ export default function PedidosPage() {
   // Filtered orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      // Branch filter
-      if (selectedBranchFilter !== "all" && order.branchId !== selectedBranchFilter) {
-        return false;
+      // Branch filter (revisar sucursal de entrega o sucursal donde se levantó/cobró)
+      if (selectedBranchFilter !== "all") {
+        const orderOperating = (order as any).operatingBranchId;
+        const matchesBranch = !order.branchId || order.branchId === selectedBranchFilter || orderOperating === selectedBranchFilter;
+        if (!matchesBranch) return false;
       }
 
       // Status filter
@@ -847,6 +849,13 @@ export default function PedidosPage() {
           const created = getStoredOrders().find((o) => o.id === orderId);
           if (created) {
             setSelectedOrderForReceipt(created);
+            if (
+              selectedBranchFilter !== "all" &&
+              created.branchId !== selectedBranchFilter &&
+              (created as any).operatingBranchId !== selectedBranchFilter
+            ) {
+              setSelectedBranchFilter("all");
+            }
           }
         }}
       />
