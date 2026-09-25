@@ -691,18 +691,22 @@ export default function CreateOrderModal({
     });
   };
 
-  // Lista de 4 opciones rápidas de fecha: Hoy, Mañana, Sábado, Domingo
+  // Lista de 4 opciones rápidas de fecha consecutivas y únicas: Hoy, Mañana y los 2 días siguientes
   const upcomingDays = useMemo(() => {
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const fullDayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-    const getDayInfo = (offset: number, label: string) => {
+    return [0, 1, 2, 3].map((offset) => {
       const d = new Date();
       d.setDate(d.getDate() + offset);
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
       const dateStr = `${year}-${month}-${day}`;
+
+      let label = fullDayNames[d.getDay()];
+      if (offset === 0) label = "Hoy";
+      else if (offset === 1) label = "Mañana";
 
       return {
         dateStr,
@@ -711,26 +715,7 @@ export default function CreateOrderModal({
         dayNum: d.getDate(),
         monthStr: monthNames[d.getMonth()],
       };
-    };
-
-    const today = new Date();
-    const currentDay = today.getDay(); // 0: Dom, 1: Lun, 2: Mar, 3: Mié, 4: Jue, 5: Vie, 6: Sáb
-
-    // 1. Hoy
-    const hoy = getDayInfo(0, "Hoy");
-
-    // 2. Mañana
-    const manana = getDayInfo(1, "Mañana");
-
-    // 3. Sábado (próximo sábado: si hoy es sábado, calcula el siguiente sábado +7)
-    const sabOffset = currentDay === 6 ? 7 : (6 - currentDay + 7) % 7;
-    const sabado = getDayInfo(sabOffset, "Sábado");
-
-    // 4. Domingo (próximo domingo: si hoy es domingo, calcula el siguiente domingo +7)
-    const domOffset = currentDay === 0 ? 7 : (7 - currentDay) % 7;
-    const domingo = getDayInfo(domOffset, "Domingo");
-
-    return [hoy, manana, sabado, domingo];
+    });
   }, []);
 
   // Formato amigable de la fecha de entrega seleccionada
