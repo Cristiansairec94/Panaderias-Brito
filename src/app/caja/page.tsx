@@ -411,7 +411,6 @@ export default function CajaPage() {
   const [countedCash, setCountedCash] = useState<string>("");
   const [nextFundAmount, setNextFundAmount] = useState<string>("500");
   const [corteNotes, setCorteNotes] = useState<string>("");
-  const [corteConfirmationText, setCorteConfirmationText] = useState<string>("");
 
   const handleOpenCorteModal = () => {
     const auto = getShiftSuggestionByCurrentTime();
@@ -420,7 +419,6 @@ export default function CajaPage() {
     setPasswordError(null);
     setDeliveryPassword("");
     setCountedCash(expectedCashInDrawer > 0 ? expectedCashInDrawer.toString() : "0");
-    setCorteConfirmationText("");
     setIsCorteModalOpen(true);
   };
 
@@ -539,10 +537,6 @@ export default function CajaPage() {
   const liveCountedValue = countedCash !== "" && !isNaN(Number(countedCash)) ? Number(countedCash) : expectedCashInDrawer;
   const liveCashDifference = liveCountedValue - expectedCashInDrawer;
   const liveDeliveredToOwner = Math.max(0, liveCountedValue - (Number(nextFundAmount) || 0));
-
-  const normalizedConfirm = corteConfirmationText.trim().toLowerCase();
-  const isConfirmYes = normalizedConfirm === "si" || normalizedConfirm === "sí" || normalizedConfirm === "s";
-  const isConfirmNo = normalizedConfirm === "no" || normalizedConfirm === "n";
 
   // Active shift responsible name
   const currentShiftResponsible = user?.name || "Lupita Brito (Cajera 1)";
@@ -846,17 +840,6 @@ export default function CajaPage() {
   const handleConfirmLiveCut = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 0. Validar confirmación interactiva de seguridad "¿Realizar corte de caja? SI / NO"
-    if (isConfirmNo) {
-      alert("Has indicado 'NO'. El corte de caja ha sido cancelado.");
-      return;
-    }
-
-    if (!isConfirmYes) {
-      alert('Debes confirmar respondiendo "SI" en la casilla de confirmación para poder realizar el corte de caja.');
-      return;
-    }
-
     // 1. Validar contraseña / PIN de quien entrega
     if (!deliveryPassword.trim()) {
       setPasswordError("Debes ingresar la contraseña o PIN de autorización para firmar y entregar el turno.");
@@ -963,7 +946,6 @@ export default function CajaPage() {
     setDeliveryPassword("");
     setPasswordError(null);
     setCorteNotes("");
-    setCorteConfirmationText("");
     
     // Open detail modal immediately so user can reprint or review ticket
     setSelectedCutForDetail(newCut);
@@ -2148,7 +2130,6 @@ export default function CajaPage() {
                   setIsCorteModalOpen(false);
                   setPasswordError(null);
                   setDeliveryPassword("");
-                  setCorteConfirmationText("");
                 }} 
                 className="p-2 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
                 title="Cerrar ventana"
@@ -2436,113 +2417,7 @@ export default function CajaPage() {
                 />
               </div>
 
-              {/* 6. CONFIRMACIÓN INTERACTIVA: ¿DESEAS REALIZAR EL CORTE DE CAJA? (ESCRIBIR SI O NO) */}
-              <div className={`p-4 rounded-3xl border-2 transition-all space-y-2.5 ${
-                isConfirmYes
-                  ? "bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20"
-                  : isConfirmNo
-                  ? "bg-rose-500/10 border-rose-400 ring-2 ring-rose-400/20"
-                  : "bg-amber-50 border-amber-300"
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">{isConfirmYes ? "✅" : isConfirmNo ? "🛑" : "⚠️"}</span>
-                    <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">
-                      ¿Deseas realizar el corte de caja de este turno? *
-                    </h4>
-                  </div>
-                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
-                    isConfirmYes
-                      ? "bg-emerald-600 text-white"
-                      : isConfirmNo
-                      ? "bg-rose-600 text-white"
-                      : "bg-amber-200 text-amber-900"
-                  }`}>
-                    {isConfirmYes ? "AUTORIZADO" : isConfirmNo ? "CANCELADO" : "RESPUESTA REQUERIDA"}
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-stone-600 font-medium leading-relaxed">
-                  Para confirmar el cierre oficial y pase de turno, <strong>escribe "SI"</strong> en la casilla. Si prefieres cancelar, <strong>escribe "NO"</strong>:
-                </p>
-
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      value={corteConfirmationText}
-                      onChange={(e) => setCorteConfirmationText(e.target.value.toUpperCase())}
-                      placeholder='Escribe "SI" o "NO"...'
-                      className={`w-full px-3.5 py-2.5 rounded-2xl border-2 text-xs font-black uppercase tracking-wider focus:outline-none transition-all ${
-                        isConfirmYes
-                          ? "border-emerald-500 bg-white text-emerald-950 ring-2 ring-emerald-500/20"
-                          : isConfirmNo
-                          ? "border-rose-400 bg-white text-rose-950 ring-2 ring-rose-400/20"
-                          : "border-stone-300 bg-white text-stone-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
-                      }`}
-                    />
-                    {corteConfirmationText && (
-                      <button
-                        type="button"
-                        onClick={() => setCorteConfirmationText("")}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Botones de acción rápida para autocompletar SI o NO */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setCorteConfirmationText("SI")}
-                      className={`px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                        isConfirmYes
-                          ? "bg-emerald-600 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-400/30"
-                          : "bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
-                      }`}
-                    >
-                      ✓ Escribir "SI"
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCorteConfirmationText("NO")}
-                      className={`px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
-                        isConfirmNo
-                          ? "bg-rose-600 text-white border-rose-700 shadow-xs ring-2 ring-rose-400/30"
-                          : "bg-white hover:bg-rose-50 text-rose-800 border-rose-300 shadow-2xs"
-                      }`}
-                    >
-                      ✕ Escribir "NO"
-                    </button>
-                  </div>
-                </div>
-
-                {/* Mensaje de validación contextual */}
-                {isConfirmYes && (
-                  <div className="flex items-center gap-1.5 text-[11px] font-black text-emerald-800 bg-emerald-100/70 p-2 rounded-xl border border-emerald-200">
-                    <span>✓</span>
-                    <span>Confirmación aceptada. Se procederá a guardar el corte oficial y generar el comprobante.</span>
-                  </div>
-                )}
-
-                {isConfirmNo && (
-                  <div className="flex items-center gap-1.5 text-[11px] font-black text-rose-800 bg-rose-100/70 p-2 rounded-xl border border-rose-200">
-                    <span>✕</span>
-                    <span>Has indicado "NO". El corte de caja está bloqueado y no se guardará.</span>
-                  </div>
-                )}
-
-                {!isConfirmYes && !isConfirmNo && corteConfirmationText.trim() !== "" && (
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-100/70 p-2 rounded-xl border border-amber-200">
-                    <span>⚠️</span>
-                    <span>Respuesta no reconocida. Por favor escribe exactamente <strong>"SI"</strong> o <strong>"NO"</strong>.</span>
-                  </div>
-                )}
-              </div>
-
-              {/* 7. BOTONES DE ACCIÓN */}
+              {/* 6. BOTONES DE ACCIÓN */}
               <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"
@@ -2550,7 +2425,6 @@ export default function CajaPage() {
                     setIsCorteModalOpen(false);
                     setPasswordError(null);
                     setDeliveryPassword("");
-                    setCorteConfirmationText("");
                   }}
                   className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-2xl text-xs transition-all cursor-pointer"
                 >
@@ -2558,12 +2432,7 @@ export default function CajaPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!isConfirmYes}
-                  className={`flex-[2] py-3 rounded-2xl text-xs font-black shadow-md transition-all flex items-center justify-center gap-2 border ${
-                    isConfirmYes
-                      ? "bg-stone-900 hover:bg-black text-white border-stone-800 cursor-pointer active:scale-95 shadow-lg shadow-amber-900/10"
-                      : "bg-stone-200 text-stone-400 border-stone-300 cursor-not-allowed opacity-70"
-                  }`}
+                  className="flex-[2] py-3 rounded-2xl text-xs font-black shadow-md transition-all flex items-center justify-center gap-2 border bg-stone-900 hover:bg-black text-white border-stone-800 cursor-pointer active:scale-95 shadow-lg shadow-amber-900/10"
                 >
                   <Lock className="w-3.5 h-3.5 text-amber-400" />
                   <span>Confirmar y Guardar Corte Oficial</span>
