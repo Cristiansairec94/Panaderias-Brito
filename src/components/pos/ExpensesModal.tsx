@@ -46,14 +46,16 @@ import {
   parseDateTimeSafe,
   compareMovementsDesc,
   matchesCashier,
-  getStoredShiftStartBoundary
+  getStoredShiftStartBoundary,
+  deduplicateExpenses,
+  deduplicateIncomes
 } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { getStoredOrders } from "@/lib/orders";
-import { getStoredIncomes } from "@/lib/incomes";
+import { getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import TicketModal from "@/components/pos/TicketModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
@@ -654,7 +656,7 @@ export default function ExpensesModal({
 
   // Filtrar exclusivamente las salidas correspondientes a la cajera y turno en operación (incluyendo retiros de dueño del cajón)
   const shiftExpenses = useMemo(() => {
-    return (expenses || []).filter((e) => {
+    const filtered = (expenses || []).filter((e) => {
       if (!e) return false;
       const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
       if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
@@ -667,10 +669,11 @@ export default function ExpensesModal({
       if (expTime > Date.now() + 60000) return false;
       return true;
     });
+    return deduplicateExpenses(filtered);
   }, [expenses, cashierName, shiftStartBoundary, shiftVersion]);
 
   const shiftIncomes = useMemo(() => {
-    return (incomes || []).filter((inc) => {
+    const rawFiltered = (incomes || []).filter((inc) => {
       if (!inc) return false;
       const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
       if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
@@ -683,6 +686,7 @@ export default function ExpensesModal({
       if (incTime > Date.now() + 60000) return false;
       return true;
     });
+    return deduplicateIncomes(rawFiltered);
   }, [incomes, cashierName, shiftStartBoundary, shiftVersion]);
 
   // Filtrar exclusivamente las ventas correspondientes al turno en operación
@@ -1199,6 +1203,7 @@ export default function ExpensesModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     const parsedAmount = Number(amount);
     const finalDescription = description.trim();
     if (!parsedAmount || parsedAmount <= 0 || !finalDescription) return;
@@ -1261,13 +1266,17 @@ export default function ExpensesModal({
             },
           });
         }
-        onAddExpense(newExpense);
-        try {
-          const raw = localStorage.getItem("brito_pos_current_expenses");
-          const cur = raw ? JSON.parse(raw) : [];
-          localStorage.setItem("brito_pos_current_expenses", JSON.stringify([newExpense, ...cur]));
-          window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-        } catch (e) {}
+        if (onAddExpense) {
+          onAddExpense(newExpense);
+        } else {
+          try {
+            const raw = localStorage.getItem("brito_pos_current_expenses");
+            const cur = raw ? JSON.parse(raw) : [];
+            const filtered = Array.isArray(cur) ? cur.filter((e: any) => e.id !== newExpense.id) : [];
+            localStorage.setItem("brito_pos_current_expenses", JSON.stringify([newExpense, ...filtered]));
+            window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+          } catch (e) {}
+        }
 
         // Registrar automáticamente en el Historial Detallado de Gastos
         recordCashOutflowAsExpense({
@@ -1362,13 +1371,15 @@ export default function ExpensesModal({
         }
         if (onAddIncome) {
           onAddIncome(newIncome);
+        } else {
+          try {
+            const raw = localStorage.getItem("brito_pos_current_incomes");
+            const cur = raw ? JSON.parse(raw) : [];
+            const filtered = Array.isArray(cur) ? cur.filter((i: any) => i.id !== newIncome.id) : [];
+            localStorage.setItem("brito_pos_current_incomes", JSON.stringify([newIncome, ...filtered]));
+            window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+          } catch (e) {}
         }
-        try {
-          const raw = localStorage.getItem("brito_pos_current_incomes");
-          const cur = raw ? JSON.parse(raw) : [];
-          localStorage.setItem("brito_pos_current_incomes", JSON.stringify([newIncome, ...cur]));
-          window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-        } catch (e) {}
 
         // Notificación para la administración
         if (isChangeInflow) {
@@ -1417,63 +1428,74 @@ export default function ExpensesModal({
   };
 
   // Historial unificado del turno ordenado cronológicamente (Ventas, Entradas y Salidas en tiempo real)
-  const combinedHistory = [
-    ...effectiveSales.map((sale) => {
-      const totalPieces = (sale.items || []).reduce((sum, item) => sum + item.quantity, 0);
-      const itemsList = (sale.items || []).map((i) => `${i.quantity}x ${i.product.name}`).join(", ");
-      return {
-        id: sale.id,
-        type: "venta" as const,
-        amount: sale.total,
-        category: "venta_mostrador",
-        description: itemsList || `Ticket #${sale.id.slice(-6).toUpperCase()}`,
-        cashier: sale.cashier || cashierName,
-        date: sale.date,
-        isOwner: false,
+  const combinedHistory = useMemo(() => {
+    const rawList = [
+      ...effectiveSales.map((sale) => {
+        const totalPieces = (sale.items || []).reduce((sum, item) => sum + item.quantity, 0);
+        const itemsList = (sale.items || []).map((i) => `${i.quantity}x ${i.product.name}`).join(", ");
+        return {
+          id: sale.id,
+          type: "venta" as const,
+          amount: sale.total,
+          category: "venta_mostrador",
+          description: itemsList || `Ticket #${sale.id.slice(-6).toUpperCase()}`,
+          cashier: sale.cashier || cashierName,
+          date: sale.date,
+          isOwner: false,
+          isChange: false,
+          paymentMethod: sale.paymentMethod,
+          customerName: sale.customerName,
+          totalPieces,
+          rawSale: sale,
+          timestamp: sale.timestamp || sale.createdAt,
+          createdAt: sale.createdAt,
+        };
+      }),
+      ...shiftExpenses.map((exp) => ({
+        id: exp.id,
+        type: "salida" as const,
+        amount: exp.amount,
+        category: exp.category,
+        description: exp.description,
+        cashier: exp.cashier,
+        date: exp.date,
+        isOwner: exp.category === "retiro_dueno" || exp.description.toLowerCase().includes("dueño") || exp.description.toLowerCase().includes("toño"),
         isChange: false,
-        paymentMethod: sale.paymentMethod,
-        customerName: sale.customerName,
-        totalPieces,
-        rawSale: sale,
-        timestamp: sale.timestamp || sale.createdAt,
-        createdAt: sale.createdAt,
-      };
-    }),
-    ...shiftExpenses.map((exp) => ({
-      id: exp.id,
-      type: "salida" as const,
-      amount: exp.amount,
-      category: exp.category,
-      description: exp.description,
-      cashier: exp.cashier,
-      date: exp.date,
-      isOwner: exp.category === "retiro_dueno" || exp.description.toLowerCase().includes("dueño") || exp.description.toLowerCase().includes("toño"),
-      isChange: false,
-      paymentMethod: "efectivo" as const,
-      customerName: undefined,
-      totalPieces: 0,
-      rawSale: undefined,
-      timestamp: exp.timestamp || exp.createdAt,
-      createdAt: exp.createdAt,
-    })),
-    ...shiftIncomes.map((inc) => ({
-      id: inc.id,
-      type: "entrada" as const,
-      amount: inc.amount,
-      category: inc.category,
-      description: inc.concept || inc.categoryLabel,
-      cashier: inc.cashier,
-      date: inc.date,
-      isOwner: false,
-      isChange: inc.category === "fondo_cambio" || (inc.concept || "").toLowerCase().includes("cambio") || (inc.concept || "").toLowerCase().includes("feria"),
-      paymentMethod: (inc.paymentMethod || "efectivo") as any,
-      customerName: inc.customerName,
-      totalPieces: 0,
-      rawSale: undefined,
-      timestamp: inc.timestamp,
-      createdAt: inc.timestamp,
-    })),
-  ].sort((a, b) => compareMovementsDesc(a, b));
+        paymentMethod: "efectivo" as const,
+        customerName: undefined,
+        totalPieces: 0,
+        rawSale: undefined,
+        timestamp: exp.timestamp || exp.createdAt,
+        createdAt: exp.createdAt,
+      })),
+      ...shiftIncomes.map((inc) => ({
+        id: inc.id,
+        type: "entrada" as const,
+        amount: inc.amount,
+        category: inc.category,
+        description: inc.concept || inc.categoryLabel,
+        cashier: inc.cashier,
+        date: inc.date,
+        isOwner: false,
+        isChange: inc.category === "fondo_cambio" || (inc.concept || "").toLowerCase().includes("cambio") || (inc.concept || "").toLowerCase().includes("feria"),
+        paymentMethod: (inc.paymentMethod || "efectivo") as any,
+        customerName: inc.customerName,
+        totalPieces: 0,
+        rawSale: undefined,
+        timestamp: inc.timestamp,
+        createdAt: inc.timestamp,
+      })),
+    ].sort((a, b) => compareMovementsDesc(a, b));
+
+    const seenIds = new Set<string>();
+    return rawList.filter((item) => {
+      if (item.id) {
+        if (seenIds.has(item.id)) return false;
+        seenIds.add(item.id);
+      }
+      return true;
+    });
+  }, [effectiveSales, shiftExpenses, shiftIncomes, cashierName]);
 
   const filteredHistory = combinedHistory.filter((item) => {
     if (historyFilter === "ventas" && item.type !== "venta") return false;

@@ -351,3 +351,82 @@ export function getStoredShiftStartBoundary(): number {
   return Date.now();
 }
 
+/**
+ * Deduplica una lista de gastos/salidas de efectivo.
+ * Elimina duplicados si comparten el mismo ID o si comparten monto, descripción similar, cajera y fueron creados en una misma ventana de tiempo (< 15 segundos).
+ */
+export function deduplicateExpenses<T extends { id?: string; amount?: number; description?: string; cashier?: string; timestamp?: any; createdAt?: any; date?: any }>(items: T[]): T[] {
+  if (!Array.isArray(items)) return [];
+  const seenIds = new Set<string>();
+  const seenFingerprints = new Set<string>();
+  const result: T[] = [];
+
+  for (const item of items) {
+    if (!item) continue;
+
+    // 1. Descartar si el ID ya fue visto
+    if (item.id) {
+      if (seenIds.has(item.id)) continue;
+      seenIds.add(item.id);
+    }
+
+    // 2. Descartar duplicados creados con pocos segundos de diferencia
+    const amt = Math.round((Number(item.amount) || 0) * 100);
+    const desc = (item.description || "").trim().toLowerCase();
+    const cashier = normalizeCashierName(item.cashier || "");
+    const t = parseDateTimeSafe(item.timestamp || item.createdAt || item.date);
+    // Agrupar en ventanas de 15 segundos
+    const timeWindow = t ? Math.floor(t / 15000) : 0;
+    const fingerprint = `${amt}_${desc}_${cashier}_${timeWindow}`;
+
+    if (timeWindow > 0 && seenFingerprints.has(fingerprint)) {
+      continue;
+    }
+    if (timeWindow > 0) {
+      seenFingerprints.add(fingerprint);
+    }
+
+    result.push(item);
+  }
+
+  return result;
+}
+
+/**
+ * Deduplica una lista de entradas de dinero a caja.
+ * Elimina duplicados si comparten el mismo ID o coincidencia exacta de monto, concepto, cajera y tiempo cercano (< 15 segundos).
+ */
+export function deduplicateIncomes<T extends { id?: string; amount?: number; concept?: string; cashier?: string; timestamp?: any; createdAt?: any; date?: any }>(items: T[]): T[] {
+  if (!Array.isArray(items)) return [];
+  const seenIds = new Set<string>();
+  const seenFingerprints = new Set<string>();
+  const result: T[] = [];
+
+  for (const item of items) {
+    if (!item) continue;
+
+    if (item.id) {
+      if (seenIds.has(item.id)) continue;
+      seenIds.add(item.id);
+    }
+
+    const amt = Math.round((Number(item.amount) || 0) * 100);
+    const concept = (item.concept || "").trim().toLowerCase();
+    const cashier = normalizeCashierName(item.cashier || "");
+    const t = parseDateTimeSafe(item.timestamp || item.createdAt || item.date);
+    const timeWindow = t ? Math.floor(t / 15000) : 0;
+    const fingerprint = `${amt}_${concept}_${cashier}_${timeWindow}`;
+
+    if (timeWindow > 0 && seenFingerprints.has(fingerprint)) {
+      continue;
+    }
+    if (timeWindow > 0) {
+      seenFingerprints.add(fingerprint);
+    }
+
+    result.push(item);
+  }
+
+  return result;
+}
+

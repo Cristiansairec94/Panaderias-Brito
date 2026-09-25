@@ -637,20 +637,25 @@ export default function IngresosPage() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto relative">
+          <table className="w-full min-w-[1050px] text-left text-sm border-separate border-spacing-0">
             <thead className="bg-stone-100/90 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-xs sm:text-sm">
               <tr>
-                <th className="p-4">Folio</th>
-                <th className="p-4">Fecha/Hora</th>
-                <th className="p-4">Categoría</th>
-                <th className="p-4">Concepto / Motivo</th>
-                <th className="p-4">Cliente / Pedido</th>
-                <th className="p-4">Forma de Pago</th>
-                <th className="p-4">Sucursal</th>
-                <th className="p-4">Cajero</th>
-                <th className="p-4 text-right">Monto</th>
-                <th className="p-4 text-center">Acciones</th>
+                <th className="p-4 border-b border-stone-200">Folio</th>
+                <th className="p-4 border-b border-stone-200">Fecha/Hora</th>
+                <th className="p-4 border-b border-stone-200">Categoría</th>
+                <th className="p-4 border-b border-stone-200">Concepto / Motivo</th>
+                <th className="p-4 border-b border-stone-200">Cliente / Pedido</th>
+                <th className="p-4 border-b border-stone-200">Forma de Pago</th>
+                <th className="p-4 border-b border-stone-200">Sucursal</th>
+                <th className="p-4 border-b border-stone-200">Cajero</th>
+                <th className="p-4 text-right border-b border-stone-200">Monto</th>
+                <th className="p-4 text-center sticky right-0 bg-stone-100 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)] min-w-[150px] z-10 border-b border-stone-200">
+                  <span className="flex items-center justify-center gap-1.5 text-stone-800 font-black">
+                    <Printer className="w-4 h-4 text-emerald-700" />
+                    <span>Imprimir Ticket</span>
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 text-sm">
@@ -664,14 +669,14 @@ export default function IngresosPage() {
                 </tr>
               ) : (
                 filteredIncomes.map((inc) => (
-                  <tr key={inc.id} className="hover:bg-stone-50/70 transition-colors">
-                    <td className="p-4 font-mono font-black text-sm sm:text-base text-stone-900">
+                  <tr key={inc.id} className="group hover:bg-stone-50/80 transition-colors">
+                    <td className="p-4 font-mono font-black text-sm sm:text-base text-stone-900 border-b border-stone-100">
                       #{inc.id}
                     </td>
-                    <td className="p-4 text-stone-600 font-semibold text-xs sm:text-sm whitespace-nowrap">
+                    <td className="p-4 text-stone-600 font-semibold text-xs sm:text-sm whitespace-nowrap border-b border-stone-100">
                       {inc.date}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 border-b border-stone-100">
                       <span className={`px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap block w-fit border ${
                         inc.category === "venta_mostrador"
                           ? "bg-amber-50 text-amber-900 border-amber-300 font-extrabold"
@@ -687,7 +692,7 @@ export default function IngresosPage() {
                         {inc.categoryLabel}
                       </span>
                     </td>
-                    <td className="p-4 font-bold text-stone-950 text-sm sm:text-base max-w-xs">
+                    <td className="p-4 font-bold text-stone-950 text-sm sm:text-base max-w-xs border-b border-stone-100">
                       {inc.concept}
                       {inc.referenceNumber && (
                         <span className="block font-mono text-xs text-blue-600 font-bold mt-1">
@@ -695,7 +700,7 @@ export default function IngresosPage() {
                         </span>
                       )}
                     </td>
-                    <td className="p-4 text-stone-800 text-sm sm:text-base">
+                    <td className="p-4 text-stone-800 text-sm sm:text-base border-b border-stone-100">
                       {inc.customerName ? (
                         <div className="font-black text-stone-950">{inc.customerName}</div>
                       ) : (
@@ -712,7 +717,7 @@ export default function IngresosPage() {
                         </span>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 border-b border-stone-100">
                       <span
                         className={`px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm uppercase inline-flex items-center gap-1.5 ${
                           inc.paymentMethod === "efectivo"
@@ -728,30 +733,33 @@ export default function IngresosPage() {
                         {inc.paymentMethod}
                       </span>
                     </td>
-                    <td className="p-4 text-stone-700 font-bold text-xs sm:text-sm whitespace-nowrap">
+                    <td className="p-4 text-stone-700 font-bold text-xs sm:text-sm whitespace-nowrap border-b border-stone-100">
                       {inc.branchName || "Matriz"}
                     </td>
-                    <td className="p-4 text-stone-700 font-bold text-xs sm:text-sm whitespace-nowrap">
+                    <td className="p-4 text-stone-700 font-bold text-xs sm:text-sm whitespace-nowrap border-b border-stone-100">
                       {inc.cashier}
                     </td>
-                    <td className="p-4 text-right font-mono font-black text-base sm:text-lg text-emerald-700 whitespace-nowrap">
+                    <td className="p-4 text-right font-mono font-black text-base sm:text-lg text-emerald-700 whitespace-nowrap border-b border-stone-100">
                       +{formatCurrency(inc.amount)}
                     </td>
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td className="p-4 text-center sticky right-0 bg-white group-hover:bg-stone-50 transition-colors shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)] min-w-[150px] z-10 border-b border-stone-100">
+                      <div className="flex items-center justify-center gap-2">
                         <button
+                          type="button"
                           onClick={() => handlePrintReceipt(inc)}
-                          className="p-2 text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-sm hover:shadow-md border border-emerald-500 transition-all cursor-pointer whitespace-nowrap group/print"
                           title="Imprimir Comprobante de Ingreso (80mm)"
                         >
-                          <Printer className="w-5 h-5" />
+                          <Printer className="w-4 h-4 text-white group-hover/print:scale-110 transition-transform shrink-0" />
+                          <span>Imprimir</span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDeleteIncome(inc.id)}
-                          className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                          className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer shrink-0"
                           title="Eliminar registro"
                         >
-                          <Trash2 className="w-5 h-5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

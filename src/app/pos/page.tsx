@@ -80,7 +80,7 @@ import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import { getStoredOrders } from "@/lib/orders";
-import { recordPosSaleIncome, getStoredIncomes } from "@/lib/incomes";
+import { recordPosSaleIncome, getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
@@ -522,7 +522,11 @@ export default function POSPage() {
           const parsedExp = JSON.parse(rawExpenses);
           if (Array.isArray(parsedExp)) {
             const shiftStart = getStoredShiftStartBoundary();
+            const seenExpIds = new Set<string>();
             setExpensesList(parsedExp.filter((e: any) => {
+              if (!e || !e.id) return false;
+              if (seenExpIds.has(e.id)) return false;
+              seenExpIds.add(e.id);
               const t = parseDateTimeSafe(e?.timestamp || e?.createdAt || e?.date);
               return shiftStart <= 0 || (t && t >= shiftStart);
             }));
@@ -538,7 +542,8 @@ export default function POSPage() {
           const parsedInc = JSON.parse(rawIncomes);
           if (Array.isArray(parsedInc)) {
             const shiftStart = getStoredShiftStartBoundary();
-            setIncomesList(parsedInc.filter((i: any) => {
+            const cleaned = cleanDuplicateIncomes(parsedInc);
+            setIncomesList(cleaned.filter((i: any) => {
               const t = parseDateTimeSafe(i?.timestamp || i?.date || i?.createdAt);
               return shiftStart <= 0 || (t && t >= shiftStart);
             }));
@@ -664,7 +669,8 @@ export default function POSPage() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            return parsed.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5);
+            const cleaned = cleanDuplicateIncomes(parsed);
+            return cleaned.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5);
           }
         }
       } catch (e) {}
@@ -702,8 +708,9 @@ export default function POSPage() {
         if (savedIncomes) {
           const parsedInc = JSON.parse(savedIncomes);
           if (Array.isArray(parsedInc)) {
+            const cleaned = cleanDuplicateIncomes(parsedInc);
             setIncomesList(
-              parsedInc.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+              cleaned.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
             );
           }
         } else {
@@ -766,7 +773,8 @@ export default function POSPage() {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            const sanitized = parsed.filter(
+            const cleaned = cleanDuplicateIncomes(parsed);
+            const sanitized = cleaned.filter(
               (i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5
             );
             if (sanitized.length !== parsed.length) {
@@ -779,7 +787,8 @@ export default function POSPage() {
         if (shiftRaw) {
           const shiftParsed = JSON.parse(shiftRaw);
           if (Array.isArray(shiftParsed)) {
-            const shiftSanitized = shiftParsed.filter(
+            const cleaned = cleanDuplicateIncomes(shiftParsed);
+            const shiftSanitized = cleaned.filter(
               (i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5
             );
             if (shiftSanitized.length !== shiftParsed.length) {
@@ -817,8 +826,9 @@ export default function POSPage() {
       if (savedIncomes) {
         const parsedInc = JSON.parse(savedIncomes);
         if (Array.isArray(parsedInc)) {
+          const cleaned = cleanDuplicateIncomes(parsedInc);
           setIncomesList(
-            parsedInc.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+            cleaned.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
           );
         }
       }
@@ -1269,8 +1279,9 @@ export default function POSPage() {
           if (savedIncomes) {
             const parsedInc = JSON.parse(savedIncomes);
             if (Array.isArray(parsedInc) && parsedInc.length > 0) {
+              const cleaned = cleanDuplicateIncomes(parsedInc);
               setIncomesList(
-                parsedInc.filter((i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+                cleaned.filter((i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
               );
             }
           }
@@ -1580,8 +1591,11 @@ export default function POSPage() {
   const currentShiftExpenses = useMemo(() => {
     try {
       if (!expensesList || expensesList.length === 0) return [];
+      const seen = new Set<string>();
       return expensesList.filter((e) => {
-        if (!e) return false;
+        if (!e || !e.id) return false;
+        if (seen.has(e.id)) return false;
+        seen.add(e.id);
         const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
         if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
@@ -1600,7 +1614,8 @@ export default function POSPage() {
   const currentShiftIncomes = useMemo(() => {
     try {
       if (!incomesList || incomesList.length === 0) return [];
-      return incomesList.filter((inc) => {
+      const cleaned = cleanDuplicateIncomes(incomesList);
+      return cleaned.filter((inc) => {
         if (!inc) return false;
         const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
         if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
@@ -1665,7 +1680,9 @@ export default function POSPage() {
 
   const handleAddExpense = (newExpense: CashExpense) => {
     setExpensesList((prev) => {
-      const updated = [newExpense, ...prev];
+      if (prev.some((e) => e.id === newExpense.id)) return prev;
+      const filtered = prev.filter((e) => e.id !== newExpense.id);
+      const updated = [newExpense, ...filtered];
       try {
         localStorage.setItem("brito_pos_current_expenses", JSON.stringify(updated));
         window.dispatchEvent(new Event("brito_shift_cuts_updated"));
@@ -1676,12 +1693,15 @@ export default function POSPage() {
 
   const handleAddIncome = (newIncome: CashIncome) => {
     setIncomesList((prev) => {
-      const updated = [newIncome, ...prev];
+      if (prev.some((i) => i.id === newIncome.id)) return prev;
+      const filtered = prev.filter((i) => i.id !== newIncome.id);
+      const updated = cleanDuplicateIncomes([newIncome, ...filtered]);
       try {
         localStorage.setItem("brito_pos_current_incomes", JSON.stringify(updated));
         const allRaw = localStorage.getItem("brito_cash_incomes");
-        const allIncomes = allRaw ? JSON.parse(allRaw) : [];
-        localStorage.setItem("brito_cash_incomes", JSON.stringify([newIncome, ...allIncomes]));
+        const allIncomes: CashIncome[] = allRaw ? JSON.parse(allRaw) : [];
+        const dedupAll = cleanDuplicateIncomes([newIncome, ...allIncomes.filter((i) => i.id !== newIncome.id)]);
+        localStorage.setItem("brito_cash_incomes", JSON.stringify(dedupAll));
         window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       } catch (e) {}
       return updated;
@@ -3878,8 +3898,9 @@ export default function POSPage() {
             if (savedIncomes) {
               const parsedInc = JSON.parse(savedIncomes);
               if (Array.isArray(parsedInc)) {
+                const cleaned = cleanDuplicateIncomes(parsedInc);
                 setIncomesList(
-                  parsedInc.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+                  cleaned.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
                 );
               }
             }
