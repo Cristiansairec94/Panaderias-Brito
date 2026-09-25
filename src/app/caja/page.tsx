@@ -33,7 +33,11 @@ import {
   ArrowRight,
   Clock,
   Wifi,
-  WifiOff
+  WifiOff,
+  Check,
+  Users,
+  User,
+  Sparkles
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary } from "@/lib/utils";
@@ -574,6 +578,55 @@ export default function CajaPage() {
     return Array.from(set);
   }, [cutsHistory]);
 
+  const isAllResponsiblesSelected =
+    selectedResponsibles.length === 0 ||
+    (selectedResponsibles.length === uniqueResponsibles.length && !selectedResponsibles.includes("__none__"));
+
+  const isResponsibleChecked = (resp: string) => {
+    if (selectedResponsibles.includes("__none__")) return false;
+    if (selectedResponsibles.length === 0) return true;
+    return selectedResponsibles.includes(resp);
+  };
+
+  const toggleResponsible = (resp: string) => {
+    if (selectedResponsibles.includes("__none__")) {
+      setSelectedResponsibles([resp]);
+      return;
+    }
+    if (selectedResponsibles.length === 0) {
+      // Deselect this one from the full group
+      setSelectedResponsibles(uniqueResponsibles.filter((r) => r !== resp));
+      return;
+    }
+    if (selectedResponsibles.includes(resp)) {
+      const next = selectedResponsibles.filter((r) => r !== resp);
+      if (next.length === 0) {
+        setSelectedResponsibles(["__none__"]);
+      } else {
+        setSelectedResponsibles(next);
+      }
+    } else {
+      const next = [...selectedResponsibles, resp];
+      if (next.length === uniqueResponsibles.length) {
+        setSelectedResponsibles([]);
+      } else {
+        setSelectedResponsibles(next);
+      }
+    }
+  };
+
+  const selectOnlyResponsible = (resp: string) => {
+    setSelectedResponsibles([resp]);
+  };
+
+  const selectAllResponsibles = () => {
+    setSelectedResponsibles([]);
+  };
+
+  const clearAllResponsibles = () => {
+    setSelectedResponsibles(["__none__"]);
+  };
+
   const availableYears = useMemo(() => {
     const currentY = new Date().getFullYear();
     const set = new Set<string>([
@@ -609,6 +662,9 @@ export default function CajaPage() {
       }
 
       // 2. Filter Responsible (Multi-select)
+      if (selectedResponsibles.includes("__none__")) {
+        return false;
+      }
       if (selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length) {
         const resp = cut.responsible || cut.outgoingCashier || "";
         if (!selectedResponsibles.includes(resp)) {
@@ -1193,141 +1249,217 @@ export default function CajaPage() {
                 )}
               </div>
 
-              {/* 3. Filtro de Responsables (Opción Múltiple con Checkboxes / Popover) */}
+              {/* 3. Filtro de Responsables (Opción Múltiple / Selector Moderno) */}
               <div className="relative" ref={responsibleDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsResponsibleDropdownOpen(!isResponsibleDropdownOpen)}
-                  className={`px-3 py-2 bg-stone-50 border rounded-2xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
-                    isResponsibleDropdownOpen || (selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length)
-                      ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50 text-stone-900"
-                      : "border-stone-200 text-stone-800 hover:bg-stone-100"
+                  className={`px-3 py-2 border rounded-2xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+                    isResponsibleDropdownOpen || (!isAllResponsiblesSelected && !selectedResponsibles.includes("__none__"))
+                      ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50 text-stone-900 shadow-2xs"
+                      : "border-stone-200 bg-stone-50 text-stone-800 hover:bg-stone-100"
                   }`}
                 >
-                  <span className="text-stone-400">👤</span>
+                  <Users className="w-4 h-4 text-amber-600 shrink-0" />
                   <span className="whitespace-nowrap">
-                    {selectedResponsibles.length === 0 || selectedResponsibles.length === uniqueResponsibles.length
+                    {selectedResponsibles.includes("__none__")
+                      ? "Ningún Responsable"
+                      : isAllResponsiblesSelected
                       ? "Todos los Responsables"
                       : selectedResponsibles.length === 1
                       ? selectedResponsibles[0]
                       : `${selectedResponsibles[0]} (+${selectedResponsibles.length - 1})`}
                   </span>
                   <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-                    selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length
+                    !isAllResponsiblesSelected && !selectedResponsibles.includes("__none__")
                       ? "bg-amber-500 text-stone-950"
-                      : "bg-stone-200 text-stone-600"
+                      : "bg-stone-200 text-stone-700"
                   }`}>
-                    {selectedResponsibles.length === 0 ? uniqueResponsibles.length : selectedResponsibles.length}
+                    {selectedResponsibles.includes("__none__")
+                      ? "0"
+                      : isAllResponsiblesSelected
+                      ? uniqueResponsibles.length
+                      : selectedResponsibles.length}
                   </span>
-                  <span className="text-[10px] text-stone-400 ml-0.5">▼</span>
+                  <span className={`text-[10px] text-stone-400 transition-transform duration-200 ${
+                    isResponsibleDropdownOpen ? "rotate-180 text-amber-600" : ""
+                  }`}>
+                    ▼
+                  </span>
                 </button>
 
-                {/* Popover con Casillas de Opción Múltiple */}
+                {/* Popover Mejorado con Selección Cómoda y Visual */}
                 {isResponsibleDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl border border-stone-200 p-3 z-30 space-y-2 animate-in fade-in zoom-in-95">
-                    <div className="flex items-center justify-between pb-2 border-b border-stone-100">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-stone-500">
-                        Responsables (Opción Múltiple)
-                      </span>
-                      <div className="flex items-center gap-1.5">
+                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-stone-200 p-3.5 z-40 space-y-2.5 animate-in fade-in zoom-in-95">
+                    {/* Header del Selector */}
+                    <div className="flex items-center justify-between pb-2.5 border-b border-stone-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-bold">
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide leading-tight">
+                            Filtrar Responsables
+                          </h4>
+                          <span className="text-[10px] text-stone-400 font-medium block">
+                            Selecciona uno o varios cajeros
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setSelectedResponsibles([])}
-                          className="text-[10px] font-black text-amber-700 hover:text-amber-900 cursor-pointer"
+                          onClick={selectAllResponsibles}
+                          className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/60 transition-colors cursor-pointer"
+                          title="Mostrar todos los responsables"
                         >
-                          Todos
+                          ✓ Todos
                         </button>
-                        <span className="text-stone-300">|</span>
                         <button
                           type="button"
-                          onClick={() => setSelectedResponsibles(uniqueResponsibles.slice(0, 1))}
-                          className="text-[10px] font-black text-stone-400 hover:text-stone-700 cursor-pointer"
+                          onClick={clearAllResponsibles}
+                          className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-stone-100 hover:bg-stone-200 text-stone-600 border border-stone-200 transition-colors cursor-pointer"
+                          title="Deseleccionar todos"
                         >
-                          Solo uno
+                          ✕ Limpiar
                         </button>
                       </div>
                     </div>
 
-                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
-                      {/* Opción Todos */}
-                      <label
-                        className={`flex items-center justify-between p-2 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
-                          selectedResponsibles.length === 0 || selectedResponsibles.length === uniqueResponsibles.length
-                            ? "bg-amber-50 text-amber-950 font-black"
-                            : "hover:bg-stone-50 text-stone-700"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedResponsibles.length === 0 || selectedResponsibles.length === uniqueResponsibles.length}
-                            onChange={() => setSelectedResponsibles([])}
-                            className="rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
-                          />
-                          <span>✓ Todos los Responsables</span>
+                    {/* Opción Rápida: Todos los Responsables */}
+                    <div
+                      onClick={selectAllResponsibles}
+                      className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                        isAllResponsiblesSelected
+                          ? "bg-amber-500/10 border-amber-400 text-stone-950 font-black ring-1 ring-amber-400/30"
+                          : "bg-stone-50/70 border-stone-200/80 hover:bg-stone-100 text-stone-700 font-bold"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 ${
+                          isAllResponsiblesSelected
+                            ? "bg-amber-500 border-amber-600 text-stone-950"
+                            : "border-stone-300 bg-white"
+                        }`}>
+                          {isAllResponsiblesSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                         </div>
-                        <span className="text-[10px] text-stone-400 font-extrabold">{periodCuts.length}</span>
-                      </label>
+                        <div className="w-7 h-7 rounded-xl bg-stone-200 text-stone-700 flex items-center justify-center text-xs shrink-0 font-bold">
+                          👥
+                        </div>
+                        <div>
+                          <span className="text-xs font-black text-stone-900 block leading-tight">
+                            Todos los Responsables
+                          </span>
+                          <span className="text-[10px] text-stone-500 font-medium block">
+                            Historial completo de cortes
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-white text-stone-700 border border-stone-200 shrink-0">
+                        {periodCuts.length} cortes
+                      </span>
+                    </div>
 
-                      <div className="h-px bg-stone-100 my-1" />
+                    {/* Divisor con etiqueta */}
+                    <div className="flex items-center gap-2 py-0.5">
+                      <div className="h-px flex-1 bg-stone-100" />
+                      <span className="text-[10px] font-black text-stone-400 uppercase tracking-wider">
+                        Personal Registrado ({uniqueResponsibles.length})
+                      </span>
+                      <div className="h-px flex-1 bg-stone-100" />
+                    </div>
 
-                      {/* Lista individual con checkboxes */}
+                    {/* Lista individual con tarjetas interactivas */}
+                    <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
                       {uniqueResponsibles.map((resp) => {
-                        const isChecked = selectedResponsibles.length === 0 
-                          ? true 
-                          : selectedResponsibles.includes(resp);
-                        const count = periodCuts.filter((c) => (c.responsible || c.outgoingCashier || "") === resp).length;
+                        const isChecked = isResponsibleChecked(resp);
+                        const periodCount = periodCuts.filter((c) => (c.responsible || c.outgoingCashier || "") === resp).length;
+                        const totalCount = cutsHistory.filter((c) => (c.responsible || c.outgoingCashier || "") === resp).length;
+
+                        const isSupervisor = resp.toLowerCase().includes("toño") || resp.toLowerCase().includes("superv") || resp.toLowerCase().includes("admin");
+                        const avatarEmoji = isSupervisor ? "👨‍💼" : "👩‍🍳";
+                        const avatarBg = isSupervisor ? "bg-amber-100 text-amber-900 border-amber-200" : "bg-emerald-100 text-emerald-900 border-emerald-200";
 
                         return (
-                          <label
+                          <div
                             key={resp}
-                            className={`flex items-center justify-between p-2 rounded-xl text-xs cursor-pointer transition-colors ${
+                            onClick={() => toggleResponsible(resp)}
+                            className={`group flex items-center justify-between p-2.5 rounded-2xl border transition-all cursor-pointer ${
                               isChecked
-                                ? "bg-amber-50/60 text-stone-900 font-black"
-                                : "hover:bg-stone-50 text-stone-600 font-medium opacity-75"
+                                ? "bg-amber-50/70 border-amber-300 ring-1 ring-amber-400/30 text-stone-950 font-black"
+                                : "bg-white border-stone-200 hover:border-stone-300 hover:bg-stone-50/80 text-stone-600 font-medium"
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  if (selectedResponsibles.length === 0) {
-                                    setSelectedResponsibles(uniqueResponsibles.filter((r) => r !== resp));
-                                  } else if (selectedResponsibles.includes(resp)) {
-                                    const next = selectedResponsibles.filter((r) => r !== resp);
-                                    setSelectedResponsibles(next);
-                                  } else {
-                                    const next = [...selectedResponsibles, resp];
-                                    if (next.length === uniqueResponsibles.length) {
-                                      setSelectedResponsibles([]);
-                                    } else {
-                                      setSelectedResponsibles(next);
-                                    }
-                                  }
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                              {/* Casilla de verificación moderna */}
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleResponsible(resp);
                                 }}
-                                className="rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
-                              />
-                              <span className="truncate max-w-[170px]">{resp}</span>
+                                className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all shrink-0 cursor-pointer ${
+                                  isChecked
+                                    ? "bg-amber-500 border-amber-600 text-stone-950 shadow-2xs"
+                                    : "border-stone-300 bg-white group-hover:border-amber-400"
+                                }`}
+                              >
+                                {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                              </div>
+
+                              {/* Avatar de Personal */}
+                              <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs shrink-0 border ${avatarBg}`}>
+                                {avatarEmoji}
+                              </div>
+
+                              {/* Información del cajero */}
+                              <div className="min-w-0 flex-1">
+                                <span className="text-xs font-black text-stone-900 truncate block leading-tight">
+                                  {resp}
+                                </span>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className={`text-[10px] font-extrabold ${
+                                    periodCount > 0 ? "text-emerald-700" : "text-stone-400"
+                                  }`}>
+                                    {periodCount > 0 ? `🟢 ${periodCount} en período` : `⚪ 0 en período`}
+                                  </span>
+                                  <span className="text-[10px] text-stone-300">·</span>
+                                  <span className="text-[10px] text-stone-500 font-bold">
+                                    {totalCount} total
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-stone-100 text-stone-500 font-extrabold shrink-0">
-                              {count}
-                            </span>
-                          </label>
+
+                            {/* Botón de Selección Exclusiva "Solo este" */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                selectOnlyResponsible(resp);
+                              }}
+                              title={`Filtrar exclusivamente a ${resp}`}
+                              className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-stone-100 hover:bg-stone-900 hover:text-white text-stone-600 transition-all cursor-pointer border border-stone-200/80 shadow-2xs shrink-0"
+                            >
+                              Solo este
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
 
+                    {/* Footer del Selector */}
                     <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
-                      <span className="text-[10px] text-stone-400">
-                        {selectedResponsibles.length === 0 
-                          ? "Mostrando todos" 
+                      <span className="text-[10px] font-bold text-stone-500">
+                        {selectedResponsibles.includes("__none__")
+                          ? "Ningún cajero seleccionado"
+                          : isAllResponsiblesSelected
+                          ? `Todos activos (${uniqueResponsibles.length} cajeros)`
                           : `${selectedResponsibles.length} de ${uniqueResponsibles.length} seleccionados`}
                       </span>
                       <button
                         type="button"
                         onClick={() => setIsResponsibleDropdownOpen(false)}
-                        className="px-2.5 py-1 bg-stone-900 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-black"
+                        className="px-3.5 py-1.5 bg-stone-900 hover:bg-black text-white rounded-xl text-[11px] font-black cursor-pointer shadow-xs transition-all"
                       >
                         Listo
                       </button>
@@ -1385,6 +1517,84 @@ export default function CajaPage() {
               </div>
             </div>
 
+            {/* Fichas Rápidas de Responsables (Acceso directo con 1 Clic) */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-stone-100">
+              <span className="text-[11px] font-black text-stone-400 flex items-center gap-1 uppercase tracking-wider mr-1">
+                <Users className="w-3.5 h-3.5 text-amber-600" />
+                Cajero:
+              </span>
+
+              {/* Chip: Todos */}
+              <button
+                type="button"
+                onClick={selectAllResponsibles}
+                className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  isAllResponsiblesSelected
+                    ? "bg-stone-900 text-white border-stone-900 shadow-xs"
+                    : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                }`}
+              >
+                <span>👥 Todos</span>
+                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+                  isAllResponsiblesSelected ? "bg-white/20 text-white" : "bg-stone-200 text-stone-600"
+                }`}>
+                  {periodCuts.length}
+                </span>
+              </button>
+
+              {/* Chips individuales de cada responsable */}
+              {uniqueResponsibles.map((resp) => {
+                const isOnlyThisSelected = selectedResponsibles.length === 1 && selectedResponsibles[0] === resp;
+                const isPartOfMulti = !isAllResponsiblesSelected && selectedResponsibles.includes(resp);
+                const periodCount = periodCuts.filter((c) => (c.responsible || c.outgoingCashier || "") === resp).length;
+                const isSupervisor = resp.toLowerCase().includes("toño") || resp.toLowerCase().includes("superv") || resp.toLowerCase().includes("admin");
+                const avatarEmoji = isSupervisor ? "👨‍💼" : "👩‍🍳";
+
+                return (
+                  <button
+                    key={resp}
+                    type="button"
+                    onClick={() => {
+                      if (isOnlyThisSelected) {
+                        selectAllResponsibles();
+                      } else {
+                        selectOnlyResponsible(resp);
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border ${
+                      isOnlyThisSelected
+                        ? "bg-amber-500 text-stone-950 border-amber-600 shadow-xs ring-2 ring-amber-400/20"
+                        : isPartOfMulti
+                        ? "bg-amber-100 text-amber-950 border-amber-300 font-black"
+                        : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                    }`}
+                    title={`Clic para ver solo cortes de ${resp}`}
+                  >
+                    <span>{avatarEmoji}</span>
+                    <span className="truncate max-w-[140px] sm:max-w-[190px]">{resp}</span>
+                    <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+                      isOnlyThisSelected
+                        ? "bg-stone-900 text-amber-400"
+                        : isPartOfMulti
+                        ? "bg-amber-200 text-amber-900"
+                        : "bg-stone-200 text-stone-600"
+                    }`}>
+                      {periodCount}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {/* Botón para abrir el selector múltiple avanzado */}
+              <button
+                type="button"
+                onClick={() => setIsResponsibleDropdownOpen(true)}
+                className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-stone-500 hover:text-stone-900 hover:bg-stone-100 border border-dashed border-stone-300 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span>⚙️ Selección Múltiple</span>
+              </button>
+            </div>
+
             {/* 5. Sub-barra informativa */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 pt-1 border-t border-stone-100">
               <span className="font-bold text-stone-700 flex items-center gap-1.5 flex-wrap">
@@ -1398,13 +1608,20 @@ export default function CajaPage() {
                     ? `Año: ${selectedYearStr}`
                     : "Histórico Completo"}
                 </span>
-                {selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length && (
+                {(!isAllResponsiblesSelected || selectedResponsibles.includes("__none__")) && (
                   <span className="text-[11px] bg-stone-200 text-stone-800 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1">
-                    <span>👤 {selectedResponsibles.length === 1 ? selectedResponsibles[0] : `${selectedResponsibles.length} responsables`}</span>
+                    <span>
+                      {selectedResponsibles.includes("__none__")
+                        ? "👤 Ningún cajero"
+                        : selectedResponsibles.length === 1
+                        ? `👤 ${selectedResponsibles[0]}`
+                        : `👤 ${selectedResponsibles.length} responsables`}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setSelectedResponsibles([])}
-                      className="text-stone-500 hover:text-stone-900 ml-0.5"
+                      onClick={selectAllResponsibles}
+                      className="text-stone-500 hover:text-stone-900 ml-0.5 cursor-pointer"
+                      title="Quitar filtro de cajero"
                     >
                       ✕
                     </button>
@@ -1424,7 +1641,7 @@ export default function CajaPage() {
                 <div className="text-5xl">📜</div>
                 <h4 className="font-black text-base text-stone-800">No se encontraron cortes de caja</h4>
                 <p className="text-xs text-stone-500 max-w-md mx-auto">
-                  {filterPeriod !== "todos" || searchQuery || (selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length) || filterStatus !== "all"
+                  {filterPeriod !== "todos" || searchQuery || !isAllResponsiblesSelected || selectedResponsibles.includes("__none__") || filterStatus !== "all"
                     ? "Ningún corte coincide con el período o filtros seleccionados. Puedes cambiar de fecha, mes o ver todos los registros."
                     : "No hay registros de cortes de caja archivados aún."}
                 </p>
@@ -1437,7 +1654,7 @@ export default function CajaPage() {
                       Ver Todos los Cortes ({cutsHistory.length})
                     </button>
                   )}
-                  {(searchQuery || (selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length) || filterStatus !== "all") && (
+                  {(searchQuery || !isAllResponsiblesSelected || selectedResponsibles.includes("__none__") || filterStatus !== "all") && (
                     <button
                       onClick={() => {
                         setSearchQuery("");
