@@ -339,7 +339,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
 /**
  * Muestra el concepto compacto con botón "ver más" / "ver menos" si supera la longitud
  */
-function ExpandableConceptText({ text, maxChars = 38 }: { text: string; maxChars?: number }) {
+function ExpandableConceptText({ text, maxChars = 22 }: { text: string; maxChars?: number }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!text) return null;
@@ -348,7 +348,7 @@ function ExpandableConceptText({ text, maxChars = 38 }: { text: string; maxChars
 
   if (!isLong) {
     return (
-      <div className="font-bold text-stone-950 text-sm sm:text-base leading-snug" title={text}>
+      <div className="font-bold text-stone-950 text-sm leading-snug" title={text}>
         {text}
       </div>
     );
@@ -357,7 +357,7 @@ function ExpandableConceptText({ text, maxChars = 38 }: { text: string; maxChars
   const preview = text.slice(0, maxChars).trim() + "...";
 
   return (
-    <div className="font-bold text-stone-950 text-sm sm:text-base leading-snug" title={text}>
+    <div className="font-bold text-stone-950 text-sm leading-snug" title={text}>
       <span>{isExpanded ? text : preview}</span>
       <button
         type="button"
@@ -365,7 +365,7 @@ function ExpandableConceptText({ text, maxChars = 38 }: { text: string; maxChars
           e.stopPropagation();
           setIsExpanded((prev) => !prev);
         }}
-        className="inline-flex items-center text-[11px] font-black text-rose-700 hover:text-rose-950 bg-rose-50 hover:bg-rose-100 border border-rose-200/90 px-1.5 py-0.5 rounded-md ml-1.5 transition-colors cursor-pointer select-none"
+        className="inline-flex items-center text-[11px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-full ml-1.5 transition-colors cursor-pointer select-none shadow-2xs"
         title={isExpanded ? "Mostrar menos texto" : "Mostrar texto completo"}
       >
         {isExpanded ? "ver menos" : "ver más"}
@@ -1344,7 +1344,7 @@ export default function GastosPage() {
                       {/* 5. Concepto / Motivo */}
                       <td className="py-3.5 px-4 align-middle max-w-sm">
                         <div className={isAnulado ? "line-through text-stone-500" : ""}>
-                          <ExpandableConceptText text={g.description} maxChars={38} />
+                          <ExpandableConceptText text={g.description} maxChars={22} />
                         </div>
                         {g.supplier && (
                           <div className="text-xs sm:text-sm text-stone-500 truncate mt-1">

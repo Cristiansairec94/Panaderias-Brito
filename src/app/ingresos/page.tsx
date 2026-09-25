@@ -245,39 +245,106 @@ const CUENTAS_DESTINO = [
 const QUICK_AMOUNTS = [50, 100, 200, 500, 1000];
 
 /**
- * Muestra el concepto compacto con botón "ver más" / "ver menos" si supera la longitud
+ * Muestra el concepto compacto y ultra limpio con leyenda "ver más" / "ver menos".
+ * Evita ruido visual como "Compra de mostrador:" repetido y oculta "Público en General" innecesario.
  */
-function ExpandableConceptText({ text, maxChars = 38 }: { text: string; maxChars?: number }) {
+function CompactIncomeConcept({
+  concept,
+  customerName,
+  orderNumber,
+  saleId,
+  referenceNumber,
+}: {
+  concept: string;
+  customerName?: string;
+  orderNumber?: string;
+  saleId?: string;
+  referenceNumber?: string;
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  if (!text) return null;
+  if (!concept) return <span className="text-stone-400 italic text-sm">Sin concepto</span>;
 
-  const isLong = text.length > maxChars;
+  // Quitar prefijos repetitivos como "Compra de mostrador: "
+  const cleanedConcept = concept.replace(/^Compra de mostrador:\s*/i, "").trim();
 
-  if (!isLong) {
-    return (
-      <div className="font-bold text-stone-950 text-sm sm:text-base leading-snug" title={text}>
-        {text}
-      </div>
-    );
+  // Cliente real vs genérico
+  const isNamedCustomer =
+    customerName &&
+    customerName.trim().length > 0 &&
+    !/^p[uú]blico\s+(en\s+)?general$/i.test(customerName.trim()) &&
+    customerName.trim().toLowerCase() !== "general";
+
+  // Identificar si contiene múltiples productos (separados por coma) o texto largo (> 22 caracteres)
+  const hasMultiple = cleanedConcept.includes(",");
+  const isLong = hasMultiple || cleanedConcept.length > 22 || concept.length > 28;
+
+  // Texto resumido para vista compacta
+  let previewText = cleanedConcept;
+  if (hasMultiple) {
+    const firstItem = cleanedConcept.split(",")[0].trim();
+    previewText = firstItem.length > 24 ? firstItem.slice(0, 22).trim() + "..." : firstItem + "...";
+  } else if (cleanedConcept.length > 22) {
+    previewText = cleanedConcept.slice(0, 20).trim() + "...";
   }
 
-  const preview = text.slice(0, maxChars).trim() + "...";
-
   return (
-    <div className="font-bold text-stone-950 text-sm sm:text-base leading-snug" title={text}>
-      <span>{isExpanded ? text : preview}</span>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsExpanded((prev) => !prev);
-        }}
-        className="inline-flex items-center text-[11px] font-black text-emerald-700 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 px-1.5 py-0.5 rounded-md ml-1.5 transition-colors cursor-pointer select-none"
-        title={isExpanded ? "Mostrar menos texto" : "Mostrar texto completo"}
-      >
-        {isExpanded ? "ver menos" : "ver más"}
-      </button>
+    <div className="leading-snug max-w-sm">
+      {/* 1. Línea principal: Concepto conciso con botón "ver más" */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-bold text-stone-900 text-sm leading-tight" title={concept}>
+          {isExpanded ? concept : previewText}
+        </span>
+
+        {isLong && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded((prev) => !prev);
+            }}
+            className="inline-flex items-center gap-0.5 text-[11px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-full cursor-pointer transition-colors shadow-2xs select-none"
+            title={isExpanded ? "Mostrar menos texto" : "Mostrar texto completo"}
+          >
+            <span>{isExpanded ? "ver menos" : "ver más"}</span>
+          </button>
+        )}
+      </div>
+
+      {/* 2. Metadatos secundarios: Solo clientes reales y folios para no saturar la vista */}
+      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+        {isNamedCustomer && (
+          <span className="text-xs text-stone-600 font-medium inline-flex items-center gap-1">
+            <span>Cliente:</span>
+            <strong className="text-stone-900 font-semibold">{customerName}</strong>
+          </span>
+        )}
+
+        {orderNumber && (
+          <span className="text-[11px] font-black text-rose-800 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-200">
+            Pedido: #{orderNumber}
+          </span>
+        )}
+
+        {saleId && (
+          <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200">
+            Ticket: #{saleId}
+          </span>
+        )}
+
+        {referenceNumber && (
+          <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200">
+            Ref: {referenceNumber}
+          </span>
+        )}
+
+        {/* Solo en modo expandido, si es público en general, mostrarlo sutilmente */}
+        {isExpanded && !isNamedCustomer && customerName && (
+          <span className="text-[11px] text-stone-400 italic">
+            ({customerName})
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -1142,29 +1209,13 @@ export default function IngresosPage() {
 
                       {/* 5. Concepto / Motivo */}
                       <td className="py-3.5 px-4 align-middle max-w-sm">
-                        <ExpandableConceptText text={inc.concept} maxChars={38} />
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                          {inc.customerName && (
-                            <span className="text-xs text-stone-600 font-medium">
-                              Cliente: <strong className="text-stone-800 font-semibold">{inc.customerName}</strong>
-                            </span>
-                          )}
-                          {inc.orderNumber && (
-                            <span className="text-[11px] font-black text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                              Pedido: #{inc.orderNumber}
-                            </span>
-                          )}
-                          {inc.saleId && (
-                            <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                              Ticket: #{inc.saleId}
-                            </span>
-                          )}
-                          {inc.referenceNumber && (
-                            <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                              Ref: {inc.referenceNumber}
-                            </span>
-                          )}
-                        </div>
+                        <CompactIncomeConcept
+                          concept={inc.concept}
+                          customerName={inc.customerName}
+                          orderNumber={inc.orderNumber}
+                          saleId={inc.saleId}
+                          referenceNumber={inc.referenceNumber}
+                        />
                       </td>
 
                       {/* 6. Monto */}
