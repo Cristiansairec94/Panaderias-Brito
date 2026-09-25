@@ -414,7 +414,7 @@ export default function FinanzasPage() {
                   {formatCurrency(treasury.totalLiquidFunds)}
                 </h3>
                 <p className="text-xs text-stone-400 max-w-xl">
-                  Fondos líquidos reales consolidados en gavetas de mostrador, cuentas bancarias activas y caja chica de emergencias.
+                  Fondos líquidos reales consolidados en cajas de mostrador, cuentas bancarias activas y caja chica de emergencias.
                 </p>
               </div>
 
@@ -442,13 +442,13 @@ export default function FinanzasPage() {
                   </div>
                   <div>
                     <h4 className="font-black text-base text-stone-900">Efectivo en Cajas Mostrador</h4>
-                    <span className="text-xs text-stone-500 font-medium">Gavetas de turnos activos</span>
+                    <span className="text-xs text-stone-500 font-medium">Cajas de turnos activos</span>
                   </div>
                 </div>
                 <span className="text-xl font-black text-stone-900">{formatCurrency(treasury.cashInDrawers)}</span>
               </div>
               <p className="text-xs text-stone-600">
-                Efectivo físico disponible al momento en las gavetas de cobro de Matriz y sucursales. Sujeto a arqueo en cada relevo de turno.
+                Efectivo físico disponible al momento en las cajas de cobro de Matriz y sucursales. Sujeto a arqueo en cada relevo de turno.
               </p>
               <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1">
                 <span>Estatus de turno: <strong className="text-emerald-700">En operación</strong></span>

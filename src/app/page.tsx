@@ -358,10 +358,10 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Card 2: Efectivo Neto en Gaveta */}
+          {/* Card 2: Efectivo Neto en Caja */}
           <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Efectivo en Gaveta</span>
+              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Efectivo en Caja</span>
               <div className="p-2.5 rounded-2xl bg-orange-50 text-orange-600 border border-orange-200">
                 <Wallet className="w-5 h-5" />
               </div>
@@ -371,7 +371,7 @@ export default function Home() {
                 {formatCurrency(activeCash)}
               </p>
               <p className="text-xs text-stone-600 mt-1 font-semibold">
-                {isAllBranches ? "3 gavetas de mostrador activas" : `${currentBranch?.currentShift.name.split("(")[0]}`}
+                {isAllBranches ? "3 cajas de mostrador activas" : `${currentBranch?.currentShift.name.split("(")[0]}`}
               </p>
               <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
                 <span>{isAllBranches ? "Total disponible" : `Cajero: ${currentBranch?.currentShift.cashier}`}</span>
@@ -595,7 +595,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Métricas Precisas: Ticket Promedio & Gaveta de Efectivo */}
+                  {/* Métricas Precisas: Ticket Promedio & Caja de Efectivo */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-stone-50/60 rounded-xl p-2.5 border border-stone-200/70">
                       <span className="text-[10px] font-semibold text-stone-400 block">Ticket Promedio</span>
@@ -604,7 +604,7 @@ export default function Home() {
                     </div>
 
                     <div className="bg-stone-50/60 rounded-xl p-2.5 border border-stone-200/70">
-                      <span className="text-[10px] font-semibold text-stone-400 block">Efectivo en Gaveta</span>
+                      <span className="text-[10px] font-semibold text-stone-400 block">Efectivo en Caja</span>
                       <span className="font-black text-emerald-700 text-sm">{formatCurrency(b.cashInDrawer)}</span>
                       <span className="text-[10px] text-stone-500 block mt-0.5">Fondo ini: {formatCurrency(b.currentShift?.initialFund || 1000)}</span>
                     </div>

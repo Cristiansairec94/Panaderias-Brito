@@ -471,7 +471,7 @@ export function exportFinancialSummaryToCSV(summary: FullFinancialSummary): void
     ["(=) UTILIDAD NETA FINAL REAL", pl.netProfit, `${pl.netMarginPercent}%`],
     [],
     ["2. POSICION DE TESORERIA Y DISPONIBLE", "Monto (MXN)"],
-    ["Efectivo en Gavetas de Caja", treasury.cashInDrawers],
+    ["Efectivo en Cajas", treasury.cashInDrawers],
     ["BBVA Bancomer (Don Tono)", treasury.bancoBBVA],
     ["Santander Negocio (Tarjetas)", treasury.bancoSantander],
     ["Caja Chica Emergencias", treasury.pettyCash],

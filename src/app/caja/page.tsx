@@ -2138,7 +2138,7 @@ export default function CajaPage() {
                     </span>
                   </div>
                   <p className="text-[11px] text-stone-500 mt-0.5">
-                    Comprobante oficial, arqueo de gaveta y entrega de efectivo a Don Toño.
+                    Comprobante oficial, arqueo de caja y entrega de efectivo a Don Toño.
                   </p>
                 </div>
               </div>
@@ -2296,7 +2296,7 @@ export default function CajaPage() {
                         ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
                         : "bg-rose-100 text-rose-900 border border-rose-300"
                     }`}>
-                      {expectedCashInDrawer >= 0 ? "Efectivo Teórico en Gaveta" : "Gastos superaron al efectivo"}
+                      {expectedCashInDrawer >= 0 ? "Efectivo Teórico en Caja" : "Gastos superaron al efectivo"}
                     </span>
                   </div>
                 </div>
@@ -2326,7 +2326,7 @@ export default function CajaPage() {
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-black text-stone-900 flex items-center gap-1.5">
                       <Calculator className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Arqueo Físico: Efectivo Contado en Gaveta ($ MXN):</span>
+                      <span>Arqueo Físico: Efectivo Contado en Caja ($ MXN):</span>
                     </label>
                     <button
                       type="button"

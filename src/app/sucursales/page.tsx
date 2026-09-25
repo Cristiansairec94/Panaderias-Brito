@@ -664,7 +664,7 @@ export default function SucursalesPage() {
                         <div className="bg-emerald-50/70 p-2.5 rounded-2xl border border-emerald-200/70 space-y-0.5">
                           <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1">
                             <Wallet className="w-3.5 h-3.5 text-emerald-600" />
-                            Caja en Gaveta
+                            Efectivo en Caja
                           </span>
                           <p className="font-black text-emerald-900 text-sm">
                             {formatCurrency(b.cashInDrawer)}
@@ -1316,7 +1316,7 @@ export default function SucursalesPage() {
                                       <strong className="text-stone-900">{formatCurrency(b.currentShift.initialFund)}</strong>
                                     </div>
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-stone-400">Efectivo en Gaveta:</span>
+                                      <span className="text-stone-400">Efectivo en Caja:</span>
                                       <strong className="text-emerald-700 font-black">{formatCurrency(b.cashInDrawer)}</strong>
                                     </div>
                                   </div>

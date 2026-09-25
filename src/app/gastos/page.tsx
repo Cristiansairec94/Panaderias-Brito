@@ -291,7 +291,7 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
     categoryLabel: "Retiro Don Toño / Socios",
     branchId: "branch-matriz",
     branchName: "Sucursal Matriz (Centro)",
-    description: "Retiro parcial de resguardo de efectivo de gaveta hacia caja de seguridad",
+    description: "Retiro parcial de resguardo de efectivo de caja hacia caja de seguridad",
     amount: 2000,
     paymentMethod: "efectivo",
     accountOrigin: "Caja Mostrador (Efectivo Turno)",

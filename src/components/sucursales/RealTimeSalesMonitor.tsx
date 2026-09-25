@@ -263,7 +263,7 @@ export default function RealTimeSalesMonitor({
 
                   <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100">
                     <p className="text-[10px] text-emerald-700 font-bold uppercase flex items-center justify-center gap-1">
-                      <Wallet className="w-3 h-3" /> Gaveta
+                      <Wallet className="w-3 h-3" /> Caja
                     </p>
                     <p className="font-black text-emerald-800 text-xs mt-0.5 truncate">
                       {formatCurrency(b.cashInDrawer)}

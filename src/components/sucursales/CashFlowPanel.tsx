@@ -176,7 +176,7 @@ export default function CashFlowPanel({
             Control de Efectivo, Entradas y Egresos en Tienda
           </h2>
           <p className="text-xs text-stone-300 max-w-2xl leading-relaxed">
-            Supervisa el dinero físico en las gavetas de cada sucursal, los ingresos de ventas de mostrador y los egresos cotidianos (gas para hornos, insumos urgentes y retiros de seguridad).
+            Supervisa el dinero físico en las cajas de cada sucursal, los ingresos de ventas de mostrador y los egresos cotidianos (gas para hornos, insumos urgentes y retiros de seguridad).
           </p>
         </div>
 
@@ -269,7 +269,7 @@ export default function CashFlowPanel({
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-stone-300 flex items-center gap-1.5">
               <Wallet className="w-4 h-4 text-emerald-400" />
-              Efectivo en Gavetas
+              Efectivo en Cajas
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               Arqueo en Vivo
@@ -324,7 +324,7 @@ export default function CashFlowPanel({
               {/* Cash in Drawer Primary Indicator */}
               <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/70 flex items-center justify-between">
                 <div>
-                  <span className="text-[11px] font-bold text-stone-500 block">Disponible en Gaveta</span>
+                  <span className="text-[11px] font-bold text-stone-500 block">Disponible en Caja</span>
                   <span className="text-xl font-black text-emerald-800">
                     {formatCurrency(b.cashInDrawer)}
                   </span>
@@ -551,7 +551,7 @@ export default function CashFlowPanel({
                     {modalType === "entrada" ? "Registrar Entrada de Efectivo" : "Registrar Salida / Gasto"}
                   </h3>
                   <p className="text-xs text-stone-500">
-                    Afecta inmediatamente la gaveta de la sucursal
+                    Afecta inmediatamente la caja de la sucursal
                   </p>
                 </div>
               </div>
@@ -610,7 +610,7 @@ export default function CashFlowPanel({
                 >
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.name} ({b.code}) - Gaveta: {formatCurrency(b.cashInDrawer)}
+                      {b.name} ({b.code}) - Caja: {formatCurrency(b.cashInDrawer)}
                     </option>
                   ))}
                 </select>

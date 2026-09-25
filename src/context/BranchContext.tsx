@@ -188,7 +188,7 @@ const DEFAULT_CASH_MOVEMENTS: BranchCashMovement[] = [
     category: "retiro_seguridad",
     categoryLabel: "Retiro Parcial por Seguridad",
     amount: 1200,
-    reason: "Resguardo de efectivo acumulado en gaveta hacia caja fuerte",
+    reason: "Resguardo de efectivo acumulado en caja hacia caja fuerte",
     authorizedBy: "Elena Brito",
     timestamp: "12:00 PM",
   },
