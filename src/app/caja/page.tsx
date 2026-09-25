@@ -411,7 +411,7 @@ export default function CajaPage() {
   const [countedCash, setCountedCash] = useState<string>("");
   const [nextFundAmount, setNextFundAmount] = useState<string>("500");
   const [corteNotes, setCorteNotes] = useState<string>("");
-
+  const [corteConfirmationText, setCorteConfirmationText] = useState<string>("");
 
   const handleOpenCorteModal = () => {
     const auto = getShiftSuggestionByCurrentTime();
@@ -419,6 +419,8 @@ export default function CajaPage() {
     setIncomingCashier(auto.suggestedRecipient);
     setPasswordError(null);
     setDeliveryPassword("");
+    setCountedCash(expectedCashInDrawer > 0 ? expectedCashInDrawer.toString() : "0");
+    setCorteConfirmationText("");
     setIsCorteModalOpen(true);
   };
 
@@ -534,8 +536,13 @@ export default function CajaPage() {
   const totalEntries = entryMovements.reduce((sum, m) => sum + m.amount, 0);
   const totalExpenses = movements.filter((m) => m.type === "salida").reduce((sum, m) => sum + m.amount, 0);
   const expectedCashInDrawer = initialCash + cashSales + totalEntries - totalExpenses;
-  const actualCount = expectedCashInDrawer;
-  const cashDifference = 0;
+  const liveCountedValue = countedCash !== "" && !isNaN(Number(countedCash)) ? Number(countedCash) : expectedCashInDrawer;
+  const liveCashDifference = liveCountedValue - expectedCashInDrawer;
+  const liveDeliveredToOwner = Math.max(0, liveCountedValue - (Number(nextFundAmount) || 0));
+
+  const normalizedConfirm = corteConfirmationText.trim().toLowerCase();
+  const isConfirmYes = normalizedConfirm === "si" || normalizedConfirm === "sí" || normalizedConfirm === "s";
+  const isConfirmNo = normalizedConfirm === "no" || normalizedConfirm === "n";
 
   // Active shift responsible name
   const currentShiftResponsible = user?.name || "Lupita Brito (Cajera 1)";
@@ -839,6 +846,17 @@ export default function CajaPage() {
   const handleConfirmLiveCut = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 0. Validar confirmación interactiva de seguridad "¿Realizar corte de caja? SI / NO"
+    if (isConfirmNo) {
+      alert("Has indicado 'NO'. El corte de caja ha sido cancelado.");
+      return;
+    }
+
+    if (!isConfirmYes) {
+      alert('Debes confirmar respondiendo "SI" en la casilla de confirmación para poder realizar el corte de caja.');
+      return;
+    }
+
     // 1. Validar contraseña / PIN de quien entrega
     if (!deliveryPassword.trim()) {
       setPasswordError("Debes ingresar la contraseña o PIN de autorización para firmar y entregar el turno.");
@@ -855,13 +873,13 @@ export default function CajaPage() {
       return;
     }
 
-    const parsedCounted = expectedCashInDrawer;
+    const parsedCounted = countedCash !== "" && !isNaN(Number(countedCash)) ? Number(countedCash) : expectedCashInDrawer;
     const parsedNextFund = Number(nextFundAmount) || 0;
     if (parsedCounted > 0 && parsedNextFund > parsedCounted) {
       alert(`El fondo para el siguiente turno (${formatCurrency(parsedNextFund)}) no puede ser mayor que el total en caja (${formatCurrency(parsedCounted)}).`);
       return;
     }
-    const diff = 0;
+    const diff = parsedCounted - expectedCashInDrawer;
     const newFolio = `CORTE-${Date.now().toString().slice(-6)}`;
     const nowStr = formatDateTimeSafe();
 
@@ -945,6 +963,7 @@ export default function CajaPage() {
     setDeliveryPassword("");
     setPasswordError(null);
     setCorteNotes("");
+    setCorteConfirmationText("");
     
     // Open detail modal immediately so user can reprint or review ticket
     setSelectedCutForDetail(newCut);
@@ -2104,7 +2123,7 @@ export default function CajaPage() {
       {/* MODAL 2: ARQUEO Y CORTE DE CAJA EN VIVO                                  */}
       {isCorteModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl space-y-4 border border-stone-200 hover:border-amber-400/80 transition-all duration-200 max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 max-w-xl w-full shadow-2xl space-y-4 border border-stone-200 hover:border-amber-400/80 transition-all duration-200 max-h-[92vh] overflow-y-auto">
             {/* Header del Modal */}
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2.5">
@@ -2114,12 +2133,12 @@ export default function CajaPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-black text-base sm:text-lg text-stone-900">Arqueo y Cierre de Turno</h3>
-                    <span className="bg-amber-100 text-amber-900 font-extrabold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    <span className="bg-amber-100 text-amber-900 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                       Corte Oficial
                     </span>
                   </div>
                   <p className="text-[11px] text-stone-500 mt-0.5">
-                    Corte oficial, dictamen y entrega a Don Toño.
+                    Comprobante oficial, arqueo de gaveta y entrega de efectivo a Don Toño.
                   </p>
                 </div>
               </div>
@@ -2129,6 +2148,7 @@ export default function CajaPage() {
                   setIsCorteModalOpen(false);
                   setPasswordError(null);
                   setDeliveryPassword("");
+                  setCorteConfirmationText("");
                 }} 
                 className="p-2 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
                 title="Cerrar ventana"
@@ -2137,8 +2157,8 @@ export default function CajaPage() {
               </button>
             </div>
 
-            <form onSubmit={handleConfirmLiveCut} className="space-y-3.5 text-xs">
-              {/* RELEVO DE TURNO Y RESPONSABLES */}
+            <form onSubmit={handleConfirmLiveCut} className="space-y-4 text-xs">
+              {/* 1. RELEVO DE TURNO Y RESPONSABLES */}
               <div className="bg-amber-50/70 border border-amber-200/80 p-3.5 rounded-2xl space-y-2.5 shadow-2xs">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
@@ -2164,7 +2184,7 @@ export default function CajaPage() {
                     <select
                       value={incomingCashier}
                       onChange={(e) => setIncomingCashier(e.target.value)}
-                      className="w-full mt-1 bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 text-xs font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      className="w-full mt-1 bg-stone-50 border border-stone-300 rounded-lg px-2 py-1 text-xs font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
                     >
                       <option value="Cajera 2 - Turno Vespertino">Cajera 2 - Turno Vespertino</option>
                       <option value="Lupita Brito (Cajera 1)">Lupita Brito (Cajera 1)</option>
@@ -2180,11 +2200,11 @@ export default function CajaPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-stone-600 px-1 pt-0.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-stone-600 px-1 pt-0.5">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <Clock className="w-3.5 h-3.5 text-amber-600" />
-                    <span className="font-semibold text-stone-800">Siguiente Turno a Iniciar:</span>
-                    <span className="text-[10px] font-bold text-amber-900 bg-amber-200/70 px-1.5 py-0.2 rounded">
+                    <span className="font-bold text-stone-800">Siguiente Turno a Iniciar:</span>
+                    <span className="text-[10px] font-black text-amber-900 bg-amber-200/70 px-1.5 py-0.2 rounded">
                       ⚡ Automático según corte ({autoShiftData.cutTimeStr})
                     </span>
                   </div>
@@ -2209,8 +2229,8 @@ export default function CajaPage() {
                 </div>
               </div>
 
-              {/* FIRMA DE SEGURIDAD / CONTRASEÑA */}
-              <div className="bg-white p-3 rounded-2xl border border-stone-200 space-y-1.5 shadow-2xs">
+              {/* 2. FIRMA DE SEGURIDAD / CONTRASEÑA */}
+              <div className="bg-white p-3.5 rounded-2xl border border-stone-200 space-y-1.5 shadow-2xs">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-black text-stone-900 flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 text-amber-600" />
@@ -2230,7 +2250,7 @@ export default function CajaPage() {
                       setPasswordError(null);
                     }}
                     placeholder={`Ingresa tu contraseña o PIN (${currentShiftResponsible})`}
-                    className={`w-full px-3 py-2 pr-10 bg-stone-50 rounded-xl border text-xs font-mono font-bold focus:ring-2 focus:outline-none transition-colors ${
+                    className={`w-full px-3.5 py-2.5 pr-10 bg-stone-50 rounded-xl border text-xs font-mono font-bold focus:ring-2 focus:outline-none transition-colors ${
                       passwordError ? "border-rose-400 focus:ring-rose-400 bg-rose-50/30" : "border-stone-300 focus:ring-amber-500"
                     }`}
                   />
@@ -2251,43 +2271,103 @@ export default function CajaPage() {
                 )}
               </div>
 
-              {/* CONCILIACIÓN Y FLUJO FINANCIERO DEL TURNO */}
-              <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200/90 space-y-1.5 text-xs shadow-2xs">
-                <div className="flex justify-between items-center pb-1 border-b border-stone-200/70 font-bold text-[10px] text-stone-500 uppercase tracking-wider">
-                  <span>Concepto de Caja</span>
-                  <span>Monto</span>
-                </div>
-                <div className="flex justify-between text-stone-700 pt-0.5">
-                  <span>(+) Fondo Inicial de Turno:</span>
-                  <span className="font-bold text-stone-900">{formatCurrency(initialCash)}</span>
-                </div>
-                <div className="flex justify-between text-emerald-800 font-bold">
-                  <span>(+) Ventas en Efectivo (Mostrador):</span>
-                  <span>+{formatCurrency(cashSales)}</span>
-                </div>
-                {totalEntries > 0 && (
-                  <div className="flex justify-between text-emerald-800 font-bold">
-                    <span>(+) Entradas / Anticipos registrados:</span>
-                    <span>+{formatCurrency(totalEntries)}</span>
+              {/* 3. TOTAL DE EFECTIVO EN CAJA (DESTACADO Y CON ARQUEO FÍSICO) */}
+              <div className="bg-gradient-to-br from-amber-500/15 via-amber-50/80 to-stone-50 border-2 border-amber-400/90 p-4 rounded-3xl space-y-3 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black shadow-xs shrink-0">
+                      <Coins className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-black text-amber-950 uppercase tracking-wider block leading-tight">
+                        Total de Efectivo en Caja
+                      </span>
+                      <span className="text-[11px] text-stone-500 font-medium block">
+                        Balance neto de efectivo acumulado en turno
+                      </span>
+                    </div>
                   </div>
-                )}
-                <div className="flex justify-between text-rose-700 font-bold">
-                  <span>(-) Gastos y Salidas del Turno:</span>
-                  <span>-{formatCurrency(totalExpenses)}</span>
-                </div>
-                <div className="flex justify-between text-xs font-black border-t border-stone-300 pt-2 text-stone-950">
-                  <span>(=) Efectivo Esperado en Gaveta:</span>
-                  <span className="text-amber-950 font-black text-sm">{formatCurrency(expectedCashInDrawer)}</span>
-                </div>
-                {(cardSales > 0 || transferSales > 0) && (
-                  <div className="pt-1.5 mt-1 border-t border-stone-200/60 flex flex-wrap justify-between text-[10px] text-stone-500">
-                    <span>💳 Tarjeta: {formatCurrency(cardSales)} • Transferencia: {formatCurrency(transferSales)}</span>
-                    <span className="font-semibold text-stone-600">(Depósito bancario)</span>
+                  <div className="sm:text-right">
+                    <span className="text-2xl sm:text-3xl font-black text-stone-950 block tracking-tight">
+                      {formatCurrency(expectedCashInDrawer)}
+                    </span>
+                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full inline-block mt-0.5 ${
+                      expectedCashInDrawer >= 0 
+                        ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                        : "bg-rose-100 text-rose-900 border border-rose-300"
+                    }`}>
+                      {expectedCashInDrawer >= 0 ? "Efectivo Teórico en Gaveta" : "Gastos superaron al efectivo"}
+                    </span>
                   </div>
-                )}
+                </div>
+
+                {/* Desglose rápido en 4 fichas */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  <div className="bg-white/95 p-2.5 rounded-xl border border-stone-200/80 shadow-2xs">
+                    <span className="text-[9px] font-black uppercase text-stone-400 block">Fondo Inicial</span>
+                    <span className="text-xs font-black text-stone-900 block mt-0.5">{formatCurrency(initialCash)}</span>
+                  </div>
+                  <div className="bg-white/95 p-2.5 rounded-xl border border-emerald-200/80 shadow-2xs">
+                    <span className="text-[9px] font-black uppercase text-emerald-800 block">Ventas Efectivo</span>
+                    <span className="text-xs font-black text-emerald-700 block mt-0.5">+{formatCurrency(cashSales)}</span>
+                  </div>
+                  <div className="bg-white/95 p-2.5 rounded-xl border border-blue-200/80 shadow-2xs">
+                    <span className="text-[9px] font-black uppercase text-blue-800 block">Entradas / Extra</span>
+                    <span className="text-xs font-black text-blue-700 block mt-0.5">+{formatCurrency(totalEntries)}</span>
+                  </div>
+                  <div className="bg-white/95 p-2.5 rounded-xl border border-rose-200/80 shadow-2xs">
+                    <span className="text-[9px] font-black uppercase text-rose-800 block">Gastos Pagados</span>
+                    <span className="text-xs font-black text-rose-700 block mt-0.5">-{formatCurrency(totalExpenses)}</span>
+                  </div>
+                </div>
+
+                {/* Arqueo Físico de Efectivo Contado */}
+                <div className="pt-2.5 border-t border-amber-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-stone-900 flex items-center gap-1.5">
+                      <Calculator className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Arqueo Físico: Efectivo Contado en Gaveta ($ MXN):</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setCountedCash(Math.max(0, expectedCashInDrawer).toString())}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-black bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      Copiar Total Calculado
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-black text-stone-400">$</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={countedCash}
+                      onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
+                      onChange={(e) => setCountedCash(cleanDecimalNumbers(e.target.value))}
+                      placeholder={expectedCashInDrawer > 0 ? expectedCashInDrawer.toString() : "0.00"}
+                      className="w-full pl-8 pr-28 py-2.5 bg-white rounded-xl border-2 border-amber-400 text-sm font-black text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none shadow-2xs"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${
+                        liveCashDifference === 0
+                          ? "bg-emerald-100 text-emerald-950 border-emerald-300"
+                          : liveCashDifference > 0
+                          ? "bg-blue-100 text-blue-950 border-blue-300"
+                          : "bg-rose-100 text-rose-950 border-rose-300"
+                      }`}>
+                        {liveCashDifference === 0 
+                          ? "✓ Cuadra exacto" 
+                          : liveCashDifference > 0 
+                          ? `+${formatCurrency(liveCashDifference)} Sobrante` 
+                          : `${formatCurrency(liveCashDifference)} Faltante`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* DISTRIBUCIÓN DEL DINERO */}
+              {/* 4. DISTRIBUCIÓN DEL DINERO */}
               <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-2 shadow-2xs">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-stone-800 text-[11px] block">
@@ -2299,7 +2379,7 @@ export default function CajaPage() {
                         key={fAmt}
                         type="button"
                         onClick={() => setNextFundAmount(fAmt.toString())}
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black border transition-colors cursor-pointer ${
                           nextFundAmount === fAmt.toString()
                             ? "bg-amber-600 text-white border-amber-600"
                             : "bg-white text-stone-600 border-stone-200 hover:bg-stone-100"
@@ -2319,42 +2399,150 @@ export default function CajaPage() {
                   onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                   onChange={(e) => {
                     const raw = cleanDecimalNumbers(e.target.value);
-                    const maxAllowed = Math.max(0, actualCount);
-                    if (raw !== "" && actualCount > 0 && Number(raw) > maxAllowed) {
+                    const maxAllowed = Math.max(0, liveCountedValue);
+                    if (raw !== "" && liveCountedValue > 0 && Number(raw) > maxAllowed) {
                       setNextFundAmount(maxAllowed.toString());
                     } else {
                       setNextFundAmount(raw);
                     }
                   }}
-                  className="w-full px-3 py-1.5 bg-white rounded-xl border border-stone-300 font-bold text-stone-900 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-white rounded-xl border border-stone-300 font-bold text-stone-900 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
 
                 <div className="flex justify-between items-center text-xs pt-1.5 border-t border-stone-200">
                   <div>
                     <span className="text-stone-700 font-bold block text-[11px]">Efectivo entregado a Don Toño:</span>
-                    <span className="text-[10px] text-stone-500">Total en caja (${formatCurrency(expectedCashInDrawer)}) menos fondo dejado</span>
+                    <span className="text-[10px] text-stone-500">
+                      Total contado (${formatCurrency(liveCountedValue)}) menos fondo dejado
+                    </span>
                   </div>
-                  <strong className="text-sm font-black text-emerald-950 bg-emerald-100/80 px-2.5 py-1 rounded-xl border border-emerald-300">
-                    {formatCurrency(Math.max(0, expectedCashInDrawer - (Number(nextFundAmount) || 0)))}
+                  <strong className="text-sm font-black text-emerald-950 bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-300 shadow-2xs">
+                    {formatCurrency(liveDeliveredToOwner)}
                   </strong>
                 </div>
               </div>
 
-              {/* OBSERVACIONES */}
+              {/* 5. OBSERVACIONES */}
               <div className="space-y-1">
                 <label className="font-bold text-stone-700 text-xs">
                   Observaciones del Cierre (Opcional)
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej. Entrega conforme, vitrinas llenas..."
+                  placeholder="Ej. Entrega conforme, vitrinas llenas, efectivo entregado en sobre..."
                   value={corteNotes}
                   onChange={(e) => setCorteNotes(e.target.value)}
                   className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-xs"
                 />
               </div>
 
-              {/* BOTONES DE ACCIÓN */}
+              {/* 6. CONFIRMACIÓN INTERACTIVA: ¿DESEAS REALIZAR EL CORTE DE CAJA? (ESCRIBIR SI O NO) */}
+              <div className={`p-4 rounded-3xl border-2 transition-all space-y-2.5 ${
+                isConfirmYes
+                  ? "bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20"
+                  : isConfirmNo
+                  ? "bg-rose-500/10 border-rose-400 ring-2 ring-rose-400/20"
+                  : "bg-amber-50 border-amber-300"
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{isConfirmYes ? "✅" : isConfirmNo ? "🛑" : "⚠️"}</span>
+                    <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">
+                      ¿Deseas realizar el corte de caja de este turno? *
+                    </h4>
+                  </div>
+                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                    isConfirmYes
+                      ? "bg-emerald-600 text-white"
+                      : isConfirmNo
+                      ? "bg-rose-600 text-white"
+                      : "bg-amber-200 text-amber-900"
+                  }`}>
+                    {isConfirmYes ? "AUTORIZADO" : isConfirmNo ? "CANCELADO" : "RESPUESTA REQUERIDA"}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-stone-600 font-medium leading-relaxed">
+                  Para confirmar el cierre oficial y pase de turno, <strong>escribe "SI"</strong> en la casilla. Si prefieres cancelar, <strong>escribe "NO"</strong>:
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={corteConfirmationText}
+                      onChange={(e) => setCorteConfirmationText(e.target.value.toUpperCase())}
+                      placeholder='Escribe "SI" o "NO"...'
+                      className={`w-full px-3.5 py-2.5 rounded-2xl border-2 text-xs font-black uppercase tracking-wider focus:outline-none transition-all ${
+                        isConfirmYes
+                          ? "border-emerald-500 bg-white text-emerald-950 ring-2 ring-emerald-500/20"
+                          : isConfirmNo
+                          ? "border-rose-400 bg-white text-rose-950 ring-2 ring-rose-400/20"
+                          : "border-stone-300 bg-white text-stone-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                      }`}
+                    />
+                    {corteConfirmationText && (
+                      <button
+                        type="button"
+                        onClick={() => setCorteConfirmationText("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Botones de acción rápida para autocompletar SI o NO */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setCorteConfirmationText("SI")}
+                      className={`px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                        isConfirmYes
+                          ? "bg-emerald-600 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-400/30"
+                          : "bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
+                      }`}
+                    >
+                      ✓ Escribir "SI"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCorteConfirmationText("NO")}
+                      className={`px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                        isConfirmNo
+                          ? "bg-rose-600 text-white border-rose-700 shadow-xs ring-2 ring-rose-400/30"
+                          : "bg-white hover:bg-rose-50 text-rose-800 border-rose-300 shadow-2xs"
+                      }`}
+                    >
+                      ✕ Escribir "NO"
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mensaje de validación contextual */}
+                {isConfirmYes && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-black text-emerald-800 bg-emerald-100/70 p-2 rounded-xl border border-emerald-200">
+                    <span>✓</span>
+                    <span>Confirmación aceptada. Se procederá a guardar el corte oficial y generar el comprobante.</span>
+                  </div>
+                )}
+
+                {isConfirmNo && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-black text-rose-800 bg-rose-100/70 p-2 rounded-xl border border-rose-200">
+                    <span>✕</span>
+                    <span>Has indicado "NO". El corte de caja está bloqueado y no se guardará.</span>
+                  </div>
+                )}
+
+                {!isConfirmYes && !isConfirmNo && corteConfirmationText.trim() !== "" && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-100/70 p-2 rounded-xl border border-amber-200">
+                    <span>⚠️</span>
+                    <span>Respuesta no reconocida. Por favor escribe exactamente <strong>"SI"</strong> o <strong>"NO"</strong>.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 7. BOTONES DE ACCIÓN */}
               <div className="flex gap-2.5 pt-2">
                 <button
                   type="button"
@@ -2362,14 +2550,20 @@ export default function CajaPage() {
                     setIsCorteModalOpen(false);
                     setPasswordError(null);
                     setDeliveryPassword("");
+                    setCorteConfirmationText("");
                   }}
-                  className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl text-xs transition-all cursor-pointer"
+                  className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-2xl text-xs transition-all cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-[2] py-2.5 bg-stone-900 hover:bg-black text-white font-black rounded-xl text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer border border-stone-800"
+                  disabled={!isConfirmYes}
+                  className={`flex-[2] py-3 rounded-2xl text-xs font-black shadow-md transition-all flex items-center justify-center gap-2 border ${
+                    isConfirmYes
+                      ? "bg-stone-900 hover:bg-black text-white border-stone-800 cursor-pointer active:scale-95 shadow-lg shadow-amber-900/10"
+                      : "bg-stone-200 text-stone-400 border-stone-300 cursor-not-allowed opacity-70"
+                  }`}
                 >
                   <Lock className="w-3.5 h-3.5 text-amber-400" />
                   <span>Confirmar y Guardar Corte Oficial</span>
