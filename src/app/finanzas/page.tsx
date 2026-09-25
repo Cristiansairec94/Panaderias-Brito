@@ -5,7 +5,6 @@ import Link from "next/link";
 import { 
   DollarSign, 
   TrendingUp, 
-  TrendingDown, 
   Wallet, 
   CreditCard, 
   Building2, 
@@ -139,12 +138,6 @@ export default function FinanzasPage() {
 
             {/* Enlaces de Auditoría */}
             <div className="hidden xl:flex items-center gap-2 border-l border-stone-200 pl-2">
-              <Link
-                href="/gastos"
-                className="flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold px-3 py-2.5 rounded-2xl text-xs transition-all border border-stone-200"
-              >
-                <TrendingDown className="w-3.5 h-3.5 text-rose-600" /> Gastos
-              </Link>
               <Link
                 href="/caja"
                 className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-bold px-3 py-2.5 rounded-2xl text-xs transition-all shadow-sm"
