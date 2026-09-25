@@ -304,6 +304,8 @@ export default function CajaPage() {
   const [selectedResponsibles, setSelectedResponsibles] = useState<string[]>([]);
   const [isResponsibleDropdownOpen, setIsResponsibleDropdownOpen] = useState(false);
   const responsibleDropdownRef = useRef<HTMLDivElement>(null);
+  const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
+  const periodDropdownRef = useRef<HTMLDivElement>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "cuadrado" | "sobrante" | "faltante">("all");
 
   const getStoredCajaInitialFund = (fallback: number = 0): number => {
@@ -513,11 +515,14 @@ export default function CajaPage() {
     }
   }, []);
 
-  // Close responsible dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (responsibleDropdownRef.current && !responsibleDropdownRef.current.contains(event.target as Node)) {
         setIsResponsibleDropdownOpen(false);
+      }
+      if (periodDropdownRef.current && !periodDropdownRef.current.contains(event.target as Node)) {
+        setIsPeriodDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -1144,39 +1149,207 @@ export default function CajaPage() {
                 )}
               </div>
 
-              {/* 2. Filtro de Período (Opción Múltiple / Selector Desplegable) */}
+              {/* 2. Filtro de Período (Selector Moderno con Popover Personalizado) */}
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 rounded-2xl px-3 py-1.5 shadow-2xs">
-                  <Calendar className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span className="text-xs font-bold text-stone-500 whitespace-nowrap">Período:</span>
-                  <select
-                    value={filterPeriod}
-                    onChange={(e) => setFilterPeriod(e.target.value as any)}
-                    className="bg-transparent text-xs font-black text-stone-800 focus:outline-none cursor-pointer pr-1"
+                <div className="relative" ref={periodDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsPeriodDropdownOpen(!isPeriodDropdownOpen)}
+                    className={`px-3 py-2 border rounded-2xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+                      isPeriodDropdownOpen
+                        ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50 text-stone-900 shadow-2xs"
+                        : "border-stone-200 bg-stone-50 text-stone-800 hover:bg-stone-100"
+                    }`}
                   >
-                    <option value="dia">📅 Por Día ({countsByPeriod.day})</option>
-                    <option value="mes">🗓️ Por Mes ({countsByPeriod.month})</option>
-                    <option value="ano">📆 Por Año ({countsByPeriod.year})</option>
-                    <option value="todos">📂 Ver Todos ({cutsHistory.length})</option>
-                  </select>
+                    <Calendar className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="text-stone-400 font-bold">Período:</span>
+                    <span className="font-black text-stone-900">
+                      {filterPeriod === "dia" && "Por Día"}
+                      {filterPeriod === "mes" && "Por Mes"}
+                      {filterPeriod === "ano" && "Por Año"}
+                      {filterPeriod === "todos" && "Ver Todos"}
+                    </span>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                      isPeriodDropdownOpen ? "bg-amber-500 text-stone-950" : "bg-stone-200 text-stone-700"
+                    }`}>
+                      {filterPeriod === "dia" && countsByPeriod.day}
+                      {filterPeriod === "mes" && countsByPeriod.month}
+                      {filterPeriod === "ano" && countsByPeriod.year}
+                      {filterPeriod === "todos" && cutsHistory.length}
+                    </span>
+                    <span className={`text-[10px] text-stone-400 transition-transform duration-200 ${
+                      isPeriodDropdownOpen ? "rotate-180 text-amber-600" : ""
+                    }`}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {/* Popover Mejorado para Selección de Período */}
+                  {isPeriodDropdownOpen && (
+                    <div className="absolute left-0 top-full mt-2 w-72 sm:w-80 bg-white rounded-3xl shadow-2xl border border-stone-200 p-3 z-40 space-y-1.5 animate-in fade-in zoom-in-95">
+                      <div className="pb-2 px-1 border-b border-stone-100">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-stone-400 block">
+                          Período de Auditoría
+                        </span>
+                        <span className="text-xs font-black text-stone-800 block">
+                          Selecciona cómo agrupar los cortes
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 pt-1">
+                        {/* 1. Por Día */}
+                        <div
+                          onClick={() => {
+                            setFilterPeriod("dia");
+                            setIsPeriodDropdownOpen(false);
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                            filterPeriod === "dia"
+                              ? "bg-amber-500/10 border-amber-400 text-stone-950 font-black ring-1 ring-amber-400/30"
+                              : "bg-white border-stone-200/80 hover:bg-stone-50 hover:border-stone-300 text-stone-700 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-900 border border-amber-200 flex items-center justify-center text-sm font-bold shrink-0">
+                              📅
+                            </div>
+                            <div>
+                              <span className="text-xs font-black text-stone-900 block leading-tight">
+                                Por Día
+                              </span>
+                              <span className="text-[10px] text-stone-500 font-medium block">
+                                Turnos de una fecha exacta
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-stone-100 text-stone-700 border border-stone-200">
+                              {countsByPeriod.day} cortes
+                            </span>
+                            {filterPeriod === "dia" && <Check className="w-4 h-4 text-amber-600 stroke-[3]" />}
+                          </div>
+                        </div>
+
+                        {/* 2. Por Mes */}
+                        <div
+                          onClick={() => {
+                            setFilterPeriod("mes");
+                            setIsPeriodDropdownOpen(false);
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                            filterPeriod === "mes"
+                              ? "bg-amber-500/10 border-amber-400 text-stone-950 font-black ring-1 ring-amber-400/30"
+                              : "bg-white border-stone-200/80 hover:bg-stone-50 hover:border-stone-300 text-stone-700 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-900 border border-blue-200 flex items-center justify-center text-sm font-bold shrink-0">
+                              🗓️
+                            </div>
+                            <div>
+                              <span className="text-xs font-black text-stone-900 block leading-tight">
+                                Por Mes
+                              </span>
+                              <span className="text-[10px] text-stone-500 font-medium block">
+                                Acumulado mensual de caja
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-stone-100 text-stone-700 border border-stone-200">
+                              {countsByPeriod.month} cortes
+                            </span>
+                            {filterPeriod === "mes" && <Check className="w-4 h-4 text-amber-600 stroke-[3]" />}
+                          </div>
+                        </div>
+
+                        {/* 3. Por Año */}
+                        <div
+                          onClick={() => {
+                            setFilterPeriod("ano");
+                            setIsPeriodDropdownOpen(false);
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                            filterPeriod === "ano"
+                              ? "bg-amber-500/10 border-amber-400 text-stone-950 font-black ring-1 ring-amber-400/30"
+                              : "bg-white border-stone-200/80 hover:bg-stone-50 hover:border-stone-300 text-stone-700 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-900 border border-purple-200 flex items-center justify-center text-sm font-bold shrink-0">
+                              📆
+                            </div>
+                            <div>
+                              <span className="text-xs font-black text-stone-900 block leading-tight">
+                                Por Año
+                              </span>
+                              <span className="text-[10px] text-stone-500 font-medium block">
+                                Cierres anuales consolidados
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-stone-100 text-stone-700 border border-stone-200">
+                              {countsByPeriod.year} cortes
+                            </span>
+                            {filterPeriod === "ano" && <Check className="w-4 h-4 text-amber-600 stroke-[3]" />}
+                          </div>
+                        </div>
+
+                        {/* 4. Ver Todos */}
+                        <div
+                          onClick={() => {
+                            setFilterPeriod("todos");
+                            setIsPeriodDropdownOpen(false);
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                            filterPeriod === "todos"
+                              ? "bg-amber-500/10 border-amber-400 text-stone-950 font-black ring-1 ring-amber-400/30"
+                              : "bg-white border-stone-200/80 hover:bg-stone-50 hover:border-stone-300 text-stone-700 font-bold"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-900 border border-emerald-200 flex items-center justify-center text-sm font-bold shrink-0">
+                              📂
+                            </div>
+                            <div>
+                              <span className="text-xs font-black text-stone-900 block leading-tight">
+                                Ver Todos
+                              </span>
+                              <span className="text-[10px] text-stone-500 font-medium block">
+                                Histórico completo sin límite
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-stone-100 text-stone-700 border border-stone-200">
+                              {cutsHistory.length} total
+                            </span>
+                            {filterPeriod === "todos" && <Check className="w-4 h-4 text-amber-600 stroke-[3]" />}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Controles Dinámicos de Fecha / Mes / Año */}
                 {filterPeriod === "dia" && (
-                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
+                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-2xl border border-stone-200 shadow-2xs hover:border-amber-400 transition-colors">
+                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-0.5">Fecha:</span>
                     <input
                       type="date"
                       value={selectedDayDate}
                       onChange={(e) => setSelectedDayDate(e.target.value)}
                       className="text-xs font-black text-stone-800 bg-transparent focus:outline-none cursor-pointer"
                     />
-                    <div className="flex items-center gap-1 pl-1 border-l border-stone-200">
+                    <div className="flex items-center gap-1 pl-1.5 border-l border-stone-200">
                       <button
                         type="button"
                         onClick={() => setSelectedDayDate(formatLocalDate(new Date()))}
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
                           selectedDayDate === formatLocalDate(new Date())
-                            ? "bg-amber-500 text-stone-900"
+                            ? "bg-amber-500 text-stone-900 shadow-2xs"
                             : "bg-stone-100 hover:bg-stone-200 text-stone-700"
                         }`}
                       >
@@ -1191,7 +1364,7 @@ export default function CajaPage() {
                         }}
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
                           selectedDayDate === formatLocalDate(new Date(Date.now() - 86400000))
-                            ? "bg-amber-500 text-stone-900"
+                            ? "bg-amber-500 text-stone-900 shadow-2xs"
                             : "bg-stone-100 hover:bg-stone-200 text-stone-700"
                         }`}
                       >
@@ -1202,29 +1375,33 @@ export default function CajaPage() {
                 )}
 
                 {filterPeriod === "mes" && (
-                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
+                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-2xl border border-stone-200 shadow-2xs hover:border-amber-400 transition-colors">
+                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-0.5">Mes:</span>
                     <input
                       type="month"
                       value={selectedMonthStr}
                       onChange={(e) => setSelectedMonthStr(e.target.value)}
                       className="text-xs font-black text-stone-800 bg-transparent focus:outline-none cursor-pointer"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMonthStr(formatLocalMonth(new Date()))}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
-                        selectedMonthStr === formatLocalMonth(new Date())
-                          ? "bg-amber-500 text-stone-900"
-                          : "bg-stone-100 hover:bg-stone-200 text-stone-700"
-                      }`}
-                    >
-                      Mes Actual
-                    </button>
+                    <div className="pl-1.5 border-l border-stone-200">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMonthStr(formatLocalMonth(new Date()))}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
+                          selectedMonthStr === formatLocalMonth(new Date())
+                            ? "bg-amber-500 text-stone-900 shadow-2xs"
+                            : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        }`}
+                      >
+                        Mes Actual
+                      </button>
+                    </div>
                   </div>
                 )}
 
                 {filterPeriod === "ano" && (
-                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
+                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-2xl border border-stone-200 shadow-2xs hover:border-amber-400 transition-colors">
+                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-0.5">Año:</span>
                     <select
                       value={selectedYearStr}
                       onChange={(e) => setSelectedYearStr(e.target.value)}
@@ -1234,17 +1411,19 @@ export default function CajaPage() {
                         <option key={y} value={y}>Año {y}</option>
                       ))}
                     </select>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedYearStr(new Date().getFullYear().toString())}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
-                        selectedYearStr === new Date().getFullYear().toString()
-                          ? "bg-amber-500 text-stone-900"
-                          : "bg-stone-100 hover:bg-stone-200 text-stone-700"
-                      }`}
-                    >
-                      Año Actual
-                    </button>
+                    <div className="pl-1.5 border-l border-stone-200">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedYearStr(new Date().getFullYear().toString())}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
+                          selectedYearStr === new Date().getFullYear().toString()
+                            ? "bg-amber-500 text-stone-900 shadow-2xs"
+                            : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                        }`}
+                      >
+                        Año Actual
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
