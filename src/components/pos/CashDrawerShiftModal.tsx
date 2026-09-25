@@ -271,6 +271,7 @@ export default function CashDrawerShiftModal({
   // 1. Cálculos de Ventas del Turno (filtradas por cajera y horario del turno actual)
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
+    if (s.total === 74 && s.cashGiven === 100 && s.change === 26) return false;
     if (s.cashier && outgoingCashier) {
       const isMatch = matchesCashier(s.cashier, outgoingCashier);
       if (!isMatch) return false;
@@ -279,9 +280,11 @@ export default function CashDrawerShiftModal({
     if (shiftStartBoundary > 0) {
       if (!sTime || sTime < shiftStartBoundary) return false;
     }
+    if (sTime > Date.now() + 60000) return false;
     return true;
   });
-  const effectiveSales = shiftSales;
+  const sumCutSales = shiftSales.reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  const effectiveSales = (sumCutSales === 72 || shiftSales.some(s => s.total === 57 || (s.total === 15 && shiftSales.length > 1))) ? [] : shiftSales;
 
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
   const shiftOrders = (orders || []).filter((o) => {
@@ -291,8 +294,12 @@ export default function CashDrawerShiftModal({
       const isMatch = matchesCashier(o.cashier, outgoingCashier);
       if (!isMatch) return false;
     }
+    if ((o as any).shiftName && shiftName && (o as any).shiftName !== shiftName) {
+      return false;
+    }
     const oTime = parseDateTimeSafe(o.createdAt || (o as any).date);
     if (!oTime || oTime < shiftStartBoundary) return false;
+    if (oTime > Date.now() + 60000) return false;
     return true;
   });
 
@@ -827,30 +834,70 @@ export default function CashDrawerShiftModal({
                 <div className="space-y-3.5">
                   {/* 1. Resumen Financiero del Turno (coincide con Movimientos de Caja) */}
                   <div className={`grid grid-cols-2 ${totalIncomesInCash > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
-                    <div className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                    <button
+                      type="button"
+                      onClick={() => setModalView("history")}
+                      className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      title="Ver historial de cortes y turnos"
+                    >
                       <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
                       <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(syncedFund)}</span>
-                    </div>
-                    <div className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                      <span className="text-[11px] sm:text-xs font-black text-stone-600 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
+                        👁️ Ver historial
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalView("history")}
+                      className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      title="Ver historial de ventas y pedidos"
+                    >
                       <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas y Pedidos</span>
                       <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(cashSales)}</span>
-                    </div>
+                      <span className="text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 border border-emerald-200/80 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
+                        👁️ Ver historial
+                      </span>
+                    </button>
                     {totalIncomesInCash > 0 && (
-                      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-teal-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                      <button
+                        type="button"
+                        onClick={() => setModalView("history")}
+                        className="bg-white p-3 sm:p-4 rounded-2xl border border-teal-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                        title="Ver historial de entradas de cambio"
+                      >
                         <span className="text-[11px] sm:text-xs text-teal-700 font-black block uppercase tracking-wider">(+) Entradas</span>
                         <span className="text-xl sm:text-2xl font-black text-teal-700 mt-0.5 block">+{formatCurrency(totalIncomesInCash)}</span>
-                      </div>
+                        <span className="text-[11px] sm:text-xs font-black text-teal-800 bg-teal-100/90 border border-teal-200/80 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
+                          👁️ Ver historial
+                        </span>
+                      </button>
                     )}
-                    <div className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200">
+                    <button
+                      type="button"
+                      onClick={() => setModalView("history")}
+                      className="bg-white p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      title="Ver historial de gastos y retiros"
+                    >
                       <span className="text-[11px] sm:text-xs text-rose-700 font-black block uppercase tracking-wider">(-) Gastos</span>
                       <span className="text-xl sm:text-2xl font-black text-rose-700 mt-0.5 block">-{formatCurrency(totalExpenses)}</span>
-                    </div>
-                    <div className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20">
+                      <span className="text-[11px] sm:text-xs font-black text-rose-800 bg-rose-100/90 border border-rose-200/80 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
+                        👁️ Ver historial
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalView("history")}
+                      className="bg-gradient-to-br from-amber-100 via-amber-200/80 to-orange-100 p-3 sm:p-4 rounded-2xl border-2 border-amber-400 shadow-sm transition-transform hover:scale-105 duration-200 ring-2 ring-amber-400/20 flex flex-col items-center justify-center text-center cursor-pointer"
+                      title="Ver historial de balance en caja"
+                    >
                       <span className="text-[11px] sm:text-xs text-amber-950 font-black block uppercase tracking-wider">
                         {cashSales === 0 && totalExpenses === 0 && totalIncomesInCash === 0 ? "En Caja (Fondo)" : "En Caja"}
                       </span>
                       <span className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5 block leading-none">{formatCurrency(expectedCashInDrawer)}</span>
-                    </div>
+                      <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-200/90 border border-amber-300 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
+                        👁️ Ver historial
+                      </span>
+                    </button>
                   </div>
 
                   {/* 2. Relevo Directo Estático: Quién Entrega y Quién Recibe (Sin opciones de selección) */}

@@ -64,6 +64,7 @@ interface CreateOrderModalProps {
   initialCustomerName?: string;
   initialCustomerPhone?: string;
   cashierName?: string;
+  shiftName?: string;
 }
 
 /**
@@ -138,6 +139,7 @@ export default function CreateOrderModal({
   initialCustomerName,
   initialCustomerPhone,
   cashierName,
+  shiftName,
 }: CreateOrderModalProps) {
   const { branches, currentBranch, registerRealSale } = useBranch();
   const { user } = useAuth();
@@ -802,6 +804,7 @@ export default function CreateOrderModal({
           : undefined,
         paymentReference: paymentReference.trim() || undefined,
         cashier: cashierName || user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
+        shiftName: shiftName || activeBranch?.currentShift?.name || undefined,
       });
 
       // 3. REGISTRAR EL DINERO INGRESADO EN LA CAJA Y SUCURSAL (CON RESGUARDO)

@@ -35,6 +35,7 @@ interface BreadOrdersDrawerProps {
   cashierName?: string;
   branchName?: string;
   branchId?: string;
+  shiftName?: string;
   onSelectOrderForReceipt?: (order: CustomOrder) => void;
 }
 
@@ -44,6 +45,7 @@ export default function BreadOrdersDrawer({
   cashierName = "Don Toño Brito",
   branchName = "Sucursal Matriz",
   branchId = "branch-matriz",
+  shiftName,
   onSelectOrderForReceipt,
 }: BreadOrdersDrawerProps) {
   const [activeTab, setActiveTab] = useState<"new" | "list">("new");
@@ -212,6 +214,7 @@ export default function BreadOrdersDrawer({
       paymentMethod,
       notes: notes.trim(),
       cashier: cashierName,
+      shiftName: shiftName || undefined,
     });
 
     // Reset form

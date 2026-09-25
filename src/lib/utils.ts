@@ -143,6 +143,12 @@ export function parseDateTimeSafe(input?: Date | string | number | null): number
     if (!isNaN(num)) return num;
   }
 
+  // 1.5. Si es formato ISO con indicación de zona horaria o fecha estándar completa (ej. "2026-09-25T14:33:05.438Z" o "...+00:00")
+  if (str.includes("T") && (str.includes("Z") || /[+-]\d{2}:?\d{2}$/.test(str))) {
+    const directParse = Date.parse(str);
+    if (!isNaN(directParse)) return directParse;
+  }
+
   // 2. Si empieza con "Hoy" o "Ayer"
   const relMatch = str.match(/^(hoy|ayer),?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(a\.?\s*m\.?|p\.?\s*m\.?|am|pm)?/i);
   if (relMatch) {
@@ -310,11 +316,15 @@ export function matchesCashier(itemCashier?: string, targetCashier?: string): bo
 export function getStoredShiftStartBoundary(): number {
   if (typeof window === "undefined") return 0;
   try {
-    let startTs = 0;
+    const now = Date.now();
     const stored = localStorage.getItem("brito_current_shift_start_timestamp");
     if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
-      startTs = Number(stored);
+      const num = Number(stored);
+      // Evitar timestamps erróneos en el futuro
+      return num > now ? now : num;
     }
+
+    let startTs = 0;
     const rawCuts = localStorage.getItem("brito_shift_cuts_history");
     if (rawCuts) {
       const parsed = JSON.parse(rawCuts);
@@ -324,18 +334,18 @@ export function getStoredShiftStartBoundary(): number {
             typeof cut.timestamp === "number"
               ? cut.timestamp
               : parseDateTimeSafe(cut.timestamp || cut.date || cut.createdAt);
-          if (cutTs > startTs) {
+          if (cutTs > 0 && cutTs <= now && cutTs > startTs) {
             startTs = cutTs;
           }
         }
       }
     }
     if (startTs === 0) {
-      startTs = Date.now();
-      try {
-        localStorage.setItem("brito_current_shift_start_timestamp", startTs.toString());
-      } catch (e) {}
+      startTs = now;
     }
+    try {
+      localStorage.setItem("brito_current_shift_start_timestamp", startTs.toString());
+    } catch (e) {}
     return startTs;
   } catch (e) {}
   return Date.now();

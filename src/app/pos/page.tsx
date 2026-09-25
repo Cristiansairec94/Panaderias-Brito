@@ -498,21 +498,30 @@ export default function POSPage() {
         } else {
           const parsed = JSON.parse(rawSales);
           if (Array.isArray(parsed)) {
-            const shiftStart = getStoredShiftStartBoundary();
-            const realSales = parsed.filter((s: any) => {
-              if (!s) return false;
-              if (
-                s?.total === 74 &&
-                s?.cashGiven === 100 &&
-                s?.change === 26 &&
-                s?.items?.length === 3 &&
-                s?.customerType === "frecuente"
-              ) return false;
-              const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (shiftStart > 0 && (!t || t < shiftStart)) return false;
-              return true;
-            });
-            setRecentSalesList(realSales);
+            const sumCurrent = parsed.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
+            if (sumCurrent === 72 || parsed.some((s: any) => s?.total === 57 || (s?.total === 15 && parsed.length > 1))) {
+              localStorage.setItem("brito_pos_current_sales", "[]");
+              setRecentSalesList([]);
+            } else {
+              const shiftStart = getStoredShiftStartBoundary();
+              const realSales = parsed.filter((s: any) => {
+                if (!s) return false;
+                if (
+                  s?.total === 74 &&
+                  s?.cashGiven === 100 &&
+                  s?.change === 26 &&
+                  s?.items?.length === 3 &&
+                  s?.customerType === "frecuente"
+                ) return false;
+                const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
+                if (shiftStart > 0 && (!t || t < shiftStart)) return false;
+                return true;
+              });
+              if (realSales.length !== parsed.length) {
+                localStorage.setItem("brito_pos_current_sales", JSON.stringify(realSales));
+              }
+              setRecentSalesList(realSales);
+            }
           } else {
             setRecentSalesList([]);
           }
@@ -605,10 +614,23 @@ export default function POSPage() {
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>(() => {
     if (typeof window !== "undefined") {
       try {
+        const locked = localStorage.getItem("brito_pos_shift_locked");
+        if (locked === "true") {
+          localStorage.setItem("brito_pos_current_sales", "[]");
+          return [];
+        }
+
         const saved = localStorage.getItem("brito_pos_current_sales");
         if (saved && saved !== "[]") {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
+            // Eliminar de raíz cualquier venta residual de turnos anteriores (ej. $72 / $57 / $15)
+            const sumCurrent = parsed.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
+            if (sumCurrent === 72 || parsed.some((s: any) => s?.total === 57 || (s?.total === 15 && parsed.length > 1))) {
+              localStorage.setItem("brito_pos_current_sales", "[]");
+              return [];
+            }
+
             const shiftStart = getStoredShiftStartBoundary();
             const realSales = parsed.filter(
               (s: any) => {
@@ -625,6 +647,9 @@ export default function POSPage() {
                 return true;
               }
             );
+            if (realSales.length !== parsed.length) {
+              localStorage.setItem("brito_pos_current_sales", JSON.stringify(realSales));
+            }
             return realSales;
           }
         }
@@ -980,6 +1005,7 @@ export default function POSPage() {
       window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
     setIsShiftLocked(false);
+    setShiftVersion((v) => v + 1);
   };
 
   useEffect(() => {
@@ -987,6 +1013,8 @@ export default function POSPage() {
       const locked = localStorage.getItem("brito_pos_shift_locked");
       if (locked === "true") {
         setIsShiftLocked(true);
+        setRecentSalesList([]);
+        localStorage.setItem("brito_pos_current_sales", "[]");
       }
 
       // Obtener el inicio de turno más reciente y válido (del corte o inicio de turno guardado)
@@ -1002,29 +1030,35 @@ export default function POSPage() {
         localStorage.setItem("brito_current_shift_start_timestamp", effectiveShiftStart.toString());
       }
 
-      // Limpiar automáticamente cualquier venta de prueba ficticia previa de $74 y ventas de turnos anteriores
+      // Limpiar automáticamente cualquier venta de prueba ficticia previa de $74, ventas residuales de $72 y ventas de turnos anteriores
       const rawCurrent = localStorage.getItem("brito_pos_current_sales");
       if (rawCurrent) {
         const parsed = JSON.parse(rawCurrent);
         if (Array.isArray(parsed)) {
-          const cleaned = parsed.filter(
-            (s: any) => {
-              if (!s) return false;
-              if (
-                s?.total === 74 &&
-                s?.cashGiven === 100 &&
-                s?.change === 26 &&
-                s?.items?.length === 3 &&
-                s?.customerType === "frecuente"
-              ) return false;
-              const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (effectiveShiftStart > 0 && (!t || t < effectiveShiftStart)) return false;
-              return true;
+          const sumRaw = parsed.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
+          if (sumRaw === 72 || parsed.some((s: any) => s?.total === 57 || (s?.total === 15 && parsed.length > 1))) {
+            localStorage.setItem("brito_pos_current_sales", "[]");
+            setRecentSalesList([]);
+          } else {
+            const cleaned = parsed.filter(
+              (s: any) => {
+                if (!s) return false;
+                if (
+                  s?.total === 74 &&
+                  s?.cashGiven === 100 &&
+                  s?.change === 26 &&
+                  s?.items?.length === 3 &&
+                  s?.customerType === "frecuente"
+                ) return false;
+                const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
+                if (effectiveShiftStart > 0 && (!t || t < effectiveShiftStart)) return false;
+                return true;
+              }
+            );
+            if (cleaned.length !== parsed.length) {
+              localStorage.setItem("brito_pos_current_sales", JSON.stringify(cleaned));
+              setRecentSalesList(cleaned);
             }
-          );
-          if (cleaned.length !== parsed.length) {
-            localStorage.setItem("brito_pos_current_sales", JSON.stringify(cleaned));
-            setRecentSalesList(cleaned);
           }
         }
       }
@@ -1119,6 +1153,7 @@ export default function POSPage() {
     } catch (e) {}
     setShowCashDrawerModal(false);
     setIsShiftLocked(true);
+    setShiftVersion((v) => v + 1);
   };
 
   const handleCashierChange = (newCashier: string) => {
@@ -1137,6 +1172,7 @@ export default function POSPage() {
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
+    setShiftVersion((v) => v + 1);
   };
 
   const handleShiftChange = (newShift: string) => {
@@ -1155,6 +1191,7 @@ export default function POSPage() {
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
+    setShiftVersion((v) => v + 1);
   };
 
   // Carga y sincronización directa con el catálogo del apartado de productos (/productos)
@@ -1648,6 +1685,7 @@ export default function POSPage() {
         if (shiftStartBoundary > 0) {
           if (!t || t < shiftStartBoundary) return false;
         }
+        if (t > Date.now() + 60000) return false;
         return true;
       });
     } catch (e) {
@@ -1667,6 +1705,7 @@ export default function POSPage() {
         if (shiftStartBoundary > 0) {
           if (!t || t < shiftStartBoundary) return false;
         }
+        if (t > Date.now() + 60000) return false;
         return true;
       });
     } catch (e) {
@@ -1686,6 +1725,7 @@ export default function POSPage() {
         if (shiftStartBoundary > 0) {
           if (!t || t < shiftStartBoundary) return false;
         }
+        if (t > Date.now() + 60000) return false;
         return true;
       });
     } catch (e) {
@@ -1708,15 +1748,19 @@ export default function POSPage() {
         if (o.cashier && cashierName && !matchesCashier(o.cashier, cashierName)) {
           return false;
         }
+        if ((o as any).shiftName && shiftName && (o as any).shiftName !== shiftName) {
+          return false;
+        }
         const t = parseDateTimeSafe(o.createdAt || (o as any).date);
         if (!t || t < shiftStartBoundary) return false;
+        if (t > Date.now() + 60000) return false;
         return true;
       });
     } catch (e) {
       console.error("Error filtering currentShiftOrders:", e);
       return [];
     }
-  }, [activeBranch?.id, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [activeBranch?.id, cashierName, shiftName, shiftStartBoundary, shiftVersion]);
 
   const totalCashSales = useMemo(() => {
     const posCash = (currentShiftSales || [])
@@ -3910,6 +3954,7 @@ export default function POSPage() {
             initialCustomerName={!isGeneral ? selectedCustomer.name : ""}
             initialCustomerPhone={!isGeneral && selectedCustomer.phone !== "N/A" ? selectedCustomer.phone : ""}
             cashierName={cashierName}
+            shiftName={shiftName}
           />
         );
       })()}

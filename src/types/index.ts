@@ -137,6 +137,7 @@ export interface CustomOrder {
   notes?: string;
   createdAt: string;
   cashier: string;
+  shiftName?: string;
   payments?: OrderPayment[];
 }
 

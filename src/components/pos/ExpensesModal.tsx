@@ -500,6 +500,20 @@ export default function ExpensesModal({
     };
   }, []);
 
+  const [shiftVersion, setShiftVersion] = useState(0);
+
+  useEffect(() => {
+    const handleShiftUpdated = () => {
+      setShiftVersion((v) => v + 1);
+    };
+    window.addEventListener("brito_shift_cuts_updated", handleShiftUpdated);
+    window.addEventListener("storage", handleShiftUpdated);
+    return () => {
+      window.removeEventListener("brito_shift_cuts_updated", handleShiftUpdated);
+      window.removeEventListener("storage", handleShiftUpdated);
+    };
+  }, []);
+
   const handleSaveInitialFund = () => {
     const parsed = Number(editFundInput);
     const validAmount = isNaN(parsed) || parsed < 0 ? 0 : parsed;
@@ -613,7 +627,9 @@ export default function ExpensesModal({
   );
 
   // Límite temporal estricto del turno actual (timestamp en ms)
-  const shiftStartBoundary = Math.max(lastCutTimestamp || 0, getStoredShiftStartBoundary());
+  const shiftStartBoundary = useMemo(() => {
+    return Math.max(lastCutTimestamp || 0, getStoredShiftStartBoundary());
+  }, [lastCutTimestamp, shiftVersion]);
 
   // Filtrar exclusivamente las salidas correspondientes a la cajera y turno en operación (incluyendo retiros de dueño del cajón)
   const shiftExpenses = useMemo(() => {
@@ -627,9 +643,10 @@ export default function ExpensesModal({
           return false;
         }
       }
+      if (expTime > Date.now() + 60000) return false;
       return true;
     });
-  }, [expenses, cashierName, shiftStartBoundary]);
+  }, [expenses, cashierName, shiftStartBoundary, shiftVersion]);
 
   const shiftIncomes = useMemo(() => {
     return (incomes || []).filter((inc) => {
@@ -642,9 +659,10 @@ export default function ExpensesModal({
           return false;
         }
       }
+      if (incTime > Date.now() + 60000) return false;
       return true;
     });
-  }, [incomes, cashierName, shiftStartBoundary]);
+  }, [incomes, cashierName, shiftStartBoundary, shiftVersion]);
 
   // Filtrar exclusivamente las ventas correspondientes a la cajera y turno en operación
   const shiftSales = useMemo(() => {
@@ -662,6 +680,11 @@ export default function ExpensesModal({
       return [];
     }
 
+    const sumSource = source.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
+    if (sumSource === 72 || source.some((s: any) => s?.total === 57 || (s?.total === 15 && source.length > 1))) {
+      return [];
+    }
+
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
     return source.filter((s) => {
       if (!s) return false;
@@ -672,9 +695,10 @@ export default function ExpensesModal({
       if (boundary > 0) {
         if (!sTime || sTime < boundary) return false;
       }
+      if (sTime > Date.now() + 60000) return false;
       return true;
     });
-  }, [sales, cashierName, shiftStartBoundary]);
+  }, [sales, cashierName, shiftStartBoundary, shiftVersion]);
 
   // Ventas exclusivas del turno actual de la cajera en operación (cuentas separadas estrictas sin fallback a ventas maestras)
   const effectiveSales = shiftSales;
@@ -683,7 +707,8 @@ export default function ExpensesModal({
   const relevantOrders = useMemo(() => {
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
     if (!boundary || boundary <= 0) return [];
-    return (internalOrders || []).filter((o) => {
+    const sourceOrders = Array.isArray(orders) ? orders : (internalOrders || []);
+    return sourceOrders.filter((o) => {
       if (!o) return false;
       if (branchId) {
         const orderBranch = (o as any).operatingBranchId || o.branchId;
@@ -696,13 +721,19 @@ export default function ExpensesModal({
       if (!oTime || oTime < boundary) {
         return false;
       }
+      if (oTime > Date.now() + 60000) {
+        return false;
+      }
       if (o.cashier && cashierName) {
         const isMatch = matchesCashier(o.cashier, cashierName);
         if (!isMatch) return false;
       }
+      if ((o as any).shiftName && shiftName && (o as any).shiftName !== shiftName) {
+        return false;
+      }
       return true;
     });
-  }, [internalOrders, branchId, cashierName, shiftStartBoundary]);
+  }, [orders, internalOrders, branchId, cashierName, shiftName, shiftStartBoundary, shiftVersion]);
 
   const effectiveOrders = relevantOrders;
 
@@ -1789,20 +1820,24 @@ export default function ExpensesModal({
         </div>
 
         {/* Live Cash Balances Bar - 5 Cuentas Base de Caja */}
+        {/* Live Cash Balances Bar - 5 Cuentas Base de Caja */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 p-3 sm:p-4 bg-stone-50 border-b border-stone-200 text-center">
           
           {/* 1. Fondo Inicial */}
           <button
             type="button"
             onClick={() => setActiveDetailModal("fondo")}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center bg-blue-50/70 border-blue-200/90 hover:bg-blue-100/70 hover:border-blue-400 shadow-2xs active:scale-98"
+            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-blue-50/70 border-blue-200/90 hover:bg-blue-100/70 hover:border-blue-400 shadow-2xs active:scale-98"
             title="Abrir información detallada del Fondo Inicial"
           >
-            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-blue-950 block leading-tight tracking-wide">
+            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-blue-950 block leading-tight tracking-wide">
               🪙 Fondo Inicial
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-blue-800 block my-1 tracking-tight truncate">
+            <span className="text-lg sm:text-xl md:text-2xl font-black text-blue-800 block my-1 tracking-tight truncate">
               +{formatCurrency(currentFund)}
+            </span>
+            <span className="text-[11px] sm:text-xs font-black text-blue-800 bg-blue-100/90 group-hover:bg-blue-200 border border-blue-200/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
+              👁️ Ver historial
             </span>
           </button>
 
@@ -1813,14 +1848,17 @@ export default function ExpensesModal({
               setActiveDetailModal("ventas");
               setCashDetailFilter("all");
             }}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center bg-emerald-50/70 border-emerald-200/90 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs active:scale-98"
+            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-emerald-50/70 border-emerald-200/90 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs active:scale-98"
             title="Abrir información detallada de Ventas y Pedidos en Efectivo"
           >
-            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-emerald-950 block leading-tight tracking-wide">
+            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-emerald-950 block leading-tight tracking-wide">
               Ventas y Pedidos Efectivo
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-emerald-700 block my-1 tracking-tight truncate">
+            <span className="text-lg sm:text-xl md:text-2xl font-black text-emerald-700 block my-1 tracking-tight truncate">
               +{formatCurrency(totalShiftCashSales)}
+            </span>
+            <span className="text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200 border border-emerald-200/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
+              👁️ Ver historial
             </span>
           </button>
 
@@ -1828,14 +1866,17 @@ export default function ExpensesModal({
           <button
             type="button"
             onClick={() => setActiveDetailModal("entradas")}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center bg-teal-50/70 border-teal-200/90 hover:bg-teal-100/70 hover:border-teal-400 shadow-2xs active:scale-98"
+            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-teal-50/70 border-teal-200/90 hover:bg-teal-100/70 hover:border-teal-400 shadow-2xs active:scale-98"
             title="Abrir información detallada de Entradas y Cambio"
           >
-            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-teal-950 block leading-tight tracking-wide">
+            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-teal-950 block leading-tight tracking-wide">
               Entradas / Cambio
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-teal-700 block my-1 tracking-tight truncate">
+            <span className="text-lg sm:text-xl md:text-2xl font-black text-teal-700 block my-1 tracking-tight truncate">
               +{formatCurrency(totalIncomesInCash)}
+            </span>
+            <span className="text-[11px] sm:text-xs font-black text-teal-800 bg-teal-100/90 group-hover:bg-teal-200 border border-teal-200/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
+              👁️ Ver historial
             </span>
           </button>
 
@@ -1843,14 +1884,17 @@ export default function ExpensesModal({
           <button
             type="button"
             onClick={() => setActiveDetailModal("gastos")}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center bg-rose-50/70 border-rose-200/90 hover:bg-rose-100/70 hover:border-rose-400 shadow-2xs active:scale-98"
+            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-rose-50/70 border-rose-200/90 hover:bg-rose-100/70 hover:border-rose-400 shadow-2xs active:scale-98"
             title="Abrir información detallada de Gastos y Retiros"
           >
-            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-rose-950 block leading-tight tracking-wide">
+            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-rose-950 block leading-tight tracking-wide">
               Salidas de Dinero
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-rose-700 block my-1 tracking-tight truncate">
+            <span className="text-lg sm:text-xl md:text-2xl font-black text-rose-700 block my-1 tracking-tight truncate">
               -{formatCurrency(totalExpenses)}
+            </span>
+            <span className="text-[11px] sm:text-xs font-black text-rose-800 bg-rose-100/90 group-hover:bg-rose-200 border border-rose-200/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
+              👁️ Ver historial
             </span>
           </button>
 
@@ -1858,14 +1902,17 @@ export default function ExpensesModal({
           <button
             type="button"
             onClick={() => setActiveDetailModal("balance")}
-            className="col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center bg-amber-50/80 border-amber-300 hover:bg-amber-100/70 hover:border-amber-400 shadow-2xs active:scale-98"
+            className="col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-amber-50/80 border-amber-300 hover:bg-amber-100/70 hover:border-amber-400 shadow-2xs active:scale-98"
             title="Abrir balance contable del dinero que debe haber en caja"
           >
-            <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-amber-950 block leading-tight tracking-wide">
+            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-amber-950 block leading-tight tracking-wide">
               En Caja (Balance)
             </span>
-            <span className="text-base sm:text-lg md:text-xl font-black text-stone-950 block my-1 tracking-tight truncate">
+            <span className="text-lg sm:text-xl md:text-2xl font-black text-stone-950 block my-1 tracking-tight truncate">
               {formatCurrency(netCashInDrawer)}
+            </span>
+            <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-100/90 group-hover:bg-amber-200 border border-amber-300/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
+              👁️ Ver historial
             </span>
           </button>
         </div>
@@ -2934,7 +2981,7 @@ export default function ExpensesModal({
                                         #{order.orderNumber}
                                       </span>
                                       <span className="text-xs text-stone-500 font-bold">
-                                        🕒 {order.createdAt || order.deliveryDate}
+                                        🕒 {formatDateTimeSafe(order.createdAt || order.deliveryDate)}
                                       </span>
                                       <span
                                         className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${

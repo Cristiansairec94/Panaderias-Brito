@@ -520,6 +520,7 @@ export function addCustomOrder(data: {
   dedication?: string;
   notes?: string;
   cashier: string;
+  shiftName?: string;
 }): CustomOrder {
   const current = getStoredOrders();
   const orderNumber = generateNextOrderNumber();
@@ -602,6 +603,7 @@ export function addCustomOrder(data: {
     notes: data.notes?.trim(),
     createdAt: new Date().toISOString(),
     cashier: data.cashier,
+    shiftName: data.shiftName || (typeof window !== "undefined" ? localStorage.getItem("brito_current_shift_name") || undefined : undefined),
     payments: payments,
   };
 

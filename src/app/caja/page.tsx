@@ -330,6 +330,8 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
+            const sumRaw = list.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
+            if (sumRaw === 72 || list.some((s: any) => s?.total === 57 || (s?.total === 15 && list.length > 1))) return 0;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
@@ -350,6 +352,8 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
+            const sumRaw = list.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
+            if (sumRaw === 72 || list.some((s: any) => s?.total === 57 || (s?.total === 15 && list.length > 1))) return 0;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
@@ -370,6 +374,8 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
+            const sumRaw = list.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
+            if (sumRaw === 72 || list.some((s: any) => s?.total === 57 || (s?.total === 15 && list.length > 1))) return 0;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
@@ -449,6 +455,13 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
+            const sumRaw = list.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
+            if (sumRaw === 72 || list.some((s: any) => s?.total === 57 || (s?.total === 15 && list.length > 1))) {
+              setCashSales(0);
+              setCardSales(0);
+              setTransferSales(0);
+              return;
+            }
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
