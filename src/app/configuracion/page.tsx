@@ -26,7 +26,6 @@ import {
   Phone,
   Edit3,
   Trash2,
-  ShoppingBag,
   ExternalLink,
   Wallet,
   AlertCircle,
@@ -47,7 +46,7 @@ function ConfiguracionContent() {
   const searchParams = useSearchParams();
   const tabQuery = searchParams ? searchParams.get("tab") : null;
   const { usersList, addUser } = useAuth();
-  const { branches, addBranch, updateBranch, deleteBranch, switchBranch } = useBranch();
+  const { branches, addBranch, updateBranch, deleteBranch } = useBranch();
 
   const [activeTab, setActiveTab] = useState<"general" | "sucursales" | "roles" | "empleados" | "ticket" | "operaciones" | "offline" | "database">(
     tabQuery === "usuarios" ? "roles" : (tabQuery as any) || "roles"
@@ -206,10 +205,6 @@ function ConfiguracionContent() {
     }
   };
 
-  const handleOpenBranchPos = (branchId: string) => {
-    switchBranch(branchId);
-    router.push("/pos");
-  };
 
   // Business Info Form State
   const [businessName, setBusinessName] = useState("Panadería Bakery Brito");
@@ -599,21 +594,12 @@ function ConfiguracionContent() {
                   <div className="pt-2 border-t border-stone-100 flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => handleOpenBranchPos(branch.id)}
-                      className="flex-1 flex items-center justify-center gap-1.5 bg-stone-900 hover:bg-black text-white font-bold py-2 px-3 rounded-xl text-xs shadow-xs transition-all active:scale-95"
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5 text-brito-orange-400" />
-                      <span>Abrir POS</span>
-                    </button>
-
-                    <button
-                      type="button"
                       onClick={() => openEditBranch(branch)}
-                      className="p-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl text-xs transition-all flex items-center gap-1"
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-2 px-3 rounded-xl text-xs transition-all active:scale-95"
                       title="Editar sucursal y usuario ligado"
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span className="text-[11px]">Editar</span>
+                      <Edit3 className="w-3.5 h-3.5 text-stone-500" />
+                      <span>Editar</span>
                     </button>
 
                     {branches.length > 1 && (
