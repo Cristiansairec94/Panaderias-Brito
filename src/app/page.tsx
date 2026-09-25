@@ -9,7 +9,6 @@ import {
   Wallet, 
   Users, 
   ShieldCheck, 
-  Zap, 
   Store, 
   Clock, 
   Receipt, 
@@ -69,7 +68,6 @@ export default function Home() {
     isAllBranches, 
     switchBranch, 
     consolidatedMetrics,
-    simulateSale,
     recentSimulatedSales
   } = useBranch();
 
@@ -456,22 +454,6 @@ export default function Home() {
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => simulateSale()}
-              className="text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1 active:scale-95"
-            >
-              <Zap className="w-3.5 h-3.5 text-orange-500" />
-              Simular Ticket
-            </button>
-            <Link
-              href="/pos"
-              className="text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1"
-            >
-              Ir a POS <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
         </div>
 
         {recentSimulatedSales.length === 0 ? (
@@ -479,7 +461,7 @@ export default function Home() {
             <Receipt className="w-8 h-8 text-stone-300 mx-auto" />
             <p className="text-xs font-bold text-stone-600">Aún no hay tickets registrados en esta sesión de mostrador</p>
             <p className="text-[11px] text-stone-400">
-              Presiona el botón <strong className="text-orange-600">Simular Ticket</strong> o cobra en el <strong className="text-orange-600">POS</strong> para ver transacciones en vivo.
+              Las transacciones cobradas en caja se reflejarán automáticamente en este panel en tiempo real.
             </p>
           </div>
         ) : (
