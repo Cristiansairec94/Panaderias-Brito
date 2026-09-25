@@ -439,7 +439,6 @@ export default function ExpensesModal({
   const [activeDetailModal, setActiveDetailModal] = useState<"fondo" | "ventas" | "entradas" | "gastos" | "balance" | null>(null);
   const [cashDetailFilter, setCashDetailFilter] = useState<"all" | "ventas" | "pedidos">("all");
   const [cashMethodFilter, setCashMethodFilter] = useState<"all" | "efectivo" | "tarjeta" | "transferencia">("all");
-  const [showFilterBoxes, setShowFilterBoxes] = useState<boolean>(true);
 
   const handleCloseDetailModal = () => {
     setActiveDetailModal(null);
@@ -3138,27 +3137,11 @@ export default function ExpensesModal({
                             </select>
                             <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
-
-                          {/* Botón Desplegable para ver/ocultar los cuadros de botones */}
-                          <button
-                            type="button"
-                            onClick={() => setShowFilterBoxes((prev) => !prev)}
-                            className={`px-3 py-2 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 border ${
-                              showFilterBoxes
-                                ? "bg-amber-100 text-amber-950 border-amber-300 shadow-2xs"
-                                : "bg-white text-stone-700 hover:bg-stone-100 border-stone-300"
-                            }`}
-                            title={showFilterBoxes ? "Ocultar botones en cuadros" : "Desplegar botones en cuadros"}
-                          >
-                            <span>{showFilterBoxes ? "Ocultar Cuadros" : "Ver Cuadros"}</span>
-                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showFilterBoxes ? "rotate-180" : ""}`} />
-                          </button>
                         </div>
                       </div>
 
                       {/* 2. Cuadros organizados en cuadrículas limpias (SIN deslizar horizontalmente, SIN barras de desplazamiento) */}
-                      {showFilterBoxes && (
-                        <div className="space-y-3 pt-2.5 border-t border-stone-200">
+                      <div className="space-y-3 pt-2.5 border-t border-stone-200">
                           {/* Fila A: Tipo de Registro (3 columnas completas) */}
                           <div>
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
@@ -3238,8 +3221,7 @@ export default function ExpensesModal({
                             </div>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
 
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between text-xs px-1 gap-2 flex-wrap">
