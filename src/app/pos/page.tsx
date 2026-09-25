@@ -2324,47 +2324,6 @@ export default function POSPage() {
 
             </div>
 
-            {/* Grupo Pedidos Especiales y Ventas del Turno */}
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Botón Pedidos Especiales con Contador en Vivo */}
-              <button
-                type="button"
-                onClick={() => setShowOrdersDrawer(true)}
-                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-rose-300 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/90 text-rose-950 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
-                title="Ver pedidos especiales, apartados y encargos de mostrador"
-              >
-                <span className="w-6 h-6 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-600 text-white font-black flex items-center justify-center text-xs shadow-xs shrink-0">
-                  🎂
-                </span>
-                <span>Pedidos</span>
-                {branchPendingOrdersCount > 0 ? (
-                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-rose-600 text-white text-[11px] font-black flex items-center justify-center shadow-xs animate-pulse">
-                    {branchPendingOrdersCount}
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded-md">
-                    0
-                  </span>
-                )}
-              </button>
-
-              {/* Botón Ventas del Turno / Historial */}
-              <button
-                type="button"
-                onClick={() => setShowRecentSales(true)}
-                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-emerald-300 hover:border-emerald-400 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
-                title="Ver historial de ventas del turno y tickets emitidos"
-              >
-                <span className="w-6 h-6 rounded-xl bg-emerald-600 text-white font-black flex items-center justify-center text-xs shadow-xs shrink-0">
-                  🧾
-                </span>
-                <span>Ventas</span>
-                <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200">
-                  {currentShiftSales.length + currentShiftOrders.length}
-                </span>
-              </button>
-            </div>
-
             {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
             <div className="flex items-center gap-2 shrink-0">
 
