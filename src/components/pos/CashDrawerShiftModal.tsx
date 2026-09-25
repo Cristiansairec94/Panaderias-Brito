@@ -269,16 +269,12 @@ export default function CashDrawerShiftModal({
   const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) ? lastCutTimestamp : 0;
   const shiftStartBoundary = Math.max(validLastCut, getStoredShiftStartBoundary());
 
-  // 1. Cálculos de Ventas del Turno (filtradas por cajera y horario del turno actual)
+  // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta terminal)
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
-    if (s.cashier && outgoingCashier) {
-      const isMatch = matchesCashier(s.cashier, outgoingCashier);
-      if (!isMatch) return false;
-    }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
     if (shiftStartBoundary > 0) {
-      if (!sTime || sTime < shiftStartBoundary - 10000) return false;
+      if (!sTime || sTime < shiftStartBoundary - 60000) return false;
     }
     if (sTime > Date.now() + 60000) return false;
     return true;
@@ -288,14 +284,10 @@ export default function CashDrawerShiftModal({
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
   const shiftOrders = (orders || []).filter((o) => {
     if (!o) return false;
-    if (!shiftStartBoundary || shiftStartBoundary <= 0) return false;
-    if (o.cashier && outgoingCashier) {
-      const isMatch = matchesCashier(o.cashier, outgoingCashier);
-      const isGenericOrAdmin = /admin|dueño|toño|cajero en turno/i.test(o.cashier);
-      if (!isMatch && !isGenericOrAdmin) return false;
+    const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
+    if (shiftStartBoundary > 0) {
+      if (!oTime || oTime < shiftStartBoundary - 60000) return false;
     }
-    const oTime = parseDateTimeSafe(o.createdAt || (o as any).date);
-    if (!oTime || oTime < shiftStartBoundary - 10000) return false;
     if (oTime > Date.now() + 60000) return false;
     return true;
   });
@@ -316,7 +308,7 @@ export default function CashDrawerShiftModal({
     const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, outgoingCashier))) return false;
     const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
-    if (shiftStartBoundary > 0 && expTime && expTime < (shiftStartBoundary - 10000)) return false;
+    if (shiftStartBoundary > 0 && expTime && expTime < (shiftStartBoundary - 60000)) return false;
     return true;
   });
   const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -326,11 +318,11 @@ export default function CashDrawerShiftModal({
     const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier))) return false;
     const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
-    if (shiftStartBoundary > 0 && incTime && incTime < (shiftStartBoundary - 10000)) return false;
+    if (shiftStartBoundary > 0 && incTime && incTime < (shiftStartBoundary - 60000)) return false;
     return true;
   });
   const totalIncomesInCash = shiftIncomes
-    .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && typeof i.amount === "number" && i.amount > 0 && i.amount !== 902095.5)
+    .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && i.category !== "abono_pedido" && !(i as any).orderId && typeof i.amount === "number" && i.amount > 0 && i.amount !== 902095.5)
     .reduce((sum, i) => sum + i.amount, 0);
 
   // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
@@ -472,9 +464,6 @@ export default function CashDrawerShiftModal({
   };
 
   const handleClose = () => {
-    if (showCutSuccess && onCompleteShiftCut) {
-      onCompleteShiftCut();
-    }
     setHasAcceptedCash(false);
     onClose();
   };

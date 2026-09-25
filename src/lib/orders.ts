@@ -251,6 +251,10 @@ function normalizeOrder(order: any): CustomOrder {
     dedication: order.dedication || "",
     notes: order.notes || "",
     createdAt: order.createdAt || new Date().toISOString(),
+    timestamp: order.timestamp ? Number(order.timestamp) : parseDateTimeSafe(order.createdAt) || Date.now(),
+    operatingBranchId: order.operatingBranchId || order.branchId,
+    operatingBranchName: order.operatingBranchName || order.branchName,
+    shiftName: order.shiftName,
     cashier: order.cashier || "Don Toño Brito",
     payments: Array.isArray(order.payments) && order.payments.length > 0
       ? order.payments
@@ -462,7 +466,7 @@ export function recordOrderAsPosSale(params: {
     const cleanCurrentSales = currentSales.filter((s) => {
       if (!s) return false;
       const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
+      return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
     });
 
     const nextSales = [newSale, ...cleanCurrentSales];

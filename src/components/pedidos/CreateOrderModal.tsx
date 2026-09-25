@@ -427,8 +427,8 @@ export default function CreateOrderModal({
   }, [total, deposit]);
 
   const numericDeposit = deposit === "" ? 0 : Math.max(0, Number(deposit) || 0);
-  // El sistema exige como mínimo el 50% de adelanto o liquidar el 100% para apartar pedido
-  const isDepositValid = total > 0 && numericDeposit >= minRequiredDeposit && numericDeposit <= total;
+  // El sistema permite apartar cualquier pedido sin excepción de cantidad ni precio: desde 1 pieza o el producto de menor valor, con adelanto de $0, 50% o liquidado
+  const isDepositValid = total > 0 && numericDeposit >= 0 && numericDeposit <= total;
   const isDepositSufficient = isDepositValid;
   const remainingBalance = Math.max(0, total - numericDeposit);
 
@@ -909,13 +909,13 @@ export default function CreateOrderModal({
     }
 
     if (total <= 0) {
-      alert("Por favor agrega productos del catálogo o escribe el precio total acordado.");
+      alert("Por favor agrega productos del catálogo o escribe el precio total acordado (debe ser mayor a $0).");
       customTotalInputRef.current?.focus();
       return;
     }
 
-    if (!isDepositValid || numericDeposit < minRequiredDeposit) {
-      alert(`Para apartar el pedido se requiere como mínimo el 50% de adelanto (${formatCurrency(minRequiredDeposit)}) o liquidar el 100% (${formatCurrency(total)}).`);
+    if (numericDeposit < 0) {
+      alert("El anticipo no puede ser un número negativo.");
       return;
     }
 
@@ -968,7 +968,7 @@ export default function CreateOrderModal({
                   Apartar Pedido Especial
                 </h2>
                 <span className="text-[10px] bg-amber-500 text-stone-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
-                  50% Mínimo
+                  Sin Mínimos • Desde 1 Pieza
                 </span>
               </div>
               <p className="text-xs text-amber-200/80 flex items-center gap-1.5 mt-0.5">
@@ -1414,9 +1414,9 @@ export default function CreateOrderModal({
                   <input
                     ref={customTotalInputRef}
                     type="number"
-                    min="1"
+                    min="0.01"
                     step="any"
-                    placeholder="Ej. 650"
+                    placeholder="Ej. 10"
                     value={customTotal}
                     onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                     onChange={(e) => setCustomTotal(e.target.value === "" ? "" : Number(e.target.value))}
@@ -1857,26 +1857,44 @@ export default function CreateOrderModal({
               </div>
             </div>
 
-            {/* Botones Táctiles para el Cajero: 50% y 100% */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* Botones Táctiles para el Cajero: Sin Anticipo, 50% y 100% */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setDeposit("0")}
+                className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                  numericDeposit === 0 && total > 0
+                    ? "bg-gradient-to-r from-stone-800 to-stone-700 text-amber-300 border-amber-400 font-black shadow-lg ring-2 ring-amber-400/50 scale-[1.02]"
+                    : "bg-stone-850 hover:bg-stone-800 text-stone-200 border-stone-750 font-bold"
+                }`}
+                title="El cliente no deja anticipo y liquida al recoger"
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs sm:text-sm font-black">🪙 $0</span>
+                </div>
+                <span className="text-[10px] sm:text-xs font-black text-amber-200">
+                  Sin Anticipo
+                </span>
+                <span className="text-[9px] text-stone-400">Paga al recoger</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setDeposit(minRequiredDeposit.toString())}
                 className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === minRequiredDeposit && total > 0 && numericDeposit > 0
                     ? "bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 border-amber-300 font-black shadow-lg ring-2 ring-amber-400/50 scale-[1.02]"
-                    : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
+                    : "bg-stone-850 hover:bg-stone-800 text-stone-200 border-stone-750 font-bold"
                 }`}
+                title="Adelanto del 50% sugerido"
               >
                 <div className="flex items-center gap-1">
                   <span className="text-xs sm:text-sm font-black">💵 50%</span>
-                  <span className="text-[9px] bg-stone-950 text-amber-300 px-1.5 py-0.5 rounded font-black">
-                    Mínimo Requerido
-                  </span>
                 </div>
-                <span className="text-xs sm:text-sm font-black">
+                <span className="text-[10px] sm:text-xs font-black text-amber-100">
                   {formatCurrency(minRequiredDeposit)}
                 </span>
+                <span className="text-[9px] text-stone-400">Sugerido</span>
               </button>
 
               <button
@@ -1885,18 +1903,17 @@ export default function CreateOrderModal({
                 className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === total && total > 0
                     ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-300 font-black shadow-lg ring-2 ring-emerald-400/50 scale-[1.02]"
-                    : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
+                    : "bg-stone-850 hover:bg-stone-800 text-stone-200 border-stone-750 font-bold"
                 }`}
+                title="Liquidado 100% de inmediato"
               >
                 <div className="flex items-center gap-1">
                   <span className="text-xs sm:text-sm font-black">💳 100%</span>
-                  <span className="text-[9px] bg-stone-950 text-emerald-300 px-1.5 py-0.5 rounded font-black">
-                    Liquidado
-                  </span>
                 </div>
-                <span className="text-xs sm:text-sm font-black">
+                <span className="text-[10px] sm:text-xs font-black text-emerald-200">
                   {formatCurrency(total)}
                 </span>
+                <span className="text-[9px] text-emerald-300/80">Liquidado</span>
               </button>
             </div>
 
@@ -1904,10 +1921,10 @@ export default function CreateOrderModal({
             <div className="flex items-center justify-between gap-3 pt-1">
               <div>
                 <label className="text-xs font-bold text-stone-300 block">
-                  O escribe otra cantidad dejada:
+                  O escribe otra cantidad dejada ($):
                 </label>
                 <span className="text-[10px] text-amber-300/80 font-medium">
-                  Mínimo 50%: {formatCurrency(minRequiredDeposit)}
+                  Cualquier adelanto desde $0 hasta {formatCurrency(total)}
                 </span>
               </div>
               <div className="relative w-36">
@@ -1937,10 +1954,8 @@ export default function CreateOrderModal({
                     }
                   }}
                   className={`w-full pl-7 pr-3 py-1.5 bg-stone-950 border rounded-xl text-right text-sm font-black focus:outline-none transition-colors ${
-                    numericDeposit >= minRequiredDeposit && total > 0
+                    numericDeposit >= 0 && total > 0
                       ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/50"
-                      : numericDeposit > 0
-                      ? "border-rose-500 text-rose-300"
                       : "border-stone-700 text-white"
                   }`}
                 />
@@ -1952,14 +1967,9 @@ export default function CreateOrderModal({
               <div className="flex items-center justify-between text-xs pt-1 border-t border-stone-800">
                 <span className="font-bold flex items-center gap-1.5">
                   {numericDeposit === 0 ? (
-                    <span className="text-amber-400 flex items-center gap-1.5">
-                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                      Falta elegir adelanto: mínimo 50% ({formatCurrency(minRequiredDeposit)}) o 100%
-                    </span>
-                  ) : numericDeposit < minRequiredDeposit ? (
-                    <span className="text-rose-400 flex items-center gap-1.5">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                      Adelanto menor al 50%: mínimo {formatCurrency(minRequiredDeposit)}
+                    <span className="text-amber-300 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-amber-300 shrink-0" />
+                      Sin anticipo — Pago total ({formatCurrency(total)}) al entregar
                     </span>
                   ) : numericDeposit >= total ? (
                     <span className="text-emerald-400 flex items-center gap-1.5">
@@ -1969,7 +1979,7 @@ export default function CreateOrderModal({
                   ) : (
                     <span className="text-emerald-400 flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      Adelanto válido del {Math.round((numericDeposit / total) * 100)}% ({formatCurrency(numericDeposit)})
+                      Adelanto válido de {formatCurrency(numericDeposit)} ({Math.round((numericDeposit / total) * 100)}%)
                     </span>
                   )}
                 </span>
@@ -2437,15 +2447,13 @@ export default function CreateOrderModal({
                   ? "Escribe el nombre del cliente para apartar"
                   : total <= 0
                   ? "Indica el monto total del encargo"
-                  : numericDeposit === 0
-                  ? `Elige el adelanto (Mínimo 50% o 100%) para apartar`
-                  : numericDeposit < minRequiredDeposit
-                  ? `Adelanto insuficiente (Mínimo 50% — ${formatCurrency(minRequiredDeposit)})`
                   : isCustomerDecisionPending
                   ? `Elige si guardar o no al cliente antes de apartar`
+                  : numericDeposit === 0
+                  ? `GUARDAR Y APARTAR PEDIDO (Sin Anticipo — Saldo: ${formatCurrency(total)})`
                   : numericDeposit >= total
                   ? `GUARDAR Y APARTAR PEDIDO (100% Liquidado — ${formatCurrency(numericDeposit)})`
-                  : `GUARDAR Y APARTAR PEDIDO (${Math.round((numericDeposit / total) * 100)}% Adelanto — ${formatCurrency(numericDeposit)} Recibidos)`}
+                  : `GUARDAR Y APARTAR PEDIDO (Adelanto: ${formatCurrency(numericDeposit)} — Saldo: ${formatCurrency(remainingBalance)})`}
               </span>
             </button>
           </div>

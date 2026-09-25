@@ -657,7 +657,7 @@ export default function ExpensesModal({
       if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
       const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
       if (shiftStartBoundary > 0) {
-        if (!expTime || expTime < shiftStartBoundary) {
+        if (!expTime || expTime < shiftStartBoundary - 60000) {
           return false;
         }
       }
@@ -673,7 +673,7 @@ export default function ExpensesModal({
       if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
       const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
       if (shiftStartBoundary > 0) {
-        if (!incTime || incTime < shiftStartBoundary) {
+        if (!incTime || incTime < shiftStartBoundary - 60000) {
           return false;
         }
       }
@@ -682,10 +682,10 @@ export default function ExpensesModal({
     });
   }, [incomes, cashierName, shiftStartBoundary, shiftVersion]);
 
-  // Filtrar exclusivamente las ventas correspondientes a la cajera y turno en operación
+  // Filtrar exclusivamente las ventas correspondientes al turno en operación
   const shiftSales = useMemo(() => {
-    let source = Array.isArray(sales) ? sales : [];
-    if (!sales && typeof window !== "undefined") {
+    let source = Array.isArray(sales) && sales.length > 0 ? sales : [];
+    if (source.length === 0 && typeof window !== "undefined") {
       try {
         const raw = localStorage.getItem("brito_pos_current_sales");
         if (raw && raw !== "[]") {
@@ -701,26 +701,22 @@ export default function ExpensesModal({
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
     return source.filter((s) => {
       if (!s) return false;
-      if (s.cashier && cashierName) {
-        if (!matchesCashier(s.cashier, cashierName)) return false;
-      }
       const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
       if (boundary > 0) {
-        if (!sTime || sTime < boundary - 10000) return false;
+        if (!sTime || sTime < boundary - 60000) return false;
       }
       if (sTime > Date.now() + 60000) return false;
       return true;
     });
-  }, [sales, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [sales, shiftStartBoundary, shiftVersion]);
 
-  // Ventas exclusivas del turno actual de la cajera en operación (cuentas separadas estrictas sin fallback a ventas maestras)
+  // Ventas exclusivas del turno actual (todas las ventas emitidas en la terminal en este turno)
   const effectiveSales = shiftSales;
 
-  // Pedidos especiales del turno y cajera actual (únicamente los creados dentro del turno activo)
+  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos creados en el turno activo)
   const relevantOrders = useMemo(() => {
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
-    if (!boundary || boundary <= 0) return [];
-    const sourceOrders = Array.isArray(orders) ? orders : (internalOrders || []);
+    const sourceOrders = Array.isArray(orders) && orders.length > 0 ? orders : (internalOrders || []);
     return sourceOrders.filter((o) => {
       if (!o) return false;
       if (branchId) {
@@ -729,22 +725,18 @@ export default function ExpensesModal({
           return false;
         }
       }
-      const oTime = parseDateTimeSafe(o.createdAt || (o as any).date);
-      // Solo pedidos creados dentro de la ventana de tiempo del turno actual (con 10s de tolerancia)
-      if (!oTime || oTime < boundary - 10000) {
-        return false;
+      const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
+      if (boundary > 0) {
+        if (!oTime || oTime < boundary - 60000) {
+          return false;
+        }
       }
       if (oTime > Date.now() + 60000) {
         return false;
       }
-      if (o.cashier && cashierName) {
-        const isMatch = matchesCashier(o.cashier, cashierName);
-        const isGenericOrAdmin = /admin|dueño|toño|cajero en turno/i.test(o.cashier);
-        if (!isMatch && !isGenericOrAdmin) return false;
-      }
       return true;
     });
-  }, [orders, internalOrders, branchId, cashierName, shiftName, shiftStartBoundary, shiftVersion]);
+  }, [orders, internalOrders, branchId, shiftStartBoundary, shiftVersion]);
 
   const effectiveOrders = relevantOrders;
 
@@ -802,8 +794,10 @@ export default function ExpensesModal({
     return getStoredOrders();
   }, [ticketScopeFilter, effectiveOrders, operatorAllOrders]);
 
-  // Métricas superiores sincronizadas con el alcance activo
-  const activeSalesForKpi = salesPoolForTickets;
+  // Métricas superiores sincronizadas con el alcance activo (ventas de mostrador sin pedidos)
+  const activeSalesForKpi = useMemo(() => {
+    return salesPoolForTickets.filter((s) => !s.isCustomOrder);
+  }, [salesPoolForTickets]);
   const activeOrdersForKpi = ordersPool;
 
   const totalSalesSum = activeSalesForKpi.reduce((acc, s) => acc + s.total, 0);
@@ -856,9 +850,9 @@ export default function ExpensesModal({
 
   const averageTicket = totalRecordsCount > 0 ? totalCombinedRevenue / totalRecordsCount : 0;
 
-  // Listados específicos para los modales emergentes de detalle
+  // Listados específicos para los modales emergentes de detalle: ventas regulares en mostrador
   const cashSalesList = useMemo(() => {
-    return effectiveSales.filter((s) => s.paymentMethod === "efectivo");
+    return effectiveSales.filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder);
   }, [effectiveSales]);
 
   const cashSalesPieces = useMemo(() => {
@@ -869,13 +863,57 @@ export default function ExpensesModal({
 
   // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones)
   const cashOrdersList = useMemo(() => {
-    return effectiveOrders.filter((o) => {
+    const ordersMap = new Map<string, CustomOrder>();
+
+    // 1. Pedidos desde effectiveOrders con cobro en efectivo
+    effectiveOrders.forEach((o) => {
       const isCash = o.paymentMethod === "efectivo" || !o.paymentMethod ||
         (o.payments && o.payments.some((p) => p.paymentMethod === "efectivo"));
       const hasCashAmount = (Number(o.deposit) || 0) > 0 || (o.payments && o.payments.some((p) => p.paymentMethod === "efectivo" && p.amount > 0));
-      const notInSales = !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id);
-      return isCash && hasCashAmount && notInSales;
+      if (isCash && hasCashAmount) {
+        ordersMap.set(o.orderNumber || o.id, o);
+      }
     });
+
+    // 2. Pedidos especiales registrados en effectiveSales que sean en efectivo
+    effectiveSales.forEach((s) => {
+      if (s.isCustomOrder && s.paymentMethod === "efectivo") {
+        const orderKey = s.orderNumber || s.id;
+        if (!ordersMap.has(orderKey)) {
+          const synthOrder: CustomOrder = {
+            id: s.id,
+            orderNumber: s.orderNumber || s.id,
+            customerName: s.customerName || "Cliente Pedido",
+            phone: "N/A",
+            branchId: (s as any).branchId || "branch-matriz",
+            branchName: "Sucursal",
+            description: s.items && s.items.length > 0 ? s.items.map((i) => `${i.quantity}x ${i.product.name}`).join(", ") : "Pedido Especial",
+            items: (s.items || []).map((i) => ({
+              productId: i.product.id,
+              name: i.product.name,
+              quantity: i.quantity,
+              unitPrice: i.product.price,
+              subtotal: i.quantity * i.product.price,
+            })),
+            deliveryDate: s.date || "Hoy",
+            deliveryTime: "12:00",
+            deliveryType: "sucursal",
+            status: "listo",
+            total: s.total,
+            deposit: s.total,
+            remainingBalance: 0,
+            paymentStatus: "anticipo",
+            paymentMethod: "efectivo",
+            createdAt: s.createdAt || (s.timestamp ? new Date(s.timestamp).toISOString() : new Date().toISOString()),
+            timestamp: parseDateTimeSafe(s.timestamp || s.createdAt || s.date) || Date.now(),
+            cashier: s.cashier,
+          };
+          ordersMap.set(orderKey, synthOrder);
+        }
+      }
+    });
+
+    return Array.from(ordersMap.values());
   }, [effectiveOrders, effectiveSales]);
 
   const cashOrdersPieces = useMemo(() => {
@@ -936,6 +974,7 @@ export default function ExpensesModal({
     if (ticketTypeFilter === "pedidos") return [];
     return salesPoolForTickets
       .filter((sale) => {
+        if (ticketTypeFilter === "ventas" && sale.isCustomOrder) return false;
         if (ticketMethodFilter !== "all" && sale.paymentMethod !== ticketMethodFilter) return false;
         if (ticketSearch.trim()) {
           const q = ticketSearch.toLowerCase().trim();
@@ -1121,7 +1160,7 @@ export default function ExpensesModal({
 
   const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalIncomesInCash = shiftIncomes
-    .filter((i) => i.paymentMethod === "efectivo" || !i.paymentMethod)
+    .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && i.category !== "abono_pedido" && !(i as any).orderId)
     .reduce((sum, i) => sum + i.amount, 0);
 
   const netCashInDrawer = Math.max(0, currentFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);

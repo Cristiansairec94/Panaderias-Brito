@@ -333,7 +333,7 @@ export default function CajaPage() {
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -353,7 +353,7 @@ export default function CajaPage() {
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -373,7 +373,7 @@ export default function CajaPage() {
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -452,7 +452,7 @@ export default function CajaPage() {
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
             });
             const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);

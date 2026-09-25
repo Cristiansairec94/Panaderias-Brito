@@ -502,12 +502,9 @@ export default function POSPage() {
             const realSales = parsed.filter((s: any) => {
               if (!s) return false;
               const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (shiftStart > 0 && (!t || t < shiftStart - 10000)) return false;
+              if (shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
               return true;
             });
-            if (realSales.length !== parsed.length) {
-              localStorage.setItem("brito_pos_current_sales", JSON.stringify(realSales));
-            }
             setRecentSalesList((prev) => {
               if (prev.length === realSales.length && prev.every((s, i) => s.id === realSales[i]?.id)) {
                 return prev;
@@ -616,7 +613,7 @@ export default function POSPage() {
               (s: any) => {
                 if (!s) return false;
                 const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-                if (shiftStart > 0 && (!t || t < shiftStart - 10000)) return false;
+                if (shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
                 return true;
               }
             );
@@ -755,7 +752,7 @@ export default function POSPage() {
             const realSales = parsed.filter((s: any) => {
               if (!s) return false;
               const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (shiftStart > 0 && (!t || t < shiftStart - 10000)) return false;
+              if (shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
               return true;
             });
             setRecentSalesList((prev) => {
@@ -861,7 +858,7 @@ export default function POSPage() {
           const cleanSales = parsedSales.filter((s: any) => {
             if (!s) return false;
             const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-            return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
+            return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
           });
           setRecentSalesList(cleanSales);
         }
@@ -869,6 +866,11 @@ export default function POSPage() {
     } catch (e) {}
 
     setShiftVersion((v) => v + 1);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_orders_updated"));
+      window.dispatchEvent(new Event("brito_sales_updated"));
+      window.dispatchEvent(new Event("brito_incomes_updated"));
+    }
 
     // Si se apartó desde la charola del POS, limpiamos la charola
     if (specialOrderInitialItems.length > 0) {
@@ -1011,7 +1013,7 @@ export default function POSPage() {
             (s: any) => {
               if (!s) return false;
               const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (effectiveShiftStart > 0 && (!t || t < effectiveShiftStart - 10000)) return false;
+              if (effectiveShiftStart > 0 && (!t || t < effectiveShiftStart - 60000)) return false;
               return true;
             }
           );
@@ -1081,18 +1083,6 @@ export default function POSPage() {
 
 
   const handleCompleteShiftCut = () => {
-    setRecentSalesList([]);
-    setExpensesList([]);
-    setIncomesList([]);
-    try {
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
-      localStorage.setItem("brito_pos_shift_locked", "true");
-      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
-      window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-      window.dispatchEvent(new Event("brito_sales_updated"));
-    } catch (e) {}
     setShowCashDrawerModal(false);
     setIsShiftLocked(true);
     setShiftVersion((v) => v + 1);
@@ -1100,38 +1090,18 @@ export default function POSPage() {
 
   const handleCashierChange = (newCashier: string) => {
     setCashierName(newCashier);
-    setRecentSalesList([]);
-    setExpensesList([]);
-    setIncomesList([]);
-    setCart([]);
-    setCashGiven("");
     try {
       localStorage.setItem("brito_current_shift_cashier", newCashier);
-      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-      window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
     setShiftVersion((v) => v + 1);
   };
 
   const handleShiftChange = (newShift: string) => {
     setShiftName(newShift);
-    setRecentSalesList([]);
-    setExpensesList([]);
-    setIncomesList([]);
-    setCart([]);
-    setCashGiven("");
     try {
       localStorage.setItem("brito_current_shift_name", newShift);
-      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-      window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
     setShiftVersion((v) => v + 1);
   };
@@ -1622,7 +1592,7 @@ export default function POSPage() {
         if (!s) return false;
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 10000) return false;
+          if (!t || t < shiftStartBoundary - 60000) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1642,7 +1612,7 @@ export default function POSPage() {
         if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 10000) return false;
+          if (!t || t < shiftStartBoundary - 60000) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1662,7 +1632,7 @@ export default function POSPage() {
         if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(inc.timestamp || (inc as any).createdAt || inc.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 10000) return false;
+          if (!t || t < shiftStartBoundary - 60000) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1683,7 +1653,7 @@ export default function POSPage() {
         }
         const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 10000) return false;
+          if (!t || t < shiftStartBoundary - 60000) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1706,7 +1676,7 @@ export default function POSPage() {
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])
-    .filter((i) => i && i.paymentMethod === "efectivo")
+    .filter((i) => i && (i.paymentMethod === "efectivo" || !i.paymentMethod) && i.category !== "abono_pedido" && !(i as any).orderId)
     .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
   const netCashInDrawer = (Number(initialCashFund) || 0) + totalCashSales + totalExtraInCash - totalExpenses;
   const totalStockValue = (products || []).reduce((sum, p) => sum + ((Number(p?.stock) || 0) * (Number(p?.price) || 0)), 0);
@@ -1860,7 +1830,7 @@ export default function POSPage() {
     }
 
     // 5. Guardar en disco local la venta del turno sin perder ninguna venta
-    const currentShiftStart = getStoredShiftStartBoundary() || Date.now();
+    const currentShiftStart = getStoredShiftStartBoundary();
     let currentStoredSales: Sale[] = [];
     try {
       const raw = localStorage.getItem("brito_pos_current_sales");
@@ -1877,7 +1847,7 @@ export default function POSPage() {
     const cleanPrevSales = combinedPrev.filter((s) => {
       if (!s || s.id === newSaleRecord.id) return false;
       const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      return t > 0 && t >= currentShiftStart - 10000;
+      return currentShiftStart <= 0 || (t > 0 && t >= currentShiftStart - 60000);
     });
     const nextList = [newSaleRecord, ...cleanPrevSales];
     try {
@@ -2457,8 +2427,24 @@ export default function POSPage() {
 
             </div>
 
-            {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
+            {/* Grupo Pedidos, Caja y Turno: Pedidos Especiales + Movimientos de Caja + Cerrar Turno */}
             <div className="flex items-center gap-2 shrink-0">
+
+              {/* Botón Pedidos Especiales de la Sucursal */}
+              <button
+                type="button"
+                onClick={() => setShowOrdersDrawer(true)}
+                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-rose-300 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/90 text-rose-950 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
+                title="Ver y levantar pedidos especiales de clientes (pasteles, charolas, eventos)"
+              >
+                <span className="text-lg">🎂</span>
+                <span>Pedidos Especiales</span>
+                {branchPendingOrdersCount > 0 && (
+                  <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-xs">
+                    {branchPendingOrdersCount}
+                  </span>
+                )}
+              </button>
 
               {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
               <button
@@ -3554,6 +3540,22 @@ export default function POSPage() {
             </div>
           )}
 
+
+          {/* Botón para Apartar la charola como Pedido Especial (cualquier pan, incluso 1 sola pieza o el de menor valor) */}
+          {cart.length > 0 && (
+            <div className="pt-0.5">
+              <button
+                type="button"
+                onClick={() => handleOpenCreateOrder(true)}
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#881337] via-[#be123c] to-[#9a3412] hover:from-[#9f1239] hover:via-[#e11d48] hover:to-[#c2410c] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-rose-950/20 border-2 border-amber-300/80 hover:border-amber-200 cursor-pointer active:scale-98 transition-all group"
+                title="Apartar estos productos de la charola como Pedido Especial para otra fecha"
+              >
+                <Cake className="w-4 h-4 text-amber-200 group-hover:scale-110 transition-transform" />
+                <span className="truncate">🎂 Apartar como Pedido Especial ({totalPieces} {totalPieces === 1 ? "pz" : "pzs"})</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
+              </button>
+            </div>
+          )}
 
           {/* Botones de Acción */}
           <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">
