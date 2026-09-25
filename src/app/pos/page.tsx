@@ -1577,22 +1577,31 @@ export default function POSPage() {
 
   const currentShiftOrders = useMemo(() => {
     try {
-      if (!shiftStartBoundary || shiftStartBoundary <= 0) {
-        return [];
-      }
+      const isOwnerOrAdmin =
+        cashierName.toLowerCase().includes("don toño") ||
+        cashierName.toLowerCase().includes("admin") ||
+        user?.role === "admin";
+
       return getStoredOrders().filter((o) => {
         if (!o) return false;
-        if (activeBranch && o.branchId && o.branchId !== activeBranch.id) return false;
-        if (!o.cashier || !matchesCashier(o.cashier, cashierName)) return false;
+        if (activeBranch) {
+          const matchBranch = !o.branchId || o.branchId === activeBranch.id || (o as any).operatingBranchId === activeBranch.id;
+          if (!matchBranch) return false;
+        }
+        if (!isOwnerOrAdmin && o.cashier && cashierName && !matchesCashier(o.cashier, cashierName)) {
+          return false;
+        }
         const t = parseDateTimeSafe(o.createdAt || (o as any).date);
-        if (!t || t < shiftStartBoundary) return false;
+        if (shiftStartBoundary > 0) {
+          if (!t || t < (shiftStartBoundary - 10000)) return false;
+        }
         return true;
       });
     } catch (e) {
       console.error("Error filtering currentShiftOrders:", e);
       return [];
     }
-  }, [activeBranch?.id, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [activeBranch?.id, cashierName, user?.role, shiftStartBoundary, shiftVersion]);
 
   const totalCashSales = useMemo(() => {
     const posCash = (currentShiftSales || [])
@@ -2315,6 +2324,47 @@ export default function POSPage() {
 
             </div>
 
+            {/* Grupo Pedidos Especiales y Ventas del Turno */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Botón Pedidos Especiales con Contador en Vivo */}
+              <button
+                type="button"
+                onClick={() => setShowOrdersDrawer(true)}
+                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-rose-300 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/90 text-rose-950 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
+                title="Ver pedidos especiales, apartados y encargos de mostrador"
+              >
+                <span className="w-6 h-6 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-600 text-white font-black flex items-center justify-center text-xs shadow-xs shrink-0">
+                  🎂
+                </span>
+                <span>Pedidos</span>
+                {branchPendingOrdersCount > 0 ? (
+                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-rose-600 text-white text-[11px] font-black flex items-center justify-center shadow-xs animate-pulse">
+                    {branchPendingOrdersCount}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded-md">
+                    0
+                  </span>
+                )}
+              </button>
+
+              {/* Botón Ventas del Turno / Historial */}
+              <button
+                type="button"
+                onClick={() => setShowRecentSales(true)}
+                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-emerald-300 hover:border-emerald-400 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
+                title="Ver historial de ventas del turno y tickets emitidos"
+              >
+                <span className="w-6 h-6 rounded-xl bg-emerald-600 text-white font-black flex items-center justify-center text-xs shadow-xs shrink-0">
+                  🧾
+                </span>
+                <span>Ventas</span>
+                <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200">
+                  {currentShiftSales.length + currentShiftOrders.length}
+                </span>
+              </button>
+            </div>
+
             {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
             <div className="flex items-center gap-2 shrink-0">
 
@@ -2965,7 +3015,7 @@ export default function POSPage() {
                   Escanea el código de barras o toca cualquier pan del mostrador para agregarlo al cobro.
                 </p>
               </div>
-              <div className="pt-3 w-full max-w-xs mx-auto">
+              <div className="pt-3 w-full max-w-xs mx-auto space-y-2">
                 <button
                   type="button"
                   onClick={() => handleOpenCreateOrder(false)}
@@ -2978,6 +3028,26 @@ export default function POSPage() {
                   <span className="tracking-wide drop-shadow-sm font-black">Hacer Pedido Especial</span>
                   <Sparkles className="w-4 h-4 text-amber-300 animate-pulse shrink-0 drop-shadow" />
                 </button>
+
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowOrdersDrawer(true)}
+                    className="py-2.5 px-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-950 border border-rose-200 text-xs font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    title="Ver pedidos especiales registrados"
+                  >
+                    <span>🎂 Pedidos ({branchPendingOrdersCount})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowRecentSales(true)}
+                    className="py-2.5 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-200 text-xs font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    title="Ver ventas del turno"
+                  >
+                    <span>🧾 Ventas ({currentShiftSales.length + currentShiftOrders.length})</span>
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
