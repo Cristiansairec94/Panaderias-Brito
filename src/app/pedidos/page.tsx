@@ -27,7 +27,8 @@ import {
   Flame,
   ArrowUpRight,
   User,
-  Check
+  Check,
+  Eye
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -42,6 +43,7 @@ import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import EditOrderModal from "@/components/pedidos/EditOrderModal";
+import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 
 export default function PedidosPage() {
   const { branches, currentBranch } = useBranch();
@@ -63,6 +65,7 @@ export default function PedidosPage() {
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<CustomOrder | null>(null);
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<CustomOrder | null>(null);
 
   // Load orders
   const loadOrders = () => {
@@ -519,12 +522,8 @@ export default function PedidosPage() {
                   return (
                     <React.Fragment key={order.id}>
                       <tr
-                        className={`transition-all duration-150 group cursor-pointer ${
-                          isExpanded
-                            ? "bg-amber-100/70 border-l-4 border-l-amber-600 shadow-xs"
-                            : "hover:bg-amber-100/60 hover:shadow-xs"
-                        }`}
-                        onClick={() => setExpandedRowId(isExpanded ? null : order.id)}
+                        className="transition-all duration-150 group cursor-pointer hover:bg-amber-100/60 hover:shadow-xs"
+                        onClick={() => setSelectedOrderForDetail(order)}
                       >
                         {/* 1. Folio */}
                         <td className="py-4 px-4 font-mono">
@@ -726,19 +725,19 @@ export default function PedidosPage() {
                               <span>Eliminar</span>
                             </button>
 
-                            {/* 7. Desplegable detalles */}
+                            {/* 7. Pantalla de detalles del pedido */}
                             <button
                               type="button"
-                              onClick={() => setExpandedRowId(isExpanded ? null : order.id)}
-                              className="px-2.5 py-1.5 bg-stone-50 hover:bg-stone-200 active:scale-95 text-stone-600 hover:text-stone-900 border border-stone-200 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs"
-                              title={isExpanded ? "Ocultar desglose" : "Ver detalle completo del pedido"}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedOrderForDetail(order);
+                              }}
+                              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 hover:text-stone-950 border border-amber-300 hover:border-amber-400 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs group"
+                              title="Abrir pantalla con todos los detalles del pedido"
                             >
-                              <span>{isExpanded ? "Cerrar" : "Detalles"}</span>
-                              {isExpanded ? (
-                                <ChevronDown className="w-3.5 h-3.5 text-stone-500" />
-                              ) : (
-                                <ChevronRight className="w-3.5 h-3.5 text-stone-500" />
-                              )}
+                              <Eye className="w-3.5 h-3.5 text-amber-700" />
+                              <span>Detalles</span>
+                              <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
                             </button>
                           </div>
                         </td>
@@ -905,6 +904,30 @@ export default function PedidosPage() {
         order={selectedOrderForEdit}
         onOrderUpdated={() => {
           loadOrders();
+        }}
+      />
+
+      <OrderDetailModal
+        isOpen={!!selectedOrderForDetail}
+        onClose={() => setSelectedOrderForDetail(null)}
+        order={selectedOrderForDetail}
+        onPrintReceipt={(o) => {
+          setSelectedOrderForReceipt(o);
+        }}
+        onOpenPayment={(o) => {
+          setSelectedOrderForPayment(o);
+        }}
+        onOpenEdit={(o) => {
+          setSelectedOrderForEdit(o);
+        }}
+        onAdvanceStatus={(o) => {
+          handleAdvanceStatus(o);
+          loadOrders();
+          const updated = getStoredOrders().find((item) => item.id === o.id);
+          if (updated) setSelectedOrderForDetail(updated);
+        }}
+        onSendWhatsApp={(o) => {
+          handleSendWhatsApp(o);
         }}
       />
     </div>
