@@ -438,10 +438,12 @@ export default function ExpensesModal({
   // Modal emergente de información detallada para cada opción de balance
   const [activeDetailModal, setActiveDetailModal] = useState<"fondo" | "ventas" | "entradas" | "gastos" | "balance" | null>(null);
   const [cashDetailFilter, setCashDetailFilter] = useState<"all" | "ventas" | "pedidos">("all");
+  const [cashMethodFilter, setCashMethodFilter] = useState<"all" | "efectivo" | "tarjeta" | "transferencia">("all");
 
   const handleCloseDetailModal = () => {
     setActiveDetailModal(null);
     setCashDetailFilter("all");
+    setCashMethodFilter("all");
     setActiveTab("register");
   };
 
@@ -809,14 +811,32 @@ export default function ExpensesModal({
 
   const totalSalesSum = activeSalesForKpi.reduce((acc, s) => acc + s.total, 0);
   
-  // Ventas de mostrador puras en efectivo (excluyendo pedidos)
+  // Ventas de mostrador del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
+  const shiftPurePosTotal = useMemo(() => {
+    return effectiveSales
+      .filter((s) => !s.isCustomOrder)
+      .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  }, [effectiveSales]);
+
+  // Ventas de mostrador puras en efectivo (excluyendo pedidos) - Para el balance contable del cajón
   const shiftPurePosCash = useMemo(() => {
     return effectiveSales
       .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder)
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
   }, [effectiveSales]);
 
-  // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones)
+  // Pedidos especiales del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
+  const shiftOrdersTotal = useMemo(() => {
+    const fromSales = effectiveSales
+      .filter((s) => s.isCustomOrder)
+      .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+    const fromOrders = effectiveOrders
+      .filter((o) => !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
+      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+    return fromSales + fromOrders;
+  }, [effectiveSales, effectiveOrders]);
+
+  // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones) - Para el balance contable del cajón
   const shiftOrdersCash = useMemo(() => {
     const fromSales = effectiveSales
       .filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder)
@@ -869,34 +889,26 @@ export default function ExpensesModal({
 
   const averageTicket = totalRecordsCount > 0 ? totalCombinedRevenue / totalRecordsCount : 0;
 
-  // Listados específicos para los modales emergentes de detalle: ventas regulares en mostrador
-  const cashSalesList = useMemo(() => {
-    return effectiveSales.filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder);
+  // Listados específicos para los modales emergentes de detalle: ventas regulares en mostrador (todos los métodos)
+  const allShiftPureSales = useMemo(() => {
+    return effectiveSales.filter((s) => !s.isCustomOrder);
   }, [effectiveSales]);
 
-  const cashSalesPieces = useMemo(() => {
-    return cashSalesList.reduce((acc, s) => {
-      return acc + (s.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
-    }, 0);
-  }, [cashSalesList]);
-
-  // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones)
-  const cashOrdersList = useMemo(() => {
+  // Todos los pedidos especiales del turno activo (anticipos y liquidaciones de todos los métodos)
+  const allShiftOrdersList = useMemo(() => {
     const ordersMap = new Map<string, CustomOrder>();
 
-    // 1. Pedidos desde effectiveOrders con cobro en efectivo
+    // 1. Pedidos desde effectiveOrders
     effectiveOrders.forEach((o) => {
-      const isCash = o.paymentMethod === "efectivo" || !o.paymentMethod ||
-        (o.payments && o.payments.some((p) => p.paymentMethod === "efectivo"));
-      const hasCashAmount = (Number(o.deposit) || 0) > 0 || (o.payments && o.payments.some((p) => p.paymentMethod === "efectivo" && p.amount > 0));
-      if (isCash && hasCashAmount) {
+      const hasDeposit = (Number(o.deposit) || 0) > 0 || (Number(o.total) || 0) > 0;
+      if (hasDeposit) {
         ordersMap.set(o.orderNumber || o.id, o);
       }
     });
 
-    // 2. Pedidos especiales registrados en effectiveSales que sean en efectivo
+    // 2. Pedidos especiales registrados en effectiveSales
     effectiveSales.forEach((s) => {
-      if (s.isCustomOrder && s.paymentMethod === "efectivo") {
+      if (s.isCustomOrder) {
         const orderKey = s.orderNumber || s.id;
         if (!ordersMap.has(orderKey)) {
           const synthOrder: CustomOrder = {
@@ -922,7 +934,7 @@ export default function ExpensesModal({
             deposit: s.total,
             remainingBalance: 0,
             paymentStatus: "anticipo",
-            paymentMethod: "efectivo",
+            paymentMethod: (s.paymentMethod || "efectivo") as any,
             createdAt: s.createdAt || (s.timestamp ? new Date(s.timestamp).toISOString() : new Date().toISOString()),
             timestamp: parseDateTimeSafe(s.timestamp || s.createdAt || s.date) || Date.now(),
             cashier: s.cashier,
@@ -935,6 +947,21 @@ export default function ExpensesModal({
     return Array.from(ordersMap.values());
   }, [effectiveOrders, effectiveSales]);
 
+  // Listados específicos en efectivo para compatibilidad
+  const cashSalesList = useMemo(() => {
+    return allShiftPureSales.filter((s) => s.paymentMethod === "efectivo");
+  }, [allShiftPureSales]);
+
+  const cashSalesPieces = useMemo(() => {
+    return cashSalesList.reduce((acc, s) => {
+      return acc + (s.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+    }, 0);
+  }, [cashSalesList]);
+
+  const cashOrdersList = useMemo(() => {
+    return allShiftOrdersList.filter((o) => (o.paymentMethod || "efectivo") === "efectivo");
+  }, [allShiftOrdersList]);
+
   const cashOrdersPieces = useMemo(() => {
     return cashOrdersList.reduce((acc, o) => {
       return acc + (o.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
@@ -944,30 +971,43 @@ export default function ExpensesModal({
   const totalCashRecordsCount = cashSalesList.length + cashOrdersList.length;
   const totalCashPiecesCount = cashSalesPieces + cashOrdersPieces;
 
-  // Lista unificada cronológica de ventas y pedidos en efectivo
-  const unifiedCashMovements = useMemo(() => {
+  // Lista unificada cronológica de ventas y pedidos con clasificación por método de pago
+  const unifiedShiftMovements = useMemo(() => {
     const list: Array<{
       id: string;
       type: "venta" | "pedido";
       timestamp: number;
+      paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+      amount: number;
+      pieces: number;
       sale?: Sale;
       order?: CustomOrder;
     }> = [];
 
-    cashSalesList.forEach((s) => {
+    allShiftPureSales.forEach((s) => {
+      const method = ((s.paymentMethod || "efectivo") as "efectivo" | "tarjeta" | "transferencia");
+      const pieces = (s.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
       list.push({
         id: `sale-${s.id}`,
         type: "venta",
         timestamp: parseDateTimeSafe(s.timestamp || s.createdAt || s.date) || 0,
+        paymentMethod: method,
+        amount: Number(s.total) || 0,
+        pieces,
         sale: s,
       });
     });
 
-    cashOrdersList.forEach((o) => {
+    allShiftOrdersList.forEach((o) => {
+      const method = ((o.paymentMethod || "efectivo") as "efectivo" | "tarjeta" | "transferencia");
+      const pieces = (o.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
       list.push({
         id: `order-${o.id}`,
         type: "pedido",
         timestamp: parseDateTimeSafe(o.createdAt || (o as any).date || o.deliveryDate) || 0,
+        paymentMethod: method,
+        amount: Number(o.deposit) || Number(o.total) || 0,
+        pieces,
         order: o,
       });
     });
@@ -981,13 +1021,42 @@ export default function ExpensesModal({
         : { id: b.order!.orderNumber || b.order!.id, date: b.order!.createdAt || b.order!.deliveryDate, timestamp: b.order!.createdAt, createdAt: b.order!.createdAt };
       return compareMovementsDesc(itemA, itemB);
     });
-  }, [cashSalesList, cashOrdersList]);
+  }, [allShiftPureSales, allShiftOrdersList]);
 
+  // Alias para mantener compatibilidad
+  const unifiedCashMovements = unifiedShiftMovements;
+
+  // Filtrado por Tipo (Todos / Ventas en Caja / Pedidos Especiales)
+  const movementsMatchingType = useMemo(() => {
+    if (cashDetailFilter === "ventas") return unifiedShiftMovements.filter((m) => m.type === "venta");
+    if (cashDetailFilter === "pedidos") return unifiedShiftMovements.filter((m) => m.type === "pedido");
+    return unifiedShiftMovements;
+  }, [unifiedShiftMovements, cashDetailFilter]);
+
+  // Conteo de métodos para los botones de clasificación de pago (según el tipo seleccionado)
+  const detailMethodCounts = useMemo(() => {
+    return {
+      all: movementsMatchingType.length,
+      efectivo: movementsMatchingType.filter((m) => m.paymentMethod === "efectivo").length,
+      tarjeta: movementsMatchingType.filter((m) => m.paymentMethod === "tarjeta").length,
+      transferencia: movementsMatchingType.filter((m) => m.paymentMethod === "transferencia").length,
+    };
+  }, [movementsMatchingType]);
+
+  // Movimientos visibles aplicando ambos filtros: tipo y método de pago
   const visibleCashMovements = useMemo(() => {
-    if (cashDetailFilter === "ventas") return unifiedCashMovements.filter((m) => m.type === "venta");
-    if (cashDetailFilter === "pedidos") return unifiedCashMovements.filter((m) => m.type === "pedido");
-    return unifiedCashMovements;
-  }, [unifiedCashMovements, cashDetailFilter]);
+    if (cashMethodFilter === "all") return movementsMatchingType;
+    return movementsMatchingType.filter((m) => m.paymentMethod === cashMethodFilter);
+  }, [movementsMatchingType, cashMethodFilter]);
+
+  // Métricas dinámicas calculadas para el banner
+  const currentFilteredTotal = useMemo(() => {
+    return visibleCashMovements.reduce((sum, m) => sum + m.amount, 0);
+  }, [visibleCashMovements]);
+
+  const currentFilteredPieces = useMemo(() => {
+    return visibleCashMovements.reduce((sum, m) => sum + m.pieces, 0);
+  }, [visibleCashMovements]);
 
   const filteredTickets = useMemo(() => {
     if (ticketTypeFilter === "pedidos") return [];
@@ -1273,7 +1342,7 @@ export default function ExpensesModal({
             const raw = localStorage.getItem("brito_pos_current_expenses");
             const cur = raw ? JSON.parse(raw) : [];
             const filtered = Array.isArray(cur) ? cur.filter((e: any) => e.id !== newExpense.id) : [];
-            localStorage.setItem("brito_pos_current_expenses", JSON.stringify([newExpense, ...filtered]));
+            localStorage.setItem("brito_pos_current_expenses", JSON.stringify(deduplicateExpenses([newExpense, ...filtered])));
             window.dispatchEvent(new Event("brito_shift_cuts_updated"));
           } catch (e) {}
         }
@@ -1376,7 +1445,7 @@ export default function ExpensesModal({
             const raw = localStorage.getItem("brito_pos_current_incomes");
             const cur = raw ? JSON.parse(raw) : [];
             const filtered = Array.isArray(cur) ? cur.filter((i: any) => i.id !== newIncome.id) : [];
-            localStorage.setItem("brito_pos_current_incomes", JSON.stringify([newIncome, ...filtered]));
+            localStorage.setItem("brito_pos_current_incomes", JSON.stringify(deduplicateIncomes([newIncome, ...filtered])));
             window.dispatchEvent(new Event("brito_shift_cuts_updated"));
           } catch (e) {}
         }
@@ -1903,42 +1972,44 @@ export default function ExpensesModal({
             </span>
           </div>
 
-          {/* 2. Ventas Efectivo */}
+          {/* 2. Ventas */}
           <button
             type="button"
             onClick={() => {
               setActiveDetailModal("ventas");
               setCashDetailFilter("ventas");
+              setCashMethodFilter("all");
             }}
             className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-emerald-50/70 border-emerald-200/90 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs active:scale-98"
-            title="Abrir información detallada de Ventas en Mostrador en Efectivo"
+            title="Abrir información detallada de Ventas en Mostrador"
           >
             <span className="text-xs sm:text-sm uppercase font-black text-emerald-950 block leading-tight tracking-wide">
-              Ventas Efectivo
+              Ventas
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-emerald-700 block my-1 tracking-tight truncate">
-              +{formatCurrency(shiftPurePosCash)}
+              +{formatCurrency(shiftPurePosTotal)}
             </span>
             <span className="text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200 border border-emerald-200/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
               👁️ Ver historial
             </span>
           </button>
 
-          {/* 3. Pedidos Efectivo */}
+          {/* 3. Pedidos */}
           <button
             type="button"
             onClick={() => {
               setActiveDetailModal("ventas");
               setCashDetailFilter("pedidos");
+              setCashMethodFilter("all");
             }}
             className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-amber-50/80 border-amber-300 hover:bg-amber-100 hover:border-amber-400 shadow-2xs active:scale-98"
-            title="Abrir información detallada de Pedidos Especiales cobrados en Efectivo"
+            title="Abrir información detallada de Pedidos Especiales"
           >
             <span className="text-xs sm:text-sm uppercase font-black text-amber-950 block leading-tight tracking-wide">
-              Pedidos Efectivo
+              Pedidos
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-amber-800 block my-1 tracking-tight truncate">
-              +{formatCurrency(shiftOrdersCash)}
+              +{formatCurrency(shiftOrdersTotal)}
             </span>
             <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-200/90 group-hover:bg-amber-300 border border-amber-300/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
               👁️ Ver historial
@@ -2808,11 +2879,29 @@ export default function ExpensesModal({
                     <h3 className="font-black text-base sm:text-lg leading-tight">
                       {activeDetailModal === "fondo" && "Fondo Inicial de Caja"}
                       {activeDetailModal === "ventas" && (
-                        cashDetailFilter === "pedidos"
-                          ? "Historial de Pedidos Especiales en Efectivo"
-                          : cashDetailFilter === "ventas"
-                          ? "Historial de Ventas en Efectivo"
-                          : "Historial de Ventas y Pedidos en Efectivo"
+                        cashMethodFilter === "all"
+                          ? (cashDetailFilter === "pedidos"
+                              ? "Historial de Pedidos Especiales"
+                              : cashDetailFilter === "ventas"
+                              ? "Historial de Ventas en Caja"
+                              : "Historial de Ventas y Pedidos")
+                          : cashMethodFilter === "efectivo"
+                          ? (cashDetailFilter === "pedidos"
+                              ? "Historial de Pedidos Especiales en Efectivo"
+                              : cashDetailFilter === "ventas"
+                              ? "Historial de Ventas en Efectivo"
+                              : "Historial de Ventas y Pedidos en Efectivo")
+                          : cashMethodFilter === "tarjeta"
+                          ? (cashDetailFilter === "pedidos"
+                              ? "Historial de Pedidos Cobrados con Tarjeta"
+                              : cashDetailFilter === "ventas"
+                              ? "Historial de Ventas Cobradas con Tarjeta"
+                              : "Historial de Ventas y Pedidos con Tarjeta")
+                          : (cashDetailFilter === "pedidos"
+                              ? "Historial de Pedidos por Transferencia"
+                              : cashDetailFilter === "ventas"
+                              ? "Historial de Ventas por Transferencia"
+                              : "Historial de Ventas y Pedidos por Transferencia")
                       )}
                       {activeDetailModal === "entradas" && "Historial de Entradas / Cambio"}
                       {activeDetailModal === "gastos" && "Historial de Gastos y Salidas"}
@@ -2915,97 +3004,150 @@ export default function ExpensesModal({
                   </div>
                 )}
 
-                {/* 2. MODAL: VENTAS Y PEDIDOS EN EFECTIVO */}
+                {/* 2. MODAL: VENTAS Y PEDIDOS CON CLASIFICACIÓN DE PAGO */}
                 {activeDetailModal === "ventas" && (
                   <div className="space-y-4">
                     <div className={`p-5 sm:p-6 rounded-3xl shadow-lg border-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-white transition-all ${
-                      cashDetailFilter === "pedidos"
+                      cashMethodFilter === "tarjeta"
+                        ? "bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 border-blue-400"
+                        : cashMethodFilter === "transferencia"
+                        ? "bg-gradient-to-br from-purple-600 via-purple-700 to-purple-900 border-purple-400"
+                        : cashDetailFilter === "pedidos"
                         ? "bg-gradient-to-br from-amber-600 via-amber-700 to-amber-900 border-amber-400"
                         : "bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 border-emerald-400"
                     }`}>
                       <div>
                         <span className={`text-xs uppercase font-black tracking-widest block ${
-                          cashDetailFilter === "pedidos" ? "text-amber-200" : "text-emerald-200"
+                          cashMethodFilter === "tarjeta"
+                            ? "text-blue-200"
+                            : cashMethodFilter === "transferencia"
+                            ? "text-purple-200"
+                            : cashDetailFilter === "pedidos"
+                            ? "text-amber-200"
+                            : "text-emerald-200"
                         }`}>
-                          {cashDetailFilter === "pedidos"
-                            ? "🎂 Pedidos Especiales en Efectivo"
-                            : cashDetailFilter === "ventas"
-                            ? "🥖 Ventas de Mostrador en Efectivo"
-                            : "🥖 Ventas y Pedidos en Efectivo del Turno"}
+                          {cashMethodFilter === "tarjeta"
+                            ? (cashDetailFilter === "pedidos" ? "🎂 Pedidos Cobrados con Tarjeta" : cashDetailFilter === "ventas" ? "💳 Ventas Cobradas con Tarjeta" : "💳 Ventas y Pedidos con Tarjeta")
+                            : cashMethodFilter === "transferencia"
+                            ? (cashDetailFilter === "pedidos" ? "📱 Pedidos por Transferencia" : cashDetailFilter === "ventas" ? "📱 Ventas por Transferencia" : "📱 Ventas y Pedidos por Transferencia")
+                            : cashMethodFilter === "efectivo"
+                            ? (cashDetailFilter === "pedidos" ? "🎂 Pedidos Especiales en Efectivo" : cashDetailFilter === "ventas" ? "🥖 Ventas de Mostrador en Efectivo" : "🥖 Ventas y Pedidos en Efectivo")
+                            : (cashDetailFilter === "pedidos" ? "🎂 Pedidos Especiales (Todos los Métodos)" : cashDetailFilter === "ventas" ? "🥖 Ventas en Caja (Todos los Métodos)" : "🥖 Ventas y Pedidos del Turno (Todos los Métodos)")}
                         </span>
                         <h2 className="text-3xl sm:text-4xl font-black tracking-tight mt-1 text-white">
-                          +{formatCurrency(
-                            cashDetailFilter === "pedidos"
-                              ? shiftOrdersCash
-                              : cashDetailFilter === "ventas"
-                              ? shiftPurePosCash
-                              : totalShiftCashSales
-                          )}
+                          +{formatCurrency(currentFilteredTotal)}
                         </h2>
                         <p className={`text-xs font-medium mt-1 ${
-                          cashDetailFilter === "pedidos" ? "text-amber-100" : "text-emerald-100"
+                          cashMethodFilter === "tarjeta"
+                            ? "text-blue-100"
+                            : cashMethodFilter === "transferencia"
+                            ? "text-purple-100"
+                            : cashDetailFilter === "pedidos"
+                            ? "text-amber-100"
+                            : "text-emerald-100"
                         }`}>
                           {cashDetailFilter === "pedidos"
-                            ? `Anticipos y liquidaciones de pedidos cobrados en efectivo por ${cashierName}`
+                            ? `Anticipos y liquidaciones de pedidos ${cashMethodFilter === "all" ? "en todos los métodos" : `por ${cashMethodFilter}`} por ${cashierName}`
                             : cashDetailFilter === "ventas"
-                            ? `Tickets cobrados en mostrador por ${cashierName}`
-                            : `Cobrado en efectivo en mostrador y anticipos de pedidos por ${cashierName}`}
+                            ? `Tickets cobrados en mostrador ${cashMethodFilter === "all" ? "en todos los métodos" : `por ${cashMethodFilter}`} por ${cashierName}`
+                            : `Cobrado en mostrador y pedidos ${cashMethodFilter === "all" ? "en todos los métodos" : `por ${cashMethodFilter}`} por ${cashierName}`}
                         </p>
                       </div>
                       <div className="flex sm:flex-col gap-2 shrink-0 self-stretch sm:self-auto">
                         <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-white/20 text-center">
                           <span className={`text-[10px] font-bold block uppercase ${
-                            cashDetailFilter === "pedidos" ? "text-amber-200" : "text-emerald-200"
+                            cashMethodFilter === "tarjeta"
+                              ? "text-blue-200"
+                              : cashMethodFilter === "transferencia"
+                              ? "text-purple-200"
+                              : cashDetailFilter === "pedidos"
+                              ? "text-amber-200"
+                              : "text-emerald-200"
                           }`}>
                             {cashDetailFilter === "pedidos" ? "Pedidos" : cashDetailFilter === "ventas" ? "Tickets" : "Registros"}
                           </span>
                           <span className="text-base sm:text-lg font-black text-white">
-                            {cashDetailFilter === "pedidos" ? cashOrdersList.length : cashDetailFilter === "ventas" ? cashSalesList.length : totalCashRecordsCount}
+                            {visibleCashMovements.length}
                           </span>
                         </div>
                         <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-white/20 text-center">
                           <span className={`text-[10px] font-bold block uppercase ${
-                            cashDetailFilter === "pedidos" ? "text-amber-200" : "text-emerald-200"
+                            cashMethodFilter === "tarjeta"
+                              ? "text-blue-200"
+                              : cashMethodFilter === "transferencia"
+                              ? "text-purple-200"
+                              : cashDetailFilter === "pedidos"
+                              ? "text-amber-200"
+                              : "text-emerald-200"
                           }`}>
                             Piezas Pan
                           </span>
                           <span className="text-base sm:text-lg font-black text-white">
-                            {cashDetailFilter === "pedidos" ? cashOrdersPieces : cashDetailFilter === "ventas" ? cashSalesPieces : totalCashPiecesCount}
+                            {currentFilteredPieces}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Botones de Clasificación (Todos / Ventas en Caja / Pedidos Especiales) */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                      {[
-                        { id: "all", label: `Todos (${totalCashRecordsCount})` },
-                        { id: "ventas", label: `🥖 Ventas en Caja (${cashSalesList.length})` },
-                        { id: "pedidos", label: `🎂 Pedidos Especiales (${cashOrdersList.length})` },
-                      ].map((tab) => (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          onClick={() => setCashDetailFilter(tab.id as any)}
-                          className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all border cursor-pointer ${
-                            cashDetailFilter === tab.id
-                              ? "bg-emerald-800 text-white border-emerald-900 shadow-xs ring-2 ring-emerald-700/20"
-                              : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
-                          }`}
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
+                    {/* Botones de Clasificación: Tipo de Registro y Clasificación por Método de Pago */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 bg-stone-50/80 p-2.5 rounded-2xl border border-stone-200">
+                      {/* 1. Tipo de Registro */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs">
+                        {[
+                          { id: "all", label: `Todos (${unifiedShiftMovements.length})` },
+                          { id: "ventas", label: `🥖 Ventas en Caja (${allShiftPureSales.length})` },
+                          { id: "pedidos", label: `🎂 Pedidos Especiales (${allShiftOrdersList.length})` },
+                        ].map((tab) => (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setCashDetailFilter(tab.id as any)}
+                            className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all border cursor-pointer whitespace-nowrap ${
+                              cashDetailFilter === tab.id
+                                ? "bg-stone-900 text-white border-stone-950 shadow-xs ring-2 ring-stone-900/20"
+                                : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
+                            }`}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* 2. Clasificación por Método de Pago (Transferencia, Efectivo, Tarjeta) */}
+                      <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 text-xs">
+                        <span className="text-[10px] font-black uppercase text-stone-400 mr-0.5 shrink-0">
+                          Pago:
+                        </span>
+                        {[
+                          { id: "all", label: `Todos (${detailMethodCounts.all})`, activeClass: "bg-stone-900 text-white border-stone-900 ring-2 ring-stone-900/20" },
+                          { id: "efectivo", label: `💵 Efectivo (${detailMethodCounts.efectivo})`, activeClass: "bg-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-700/20" },
+                          { id: "tarjeta", label: `💳 Tarjeta (${detailMethodCounts.tarjeta})`, activeClass: "bg-blue-800 text-white border-blue-900 ring-2 ring-blue-700/20" },
+                          { id: "transferencia", label: `📱 Transf. (${detailMethodCounts.transferencia})`, activeClass: "bg-purple-800 text-white border-purple-900 ring-2 ring-purple-700/20" },
+                        ].map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setCashMethodFilter(m.id as any)}
+                            className={`px-2.5 py-1.5 rounded-xl font-black text-xs transition-all border cursor-pointer whitespace-nowrap shrink-0 ${
+                              cashMethodFilter === m.id
+                                ? `${m.activeClass} shadow-xs`
+                                : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
+                            }`}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between text-xs px-1 gap-2 flex-wrap">
                         <span className="font-black text-stone-700 uppercase tracking-wide">
                           {cashDetailFilter === "ventas"
-                            ? `Tickets de Mostrador en Efectivo (${cashSalesList.length})`
+                            ? `Tickets de Mostrador ${cashMethodFilter === "efectivo" ? "en Efectivo" : cashMethodFilter === "tarjeta" ? "con Tarjeta" : cashMethodFilter === "transferencia" ? "por Transferencia" : ""} (${visibleCashMovements.length})`.trim()
                             : cashDetailFilter === "pedidos"
-                            ? `Pedidos con Cobro en Efectivo (${cashOrdersList.length})`
-                            : `Historial de Ventas y Pedidos en Efectivo (${visibleCashMovements.length})`}
+                            ? `Pedidos Especiales ${cashMethodFilter === "efectivo" ? "en Efectivo" : cashMethodFilter === "tarjeta" ? "con Tarjeta" : cashMethodFilter === "transferencia" ? "por Transferencia" : ""} (${visibleCashMovements.length})`.trim()
+                            : `Historial de Ventas y Pedidos ${cashMethodFilter === "efectivo" ? "en Efectivo" : cashMethodFilter === "tarjeta" ? "con Tarjeta" : cashMethodFilter === "transferencia" ? "por Transferencia" : ""} (${visibleCashMovements.length})`.trim()}
                         </span>
                         <div className="flex items-center gap-2">
                           {cashDetailFilter === "pedidos" && onOpenCreateOrder && (
@@ -3030,19 +3172,27 @@ export default function ExpensesModal({
                       {visibleCashMovements.length === 0 ? (
                         <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-3xl p-8 text-center space-y-2">
                           <div className="text-4xl">
-                            {cashDetailFilter === "pedidos" ? "🎂" : "🥖"}
+                            {cashDetailFilter === "pedidos"
+                              ? "🎂"
+                              : cashMethodFilter === "tarjeta"
+                              ? "💳"
+                              : cashMethodFilter === "transferencia"
+                              ? "📱"
+                              : "🥖"}
                           </div>
                           <h4 className="font-black text-stone-800 text-sm sm:text-base">
-                            {cashDetailFilter === "pedidos"
-                              ? "No hay pedidos especiales cobrados en efectivo en este turno"
+                            {cashMethodFilter !== "all"
+                              ? `No hay ${cashDetailFilter === "pedidos" ? "pedidos" : cashDetailFilter === "ventas" ? "ventas" : "registros"} con ${cashMethodFilter === "efectivo" ? "efectivo" : cashMethodFilter === "tarjeta" ? "tarjeta" : "transferencia"} en este turno`
+                              : cashDetailFilter === "pedidos"
+                              ? "No hay pedidos especiales registrados en este turno"
                               : cashDetailFilter === "ventas"
-                              ? "No hay ventas en efectivo registradas aún"
-                              : "No hay ventas ni pedidos en efectivo registrados aún"}
+                              ? "No hay ventas registradas aún"
+                              : "No hay ventas ni pedidos registrados aún"}
                           </h4>
                           <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                            {cashDetailFilter === "pedidos"
-                              ? "Los apartados o anticipos de pedidos especiales cobrados en efectivo aparecerán aquí con su folio y monto."
-                              : "Al comenzar un nuevo turno, el contador inicia en $0.00. Conforme realices cobros en efectivo se listarán automáticamente aquí."}
+                            {cashMethodFilter !== "all"
+                              ? `Conforme cobres movimientos con ${cashMethodFilter} en el punto de venta aparecerán listados automáticamente aquí.`
+                              : "Al comenzar un nuevo turno, el contador inicia en $0.00. Conforme realices cobros se listarán automáticamente aquí."}
                           </p>
                         </div>
                       ) : (
@@ -3064,6 +3214,19 @@ export default function ExpensesModal({
                                       </span>
                                       <span className="font-mono font-black text-xs bg-stone-900 text-amber-300 px-2 py-0.5 rounded-lg">
                                         #{sale.id.slice(-6).toUpperCase()}
+                                      </span>
+                                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                                        sale.paymentMethod === "efectivo"
+                                          ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                          : sale.paymentMethod === "tarjeta"
+                                          ? "bg-blue-100 text-blue-900 border-blue-300"
+                                          : "bg-purple-100 text-purple-900 border-purple-300"
+                                      }`}>
+                                        {sale.paymentMethod === "efectivo"
+                                          ? "💵 Efectivo"
+                                          : sale.paymentMethod === "tarjeta"
+                                          ? "💳 Tarjeta"
+                                          : "📱 Transferencia"}
                                       </span>
                                       <span className="text-xs text-stone-500 font-bold">
                                         🕒 {sale.date}
@@ -3116,6 +3279,19 @@ export default function ExpensesModal({
                                       </span>
                                       <span className="font-mono font-black text-xs bg-stone-900 text-amber-300 px-2 py-0.5 rounded-lg">
                                         #{order.orderNumber}
+                                      </span>
+                                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                                        (order.paymentMethod === "efectivo" || !order.paymentMethod)
+                                          ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                          : order.paymentMethod === "tarjeta"
+                                          ? "bg-blue-100 text-blue-900 border-blue-300"
+                                          : "bg-purple-100 text-purple-900 border-purple-300"
+                                      }`}>
+                                        {(order.paymentMethod === "efectivo" || !order.paymentMethod)
+                                          ? "💵 Efectivo"
+                                          : order.paymentMethod === "tarjeta"
+                                          ? "💳 Tarjeta"
+                                          : "📱 Transferencia"}
                                       </span>
                                       <span className="text-xs text-stone-500 font-bold">
                                         🕒 {formatDateTimeSafe(order.createdAt || order.deliveryDate)}

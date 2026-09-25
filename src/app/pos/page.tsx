@@ -50,7 +50,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
 import { 
@@ -522,14 +522,17 @@ export default function POSPage() {
           const parsedExp = JSON.parse(rawExpenses);
           if (Array.isArray(parsedExp)) {
             const shiftStart = getStoredShiftStartBoundary();
-            const seenExpIds = new Set<string>();
-            setExpensesList(parsedExp.filter((e: any) => {
-              if (!e || !e.id) return false;
-              if (seenExpIds.has(e.id)) return false;
-              seenExpIds.add(e.id);
+            const filtered = parsedExp.filter((e: any) => {
               const t = parseDateTimeSafe(e?.timestamp || e?.createdAt || e?.date);
               return shiftStart <= 0 || (t && t >= shiftStart);
-            }));
+            });
+            const deduped = deduplicateExpenses(filtered);
+            setExpensesList(deduped);
+            if (deduped.length !== parsedExp.length) {
+              try {
+                localStorage.setItem("brito_pos_current_expenses", JSON.stringify(deduped));
+              } catch (e) {}
+            }
           } else {
             setExpensesList([]);
           }
@@ -542,11 +545,17 @@ export default function POSPage() {
           const parsedInc = JSON.parse(rawIncomes);
           if (Array.isArray(parsedInc)) {
             const shiftStart = getStoredShiftStartBoundary();
-            const cleaned = cleanDuplicateIncomes(parsedInc);
-            setIncomesList(cleaned.filter((i: any) => {
+            const filtered = parsedInc.filter((i: any) => {
               const t = parseDateTimeSafe(i?.timestamp || i?.date || i?.createdAt);
               return shiftStart <= 0 || (t && t >= shiftStart);
-            }));
+            });
+            const deduped = deduplicateIncomes(filtered);
+            setIncomesList(deduped);
+            if (deduped.length !== parsedInc.length) {
+              try {
+                localStorage.setItem("brito_pos_current_incomes", JSON.stringify(deduped));
+              } catch (e) {}
+            }
           } else {
             setIncomesList([]);
           }
@@ -637,7 +646,13 @@ export default function POSPage() {
         const saved = localStorage.getItem("brito_pos_current_expenses");
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          if (Array.isArray(parsed)) {
+            const deduped = deduplicateExpenses(parsed);
+            if (deduped.length !== parsed.length) {
+              localStorage.setItem("brito_pos_current_expenses", JSON.stringify(deduped));
+            }
+            return deduped;
+          }
         }
       } catch (e) {}
     }
@@ -669,8 +684,12 @@ export default function POSPage() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            const cleaned = cleanDuplicateIncomes(parsed);
-            return cleaned.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5);
+            const valid = parsed.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5);
+            const deduped = deduplicateIncomes(valid);
+            if (deduped.length !== parsed.length) {
+              localStorage.setItem("brito_pos_current_incomes", JSON.stringify(deduped));
+            }
+            return deduped;
           }
         }
       } catch (e) {}
@@ -1591,11 +1610,8 @@ export default function POSPage() {
   const currentShiftExpenses = useMemo(() => {
     try {
       if (!expensesList || expensesList.length === 0) return [];
-      const seen = new Set<string>();
-      return expensesList.filter((e) => {
-        if (!e || !e.id) return false;
-        if (seen.has(e.id)) return false;
-        seen.add(e.id);
+      const filtered = expensesList.filter((e) => {
+        if (!e) return false;
         const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
         if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
@@ -1605,6 +1621,7 @@ export default function POSPage() {
         if (t > Date.now() + 60000) return false;
         return true;
       });
+      return deduplicateExpenses(filtered);
     } catch (e) {
       console.error("Error filtering currentShiftExpenses:", e);
       return [];
@@ -1614,8 +1631,7 @@ export default function POSPage() {
   const currentShiftIncomes = useMemo(() => {
     try {
       if (!incomesList || incomesList.length === 0) return [];
-      const cleaned = cleanDuplicateIncomes(incomesList);
-      return cleaned.filter((inc) => {
+      const filtered = incomesList.filter((inc) => {
         if (!inc) return false;
         const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
         if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
@@ -1626,6 +1642,7 @@ export default function POSPage() {
         if (t > Date.now() + 60000) return false;
         return true;
       });
+      return deduplicateIncomes(filtered);
     } catch (e) {
       console.error("Error filtering currentShiftIncomes:", e);
       return [];
@@ -1680,32 +1697,35 @@ export default function POSPage() {
 
   const handleAddExpense = (newExpense: CashExpense) => {
     setExpensesList((prev) => {
-      if (prev.some((e) => e.id === newExpense.id)) return prev;
-      const filtered = prev.filter((e) => e.id !== newExpense.id);
-      const updated = [newExpense, ...filtered];
-      try {
-        localStorage.setItem("brito_pos_current_expenses", JSON.stringify(updated));
-        window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-      } catch (e) {}
-      return updated;
+      const cleanPrev = prev.filter((e) => e.id !== newExpense.id);
+      return deduplicateExpenses([newExpense, ...cleanPrev]);
     });
+    try {
+      const raw = localStorage.getItem("brito_pos_current_expenses");
+      const cur = raw ? JSON.parse(raw) : [];
+      const cleanCur = Array.isArray(cur) ? cur.filter((e: any) => e.id !== newExpense.id) : [];
+      const updated = deduplicateExpenses([newExpense, ...cleanCur]);
+      localStorage.setItem("brito_pos_current_expenses", JSON.stringify(updated));
+    } catch (e) {}
   };
 
   const handleAddIncome = (newIncome: CashIncome) => {
     setIncomesList((prev) => {
-      if (prev.some((i) => i.id === newIncome.id)) return prev;
-      const filtered = prev.filter((i) => i.id !== newIncome.id);
-      const updated = cleanDuplicateIncomes([newIncome, ...filtered]);
-      try {
-        localStorage.setItem("brito_pos_current_incomes", JSON.stringify(updated));
-        const allRaw = localStorage.getItem("brito_cash_incomes");
-        const allIncomes: CashIncome[] = allRaw ? JSON.parse(allRaw) : [];
-        const dedupAll = cleanDuplicateIncomes([newIncome, ...allIncomes.filter((i) => i.id !== newIncome.id)]);
-        localStorage.setItem("brito_cash_incomes", JSON.stringify(dedupAll));
-        window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-      } catch (e) {}
-      return updated;
+      const cleanPrev = prev.filter((i) => i.id !== newIncome.id);
+      return deduplicateIncomes([newIncome, ...cleanPrev]);
     });
+    try {
+      const raw = localStorage.getItem("brito_pos_current_incomes");
+      const cur = raw ? JSON.parse(raw) : [];
+      const cleanCur = Array.isArray(cur) ? cur.filter((i: any) => i.id !== newIncome.id) : [];
+      const updated = deduplicateIncomes([newIncome, ...cleanCur]);
+      localStorage.setItem("brito_pos_current_incomes", JSON.stringify(updated));
+
+      const allRaw = localStorage.getItem("brito_cash_incomes");
+      const allIncomes = allRaw ? JSON.parse(allRaw) : [];
+      const cleanAll = Array.isArray(allIncomes) ? allIncomes.filter((i: any) => i.id !== newIncome.id) : [];
+      localStorage.setItem("brito_cash_incomes", JSON.stringify(deduplicateIncomes([newIncome, ...cleanAll])));
+    } catch (e) {}
   };
 
   const handleDeleteIncome = (id: string) => {
