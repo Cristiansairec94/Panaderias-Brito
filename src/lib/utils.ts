@@ -318,8 +318,16 @@ export function getStoredShiftStartBoundary(): number {
     const rawCuts = localStorage.getItem("brito_shift_cuts_history");
     if (rawCuts) {
       const parsed = JSON.parse(rawCuts);
-      if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0].timestamp === "number") {
-        startTs = Math.max(startTs, parsed[0].timestamp);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        for (const cut of parsed) {
+          const cutTs =
+            typeof cut.timestamp === "number"
+              ? cut.timestamp
+              : parseDateTimeSafe(cut.timestamp || cut.date || cut.createdAt);
+          if (cutTs > startTs) {
+            startTs = cutTs;
+          }
+        }
       }
     }
     if (startTs === 0) {

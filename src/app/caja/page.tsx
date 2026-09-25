@@ -331,12 +331,12 @@ export default function CajaPage() {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
             const sum = list.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            if (sum > 0) return sum;
+            return sum;
           }
         }
       } catch {}
     }
-    return 4150;
+    return 0;
   });
   const [cardSales, setCardSales] = useState<number>(() => {
     if (typeof window !== "undefined") {
@@ -346,12 +346,12 @@ export default function CajaPage() {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
             const sum = list.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            if (sum > 0) return sum;
+            return sum;
           }
         }
       } catch {}
     }
-    return 700;
+    return 0;
   });
   const [transferSales, setTransferSales] = useState<number>(() => {
     if (typeof window !== "undefined") {
@@ -361,12 +361,12 @@ export default function CajaPage() {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
             const sum = list.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            if (sum > 0) return sum;
+            return sum;
           }
         }
       } catch {}
     }
-    return 350;
+    return 0;
   });
 
   // Live Movement Modal
@@ -437,12 +437,24 @@ export default function CajaPage() {
             const cSum = list.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             const kSum = list.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             const tSum = list.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            if (cSum > 0) setCashSales(cSum);
-            if (kSum > 0) setCardSales(kSum);
-            if (tSum > 0) setTransferSales(tSum);
+            setCashSales(cSum);
+            setCardSales(kSum);
+            setTransferSales(tSum);
+          } else {
+            setCashSales(0);
+            setCardSales(0);
+            setTransferSales(0);
           }
+        } else {
+          setCashSales(0);
+          setCardSales(0);
+          setTransferSales(0);
         }
-      } catch {}
+      } catch {
+        setCashSales(0);
+        setCardSales(0);
+        setTransferSales(0);
+      }
     };
     window.addEventListener("brito_shift_cuts_updated", handleSync);
     window.addEventListener("storage", handleSync);
@@ -779,12 +791,16 @@ export default function CajaPage() {
       const updated = [newCut, ...existing];
       localStorage.setItem("brito_shift_cuts_history", JSON.stringify(updated));
       localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
-      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      localStorage.setItem("brito_current_shift_start_timestamp", newCut.timestamp ? newCut.timestamp.toString() : Date.now().toString());
       localStorage.setItem("brito_current_shift_cashier", recipient);
-      localStorage.removeItem("brito_pos_current_sales");
-      localStorage.removeItem("brito_pos_current_expenses");
-      localStorage.removeItem("brito_pos_current_incomes");
+      localStorage.setItem("brito_pos_current_sales", "[]");
+      localStorage.setItem("brito_pos_current_expenses", "[]");
+      localStorage.setItem("brito_pos_current_incomes", "[]");
       setCutsHistory(updated);
+      setCashSales(0);
+      setCardSales(0);
+      setTransferSales(0);
+      setInitialCash(parsedNextFund);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (err) {

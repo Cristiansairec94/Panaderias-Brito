@@ -623,7 +623,7 @@ export default function ExpensesModal({
       if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
       const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
       if (shiftStartBoundary > 0) {
-        if (!expTime || expTime < (shiftStartBoundary - 10000)) {
+        if (!expTime || expTime < shiftStartBoundary) {
           return false;
         }
       }
@@ -638,7 +638,7 @@ export default function ExpensesModal({
       if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
       const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
       if (shiftStartBoundary > 0) {
-        if (!incTime || incTime < (shiftStartBoundary - 10000)) {
+        if (!incTime || incTime < shiftStartBoundary) {
           return false;
         }
       }
@@ -875,22 +875,6 @@ export default function ExpensesModal({
     if (cashDetailFilter === "pedidos") return unifiedCashMovements.filter((m) => m.type === "pedido");
     return unifiedCashMovements;
   }, [unifiedCashMovements, cashDetailFilter]);
-
-  const ownerExpensesList = useMemo(() => {
-    return shiftExpenses.filter((e) => e.isOwner || e.category === "retiro_dueno");
-  }, [shiftExpenses]);
-
-  const totalOwnerWithdrawals = useMemo(() => {
-    return ownerExpensesList.reduce((sum, e) => sum + e.amount, 0);
-  }, [ownerExpensesList]);
-
-  const operationalExpensesList = useMemo(() => {
-    return shiftExpenses.filter((e) => !e.isOwner && e.category !== "retiro_dueno");
-  }, [shiftExpenses]);
-
-  const totalOperationalExpenses = useMemo(() => {
-    return operationalExpensesList.reduce((sum, e) => sum + e.amount, 0);
-  }, [operationalExpensesList]);
 
   const filteredTickets = useMemo(() => {
     if (ticketTypeFilter === "pedidos") return [];
@@ -1849,7 +1833,7 @@ export default function ExpensesModal({
             title="Abrir información detallada de Gastos y Retiros"
           >
             <span className="text-xs sm:text-xs md:text-sm uppercase font-black text-rose-950 block leading-tight tracking-wide">
-              Gastos / Retiros
+              Salidas de Dinero
             </span>
             <span className="text-base sm:text-lg md:text-xl font-black text-rose-700 block my-1 tracking-tight truncate">
               -{formatCurrency(totalExpenses)}
@@ -3090,13 +3074,13 @@ export default function ExpensesModal({
                   </div>
                 )}
 
-                {/* 4. MODAL: GASTOS / RETIROS */}
+                {/* 4. MODAL: SALIDAS DE DINERO */}
                 {activeDetailModal === "gastos" && (
                   <div className="space-y-4">
                     <div className="bg-gradient-to-br from-rose-600 via-rose-700 to-red-800 text-white p-5 sm:p-6 rounded-3xl shadow-lg border-2 border-rose-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div>
                         <span className="text-xs uppercase font-black tracking-widest text-rose-200 block">
-                          💸 Gastos y Salidas de Efectivo
+                          💸 Salidas de Dinero
                         </span>
                         <h2 className="text-3xl sm:text-4xl font-black tracking-tight mt-1 text-white">
                           -{formatCurrency(totalExpenses)}
@@ -3105,15 +3089,16 @@ export default function ExpensesModal({
                           Dinero retirado directamente del cajón durante este turno
                         </p>
                       </div>
-                      <div className="flex sm:flex-col gap-2 shrink-0 self-stretch sm:self-auto">
-                        <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-1.5 rounded-2xl border border-white/20 text-center">
-                          <span className="text-[10px] text-rose-200 font-bold block uppercase">👑 Retiros Dueño</span>
-                          <span className="text-xs sm:text-sm font-black text-white">-{formatCurrency(totalOwnerWithdrawals)}</span>
-                        </div>
-                        <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-1.5 rounded-2xl border border-white/20 text-center">
-                          <span className="text-[10px] text-rose-200 font-bold block uppercase">📦 Gastos Operación</span>
-                          <span className="text-xs sm:text-sm font-black text-white">-{formatCurrency(totalOperationalExpenses)}</span>
-                        </div>
+                      <div className="bg-white/15 backdrop-blur-xs px-4 py-2.5 rounded-2xl border border-white/20 text-center self-stretch sm:self-auto shrink-0 flex flex-col justify-center">
+                        <span className="text-[10px] text-rose-200 font-bold block uppercase tracking-wide">
+                          Salidas de Dinero
+                        </span>
+                        <span className="text-base sm:text-lg font-black text-white">
+                          -{formatCurrency(totalExpenses)}
+                        </span>
+                        <span className="text-[10px] text-rose-200 font-medium block mt-0.5">
+                          {shiftExpenses.length} {shiftExpenses.length === 1 ? "registro" : "registros"}
+                        </span>
                       </div>
                     </div>
 
@@ -3134,7 +3119,7 @@ export default function ExpensesModal({
                             No se han registrado salidas de dinero en este turno
                           </h4>
                           <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                            Cada gasto operativo o retiro de dueño por Don Toño se reflejará aquí con su comprobante y motivo detallado.
+                            Cada salida de dinero registrada se reflejará aquí con su comprobante y motivo detallado.
                           </p>
                         </div>
                       ) : (
@@ -3146,14 +3131,8 @@ export default function ExpensesModal({
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span
-                                    className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                                      exp.isOwner || exp.category === "retiro_dueno"
-                                        ? "bg-amber-100 text-amber-950 border-amber-300"
-                                        : "bg-rose-100 text-rose-950 border-rose-300"
-                                    }`}
-                                  >
-                                    {exp.isOwner || exp.category === "retiro_dueno" ? "👑 Retiro Dueño" : "Salida Caja"}
+                                  <span className="text-[10px] bg-rose-100 text-rose-950 border border-rose-300 font-black px-2 py-0.5 rounded-md">
+                                    💸 Salida de Dinero
                                   </span>
                                   <span className="text-xs text-stone-500 font-bold">
                                     🕒 {exp.date || formatDateTimeSafe(new Date(exp.timestamp || Date.now()))}
@@ -3228,7 +3207,7 @@ export default function ExpensesModal({
 
                         <div className="flex items-center justify-between p-2.5 bg-rose-50/70 border border-rose-200 rounded-xl">
                           <span className="text-rose-950 flex items-center gap-1.5">
-                            <span>💸</span> (-) Gastos Operativos y Retiros
+                            <span>💸</span> (-) Salidas de Dinero
                           </span>
                           <span className="font-black text-rose-700">-{formatCurrency(totalExpenses)}</span>
                         </div>

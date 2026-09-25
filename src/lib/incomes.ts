@@ -316,12 +316,14 @@ export function recordCashIncome(income: {
   const updated = cleanDuplicateIncomes([newIncome, ...current]);
   saveStoredIncomes(updated);
 
-  // Sincronizar también con los ingresos del turno activo de la terminal POS si aplica
+  // Sincronizar también con las entradas del turno activo de la terminal POS si aplica (excluyendo ventas y pedidos que tienen sus propios registros)
   try {
-    const shiftIncomesRaw = localStorage.getItem("brito_pos_current_incomes");
-    const shiftIncomes: CashIncome[] = shiftIncomesRaw ? JSON.parse(shiftIncomesRaw) : [];
-    if (!shiftIncomes.some((si) => si.id === newIncome.id)) {
-      localStorage.setItem("brito_pos_current_incomes", JSON.stringify([newIncome, ...shiftIncomes]));
+    if (newIncome.category !== "venta_mostrador" && newIncome.category !== "pedido_especial") {
+      const shiftIncomesRaw = localStorage.getItem("brito_pos_current_incomes");
+      const shiftIncomes: CashIncome[] = shiftIncomesRaw ? JSON.parse(shiftIncomesRaw) : [];
+      if (!shiftIncomes.some((si) => si.id === newIncome.id)) {
+        localStorage.setItem("brito_pos_current_incomes", JSON.stringify([newIncome, ...shiftIncomes]));
+      }
     }
   } catch (e) {}
 

@@ -426,16 +426,21 @@ export default function CashDrawerShiftModal({
       setCutsHistory(updatedHistory);
 
       // Reiniciar inicio de turno y cajero entrante para que ventas/gastos inicien estrictamente en 0
-      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      const cutTs = cutRecord.timestamp || Date.now();
+      localStorage.setItem("brito_current_shift_start_timestamp", cutTs.toString());
       localStorage.setItem("brito_current_shift_cashier", incomingCashier);
       localStorage.setItem("brito_current_shift_name", nextShiftName);
       localStorage.setItem("brito_pos_shift_locked", "true");
       localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
-      localStorage.removeItem("brito_pos_current_sales");
-      localStorage.removeItem("brito_pos_current_expenses");
-      localStorage.removeItem("brito_pos_current_incomes");
+      localStorage.setItem("brito_pos_current_sales", "[]");
+      localStorage.setItem("brito_pos_current_expenses", "[]");
+      localStorage.setItem("brito_pos_current_incomes", "[]");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
+
+      if (onCompleteShiftCut) {
+        onCompleteShiftCut();
+      }
     } catch (e) {
       console.error("Error guardando corte en historial:", e);
     }
