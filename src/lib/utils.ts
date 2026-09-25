@@ -332,7 +332,9 @@ export function getStoredShiftStartBoundary(): number {
     }
     if (startTs === 0) {
       startTs = Date.now();
-      localStorage.setItem("brito_current_shift_start_timestamp", startTs.toString());
+      try {
+        localStorage.setItem("brito_current_shift_start_timestamp", startTs.toString());
+      } catch (e) {}
     }
     return startTs;
   } catch (e) {}

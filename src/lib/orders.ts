@@ -1,5 +1,5 @@
 import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types";
-import { formatDateTimeSafe } from "@/lib/utils";
+import { formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
 export const STORAGE_ORDERS_KEY = "brito_custom_orders";
@@ -451,7 +451,14 @@ export function recordOrderAsPosSale(params: {
     (newSale as any).branchId = params.operatingBranchId || params.branchId;
     (newSale as any).operatingBranchId = params.operatingBranchId;
 
-    const nextSales = [newSale, ...currentSales];
+    const shiftStart = getStoredShiftStartBoundary();
+    const cleanCurrentSales = currentSales.filter((s) => {
+      if (!s) return false;
+      const t = parseDateTimeSafe(s.timestamp || s.date || s.createdAt);
+      return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+    });
+
+    const nextSales = [newSale, ...cleanCurrentSales];
     localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextSales));
 
     try {

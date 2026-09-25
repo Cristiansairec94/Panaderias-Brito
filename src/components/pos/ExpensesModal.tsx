@@ -648,16 +648,29 @@ export default function ExpensesModal({
 
   // Filtrar exclusivamente las ventas correspondientes a la cajera y turno en operación
   const shiftSales = useMemo(() => {
-    const source = Array.isArray(sales) && sales.length > 0 ? sales : [];
+    let source = Array.isArray(sales) ? sales : [];
+    if (!sales && typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("brito_pos_current_sales");
+        if (raw && raw !== "[]") {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) source = parsed;
+        }
+      } catch (e) {}
+    }
     if (source.length === 0) {
       return [];
     }
+
+    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
     return source.filter((s) => {
       if (!s) return false;
-      if (!s.cashier || !matchesCashier(s.cashier, cashierName)) return false;
+      if (s.cashier && cashierName) {
+        if (!matchesCashier(s.cashier, cashierName)) return false;
+      }
       const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      if (shiftStartBoundary > 0) {
-        if (!sTime || sTime < shiftStartBoundary) return false;
+      if (boundary > 0) {
+        if (!sTime || sTime < boundary) return false;
       }
       return true;
     });
@@ -668,7 +681,8 @@ export default function ExpensesModal({
 
   // Pedidos especiales del turno y cajera actual (únicamente los creados dentro del turno activo)
   const relevantOrders = useMemo(() => {
-    if (!shiftStartBoundary || shiftStartBoundary <= 0) return [];
+    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
+    if (!boundary || boundary <= 0) return [];
     return (internalOrders || []).filter((o) => {
       if (!o) return false;
       if (branchId) {
@@ -679,7 +693,7 @@ export default function ExpensesModal({
       }
       const oTime = parseDateTimeSafe(o.createdAt || (o as any).date);
       // Solo pedidos creados dentro de la ventana de tiempo del turno actual
-      if (!oTime || oTime < shiftStartBoundary) {
+      if (!oTime || oTime < boundary) {
         return false;
       }
       if (o.cashier && cashierName) {

@@ -36,7 +36,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -330,7 +330,12 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const sum = list.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            const shiftStart = getStoredShiftStartBoundary();
+            const filtered = list.filter((s: any) => {
+              const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+            });
+            const sum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
           }
         }
@@ -345,7 +350,12 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const sum = list.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            const shiftStart = getStoredShiftStartBoundary();
+            const filtered = list.filter((s: any) => {
+              const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+            });
+            const sum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
           }
         }
@@ -360,7 +370,12 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const sum = list.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            const shiftStart = getStoredShiftStartBoundary();
+            const filtered = list.filter((s: any) => {
+              const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+            });
+            const sum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
           }
         }
@@ -434,9 +449,14 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const cSum = list.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            const kSum = list.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            const tSum = list.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            const shiftStart = getStoredShiftStartBoundary();
+            const filtered = list.filter((s: any) => {
+              const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+            });
+            const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+            const tSum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             setCashSales(cSum);
             setCardSales(kSum);
             setTransferSales(tSum);

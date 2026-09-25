@@ -277,7 +277,7 @@ export default function CashDrawerShiftModal({
     }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
     if (shiftStartBoundary > 0) {
-      if (!sTime || sTime < (shiftStartBoundary - 10000)) return false;
+      if (!sTime || sTime < shiftStartBoundary) return false;
     }
     return true;
   });
@@ -286,12 +286,12 @@ export default function CashDrawerShiftModal({
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
   const shiftOrders = (orders || []).filter((o) => {
     if (!o) return false;
+    if (!shiftStartBoundary || shiftStartBoundary <= 0) return false;
     if (o.cashier && outgoingCashier) {
       const isMatch = matchesCashier(o.cashier, outgoingCashier);
       if (!isMatch) return false;
     }
     const oTime = parseDateTimeSafe(o.createdAt || (o as any).date);
-    if (!shiftStartBoundary || shiftStartBoundary <= 0) return false;
     if (!oTime || oTime < shiftStartBoundary) return false;
     return true;
   });
