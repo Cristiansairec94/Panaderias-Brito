@@ -3088,7 +3088,7 @@ export default function POSPage() {
                   Escanea el código de barras o toca cualquier pan del mostrador para agregarlo al cobro.
                 </p>
               </div>
-              <div className="pt-3 w-full max-w-xs mx-auto space-y-2">
+              <div className="pt-3 w-full max-w-xs mx-auto">
                 <button
                   type="button"
                   onClick={() => handleOpenCreateOrder(false)}
@@ -3101,26 +3101,6 @@ export default function POSPage() {
                   <span className="tracking-wide drop-shadow-sm font-black">Hacer Pedido Especial</span>
                   <Sparkles className="w-4 h-4 text-amber-300 animate-pulse shrink-0 drop-shadow" />
                 </button>
-
-                <div className="grid grid-cols-2 gap-2 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowOrdersDrawer(true)}
-                    className="py-2.5 px-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-950 border border-rose-200 text-xs font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                    title="Ver pedidos especiales registrados"
-                  >
-                    <span>🎂 Pedidos ({branchPendingOrdersCount})</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowRecentSales(true)}
-                    className="py-2.5 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-200 text-xs font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                    title="Ver ventas del turno"
-                  >
-                    <span>🧾 Ventas ({currentShiftSales.length + currentShiftOrders.length})</span>
-                  </button>
-                </div>
               </div>
             </div>
           ) : (
@@ -3804,6 +3784,8 @@ export default function POSPage() {
           lastCutTimestamp={shiftStartBoundary}
           branchId={activeBranch?.id}
           branchName={activeBranch?.name}
+          branchAddress={activeBranch?.address}
+          branchPhone={activeBranch?.phone}
         />
       )}
 

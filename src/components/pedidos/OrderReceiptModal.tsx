@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useMemo } from "react";
+import React, { useRef, useState, useMemo, useEffect } from "react";
 import {
   Printer,
   X,
@@ -103,15 +103,34 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
     }
   };
 
+  // Listener de tecla Escape para cerrar el comprobante de pedido
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !order) return null;
 
   const handlePrint = () => {
     window.print();
   };
 
-
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-stone-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div 
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-stone-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-stone-200 flex flex-col max-h-[94vh]">
         {/* Header toolbar */}
         <div className="bg-gradient-to-r from-stone-900 to-amber-950 text-white p-4 px-6 flex items-center justify-between">

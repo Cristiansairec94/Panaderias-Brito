@@ -55,6 +55,9 @@ import { useSync } from "@/context/SyncContext";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { getStoredOrders } from "@/lib/orders";
 import { getStoredIncomes } from "@/lib/incomes";
+import TicketModal from "@/components/pos/TicketModal";
+import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
+import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
 
 interface UnifiedTicketItem {
   id: string;
@@ -136,6 +139,8 @@ interface ExpensesModalProps {
   lastCutTimestamp?: number;
   branchId?: string;
   branchName?: string;
+  branchAddress?: string;
+  branchPhone?: string;
 }
 
 const QUICK_AMOUNTS = [50, 100, 200, 500, 1000];
@@ -402,6 +407,8 @@ export default function ExpensesModal({
   lastCutTimestamp,
   branchId,
   branchName,
+  branchAddress,
+  branchPhone,
 }: ExpensesModalProps) {
   const { addNotification } = useNotifications();
   const { enqueueOfflineItem, isOnline } = useSync();
@@ -411,6 +418,11 @@ export default function ExpensesModal({
   // Estado para pantalla desplegable amplia que ocupe gran parte de la pantalla
   const [isMaximized, setIsMaximized] = useState(false);
   const isExpandedView = isMaximized || activeTab === "tickets";
+
+  // Estados locales para previsualizar/reimprimir tickets directamente sin salir de la pestaña
+  const [previewSale, setPreviewSale] = useState<Sale | null>(null);
+  const [previewOrder, setPreviewOrder] = useState<CustomOrder | null>(null);
+  const [showPrinterModal, setShowPrinterModal] = useState(false);
 
   useEffect(() => {
     if (initialTab) {
@@ -435,15 +447,30 @@ export default function ExpensesModal({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && activeDetailModal) {
-        handleCloseDetailModal();
+      if (e.key === "Escape") {
+        if (showPrinterModal) {
+          setShowPrinterModal(false);
+          return;
+        }
+        if (previewSale) {
+          setPreviewSale(null);
+          return;
+        }
+        if (previewOrder) {
+          setPreviewOrder(null);
+          return;
+        }
+        if (activeDetailModal) {
+          handleCloseDetailModal();
+          return;
+        }
       }
     };
-    if (activeDetailModal) {
+    if (activeDetailModal || previewSale || previewOrder || showPrinterModal) {
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
     }
-  }, [activeDetailModal]);
+  }, [activeDetailModal, previewSale, previewOrder, showPrinterModal]);
   
   // Estado local para el Fondo Inicial de Caja
   const [currentFund, setCurrentFund] = useState<number>(() => {
@@ -1533,10 +1560,10 @@ export default function ExpensesModal({
                 </button>
               )}
 
-              {onSelectOrderForReceipt && (
+              {(onSelectOrderForReceipt || true) && (
                 <button
                   type="button"
-                  onClick={() => onSelectOrderForReceipt(order)}
+                  onClick={() => setPreviewOrder(order)}
                   className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                   title="Ver ticket de pedido especial y reimprimir"
                 >
@@ -1686,10 +1713,10 @@ export default function ExpensesModal({
                 {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
 
-              {onSelectSaleForReprint && (
+              {(onSelectSaleForReprint || true) && (
                 <button
                   type="button"
-                  onClick={() => onSelectSaleForReprint(sale)}
+                  onClick={() => setPreviewSale(sale)}
                   className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
                   title="Ver ticket digital y mandar a imprimir en impresora térmica"
                 >
@@ -1743,7 +1770,8 @@ export default function ExpensesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200">
+    <>
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200">
       <div 
         className={`bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col border-2 border-stone-200 transition-all duration-300 ease-in-out ${
           isExpandedView
@@ -1813,11 +1841,8 @@ export default function ExpensesModal({
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 p-3 sm:p-4 bg-stone-50 border-b border-stone-200 text-center">
           
           {/* 1. Fondo Inicial */}
-          <button
-            type="button"
-            onClick={() => setActiveDetailModal("fondo")}
-            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-blue-50/70 border-blue-200/90 hover:bg-blue-100/70 hover:border-blue-400 shadow-2xs active:scale-98"
-            title="Abrir información detallada del Fondo Inicial"
+          <div
+            className="p-2.5 sm:p-3 rounded-2xl border-2 text-center flex flex-col justify-center items-center bg-blue-50/70 border-blue-200/90 shadow-2xs"
           >
             <span className="text-xs sm:text-sm md:text-base uppercase font-black text-blue-950 block leading-tight tracking-wide">
               🪙 Fondo Inicial
@@ -1825,10 +1850,7 @@ export default function ExpensesModal({
             <span className="text-lg sm:text-xl md:text-2xl font-black text-blue-800 block my-1 tracking-tight truncate">
               +{formatCurrency(currentFund)}
             </span>
-            <span className="text-[11px] sm:text-xs font-black text-blue-800 bg-blue-100/90 group-hover:bg-blue-200 border border-blue-200/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
-              👁️ Ver historial
-            </span>
-          </button>
+          </div>
 
           {/* 2. Ventas y Pedidos Efectivo */}
           <button
@@ -2646,10 +2668,10 @@ export default function ExpensesModal({
 
                         {/* Acciones por tipo */}
                         <div className="flex items-center gap-1 shrink-0 self-center">
-                          {isVenta && onSelectSaleForReprint && mov.rawSale && (
+                          {isVenta && mov.rawSale && (
                             <button
                               type="button"
-                              onClick={() => onSelectSaleForReprint(mov.rawSale!)}
+                              onClick={() => setPreviewSale(mov.rawSale!)}
                               className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-stone-900 hover:text-white text-stone-700 font-bold rounded-xl text-xs border border-stone-200 shadow-2xs transition-all cursor-pointer"
                               title="Ver y reimprimir ticket digital"
                             >
@@ -2699,7 +2721,7 @@ export default function ExpensesModal({
               }
             }}
           >
-            <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden border-2 border-stone-200 animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-3xl sm:max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border-2 border-stone-200 animate-in zoom-in-95 duration-200">
               {/* Cabecera del Modal Emergente */}
               <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white shrink-0">
                 <div className="flex items-center gap-3">
@@ -2934,11 +2956,11 @@ export default function ExpensesModal({
                                     <span className="text-base sm:text-lg font-black text-emerald-700">
                                       +{formatCurrency(sale.total)}
                                     </span>
-                                    {onSelectSaleForReprint && (
+                                    {(onSelectSaleForReprint || true) && (
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          onSelectSaleForReprint(sale);
+                                          setPreviewSale(sale);
                                         }}
                                         className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
                                         title="Reimprimir comprobante"
@@ -3018,12 +3040,11 @@ export default function ExpensesModal({
                                           Cobrar
                                         </button>
                                       )}
-                                      {onSelectOrderForReceipt && (
+                                      {(onSelectOrderForReceipt || true) && (
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            handleCloseDetailModal();
-                                            onSelectOrderForReceipt(order);
+                                            setPreviewOrder(order);
                                           }}
                                           className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
                                           title="Ver comprobante de pedido"
@@ -3300,5 +3321,49 @@ export default function ExpensesModal({
 
       </div>
     </div>
+
+    {/* Visualizador de Ticket de Venta Regular (Reimpresión Directa dentro de Movimientos de Caja) */}
+    {previewSale && (
+      <TicketModal
+        isOpen={Boolean(previewSale)}
+        onClose={() => setPreviewSale(null)}
+        isReprint={true}
+        saleId={previewSale.id}
+        items={previewSale.items}
+        total={previewSale.total}
+        paymentMethod={previewSale.paymentMethod}
+        transferAccount={previewSale.transferAccount}
+        cardTerminal={previewSale.cardTerminal}
+        paymentReference={previewSale.paymentReference}
+        cashGiven={previewSale.cashGiven}
+        change={previewSale.change}
+        cashierName={previewSale.cashier || cashierName}
+        customerName={previewSale.customerName || "Público en General"}
+        customerType={previewSale.customerType}
+        branchName={branchName || "Sucursal Matriz"}
+        branchAddress={branchAddress}
+        branchPhone={branchPhone}
+        date={previewSale.date}
+        onConfigurePrinter={() => setShowPrinterModal(true)}
+      />
+    )}
+
+    {/* Visualizador de Ticket de Pedido Especial (Directo dentro de Movimientos de Caja) */}
+    {previewOrder && (
+      <OrderReceiptModal
+        isOpen={Boolean(previewOrder)}
+        onClose={() => setPreviewOrder(null)}
+        order={previewOrder}
+      />
+    )}
+
+    {/* Modal de Configuración y Selección de Impresora Directa */}
+    <PrinterConfigModal
+      isOpen={showPrinterModal}
+      onClose={() => setShowPrinterModal(false)}
+      branchName={branchName || "Sucursal Matriz"}
+      cashierName={cashierName}
+    />
+  </>
   );
 }

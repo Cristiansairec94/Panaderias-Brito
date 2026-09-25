@@ -831,18 +831,12 @@ export default function CashDrawerShiftModal({
                 <div className="space-y-3.5">
                   {/* 1. Resumen Financiero del Turno (coincide con Movimientos de Caja) */}
                   <div className={`grid grid-cols-2 ${totalIncomesInCash > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
-                    <button
-                      type="button"
-                      onClick={() => setModalView("history")}
-                      className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
-                      title="Ver historial de cortes y turnos"
+                    <div
+                      className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center"
                     >
                       <span className="text-[11px] sm:text-xs text-stone-500 font-black block uppercase tracking-wider">Fondo Inicial</span>
                       <span className="text-xl sm:text-2xl font-black text-stone-900 mt-0.5 block">{formatCurrency(syncedFund)}</span>
-                      <span className="text-[11px] sm:text-xs font-black text-stone-600 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
-                        👁️ Ver historial
-                      </span>
-                    </button>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setModalView("history")}
