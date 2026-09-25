@@ -10,9 +10,11 @@ import {
   Flame, 
   BarChart3, 
   PieChart as PieIcon, 
-  Layers, 
+  CheckCircle2, 
   ArrowUpRight,
-  Info
+  Info,
+  DollarSign,
+  Award
 } from "lucide-react";
 import { FullFinancialSummary } from "@/lib/finanzas";
 import { formatCurrency } from "@/lib/utils";
@@ -22,63 +24,119 @@ interface OperationsIncomeChartProps {
   plViewMode?: "currency" | "percent";
 }
 
-type ChartViewType = "combined" | "trend" | "donut";
+type ChartTab = "dias" | "canales";
 
-export default function OperationsIncomeChart({ summary, plViewMode = "currency" }: OperationsIncomeChartProps) {
-  const [viewType, setViewType] = useState<ChartViewType>("combined");
-  const [hoveredDayIndex, setHoveredDayIndex] = useState<number | null>(null);
-  const [hoveredChannel, setHoveredChannel] = useState<string | null>(null);
+export default function OperationsIncomeChart({ summary }: OperationsIncomeChartProps) {
+  const [activeTab, setActiveTab] = useState<ChartTab>("dias");
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const { pl, cashFlow, kpis } = summary;
+  const { pl, cashFlow } = summary;
 
-  // Calculamos los canales activos sin 'mayoristas' según la solicitud anterior
+  // Canales de ingreso
   const totalTracked = pl.counterSales + pl.ordersSales + pl.otherIncomes;
   const safeTotal = totalTracked > 0 ? totalTracked : pl.grossSales || 1;
 
   const channels = useMemo(() => [
     {
       id: "counter",
-      name: "Mostrador (Efectivo & Tarjeta)",
+      name: "Mostrador (Pan Dulce & Bolillo)",
       shortName: "Mostrador",
       amount: pl.counterSales,
       percent: Number(((pl.counterSales / safeTotal) * 100).toFixed(1)),
       color: "#10b981", // Emerald 500
-      glowColor: "rgba(16, 185, 129, 0.4)",
-      gradId: "counterGrad",
+      badgeBg: "bg-emerald-100 text-emerald-800 border-emerald-200",
+      barColor: "bg-emerald-500",
       icon: Store,
-      description: "Venta directa al público en vitrina y canastos",
+      description: "Ventas en mostrador en efectivo y terminal bancaria.",
     },
     {
       id: "orders",
-      name: "Pasteles & Encargos Especiales",
+      name: "Pasteles & Pedidos Especiales",
       shortName: "Pasteles & Encargos",
       amount: pl.ordersSales,
       percent: Number(((pl.ordersSales / safeTotal) * 100).toFixed(1)),
-      color: "#f97316", // Brito Orange 500
-      glowColor: "rgba(249, 115, 22, 0.4)",
-      gradId: "ordersGrad",
+      color: "#f97316", // Brito Orange
+      badgeBg: "bg-orange-100 text-orange-800 border-orange-200",
+      barColor: "bg-orange-500",
       icon: Cake,
-      description: "Pastelería de tres leches, eventos y pedidos bajo anticipo",
+      description: "Pasteles de vitrina, tres leches y pedidos de eventos.",
     },
     {
       id: "other",
-      name: "Otros (Costales, Reciclaje)",
+      name: "Otros Ingresos de Operación",
       shortName: "Otros Ingresos",
       amount: pl.otherIncomes,
       percent: Number(((pl.otherIncomes / safeTotal) * 100).toFixed(1)),
-      color: "#8b5cf6", // Purple/Indigo 500
-      glowColor: "rgba(139, 92, 246, 0.4)",
-      gradId: "otherGrad",
+      color: "#8b5cf6", // Purple
+      badgeBg: "bg-purple-100 text-purple-800 border-purple-200",
+      barColor: "bg-purple-500",
       icon: Sparkles,
-      description: "Venta de bultos vacíos de harina, azúcar y subproductos",
+      description: "Venta de bultos vacíos de harina, azúcar y reciclaje.",
     },
   ], [pl.counterSales, pl.ordersSales, pl.otherIncomes, safeTotal]);
 
-  // Cálculos para la gráfica de Donut SVG
+  // Cálculos de la Gráfica de Barras Diarias
+  const dailyData = useMemo(() => {
+    const days = cashFlow && cashFlow.length > 0 ? cashFlow : [];
+    const maxVal = Math.max(...days.map((d) => d.income), 1000);
+    const avgVal = days.length > 0 ? Math.round(days.reduce((a, b) => a + b.income, 0) / days.length) : 0;
+    const peakDay = days.reduce((prev, curr) => (curr.income > prev.income ? curr : prev), days[0] || { day: "Sábado", income: 0 });
+
+    const svgWidth = 720;
+    const svgHeight = 280;
+    const paddingLeft = 55;
+    const paddingRight = 25;
+    const paddingTop = 45;
+    const paddingBottom = 55;
+    const chartHeight = svgHeight - paddingTop - paddingBottom;
+    const chartWidth = svgWidth - paddingLeft - paddingRight;
+
+    // Escala con 15% de margen superior para los textos de montos
+    const scaleMax = maxVal * 1.15;
+    const slotWidth = days.length > 0 ? chartWidth / days.length : chartWidth;
+    const barWidth = Math.min(52, slotWidth * 0.58);
+
+    const bars = days.map((d, i) => {
+      const x = paddingLeft + i * slotWidth + (slotWidth - barWidth) / 2;
+      const barHeight = Math.max(12, (d.income / scaleMax) * chartHeight);
+      const y = paddingTop + (chartHeight - barHeight);
+      const isPeak = d.day === peakDay.day || d.isPeak;
+
+      return {
+        ...d,
+        x,
+        y,
+        barWidth,
+        barHeight,
+        isPeak,
+        diffFromAvg: Math.round(((d.income - avgVal) / (avgVal || 1)) * 100),
+      };
+    });
+
+    const avgY = paddingTop + (chartHeight - (avgVal / scaleMax) * chartHeight);
+
+    return {
+      svgWidth,
+      svgHeight,
+      paddingLeft,
+      paddingRight,
+      paddingTop,
+      paddingBottom,
+      chartHeight,
+      chartWidth,
+      baselineY: paddingTop + chartHeight,
+      avgVal,
+      avgY,
+      peakDay,
+      bars,
+    };
+  }, [cashFlow]);
+
+  // Cálculos para la gráfica de Donut
   const donutData = useMemo(() => {
-    const radius = 68;
-    const strokeWidth = 24;
-    const circumference = 2 * Math.PI * radius; // ~427.26
+    const radius = 72;
+    const strokeWidth = 26;
+    const circumference = 2 * Math.PI * radius; // ~452.39
     let accumulatedAngle = 0;
 
     const segments = channels.map((ch) => {
@@ -97,571 +155,400 @@ export default function OperationsIncomeChart({ summary, plViewMode = "currency"
     return { radius, strokeWidth, circumference, segments };
   }, [channels]);
 
-  // Cálculos para la gráfica de Tendencia (Barras + Curva Spline)
-  const trendData = useMemo(() => {
-    const days = cashFlow && cashFlow.length > 0 ? cashFlow : [];
-    const maxVal = Math.max(...days.map((d) => d.income), 1000);
-    const avgVal = days.length > 0 ? Math.round(days.reduce((a, b) => a + b.income, 0) / days.length) : 0;
-
-    const svgWidth = 560;
-    const svgHeight = 220;
-    const paddingX = 35;
-    const paddingBottom = 40;
-    const paddingTop = 30;
-    const chartHeight = svgHeight - paddingTop - paddingBottom;
-    const chartWidth = svgWidth - paddingX * 2;
-    const stepX = days.length > 1 ? chartWidth / (days.length - 1) : chartWidth;
-
-    const points = days.map((d, i) => {
-      const x = paddingX + i * stepX;
-      const normalizedHeight = (d.income / maxVal) * (chartHeight * 0.9);
-      const y = svgHeight - paddingBottom - normalizedHeight;
-      return {
-        ...d,
-        x,
-        y,
-        barHeight: normalizedHeight,
-        percentOfMax: Math.round((d.income / maxVal) * 100),
-      };
-    });
-
-    // Construcción de la curva cúbica suave (Bézier spline)
-    let pathD = "";
-    let areaD = "";
-    if (points.length > 0) {
-      pathD = `M ${points[0].x} ${points[0].y}`;
-      for (let i = 0; i < points.length - 1; i++) {
-        const p0 = points[i];
-        const p1 = points[i + 1];
-        const cx1 = p0.x + (p1.x - p0.x) * 0.5;
-        const cy1 = p0.y;
-        const cx2 = p0.x + (p1.x - p0.x) * 0.5;
-        const cy2 = p1.y;
-        pathD += ` C ${cx1} ${cy1}, ${cx2} ${cy2}, ${p1.x} ${p1.y}`;
-      }
-      const baselineY = svgHeight - paddingBottom;
-      areaD = `${pathD} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z`;
-    }
-
-    return {
-      svgWidth,
-      svgHeight,
-      paddingX,
-      paddingBottom,
-      baselineY: svgHeight - paddingBottom,
-      maxVal,
-      avgVal,
-      points,
-      pathD,
-      areaD,
-    };
-  }, [cashFlow]);
-
   return (
-    <div className="bg-gradient-to-b from-stone-900 via-stone-900 to-stone-950 text-white rounded-3xl p-5 sm:p-7 shadow-xl border border-stone-800 space-y-6">
-      {/* ─── Encabezado de la Gráfica ────────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-stone-800/80 pb-5">
+    <div className="bg-white rounded-3xl border border-stone-200/90 shadow-sm p-5 sm:p-7 space-y-6">
+      {/* ─── Encabezado y Selector Intuitivo ────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-100">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
-              <TrendingUp className="w-3.5 h-3.5" /> Gráfica Operativa Oficial
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-xl bg-orange-100 text-orange-800 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border border-orange-200">
+              <TrendingUp className="w-3.5 h-3.5 text-brito-orange-600" />
+              Gráfica de Ventas
             </span>
-            <span className="text-xs text-stone-400 font-semibold">• {summary.periodLabel}</span>
+            <span className="text-xs text-stone-500 font-bold">• {summary.periodLabel}</span>
           </div>
-          <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-            Desempeño Visual de Ventas & Canales
+          <h3 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
+            Comportamiento de Ingresos de Operación
           </h3>
-          <p className="text-xs text-stone-400 font-medium max-w-xl">
-            Monitoreo en tiempo real del flujo de ingresos por mostrador y encargos de panadería tradicional.
+          <p className="text-xs text-stone-500 font-medium">
+            Visualiza de forma clara y directa cuánto dinero ingresa a la panadería y en qué días se vende más.
           </p>
         </div>
 
-        {/* Selector de tipo de vista */}
-        <div className="flex items-center gap-1 bg-stone-800/90 p-1.5 rounded-2xl border border-stone-700/60 self-start lg:self-auto shrink-0 shadow-inner">
+        {/* Botones de Selección Claros */}
+        <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-2xl border border-stone-200 self-start sm:self-auto shrink-0 shadow-inner">
           <button
-            onClick={() => setViewType("combined")}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 ${
-              viewType === "combined"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-600/30"
-                : "text-stone-400 hover:text-white hover:bg-stone-700/50"
+            onClick={() => setActiveTab("dias")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+              activeTab === "dias"
+                ? "bg-stone-900 text-white shadow-md shadow-stone-900/15"
+                : "text-stone-600 hover:text-stone-900 hover:bg-white/80"
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Vista Doble</span>
+            <BarChart3 className="w-4 h-4 text-emerald-400" />
+            <span>Ventas por Día</span>
           </button>
           <button
-            onClick={() => setViewType("trend")}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 ${
-              viewType === "trend"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-600/30"
-                : "text-stone-400 hover:text-white hover:bg-stone-700/50"
+            onClick={() => setActiveTab("canales")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+              activeTab === "canales"
+                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25"
+                : "text-stone-600 hover:text-stone-900 hover:bg-white/80"
             }`}
           >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Tendencia</span>
-          </button>
-          <button
-            onClick={() => setViewType("donut")}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 ${
-              viewType === "donut"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-600/30"
-                : "text-stone-400 hover:text-white hover:bg-stone-700/50"
-            }`}
-          >
-            <PieIcon className="w-3.5 h-3.5" />
-            <span>Canales</span>
+            <PieIcon className="w-4 h-4 text-white" />
+            <span>Porcentaje por Canal</span>
           </button>
         </div>
       </div>
 
-      {/* ─── Tarjetas de Resumen KPI Superiores ──────────────────────────────── */}
+      {/* ─── 4 Tarjetas Informativas Fáciles de Entender ─────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-stone-800/60 border border-stone-700/50 rounded-2xl p-3.5 hover:border-emerald-500/40 transition-all">
-          <span className="text-[11px] font-bold text-stone-400 block uppercase tracking-wider">
-            Total Ingresos
+        {/* Total Ingresos */}
+        <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200/80 hover:border-emerald-300 transition-all">
+          <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block">
+            Total Vendido ({summary.periodLabel})
           </span>
-          <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-0.5">
+          <p className="text-xl sm:text-2xl font-black text-stone-900 mt-1">
             {formatCurrency(pl.grossSales)}
           </p>
-          <span className="text-[10px] text-stone-400 font-semibold block mt-0.5">
-            100% Base de operación
+          <span className="text-[10px] text-emerald-700 font-extrabold block mt-1">
+            ✓ 100% ingresos registrados
           </span>
         </div>
 
-        <div className="bg-stone-800/60 border border-stone-700/50 rounded-2xl p-3.5 hover:border-brito-orange-500/40 transition-all">
-          <span className="text-[11px] font-bold text-stone-400 block uppercase tracking-wider">
-            Canal Estrella
+        {/* Mostrador */}
+        <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-200/70 hover:border-emerald-300 transition-all">
+          <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block flex items-center gap-1">
+            <Store className="w-3.5 h-3.5" /> Mostrador (Mayoría)
           </span>
-          <p className="text-xl sm:text-2xl font-black text-brito-orange-400 mt-0.5">
-            Mostrador ({channels[0].percent}%)
-          </p>
-          <span className="text-[10px] text-stone-400 font-semibold block mt-0.5">
+          <p className="text-xl sm:text-2xl font-black text-emerald-900 mt-1">
             {formatCurrency(pl.counterSales)}
+          </p>
+          <span className="text-[10px] text-emerald-700 font-extrabold block mt-1">
+            {channels[0].percent}% del dinero total
           </span>
         </div>
 
-        <div className="bg-stone-800/60 border border-stone-700/50 rounded-2xl p-3.5 hover:border-amber-500/40 transition-all">
-          <span className="text-[11px] font-bold text-stone-400 block uppercase tracking-wider flex items-center gap-1">
-            <Flame className="w-3 h-3 text-amber-400 fill-amber-400" /> Pico Máximo
+        {/* Pasteles & Encargos */}
+        <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-200/70 hover:border-orange-300 transition-all">
+          <span className="text-[11px] font-bold text-orange-800 uppercase tracking-wider block flex items-center gap-1">
+            <Cake className="w-3.5 h-3.5" /> Pasteles & Encargos
           </span>
-          <p className="text-xl sm:text-2xl font-black text-amber-300 mt-0.5">
-            Sábado
+          <p className="text-xl sm:text-2xl font-black text-orange-950 mt-1">
+            {formatCurrency(pl.ordersSales)}
           </p>
-          <span className="text-[10px] text-stone-400 font-semibold block mt-0.5">
-            Tarde familiar de alta venta
+          <span className="text-[10px] text-orange-700 font-extrabold block mt-1">
+            {channels[1].percent}% de las ventas
           </span>
         </div>
 
-        <div className="bg-stone-800/60 border border-stone-700/50 rounded-2xl p-3.5 hover:border-purple-500/40 transition-all">
-          <span className="text-[11px] font-bold text-stone-400 block uppercase tracking-wider">
-            Promedio Diario
+        {/* Día Más Fuerte */}
+        <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200/80 hover:border-amber-300 transition-all">
+          <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block flex items-center gap-1">
+            <Award className="w-3.5 h-3.5 text-amber-600" /> Día Más Fuerte
           </span>
-          <p className="text-xl sm:text-2xl font-black text-white mt-0.5">
-            {formatCurrency(trendData.avgVal)}
+          <p className="text-xl sm:text-2xl font-black text-amber-950 mt-1">
+            {dailyData.peakDay.day}
           </p>
-          <span className="text-[10px] text-stone-400 font-semibold block mt-0.5">
-            Estimado por jornada
+          <span className="text-[10px] text-amber-800 font-extrabold block mt-1">
+            {formatCurrency(dailyData.peakDay.income)} vendidos
           </span>
         </div>
       </div>
 
-      {/* ─── Área Principal de Gráficas ─────────────────────────────────────── */}
-      <div className={`grid gap-6 ${
-        viewType === "combined" ? "grid-cols-1 xl:grid-cols-12" : "grid-cols-1"
-      }`}>
-        {/* ── GRÁFICA 1: Tendencia y Flujo de Ventas Diarias ── */}
-        {(viewType === "combined" || viewType === "trend") && (
-          <div className={`bg-stone-950/70 border border-stone-800/90 rounded-3xl p-5 sm:p-6 space-y-4 flex flex-col justify-between ${
-            viewType === "combined" ? "xl:col-span-7" : "col-span-1"
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
-                  <BarChart3 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="font-black text-sm text-white uppercase tracking-wide">
-                    Flujo de Ventas en el Tiempo
-                  </h4>
-                  <p className="text-[11px] text-stone-400">
-                    Ingresos diarios con picos de demanda del periodo
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-800/50">
-                Promedio: {formatCurrency(trendData.avgVal)}/día
+      {/* ─── VISTA 1: Gráfica de Barras por Día (Limpia, con Montos Arriba) ─────── */}
+      {activeTab === "dias" && (
+        <div className="bg-stone-50/70 border border-stone-200/80 rounded-3xl p-5 sm:p-6 space-y-4 animate-in fade-in duration-150">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h4 className="font-black text-base text-stone-900 flex items-center gap-2">
+                <span>Ventas Día por Día en la Semana</span>
+              </h4>
+              <p className="text-xs text-stone-500">
+                El monto arriba de cada barra muestra exactamente cuánto se vendió ese día.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs font-bold text-stone-600">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-md bg-emerald-500 inline-block" /> Día normal
+              </span>
+              <span className="flex items-center gap-1.5 text-orange-700 font-black">
+                <span className="w-3 h-3 rounded-md bg-brito-orange-600 inline-block" /> Día de alta venta
               </span>
             </div>
+          </div>
 
-            {/* Canvas SVG Interactivo */}
-            <div className="relative w-full overflow-hidden pt-2">
+          {/* Canvas SVG de Barras Claras con Montos Visibles */}
+          <div className="w-full overflow-x-auto pt-2 pb-1">
+            <div className="min-w-[620px]">
               <svg
-                viewBox={`0 0 ${trendData.svgWidth} ${trendData.svgHeight}`}
-                className="w-full h-auto select-none overflow-visible"
+                viewBox={`0 0 ${dailyData.svgWidth} ${dailyData.svgHeight}`}
+                className="w-full h-auto select-none"
               >
-                <defs>
-                  {/* Gradiente de relleno bajo la curva */}
-                  <linearGradient id="areaGlowGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.38" />
-                    <stop offset="50%" stopColor="#059669" stopOpacity="0.12" />
-                    <stop offset="100%" stopColor="#047857" stopOpacity="0.0" />
-                  </linearGradient>
-
-                  {/* Gradiente para barras normales */}
-                  <linearGradient id="barNormalGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#34d399" />
-                    <stop offset="100%" stopColor="#059669" />
-                  </linearGradient>
-
-                  {/* Gradiente para barras pico (Sábado/Domingo) */}
-                  <linearGradient id="barPeakGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#fb923c" />
-                    <stop offset="100%" stopColor="#ea580c" />
-                  </linearGradient>
-
-                  {/* Sombra suave para barras */}
-                  <filter id="barShadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#000000" floodOpacity="0.5" />
-                  </filter>
-                </defs>
-
-                {/* Líneas de guía horizontal */}
+                {/* Línea horizontal de base */}
                 <line
-                  x1={trendData.paddingX}
-                  y1={trendData.baselineY - 110}
-                  x2={trendData.svgWidth - trendData.paddingX}
-                  y2={trendData.baselineY - 110}
-                  stroke="#334155"
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                  opacity="0.4"
+                  x1={dailyData.paddingLeft}
+                  y1={dailyData.baselineY}
+                  x2={dailyData.svgWidth - dailyData.paddingRight}
+                  y2={dailyData.baselineY}
+                  stroke="#cbd5e1"
+                  strokeWidth="2"
                 />
+
+                {/* Línea punteada del promedio diario */}
                 <line
-                  x1={trendData.paddingX}
-                  y1={trendData.baselineY - 55}
-                  x2={trendData.svgWidth - trendData.paddingX}
-                  y2={trendData.baselineY - 55}
-                  stroke="#334155"
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                  opacity="0.4"
-                />
-                <line
-                  x1={trendData.paddingX}
-                  y1={trendData.baselineY}
-                  x2={trendData.svgWidth - trendData.paddingX}
-                  y2={trendData.baselineY}
-                  stroke="#475569"
+                  x1={dailyData.paddingLeft}
+                  y1={dailyData.avgY}
+                  x2={dailyData.svgWidth - dailyData.paddingRight}
+                  y2={dailyData.avgY}
+                  stroke="#f97316"
                   strokeWidth="1.5"
-                  opacity="0.8"
+                  strokeDasharray="4 4"
+                  opacity="0.85"
                 />
+                <text
+                  x={dailyData.svgWidth - dailyData.paddingRight}
+                  y={dailyData.avgY - 7}
+                  textAnchor="end"
+                  fontSize="11"
+                  fontWeight="800"
+                  fill="#ea580c"
+                >
+                  Promedio: {formatCurrency(dailyData.avgVal)} al día
+                </text>
 
-                {/* Área bajo la curva con gradiente glow */}
-                {trendData.areaD && (
-                  <path d={trendData.areaD} fill="url(#areaGlowGrad)" />
-                )}
-
-                {/* Curva de tendencia Bézier */}
-                {trendData.pathD && (
-                  <path
-                    d={trendData.pathD}
-                    fill="none"
-                    stroke="#10b981"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                )}
-
-                {/* Barras verticales interactivas */}
-                {trendData.points.map((pt, idx) => {
-                  const isHovered = hoveredDayIndex === idx;
-                  const barWidth = 32;
-                  const barX = pt.x - barWidth / 2;
-                  const barY = pt.y;
+                {/* Renderizado de cada barra de día */}
+                {dailyData.bars.map((bar, idx) => {
+                  const isHovered = hoveredIndex === idx;
+                  const centerX = bar.x + bar.barWidth / 2;
 
                   return (
                     <g
-                      key={pt.day}
-                      className="cursor-pointer transition-all duration-200"
-                      onMouseEnter={() => setHoveredDayIndex(idx)}
-                      onMouseLeave={() => setHoveredDayIndex(null)}
+                      key={bar.day}
+                      className="cursor-pointer transition-all duration-150"
+                      onMouseEnter={() => setHoveredIndex(idx)}
+                      onMouseLeave={() => setHoveredIndex(null)}
                     >
-                      {/* Fondo de hover completo de la columna */}
+                      {/* Fondo transparente que agranda la zona de hover */}
                       <rect
-                        x={barX - 6}
-                        y={20}
-                        width={barWidth + 12}
-                        height={trendData.baselineY - 15}
+                        x={bar.x - 8}
+                        y={dailyData.paddingTop}
+                        width={bar.barWidth + 16}
+                        height={dailyData.chartHeight}
                         rx="12"
-                        fill={isHovered ? "rgba(255, 255, 255, 0.06)" : "transparent"}
+                        fill={isHovered ? "rgba(249, 115, 22, 0.08)" : "transparent"}
                       />
 
-                      {/* Barra con gradiente */}
+                      {/* Barra con esquinas redondeadas arriba */}
                       <rect
-                        x={barX}
-                        y={barY}
-                        width={barWidth}
-                        height={pt.barHeight}
-                        rx="7"
-                        fill={pt.isPeak ? "url(#barPeakGrad)" : "url(#barNormalGrad)"}
-                        opacity={isHovered ? 1 : 0.88}
-                        filter="url(#barShadow)"
-                        className="transition-all duration-150"
+                        x={bar.x}
+                        y={bar.y}
+                        width={bar.barWidth}
+                        height={bar.barHeight}
+                        rx="10"
+                        fill={bar.isPeak ? "#ea580c" : "#10b981"}
+                        opacity={isHovered ? 1 : 0.9}
+                        className="transition-all duration-150 shadow-sm"
                         style={{
-                          transform: isHovered ? "scaleY(1.03)" : "scaleY(1)",
-                          transformOrigin: `center ${trendData.baselineY}px`,
+                          transform: isHovered ? "scaleY(1.02)" : "scaleY(1)",
+                          transformOrigin: `center ${dailyData.baselineY}px`,
                         }}
                       />
 
-                      {/* Punto en la cima de la barra */}
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={isHovered ? 6 : 4}
-                        fill="#ffffff"
-                        stroke={pt.isPeak ? "#ea580c" : "#059669"}
-                        strokeWidth="2.5"
-                        className="transition-all"
-                      />
-
-                      {/* Etiqueta del día en el eje X */}
+                      {/* Monto exacto en dinero arriba de cada columna (VISIBLE SIEMPRE) */}
                       <text
-                        x={pt.x}
-                        y={trendData.baselineY + 22}
+                        x={centerX}
+                        y={bar.y - 10}
                         textAnchor="middle"
-                        fontSize="11"
-                        fontWeight={isHovered ? "900" : "700"}
-                        fill={isHovered ? "#ffffff" : "#94a3b8"}
+                        fontSize={bar.isPeak ? "12" : "11"}
+                        fontWeight="900"
+                        fill={bar.isPeak ? "#c2410c" : "#065f46"}
                       >
-                        {pt.shortDay}
+                        {formatCurrency(bar.income)}
                       </text>
 
-                      {/* Badge de Pico para fines de semana */}
-                      {pt.isPeak && (
-                        <text
-                          x={pt.x}
-                          y={barY - 10}
-                          textAnchor="middle"
-                          fontSize="9"
-                          fontWeight="900"
-                          fill="#fb923c"
-                        >
-                          🔥 PICO
-                        </text>
+                      {/* Nombre corto del día en negrita en el eje X */}
+                      <text
+                        x={centerX}
+                        y={dailyData.baselineY + 22}
+                        textAnchor="middle"
+                        fontSize="13"
+                        fontWeight={isHovered || bar.isPeak ? "900" : "700"}
+                        fill={bar.isPeak ? "#ea580c" : "#1c1917"}
+                      >
+                        {bar.shortDay}
+                      </text>
+
+                      {/* Nombre completo debajo */}
+                      <text
+                        x={centerX}
+                        y={dailyData.baselineY + 38}
+                        textAnchor="middle"
+                        fontSize="10"
+                        fontWeight="600"
+                        fill="#78716c"
+                      >
+                        {bar.day}
+                      </text>
+
+                      {/* Badge 'Día Fuerte' para fines de semana */}
+                      {bar.isPeak && (
+                        <g>
+                          <rect
+                            x={centerX - 28}
+                            y={bar.y - 28}
+                            width="56"
+                            height="16"
+                            rx="8"
+                            fill="#ea580c"
+                          />
+                          <text
+                            x={centerX}
+                            y={bar.y - 17}
+                            textAnchor="middle"
+                            fontSize="9"
+                            fontWeight="900"
+                            fill="#ffffff"
+                          >
+                            ⭐ MÁS ALTO
+                          </text>
+                        </g>
                       )}
                     </g>
                   );
                 })}
               </svg>
-
-              {/* Tooltip flotante interactivo al pasar el mouse */}
-              {hoveredDayIndex !== null && trendData.points[hoveredDayIndex] && (
-                <div
-                  className="absolute pointer-events-none transform -translate-x-1/2 bg-stone-900/95 backdrop-blur-md text-white text-xs py-2 px-3 rounded-xl border border-stone-700 shadow-2xl transition-all duration-100 flex flex-col gap-0.5 z-20"
-                  style={{
-                    left: `${(trendData.points[hoveredDayIndex].x / trendData.svgWidth) * 100}%`,
-                    top: "10px",
-                  }}
-                >
-                  <div className="flex items-center gap-1.5 font-bold text-stone-300">
-                    <span>{trendData.points[hoveredDayIndex].day}</span>
-                    {trendData.points[hoveredDayIndex].isPeak && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-orange-500/20 text-orange-400 font-black">
-                        Alta Demanda
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-base font-black text-emerald-400">
-                    {formatCurrency(trendData.points[hoveredDayIndex].income)}
-                  </span>
-                  <span className="text-[10px] text-stone-400 font-semibold">
-                    {trendData.points[hoveredDayIndex].income >= trendData.avgVal ? "▲ Arriba del promedio" : "▼ Ajustado a la media"}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Leyenda de la gráfica de barras */}
-            <div className="flex items-center justify-between text-xs text-stone-400 pt-2 border-t border-stone-800/80 flex-wrap gap-2">
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5 font-semibold">
-                  <span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" /> Ventas Normales
-                </span>
-                <span className="flex items-center gap-1.5 font-semibold text-amber-300">
-                  <span className="w-3 h-3 rounded-sm bg-amber-500 inline-block" /> Fin de Semana (Pico)
-                </span>
-              </div>
-              <span className="text-[11px] text-stone-500">
-                Pasa el cursor sobre cada día para ver detalles
-              </span>
             </div>
           </div>
-        )}
 
-        {/* ── GRÁFICA 2: Donut SVG de Participación por Canales ── */}
-        {(viewType === "combined" || viewType === "donut") && (
-          <div className={`bg-stone-950/70 border border-stone-800/90 rounded-3xl p-5 sm:p-6 space-y-5 flex flex-col justify-between ${
-            viewType === "combined" ? "xl:col-span-5" : "col-span-1"
-          }`}>
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-brito-orange-500/20 text-brito-orange-400 rounded-xl">
-                <PieIcon className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="font-black text-sm text-white uppercase tracking-wide">
-                  Distribución por Canal
-                </h4>
-                <p className="text-[11px] text-stone-400">
-                  Participación porcentual y monto por fuente de venta
-                </p>
-              </div>
-            </div>
+          {/* Explicación en texto claro para el dueño */}
+          <div className="p-3.5 bg-white rounded-2xl border border-stone-200 text-xs text-stone-600 flex items-center justify-between flex-wrap gap-2">
+            <span className="flex items-center gap-1.5 font-medium">
+              <Info className="w-4 h-4 text-brito-orange-600 shrink-0" />
+              Los <strong>fines de semana (Sábados y Domingos)</strong> representan el mayor volumen de venta por la compra familiar de pan dulce y bolillos.
+            </span>
+            <span className="font-extrabold text-stone-900">
+              Promedio diario semanal: {formatCurrency(dailyData.avgVal)}
+            </span>
+          </div>
+        </div>
+      )}
 
-            {/* Gráfica Circular Donut en SVG */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-2">
-              <div className="relative w-44 h-44 shrink-0 flex items-center justify-center">
+      {/* ─── VISTA 2: Gráfica de Porcentaje por Canales (Donut + Tarjetas Claras) ─ */}
+      {activeTab === "canales" && (
+        <div className="bg-stone-50/70 border border-stone-200/80 rounded-3xl p-5 sm:p-6 space-y-5 animate-in fade-in duration-150">
+          <div>
+            <h4 className="font-black text-base text-stone-900">
+              ¿De dónde entra el dinero a la panadería?
+            </h4>
+            <p className="text-xs text-stone-500">
+              Distribución de cada peso ingresado según el canal de venta.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            {/* Donut SVG con Centro Claro */}
+            <div className="lg:col-span-5 flex items-center justify-center">
+              <div className="relative w-52 h-52 flex items-center justify-center">
                 <svg
                   viewBox="0 0 200 200"
                   className="w-full h-full transform -rotate-90 select-none overflow-visible"
                 >
-                  <defs>
-                    <linearGradient id="counterGrad" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#34d399" />
-                      <stop offset="100%" stopColor="#059669" />
-                    </linearGradient>
-                    <linearGradient id="ordersGrad" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#fb923c" />
-                      <stop offset="100%" stopColor="#ea580c" />
-                    </linearGradient>
-                    <linearGradient id="otherGrad" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" />
-                      <stop offset="100%" stopColor="#7c3aed" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Círculo base de fondo */}
+                  {/* Círculo base */}
                   <circle
                     cx="100"
                     cy="100"
                     r={donutData.radius}
                     fill="none"
-                    stroke="#1e293b"
+                    stroke="#e2e8f0"
                     strokeWidth={donutData.strokeWidth}
-                    opacity="0.3"
                   />
 
-                  {/* Segmentos del Donut */}
-                  {donutData.segments.map((seg) => {
-                    const isHovered = hoveredChannel === seg.id;
-                    return (
-                      <circle
-                        key={seg.id}
-                        cx="100"
-                        cy="100"
-                        r={donutData.radius}
-                        fill="none"
-                        stroke={`url(#${seg.gradId})`}
-                        strokeWidth={isHovered ? donutData.strokeWidth + 4 : donutData.strokeWidth}
-                        strokeDasharray={seg.strokeDasharray}
-                        strokeDashoffset={seg.strokeDashoffset}
-                        className="transition-all duration-200 cursor-pointer"
-                        onMouseEnter={() => setHoveredChannel(seg.id)}
-                        onMouseLeave={() => setHoveredChannel(null)}
-                        style={{
-                          filter: isHovered ? `drop-shadow(0 0 8px ${seg.glowColor})` : undefined,
-                        }}
-                      />
-                    );
-                  })}
+                  {/* Segmentos Donut */}
+                  {donutData.segments.map((seg) => (
+                    <circle
+                      key={seg.id}
+                      cx="100"
+                      cy="100"
+                      r={donutData.radius}
+                      fill="none"
+                      stroke={seg.color}
+                      strokeWidth={donutData.strokeWidth}
+                      strokeDasharray={seg.strokeDasharray}
+                      strokeDashoffset={seg.strokeDashoffset}
+                      className="transition-all duration-300"
+                    />
+                  ))}
                 </svg>
 
                 {/* Centro del Donut */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-4">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-stone-400">
-                    {hoveredChannel 
-                      ? channels.find(c => c.id === hoveredChannel)?.shortName 
-                      : "VENTAS BRUTAS"}
+                  <span className="text-[10px] font-black uppercase tracking-wider text-stone-500">
+                    Ventas Totales
                   </span>
-                  <span className="text-lg sm:text-xl font-black text-white leading-tight mt-0.5">
-                    {hoveredChannel
-                      ? formatCurrency(channels.find(c => c.id === hoveredChannel)?.amount || 0)
-                      : formatCurrency(pl.grossSales)}
+                  <span className="text-xl font-black text-stone-900 leading-tight mt-0.5">
+                    {formatCurrency(pl.grossSales)}
                   </span>
-                  <span className="text-[10px] font-bold text-emerald-400 mt-0.5">
-                    {hoveredChannel
-                      ? `${channels.find(c => c.id === hoveredChannel)?.percent}% del total`
-                      : "100% Operación"}
+                  <span className="text-[11px] font-extrabold text-emerald-700 mt-0.5">
+                    100% de Ingresos
                   </span>
                 </div>
               </div>
+            </div>
 
-              {/* Lista Descriptiva de Canales */}
-              <div className="flex-1 w-full space-y-2.5">
-                {channels.map((ch) => {
-                  const Icon = ch.icon;
-                  const isHovered = hoveredChannel === ch.id;
-
-                  return (
-                    <div
-                      key={ch.id}
-                      onMouseEnter={() => setHoveredChannel(ch.id)}
-                      onMouseLeave={() => setHoveredChannel(null)}
-                      className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                        isHovered 
-                          ? "bg-stone-900 border-white/30 shadow-md scale-[1.02]" 
-                          : "bg-stone-900/60 border-stone-800 hover:border-stone-700"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-xs font-bold">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ backgroundColor: ch.color }}
-                          />
-                          <span className="text-white font-extrabold">{ch.shortName}</span>
+            {/* Tarjetas Descriptivas de los 3 Canales */}
+            <div className="lg:col-span-7 space-y-3">
+              {channels.map((ch) => {
+                const Icon = ch.icon;
+                return (
+                  <div
+                    key={ch.id}
+                    className="p-4 rounded-2xl bg-white border border-stone-200/90 shadow-xs space-y-2 hover:border-stone-300 transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-bold"
+                          style={{ backgroundColor: ch.color }}
+                        >
+                          <Icon className="w-4 h-4" />
                         </div>
-                        <span className="text-stone-300 font-black">{ch.percent}%</span>
+                        <div>
+                          <h5 className="font-black text-stone-900 text-sm">{ch.name}</h5>
+                          <span className="text-[11px] text-stone-500 font-medium">
+                            {ch.description}
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="flex items-center justify-between mt-1 text-[11px]">
-                        <span className="text-stone-400 font-medium truncate max-w-[140px]">
-                          {ch.description}
-                        </span>
-                        <span className="font-black text-emerald-400 shrink-0">
+                      <div className="text-right shrink-0">
+                        <span className="text-base sm:text-lg font-black text-stone-900 block">
                           {formatCurrency(ch.amount)}
                         </span>
-                      </div>
-
-                      {/* Barra de progreso miniatura */}
-                      <div className="w-full bg-stone-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{
-                            width: `${ch.percent}%`,
-                            backgroundColor: ch.color,
-                          }}
-                        />
+                        <span className={`text-[11px] font-black px-2 py-0.5 rounded-md border inline-block ${ch.badgeBg}`}>
+                          {ch.percent}% del total
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Pie de la tarjeta de canales */}
-            <div className="flex items-center justify-between text-[11px] text-stone-400 pt-2 border-t border-stone-800/80">
-              <span className="flex items-center gap-1 font-medium">
-                <Info className="w-3.5 h-3.5 text-stone-500" />
-                Ventas de panadería tradicional y mostrador
-              </span>
-              <span className="text-emerald-400 font-extrabold">
-                {channels.length} canales activos
-              </span>
+                    {/* Barra de Progreso */}
+                    <div className="w-full bg-stone-100 h-2.5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${ch.percent}%`,
+                          backgroundColor: ch.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
