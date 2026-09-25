@@ -491,17 +491,15 @@ export default function CajaPage() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
-      if (tab === "historial") {
+      if (tab === "historial" || tab === "turno") {
         setActiveTab("historial");
-      } else if (tab === "turno") {
-        setActiveTab("turno");
       } else if (tab === "entradas") {
-        setActiveTab("turno");
+        setActiveTab("historial");
         setMovementType("entrada");
         setMovCategory("abono_cliente");
         setIsMovementModalOpen(true);
       } else if (tab === "salidas") {
-        setActiveTab("turno");
+        setActiveTab("historial");
         setMovementType("salida");
         setMovCategory("compra_insumos");
         setIsMovementModalOpen(true);
@@ -913,10 +911,7 @@ export default function CajaPage() {
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => {
-              setActiveTab("turno");
-              handleOpenCorteModal();
-            }}
+            onClick={handleOpenCorteModal}
             className="flex items-center gap-1.5 bg-stone-900 hover:bg-black text-white font-black px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95 border border-stone-800 cursor-pointer"
           >
             <Lock className="w-4 h-4 text-amber-400" /> + Realizar Corte de Turno
@@ -924,49 +919,25 @@ export default function CajaPage() {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Navigation Header */}
       <div className="flex items-center justify-between border-b border-stone-200 gap-2 pb-0">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab("historial")}
-            className={`flex items-center gap-2 px-5 py-3 font-black text-xs sm:text-sm border-b-2 transition-all cursor-pointer ${
-              activeTab === "historial"
-                ? "border-amber-600 text-amber-950 bg-amber-50/70 rounded-t-2xl shadow-2xs"
-                : "border-transparent text-stone-500 hover:text-stone-900 hover:bg-stone-50 rounded-t-xl"
-            }`}
-          >
+          <div className="flex items-center gap-2 px-5 py-3 font-black text-xs sm:text-sm border-b-2 border-amber-600 text-amber-950 bg-amber-50/70 rounded-t-2xl shadow-2xs">
             <History className="w-4 h-4 text-amber-600" />
             <span>📜 Historial de Cortes de Caja</span>
             <span className="bg-amber-200 text-amber-950 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
               {cutsHistory.length}
             </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("turno")}
-            className={`flex items-center gap-2 px-5 py-3 font-black text-xs sm:text-sm border-b-2 transition-all cursor-pointer ${
-              activeTab === "turno"
-                ? "border-amber-600 text-amber-950 bg-amber-50/70 rounded-t-2xl shadow-2xs"
-                : "border-transparent text-stone-500 hover:text-stone-900 hover:bg-stone-50 rounded-t-xl"
-            }`}
-          >
-            <Wallet className="w-4 h-4 text-emerald-600" />
-            <span>⚡ Turno en Vivo & Movimientos</span>
-            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
-              Abierta
-            </span>
-          </button>
+          </div>
         </div>
 
-        {activeTab === "historial" && (
-          <button
-            onClick={handleExportCSV}
-            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-stone-50 text-stone-700 font-bold rounded-xl border border-stone-200 text-xs shadow-2xs transition-colors mb-2"
-          >
-            <Download className="w-3.5 h-3.5 text-stone-600" />
-            <span>Exportar Historial (CSV)</span>
-          </button>
-        )}
+        <button
+          onClick={handleExportCSV}
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-stone-50 text-stone-700 font-bold rounded-xl border border-stone-200 text-xs shadow-2xs transition-colors mb-2 cursor-pointer"
+        >
+          <Download className="w-3.5 h-3.5 text-stone-600" />
+          <span>Exportar Historial (CSV)</span>
+        </button>
       </div>
 
       {/* ========================================================================= */}
@@ -1552,158 +1523,7 @@ export default function CajaPage() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* PESTAÑA 2: TURNO EN VIVO & MOVIMIENTOS                                   */}
-      {/* ========================================================================= */}
-      {activeTab === "turno" && (
-        <div className="space-y-6">
-          {/* Live Shift Box Status */}
-          <div className="bg-gradient-to-br from-stone-900 via-stone-850 to-stone-950 rounded-3xl p-6 text-white shadow-2xl border border-stone-800 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 transition-all duration-200 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-amber-600 text-white rounded-2xl shadow-lg shadow-amber-600/30">
-                  <Wallet className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg font-black tracking-tight">Turno Actual: Turno Matutino</h3>
-                    <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase">
-                      Caja Abierta
-                    </span>
-                  </div>
-                  {/* RESPONSABLE DESTACADO EN VIVO */}
-                  <p className="text-xs text-stone-300 mt-1 flex items-center gap-1.5 flex-wrap">
-                    <span>👤 Responsable del Turno:</span>
-                    <strong className="text-amber-400 font-black">{currentShiftResponsible}</strong>
-                    <span className="text-stone-500">•</span>
-                    <span>Apertura: 06:00 AM con {formatCurrency(initialCash)} de fondo</span>
-                  </p>
-                </div>
-              </div>
 
-              <div className="text-left md:text-right">
-                <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
-                  Efectivo Esperado en Caja:
-                </span>
-                <span className="text-3xl font-black text-emerald-400 tracking-tight">
-                  {formatCurrency(expectedCashInDrawer)}
-                </span>
-              </div>
-            </div>
-
-            {/* Breakdown Row */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
-                <span className="text-stone-400 text-[10px] font-bold block">Fondo Inicial:</span>
-                <span className="text-base font-bold text-stone-200">{formatCurrency(initialCash)}</span>
-              </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
-                <span className="text-stone-400 text-[10px] font-bold block">Ventas Efectivo:</span>
-                <span className="text-base font-bold text-emerald-400">+{formatCurrency(cashSales)}</span>
-              </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
-                <span className="text-stone-400 text-[10px] font-bold block">Otras Entradas:</span>
-                <span className="text-base font-bold text-emerald-400">+{formatCurrency(totalEntries)}</span>
-              </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
-                <span className="text-stone-400 text-[10px] font-bold block">Gastos / Retiros:</span>
-                <span className="text-base font-bold text-rose-400">-{formatCurrency(totalExpenses)}</span>
-              </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
-                <span className="text-stone-400 text-[10px] font-bold block">Cobros Tarjeta:</span>
-                <span className="text-base font-bold text-blue-400">{formatCurrency(cardSales)}</span>
-              </div>
-              <div className="bg-stone-850/80 p-3.5 rounded-2xl border border-stone-800 hover:border-orange-400/60 hover:ring-1 hover:ring-orange-400/20 transition-all duration-200">
-                <span className="text-stone-400 text-[10px] font-bold block">Transferencias:</span>
-                <span className="text-base font-bold text-purple-400">{formatCurrency(transferSales)}</span>
-              </div>
-            </div>
-
-            {/* Quick Live Actions */}
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-stone-800">
-              <button
-                onClick={() => {
-                  setMovementType("entrada");
-                  setMovCategory("abono_cliente");
-                  setIsMovementModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
-              >
-                <Plus className="w-4 h-4" /> + Entrada
-              </button>
-              <button
-                onClick={() => {
-                  setMovementType("salida");
-                  setMovCategory("compra_insumos");
-                  setIsMovementModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-black px-4 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
-              >
-                <Minus className="w-4 h-4" /> - Registrar Gasto / Retiro
-              </button>
-              <button
-                onClick={handleOpenCorteModal}
-                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black px-5 py-2.5 rounded-xl shadow-md text-xs transition-all active:scale-95"
-              >
-                <Lock className="w-4 h-4" /> Cerrar Turno & Realizar Corte
-              </button>
-            </div>
-          </div>
-
-          {/* Movements Table */}
-          <div className="bg-white rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden space-y-3 p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <History className="w-5 h-5 text-amber-600" />
-                <h3 className="font-black text-base text-stone-900">Movimientos de Efectivo del Turno Actual</h3>
-              </div>
-              <span className="text-xs text-stone-500 font-semibold">{movements.length} movimientos registrados</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-stone-50 text-stone-500 font-extrabold border-b border-stone-200">
-                  <tr>
-                    <th className="p-3.5">Hora</th>
-                    <th className="p-3.5">Tipo</th>
-                    <th className="p-3.5">Categoría</th>
-                    <th className="p-3.5">Monto</th>
-                    <th className="p-3.5">Motivo / Detalle</th>
-                    <th className="p-3.5">Autorizado Por</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {movements.map((m) => {
-                    const isEntry = m.type === "entrada";
-                    return (
-                      <tr key={m.id} className="hover:bg-stone-50/50">
-                        <td className="p-3.5 font-bold text-stone-500">{m.timestamp}</td>
-                        <td className="p-3.5">
-                          {isEntry ? (
-                            <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md text-[10px] uppercase flex items-center gap-1 w-fit">
-                              <ArrowUpRight className="w-3 h-3" /> Entrada
-                            </span>
-                          ) : (
-                            <span className="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-md text-[10px] uppercase flex items-center gap-1 w-fit">
-                              <ArrowDownRight className="w-3 h-3" /> Salida
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-3.5 font-bold text-stone-900">{m.categoryLabel}</td>
-                        <td className={`p-3.5 font-black text-sm ${isEntry ? "text-emerald-600" : "text-rose-600"}`}>
-                          {isEntry ? `+${formatCurrency(m.amount)}` : `-${formatCurrency(m.amount)}`}
-                        </td>
-                        <td className="p-3.5 text-stone-600">{m.reason}</td>
-                        <td className="p-3.5 font-medium text-stone-500">{m.authorizedBy}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL 1: REGISTRAR ENTRADA / SALIDA                                      */}
