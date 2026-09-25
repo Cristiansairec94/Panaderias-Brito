@@ -319,6 +319,7 @@ export interface AppUser {
   assignedBranchName?: string;
   permissions?: Partial<RolePermissions>;
   status?: "activo" | "inactivo";
+  hasSystemAccess?: boolean;
   createdAt?: string;
 }
 

@@ -404,6 +404,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: "Esta cuenta se encuentra temporalmente desactivada. Consulta con el Administrador." };
     }
 
+    if (found.hasSystemAccess === false) {
+      return { success: false, message: "Este trabajador no tiene credenciales de acceso al sistema habilitadas. Consulta con el Administrador." };
+    }
+
     if (found.password && found.password !== cleanPass) {
       return { success: false, message: "Contraseña incorrecta. Por favor verifica tus datos." };
     }
