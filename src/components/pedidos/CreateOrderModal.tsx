@@ -147,7 +147,6 @@ export default function CreateOrderModal({
   const { addNotification } = useNotifications();
 
   const customerNameInputRef = useRef<HTMLInputElement>(null);
-  const customTotalInputRef = useRef<HTMLInputElement>(null);
   const customerDecisionRef = useRef<HTMLDivElement>(null);
   const [mustChooseCustomerAlert, setMustChooseCustomerAlert] = useState(false);
 
@@ -218,7 +217,6 @@ export default function CreateOrderModal({
   // 2. Detalle del pedido
   const [description, setDescription] = useState("");
   const [items, setItems] = useState<OrderItem[]>([]);
-  const [customTotal, setCustomTotal] = useState<number | "">("");
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
 
@@ -357,7 +355,6 @@ export default function CreateOrderModal({
       } else {
         setItems([]);
         setDescription("");
-        setCustomTotal("");
       }
 
       // Pre-llenar cliente si viene del POS (verificando que no sea Público en General)
@@ -400,16 +397,15 @@ export default function CreateOrderModal({
     }
   }, [isOpen, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone, tomorrowStr, initialBranchId, activeBranch, branches]);
 
-  // Cálculo del Total: Si hay items se suman, si no, toma customTotal
+  // Cálculo del Total: Suma del valor de las piezas a pagar
   const total = useMemo(() => {
-    if (items.length > 0) {
-      return items.reduce((acc, it) => acc + it.unitPrice * it.quantity, 0);
-    }
-    if (typeof customTotal === "number" && customTotal > 0) {
-      return customTotal;
-    }
-    return 0;
-  }, [items, customTotal]);
+    return items.reduce((acc, it) => acc + it.unitPrice * it.quantity, 0);
+  }, [items]);
+
+  // Conteo total de piezas del encargo
+  const totalPieces = useMemo(() => {
+    return items.reduce((acc, it) => acc + it.quantity, 0);
+  }, [items]);
 
   // Anticipo obligatorio del 50%
   const minRequiredDeposit = useMemo(() => {
@@ -911,8 +907,7 @@ export default function CreateOrderModal({
     }
 
     if (total <= 0) {
-      alert("Por favor agrega productos del catálogo o escribe el precio total acordado (debe ser mayor a $0).");
-      customTotalInputRef.current?.focus();
+      alert("Por favor agrega al menos un producto o pieza del catálogo para calcular el total a pagar.");
       return;
     }
 
@@ -1307,37 +1302,37 @@ export default function CreateOrderModal({
               />
             </div>
 
-            {/* Precio Total del Pedido */}
+            {/* Total de las Piezas a Pagar */}
             <div className="bg-white p-3 rounded-xl border border-stone-200 flex items-center justify-between gap-3">
               <div>
                 <label className="text-xs font-black text-stone-800 block">
-                  Precio Total del Pedido ($ MXN) *
+                  Total de las Piezas a Pagar ($ MXN) *
                 </label>
                 <p className="text-[11px] text-stone-500">
-                  {items.length > 0 ? "Calculado por productos seleccionados" : "Costo total acordado"}
+                  {totalPieces > 0
+                    ? `Calculado automáticamente (${totalPieces} ${totalPieces === 1 ? "pieza" : "piezas"} a pagar)`
+                    : "0 piezas seleccionadas • En 0 por defecto hasta agregar piezas"}
                 </p>
               </div>
 
-              {items.length > 0 ? (
-                <span className="text-xl font-black text-amber-950 bg-amber-50 border border-amber-300 px-4 py-1.5 rounded-xl">
-                  {formatCurrency(total)}
-                </span>
-              ) : (
-                <div className="relative w-40">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-amber-600">$</span>
+              <div className="flex items-center gap-2">
+                {totalPieces > 0 && (
+                  <span className="text-xs font-black text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-1.5 rounded-xl">
+                    {totalPieces} {totalPieces === 1 ? "pieza" : "piezas"}
+                  </span>
+                )}
+                <div className="relative w-36 sm:w-40">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-amber-600 select-none">$</span>
                   <input
-                    ref={customTotalInputRef}
-                    type="number"
-                    min="0.01"
-                    step="any"
-                    placeholder="Ej. 100"
-                    value={customTotal}
-                    onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                    onChange={(e) => setCustomTotal(e.target.value === "" ? "" : Number(e.target.value))}
-                    className="w-full pl-7 pr-3 py-2 bg-amber-50/50 border-2 border-amber-400 rounded-xl text-right text-base font-black text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    type="text"
+                    readOnly
+                    disabled
+                    value={total > 0 ? total.toFixed(2) : "0"}
+                    className="w-full pl-7 pr-3 py-2 bg-amber-50/50 border-2 border-amber-400 rounded-xl text-right text-base font-black text-stone-900 cursor-not-allowed select-none focus:outline-none shadow-2xs"
+                    title="Total de las piezas a pagar (no editable, en $0 sin piezas)"
                   />
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
