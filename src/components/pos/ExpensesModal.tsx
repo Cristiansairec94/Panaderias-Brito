@@ -439,6 +439,7 @@ export default function ExpensesModal({
   const [activeDetailModal, setActiveDetailModal] = useState<"fondo" | "ventas" | "entradas" | "gastos" | "balance" | null>(null);
   const [cashDetailFilter, setCashDetailFilter] = useState<"all" | "ventas" | "pedidos">("all");
   const [cashMethodFilter, setCashMethodFilter] = useState<"all" | "efectivo" | "tarjeta" | "transferencia">("all");
+  const [showFilterBoxes, setShowFilterBoxes] = useState<boolean>(true);
 
   const handleCloseDetailModal = () => {
     setActiveDetailModal(null);
@@ -2100,7 +2101,7 @@ export default function ExpensesModal({
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 self-stretch sm:self-auto overflow-x-auto">
+                <div className="flex items-center gap-1.5 self-stretch sm:self-auto flex-wrap">
                   <button
                     type="button"
                     onClick={() => {
@@ -2255,7 +2256,7 @@ export default function ExpensesModal({
                 </div>
 
                 {/* Subfiltros por Método de Pago */}
-                <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[10px] font-bold uppercase text-stone-400 mr-1 shrink-0">Método:</span>
                   {[
                     { id: "all", label: "Todos" },
@@ -2324,7 +2325,7 @@ export default function ExpensesModal({
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                  <div className="flex items-center gap-1.5 flex-wrap text-xs">
                     <button
                       type="button"
                       onClick={() => setSelectedDayKey("all")}
@@ -2618,7 +2619,7 @@ export default function ExpensesModal({
             <div className="space-y-3.5">
               {/* Filtros de Historial (Todos, Ventas, Entradas, Salidas) */}
               <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between pb-1">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setHistoryFilter("todos")}
@@ -3089,55 +3090,155 @@ export default function ExpensesModal({
                       </div>
                     </div>
 
-                    {/* Botones de Clasificación: Tipo de Registro y Clasificación por Método de Pago */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 bg-stone-50/80 p-2.5 rounded-2xl border border-stone-200">
-                      {/* 1. Tipo de Registro */}
-                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs">
-                        {[
-                          { id: "all", label: `Todos (${unifiedShiftMovements.length})` },
-                          { id: "ventas", label: `🥖 Ventas en Caja (${allShiftPureSales.length})` },
-                          { id: "pedidos", label: `🎂 Pedidos Especiales (${allShiftOrdersList.length})` },
-                        ].map((tab) => (
+                    {/* Panel de Clasificación y Filtros Desplegable */}
+                    <div className="bg-stone-50/90 rounded-3xl border-2 border-stone-200/90 p-3 sm:p-4 shadow-sm space-y-3">
+                      {/* 1. Barra de Control con Selectores Desplegables y Botón de Cuadros */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-8 h-8 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black text-sm shadow-2xs shrink-0">
+                            🎛️
+                          </span>
+                          <div>
+                            <span className="text-xs font-black text-stone-900 uppercase tracking-wide block leading-tight">
+                              Filtros de Clasificación
+                            </span>
+                            <span className="text-[11px] text-stone-500 font-bold block">
+                              {cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : "Pedidos Especiales"} • {cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : "Transferencia"} ({visibleCashMovements.length})
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Desplegables directos (Selectores Dropdown) */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Desplegable: Tipo de Registro */}
+                          <div className="relative flex-1 sm:flex-initial min-w-[140px]">
+                            <select
+                              value={cashDetailFilter}
+                              onChange={(e) => setCashDetailFilter(e.target.value as any)}
+                              className="w-full appearance-none bg-white hover:bg-stone-100 text-stone-800 font-black text-xs px-3 py-2 pr-7 rounded-xl border border-stone-300 shadow-2xs cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                            >
+                              <option value="all">📋 Tipo: Todos ({unifiedShiftMovements.length})</option>
+                              <option value="ventas">🥖 Tipo: Ventas ({allShiftPureSales.length})</option>
+                              <option value="pedidos">🎂 Tipo: Pedidos ({allShiftOrdersList.length})</option>
+                            </select>
+                            <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+
+                          {/* Desplegable: Método de Pago */}
+                          <div className="relative flex-1 sm:flex-initial min-w-[145px]">
+                            <select
+                              value={cashMethodFilter}
+                              onChange={(e) => setCashMethodFilter(e.target.value as any)}
+                              className="w-full appearance-none bg-white hover:bg-stone-100 text-stone-800 font-black text-xs px-3 py-2 pr-7 rounded-xl border border-stone-300 shadow-2xs cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all"
+                            >
+                              <option value="all">🌐 Pago: Todos ({detailMethodCounts.all})</option>
+                              <option value="efectivo">💵 Pago: Efectivo ({detailMethodCounts.efectivo})</option>
+                              <option value="tarjeta">💳 Pago: Tarjeta ({detailMethodCounts.tarjeta})</option>
+                              <option value="transferencia">📱 Pago: Transf. ({detailMethodCounts.transferencia})</option>
+                            </select>
+                            <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+
+                          {/* Botón Desplegable para ver/ocultar los cuadros de botones */}
                           <button
-                            key={tab.id}
                             type="button"
-                            onClick={() => setCashDetailFilter(tab.id as any)}
-                            className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all border cursor-pointer whitespace-nowrap ${
-                              cashDetailFilter === tab.id
-                                ? "bg-stone-900 text-white border-stone-950 shadow-xs ring-2 ring-stone-900/20"
-                                : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
+                            onClick={() => setShowFilterBoxes((prev) => !prev)}
+                            className={`px-3 py-2 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 border ${
+                              showFilterBoxes
+                                ? "bg-amber-100 text-amber-950 border-amber-300 shadow-2xs"
+                                : "bg-white text-stone-700 hover:bg-stone-100 border-stone-300"
                             }`}
+                            title={showFilterBoxes ? "Ocultar botones en cuadros" : "Desplegar botones en cuadros"}
                           >
-                            {tab.label}
+                            <span>{showFilterBoxes ? "Ocultar Cuadros" : "Ver Cuadros"}</span>
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showFilterBoxes ? "rotate-180" : ""}`} />
                           </button>
-                        ))}
+                        </div>
                       </div>
 
-                      {/* 2. Clasificación por Método de Pago (Transferencia, Efectivo, Tarjeta) */}
-                      <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 text-xs">
-                        <span className="text-[10px] font-black uppercase text-stone-400 mr-0.5 shrink-0">
-                          Pago:
-                        </span>
-                        {[
-                          { id: "all", label: `Todos (${detailMethodCounts.all})`, activeClass: "bg-stone-900 text-white border-stone-900 ring-2 ring-stone-900/20" },
-                          { id: "efectivo", label: `💵 Efectivo (${detailMethodCounts.efectivo})`, activeClass: "bg-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-700/20" },
-                          { id: "tarjeta", label: `💳 Tarjeta (${detailMethodCounts.tarjeta})`, activeClass: "bg-blue-800 text-white border-blue-900 ring-2 ring-blue-700/20" },
-                          { id: "transferencia", label: `📱 Transf. (${detailMethodCounts.transferencia})`, activeClass: "bg-purple-800 text-white border-purple-900 ring-2 ring-purple-700/20" },
-                        ].map((m) => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => setCashMethodFilter(m.id as any)}
-                            className={`px-2.5 py-1.5 rounded-xl font-black text-xs transition-all border cursor-pointer whitespace-nowrap shrink-0 ${
-                              cashMethodFilter === m.id
-                                ? `${m.activeClass} shadow-xs`
-                                : "bg-white text-stone-700 hover:bg-stone-100 border-stone-200"
-                            }`}
-                          >
-                            {m.label}
-                          </button>
-                        ))}
-                      </div>
+                      {/* 2. Cuadros organizados en cuadrículas limpias (SIN deslizar horizontalmente, SIN barras de desplazamiento) */}
+                      {showFilterBoxes && (
+                        <div className="space-y-3 pt-2.5 border-t border-stone-200">
+                          {/* Fila A: Tipo de Registro (3 columnas completas) */}
+                          <div>
+                            <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
+                              <span>1. Tipo de Movimiento:</span>
+                              <span className="text-[10px] font-bold lowercase text-stone-400">
+                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : "solo pedidos"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              {[
+                                { id: "all", label: "Todos", icon: "📋", count: unifiedShiftMovements.length },
+                                { id: "ventas", label: "Ventas en Caja", icon: "🥖", count: allShiftPureSales.length },
+                                { id: "pedidos", label: "Pedidos Especiales", icon: "🎂", count: allShiftOrdersList.length },
+                              ].map((tab) => (
+                                <button
+                                  key={tab.id}
+                                  type="button"
+                                  onClick={() => setCashDetailFilter(tab.id as any)}
+                                  className={`py-2.5 px-2 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 text-center active:scale-98 ${
+                                    cashDetailFilter === tab.id
+                                      ? "bg-stone-900 text-white border-stone-950 shadow-md ring-2 ring-stone-900/20"
+                                      : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
+                                  }`}
+                                >
+                                  <span className="text-base sm:text-lg">{tab.icon}</span>
+                                  <span className="line-clamp-1">{tab.label}</span>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                                    cashDetailFilter === tab.id
+                                      ? "bg-white/20 text-white"
+                                      : "bg-stone-100 text-stone-600"
+                                  }`}>
+                                    {tab.count}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Fila B: Método de Pago (4 columnas en desktop / 2 en móvil) */}
+                          <div>
+                            <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
+                              <span>2. Método de Cobro:</span>
+                              <span className="text-[10px] font-bold lowercase text-stone-400">
+                                {cashMethodFilter === "all" ? "todos los métodos" : `solo ${cashMethodFilter}`}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {[
+                                { id: "all", label: "Todos", icon: "🌐", count: detailMethodCounts.all, activeClass: "bg-stone-900 text-white border-stone-950 ring-2 ring-stone-900/20" },
+                                { id: "efectivo", label: "Efectivo", icon: "💵", count: detailMethodCounts.efectivo, activeClass: "bg-gradient-to-r from-emerald-700 to-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-600/30" },
+                                { id: "tarjeta", label: "Tarjeta", icon: "💳", count: detailMethodCounts.tarjeta, activeClass: "bg-gradient-to-r from-blue-700 to-blue-800 text-white border-blue-900 ring-2 ring-blue-600/30" },
+                                { id: "transferencia", label: "Transf.", icon: "📱", count: detailMethodCounts.transferencia, activeClass: "bg-gradient-to-r from-purple-700 to-purple-800 text-white border-purple-900 ring-2 ring-purple-600/30" },
+                              ].map((m) => (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => setCashMethodFilter(m.id as any)}
+                                  className={`py-2 px-2.5 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
+                                    cashMethodFilter === m.id
+                                      ? `${m.activeClass} shadow-md`
+                                      : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-sm shrink-0">{m.icon}</span>
+                                    <span className="truncate">{m.label}</span>
+                                  </div>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${
+                                    cashMethodFilter === m.id
+                                      ? "bg-white/20 text-white"
+                                      : "bg-stone-100 text-stone-600"
+                                  }`}>
+                                    {m.count}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2.5">
