@@ -245,8 +245,11 @@ const CUENTAS_DESTINO = [
 const QUICK_AMOUNTS = [50, 100, 200, 500, 1000];
 
 /**
- * Muestra el concepto compacto y ultra limpio con leyenda "ver más" / "ver menos".
- * Evita ruido visual como "Compra de mostrador:" repetido y oculta "Público en General" innecesario.
+ * Muestra el concepto de ingreso de forma impecable, ordenada y profesional ("bien acomodado").
+ * - Corrige truncaciones agresivas y elimina botones "ver más" innecesarios para productos individuales.
+ * - Desglosa ventas de múltiples productos de forma limpia y desplegable.
+ * - Estandariza la jerarquía visual: Título claro arriba + Etiquetas y metadatos alineados abajo.
+ * - Muestra folios de pedidos, tickets de venta y notas de caja sin redundancias.
  */
 function CompactIncomeConcept({
   concept,
@@ -254,94 +257,180 @@ function CompactIncomeConcept({
   orderNumber,
   saleId,
   referenceNumber,
+  category,
 }: {
   concept: string;
   customerName?: string;
   orderNumber?: string;
   saleId?: string;
   referenceNumber?: string;
+  category?: string;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!concept) return <span className="text-stone-400 italic text-sm">Sin concepto</span>;
 
-  // Quitar prefijos repetitivos como "Compra de mostrador: "
-  const cleanedConcept = concept.replace(/^Compra de mostrador:\s*/i, "").trim();
+  // 1. Limpieza inicial de prefijos técnicos o redundantes
+  let cleaned = concept
+    .replace(/^Compra de mostrador:\s*/i, "")
+    .replace(/🎂\s*\[Pedido(?:\s+Especial)?\]\s*/gi, "🎂 ")
+    .replace(/\[Pedido(?:\s+Especial)?\]\s*/gi, "")
+    .trim();
 
-  // Cliente real vs genérico
+  // 2. Normalización de pedidos para evitar títulos duplicados con el badge
+  const isAbonoPedido = /abono_pedido/i.test(category || "") || /^(PED-|LIQ-)/i.test(saleId || "") || Boolean(orderNumber);
+  const isLiquidacion = /liquidaci[oó]n/i.test(cleaned) || /^(LIQ-)/i.test(saleId || "");
+  const isAnticipo = /anticipo/i.test(cleaned) || /abono/i.test(cleaned) || /abono_pedido/i.test(category || "");
+
+  if (isAbonoPedido && (isLiquidacion || isAnticipo)) {
+    if (/^anticipo\s+pedido\s+ped-/i.test(cleaned) || /^anticipo\s+pedido/i.test(cleaned)) {
+      cleaned = "🎂 Anticipo de Pedido";
+    } else if (/^liquidaci[oó]n\s+pedido/i.test(cleaned)) {
+      cleaned = "🎂 Liquidación de Pedido";
+    }
+  }
+
+  // Capitalizar primera letra si está en minúsculas (ej: "escoba" -> "Escoba", "llego la dueña" -> "Llegó la dueña")
+  if (cleaned.length > 0 && cleaned[0] === cleaned[0].toLowerCase() && cleaned[0] !== cleaned[0].toUpperCase()) {
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
+
+  // 3. Identificar si contiene múltiples productos (separados por coma)
+  const productItems = cleaned.includes(",")
+    ? cleaned.split(",").map((p) => p.trim()).filter(Boolean)
+    : [];
+  const hasMultipleProducts = productItems.length > 1;
+
+  // Título principal
+  const mainTitle = hasMultipleProducts ? productItems[0] : cleaned;
+
+  // Truncado suave solo si es una descripción inusualmente larga (> 50 caracteres)
+  const isSingleVeryLong = !hasMultipleProducts && cleaned.length > 50;
+  const singlePreview = isSingleVeryLong ? cleaned.slice(0, 48).trim() + "..." : cleaned;
+
+  // 4. Normalización de Cliente (ignorar nombres genéricos)
   const isNamedCustomer =
     customerName &&
     customerName.trim().length > 0 &&
     !/^p[uú]blico\s+(en\s+)?general$/i.test(customerName.trim()) &&
     customerName.trim().toLowerCase() !== "general";
 
-  // Identificar si contiene múltiples productos (separados por coma) o texto largo (> 22 caracteres)
-  const hasMultiple = cleanedConcept.includes(",");
-  const isLong = hasMultiple || cleanedConcept.length > 22 || concept.length > 28;
+  // Formatear cliente en Title Case si viene en minúsculas
+  const formattedCustomer = isNamedCustomer
+    ? customerName.trim().replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    : null;
 
-  // Texto resumido para vista compacta
-  let previewText = cleanedConcept;
-  if (hasMultiple) {
-    const firstItem = cleanedConcept.split(",")[0].trim();
-    previewText = firstItem.length > 24 ? firstItem.slice(0, 22).trim() + "..." : firstItem + "...";
-  } else if (cleanedConcept.length > 22) {
-    previewText = cleanedConcept.slice(0, 20).trim() + "...";
-  }
+  // 5. Resolución unificada de Pedido vs Ticket POS
+  const isOrder = Boolean(orderNumber || (saleId && /^(PED-|LIQ-)/i.test(saleId)) || category === "abono_pedido");
+  const resolvedOrderNum = orderNumber || (saleId && /^(PED-|LIQ-)/i.test(saleId) ? saleId.replace(/^(PED-|LIQ-)/i, "") : null);
+  const resolvedTicketNum = !isOrder && saleId ? saleId : null;
+
+  // 6. Detección de aportaciones de cambio / notas de caja manuales
+  const isCambio =
+    category === "fondo_cambio" ||
+    /\b(cambio|feria|fondo)\b/i.test(cleaned);
 
   return (
-    <div className="leading-snug max-w-sm">
-      {/* 1. Línea principal: Concepto conciso con botón "ver más" */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="font-bold text-stone-900 text-sm leading-tight" title={concept}>
-          {isExpanded ? concept : previewText}
+    <div className="leading-snug max-w-sm py-0.5">
+      {/* ── 1. LÍNEA PRINCIPAL: Título del Concepto / Producto ── */}
+      <div className="flex flex-wrap items-center gap-1.5 min-h-[22px]">
+        <span className="font-bold text-stone-900 text-sm leading-tight" title={cleaned}>
+          {hasMultipleProducts ? mainTitle : (isExpanded ? cleaned : singlePreview)}
         </span>
 
-        {isLong && (
+        {/* Badge interactivo si son múltiples productos */}
+        {hasMultipleProducts && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setIsExpanded((prev) => !prev);
             }}
-            className="inline-flex items-center gap-0.5 text-[11px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-full cursor-pointer transition-colors shadow-2xs select-none"
+            className="inline-flex items-center gap-1 text-[11px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-full cursor-pointer transition-colors shadow-2xs select-none"
+            title={isExpanded ? "Ocultar desglose" : "Ver todos los productos"}
+          >
+            <span>{isExpanded ? "Ocultar" : `+${productItems.length - 1} más`}</span>
+            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+          </button>
+        )}
+
+        {/* Botón ver más solo para descripciones individuales largas (> 50 caracteres) */}
+        {isSingleVeryLong && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded((prev) => !prev);
+            }}
+            className="inline-flex items-center text-[11px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-full cursor-pointer transition-colors shadow-2xs select-none"
             title={isExpanded ? "Mostrar menos texto" : "Mostrar texto completo"}
           >
-            <span>{isExpanded ? "ver menos" : "ver más"}</span>
+            {isExpanded ? "ver menos" : "ver más"}
           </button>
         )}
       </div>
 
-      {/* 2. Metadatos secundarios: Solo clientes reales y folios para no saturar la vista */}
+      {/* Desglose desplegable de productos múltiples */}
+      {hasMultipleProducts && isExpanded && (
+        <div className="mt-2 mb-1 p-2.5 bg-stone-50 border border-stone-200 rounded-xl space-y-1 text-xs shadow-xs">
+          <div className="font-extrabold text-[10px] text-stone-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span>Productos ({productItems.length}):</span>
+            <span className="text-[10px] text-amber-700 font-bold">Ticket Completo</span>
+          </div>
+          {productItems.map((item, idx) => (
+            <div key={idx} className="flex items-start gap-1.5 font-semibold text-stone-800">
+              <span className="text-amber-500 font-bold shrink-0 mt-0.5">•</span>
+              <span className="leading-tight">{item}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── 2. LÍNEA SECUNDARIA: Metadatos y Badges Perfectamente Alineados ── */}
       <div className="flex flex-wrap items-center gap-1.5 mt-1">
-        {isNamedCustomer && (
-          <span className="text-xs text-stone-600 font-medium inline-flex items-center gap-1">
-            <span>Cliente:</span>
-            <strong className="text-stone-900 font-semibold">{customerName}</strong>
+        {/* Cliente con nombre real */}
+        {formattedCustomer && (
+          <span className="text-xs text-stone-700 font-semibold inline-flex items-center gap-1">
+            <span className="text-stone-400">👤</span>
+            <strong className="text-stone-900 font-bold">{formattedCustomer}</strong>
           </span>
         )}
 
-        {orderNumber && (
-          <span className="text-[11px] font-black text-rose-800 bg-rose-50 px-1.5 py-0.5 rounded-md border border-rose-200">
-            Pedido: #{orderNumber}
+        {/* Badge de Pedido Especial */}
+        {resolvedOrderNum && (
+          <span className="text-[11px] font-black text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 inline-flex items-center gap-1 shadow-2xs">
+            <span>🎂</span>
+            <span>Pedido: #{resolvedOrderNum}</span>
           </span>
         )}
 
-        {saleId && (
-          <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200">
-            Ticket: #{saleId}
+        {/* Badge de Ticket de Venta POS */}
+        {resolvedTicketNum && (
+          <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 inline-flex items-center gap-1 shadow-2xs">
+            <span>🧾</span>
+            <span>Ticket: #{resolvedTicketNum}</span>
           </span>
         )}
 
+        {/* Folio de Transferencia / SPEI */}
         {referenceNumber && (
-          <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200">
-            Ref: {referenceNumber}
+          <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200 inline-flex items-center gap-1">
+            <span>Ref:</span>
+            <span>{referenceNumber}</span>
           </span>
         )}
 
-        {/* Solo en modo expandido, si es público en general, mostrarlo sutilmente */}
-        {isExpanded && !isNamedCustomer && customerName && (
-          <span className="text-[11px] text-stone-400 italic">
-            ({customerName})
+        {/* Movimientos de caja manuales (ej: "llego la dueña", "escoba", "cambio") */}
+        {!formattedCustomer && !resolvedOrderNum && !resolvedTicketNum && !referenceNumber && (
+          <span
+            className={`text-[11px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center gap-1 shadow-2xs ${
+              isCambio
+                ? "text-teal-800 bg-teal-50 border-teal-200"
+                : "text-stone-600 bg-stone-100 border-stone-200/90"
+            }`}
+          >
+            <span>{isCambio ? "🪙" : "📝"}</span>
+            <span>{isCambio ? "Fondo de Cambio" : "Movimiento en Caja"}</span>
           </span>
         )}
       </div>
@@ -1215,6 +1304,7 @@ export default function IngresosPage() {
                           orderNumber={inc.orderNumber}
                           saleId={inc.saleId}
                           referenceNumber={inc.referenceNumber}
+                          category={inc.category}
                         />
                       </td>
 

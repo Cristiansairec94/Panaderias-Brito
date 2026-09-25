@@ -339,26 +339,31 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
 /**
  * Muestra el concepto compacto con botón "ver más" / "ver menos" si supera la longitud
  */
-function ExpandableConceptText({ text, maxChars = 22 }: { text: string; maxChars?: number }) {
+function ExpandableConceptText({ text, maxChars = 50 }: { text: string; maxChars?: number }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!text) return null;
 
-  const isLong = text.length > maxChars;
+  // Capitalizar primera letra si está en minúsculas
+  const formattedText = text.length > 0 && text[0] === text[0].toLowerCase() && text[0] !== text[0].toUpperCase()
+    ? text.charAt(0).toUpperCase() + text.slice(1)
+    : text;
+
+  const isLong = formattedText.length > maxChars;
 
   if (!isLong) {
     return (
-      <div className="font-bold text-stone-950 text-sm leading-snug" title={text}>
-        {text}
+      <div className="font-bold text-stone-950 text-sm leading-snug" title={formattedText}>
+        {formattedText}
       </div>
     );
   }
 
-  const preview = text.slice(0, maxChars).trim() + "...";
+  const preview = formattedText.slice(0, maxChars).trim() + "...";
 
   return (
-    <div className="font-bold text-stone-950 text-sm leading-snug" title={text}>
-      <span>{isExpanded ? text : preview}</span>
+    <div className="font-bold text-stone-950 text-sm leading-snug" title={formattedText}>
+      <span>{isExpanded ? formattedText : preview}</span>
       <button
         type="button"
         onClick={(e) => {
@@ -1344,7 +1349,7 @@ export default function GastosPage() {
                       {/* 5. Concepto / Motivo */}
                       <td className="py-3.5 px-4 align-middle max-w-sm">
                         <div className={isAnulado ? "line-through text-stone-500" : ""}>
-                          <ExpandableConceptText text={g.description} maxChars={22} />
+                          <ExpandableConceptText text={g.description} maxChars={50} />
                         </div>
                         {g.supplier && (
                           <div className="text-xs sm:text-sm text-stone-500 truncate mt-1">
