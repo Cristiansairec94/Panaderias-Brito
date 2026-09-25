@@ -12,6 +12,7 @@ interface TicketModalProps {
   onClose: () => void;
   onCancelTicket?: () => void;
   onConfigurePrinter?: () => void;
+  isReprint?: boolean;
   saleId?: string;
   items: CartItem[];
   total: number;
@@ -35,6 +36,7 @@ export default function TicketModal({
   onClose,
   onCancelTicket,
   onConfigurePrinter,
+  isReprint = false,
   saleId,
   items,
   total,
@@ -87,10 +89,12 @@ export default function TicketModal({
   };
 
   const handleFinishSale = () => {
-    try {
-      playCashRegisterSound();
-    } catch (e) {
-      console.error("Error al reproducir caja registradora:", e);
+    if (!isReprint) {
+      try {
+        playCashRegisterSound();
+      } catch (e) {
+        console.error("Error al reproducir caja registradora:", e);
+      }
     }
     onClose();
   };
@@ -98,7 +102,7 @@ export default function TicketModal({
   const is58mm = printerConfig.paperWidth === "58mm";
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg sm:max-w-xl w-full overflow-hidden flex flex-col max-h-[94vh]">
         {/* Header bar del modal */}
         <div className="bg-neutral-900 text-white p-4 px-6 flex items-center justify-between">
@@ -123,9 +127,9 @@ export default function TicketModal({
             </div>
           </div>
           <button
-            onClick={onCancelTicket || handleFinishSale}
-            className="p-2 hover:bg-neutral-800 rounded-xl text-neutral-400 hover:text-rose-400 transition-colors cursor-pointer"
-            title={onCancelTicket ? "Cancelar ticket y compra" : "Cerrar"}
+            onClick={onClose}
+            className="p-2 hover:bg-neutral-800 rounded-xl text-neutral-400 hover:text-white transition-colors cursor-pointer"
+            title="Cerrar ticket"
           >
             <X className="w-5 h-5" />
           </button>
@@ -357,19 +361,21 @@ export default function TicketModal({
               </span>
             </button>
 
-            {/* Botón 2: Terminar Venta */}
+            {/* Botón 2: Terminar Venta o Cerrar Ticket */}
             <button
               type="button"
               onClick={handleFinishSale}
               className="flex items-center justify-center gap-2 py-4 px-4 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-2xl text-sm sm:text-base shadow-lg shadow-emerald-600/30 transition-all active:scale-95 cursor-pointer"
             >
               <CheckCircle className="w-5 h-5 text-white shrink-0" />
-              <span className="whitespace-nowrap font-black">Terminar Venta</span>
+              <span className="whitespace-nowrap font-black">
+                {isReprint ? "Cerrar Ticket" : "Terminar Venta"}
+              </span>
             </button>
           </div>
 
           {/* Botón de Cancelar Ticket */}
-          {onCancelTicket && (
+          {!isReprint && onCancelTicket && (
             <button
               type="button"
               onClick={onCancelTicket}

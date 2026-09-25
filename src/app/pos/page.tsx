@@ -594,6 +594,7 @@ export default function POSPage() {
 
   // Modals & Drawers state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [isReprintMode, setIsReprintMode] = useState(false);
   const [showRecentSales, setShowRecentSales] = useState(false);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
@@ -2013,6 +2014,7 @@ export default function POSPage() {
       } catch (e) {}
       setRecentSalesList(nextList);
       setIsSubmitting(false);
+      setIsReprintMode(false);
       setShowReceiptModal(true);
 
       // Al completar la compra, la charola se limpia y vuelve automáticamente a Público en General con efectivo
@@ -2086,8 +2088,7 @@ export default function POSPage() {
 
   const handleReprintSale = (sale: Sale) => {
     setCompletedSale(sale);
-    setShowRecentSales(false);
-    setShowExpensesModal(false);
+    setIsReprintMode(true);
     setShowReceiptModal(true);
   };
 
@@ -2101,6 +2102,17 @@ export default function POSPage() {
     setIsCustomerPickerOpen(false);
     setShowReceiptModal(false);
     setCompletedSale(null);
+    setIsReprintMode(false);
+  };
+
+  const handleCloseReceiptModal = () => {
+    setShowReceiptModal(false);
+    setCompletedSale(null);
+    if (!isReprintMode) {
+      resetSale();
+    } else {
+      setIsReprintMode(false);
+    }
   };
 
   const handleCancelTicket = () => {
@@ -3677,8 +3689,9 @@ export default function POSPage() {
       {completedSale && (
         <TicketModal
           isOpen={showReceiptModal}
-          onClose={resetSale}
-          onCancelTicket={handleCancelTicket}
+          onClose={handleCloseReceiptModal}
+          onCancelTicket={isReprintMode ? undefined : handleCancelTicket}
+          isReprint={isReprintMode}
           saleId={completedSale.id}
           items={completedSale.items}
           total={completedSale.total}
@@ -3813,7 +3826,6 @@ export default function POSPage() {
         onSelectSaleForReprint={handleReprintSale}
         orders={currentShiftOrders}
         onSelectOrderForReceipt={(order) => {
-          setShowRecentSales(false);
           setSelectedOrderForReceipt(order);
         }}
         onSelectOrderForPayment={(order) => {
@@ -3837,7 +3849,6 @@ export default function POSPage() {
           onSelectSaleForReprint={handleReprintSale}
           orders={currentShiftOrders}
           onSelectOrderForReceipt={(order) => {
-            setShowExpensesModal(false);
             setSelectedOrderForReceipt(order);
           }}
           onSelectOrderForPayment={(order) => {

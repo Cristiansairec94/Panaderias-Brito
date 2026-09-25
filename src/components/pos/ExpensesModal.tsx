@@ -2950,7 +2950,6 @@ export default function ExpensesModal({
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          handleCloseDetailModal();
                                           onSelectSaleForReprint(sale);
                                         }}
                                         className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
