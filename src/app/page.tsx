@@ -29,7 +29,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
-import { useBranch, SimulatedSale } from "@/context/BranchContext";
+import { useBranch } from "@/context/BranchContext";
 import { getStoredOrders } from "@/lib/orders";
 import { CustomOrder } from "@/types";
 
@@ -67,8 +67,7 @@ export default function Home() {
     currentBranch, 
     isAllBranches, 
     switchBranch, 
-    consolidatedMetrics,
-    recentSimulatedSales
+    consolidatedMetrics
   } = useBranch();
 
   // Orders state (Pedidos de mostrador levantados por cajeros)
@@ -434,88 +433,6 @@ export default function Home() {
 
       </div>
 
-      {/* ========================================================= */}
-      {/* 3. LIVE TICKETS FEED (Ventas en Mostrador en Vivo)       */}
-      {/* ========================================================= */}
-      <div className="bg-white rounded-3xl border border-stone-200/90 p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-            </span>
-            <div>
-              <h2 className="text-sm font-black text-stone-900 flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-orange-600" />
-                Flujo de Ventas en Vivo (Últimos Tickets Emitidos)
-              </h2>
-              <p className="text-xs text-stone-500">
-                Monitoreo en tiempo real de transacciones registradas en mostrador por las cajeras.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {recentSimulatedSales.length === 0 ? (
-          <div className="p-6 text-center bg-stone-50/70 rounded-2xl border border-dashed border-stone-200 space-y-2">
-            <Receipt className="w-8 h-8 text-stone-300 mx-auto" />
-            <p className="text-xs font-bold text-stone-600">Aún no hay tickets registrados en esta sesión de mostrador</p>
-            <p className="text-[11px] text-stone-400">
-              Las transacciones cobradas en caja se reflejarán automáticamente en este panel en tiempo real.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {recentSimulatedSales.slice(0, 4).map((sale) => {
-              const isCash = sale.paymentMethod === "efectivo";
-              const isCard = sale.paymentMethod === "tarjeta";
-
-              return (
-                <div
-                  key={sale.id}
-                  className="p-3.5 rounded-2xl bg-stone-50/70 hover:bg-white border border-stone-200/80 hover:border-orange-300 transition-all flex flex-col justify-between space-y-2 shadow-xs group"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-stone-200/80 text-stone-800">
-                        {sale.branchName}
-                      </span>
-                      <span className="text-[11px] font-semibold text-stone-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-stone-400" />
-                        {sale.timestamp}
-                      </span>
-                    </div>
-
-                    <p className="font-extrabold text-xs text-stone-900 line-clamp-1 group-hover:text-orange-600 transition-colors">
-                      {sale.itemsSummary}
-                    </p>
-
-                    <p className="text-[10px] text-stone-500">
-                      Cajera: <strong className="text-stone-700">{sale.cashier}</strong>
-                    </p>
-                  </div>
-
-                  <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between">
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                      isCash 
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                        : isCard 
-                        ? "bg-blue-50 text-blue-800 border-blue-200"
-                        : "bg-purple-50 text-purple-800 border-purple-200"
-                    }`}>
-                      {isCash ? "💵 Efectivo" : isCard ? "💳 Tarjeta" : "📱 Transf."}
-                    </span>
-
-                    <span className="font-black text-sm text-stone-900">
-                      {formatCurrency(sale.total)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* ========================================================= */}
       {/* 4. SUCURSALES MATRIX (Desempeño Comparativo)             */}
