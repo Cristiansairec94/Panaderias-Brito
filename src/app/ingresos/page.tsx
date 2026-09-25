@@ -143,9 +143,9 @@ export default function IngresosPage() {
 
   const [incomes, setIncomes] = useState<CashIncome[]>([]);
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<"all" | CashIncomeCategory>("all");
   const [selectedMethod, setSelectedMethod] = useState<"all" | "efectivo" | "tarjeta" | "transferencia">("all");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [lastSyncTime, setLastSyncTime] = useState<string>("En vivo");
   
   // Modals state
@@ -258,11 +258,11 @@ export default function IngresosPage() {
       (inc.saleId && inc.saleId.toLowerCase().includes(search.toLowerCase())) ||
       inc.cashier.toLowerCase().includes(search.toLowerCase());
 
-    const matchesCategory = selectedCategory === "all" || inc.category === selectedCategory;
     const matchesMethod = selectedMethod === "all" || inc.paymentMethod === selectedMethod;
     const matchesBranch = selectedBranch === "all" || inc.branchName === selectedBranch;
+    const matchesCategory = selectedCategory === "all" || inc.category === selectedCategory;
 
-    return matchesSearch && matchesCategory && matchesMethod && matchesBranch;
+    return matchesSearch && matchesMethod && matchesBranch && matchesCategory;
   });
 
   const handleCreateIncome = async (e: React.FormEvent) => {
@@ -549,7 +549,7 @@ export default function IngresosPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-4 transition-all duration-200 hover:border-emerald-400/80 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20">
+      <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-emerald-400/80 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Search Box */}
           <div className="relative flex-1 w-full">
@@ -591,34 +591,6 @@ export default function IngresosPage() {
               ))}
             </select>
           </div>
-        </div>
-
-        {/* Category Filter Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 text-sm">
-          <button
-            onClick={() => setSelectedCategory("all")}
-            className={`px-4 py-2 rounded-xl font-black text-sm whitespace-nowrap transition-all ${
-              selectedCategory === "all"
-                ? "bg-emerald-700 text-white shadow-sm"
-                : "bg-stone-100 text-stone-700 hover:bg-stone-200"
-            }`}
-          >
-            Todos ({incomes.length})
-          </button>
-          {CATEGORY_OPTIONS.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                selectedCategory === cat.id
-                  ? "bg-emerald-700 text-white shadow-sm"
-                  : "bg-stone-100 text-stone-700 hover:bg-stone-200"
-              }`}
-            >
-              <span>{cat.icon}</span>
-              <span>{cat.shortLabel || cat.label}</span>
-            </button>
-          ))}
         </div>
       </div>
 
