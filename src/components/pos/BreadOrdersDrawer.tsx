@@ -114,11 +114,11 @@ export default function BreadOrdersDrawer({
 
   const numericDeposit = typeof depositInput === "number" ? depositInput : (depositInput === "" ? 0 : Number(depositInput) || 0);
 
-  // Validation: deposit can be 0 or any amount up to total
+  // Validation: deposit must be at least 50% up to total
   const isDepositValid = useMemo(() => {
     if (total <= 0) return false;
-    return numericDeposit >= 0 && numericDeposit <= total;
-  }, [total, numericDeposit]);
+    return numericDeposit >= minRequiredDeposit && numericDeposit <= total;
+  }, [total, numericDeposit, minRequiredDeposit]);
 
   const remainingBalance = useMemo(() => {
     return Math.max(0, total - numericDeposit);
@@ -649,31 +649,25 @@ export default function BreadOrdersDrawer({
                     <span className="text-[10px] text-amber-300 font-bold uppercase">Atajos:</span>
                     <button
                       type="button"
-                      onClick={() => setDepositInput(0)}
-                      className="py-1.5 px-3 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-xl text-[11px] font-black transition-all text-amber-200"
-                    >
-                      $0.00
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => handleSetQuickDeposit(50)}
-                      className="flex-1 py-1.5 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-xl text-[11px] font-black transition-all text-amber-200"
+                      className={`flex-1 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer border ${
+                        numericDeposit === minRequiredDeposit
+                          ? "bg-amber-500 text-stone-950 border-amber-300 shadow-md ring-2 ring-amber-400/50"
+                          : "bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border-amber-500/50 text-amber-200"
+                      }`}
                     >
-                      50% ({formatCurrency(minRequiredDeposit)})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSetQuickDeposit(70)}
-                      className="flex-1 py-1.5 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-xl text-[11px] font-black transition-all text-amber-200"
-                    >
-                      70% ({formatCurrency(total * 0.7)})
+                      💵 50% Mínimo ({formatCurrency(minRequiredDeposit)})
                     </button>
                     <button
                       type="button"
                       onClick={() => handleSetQuickDeposit(100)}
-                      className="flex-1 py-1.5 bg-amber-500/20 hover:bg-amber-500 hover:text-stone-950 border border-amber-500/50 rounded-xl text-[11px] font-black transition-all text-amber-200"
+                      className={`flex-1 py-1.5 rounded-xl text-[11px] font-black transition-all cursor-pointer border ${
+                        numericDeposit === total
+                          ? "bg-emerald-500 text-white border-emerald-300 shadow-md ring-2 ring-emerald-400/50"
+                          : "bg-emerald-500/20 hover:bg-emerald-500 hover:text-white border-emerald-500/50 text-emerald-200"
+                      }`}
                     >
-                      100% ({formatCurrency(total)})
+                      💳 100% Liquidado ({formatCurrency(total)})
                     </button>
                   </div>
                 </div>
@@ -761,20 +755,22 @@ export default function BreadOrdersDrawer({
                 disabled={!isDepositValid || !customerName.trim() || !customerPhone.trim()}
                 className={`w-full py-4 rounded-2xl text-sm font-black flex items-center justify-center gap-2 shadow-xl transition-all ${
                   isDepositValid && customerName.trim() && customerPhone.trim()
-                    ? "bg-[#3e2723] hover:bg-black text-amber-50 border-2 border-amber-500 active:scale-98 shadow-amber-950/30"
-                    : "bg-stone-300 text-stone-500 border border-stone-400 cursor-not-allowed"
+                    ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-500 hover:to-emerald-600 text-white border-2 border-emerald-300 ring-4 ring-emerald-500/30 active:scale-98 shadow-emerald-950/40 cursor-pointer animate-in fade-in"
+                    : "bg-stone-850 text-stone-400 border border-stone-700/80 cursor-not-allowed opacity-75 shadow-none"
                 }`}
               >
-                <span>🥖</span>
+                <span>{isDepositValid && customerName.trim() && customerPhone.trim() ? "✨" : "🔒"}</span>
                 <span>
                   {!customerName.trim() || !customerPhone.trim()
                     ? "Completa los datos del cliente para continuar"
-                    : numericDeposit === 0
-                    ? "Confirmar Pedido de Pan (Sin anticipo - $0.00)"
-                    : `Confirmar Pedido de Pan con Anticipo de ${formatCurrency(numericDeposit)}`}
+                    : !isDepositValid
+                    ? `Elige el adelanto (Mínimo 50% — ${formatCurrency(minRequiredDeposit)})`
+                    : numericDeposit >= total
+                    ? `CONFIRMAR PEDIDO (100% Liquidado — ${formatCurrency(numericDeposit)})`
+                    : `CONFIRMAR PEDIDO (${Math.round((numericDeposit / total) * 100)}% Adelanto — ${formatCurrency(numericDeposit)})`}
                 </span>
                 {isDepositValid && customerName.trim() && customerPhone.trim() && (
-                  <ChevronRight className="w-4 h-4 text-amber-400" />
+                  <ChevronRight className="w-4 h-4 text-amber-300" />
                 )}
               </button>
 

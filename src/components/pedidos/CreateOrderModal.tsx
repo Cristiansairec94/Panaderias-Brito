@@ -30,7 +30,8 @@ import {
   Users,
   Check,
   Barcode,
-  Copy
+  Copy,
+  Sparkles
 } from "lucide-react";
 import { Product, Customer, OrderItem } from "@/types";
 import { getStoredCustomers, createCustomerInDb, normalizeCustomerName } from "@/lib/customers";
@@ -426,7 +427,9 @@ export default function CreateOrderModal({
   }, [total, deposit]);
 
   const numericDeposit = deposit === "" ? 0 : Math.max(0, Number(deposit) || 0);
-  const isDepositSufficient = true; // El anticipo es editable libremente y puede ser $0.00
+  // El sistema exige como mínimo el 50% de adelanto o liquidar el 100% para apartar pedido
+  const isDepositValid = total > 0 && numericDeposit >= minRequiredDeposit && numericDeposit <= total;
+  const isDepositSufficient = isDepositValid;
   const remainingBalance = Math.max(0, total - numericDeposit);
 
   // Sugerencias de clientes existentes
@@ -908,6 +911,11 @@ export default function CreateOrderModal({
     if (total <= 0) {
       alert("Por favor agrega productos del catálogo o escribe el precio total acordado.");
       customTotalInputRef.current?.focus();
+      return;
+    }
+
+    if (!isDepositValid || numericDeposit < minRequiredDeposit) {
+      alert(`Para apartar el pedido se requiere como mínimo el 50% de adelanto (${formatCurrency(minRequiredDeposit)}) o liquidar el 100% (${formatCurrency(total)}).`);
       return;
     }
 
@@ -1856,14 +1864,14 @@ export default function CreateOrderModal({
                 onClick={() => setDeposit(minRequiredDeposit.toString())}
                 className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === minRequiredDeposit && total > 0 && numericDeposit > 0
-                    ? "bg-amber-500 text-stone-950 border-amber-400 font-black shadow-lg scale-[1.02]"
+                    ? "bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 border-amber-300 font-black shadow-lg ring-2 ring-amber-400/50 scale-[1.02]"
                     : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
                 }`}
               >
                 <div className="flex items-center gap-1">
                   <span className="text-xs sm:text-sm font-black">💵 50%</span>
-                  <span className="text-[9px] bg-stone-950 text-amber-300 px-1 py-0.5 rounded font-black">
-                    Sugerido
+                  <span className="text-[9px] bg-stone-950 text-amber-300 px-1.5 py-0.5 rounded font-black">
+                    Mínimo Requerido
                   </span>
                 </div>
                 <span className="text-xs sm:text-sm font-black">
@@ -1876,13 +1884,13 @@ export default function CreateOrderModal({
                 onClick={() => setDeposit(total.toString())}
                 className={`p-2.5 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === total && total > 0
-                    ? "bg-emerald-500 text-stone-950 border-emerald-400 font-black shadow-lg scale-[1.02]"
+                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-300 font-black shadow-lg ring-2 ring-emerald-400/50 scale-[1.02]"
                     : "bg-stone-800/90 hover:bg-stone-800 text-stone-200 border-stone-700 font-bold"
                 }`}
               >
                 <div className="flex items-center gap-1">
                   <span className="text-xs sm:text-sm font-black">💳 100%</span>
-                  <span className="text-[9px] bg-stone-950 text-emerald-300 px-1 py-0.5 rounded font-black">
+                  <span className="text-[9px] bg-stone-950 text-emerald-300 px-1.5 py-0.5 rounded font-black">
                     Liquidado
                   </span>
                 </div>
@@ -1894,9 +1902,14 @@ export default function CreateOrderModal({
 
             {/* Input personalizado editable */}
             <div className="flex items-center justify-between gap-3 pt-1">
-              <label className="text-xs font-bold text-stone-300">
-                O escribe otra cantidad dejada:
-              </label>
+              <div>
+                <label className="text-xs font-bold text-stone-300 block">
+                  O escribe otra cantidad dejada:
+                </label>
+                <span className="text-[10px] text-amber-300/80 font-medium">
+                  Mínimo 50%: {formatCurrency(minRequiredDeposit)}
+                </span>
+              </div>
               <div className="relative w-36">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 font-black">$</span>
                 <input
@@ -1923,7 +1936,13 @@ export default function CreateOrderModal({
                       setDeposit("0");
                     }
                   }}
-                  className="w-full pl-7 pr-3 py-1.5 bg-stone-950 border border-stone-700 rounded-xl text-right text-sm font-black text-white focus:outline-none focus:border-amber-400"
+                  className={`w-full pl-7 pr-3 py-1.5 bg-stone-950 border rounded-xl text-right text-sm font-black focus:outline-none transition-colors ${
+                    numericDeposit >= minRequiredDeposit && total > 0
+                      ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/50"
+                      : numericDeposit > 0
+                      ? "border-rose-500 text-rose-300"
+                      : "border-stone-700 text-white"
+                  }`}
                 />
               </div>
             </div>
@@ -1931,13 +1950,28 @@ export default function CreateOrderModal({
             {/* Resumen del Anticipo y Saldo Pendiente */}
             {total > 0 && (
               <div className="flex items-center justify-between text-xs pt-1 border-t border-stone-800">
-                <span className="text-amber-300 font-bold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  {numericDeposit === 0
-                    ? "Sin anticipo — Se cobrará completo al entregar"
-                    : numericDeposit >= total
-                    ? "Pedido liquidado al 100%"
-                    : `Anticipo de ${formatCurrency(numericDeposit)} registrado`}
+                <span className="font-bold flex items-center gap-1.5">
+                  {numericDeposit === 0 ? (
+                    <span className="text-amber-400 flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                      Falta elegir adelanto: mínimo 50% ({formatCurrency(minRequiredDeposit)}) o 100%
+                    </span>
+                  ) : numericDeposit < minRequiredDeposit ? (
+                    <span className="text-rose-400 flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                      Adelanto menor al 50%: mínimo {formatCurrency(minRequiredDeposit)}
+                    </span>
+                  ) : numericDeposit >= total ? (
+                    <span className="text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      Pedido liquidado al 100% — ¡Listo para apartar!
+                    </span>
+                  ) : (
+                    <span className="text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      Adelanto válido del {Math.round((numericDeposit / total) * 100)}% ({formatCurrency(numericDeposit)})
+                    </span>
+                  )}
                 </span>
                 <span className="text-stone-300">
                   Resta al entregar: <strong className="text-amber-400 text-sm font-mono font-black">{formatCurrency(remainingBalance)}</strong>
@@ -2366,27 +2400,35 @@ export default function CreateOrderModal({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSubmitting}
-              className={`w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
+              disabled={isSubmitting || !isDepositValid || !customerName.trim() || total <= 0}
+              className={`w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2.5 transition-all ${
                 isSubmitting
-                  ? "bg-stone-400 text-stone-700 cursor-wait"
-                  : !customerName.trim() || total <= 0
-                  ? "bg-amber-500 hover:bg-amber-600 text-stone-950 shadow-amber-900/20 active:scale-98"
+                  ? "bg-stone-700 text-stone-400 cursor-wait shadow-none"
+                  : !customerName.trim()
+                  ? "bg-stone-850 text-stone-400 border-2 border-stone-700/80 cursor-not-allowed opacity-75 shadow-none"
+                  : total <= 0
+                  ? "bg-stone-850 text-stone-400 border-2 border-stone-700/80 cursor-not-allowed opacity-75 shadow-none"
+                  : !isDepositValid
+                  ? "bg-stone-850 text-amber-400/80 border-2 border-dashed border-amber-500/40 cursor-not-allowed opacity-80 shadow-none hover:bg-stone-800"
                   : isCustomerDecisionPending
-                  ? "bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-stone-950 shadow-amber-900/30 ring-4 ring-amber-400/40 active:scale-98"
-                  : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-emerald-950/30 active:scale-98 ring-4 ring-emerald-500/20"
+                  ? "bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-stone-950 shadow-xl shadow-amber-900/30 ring-4 ring-amber-400/40 active:scale-98 cursor-pointer"
+                  : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/40 border-2 border-emerald-300/90 active:scale-98 cursor-pointer animate-in fade-in"
               }`}
             >
               <span>
-                {isSubmitting
-                  ? "⏳"
-                  : !customerName.trim()
-                  ? "👤"
-                  : total <= 0
-                  ? "🎂"
-                  : isCustomerDecisionPending
-                  ? "👥"
-                  : "✅"}
+                {isSubmitting ? (
+                  "⏳"
+                ) : !customerName.trim() ? (
+                  "👤"
+                ) : total <= 0 ? (
+                  "🎂"
+                ) : !isDepositValid ? (
+                  "🔒"
+                ) : isCustomerDecisionPending ? (
+                  "👥"
+                ) : (
+                  <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
+                )}
               </span>
               <span>
                 {isSubmitting
@@ -2395,11 +2437,15 @@ export default function CreateOrderModal({
                   ? "Escribe el nombre del cliente para apartar"
                   : total <= 0
                   ? "Indica el monto total del encargo"
+                  : numericDeposit === 0
+                  ? `Elige el adelanto (Mínimo 50% o 100%) para apartar`
+                  : numericDeposit < minRequiredDeposit
+                  ? `Adelanto insuficiente (Mínimo 50% — ${formatCurrency(minRequiredDeposit)})`
                   : isCustomerDecisionPending
                   ? `Elige si guardar o no al cliente antes de apartar`
-                  : numericDeposit === 0
-                  ? `GUARDAR Y APARTAR PEDIDO (Sin anticipo - $0.00)`
-                  : `GUARDAR Y APARTAR PEDIDO (${formatCurrency(numericDeposit)} Recibidos)`}
+                  : numericDeposit >= total
+                  ? `GUARDAR Y APARTAR PEDIDO (100% Liquidado — ${formatCurrency(numericDeposit)})`
+                  : `GUARDAR Y APARTAR PEDIDO (${Math.round((numericDeposit / total) * 100)}% Adelanto — ${formatCurrency(numericDeposit)} Recibidos)`}
               </span>
             </button>
           </div>

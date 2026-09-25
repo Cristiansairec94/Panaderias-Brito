@@ -34,9 +34,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  Info,
-  Maximize2,
-  Minimize2
+  Info
 } from "lucide-react";
 import { CashExpense, CashIncome, Sale, CustomOrder } from "@/types";
 import { 
@@ -415,9 +413,6 @@ export default function ExpensesModal({
   const [activeTab, setActiveTab] = useState<"tickets" | "register" | "list">(
     initialTab || "register"
   );
-  // Estado para pantalla desplegable amplia que ocupe gran parte de la pantalla
-  const [isMaximized, setIsMaximized] = useState(false);
-  const isExpandedView = isMaximized || activeTab === "tickets";
 
   // Estados locales para previsualizar/reimprimir tickets directamente sin salir de la pestaña
   const [previewSale, setPreviewSale] = useState<Sale | null>(null);
@@ -1773,11 +1768,7 @@ export default function ExpensesModal({
     <>
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200">
       <div 
-        className={`bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col border-2 border-stone-200 transition-all duration-300 ease-in-out ${
-          isExpandedView
-            ? "w-[96vw] max-w-7xl h-[92vh] sm:h-[94vh] max-h-[96vh]"
-            : "w-full max-w-2xl sm:max-w-3xl max-h-[94vh]"
-        }`}
+        className="bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col border-2 border-stone-200 transition-all duration-300 ease-in-out w-[96vw] max-w-7xl h-[92vh] sm:h-[94vh] max-h-[96vh]"
       >
         
         {/* Header Principal con $ destacado */}
@@ -1808,24 +1799,6 @@ export default function ExpensesModal({
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsMaximized(!isMaximized)}
-              className="p-2 sm:px-3 sm:py-2 rounded-xl text-stone-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-white/10 hover:border-white/20"
-              title={isExpandedView ? "Reducir tamaño" : "Desplegar a pantalla completa"}
-            >
-              {isExpandedView ? (
-                <>
-                  <Minimize2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
-                  <span className="hidden md:inline">Reducir</span>
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
-                  <span className="hidden md:inline">Pantalla Completa</span>
-                </>
-              )}
-            </button>
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
