@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   X, 
   DollarSign, 
+  Plus,
   PlusCircle, 
   Trash2, 
   Receipt,
@@ -139,6 +140,7 @@ interface ExpensesModalProps {
   branchName?: string;
   branchAddress?: string;
   branchPhone?: string;
+  onOpenCreateOrder?: () => void;
 }
 
 const QUICK_AMOUNTS = [50, 100, 200, 500, 1000];
@@ -407,6 +409,7 @@ export default function ExpensesModal({
   branchName,
   branchAddress,
   branchPhone,
+  onOpenCreateOrder,
 }: ExpensesModalProps) {
   const { addNotification } = useNotifications();
   const { enqueueOfflineItem, isOnline } = useSync();
@@ -802,16 +805,28 @@ export default function ExpensesModal({
 
   const totalSalesSum = activeSalesForKpi.reduce((acc, s) => acc + s.total, 0);
   
-  // Ventas en efectivo (mostrador + anticipos/liquidaciones de pedidos en efectivo)
-  const totalShiftCashSales = useMemo(() => {
-    const posCash = effectiveSales
-      .filter((s) => s.paymentMethod === "efectivo")
-      .reduce((acc, s) => acc + s.total, 0);
-    const ordersCash = effectiveOrders
+  // Ventas de mostrador puras en efectivo (excluyendo pedidos)
+  const shiftPurePosCash = useMemo(() => {
+    return effectiveSales
+      .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder)
+      .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  }, [effectiveSales]);
+
+  // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones)
+  const shiftOrdersCash = useMemo(() => {
+    const fromSales = effectiveSales
+      .filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder)
+      .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+    const fromOrders = effectiveOrders
       .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
       .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
-    return posCash + ordersCash;
+    return fromSales + fromOrders;
   }, [effectiveSales, effectiveOrders]);
+
+  // Ventas totales en efectivo (mostrador + anticipos/liquidaciones de pedidos)
+  const totalShiftCashSales = useMemo(() => {
+    return shiftPurePosCash + shiftOrdersCash;
+  }, [shiftPurePosCash, shiftOrdersCash]);
 
   const totalOrdersDeposits = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
   const totalOrdersValue = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
@@ -1848,51 +1863,74 @@ export default function ExpensesModal({
           </div>
         </div>
 
-        {/* Live Cash Balances Bar - 5 Cuentas Base de Caja */}
-        {/* Live Cash Balances Bar - 5 Cuentas Base de Caja */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-2.5 p-3 sm:p-4 bg-stone-50 border-b border-stone-200 text-center">
+        {/* Live Cash Balances Bar - 6 Cuentas Base de Caja (con Botón Dedicado de Pedidos) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5 p-3 sm:p-4 bg-stone-50 border-b border-stone-200 text-center">
           
           {/* 1. Fondo Inicial */}
           <div
             className="p-2.5 sm:p-3 rounded-2xl border-2 text-center flex flex-col justify-center items-center bg-blue-50/70 border-blue-200/90 shadow-2xs"
           >
-            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-blue-950 block leading-tight tracking-wide">
+            <span className="text-xs sm:text-sm uppercase font-black text-blue-950 block leading-tight tracking-wide">
               🪙 Fondo Inicial
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-blue-800 block my-1 tracking-tight truncate">
               +{formatCurrency(currentFund)}
             </span>
+            <span className="text-[10px] text-blue-700 font-bold block">
+              Base de caja
+            </span>
           </div>
 
-          {/* 2. Ventas y Pedidos Efectivo */}
+          {/* 2. Ventas Efectivo */}
           <button
             type="button"
             onClick={() => {
               setActiveDetailModal("ventas");
-              setCashDetailFilter("all");
+              setCashDetailFilter("ventas");
             }}
             className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-emerald-50/70 border-emerald-200/90 hover:bg-emerald-100/70 hover:border-emerald-400 shadow-2xs active:scale-98"
-            title="Abrir información detallada de Ventas y Pedidos en Efectivo"
+            title="Abrir información detallada de Ventas en Mostrador en Efectivo"
           >
-            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-emerald-950 block leading-tight tracking-wide">
-              Ventas y Pedidos Efectivo
+            <span className="text-xs sm:text-sm uppercase font-black text-emerald-950 block leading-tight tracking-wide">
+              Ventas Efectivo
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-emerald-700 block my-1 tracking-tight truncate">
-              +{formatCurrency(totalShiftCashSales)}
+              +{formatCurrency(shiftPurePosCash)}
             </span>
             <span className="text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200 border border-emerald-200/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
               👁️ Ver historial
             </span>
           </button>
 
-          {/* 3. Entradas / Cambio */}
+          {/* 3. Pedidos Efectivo */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveDetailModal("ventas");
+              setCashDetailFilter("pedidos");
+            }}
+            className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-amber-50/80 border-amber-300 hover:bg-amber-100 hover:border-amber-400 shadow-2xs active:scale-98"
+            title="Abrir información detallada de Pedidos Especiales cobrados en Efectivo"
+          >
+            <span className="text-xs sm:text-sm uppercase font-black text-amber-950 block leading-tight tracking-wide">
+              Pedidos Efectivo
+            </span>
+            <span className="text-lg sm:text-xl md:text-2xl font-black text-amber-800 block my-1 tracking-tight truncate">
+              +{formatCurrency(shiftOrdersCash)}
+            </span>
+            <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-200/90 group-hover:bg-amber-300 border border-amber-300/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
+              👁️ Ver historial
+            </span>
+          </button>
+
+          {/* 4. Entradas / Cambio */}
           <button
             type="button"
             onClick={() => setActiveDetailModal("entradas")}
             className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-teal-50/70 border-teal-200/90 hover:bg-teal-100/70 hover:border-teal-400 shadow-2xs active:scale-98"
             title="Abrir información detallada de Entradas y Cambio"
           >
-            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-teal-950 block leading-tight tracking-wide">
+            <span className="text-xs sm:text-sm uppercase font-black text-teal-950 block leading-tight tracking-wide">
               Entradas / Cambio
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-teal-700 block my-1 tracking-tight truncate">
@@ -1903,14 +1941,14 @@ export default function ExpensesModal({
             </span>
           </button>
 
-          {/* 4. Gastos / Retiros */}
+          {/* 5. Salidas de Dinero */}
           <button
             type="button"
             onClick={() => setActiveDetailModal("gastos")}
             className="p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-rose-50/70 border-rose-200/90 hover:bg-rose-100/70 hover:border-rose-400 shadow-2xs active:scale-98"
             title="Abrir información detallada de Gastos y Retiros"
           >
-            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-rose-950 block leading-tight tracking-wide">
+            <span className="text-xs sm:text-sm uppercase font-black text-rose-950 block leading-tight tracking-wide">
               Salidas de Dinero
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-rose-700 block my-1 tracking-tight truncate">
@@ -1921,20 +1959,20 @@ export default function ExpensesModal({
             </span>
           </button>
 
-          {/* 5. En Cajón Ahora */}
+          {/* 6. En Cajón Ahora */}
           <button
             type="button"
             onClick={() => setActiveDetailModal("balance")}
-            className="col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-amber-50/80 border-amber-300 hover:bg-amber-100/70 hover:border-amber-400 shadow-2xs active:scale-98"
+            className="col-span-2 sm:col-span-1 p-2.5 sm:p-3 rounded-2xl border-2 transition-all text-center cursor-pointer group flex flex-col justify-center items-center bg-stone-100 border-stone-300 hover:bg-stone-200/80 hover:border-stone-400 shadow-2xs active:scale-98"
             title="Abrir balance contable del dinero que debe haber en caja"
           >
-            <span className="text-xs sm:text-sm md:text-base uppercase font-black text-amber-950 block leading-tight tracking-wide">
+            <span className="text-xs sm:text-sm uppercase font-black text-stone-900 block leading-tight tracking-wide">
               En Caja (Balance)
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-stone-950 block my-1 tracking-tight truncate">
               {formatCurrency(netCashInDrawer)}
             </span>
-            <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-100/90 group-hover:bg-amber-200 border border-amber-300/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
+            <span className="text-[11px] sm:text-xs font-black text-stone-800 bg-stone-200 border border-stone-300/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
               👁️ Ver historial
             </span>
           </button>
@@ -2739,7 +2777,7 @@ export default function ExpensesModal({
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-xl shrink-0">
                     {activeDetailModal === "fondo" && "🪙"}
-                    {activeDetailModal === "ventas" && "🥖"}
+                    {activeDetailModal === "ventas" && (cashDetailFilter === "pedidos" ? "🎂" : "🥖")}
                     {activeDetailModal === "entradas" && "🪙"}
                     {activeDetailModal === "gastos" && "💸"}
                     {activeDetailModal === "balance" && "💵"}
@@ -2747,7 +2785,13 @@ export default function ExpensesModal({
                   <div>
                     <h3 className="font-black text-base sm:text-lg leading-tight">
                       {activeDetailModal === "fondo" && "Fondo Inicial de Caja"}
-                      {activeDetailModal === "ventas" && "Historial de Ventas y Pedidos en Efectivo"}
+                      {activeDetailModal === "ventas" && (
+                        cashDetailFilter === "pedidos"
+                          ? "Historial de Pedidos Especiales en Efectivo"
+                          : cashDetailFilter === "ventas"
+                          ? "Historial de Ventas en Efectivo"
+                          : "Historial de Ventas y Pedidos en Efectivo"
+                      )}
                       {activeDetailModal === "entradas" && "Historial de Entradas / Cambio"}
                       {activeDetailModal === "gastos" && "Historial de Gastos y Salidas"}
                       {activeDetailModal === "balance" && "Dinero que Debe Haber en Caja (Balance)"}
@@ -2852,26 +2896,60 @@ export default function ExpensesModal({
                 {/* 2. MODAL: VENTAS Y PEDIDOS EN EFECTIVO */}
                 {activeDetailModal === "ventas" && (
                   <div className="space-y-4">
-                    <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white p-5 sm:p-6 rounded-3xl shadow-lg border-2 border-emerald-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className={`p-5 sm:p-6 rounded-3xl shadow-lg border-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-white transition-all ${
+                      cashDetailFilter === "pedidos"
+                        ? "bg-gradient-to-br from-amber-600 via-amber-700 to-amber-900 border-amber-400"
+                        : "bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 border-emerald-400"
+                    }`}>
                       <div>
-                        <span className="text-xs uppercase font-black tracking-widest text-emerald-200 block">
-                          🥖 Ventas y Pedidos en Efectivo del Turno
+                        <span className={`text-xs uppercase font-black tracking-widest block ${
+                          cashDetailFilter === "pedidos" ? "text-amber-200" : "text-emerald-200"
+                        }`}>
+                          {cashDetailFilter === "pedidos"
+                            ? "🎂 Pedidos Especiales en Efectivo"
+                            : cashDetailFilter === "ventas"
+                            ? "🥖 Ventas de Mostrador en Efectivo"
+                            : "🥖 Ventas y Pedidos en Efectivo del Turno"}
                         </span>
                         <h2 className="text-3xl sm:text-4xl font-black tracking-tight mt-1 text-white">
-                          +{formatCurrency(totalShiftCashSales)}
+                          +{formatCurrency(
+                            cashDetailFilter === "pedidos"
+                              ? shiftOrdersCash
+                              : cashDetailFilter === "ventas"
+                              ? shiftPurePosCash
+                              : totalShiftCashSales
+                          )}
                         </h2>
-                        <p className="text-xs text-emerald-100 font-medium mt-1">
-                          Cobrado en efectivo en mostrador y anticipos de pedidos por {cashierName}
+                        <p className={`text-xs font-medium mt-1 ${
+                          cashDetailFilter === "pedidos" ? "text-amber-100" : "text-emerald-100"
+                        }`}>
+                          {cashDetailFilter === "pedidos"
+                            ? `Anticipos y liquidaciones de pedidos cobrados en efectivo por ${cashierName}`
+                            : cashDetailFilter === "ventas"
+                            ? `Tickets cobrados en mostrador por ${cashierName}`
+                            : `Cobrado en efectivo en mostrador y anticipos de pedidos por ${cashierName}`}
                         </p>
                       </div>
                       <div className="flex sm:flex-col gap-2 shrink-0 self-stretch sm:self-auto">
                         <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-white/20 text-center">
-                          <span className="text-[10px] text-emerald-200 font-bold block uppercase">Registros</span>
-                          <span className="text-base sm:text-lg font-black text-white">{totalCashRecordsCount}</span>
+                          <span className={`text-[10px] font-bold block uppercase ${
+                            cashDetailFilter === "pedidos" ? "text-amber-200" : "text-emerald-200"
+                          }`}>
+                            {cashDetailFilter === "pedidos" ? "Pedidos" : cashDetailFilter === "ventas" ? "Tickets" : "Registros"}
+                          </span>
+                          <span className="text-base sm:text-lg font-black text-white">
+                            {cashDetailFilter === "pedidos" ? cashOrdersList.length : cashDetailFilter === "ventas" ? cashSalesList.length : totalCashRecordsCount}
+                          </span>
                         </div>
                         <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-white/20 text-center">
-                          <span className="text-[10px] text-emerald-200 font-bold block uppercase">Piezas Pan</span>
-                          <span className="text-base sm:text-lg font-black text-white">{totalCashPiecesCount}</span>
+                          <span className={`text-[10px] font-bold block uppercase ${
+                            cashDetailFilter === "pedidos" ? "text-amber-200" : "text-emerald-200"
+                          }`}>
+                            Piezas Pan
+                          </span>
+                          <span className="text-base sm:text-lg font-black text-white">
+                            {cashDetailFilter === "pedidos" ? cashOrdersPieces : cashDetailFilter === "ventas" ? cashSalesPieces : totalCashPiecesCount}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -2899,7 +2977,7 @@ export default function ExpensesModal({
                     </div>
 
                     <div className="space-y-2.5">
-                      <div className="flex items-center justify-between text-xs px-1">
+                      <div className="flex items-center justify-between text-xs px-1 gap-2 flex-wrap">
                         <span className="font-black text-stone-700 uppercase tracking-wide">
                           {cashDetailFilter === "ventas"
                             ? `Tickets de Mostrador en Efectivo (${cashSalesList.length})`
@@ -2907,9 +2985,24 @@ export default function ExpensesModal({
                             ? `Pedidos con Cobro en Efectivo (${cashOrdersList.length})`
                             : `Historial de Ventas y Pedidos en Efectivo (${visibleCashMovements.length})`}
                         </span>
-                        <span className="text-stone-500 font-medium text-[11px]">
-                          {shiftName}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {cashDetailFilter === "pedidos" && onOpenCreateOrder && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleCloseDetailModal();
+                                onOpenCreateOrder();
+                              }}
+                              className="px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Apartar Pedido</span>
+                            </button>
+                          )}
+                          <span className="text-stone-500 font-medium text-[11px]">
+                            {shiftName}
+                          </span>
+                        </div>
                       </div>
 
                       {visibleCashMovements.length === 0 ? (

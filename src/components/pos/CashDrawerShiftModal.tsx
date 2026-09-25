@@ -296,8 +296,11 @@ export default function CashDrawerShiftModal({
     .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
     .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
 
-  const posCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo").reduce((sum, s) => sum + s.total, 0);
-  const cashSales = posCash + ordersCash;
+  const purePosCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
+  const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
+  const totalOrdersCash = ordersCash + ordersInSalesCash;
+  const posCash = purePosCash + totalOrdersCash;
+  const cashSales = posCash;
   const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
   const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
   const totalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0);
@@ -819,7 +822,7 @@ export default function CashDrawerShiftModal({
                 /* Formulario Directo de Arqueo y Relevo */
                 <div className="space-y-3.5">
                   {/* 1. Resumen Financiero del Turno (coincide con Movimientos de Caja) */}
-                  <div className={`grid grid-cols-2 ${totalIncomesInCash > 0 ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-3 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
+                  <div className={`grid grid-cols-2 ${totalIncomesInCash > 0 ? "sm:grid-cols-6" : "sm:grid-cols-5"} gap-2.5 p-3.5 bg-gradient-to-br from-stone-50 to-amber-50/40 rounded-3xl border-2 border-stone-200/90 shadow-xs`}>
                     <div
                       className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/80 shadow-xs flex flex-col items-center justify-center text-center"
                     >
@@ -830,12 +833,24 @@ export default function CashDrawerShiftModal({
                       type="button"
                       onClick={() => setModalView("history")}
                       className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-200/80 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
-                      title="Ver historial de ventas y pedidos"
+                      title="Ver historial de ventas de mostrador"
                     >
-                      <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas y Pedidos</span>
-                      <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(cashSales)}</span>
+                      <span className="text-[11px] sm:text-xs text-emerald-700 font-black block uppercase tracking-wider">(+) Ventas</span>
+                      <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5 block">+{formatCurrency(purePosCash)}</span>
                       <span className="text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 border border-emerald-200/80 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
                         👁️ Ver historial
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalView("history")}
+                      className="bg-white p-3 sm:p-4 rounded-2xl border border-amber-300 shadow-xs transition-transform hover:scale-105 duration-200 flex flex-col items-center justify-center text-center cursor-pointer"
+                      title="Ver historial de pedidos especiales cobrados"
+                    >
+                      <span className="text-[11px] sm:text-xs text-amber-800 font-black block uppercase tracking-wider">(+) Pedidos</span>
+                      <span className="text-xl sm:text-2xl font-black text-amber-800 mt-0.5 block">+{formatCurrency(totalOrdersCash)}</span>
+                      <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-200/90 border border-amber-300 px-2 py-0.5 rounded-full mt-1.5 inline-flex items-center gap-1 shadow-2xs">
+                        👁️ Ver pedidos
                       </span>
                     </button>
                     {totalIncomesInCash > 0 && (

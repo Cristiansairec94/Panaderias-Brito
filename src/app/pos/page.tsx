@@ -79,7 +79,6 @@ import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
 import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
-import PosOrdersDrawer from "@/components/pos/PosOrdersDrawer";
 import { getStoredOrders } from "@/lib/orders";
 import { recordPosSaleIncome, getStoredIncomes } from "@/lib/incomes";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
@@ -681,40 +680,19 @@ export default function POSPage() {
   const [receiptIncome, setReceiptIncome] = useState<CashIncome | null>(null);
   const [showIncomeReceiptModal, setShowIncomeReceiptModal] = useState(false);
 
-  // Estados para Pedidos Especiales (Anticipo Mínimo 50% Obligatorio)
-  const [showOrdersDrawer, setShowOrdersDrawer] = useState(false);
+  // Estados para Pedidos Especiales
   const [showCreateOrderModal, setShowCreateOrderModal] = useState(false);
   const [specialOrderInitialItems, setSpecialOrderInitialItems] = useState<OrderItem[]>([]);
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
-  const [branchPendingOrdersCount, setBranchPendingOrdersCount] = useState<number>(0);
-
-  // Contar pedidos pendientes de la sucursal activa
-  const updatePendingOrdersCount = () => {
-    try {
-      const allOrders = getStoredOrders();
-      const currentBId = activeBranch?.id;
-      const count = allOrders.filter(
-        (o) =>
-          (!currentBId || !o.branchId || o.branchId === currentBId) &&
-          o.status !== "entregado" &&
-          o.status !== "cancelado"
-      ).length;
-      setBranchPendingOrdersCount(count);
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   useEffect(() => {
-    updatePendingOrdersCount();
     const handleOrdersUpdated = () => {
-      updatePendingOrdersCount();
       setShiftVersion((v) => v + 1);
     };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
     return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
-  }, [activeBranch?.id]);
+  }, []);
 
   // Sincronizar en tiempo real el dinero ingresado del turno activo
   useEffect(() => {
@@ -833,8 +811,6 @@ export default function POSPage() {
   };
 
   const handleOrderCreated = (orderId: string) => {
-    updatePendingOrdersCount();
-
     // Actualizar inmediatamente los ingresos en caja del turno de la terminal POS
     try {
       const savedIncomes = localStorage.getItem("brito_pos_current_incomes");
@@ -1435,7 +1411,6 @@ export default function POSPage() {
         showIncomesModal ||
         showCashDrawerModal ||
         showBreadDeliveryModal ||
-        showOrdersDrawer ||
         showCreateOrderModal ||
         Boolean(selectedOrderForReceipt) ||
         Boolean(selectedOrderForPayment)
@@ -1503,7 +1478,6 @@ export default function POSPage() {
     showIncomesModal,
     showCashDrawerModal,
     showBreadDeliveryModal,
-    showOrdersDrawer,
     showCreateOrderModal,
     selectedOrderForReceipt,
     selectedOrderForPayment,
@@ -2427,24 +2401,8 @@ export default function POSPage() {
 
             </div>
 
-            {/* Grupo Pedidos, Caja y Turno: Pedidos Especiales + Movimientos de Caja + Cerrar Turno */}
+            {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
             <div className="flex items-center gap-2 shrink-0">
-
-              {/* Botón Pedidos Especiales de la Sucursal */}
-              <button
-                type="button"
-                onClick={() => setShowOrdersDrawer(true)}
-                className="flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 border-rose-300 hover:border-rose-400 bg-rose-50 hover:bg-rose-100/90 text-rose-950 text-sm sm:text-base font-black transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
-                title="Ver y levantar pedidos especiales de clientes (pasteles, charolas, eventos)"
-              >
-                <span className="text-lg">🎂</span>
-                <span>Pedidos Especiales</span>
-                {branchPendingOrdersCount > 0 && (
-                  <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-xs">
-                    {branchPendingOrdersCount}
-                  </span>
-                )}
-              </button>
 
               {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
               <button
@@ -3807,6 +3765,10 @@ export default function POSPage() {
           branchName={activeBranch?.name}
           branchAddress={activeBranch?.address}
           branchPhone={activeBranch?.phone}
+          onOpenCreateOrder={() => {
+            setShowExpensesModal(false);
+            handleOpenCreateOrder();
+          }}
         />
       )}
 
@@ -3878,17 +3840,6 @@ export default function POSPage() {
         />
       )}
 
-      {/* Drawer de Pedidos Especiales de la Sucursal */}
-      <PosOrdersDrawer
-        isOpen={showOrdersDrawer}
-        onClose={() => setShowOrdersDrawer(false)}
-        branchId={activeBranch?.id || "branch-matriz"}
-        branchName={activeBranch?.name || "Sucursal Matriz"}
-        cashierName={cashierName}
-        onOpenCreateOrder={() => handleOpenCreateOrder(false)}
-        onSelectOrderForReceipt={(order) => setSelectedOrderForReceipt(order)}
-        onSelectOrderForPayment={(order) => setSelectedOrderForPayment(order)}
-      />
 
       {/* Modal de Creación de Pedido Especial con Anticipo Obligatorio del 50% */}
       {(() => {
@@ -3922,7 +3873,6 @@ export default function POSPage() {
         onClose={() => setSelectedOrderForPayment(null)}
         order={selectedOrderForPayment}
         onPaymentSuccess={() => {
-          updatePendingOrdersCount();
           try {
             const savedIncomes = localStorage.getItem("brito_pos_current_incomes");
             if (savedIncomes) {
