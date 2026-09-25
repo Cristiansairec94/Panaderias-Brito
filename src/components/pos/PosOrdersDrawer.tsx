@@ -47,6 +47,7 @@ export default function PosOrdersDrawer({
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<"todos" | "hoy" | "saldo">("todos");
+  const [branchScope, setBranchScope] = useState<"esta" | "todas">("esta");
 
   const refreshOrders = () => {
     setOrders(getStoredOrders());
@@ -66,13 +67,15 @@ export default function PosOrdersDrawer({
 
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  // Filtrar pedidos de esta sucursal
+  // Filtrar pedidos de esta sucursal (o todas las sucursales si se selecciona)
   const branchOrders = useMemo(() => {
+    if (branchScope === "todas") return orders;
     return orders.filter((o) => {
-      if (branchId && o.branchId && o.branchId !== branchId) return false;
-      return true;
+      if (!branchId) return true;
+      const orderBranch = (o as any).operatingBranchId || o.branchId;
+      return !o.branchId || o.branchId === branchId || orderBranch === branchId;
     });
-  }, [orders, branchId]);
+  }, [orders, branchId, branchScope]);
 
   // Filtrado simple
   const filteredOrders = useMemo(() => {
@@ -234,12 +237,36 @@ export default function PosOrdersDrawer({
 
         {/* Lista de Pedidos */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-          <div className="flex items-center justify-between text-xs text-stone-600 font-bold px-1 pb-1">
-            <span>Pedidos de esta sucursal ({filteredOrders.length})</span>
+          <div className="flex items-center justify-between text-xs text-stone-600 font-bold px-1 pb-1 gap-2 flex-wrap">
+            <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl border border-stone-200">
+              <button
+                type="button"
+                onClick={() => setBranchScope("esta")}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all ${
+                  branchScope === "esta"
+                    ? "bg-white text-stone-900 shadow-xs"
+                    : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                Esta Sucursal ({filteredOrders.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setBranchScope("todas")}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all ${
+                  branchScope === "todas"
+                    ? "bg-white text-stone-900 shadow-xs"
+                    : "text-stone-500 hover:text-stone-800"
+                }`}
+              >
+                Todas ({orders.length})
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={refreshOrders}
-              className="text-amber-800 hover:text-amber-950 flex items-center gap-1 font-bold"
+              className="text-amber-800 hover:text-amber-950 flex items-center gap-1 font-bold ml-auto"
             >
               <RefreshCw className="w-3 h-3" />
               <span>Actualizar</span>
