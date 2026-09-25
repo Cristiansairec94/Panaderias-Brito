@@ -508,9 +508,14 @@ export default function POSPage() {
             if (realSales.length !== parsed.length) {
               localStorage.setItem("brito_pos_current_sales", JSON.stringify(realSales));
             }
-            setRecentSalesList(realSales);
+            setRecentSalesList((prev) => {
+              if (prev.length === realSales.length && prev.every((s, i) => s.id === realSales[i]?.id)) {
+                return prev;
+              }
+              return realSales;
+            });
           } else {
-            setRecentSalesList([]);
+            setRecentSalesList((prev) => (prev.length === 0 ? prev : []));
           }
         }
 
@@ -602,12 +607,6 @@ export default function POSPage() {
   const [recentSalesList, setRecentSalesList] = useState<Sale[]>(() => {
     if (typeof window !== "undefined") {
       try {
-        const locked = localStorage.getItem("brito_pos_shift_locked");
-        if (locked === "true") {
-          localStorage.setItem("brito_pos_current_sales", "[]");
-          return [];
-        }
-
         const saved = localStorage.getItem("brito_pos_current_sales");
         if (saved && saved !== "[]") {
           const parsed = JSON.parse(saved);
@@ -646,8 +645,12 @@ export default function POSPage() {
 
   useEffect(() => {
     try {
-      localStorage.setItem("brito_pos_current_sales", JSON.stringify(recentSalesList || []));
-      window.dispatchEvent(new Event("brito_sales_updated"));
+      const currentStored = localStorage.getItem("brito_pos_current_sales");
+      const serialized = JSON.stringify(recentSalesList || []);
+      if (currentStored !== serialized) {
+        localStorage.setItem("brito_pos_current_sales", serialized);
+        window.dispatchEvent(new Event("brito_sales_updated"));
+      }
     } catch (e) {}
   }, [recentSalesList]);
 
@@ -755,12 +758,17 @@ export default function POSPage() {
               if (shiftStart > 0 && (!t || t < shiftStart - 10000)) return false;
               return true;
             });
-            setRecentSalesList(realSales);
+            setRecentSalesList((prev) => {
+              if (prev.length === realSales.length && prev.every((s, i) => s.id === realSales[i]?.id)) {
+                return prev;
+              }
+              return realSales;
+            });
           } else {
-            setRecentSalesList([]);
+            setRecentSalesList((prev) => (prev.length === 0 ? prev : []));
           }
         } else {
-          setRecentSalesList([]);
+          setRecentSalesList((prev) => (prev.length === 0 ? prev : []));
         }
         setShiftVersion((v) => v + 1);
       } catch (e) {
@@ -956,18 +964,17 @@ export default function POSPage() {
 
   const handleDirectUnlockShift = () => {
     setInitialCashFund(baseShiftFund);
-    setRecentSalesList([]);
-    setExpensesList([]);
-    setIncomesList([]);
     try {
       localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
       localStorage.removeItem("brito_pos_shift_locked");
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
-      localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
       localStorage.setItem("brito_current_shift_cashier", cashierName);
       localStorage.setItem("brito_current_shift_name", shiftName);
+      if (!localStorage.getItem("brito_pos_current_sales")) {
+        localStorage.setItem("brito_pos_current_sales", "[]");
+      }
+      if (!localStorage.getItem("brito_current_shift_start_timestamp")) {
+        localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      }
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
     } catch (e) {}
@@ -980,8 +987,6 @@ export default function POSPage() {
       const locked = localStorage.getItem("brito_pos_shift_locked");
       if (locked === "true") {
         setIsShiftLocked(true);
-        setRecentSalesList([]);
-        localStorage.setItem("brito_pos_current_sales", "[]");
       }
 
       // Obtener el inicio de turno más reciente y válido (del corte o inicio de turno guardado)
@@ -1346,8 +1351,10 @@ export default function POSPage() {
 
   const addToCart = (product: Product) => {
     if (isShiftLocked) {
-      setIsMobileCartOpen(true);
-      return;
+      setIsShiftLocked(false);
+      try {
+        localStorage.removeItem("brito_pos_shift_locked");
+      } catch (e) {}
     }
 
     // Piezas de pan sin límites: se permite agregar libremente cualquier cantidad
@@ -1386,17 +1393,10 @@ export default function POSPage() {
     if (!code) return;
 
     if (isShiftLocked) {
-      addNotification({
-        senderName: "🔒 Terminal Bloqueada",
-        senderAvatar: "⚠️",
-        badgeIcon: "alerta",
-        title: "Escaneo Deshabilitado",
-        highlightText: "Turno cerrado",
-        description: "Desbloquea la terminal con la encargada para comenzar a cobrar productos por código de barras.",
-        category: "caja",
-      });
-      setIsMobileCartOpen(true);
-      return;
+      setIsShiftLocked(false);
+      try {
+        localStorage.removeItem("brito_pos_shift_locked");
+      } catch (e) {}
     }
 
     // Consulta en tiempo real al catálogo guardado en productos y en memoria
@@ -1542,8 +1542,10 @@ export default function POSPage() {
   const addMultipleToCart = (product: Product, count: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (isShiftLocked) {
-      setIsMobileCartOpen(true);
-      return;
+      setIsShiftLocked(false);
+      try {
+        localStorage.removeItem("brito_pos_shift_locked");
+      } catch (e) {}
     }
 
     // Sin límites: se permite sumar cualquier cantidad de piezas
@@ -1597,8 +1599,10 @@ export default function POSPage() {
   const total = cart.reduce((sum, item) => sum + (item.product.price || 0) * (item.quantity || 0), 0);
   const totalPieces = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const parsedCashGiven = Number(cashGiven) || 0;
+  const effectiveCashGiven = paymentMethod === "efectivo" ? (parsedCashGiven > 0 ? parsedCashGiven : total) : undefined;
   const change = paymentMethod === "efectivo" && parsedCashGiven >= total ? parsedCashGiven - total : 0;
-  const isPaymentValid = paymentMethod !== "efectivo" || parsedCashGiven >= total;
+  // Si no se teclea cantidad en efectivo, se asume cobro exacto para agilidad máxima sin esperas
+  const isPaymentValid = paymentMethod !== "efectivo" || cashGiven.trim() === "" || parsedCashGiven >= total;
 
   // Financial calculations strictly for the current operating cashier's shift
   const shiftStartBoundary = useMemo(() => {
@@ -1616,9 +1620,6 @@ export default function POSPage() {
       }
       return recentSalesList.filter((s) => {
         if (!s) return false;
-        if (s.cashier && cashierName) {
-          if (!matchesCashier(s.cashier, cashierName)) return false;
-        }
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
         if (shiftStartBoundary > 0) {
           if (!t || t < shiftStartBoundary - 10000) return false;
@@ -1674,22 +1675,16 @@ export default function POSPage() {
 
   const currentShiftOrders = useMemo(() => {
     try {
-      if (!shiftStartBoundary || shiftStartBoundary <= 0) {
-        return [];
-      }
       return getStoredOrders().filter((o) => {
         if (!o) return false;
         if (activeBranch) {
           const matchBranch = !o.branchId || o.branchId === activeBranch.id || (o as any).operatingBranchId === activeBranch.id;
           if (!matchBranch) return false;
         }
-        if (o.cashier && cashierName) {
-          const isMatch = matchesCashier(o.cashier, cashierName);
-          const isGenericOrAdmin = /admin|dueño|toño|cajero en turno/i.test(o.cashier);
-          if (!isMatch && !isGenericOrAdmin) return false;
+        const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
+        if (shiftStartBoundary > 0) {
+          if (!t || t < shiftStartBoundary - 10000) return false;
         }
-        const t = parseDateTimeSafe(o.createdAt || (o as any).date);
-        if (!t || t < shiftStartBoundary - 10000) return false;
         if (t > Date.now() + 60000) return false;
         return true;
       });
@@ -1697,7 +1692,7 @@ export default function POSPage() {
       console.error("Error filtering currentShiftOrders:", e);
       return [];
     }
-  }, [activeBranch?.id, cashierName, shiftName, shiftStartBoundary, shiftVersion]);
+  }, [activeBranch?.id, shiftStartBoundary, shiftVersion]);
 
   const totalCashSales = useMemo(() => {
     const posCash = (currentShiftSales || [])
@@ -1769,198 +1764,222 @@ export default function POSPage() {
     setShowIncomeReceiptModal(true);
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     const validItems = cart.filter((item) => (item.quantity || 0) > 0);
     if (validItems.length === 0 || !isPaymentValid || isSubmitting) return;
-    setIsSubmitting(true);
 
+    // Operación Local-First Inmediata (0 milisegundos de espera)
     const currentItems = [...validItems];
     const currentTotal = total;
     const currentPaymentMethod = paymentMethod;
-    const currentCashGiven = paymentMethod === "efectivo" ? parsedCashGiven : undefined;
-    const currentChange = paymentMethod === "efectivo" ? change : undefined;
+    const currentCashGiven = paymentMethod === "efectivo"
+      ? (parsedCashGiven > 0 ? parsedCashGiven : currentTotal)
+      : undefined;
+    const currentChange = paymentMethod === "efectivo"
+      ? Math.max(0, (currentCashGiven || currentTotal) - currentTotal)
+      : undefined;
 
-    let createdSaleId = `POS-${Date.now().toString().slice(-6)}`;
-    let savedToCloud = false;
+    const createdSaleId = `POS-${Date.now().toString().slice(-6)}`;
 
-    if (isOnline) {
-      try {
-        const supabase = createClient();
-        
-        const saleInsertPayload: any = {
-          total: currentTotal,
-          payment_method: currentPaymentMethod,
-          cashier: cashierName,
-        };
-        if (selectedCustomer.id && !selectedCustomer.id.startsWith("cli-")) {
-          saleInsertPayload.customer_id = selectedCustomer.id;
-        }
-
-        const { data: saleData, error: saleErr } = await supabase
-          .from("sales")
-          .insert(saleInsertPayload)
-          .select()
-          .single();
-
-        if (saleData && !saleErr) {
-          createdSaleId = saleData.id;
-          savedToCloud = true;
-
-          const saleItemsToInsert = currentItems.map((item) => ({
-            sale_id: saleData.id,
-            product_id: item.product.id.includes("-") ? item.product.id : null,
-            product_name: item.product.name,
-            quantity: item.quantity,
-            unit_price: item.product.price,
-            subtotal: item.product.price * item.quantity,
-          }));
-          await supabase.from("sale_items").insert(saleItemsToInsert);
-
-          for (const item of currentItems) {
-            if (item.product.id.includes("-")) {
-              const newStock = Math.max(0, item.product.stock - item.quantity);
-              await supabase
-                .from("products")
-                .update({ stock: newStock })
-                .eq("id", item.product.id);
-            }
-          }
-        }
-      } catch (e) {
-        console.log("Offline sale or db pending", e);
-      }
-    }
-
-    // Si no se guardó en la nube (offline o falla de red), encolar de forma segura en la cola offline local
-    if (!savedToCloud) {
-      enqueueOfflineItem({
-        type: "sale",
-        title: `Venta POS #${createdSaleId} (${formatCurrency(currentTotal)})`,
-        amount: currentTotal,
-        branchId: activeBranch?.id,
-        data: {
-          saleId: createdSaleId,
-          total: currentTotal,
-          paymentMethod: currentPaymentMethod,
-          cashier: cashierName,
-          items: currentItems.map((item) => ({
-            productId: item.product.id,
-            name: item.product.name,
-            quantity: item.quantity,
-            price: item.product.price,
-            subtotal: item.product.price * item.quantity,
-          })),
-        },
-      });
-    }
-
+    // 1. Descontar inventario localmente al instante
     setProducts((prev) => {
-        const updated = prev.map((prod) => {
-          const bought = currentItems.find((ci) => ci.product.id === prod.id);
-          if (bought) {
-            return { ...prod, stock: Math.max(0, prod.stock - bought.quantity) };
-          }
-          return prod;
-        });
-        saveStoredProducts(updated);
-        return updated;
+      const updated = prev.map((prod) => {
+        const bought = currentItems.find((ci) => ci.product.id === prod.id);
+        if (bought) {
+          return { ...prod, stock: Math.max(0, prod.stock - bought.quantity) };
+        }
+        return prod;
       });
+      saveStoredProducts(updated);
+      return updated;
+    });
 
-      const newSaleRecord: Sale = {
-        id: createdSaleId,
-        date: formatDateTimeSafe(new Date()),
-        items: currentItems,
+    // 2. Crear registro de venta con folio y fecha instantánea
+    const newSaleRecord: Sale = {
+      id: createdSaleId,
+      date: formatDateTimeSafe(new Date()),
+      items: currentItems,
+      total: currentTotal,
+      paymentMethod: currentPaymentMethod,
+      transferAccount: currentPaymentMethod === "transferencia" && selectedTransferAccount
+        ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})`
+        : undefined,
+      cardTerminal: currentPaymentMethod === "tarjeta" && selectedCardTerminal
+        ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})`
+        : undefined,
+      paymentReference: paymentReference.trim() || undefined,
+      cashier: cashierName,
+      cashGiven: currentCashGiven,
+      change: currentChange,
+      customerId: selectedCustomer.id,
+      customerName: selectedCustomer.name,
+      customerType: selectedCustomer.type,
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");
+    if (activeBranch) {
+      registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary);
+    }
+
+    // 3. Registrar automáticamente en el Historial de Ingresos sin límite de dinero
+    try {
+      recordPosSaleIncome({
+        saleId: createdSaleId,
         total: currentTotal,
         paymentMethod: currentPaymentMethod,
-        transferAccount: currentPaymentMethod === "transferencia" && selectedTransferAccount
-          ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})`
-          : undefined,
-        cardTerminal: currentPaymentMethod === "tarjeta" && selectedCardTerminal
-          ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})`
-          : undefined,
-        paymentReference: paymentReference.trim() || undefined,
+        itemsSummary,
         cashier: cashierName,
-        cashGiven: currentCashGiven,
-        change: currentChange,
-        customerId: selectedCustomer.id,
-        customerName: selectedCustomer.name,
-        customerType: selectedCustomer.type,
-        timestamp: Date.now(),
-        createdAt: new Date().toISOString(),
-      };
-
-      const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");
-      if (activeBranch) {
-        registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary);
-      }
-
-      // Registrar automáticamente en el Historial de Ingresos sin límite de dinero
-      try {
-        recordPosSaleIncome({
-          saleId: createdSaleId,
-          total: currentTotal,
-          paymentMethod: currentPaymentMethod,
-          itemsSummary,
-          cashier: cashierName,
-          branchId: activeBranch?.id,
-          branchName: activeBranch?.name || "Sucursal Matriz Centro",
-          customerId: selectedCustomer.id !== "cli-0" ? selectedCustomer.id : undefined,
-          customerName: selectedCustomer.name !== "Público General" ? selectedCustomer.name : undefined,
-          referenceNumber: paymentReference.trim() || undefined,
-          date: newSaleRecord.date,
-        });
-      } catch (err) {
-        console.error("Error al registrar ingreso de venta POS:", err);
-      }
-
-      // Registrar la compra en el cliente para calcular automáticamente su MODA de compra
-      if (selectedCustomer.id && selectedCustomer.id !== "cli-0") {
-        recordCustomerSale(
-          selectedCustomer.id,
-          currentItems.map((ci) => ({
-            name: ci.product.name,
-            quantity: ci.quantity,
-            unitPrice: ci.product.price,
-            subtotal: ci.product.price * ci.quantity,
-          })),
-          currentTotal,
-          activeBranch?.name,
-          cashierName,
-          currentPaymentMethod
-        );
-      }
-
-      setCompletedSale(newSaleRecord);
-      const currentShiftStart = getStoredShiftStartBoundary() || Date.now();
-      const cleanPrevSales = recentSalesList.filter((s) => {
-        if (!s) return false;
-        if (s.cashier && cashierName && !matchesCashier(s.cashier, cashierName)) return false;
-        const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-        return t > 0 && t >= currentShiftStart - 10000;
+        branchId: activeBranch?.id,
+        branchName: activeBranch?.name || "Sucursal Matriz Centro",
+        customerId: selectedCustomer.id !== "cli-0" ? selectedCustomer.id : undefined,
+        customerName: selectedCustomer.name !== "Público General" ? selectedCustomer.name : undefined,
+        referenceNumber: paymentReference.trim() || undefined,
+        date: newSaleRecord.date,
       });
-      const nextList = [newSaleRecord, ...cleanPrevSales];
-      try {
-        localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextList));
-        const rawMaster = localStorage.getItem("brito_pos_master_sales");
-        const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
-        const nextMaster = [newSaleRecord, ...prevMaster.filter((s) => s.id !== newSaleRecord.id)].slice(0, 1000);
-        localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
-        window.dispatchEvent(new Event("brito_sales_updated"));
-      } catch (e) {}
-      setRecentSalesList(nextList);
-      setIsSubmitting(false);
-      setIsReprintMode(false);
-      setShowReceiptModal(true);
+    } catch (err) {
+      console.error("Error al registrar ingreso de venta POS:", err);
+    }
 
-      // Al completar la compra, la charola se limpia y vuelve automáticamente a Público en General con efectivo
-      setCart([]);
-      setCashGiven("");
-      setPaymentMethod("efectivo");
-      setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
-      setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
-      setCustomerSearchQuery("");
-      setIsCustomerPickerOpen(false);
-    };
+    // 4. Registrar la compra en el cliente para calcular automáticamente su MODA de compra
+    if (selectedCustomer.id && selectedCustomer.id !== "cli-0") {
+      recordCustomerSale(
+        selectedCustomer.id,
+        currentItems.map((ci) => ({
+          name: ci.product.name,
+          quantity: ci.quantity,
+          unitPrice: ci.product.price,
+          subtotal: ci.product.price * ci.quantity,
+        })),
+        currentTotal,
+        activeBranch?.name,
+        cashierName,
+        currentPaymentMethod
+      );
+    }
+
+    // 5. Guardar en disco local la venta del turno sin perder ninguna venta
+    const currentShiftStart = getStoredShiftStartBoundary() || Date.now();
+    let currentStoredSales: Sale[] = [];
+    try {
+      const raw = localStorage.getItem("brito_pos_current_sales");
+      if (raw) currentStoredSales = JSON.parse(raw);
+    } catch (e) {}
+
+    const combinedPrev = [...recentSalesList];
+    for (const s of currentStoredSales) {
+      if (s && !combinedPrev.some((p) => p.id === s.id)) {
+        combinedPrev.push(s);
+      }
+    }
+
+    const cleanPrevSales = combinedPrev.filter((s) => {
+      if (!s || s.id === newSaleRecord.id) return false;
+      const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+      return t > 0 && t >= currentShiftStart - 10000;
+    });
+    const nextList = [newSaleRecord, ...cleanPrevSales];
+    try {
+      localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextList));
+      const rawMaster = localStorage.getItem("brito_pos_master_sales");
+      const prevMaster: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
+      const nextMaster = [newSaleRecord, ...prevMaster.filter((s) => s.id !== newSaleRecord.id)].slice(0, 1000);
+      localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
+      // Desactivar candado de turno de forma definitiva al cobrar
+      localStorage.removeItem("brito_pos_shift_locked");
+      window.dispatchEvent(new Event("brito_sales_updated"));
+    } catch (e) {}
+    setRecentSalesList(nextList);
+    setIsShiftLocked(false);
+
+    // 6. Mostrar el ticket instantáneamente al cajero y limpiar charola
+    setCompletedSale(newSaleRecord);
+    setIsSubmitting(false);
+    setIsReprintMode(false);
+    setShowReceiptModal(true);
+
+    // Al completar la compra, la charola se limpia y vuelve automáticamente a Público en General con efectivo
+    setCart([]);
+    setCashGiven("");
+    setPaymentMethod("efectivo");
+    setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
+    setSelectedCustomer(DEFAULT_GENERAL_CUSTOMER);
+    setCustomerSearchQuery("");
+    setIsCustomerPickerOpen(false);
+
+    // 7. Sincronización en segundo plano con Supabase y cola offline (asíncrona y no bloqueante)
+    (async () => {
+      let savedToCloud = false;
+      if (isOnline) {
+        try {
+          const supabase = createClient();
+          const saleInsertPayload: any = {
+            total: currentTotal,
+            payment_method: currentPaymentMethod,
+            cashier: cashierName,
+          };
+          if (selectedCustomer.id && !selectedCustomer.id.startsWith("cli-")) {
+            saleInsertPayload.customer_id = selectedCustomer.id;
+          }
+
+          const { data: saleData, error: saleErr } = await supabase
+            .from("sales")
+            .insert(saleInsertPayload)
+            .select()
+            .single();
+
+          if (saleData && !saleErr) {
+            savedToCloud = true;
+            const saleItemsToInsert = currentItems.map((item) => ({
+              sale_id: saleData.id,
+              product_id: item.product.id.includes("-") ? item.product.id : null,
+              product_name: item.product.name,
+              quantity: item.quantity,
+              unit_price: item.product.price,
+              subtotal: item.product.price * item.quantity,
+            }));
+            await supabase.from("sale_items").insert(saleItemsToInsert);
+
+            for (const item of currentItems) {
+              if (item.product.id.includes("-")) {
+                const newStock = Math.max(0, item.product.stock - item.quantity);
+                await supabase
+                  .from("products")
+                  .update({ stock: newStock })
+                  .eq("id", item.product.id);
+              }
+            }
+          }
+        } catch (e) {
+          console.log("Offline sale background pending", e);
+        }
+      }
+
+      // Si no se guardó en la nube (offline o falla de red), encolar de forma segura en la cola offline local
+      if (!savedToCloud) {
+        enqueueOfflineItem({
+          type: "sale",
+          title: `Venta POS #${createdSaleId} (${formatCurrency(currentTotal)})`,
+          amount: currentTotal,
+          branchId: activeBranch?.id,
+          data: {
+            saleId: createdSaleId,
+            total: currentTotal,
+            paymentMethod: currentPaymentMethod,
+            cashier: cashierName,
+            items: currentItems.map((item) => ({
+              productId: item.product.id,
+              name: item.product.name,
+              quantity: item.quantity,
+              price: item.product.price,
+              subtotal: item.product.price * item.quantity,
+            })),
+          },
+        });
+      }
+    })();
+  };
 
     const handleReceiveBreadDelivery = async (delivery: BreadDeliveryRecord) => {
     // 1. Sumar existencias en el catálogo local y estado

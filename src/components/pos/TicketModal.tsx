@@ -146,13 +146,6 @@ export default function TicketModal({
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-neutral-800 rounded-xl text-neutral-400 hover:text-white transition-colors cursor-pointer"
-            title="Cerrar ticket"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Printable Ticket Area con Vista Previa Ampliada para Mostrador */}
