@@ -628,7 +628,8 @@ export default function ExpensesModal({
 
   // Límite temporal estricto del turno actual (timestamp en ms)
   const shiftStartBoundary = useMemo(() => {
-    return Math.max(lastCutTimestamp || 0, getStoredShiftStartBoundary());
+    const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) ? lastCutTimestamp : 0;
+    return Math.max(validLastCut, getStoredShiftStartBoundary());
   }, [lastCutTimestamp, shiftVersion]);
 
   // Filtrar exclusivamente las salidas correspondientes a la cajera y turno en operación (incluyendo retiros de dueño del cajón)

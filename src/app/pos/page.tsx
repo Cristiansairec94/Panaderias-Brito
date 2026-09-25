@@ -1668,7 +1668,8 @@ export default function POSPage() {
     const lastCutTs = parseDateTimeSafe(
       lastCutInfo?.timestamp || lastCutInfo?.date || lastCutInfo?.createdAt || lastCutInfo?.cutTime
     );
-    return Math.max(getStoredShiftStartBoundary(), lastCutTs);
+    const validCut = lastCutTs > 0 && lastCutTs <= Date.now() ? lastCutTs : 0;
+    return Math.max(getStoredShiftStartBoundary(), validCut);
   }, [lastCutInfo, shiftVersion]);
 
   const currentShiftSales = useMemo(() => {

@@ -266,7 +266,8 @@ export default function CashDrawerShiftModal({
   if (!isOpen) return null;
 
   // Límite temporal estricto del turno actual (timestamp en ms)
-  const shiftStartBoundary = Math.max(lastCutTimestamp || 0, getStoredShiftStartBoundary());
+  const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) ? lastCutTimestamp : 0;
+  const shiftStartBoundary = Math.max(validLastCut, getStoredShiftStartBoundary());
 
   // 1. Cálculos de Ventas del Turno (filtradas por cajera y horario del turno actual)
   const shiftSales = (sales || []).filter((s) => {
