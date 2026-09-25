@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Wallet, 
   ArrowUpRight, 
@@ -297,7 +297,9 @@ export default function CajaPage() {
   const [selectedMonthStr, setSelectedMonthStr] = useState<string>(() => formatLocalMonth());
   const [selectedYearStr, setSelectedYearStr] = useState<string>(() => new Date().getFullYear().toString());
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterResponsible, setFilterResponsible] = useState<string>("all");
+  const [selectedResponsibles, setSelectedResponsibles] = useState<string[]>([]);
+  const [isResponsibleDropdownOpen, setIsResponsibleDropdownOpen] = useState(false);
+  const responsibleDropdownRef = useRef<HTMLDivElement>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "cuadrado" | "sobrante" | "faltante">("all");
 
   const getStoredCajaInitialFund = (fallback: number = 0): number => {
@@ -507,6 +509,17 @@ export default function CajaPage() {
     }
   }, []);
 
+  // Close responsible dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (responsibleDropdownRef.current && !responsibleDropdownRef.current.contains(event.target as Node)) {
+        setIsResponsibleDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Live calculations
   const entryMovements = movements.filter((m) => m.type === "entrada");
   const totalEntries = entryMovements.reduce((sum, m) => sum + m.amount, 0);
@@ -551,6 +564,33 @@ export default function CajaPage() {
     };
   }, [cutsHistory, selectedDayDate, selectedMonthStr, selectedYearStr]);
 
+  // Distinct Responsibles list for filter dropdown
+  const uniqueResponsibles = useMemo(() => {
+    const set = new Set<string>();
+    cutsHistory.forEach((c) => {
+      const name = c.responsible || c.outgoingCashier;
+      if (name) set.add(name);
+    });
+    return Array.from(set);
+  }, [cutsHistory]);
+
+  const availableYears = useMemo(() => {
+    const currentY = new Date().getFullYear();
+    const set = new Set<string>([
+      currentY.toString(),
+      (currentY - 1).toString(),
+      (currentY - 2).toString(),
+      "2026",
+      "2025",
+      "2024",
+    ]);
+    cutsHistory.forEach((c) => {
+      const parts = getCutDateParts(c);
+      if (parts.year) set.add(parts.year);
+    });
+    return Array.from(set).sort((a, b) => Number(b) - Number(a));
+  }, [cutsHistory]);
+
   // Filtered cuts history (Period + Search + Responsible + Status)
   const filteredCuts = useMemo(() => {
     return periodCuts.filter((cut) => {
@@ -568,10 +608,10 @@ export default function CajaPage() {
         }
       }
 
-      // 2. Filter Responsible
-      if (filterResponsible !== "all") {
-        const resp = (cut.responsible || cut.outgoingCashier || "").toLowerCase();
-        if (!resp.includes(filterResponsible.toLowerCase())) {
+      // 2. Filter Responsible (Multi-select)
+      if (selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length) {
+        const resp = cut.responsible || cut.outgoingCashier || "";
+        if (!selectedResponsibles.includes(resp)) {
           return false;
         }
       }
@@ -583,17 +623,7 @@ export default function CajaPage() {
 
       return true;
     });
-  }, [periodCuts, searchQuery, filterResponsible, filterStatus]);
-
-  // Distinct Responsibles list for filter dropdown
-  const uniqueResponsibles = useMemo(() => {
-    const set = new Set<string>();
-    cutsHistory.forEach((c) => {
-      const name = c.responsible || c.outgoingCashier;
-      if (name) set.add(name);
-    });
-    return Array.from(set);
-  }, [cutsHistory]);
+  }, [periodCuts, searchQuery, selectedResponsibles, uniqueResponsibles, filterStatus]);
 
   // Overall Historical Audit Metrics (reflects filtered cuts of active period)
   const auditMetrics = useMemo(() => {
@@ -1036,95 +1066,48 @@ export default function CajaPage() {
           </div>
 
           {/* Barra de Búsqueda y Filtros de Auditoría */}
-          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 space-y-4">
-            {/* 1. Selector Principal de Período (Día, Mes, Año, Todos) */}
-            <div className="bg-gradient-to-r from-stone-50 via-amber-50/20 to-stone-50 p-3 sm:p-4 rounded-2xl border border-stone-200/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-black text-stone-600 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-                  <Calendar className="w-4 h-4 text-amber-600" />
-                  Filtrar Por:
-                </span>
-                
-                <div className="inline-flex p-1 bg-white rounded-2xl border border-stone-200 shadow-2xs gap-1 flex-wrap">
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 space-y-3.5">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 flex-wrap">
+              {/* 1. Buscador de texto */}
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por folio (CORTE-...), responsable o notas..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl text-xs sm:text-sm font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none placeholder:text-stone-400 transition-all"
+                />
+                {searchQuery && (
                   <button
-                    type="button"
-                    onClick={() => setFilterPeriod("dia")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                      filterPeriod === "dia"
-                        ? "bg-amber-500 text-stone-900 shadow-xs"
-                        : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
-                    }`}
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold cursor-pointer"
                   >
-                    <span>📅</span>
-                    <span>Por Día</span>
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-                      filterPeriod === "dia" ? "bg-amber-600/30 text-stone-950" : "bg-stone-100 text-stone-500"
-                    }`}>
-                      {countsByPeriod.day}
-                    </span>
+                    ✕
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterPeriod("mes")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                      filterPeriod === "mes"
-                        ? "bg-amber-500 text-stone-900 shadow-xs"
-                        : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
-                    }`}
-                  >
-                    <span>🗓️</span>
-                    <span>Por Mes</span>
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-                      filterPeriod === "mes" ? "bg-amber-600/30 text-stone-950" : "bg-stone-100 text-stone-500"
-                    }`}>
-                      {countsByPeriod.month}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterPeriod("ano")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                      filterPeriod === "ano"
-                        ? "bg-amber-500 text-stone-900 shadow-xs"
-                        : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
-                    }`}
-                  >
-                    <span>📆</span>
-                    <span>Por Año</span>
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-                      filterPeriod === "ano" ? "bg-amber-600/30 text-stone-950" : "bg-stone-100 text-stone-500"
-                    }`}>
-                      {countsByPeriod.year}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setFilterPeriod("todos")}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                      filterPeriod === "todos"
-                        ? "bg-stone-900 text-white shadow-xs"
-                        : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
-                    }`}
-                  >
-                    <span>📂</span>
-                    <span>Ver Todos</span>
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-                      filterPeriod === "todos" ? "bg-stone-700 text-white" : "bg-stone-100 text-stone-500"
-                    }`}>
-                      {cutsHistory.length}
-                    </span>
-                  </button>
-                </div>
+                )}
               </div>
 
-              {/* Selector Dinámico de Fecha / Mes / Año */}
+              {/* 2. Filtro de Período (Opción Múltiple / Selector Desplegable) */}
               <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 rounded-2xl px-3 py-1.5 shadow-2xs">
+                  <Calendar className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="text-xs font-bold text-stone-500 whitespace-nowrap">Período:</span>
+                  <select
+                    value={filterPeriod}
+                    onChange={(e) => setFilterPeriod(e.target.value as any)}
+                    className="bg-transparent text-xs font-black text-stone-800 focus:outline-none cursor-pointer pr-1"
+                  >
+                    <option value="dia">📅 Por Día ({countsByPeriod.day})</option>
+                    <option value="mes">🗓️ Por Mes ({countsByPeriod.month})</option>
+                    <option value="ano">📆 Por Año ({countsByPeriod.year})</option>
+                    <option value="todos">📂 Ver Todos ({cutsHistory.length})</option>
+                  </select>
+                </div>
+
+                {/* Controles Dinámicos de Fecha / Mes / Año */}
                 {filterPeriod === "dia" && (
-                  <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
-                    <span className="text-[11px] font-black text-stone-400">Fecha:</span>
+                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
                     <input
                       type="date"
                       value={selectedDayDate}
@@ -1163,122 +1146,197 @@ export default function CajaPage() {
                 )}
 
                 {filterPeriod === "mes" && (
-                  <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
-                    <span className="text-[11px] font-black text-stone-400">Mes:</span>
+                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
                     <input
                       type="month"
                       value={selectedMonthStr}
                       onChange={(e) => setSelectedMonthStr(e.target.value)}
                       className="text-xs font-black text-stone-800 bg-transparent focus:outline-none cursor-pointer"
                     />
-                    <div className="flex items-center gap-1 pl-1 border-l border-stone-200">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMonthStr(formatLocalMonth(new Date()))}
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
-                          selectedMonthStr === formatLocalMonth(new Date())
-                            ? "bg-amber-500 text-stone-900"
-                            : "bg-stone-100 hover:bg-stone-200 text-stone-700"
-                        }`}
-                      >
-                        Mes Actual
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMonthStr(formatLocalMonth(new Date()))}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
+                        selectedMonthStr === formatLocalMonth(new Date())
+                          ? "bg-amber-500 text-stone-900"
+                          : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                      }`}
+                    >
+                      Mes Actual
+                    </button>
                   </div>
                 )}
 
                 {filterPeriod === "ano" && (
-                  <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
-                    <span className="text-[11px] font-black text-stone-400">Año:</span>
+                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-2xl border border-stone-200 shadow-2xs">
                     <select
                       value={selectedYearStr}
                       onChange={(e) => setSelectedYearStr(e.target.value)}
                       className="text-xs font-black text-stone-800 bg-transparent focus:outline-none cursor-pointer"
                     >
-                      {Array.from(
-                        new Set([
-                          new Date().getFullYear().toString(),
-                          (new Date().getFullYear() - 1).toString(),
-                          (new Date().getFullYear() - 2).toString(),
-                          "2026",
-                          "2025",
-                          "2024",
-                        ])
-                      )
-                        .sort((a, b) => Number(b) - Number(a))
-                        .map((y) => (
-                          <option key={y} value={y}>
-                            Año {y}
-                          </option>
-                        ))}
+                      {availableYears.map((y) => (
+                        <option key={y} value={y}>Año {y}</option>
+                      ))}
                     </select>
-                    <div className="flex items-center gap-1 pl-1 border-l border-stone-200">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedYearStr(new Date().getFullYear().toString())}
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
-                          selectedYearStr === new Date().getFullYear().toString()
-                            ? "bg-amber-500 text-stone-900"
-                            : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                    <button
+                      type="button"
+                      onClick={() => setSelectedYearStr(new Date().getFullYear().toString())}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-colors cursor-pointer ${
+                        selectedYearStr === new Date().getFullYear().toString()
+                          ? "bg-amber-500 text-stone-900"
+                          : "bg-stone-100 hover:bg-stone-200 text-stone-700"
+                      }`}
+                    >
+                      Año Actual
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Filtro de Responsables (Opción Múltiple con Checkboxes / Popover) */}
+              <div className="relative" ref={responsibleDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsResponsibleDropdownOpen(!isResponsibleDropdownOpen)}
+                  className={`px-3 py-2 bg-stone-50 border rounded-2xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
+                    isResponsibleDropdownOpen || (selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length)
+                      ? "border-amber-500 ring-2 ring-amber-500/20 bg-amber-50 text-stone-900"
+                      : "border-stone-200 text-stone-800 hover:bg-stone-100"
+                  }`}
+                >
+                  <span className="text-stone-400">👤</span>
+                  <span className="whitespace-nowrap">
+                    {selectedResponsibles.length === 0 || selectedResponsibles.length === uniqueResponsibles.length
+                      ? "Todos los Responsables"
+                      : selectedResponsibles.length === 1
+                      ? selectedResponsibles[0]
+                      : `${selectedResponsibles[0]} (+${selectedResponsibles.length - 1})`}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                    selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length
+                      ? "bg-amber-500 text-stone-950"
+                      : "bg-stone-200 text-stone-600"
+                  }`}>
+                    {selectedResponsibles.length === 0 ? uniqueResponsibles.length : selectedResponsibles.length}
+                  </span>
+                  <span className="text-[10px] text-stone-400 ml-0.5">▼</span>
+                </button>
+
+                {/* Popover con Casillas de Opción Múltiple */}
+                {isResponsibleDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl border border-stone-200 p-3 z-30 space-y-2 animate-in fade-in zoom-in-95">
+                    <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-stone-500">
+                        Responsables (Opción Múltiple)
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedResponsibles([])}
+                          className="text-[10px] font-black text-amber-700 hover:text-amber-900 cursor-pointer"
+                        >
+                          Todos
+                        </button>
+                        <span className="text-stone-300">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedResponsibles(uniqueResponsibles.slice(0, 1))}
+                          className="text-[10px] font-black text-stone-400 hover:text-stone-700 cursor-pointer"
+                        >
+                          Solo uno
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+                      {/* Opción Todos */}
+                      <label
+                        className={`flex items-center justify-between p-2 rounded-xl text-xs font-bold cursor-pointer transition-colors ${
+                          selectedResponsibles.length === 0 || selectedResponsibles.length === uniqueResponsibles.length
+                            ? "bg-amber-50 text-amber-950 font-black"
+                            : "hover:bg-stone-50 text-stone-700"
                         }`}
                       >
-                        Año Actual
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedResponsibles.length === 0 || selectedResponsibles.length === uniqueResponsibles.length}
+                            onChange={() => setSelectedResponsibles([])}
+                            className="rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                          />
+                          <span>✓ Todos los Responsables</span>
+                        </div>
+                        <span className="text-[10px] text-stone-400 font-extrabold">{periodCuts.length}</span>
+                      </label>
+
+                      <div className="h-px bg-stone-100 my-1" />
+
+                      {/* Lista individual con checkboxes */}
+                      {uniqueResponsibles.map((resp) => {
+                        const isChecked = selectedResponsibles.length === 0 
+                          ? true 
+                          : selectedResponsibles.includes(resp);
+                        const count = periodCuts.filter((c) => (c.responsible || c.outgoingCashier || "") === resp).length;
+
+                        return (
+                          <label
+                            key={resp}
+                            className={`flex items-center justify-between p-2 rounded-xl text-xs cursor-pointer transition-colors ${
+                              isChecked
+                                ? "bg-amber-50/60 text-stone-900 font-black"
+                                : "hover:bg-stone-50 text-stone-600 font-medium opacity-75"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (selectedResponsibles.length === 0) {
+                                    setSelectedResponsibles(uniqueResponsibles.filter((r) => r !== resp));
+                                  } else if (selectedResponsibles.includes(resp)) {
+                                    const next = selectedResponsibles.filter((r) => r !== resp);
+                                    setSelectedResponsibles(next);
+                                  } else {
+                                    const next = [...selectedResponsibles, resp];
+                                    if (next.length === uniqueResponsibles.length) {
+                                      setSelectedResponsibles([]);
+                                    } else {
+                                      setSelectedResponsibles(next);
+                                    }
+                                  }
+                                }}
+                                className="rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                              />
+                              <span className="truncate max-w-[170px]">{resp}</span>
+                            </div>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-stone-100 text-stone-500 font-extrabold shrink-0">
+                              {count}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
+                      <span className="text-[10px] text-stone-400">
+                        {selectedResponsibles.length === 0 
+                          ? "Mostrando todos" 
+                          : `${selectedResponsibles.length} de ${uniqueResponsibles.length} seleccionados`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsResponsibleDropdownOpen(false)}
+                        className="px-2.5 py-1 bg-stone-900 text-white rounded-lg text-[10px] font-black cursor-pointer hover:bg-black"
+                      >
+                        Listo
                       </button>
                     </div>
                   </div>
                 )}
-
-                {filterPeriod === "todos" && (
-                  <div className="text-xs font-bold text-stone-600 bg-white px-3 py-1.5 rounded-2xl border border-stone-200 shadow-2xs flex items-center gap-1.5">
-                    <span>📜</span>
-                    <span>Mostrando todo el historial sin límite de fecha</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 2. Buscador de Texto, Filtro de Responsable y Estado de Arqueo */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-              {/* Buscador de texto */}
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar por folio (CORTE-...), responsable del turno o notas..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl text-xs sm:text-sm font-bold text-stone-900 focus:ring-2 focus:ring-amber-500 focus:outline-none placeholder:text-stone-400 transition-all"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-xs font-bold cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                )}
               </div>
 
-              {/* Filtro por Responsable del Turno */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-stone-500 whitespace-nowrap">
-                  Responsable:
-                </span>
-                <select
-                  value={filterResponsible}
-                  onChange={(e) => setFilterResponsible(e.target.value)}
-                  className="px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl text-xs font-black text-stone-800 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
-                >
-                  <option value="all">Todos los Responsables</option>
-                  {uniqueResponsibles.map((resp) => (
-                    <option key={resp} value={resp}>
-                      {resp}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Filtro por Estado de Arqueo */}
+              {/* 4. Filtro por Estado de Arqueo */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                 <button
                   type="button"
@@ -1327,7 +1385,7 @@ export default function CajaPage() {
               </div>
             </div>
 
-            {/* 3. Sub-barra informativa */}
+            {/* 5. Sub-barra informativa */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-stone-500 pt-1 border-t border-stone-100">
               <span className="font-bold text-stone-700 flex items-center gap-1.5 flex-wrap">
                 <span>Mostrando <strong className="text-amber-950">{filteredCuts.length}</strong> de {cutsHistory.length} comprobante(s)</span>
@@ -1340,6 +1398,18 @@ export default function CajaPage() {
                     ? `Año: ${selectedYearStr}`
                     : "Histórico Completo"}
                 </span>
+                {selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length && (
+                  <span className="text-[11px] bg-stone-200 text-stone-800 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1">
+                    <span>👤 {selectedResponsibles.length === 1 ? selectedResponsibles[0] : `${selectedResponsibles.length} responsables`}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedResponsibles([])}
+                      className="text-stone-500 hover:text-stone-900 ml-0.5"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
               </span>
               <span className="text-[11px] text-stone-400">
                 Haz clic en <strong>"🖨️ Reimprimir Ticket"</strong> en cualquier corte para imprimir el comprobante térmico oficial.
@@ -1354,7 +1424,7 @@ export default function CajaPage() {
                 <div className="text-5xl">📜</div>
                 <h4 className="font-black text-base text-stone-800">No se encontraron cortes de caja</h4>
                 <p className="text-xs text-stone-500 max-w-md mx-auto">
-                  {filterPeriod !== "todos" || searchQuery || filterResponsible !== "all" || filterStatus !== "all"
+                  {filterPeriod !== "todos" || searchQuery || (selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length) || filterStatus !== "all"
                     ? "Ningún corte coincide con el período o filtros seleccionados. Puedes cambiar de fecha, mes o ver todos los registros."
                     : "No hay registros de cortes de caja archivados aún."}
                 </p>
@@ -1367,11 +1437,11 @@ export default function CajaPage() {
                       Ver Todos los Cortes ({cutsHistory.length})
                     </button>
                   )}
-                  {(searchQuery || filterResponsible !== "all" || filterStatus !== "all") && (
+                  {(searchQuery || (selectedResponsibles.length > 0 && selectedResponsibles.length < uniqueResponsibles.length) || filterStatus !== "all") && (
                     <button
                       onClick={() => {
                         setSearchQuery("");
-                        setFilterResponsible("all");
+                        setSelectedResponsibles([]);
                         setFilterStatus("all");
                       }}
                       className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors cursor-pointer"
