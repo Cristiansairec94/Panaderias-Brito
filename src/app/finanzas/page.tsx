@@ -11,27 +11,26 @@ import {
   PieChart, 
   ArrowUpRight, 
   ArrowDownRight, 
-  Download, 
-  Calendar,
-  Layers,
-  Sparkles,
-  Lock,
-  Coins,
-  ShieldCheck,
-  CheckCircle2,
-  AlertTriangle,
-  Users,
-  Flame,
-  Clock,
-  HelpCircle,
-  Eye,
-  Store,
-  ArrowRight,
-  Receipt,
-  FileSpreadsheet,
-  RefreshCw,
-  Percent,
-  Phone,
+  Calendar, 
+  Layers, 
+  Sparkles, 
+  Lock, 
+  Coins, 
+  ShieldCheck, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Users, 
+  Flame, 
+  Clock, 
+  HelpCircle, 
+  Eye, 
+  Store, 
+  ArrowRight, 
+  Receipt, 
+  FileSpreadsheet, 
+  RefreshCw, 
+  Percent, 
+  Phone, 
   BarChart3
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
@@ -42,7 +41,6 @@ import {
   FullFinancialSummary,
   exportFinancialSummaryToCSV
 } from "@/lib/finanzas";
-import FinancialReportModal from "@/components/finanzas/FinancialReportModal";
 import OperationsIncomeChart from "@/components/finanzas/OperationsIncomeChart";
 
 type FinanzasTab = "pl" | "tesoreria";
@@ -56,7 +54,6 @@ export default function FinanzasPage() {
   const [selectedBranchId, setSelectedBranchId] = useState<string>(
     isAllBranches ? "todas" : (currentBranch?.id || "todas")
   );
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [refreshNotification, setRefreshNotification] = useState(false);
   const [plViewMode, setPlViewMode] = useState<"currency" | "percent">("currency");
 
@@ -115,14 +112,6 @@ export default function FinanzasPage() {
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
               <span className="hidden sm:inline">Excel/CSV</span>
-            </button>
-
-            {/* Exportar PDF / Imprimir */}
-            <button 
-              onClick={() => setIsReportModalOpen(true)}
-              className="flex items-center gap-1.5 bg-brito-orange-600 hover:bg-brito-orange-700 text-white font-black px-4 py-2.5 rounded-2xl shadow-md text-xs whitespace-nowrap transition-all active:scale-95 shrink-0"
-            >
-              <Download className="w-4 h-4" /> Exportar Balance
             </button>
 
             {/* Refrescar Datos */}
@@ -542,12 +531,6 @@ export default function FinanzasPage() {
       )}
 
 
-      {/* ─── Modal de Reporte Financiero Imprimible ────────────────────────────── */}
-      <FinancialReportModal
-        isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
-        summary={summary}
-      />
     </div>
   );
 }
