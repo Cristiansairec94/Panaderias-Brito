@@ -262,12 +262,7 @@ function getStoredSalesWithFallback(propSales?: Sale[]): Sale[] {
   if (typeof window === "undefined") return propSales || [];
   const map = new Map<string, Sale>();
 
-  const isDummySale = (s: any) =>
-    s?.total === 74 &&
-    s?.cashGiven === 100 &&
-    s?.change === 26 &&
-    s?.items?.length === 3 &&
-    s?.customerType === "frecuente";
+  const isDummySale = (_s: any) => false;
 
   // 1. Ventas activas en memoria pasadas por props (items completos y frescos)
   if (Array.isArray(propSales)) {
@@ -681,11 +676,6 @@ export default function ExpensesModal({
       return [];
     }
 
-    const sumSource = source.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
-    if (sumSource === 72 || source.some((s: any) => s?.total === 57 || (s?.total === 15 && source.length > 1))) {
-      return [];
-    }
-
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
     return source.filter((s) => {
       if (!s) return false;
@@ -694,7 +684,7 @@ export default function ExpensesModal({
       }
       const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
       if (boundary > 0) {
-        if (!sTime || sTime < boundary) return false;
+        if (!sTime || sTime < boundary - 10000) return false;
       }
       if (sTime > Date.now() + 60000) return false;
       return true;
@@ -718,8 +708,8 @@ export default function ExpensesModal({
         }
       }
       const oTime = parseDateTimeSafe(o.createdAt || (o as any).date);
-      // Solo pedidos creados dentro de la ventana de tiempo del turno actual
-      if (!oTime || oTime < boundary) {
+      // Solo pedidos creados dentro de la ventana de tiempo del turno actual (con 10s de tolerancia)
+      if (!oTime || oTime < boundary - 10000) {
         return false;
       }
       if (oTime > Date.now() + 60000) {
@@ -727,10 +717,8 @@ export default function ExpensesModal({
       }
       if (o.cashier && cashierName) {
         const isMatch = matchesCashier(o.cashier, cashierName);
-        if (!isMatch) return false;
-      }
-      if ((o as any).shiftName && shiftName && (o as any).shiftName !== shiftName) {
-        return false;
+        const isGenericOrAdmin = /admin|dueño|toño|cajero en turno/i.test(o.cashier);
+        if (!isMatch && !isGenericOrAdmin) return false;
       }
       return true;
     });

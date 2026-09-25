@@ -272,20 +272,18 @@ export default function CashDrawerShiftModal({
   // 1. Cálculos de Ventas del Turno (filtradas por cajera y horario del turno actual)
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
-    if (s.total === 74 && s.cashGiven === 100 && s.change === 26) return false;
     if (s.cashier && outgoingCashier) {
       const isMatch = matchesCashier(s.cashier, outgoingCashier);
       if (!isMatch) return false;
     }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
     if (shiftStartBoundary > 0) {
-      if (!sTime || sTime < shiftStartBoundary) return false;
+      if (!sTime || sTime < shiftStartBoundary - 10000) return false;
     }
     if (sTime > Date.now() + 60000) return false;
     return true;
   });
-  const sumCutSales = shiftSales.reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-  const effectiveSales = (sumCutSales === 72 || shiftSales.some(s => s.total === 57 || (s.total === 15 && shiftSales.length > 1))) ? [] : shiftSales;
+  const effectiveSales = shiftSales;
 
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
   const shiftOrders = (orders || []).filter((o) => {
@@ -293,13 +291,11 @@ export default function CashDrawerShiftModal({
     if (!shiftStartBoundary || shiftStartBoundary <= 0) return false;
     if (o.cashier && outgoingCashier) {
       const isMatch = matchesCashier(o.cashier, outgoingCashier);
-      if (!isMatch) return false;
-    }
-    if ((o as any).shiftName && shiftName && (o as any).shiftName !== shiftName) {
-      return false;
+      const isGenericOrAdmin = /admin|dueño|toño|cajero en turno/i.test(o.cashier);
+      if (!isMatch && !isGenericOrAdmin) return false;
     }
     const oTime = parseDateTimeSafe(o.createdAt || (o as any).date);
-    if (!oTime || oTime < shiftStartBoundary) return false;
+    if (!oTime || oTime < shiftStartBoundary - 10000) return false;
     if (oTime > Date.now() + 60000) return false;
     return true;
   });

@@ -77,6 +77,19 @@ export default function TicketModal({
     }
   }, [isOpen]);
 
+  // Listener de tecla Escape para cerrar el ticket limpiamente
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const totalPieces = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -102,7 +115,14 @@ export default function TicketModal({
   const is58mm = printerConfig.paperWidth === "58mm";
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
+    <div 
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg sm:max-w-xl w-full overflow-hidden flex flex-col max-h-[94vh]">
         {/* Header bar del modal */}
         <div className="bg-neutral-900 text-white p-4 px-6 flex items-center justify-between">

@@ -374,6 +374,13 @@ function recordOrderCashIncome(params: {
     const updated = [newIncome, ...currentIncomes];
     localStorage.setItem("brito_cash_incomes", JSON.stringify(updated));
 
+    try {
+      const shiftIncomesRaw = localStorage.getItem("brito_pos_current_incomes");
+      const shiftIncomes: CashIncome[] = shiftIncomesRaw ? JSON.parse(shiftIncomesRaw) : [];
+      const updatedShiftIncomes = [newIncome, ...shiftIncomes.filter((i) => i.id !== newIncome.id)];
+      localStorage.setItem("brito_pos_current_incomes", JSON.stringify(updatedShiftIncomes));
+    } catch (e) {}
+
     window.dispatchEvent(new Event("brito_incomes_updated"));
   } catch (err) {
     console.error("Error logging cash income for order:", err);
@@ -454,8 +461,8 @@ export function recordOrderAsPosSale(params: {
     const shiftStart = getStoredShiftStartBoundary();
     const cleanCurrentSales = currentSales.filter((s) => {
       if (!s) return false;
-      const t = parseDateTimeSafe(s.timestamp || s.date || s.createdAt);
-      return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+      const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+      return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
     });
 
     const nextSales = [newSale, ...cleanCurrentSales];
@@ -602,6 +609,7 @@ export function addCustomOrder(data: {
     dedication: data.dedication?.trim(),
     notes: data.notes?.trim(),
     createdAt: new Date().toISOString(),
+    timestamp: Date.now(),
     cashier: data.cashier,
     shiftName: data.shiftName || (typeof window !== "undefined" ? localStorage.getItem("brito_current_shift_name") || undefined : undefined),
     payments: payments,

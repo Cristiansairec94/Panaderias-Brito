@@ -330,12 +330,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const sumRaw = list.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
-            if (sumRaw === 72 || list.some((s: any) => s?.total === 57 || (s?.total === 15 && list.length > 1))) return 0;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -352,12 +350,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const sumRaw = list.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
-            if (sumRaw === 72 || list.some((s: any) => s?.total === 57 || (s?.total === 15 && list.length > 1))) return 0;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -374,12 +370,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const sumRaw = list.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
-            if (sumRaw === 72 || list.some((s: any) => s?.total === 57 || (s?.total === 15 && list.length > 1))) return 0;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -455,17 +449,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const sumRaw = list.reduce((acc: number, s: any) => acc + (Number(s?.total) || 0), 0);
-            if (sumRaw === 72 || list.some((s: any) => s?.total === 57 || (s?.total === 15 && list.length > 1))) {
-              setCashSales(0);
-              setCardSales(0);
-              setTransferSales(0);
-              return;
-            }
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 10000);
             });
             const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);

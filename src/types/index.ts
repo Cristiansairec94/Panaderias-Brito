@@ -136,6 +136,7 @@ export interface CustomOrder {
   dedication?: string;
   notes?: string;
   createdAt: string;
+  timestamp?: number;
   cashier: string;
   shiftName?: string;
   payments?: OrderPayment[];
