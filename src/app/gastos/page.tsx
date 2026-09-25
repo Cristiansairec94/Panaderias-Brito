@@ -336,6 +336,44 @@ const INITIAL_GASTOS: ExpenseRecord[] = [
   },
 ];
 
+/**
+ * Muestra el concepto compacto con botón "ver más" / "ver menos" si supera la longitud
+ */
+function ExpandableConceptText({ text, maxChars = 38 }: { text: string; maxChars?: number }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  if (!text) return null;
+
+  const isLong = text.length > maxChars;
+
+  if (!isLong) {
+    return (
+      <div className="font-bold text-stone-950 text-sm sm:text-base leading-snug" title={text}>
+        {text}
+      </div>
+    );
+  }
+
+  const preview = text.slice(0, maxChars).trim() + "...";
+
+  return (
+    <div className="font-bold text-stone-950 text-sm sm:text-base leading-snug" title={text}>
+      <span>{isExpanded ? text : preview}</span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsExpanded((prev) => !prev);
+        }}
+        className="inline-flex items-center text-[11px] font-black text-rose-700 hover:text-rose-950 bg-rose-50 hover:bg-rose-100 border border-rose-200/90 px-1.5 py-0.5 rounded-md ml-1.5 transition-colors cursor-pointer select-none"
+        title={isExpanded ? "Mostrar menos texto" : "Mostrar texto completo"}
+      >
+        {isExpanded ? "ver menos" : "ver más"}
+      </button>
+    </div>
+  );
+}
+
 export default function GastosPage() {
   const { user } = useAuth();
   const { branches, currentBranch } = useBranch();
@@ -350,7 +388,6 @@ export default function GastosPage() {
   // ── Filtros ──
   const [search, setSearch] = useState("");
   const [filtroSucursal, setFiltroSucursal] = useState<string>("all");
-  const [filtroCategoria, setFiltroCategoria] = useState<string>("all");
   const [filtroTipoPago, setFiltroTipoPago] = useState<string>("all");
 
   // ── Modales ──
@@ -550,15 +587,11 @@ export default function GastosPage() {
         if (filtroSucursal !== "all" && g.branchId !== filtroSucursal) {
           return false;
         }
-        // 2. Filtro por Categoría
-        if (filtroCategoria !== "all" && g.category !== filtroCategoria && g.categoryLabel !== filtroCategoria) {
-          return false;
-        }
-        // 3. Filtro por Tipo de Pago
+        // 2. Filtro por Tipo de Pago
         if (filtroTipoPago !== "all" && g.paymentMethod !== filtroTipoPago) {
           return false;
         }
-        // 4. Búsqueda libre
+        // 3. Búsqueda libre
         if (search.trim()) {
           const query = search.toLowerCase();
           const haystack = `${g.id || ""} ${g.date || ""} ${g.categoryLabel || ""} ${g.branchName || ""} ${g.description || ""} ${g.paymentMethod || ""} ${g.accountOrigin || ""} ${g.cashier || ""} ${g.supplier || ""}`.toLowerCase();
@@ -567,7 +600,7 @@ export default function GastosPage() {
         return true;
       })
       .sort((a, b) => getExpenseTimestamp(b) - getExpenseTimestamp(a));
-  }, [gastos, filtroSucursal, filtroCategoria, filtroTipoPago, search]);
+  }, [gastos, filtroSucursal, filtroTipoPago, search]);
 
   // ─── Cálculos de KPIs (Reactivos al filtro de sucursal) ─────────────────────
   const now = new Date();
@@ -1161,20 +1194,6 @@ export default function GastosPage() {
               </select>
             </div>
 
-            {/* Filtro por Categoría */}
-            <select
-              value={filtroCategoria}
-              onChange={(e) => setFiltroCategoria(e.target.value)}
-              className="bg-stone-50 px-3.5 py-2.5 rounded-2xl border-2 border-stone-200 text-sm sm:text-base font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer shadow-xs"
-            >
-              <option value="all">Todas las Categorías</option>
-              {GASTO_CATEGORIAS.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.icon} {c.label}
-                </option>
-              ))}
-            </select>
-
             {/* Filtro por Método de Pago */}
             <select
               value={filtroTipoPago}
@@ -1188,12 +1207,11 @@ export default function GastosPage() {
             </select>
 
             {/* Botón para limpiar filtros */}
-            {(search || filtroSucursal !== "all" || filtroCategoria !== "all" || filtroTipoPago !== "all") && (
+            {(search || filtroSucursal !== "all" || filtroTipoPago !== "all") && (
               <button
                 onClick={() => {
                   setSearch("");
                   setFiltroSucursal("all");
-                  setFiltroCategoria("all");
                   setFiltroTipoPago("all");
                 }}
                 className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border-2 border-rose-200 rounded-2xl text-sm font-black transition-colors shadow-xs"
@@ -1325,11 +1343,8 @@ export default function GastosPage() {
 
                       {/* 5. Concepto / Motivo */}
                       <td className="py-3.5 px-4 align-middle max-w-sm">
-                        <div
-                          className={`font-bold text-stone-950 text-sm sm:text-base ${isAnulado ? "line-through text-stone-500" : ""}`}
-                          title={g.description}
-                        >
-                          {g.description}
+                        <div className={isAnulado ? "line-through text-stone-500" : ""}>
+                          <ExpandableConceptText text={g.description} maxChars={38} />
                         </div>
                         {g.supplier && (
                           <div className="text-xs sm:text-sm text-stone-500 truncate mt-1">

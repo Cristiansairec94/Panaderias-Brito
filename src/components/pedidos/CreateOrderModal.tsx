@@ -432,6 +432,7 @@ export default function CreateOrderModal({
   const isDepositValid = total > 0 && numericDeposit >= minRequiredDeposit && numericDeposit <= total;
   const isDepositSufficient = isDepositValid;
   const remainingBalance = Math.max(0, total - numericDeposit);
+  const isReadyToConfirm = customerName.trim().length > 0 && total > 0 && isDepositValid && !isSubmitting;
 
   // Sugerencias de clientes existentes
   const customerSuggestions = useMemo(() => {
@@ -915,8 +916,8 @@ export default function CreateOrderModal({
       return;
     }
 
-    if (numericDeposit < 0) {
-      alert("El anticipo no puede ser un número negativo.");
+    if (!isDepositValid) {
+      alert(`El anticipo mínimo requerido es del 50% (${formatCurrency(minRequiredDeposit)}).`);
       return;
     }
 
@@ -957,69 +958,75 @@ export default function CreateOrderModal({
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/80 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[95vh] flex flex-col overflow-hidden border-2 border-stone-200">
         
-        {/* CABECERA SÚPER CLARA Y AMIGABLE */}
-        <div className="bg-gradient-to-r from-stone-900 via-stone-900 to-amber-950 text-white p-4 sm:p-5 flex items-center justify-between shrink-0 border-b border-stone-800">
+        {/* CABECERA LIMPIA */}
+        <div className="bg-stone-900 text-white p-4 sm:p-5 flex items-center justify-between shrink-0 border-b border-stone-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center text-xl font-black shadow-md shadow-amber-500/30 shrink-0">
               🎂
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-black text-base sm:text-lg text-white leading-tight">
-                  Apartar Pedido Especial
-                </h2>
-                <span className="text-[10px] bg-amber-500 text-stone-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wide">
-                  Sin Mínimos • Desde 1 Pieza
-                </span>
-              </div>
-              <p className="text-xs text-amber-200/80 flex items-center gap-1.5 mt-0.5">
+              <h2 className="font-black text-base sm:text-lg text-white leading-tight">
+                Apartar Pedido Especial
+              </h2>
+              <p className="text-xs text-amber-300 font-bold flex items-center gap-1.5 mt-0.5">
                 <Store className="w-3.5 h-3.5 text-amber-400" />
-                <span className="font-bold text-white">{activeBranch.name}</span>
+                <span>{activeBranch.name}</span>
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             title="Cerrar ventana"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* CUERPO DEL FORMULARIO: 4 PASOS EN UNA SOLA VISTA LIMPIA */}
+        {/* CUERPO DEL FORMULARIO: 5 PASOS CLAROS Y DIRECTOS */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
           
-          {/* PASO 1: ¿A NOMBRE DE QUIÉN? */}
-          <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center gap-2 text-stone-900">
-              <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
-                1
-              </span>
-              <h3 className="font-black text-sm uppercase tracking-wide text-amber-950">
-                ¿A nombre de quién es el pedido?
-              </h3>
+          {/* PASO 1: AGREGAR CLIENTE */}
+          <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-stone-900">
+                <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
+                  1
+                </span>
+                <h3 className="font-black text-sm uppercase tracking-wide text-stone-900">
+                  1. Agregar Cliente
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomerModalTab("search");
+                  setIsCustomerModalOpen(true);
+                }}
+                className="text-xs font-bold text-amber-800 hover:text-amber-950 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg border border-amber-300/80 flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Buscar en lista</span>
+              </button>
             </div>
 
-            {/* Banner si hay un cliente vinculado */}
+            {/* Si ya hay cliente seleccionado */}
             {selectedCustomer && (
-              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-300/90 rounded-xl px-3 py-1.5 text-xs text-emerald-900 animate-in fade-in">
+              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-xl px-3 py-1.5 text-xs text-emerald-900">
                 <div className="flex items-center gap-2">
-                  <span className="bg-emerald-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded uppercase">
-                    {selectedCustomer.type || "Cliente"}
-                  </span>
+                  <Check className="w-4 h-4 text-emerald-600" />
                   <span className="font-extrabold">{selectedCustomer.name}</span>
                   {selectedCustomer.phone && selectedCustomer.phone !== "N/A" && (
                     <span className="text-emerald-700 font-mono text-[11px]">({selectedCustomer.phone})</span>
                   )}
-                  <span className="text-emerald-600 text-[10px] font-medium hidden sm:inline">✓ Seleccionado</span>
+                  <span className="text-emerald-700 text-[10px] font-bold">✓ En catálogo</span>
                 </div>
                 <button
                   type="button"
                   onClick={handleClearSelectedCustomer}
                   className="text-emerald-700 hover:text-emerald-950 p-1 hover:bg-emerald-200/50 rounded-lg text-xs cursor-pointer"
-                  title="Desvincular cliente"
+                  title="Cambiar cliente"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1042,11 +1049,9 @@ export default function CreateOrderModal({
                       setCustomerName(e.target.value);
                       setSelectedCustomerId("");
                       setShowCustomerSearch(true);
-                      setSaveCustomerDecision("ask");
-                      setMustChooseCustomerAlert(false);
                     }}
                     onFocus={() => setShowCustomerSearch(true)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
 
@@ -1057,15 +1062,10 @@ export default function CreateOrderModal({
                       <button
                         key={c.id}
                         type="button"
-                        onClick={() => {
-                          handleSelectCustomer(c);
-                        }}
+                        onClick={() => handleSelectCustomer(c)}
                         className="w-full p-2.5 text-left hover:bg-amber-50 flex items-center justify-between text-xs cursor-pointer"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-stone-900">{c.name}</span>
-                          <span className="text-[9px] bg-stone-100 text-stone-600 px-1.5 py-0.2 rounded font-semibold uppercase">{c.type || "cliente"}</span>
-                        </div>
+                        <span className="font-bold text-stone-900">{c.name}</span>
                         <span className="text-[11px] text-stone-500">{c.phone}</span>
                       </button>
                     ))}
@@ -1084,14 +1084,50 @@ export default function CreateOrderModal({
                     placeholder="Ej. 55 1234 5678"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
               </div>
             </div>
+
+            {/* AÑADIR AL CLIENTE SI ES QUE ES NUEVO */}
+            {!isCustomerInCatalog && customerName.trim().length > 0 && (
+              <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span className="font-bold text-emerald-950">
+                    ¿Añadir cliente nuevo al catálogo?
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSaveCustomerDecision("yes")}
+                    className={`px-3 py-1.5 rounded-lg font-black text-xs transition-all cursor-pointer ${
+                      saveCustomerDecision === "yes"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-white text-stone-700 border border-stone-200 hover:bg-stone-50"
+                    }`}
+                  >
+                    ✓ Sí, añadir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSaveCustomerDecision("no")}
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                      saveCustomerDecision === "no"
+                        ? "bg-stone-700 text-white shadow-xs"
+                        : "bg-white text-stone-500 border border-stone-200 hover:bg-stone-50"
+                    }`}
+                  >
+                    Solo este pedido
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* PASO 2: ¿QUÉ VA A LLEVAR? */}
+          {/* PASO 2: ¿DE QUÉ SERÁ EL PEDIDO? */}
           <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-stone-900">
@@ -1099,199 +1135,94 @@ export default function CreateOrderModal({
                   2
                 </span>
                 <h3 className="font-black text-sm uppercase tracking-wide text-stone-900">
-                  ¿Qué pan o pastel encarga?
+                  2. ¿De qué será el pedido?
                 </h3>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowCatalog(!showCatalog)}
+                className="text-xs font-bold text-stone-700 bg-white hover:bg-stone-100 border border-stone-200 px-2.5 py-1 rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 text-stone-500" />
+                <span>{showCatalog ? "Cerrar catálogo" : "Ver catálogo"}</span>
+              </button>
+            </div>
 
-              {/* Botones de acción */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    barcodeInputRef.current?.focus();
+            {/* Barra rápida de escaneo / búsqueda */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Barcode className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  ref={barcodeInputRef}
+                  type="text"
+                  placeholder="Escanear código de barras o escribir producto..."
+                  value={barcodeInput}
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleBarcodeScan(barcodeInput);
+                    }
                   }}
-                  className="text-xs font-black text-amber-950 bg-amber-400 hover:bg-amber-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-xs border border-amber-500/30 active:scale-95 cursor-pointer"
-                  title="Escanear o ingresar código de barras"
-                >
-                  <Barcode className="w-4 h-4 text-stone-950" />
-                  <span>+ Elegir por Código de Barras</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCatalog(!showCatalog)}
-                  className="text-xs font-bold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-100 border border-stone-200 px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <ShoppingBag className="w-3.5 h-3.5 text-stone-500" />
-                  <span>{showCatalog ? "Cerrar" : "Ver Lista"}</span>
-                </button>
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-mono font-bold text-stone-900 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
               </div>
+              <button
+                type="button"
+                onClick={() => handleBarcodeScan(barcodeInput)}
+                disabled={!barcodeInput.trim()}
+                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-stone-950 text-xs font-black rounded-xl transition-all flex items-center gap-1 shrink-0 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Agregar</span>
+              </button>
             </div>
 
-            {/* ESCANEO RÁPIDO DE CÓDIGO DE BARRAS DEL PUNTO DE VENTA */}
-            <div className="bg-gradient-to-br from-amber-50 via-orange-50/60 to-amber-100/40 border-2 border-amber-300 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-black text-amber-950">
-                  <div className="w-7 h-7 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center shadow-xs">
-                    <Barcode className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="block leading-tight font-black text-xs">Elegir Pan por Código de Barras (POS)</span>
-                    <span className="text-[10px] text-amber-800/80 font-bold block">Verifica nombre y precio oficial del catálogo</span>
-                  </div>
-                </div>
-                <span className="text-[10px] bg-amber-200 text-amber-950 font-black px-2.5 py-1 rounded-lg border border-amber-300 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Pistola / Lector Activo
+            {/* Alerta de escaneo */}
+            {lastScannedAlert && (
+              <div
+                className={`rounded-xl p-2 border flex items-center justify-between text-xs animate-in fade-in duration-150 ${
+                  lastScannedAlert.success
+                    ? "bg-emerald-50 border-emerald-300 text-emerald-950"
+                    : "bg-rose-50 border-rose-300 text-rose-950"
+                }`}
+              >
+                <span className="font-bold">
+                  {lastScannedAlert.success
+                    ? `✓ ${lastScannedAlert.productName} (${formatCurrency(lastScannedAlert.price || 0)})`
+                    : lastScannedAlert.message}
                 </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Barcode className="w-4 h-4 text-amber-700 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    ref={barcodeInputRef}
-                    type="text"
-                    placeholder="Pasa la pistola lectora o escribe el código de barras aquí (ej. 7501000100019)..."
-                    value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleBarcodeScan(barcodeInput);
-                      }
-                    }}
-                    className="w-full pl-9 pr-8 py-2.5 bg-white border-2 border-amber-400 focus:border-amber-600 rounded-xl text-xs font-mono font-bold text-stone-900 placeholder:text-stone-400 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-amber-500/20 shadow-xs"
-                  />
-                  {barcodeInput && (
-                    <button
-                      type="button"
-                      onClick={() => setBarcodeInput("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
                 <button
                   type="button"
-                  onClick={() => handleBarcodeScan(barcodeInput)}
-                  disabled={!barcodeInput.trim()}
-                  className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shadow-sm shrink-0 active:scale-95 cursor-pointer"
-                  title="Verificar y agregar producto"
+                  onClick={() => setLastScannedAlert(null)}
+                  className="p-0.5 text-stone-500 hover:text-stone-900"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Agregar</span>
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
+            )}
 
-              {/* Alerta interactiva de escaneo */}
-              {lastScannedAlert && (
-                <div
-                  className={`rounded-xl p-2.5 border flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1 duration-200 shadow-2xs ${
-                    lastScannedAlert.success
-                      ? "bg-emerald-50 border-emerald-300 text-emerald-950"
-                      : "bg-rose-50 border-rose-300 text-rose-950"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div
-                      className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 font-bold ${
-                        lastScannedAlert.success
-                          ? "bg-emerald-200 text-emerald-800"
-                          : "bg-rose-200 text-rose-800"
-                      }`}
-                    >
-                      {lastScannedAlert.success ? (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      ) : (
-                        <AlertCircle className="w-3.5 h-3.5" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      {lastScannedAlert.success ? (
-                        <>
-                          <p className="font-bold text-emerald-950 truncate leading-tight">
-                            {lastScannedAlert.productName}{" "}
-                            <span className="font-black text-emerald-800">
-                              ({formatCurrency(lastScannedAlert.price || 0)})
-                            </span>
-                          </p>
-                          <p className="text-[10px] text-emerald-700 font-mono">
-                            ✓ Verificado en el catálogo POS • Código: {lastScannedAlert.code} (+1 agregado)
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="font-bold text-rose-950 leading-tight">
-                            Código no registrado
-                          </p>
-                          <p className="text-[10px] text-rose-700">
-                            El código <span className="font-mono font-bold">"{lastScannedAlert.code}"</span> no existe en el catálogo del Punto de Venta.
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLastScannedAlert(null)}
-                    className={`p-1 rounded-lg transition-colors shrink-0 ml-2 ${
-                      lastScannedAlert.success
-                        ? "text-emerald-700 hover:bg-emerald-100"
-                        : "text-rose-700 hover:bg-rose-100"
-                    }`}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Catálogo rápido desplegable (Opcional) */}
+            {/* Catálogo rápido desplegable */}
             {showCatalog && (
               <div className="bg-white p-3 rounded-xl border border-amber-200 space-y-2 animate-in fade-in duration-150">
-                <div className="relative">
-                  <Barcode className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    data-catalog-search="true"
-                    placeholder="Escanear código de barras o buscar pan por nombre..."
-                    value={catalogSearch}
-                    onChange={(e) => setCatalogSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && catalogSearch.trim()) {
-                        const matched =
-                          findProductByBarcodeOrCode(catalogSearch.trim(), products) ||
-                          findProductByBarcodeOrCode(catalogSearch.trim(), getStoredProducts());
-                        if (matched) {
-                          e.preventDefault();
-                          handleBarcodeScan(catalogSearch.trim());
-                          setCatalogSearch("");
-                        }
-                      }
-                    }}
-                    className="w-full pl-8 pr-2 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  />
-                </div>
+                <input
+                  type="text"
+                  placeholder="Buscar pan o pastel por nombre..."
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto pt-1">
                   {filteredCatalog.map((prod) => (
                     <button
                       key={prod.id}
                       type="button"
                       onClick={() => handleAddProductFromCatalog(prod)}
-                      className="p-1.5 bg-stone-50 hover:bg-amber-100/70 border border-stone-200 rounded-lg text-left text-xs transition-colors flex items-center justify-between gap-1 group"
+                      className="p-1.5 bg-stone-50 hover:bg-amber-100/70 border border-stone-200 rounded-lg text-left text-xs transition-colors flex items-center justify-between gap-1 group cursor-pointer"
                     >
-                      <div className="min-w-0 flex-1">
-                        <span className="truncate block font-bold text-stone-800 group-hover:text-amber-950">
-                          {prod.name}
-                        </span>
-                        {(prod.barcode || prod.code) && (
-                          <span className="flex items-center gap-0.5 text-[9px] text-stone-500 font-mono truncate">
-                            <Barcode className="w-2.5 h-2.5 shrink-0 text-stone-400" />
-                            <span className="truncate">{prod.barcode || prod.code}</span>
-                          </span>
-                        )}
-                      </div>
+                      <span className="truncate font-bold text-stone-800 group-hover:text-amber-950">
+                        {prod.name}
+                      </span>
                       <span className="font-black text-amber-900 shrink-0">
                         {formatCurrency(prod.price)}
                       </span>
@@ -1301,93 +1232,75 @@ export default function CreateOrderModal({
               </div>
             )}
 
-            {/* Lista de productos agregados desde el catálogo o la charola */}
+            {/* Lista de productos agregados */}
             {items.length > 0 && (
               <div className="space-y-1.5 pt-1">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] font-black text-stone-600 uppercase">
-                    Productos en la lista ({items.length}):
+                    Productos seleccionados ({items.length}):
                   </p>
                   <button
                     type="button"
                     onClick={() => setItems([])}
-                    className="px-2.5 py-1 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white rounded-lg border border-rose-300 font-extrabold text-[11px] transition-colors"
+                    className="px-2 py-0.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg border border-rose-200 font-bold text-[10px] cursor-pointer"
                   >
-                    Vaciar lista
+                    Vaciar
                   </button>
                 </div>
-                {items.map((it, idx) => {
-                  const matchingProd = products.find((p) => p.id === it.productId);
-                  const barcodeTag = matchingProd?.barcode || matchingProd?.code;
-
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-white p-2 px-3 rounded-xl border border-stone-200 flex items-center justify-between text-xs hover:border-amber-300 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1 pr-2">
-                        <span className="font-bold text-stone-900 truncate block">{it.name}</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-stone-500 font-medium">
-                            {formatCurrency(it.unitPrice)} c/u
-                          </span>
-                          {barcodeTag && (
-                            <span className="inline-flex items-center gap-0.5 text-[9px] text-stone-500 font-mono bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200">
-                              <Barcode className="w-2.5 h-2.5 text-stone-400" />
-                              <span>{barcodeTag}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5 border border-stone-300 shadow-2xs">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateItemQty(idx, -1)}
-                            className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 hover:text-stone-900 rounded font-black text-xs transition-colors active:scale-90"
-                            title="Restar 1 pieza"
-                          >
-                            -
-                          </button>
-                          <OrderItemQuantityInput
-                            value={it.quantity}
-                            onChange={(newQty) => handleSetExactItemQty(idx, newQty)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateItemQty(idx, 1)}
-                            className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 hover:text-stone-900 rounded font-black text-xs transition-colors active:scale-90"
-                            title="Sumar 1 pieza"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span className="font-black text-stone-900 w-16 text-right">
-                          {formatCurrency(it.subtotal)}
-                        </span>
+                {items.map((it, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-white p-2 px-3 rounded-xl border border-stone-200 flex items-center justify-between text-xs"
+                  >
+                    <div className="min-w-0 flex-1 pr-2">
+                      <span className="font-bold text-stone-900 truncate block">{it.name}</span>
+                      <span className="text-[10px] text-stone-500">{formatCurrency(it.unitPrice)} c/u</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1 bg-stone-100 rounded-lg p-0.5 border border-stone-300">
                         <button
                           type="button"
-                          onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                          className="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg border border-rose-200 transition-colors shadow-2xs"
-                          title="Quitar de la lista"
+                          onClick={() => handleUpdateItemQty(idx, -1)}
+                          className="w-5 h-5 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded font-black text-xs"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          -
+                        </button>
+                        <OrderItemQuantityInput
+                          value={it.quantity}
+                          onChange={(newQty) => handleSetExactItemQty(idx, newQty)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateItemQty(idx, 1)}
+                          className="w-5 h-5 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded font-black text-xs"
+                        >
+                          +
                         </button>
                       </div>
+                      <span className="font-black text-stone-900 w-16 text-right">
+                        {formatCurrency(it.subtotal)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                        className="p-1 text-rose-500 hover:text-rose-700 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
 
-            {/* Campo de descripción directa */}
+            {/* Descripción directa del pedido */}
             <div>
               <label className="text-xs font-bold text-stone-700 block mb-1">
-                Descripción y detalles del pedido:
+                Descripción del encargo:
               </label>
               <textarea
                 rows={2}
-                placeholder="Ej. Pastel 3 leches de fresa para 30 personas. Letrero: '¡Feliz Cumpleaños Mamá!' o 100 mini bolillos dorados"
+                placeholder="Ej. Pastel 3 leches de fresa para 30 personas con letrero de 'Felicidades'..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -1401,7 +1314,7 @@ export default function CreateOrderModal({
                   Precio Total del Pedido ($ MXN) *
                 </label>
                 <p className="text-[11px] text-stone-500">
-                  {items.length > 0 ? "Calculado automáticamente por los productos" : "Escribe el costo total acordado"}
+                  {items.length > 0 ? "Calculado por productos seleccionados" : "Costo total acordado"}
                 </p>
               </div>
 
@@ -1417,7 +1330,7 @@ export default function CreateOrderModal({
                     type="number"
                     min="0.01"
                     step="any"
-                    placeholder="Ej. 10"
+                    placeholder="Ej. 100"
                     value={customTotal}
                     onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                     onChange={(e) => setCustomTotal(e.target.value === "" ? "" : Number(e.target.value))}
@@ -1428,455 +1341,167 @@ export default function CreateOrderModal({
             </div>
           </div>
 
-          {/* PASO 3: ¿CUÁNDO LO RECOGE? */}
+          {/* PASO 3: ¿CUÁNDO Y A QUÉ HORA VA A PASAR? */}
           <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
             <div className="flex items-center gap-2 text-stone-900">
               <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
                 3
               </span>
               <h3 className="font-black text-sm uppercase tracking-wide text-stone-900">
-                ¿Cuándo lo recoge?
+                3. ¿Cuándo y a qué hora va a pasar?
               </h3>
             </div>
 
-            {/* Selector interactivo de días de la semana */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-black text-stone-800 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Selecciona el día de entrega:</span>
-                </label>
-                <span className="text-[10px] text-stone-500 font-bold">
-                  Toca un día para elegirlo
-                </span>
-              </div>
-
-              {/* Botones de los 4 días para tocar y seleccionar */}
-              <div className="grid grid-cols-4 gap-2">
-                {upcomingDays.map((day) => {
-                  const isSelected = deliveryDate === day.dateStr;
-
-                  return (
-                    <button
-                      key={`${day.shortTitle}-${day.dateStr}`}
-                      type="button"
-                      onClick={() => setDeliveryDate(day.dateStr)}
-                      className={`py-2.5 px-1.5 sm:px-2 rounded-xl text-center border-2 transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer select-none active:scale-95 shadow-xs ${
-                        isSelected
-                          ? "bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-500 text-stone-950 font-black shadow-md border-amber-600 ring-2 ring-amber-400/50 scale-[1.02]"
-                          : "bg-white hover:bg-amber-50/80 border-stone-200 text-stone-700 hover:border-amber-300"
-                      }`}
-                    >
-                      <span className={`text-xs sm:text-sm font-black leading-tight ${isSelected ? "text-stone-950" : "text-stone-800"}`}>
-                        {day.shortTitle}
-                      </span>
-                      <span className={`text-[10px] sm:text-xs font-bold ${isSelected ? "text-stone-950/90" : "text-stone-500"}`}>
-                        {day.dayNum} {day.monthStr}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Resumen visible del día seleccionado */}
-              {selectedDeliveryDateLabel && (
-                <div className="p-2.5 bg-amber-50/90 border border-amber-300/80 rounded-xl flex items-center justify-between text-xs text-amber-950 shadow-xs">
-                  <span className="flex items-center gap-2 font-black">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Entrega: <strong className="text-stone-900">{selectedDeliveryDateLabel}</strong></span>
-                  </span>
-                  <span className="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded-md border border-amber-300 shrink-0">
-                    Día Seleccionado
-                  </span>
-                </div>
-              )}
+            {/* Días rápidos */}
+            <div className="grid grid-cols-4 gap-2">
+              {upcomingDays.map((day) => {
+                const isSelected = deliveryDate === day.dateStr;
+                return (
+                  <button
+                    key={`${day.shortTitle}-${day.dateStr}`}
+                    type="button"
+                    onClick={() => setDeliveryDate(day.dateStr)}
+                    className={`py-2 px-1 rounded-xl text-center border-2 transition-all flex flex-col items-center justify-center cursor-pointer ${
+                      isSelected
+                        ? "bg-amber-500 text-stone-950 font-black border-amber-600 shadow-sm"
+                        : "bg-white hover:bg-stone-100 border-stone-200 text-stone-700"
+                    }`}
+                  >
+                    <span className="text-xs font-black">{day.shortTitle}</span>
+                    <span className="text-[10px] font-bold opacity-80">{day.dayNum} {day.monthStr}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Fecha y Hora exactas (Calendario libre + Hora) */}
+            {/* Fecha y Hora */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs sm:text-sm font-black text-stone-800 flex items-center justify-between mb-1.5">
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-amber-600" />
-                    <span>Fecha de entrega:</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsCalendarExpanded((prev) => !prev)}
-                    className="text-[11px] font-black text-amber-700 hover:text-amber-800 flex items-center gap-0.5 hover:underline cursor-pointer"
-                  >
-                    <span>{isCalendarExpanded ? "▲ Ocultar" : "▼ Desplegar"}</span>
-                  </button>
+                <label className="text-xs font-bold text-stone-700 block mb-1">
+                  Fecha de entrega
                 </label>
-
-                {/* Botón / Selector de Fecha Ampliado */}
-                <button
-                  type="button"
-                  onClick={() => setIsCalendarExpanded((prev) => !prev)}
-                  className={`w-full h-12 sm:h-14 px-3.5 sm:px-4 bg-white border-2 rounded-2xl flex items-center justify-between text-base sm:text-lg font-black text-stone-900 shadow-xs transition-all cursor-pointer select-none active:scale-[0.99] ${
-                    isCalendarExpanded
-                      ? "border-amber-500 ring-4 ring-amber-400/20 bg-amber-50/30"
-                      : "border-stone-300 hover:border-amber-400"
-                  }`}
-                >
-                  <span className="tracking-wide">
-                    {deliveryDate ? (() => {
-                      const parts = deliveryDate.split("-");
-                      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : deliveryDate;
-                    })() : "DD/MM/AAAA"}
-                  </span>
-                  <div className="flex items-center gap-1 text-amber-600">
-                    <Calendar className="w-5 h-5" />
-                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isCalendarExpanded ? "rotate-180" : ""}`} />
-                  </div>
-                </button>
-
-                {/* Input nativo oculto sincronizado */}
                 <input
-                  ref={nativeDateInputRef}
                   type="date"
                   value={deliveryDate}
                   min={getLocalDateStr(0)}
                   onChange={(e) => setDeliveryDate(e.target.value)}
-                  className="sr-only"
-                  tabIndex={-1}
-                  aria-hidden="true"
+                  className="w-full py-2 px-3 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
                 />
               </div>
 
               <div>
-                <label className="text-xs sm:text-sm font-black text-stone-800 flex items-center gap-1.5 mb-1.5">
-                  <Clock className="w-4 h-4 text-amber-600" />
-                  <span>Hora estimada:</span>
+                <label className="text-xs font-bold text-stone-700 block mb-1">
+                  Hora aproximada
                 </label>
-                <div className="relative">
-                  <input
-                    type="time"
-                    value={deliveryTime}
-                    onChange={(e) => setDeliveryTime(e.target.value)}
-                    className="w-full h-12 sm:h-14 px-3.5 sm:px-4 bg-white border-2 border-stone-300 hover:border-amber-400 focus:border-amber-500 focus:outline-none focus:ring-4 focus:ring-amber-400/20 rounded-2xl text-base sm:text-lg font-black text-stone-900 shadow-xs transition-all cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:scale-125 [&::-webkit-calendar-picker-indicator]:hover:scale-135"
-                  />
-                </div>
+                <input
+                  type="time"
+                  value={deliveryTime}
+                  onChange={(e) => setDeliveryTime(e.target.value)}
+                  className="w-full py-2 px-3 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                />
               </div>
             </div>
 
-            {/* Calendario Desplegado Ampliado y Táctil */}
-            {isCalendarExpanded && (
-              <div className="p-3.5 sm:p-4 bg-white border-2 border-amber-400/90 rounded-2xl shadow-lg space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                {/* Cabecera del Mes */}
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={handlePrevMonth}
-                    className="p-2 sm:p-2.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-amber-100 hover:border-amber-300 text-stone-700 transition-colors cursor-pointer active:scale-95"
-                    title="Mes anterior"
-                  >
-                    <ChevronLeft className="w-5 h-5 text-stone-800" />
-                  </button>
+            {/* Entrega: Sucursal vs Domicilio */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeliveryType("sucursal")}
+                className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  deliveryType === "sucursal"
+                    ? "bg-stone-900 text-white border-stone-900 shadow-sm"
+                    : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
+                }`}
+              >
+                <Store className="w-4 h-4" /> Recoge en Tienda
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeliveryType("domicilio")}
+                className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  deliveryType === "domicilio"
+                    ? "bg-stone-900 text-white border-stone-900 shadow-sm"
+                    : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
+                }`}
+              >
+                <MapPin className="w-4 h-4" /> A Domicilio
+              </button>
+            </div>
 
-                  <div className="text-center">
-                    <span className="text-base sm:text-lg font-black text-stone-900 capitalize block leading-tight">
-                      {calendarMonthData.monthLabel}
-                    </span>
-                    <span className="text-[11px] font-bold text-amber-800 block">
-                      Toca un día para seleccionarlo
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleNextMonth}
-                    className="p-2 sm:p-2.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-amber-100 hover:border-amber-300 text-stone-700 transition-colors cursor-pointer active:scale-95"
-                    title="Mes siguiente"
-                  >
-                    <ChevronRight className="w-5 h-5 text-stone-800" />
-                  </button>
-                </div>
-
-                {/* Días de la semana */}
-                <div className="grid grid-cols-7 gap-1 text-center">
-                  {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((dName, idx) => (
-                    <div
-                      key={dName}
-                      className={`text-xs sm:text-sm font-black py-0.5 ${
-                        idx === 0 || idx === 6 ? "text-amber-700" : "text-stone-500"
-                      }`}
-                    >
-                      {dName}
-                    </div>
+            {/* Selector de sucursal si recoge en tienda */}
+            {deliveryType === "sucursal" && (
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">
+                  Sucursal de recolección:
+                </label>
+                <select
+                  value={pickupBranchId}
+                  onChange={(e) => setPickupBranchId(e.target.value)}
+                  className="w-full py-2 px-3 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} {b.id === activeBranch?.id ? "(Esta tienda)" : ""}
+                    </option>
                   ))}
-                </div>
-
-                {/* Cuadrícula de Días Grandes */}
-                <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
-                  {calendarMonthData.blanks.map((b) => (
-                    <div key={`blank-${b}`} className="h-10 sm:h-12" />
-                  ))}
-
-                  {calendarMonthData.days.map((day) => {
-                    return (
-                      <button
-                        key={day.dateStr}
-                        type="button"
-                        disabled={day.isPast}
-                        onClick={() => handleSelectCalendarDay(day.dateStr)}
-                        className={`h-10 sm:h-12 rounded-xl sm:rounded-2xl text-sm sm:text-base font-black flex flex-col items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
-                          day.isPast
-                            ? "bg-stone-100 text-stone-300 border border-transparent cursor-not-allowed"
-                            : day.isSelected
-                            ? "bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-500 text-stone-950 font-black shadow-md border-2 border-amber-600 scale-[1.05] ring-2 ring-amber-400/50"
-                            : day.isToday
-                            ? "bg-amber-50 text-amber-900 border-2 border-amber-400 hover:bg-amber-100 shadow-2xs"
-                            : "bg-white text-stone-800 border border-stone-200 hover:bg-amber-50 hover:border-amber-300 shadow-2xs"
-                        }`}
-                      >
-                        <span>{day.dayNum}</span>
-                        {day.isToday && (
-                          <span className="text-[9px] font-black uppercase text-amber-800 -mt-1">
-                            Hoy
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Pie del calendario con atajos */}
-                <div className="flex items-center justify-between pt-2 border-t border-stone-200 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const today = new Date();
-                      setCalendarViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
-                      setDeliveryDate(getLocalDateStr(0));
-                      setIsCalendarExpanded(false);
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 font-black hover:bg-amber-100 transition-colors cursor-pointer"
-                  >
-                    Hoy
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        try {
-                          nativeDateInputRef.current?.showPicker();
-                        } catch (e) {
-                          nativeDateInputRef.current?.focus();
-                        }
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg text-stone-500 hover:text-stone-800 font-semibold transition-colors cursor-pointer"
-                      title="Abrir selector nativo del sistema"
-                    >
-                      Selector del sistema
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsCalendarExpanded(false)}
-                      className="px-4 py-2 rounded-xl bg-stone-900 text-white font-black hover:bg-stone-800 transition-colors shadow-xs cursor-pointer"
-                    >
-                      Listo
-                    </button>
-                  </div>
-                </div>
+                </select>
               </div>
             )}
 
-            {/* Modalidad: Mostrador vs Domicilio */}
-            <div className="space-y-2 pt-1">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDeliveryType("sucursal")}
-                  className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    deliveryType === "sucursal"
-                      ? "bg-stone-900 text-white border-stone-900 shadow-sm"
-                      : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-                  }`}
-                >
-                  <Store className="w-4 h-4" /> Recoge en Tienda
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeliveryType("domicilio")}
-                  className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    deliveryType === "domicilio"
-                      ? "bg-stone-900 text-white border-stone-900 shadow-sm"
-                      : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-                  }`}
-                >
-                  <MapPin className="w-4 h-4" /> A Domicilio
-                </button>
+            {/* Dirección si es a domicilio */}
+            {deliveryType === "domicilio" && (
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">
+                  Dirección de entrega a domicilio:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Calle, número, colonia y referencias..."
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  className="w-full py-2 px-3 bg-white border border-stone-300 rounded-xl text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
               </div>
-
-              {/* Si es A Domicilio: campo de dirección */}
-              {deliveryType === "domicilio" && (
-                <div className="space-y-1 animate-in fade-in duration-150">
-                  <label className="text-xs font-bold text-stone-700 block">
-                    Dirección de entrega a domicilio:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Calle, número, colonia y referencias de entrega..."
-                    value={deliveryAddress}
-                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 animate-in fade-in"
-                  />
-                </div>
-              )}
-
-              {/* Si es Recoge en Tienda: desplegamos las sucursales disponibles */}
-              {deliveryType === "sucursal" && (
-                <div className="space-y-2 pt-1 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-extrabold text-stone-800 flex items-center gap-1.5">
-                      <Store className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Sucursales disponibles para recoger:</span>
-                    </label>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
-                      {branches.length} {branches.length === 1 ? "tienda disponible" : "tiendas disponibles"}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-1">
-                    {branches.map((br) => {
-                      const isSelected = selectedPickupBranch?.id === br.id;
-                      const isCurrentStore = br.id === activeBranch?.id;
-
-                      return (
-                        <button
-                          key={br.id}
-                          type="button"
-                          onClick={() => setPickupBranchId(br.id)}
-                          className={`p-2.5 rounded-xl text-left border-2 transition-all flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
-                            isSelected
-                              ? "bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20 shadow-xs"
-                              : "bg-white border-stone-200 hover:border-stone-300 hover:bg-stone-50"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-1">
-                            <div className="min-w-0 flex-1">
-                              <span
-                                className={`text-xs font-black block leading-snug truncate ${
-                                  isSelected ? "text-amber-950" : "text-stone-900"
-                                }`}
-                              >
-                                {br.name}
-                              </span>
-                              {br.address && (
-                                <p className="text-[10px] text-stone-500 flex items-start gap-1 leading-tight line-clamp-2 mt-0.5">
-                                  <MapPin className="w-3 h-3 text-stone-400 shrink-0 mt-0.5" />
-                                  <span>{br.address}</span>
-                                </p>
-                              )}
-                            </div>
-                            <div className="shrink-0 mt-0.5">
-                              {isSelected ? (
-                                <CheckCircle2 className="w-4 h-4 text-amber-600 fill-amber-100" />
-                              ) : (
-                                <div className="w-4 h-4 rounded-full border-2 border-stone-300 group-hover:border-stone-400 bg-white" />
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between pt-1 border-t border-stone-100 text-[9px]">
-                            {isCurrentStore ? (
-                              <span className="font-extrabold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
-                                📍 Esta tienda
-                              </span>
-                            ) : (
-                              <span className="text-stone-400 font-medium truncate">
-                                {br.phone ? `📞 ${br.phone}` : "Brito"}
-                              </span>
-                            )}
-
-                            {br.status === "abierta" ? (
-                              <span className="font-bold text-emerald-700 flex items-center gap-1 shrink-0">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                Abierta
-                              </span>
-                            ) : (
-                              <span className="font-bold text-stone-400 shrink-0">Cerrada</span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Badge informativo de sucursal elegida */}
-                  {selectedPickupBranch && (
-                    <div className="p-2.5 bg-amber-50 border border-amber-200/90 rounded-xl flex items-center justify-between text-xs text-amber-950">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-base shrink-0">🏬</span>
-                        <div className="min-w-0">
-                          <p className="font-bold text-[11px] leading-tight">
-                            Recolección en mostrador:{" "}
-                            <span className="font-black text-amber-900">{selectedPickupBranch.name}</span>
-                          </p>
-                          {selectedPickupBranch.address && (
-                            <p className="text-[10px] text-amber-800/80 truncate">
-                              {selectedPickupBranch.address}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {selectedPickupBranch.id !== activeBranch?.id ? (
-                        <span className="text-[9px] font-black uppercase bg-amber-200 text-amber-950 px-2 py-0.5 rounded shrink-0">
-                          ⚠️ Otra Tienda
-                        </span>
-                      ) : (
-                        <span className="text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded shrink-0">
-                          Esta Tienda
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
-          {/* PASO 4: ANTICIPO (EDITABLE Y CON VALOR POR DEFECTO EN 0) */}
-          <div className="bg-gradient-to-br from-stone-900 via-stone-900 to-amber-950 text-white rounded-2xl p-4 sm:p-5 space-y-4 border-2 border-amber-600/60 shadow-lg">
+          {/* PASO 4: ¿CUÁNTO DINERO VA A DEJAR? (MÍNIMO 50%) */}
+          <div className="bg-stone-900 text-white rounded-2xl p-4 sm:p-5 space-y-3.5 border-2 border-amber-600/60 shadow-lg">
             <div className="flex items-center justify-between pb-2 border-b border-stone-800">
               <div className="flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-amber-400 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
                   4
                 </span>
                 <div>
-                  <h3 className="font-black text-sm text-white uppercase tracking-wide">
-                    Anticipo para Apartar
+                  <h3 className="font-black text-sm uppercase tracking-wide text-white">
+                    4. ¿Cuánto dinero va a dejar?
                   </h3>
-                  <p className="text-[11px] text-amber-300">Anticipo mínimo del 50% requerido • Selecciona 50% o 100% liquidado</p>
+                  <p className="text-[11px] text-amber-300 font-bold">
+                    Mínimo el 50% de anticipo o pagar el 100% completo
+                  </p>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-[10px] uppercase font-bold text-stone-400 block">Total</span>
-                <span className="text-xl font-black text-amber-400">{formatCurrency(total)}</span>
+                <span className="text-xl font-black text-amber-400 font-mono">{formatCurrency(total)}</span>
               </div>
             </div>
 
-            {/* Botones Táctiles para el Cajero: 50% Mínimo y 100% Liquidado */}
+            {/* Botones de 50% o 100% */}
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setDeposit(minRequiredDeposit.toString())}
                 className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === minRequiredDeposit && total > 0 && numericDeposit > 0
-                    ? "bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 border-amber-300 font-black shadow-lg ring-2 ring-amber-400/50 scale-[1.01]"
-                    : "bg-stone-850 hover:bg-stone-800 text-stone-200 border-stone-750 font-bold"
+                    ? "bg-amber-500 text-stone-950 border-amber-300 font-black shadow-lg ring-2 ring-amber-400/50 scale-[1.01]"
+                    : "bg-stone-800 hover:bg-stone-750 text-stone-200 border-stone-700 font-bold"
                 }`}
-                title="Adelanto del 50% mínimo requerido"
               >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm sm:text-base font-black">💵 50% Mínimo</span>
-                </div>
-                <span className="text-xs sm:text-sm font-black text-amber-100">
+                <span className="text-xs sm:text-sm font-black">💵 Dejar 50% Mínimo</span>
+                <span className="text-sm sm:text-base font-black font-mono">
                   {formatCurrency(minRequiredDeposit)}
                 </span>
-                <span className="text-[10px] text-amber-200/90 font-medium">Anticipo Requerido</span>
               </button>
 
               <button
@@ -1884,29 +1509,25 @@ export default function CreateOrderModal({
                 onClick={() => setDeposit(total.toString())}
                 className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === total && total > 0
-                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-emerald-300 font-black shadow-lg ring-2 ring-emerald-400/50 scale-[1.01]"
-                    : "bg-stone-850 hover:bg-stone-800 text-stone-200 border-stone-750 font-bold"
+                    ? "bg-emerald-600 text-white border-emerald-300 font-black shadow-lg ring-2 ring-emerald-400/50 scale-[1.01]"
+                    : "bg-stone-800 hover:bg-stone-750 text-stone-200 border-stone-700 font-bold"
                 }`}
-                title="Liquidado 100% de inmediato"
               >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm sm:text-base font-black">💳 100% Liquidado</span>
-                </div>
-                <span className="text-xs sm:text-sm font-black text-emerald-200">
+                <span className="text-xs sm:text-sm font-black">💳 Liquidar 100% Total</span>
+                <span className="text-sm sm:text-base font-black font-mono">
                   {formatCurrency(total)}
                 </span>
-                <span className="text-[10px] text-emerald-300/80 font-medium">Pago Completo</span>
               </button>
             </div>
 
-            {/* Input personalizado editable */}
+            {/* Cantidad personalizada */}
             <div className="flex items-center justify-between gap-3 pt-1">
               <div>
                 <label className="text-xs font-bold text-stone-300 block">
-                  O escribe otra cantidad dejada ($):
+                  O escribe otra cantidad de anticipo:
                 </label>
                 <span className="text-[10px] text-amber-300/80 font-medium">
-                  Cualquier adelanto desde el 50% ({formatCurrency(minRequiredDeposit)}) hasta {formatCurrency(total)}
+                  Mínimo {formatCurrency(minRequiredDeposit)} hasta {formatCurrency(total)}
                 </span>
               </div>
               <div className="relative w-36">
@@ -1917,9 +1538,7 @@ export default function CreateOrderModal({
                   placeholder={minRequiredDeposit > 0 ? minRequiredDeposit.toString() : "0"}
                   value={deposit}
                   onFocus={() => {
-                    if (deposit === "0") {
-                      setDeposit("");
-                    }
+                    if (deposit === "0") setDeposit("");
                   }}
                   onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                   onChange={(e) => {
@@ -1936,7 +1555,7 @@ export default function CreateOrderModal({
                     }
                   }}
                   className={`w-full pl-7 pr-3 py-1.5 bg-stone-950 border rounded-xl text-right text-sm font-black focus:outline-none transition-colors ${
-                    numericDeposit >= minRequiredDeposit && total > 0
+                    isDepositValid
                       ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/50"
                       : "border-stone-700 text-white"
                   }`}
@@ -1944,37 +1563,36 @@ export default function CreateOrderModal({
               </div>
             </div>
 
-            {/* Resumen del Anticipo y Saldo Pendiente */}
+            {/* Saldo y validación del 50% */}
             {total > 0 && (
               <div className="flex items-center justify-between text-xs pt-1 border-t border-stone-800">
                 <span className="font-bold flex items-center gap-1.5">
-                  {numericDeposit < minRequiredDeposit ? (
-                    <span className="text-amber-400 flex items-center gap-1.5">
-                      <span>⚠️</span>
-                      Adelanto mínimo del 50% requerido ({formatCurrency(minRequiredDeposit)})
+                  {!isDepositValid ? (
+                    <span className="text-amber-400 flex items-center gap-1">
+                      ⚠️ Mínimo 50% requerido ({formatCurrency(minRequiredDeposit)})
                     </span>
                   ) : numericDeposit >= total ? (
-                    <span className="text-emerald-400 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      Pedido liquidado al 100% — ¡Listo para apartar!
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      100% Liquidado
                     </span>
                   ) : (
-                    <span className="text-emerald-400 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      Adelanto del {Math.round((numericDeposit / total) * 100)}% ({formatCurrency(numericDeposit)}) — Saldo al recoger: {formatCurrency(remainingBalance)}
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      Anticipo del {Math.round((numericDeposit / total) * 100)}% ({formatCurrency(numericDeposit)})
                     </span>
                   )}
                 </span>
                 <span className="text-stone-300">
-                  Resta al entregar: <strong className="text-amber-400 text-sm font-mono font-black">{formatCurrency(remainingBalance)}</strong>
+                  Resta al recoger: <strong className="text-amber-400 text-sm font-mono font-black">{formatCurrency(remainingBalance)}</strong>
                 </span>
               </div>
             )}
 
-            {/* Forma de pago del anticipo */}
-            <div className="pt-2 border-t border-stone-800 space-y-1.5">
+            {/* Forma de pago */}
+            <div className="pt-2 border-t border-stone-800 space-y-2">
               <label className="text-[11px] font-bold text-stone-300 block">
-                ¿Cómo pagó el anticipo?:
+                Forma de pago del anticipo:
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -1986,10 +1604,10 @@ export default function CreateOrderModal({
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMethod(m.id as any)}
-                    className={`py-2 px-2 rounded-xl text-xs font-bold transition-all ${
+                    className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       paymentMethod === m.id
                         ? "bg-amber-500 text-stone-950 font-black shadow-md"
-                        : "bg-stone-800 text-stone-300 hover:bg-stone-700"
+                        : "bg-stone-800 text-stone-300 hover:bg-stone-750"
                     }`}
                   >
                     {m.label}
@@ -1997,445 +1615,137 @@ export default function CreateOrderModal({
                 ))}
               </div>
 
-              {/* 1. DESPLIEGUE COMPLETO: OPCIONES DE TRANSFERENCIA SPEI CON INFORMACIÓN DE TARJETAS Y CUENTAS */}
+              {/* Detalle SPEI */}
               {paymentMethod === "transferencia" && (
-                <div className="p-3.5 bg-gradient-to-br from-stone-900 via-stone-900 to-amber-950/70 rounded-2xl border-2 border-amber-500/80 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200 shadow-xl mt-2">
-                  {/* Header */}
-                  <div className="flex items-center justify-between gap-2 border-b border-stone-800 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-xs">
-                        <Send className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-black text-white leading-tight">
-                          Transferencia Bancaria SPEI
-                        </h4>
-                        <p className="text-[10px] text-amber-300 font-bold">
-                          Datos de la tarjeta para recibir el anticipo
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-black text-amber-300 bg-amber-950 border border-amber-500/50 px-2.5 py-1 rounded-lg">
-                      {formatCurrency(numericDeposit)}
-                    </span>
+                <div className="p-3 bg-stone-950 rounded-xl border border-stone-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-stone-400">Banco / Cuenta:</span>
+                    <span className="font-bold text-white">{selectedTransferAccount.bank} - {selectedTransferAccount.name}</span>
                   </div>
-
-                  {/* Selector Desplegable de Tarjetas / Cuentas */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-wider text-stone-300 block">
-                      💳 ¿A qué tarjeta o cuenta van a transferir?:
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={selectedTransferAccountId}
-                        onChange={(e) => setSelectedTransferAccountId(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-stone-950 text-white rounded-xl border-2 border-amber-400 focus:border-amber-500 font-bold text-xs focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
-                      >
-                        {DEFAULT_TRANSFER_ACCOUNTS.map((acc) => (
-                          <option key={acc.id} value={acc.id} className="bg-stone-950 text-white">
-                            {acc.name} — {acc.bank}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-stone-400">CLABE:</span>
+                    <span className="font-mono font-bold text-amber-300">{selectedTransferAccount.clabe}</span>
                   </div>
-
-                  {/* Ficha Visual de la Tarjeta Bancaria Seleccionada */}
-                  {selectedTransferAccount && (
-                    <div className={`p-4 rounded-2xl border-2 shadow-2xl relative overflow-hidden text-white space-y-3 bg-gradient-to-br ${selectedTransferAccount.themeColor.gradient}`}>
-                      <div className="absolute -right-6 -bottom-6 opacity-10 text-8xl pointer-events-none select-none">
-                        💳
-                      </div>
-
-                      {/* Header de la tarjeta */}
-                      <div className="flex items-center justify-between relative z-10">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base sm:text-lg font-black tracking-wide">
-                            {selectedTransferAccount.bank}
-                          </span>
-                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs ${selectedTransferAccount.themeColor.badge}`}>
-                            {selectedTransferAccount.cardType || "Débito"}
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono font-black text-amber-300 bg-black/40 px-2 py-0.5 rounded">
-                          SPEI 24/7
-                        </span>
-                      </div>
-
-                      {/* Chip simulado */}
-                      <div className="flex items-center gap-2 py-0.5 relative z-10">
-                        <div className="w-7 h-5 bg-gradient-to-tr from-amber-400 to-amber-200 rounded-md border border-amber-500/80 shadow-xs flex items-center justify-center">
-                          <div className="w-5 h-3 border border-stone-800/40 rounded-xs" />
-                        </div>
-                        <span className="text-xs opacity-70">📶</span>
-                      </div>
-
-                      {/* CLABE Interbancaria con Botón Copiar */}
-                      <div className="bg-black/50 backdrop-blur-xs p-2.5 rounded-xl border border-white/15 space-y-1 relative z-10">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] uppercase font-bold text-stone-300">
-                            CLABE Interbancaria (18 dígitos):
-                          </span>
-                          {copiedField === `clabe-${selectedTransferAccount.id}` ? (
-                            <span className="text-[10px] font-black text-emerald-400 flex items-center gap-1 bg-emerald-950/90 border border-emerald-500/50 px-2 py-0.5 rounded">
-                              ✓ ¡Copiada!
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleCopyText(selectedTransferAccount.clabe, `clabe-${selectedTransferAccount.id}`)}
-                              className="text-[10px] font-bold text-amber-300 hover:text-white flex items-center gap-1 cursor-pointer bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded transition-colors"
-                            >
-                              <Copy className="w-3 h-3" /> Copiar CLABE
-                            </button>
-                          )}
-                        </div>
-                        <div className="font-mono text-sm sm:text-base font-black tracking-widest text-amber-200 select-all">
-                          {selectedTransferAccount.clabe}
-                        </div>
-                      </div>
-
-                      {/* Tarjeta y Cuenta */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs relative z-10">
-                        {selectedTransferAccount.cardNumber && (
-                          <div className="bg-black/40 p-2 rounded-xl border border-white/10 space-y-0.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[9px] text-stone-300 font-bold">No. de Tarjeta:</span>
-                              {copiedField === `card-${selectedTransferAccount.id}` ? (
-                                <span className="text-[9px] font-black text-emerald-400">✓ Copiado</span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyText(selectedTransferAccount.cardNumber!, `card-${selectedTransferAccount.id}`)}
-                                  className="text-[9px] font-bold text-amber-300 hover:text-white flex items-center gap-1"
-                                >
-                                  <Copy className="w-2.5 h-2.5" /> Copiar
-                                </button>
-                              )}
-                            </div>
-                            <span className="font-mono font-bold text-white text-xs block tracking-wider">
-                              {selectedTransferAccount.cardNumber}
-                            </span>
-                          </div>
-                        )}
-
-                        {selectedTransferAccount.accountNumber && (
-                          <div className="bg-black/40 p-2 rounded-xl border border-white/10 space-y-0.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[9px] text-stone-300 font-bold">No. de Cuenta:</span>
-                              {copiedField === `acc-${selectedTransferAccount.id}` ? (
-                                <span className="text-[9px] font-black text-emerald-400">✓ Copiado</span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyText(selectedTransferAccount.accountNumber!, `acc-${selectedTransferAccount.id}`)}
-                                  className="text-[9px] font-bold text-amber-300 hover:text-white flex items-center gap-1"
-                                >
-                                  <Copy className="w-2.5 h-2.5" /> Copiar
-                                </button>
-                              )}
-                            </div>
-                            <span className="font-mono font-bold text-white text-xs block">
-                              {selectedTransferAccount.accountNumber}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Titular y Monto */}
-                      <div className="pt-1.5 flex items-center justify-between text-xs border-t border-white/20 relative z-10">
-                        <div>
-                          <span className="text-[9px] uppercase font-bold text-stone-300 block">Titular / Beneficiario:</span>
-                          <span className="font-black text-white text-xs sm:text-sm">
-                            {selectedTransferAccount.holder}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[9px] uppercase font-bold text-amber-300 block">Anticipo a transferir:</span>
-                          <span className="font-black text-amber-300 text-sm sm:text-base">
-                            {formatCurrency(numericDeposit)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Campo de Comprobante / Referencia SPEI */}
-                  <div className="space-y-1 pt-0.5">
-                    <label className="text-[10px] font-bold text-stone-300 block">
-                      Folio de Rastreo SPEI / Comprobante / Referencia (Opcional):
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. RASTREO-94821 o últimos 4 dígitos"
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-stone-950 border border-stone-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-amber-400 placeholder:text-stone-500"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Folio de rastreo SPEI / Referencia (Opcional)"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-xs font-mono text-white placeholder:text-stone-500"
+                  />
                 </div>
               )}
 
-              {/* 2. DESPLIEGUE: COBRO CON TARJETA EN TERMINAL */}
+              {/* Detalle Tarjeta */}
               {paymentMethod === "tarjeta" && (
-                <div className="p-3.5 bg-gradient-to-br from-stone-900 via-stone-900 to-amber-950/70 rounded-2xl border-2 border-amber-500/80 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200 shadow-xl mt-2">
-                  <div className="flex items-center justify-between gap-2 border-b border-stone-800 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-xs">
-                        <CreditCard className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-black text-white leading-tight">
-                          Cobro con Tarjeta en Terminal
-                        </h4>
-                        <p className="text-[10px] text-amber-300 font-bold">
-                          Selecciona la terminal donde pasará la tarjeta
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-xs font-black text-amber-300 bg-amber-950 border border-amber-500/50 px-2.5 py-1 rounded-lg">
-                      {formatCurrency(numericDeposit)}
-                    </span>
+                <div className="p-3 bg-stone-950 rounded-xl border border-stone-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-stone-400">Terminal:</span>
+                    <span className="font-bold text-white">{selectedCardTerminal.name} ({selectedCardTerminal.bank})</span>
                   </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-wider text-stone-300 block">
-                      💳 Terminal de Cobro:
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={selectedCardTerminalId}
-                        onChange={(e) => setSelectedCardTerminalId(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-stone-950 text-white rounded-xl border-2 border-amber-400 focus:border-amber-500 font-bold text-xs focus:outline-none shadow-xs cursor-pointer appearance-none pr-9"
-                      >
-                        {DEFAULT_CARD_TERMINALS.map((term) => (
-                          <option key={term.id} value={term.id} className="bg-stone-950 text-white">
-                            {term.name} — {term.bank}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
-                  </div>
-
-                  {selectedCardTerminal && (
-                    <div className="bg-stone-950 rounded-xl p-3 border border-stone-800 text-xs space-y-2 text-stone-300">
-                      <div className="flex items-center justify-between">
-                        <span className="text-stone-400 font-bold">Terminal Activa:</span>
-                        <span className="font-black text-white">{selectedCardTerminal.name}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-stone-400 font-bold">Plataforma / Banco:</span>
-                        <span className="font-extrabold text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
-                          {selectedCardTerminal.bank}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between pt-1 border-t border-stone-800">
-                        <span className="text-stone-400 font-bold">Abono a Cuenta:</span>
-                        <span className="font-bold text-stone-200">{selectedCardTerminal.accountDestination}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-1 pt-0.5">
-                    <label className="text-[10px] font-bold text-stone-300 block">
-                      No. de Autorización / Voucher / Últimos 4 dígitos (Opcional):
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. AUTH-4912 o 5519"
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-stone-950 border border-stone-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-amber-400 placeholder:text-stone-500"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* 3. DESPLIEGUE: COBRO EN EFECTIVO */}
-              {paymentMethod === "efectivo" && (
-                <div className="p-3 bg-stone-900/90 rounded-2xl border border-stone-800 flex items-center justify-between text-xs animate-in fade-in duration-200 mt-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-base shrink-0">
-                      💵
-                    </div>
-                    <div>
-                      <span className="font-black text-stone-100 block">Cobro en Efectivo</span>
-                      <span className="text-[10px] text-stone-400">Ingreso directo al cajón de caja de la sucursal</span>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Anticipo recibido:</span>
-                    <span className="font-black text-emerald-400 text-sm sm:text-base">{formatCurrency(numericDeposit)}</span>
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="No. de autorización / voucher (Opcional)"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-xs font-mono text-white placeholder:text-stone-500"
+                  />
                 </div>
               )}
             </div>
-
-            {/* Pregunta obligatoria para registrar al cliente en el catálogo para búsquedas futuras */}
-            {isCustomerInCatalog ? (
-              <div className="pt-2 border-t border-stone-800 flex items-center justify-between text-xs bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-3">
-                <span className="text-emerald-300 font-bold flex items-center gap-1.5">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Cliente en catálogo: <strong className="text-white">{customerName.trim() || "Cliente"}</strong></span>
-                </span>
-                <span className="text-[10px] bg-emerald-900/60 text-emerald-200 font-bold px-2 py-0.5 rounded-full shrink-0">
-                  Vinculado
-                </span>
-              </div>
-            ) : customerName.trim() ? (
-              <div
-                ref={customerDecisionRef}
-                className={`pt-2 border-t space-y-2.5 rounded-2xl p-4 transition-all duration-200 shadow-md ${
-                  mustChooseCustomerAlert
-                    ? "bg-gradient-to-br from-amber-950 via-stone-900 to-amber-950 border-2 border-amber-400 ring-4 ring-amber-400/40 shadow-amber-500/20"
-                    : isCustomerDecisionPending
-                    ? "bg-gradient-to-br from-amber-950/50 via-stone-900/80 to-stone-900 border-2 border-amber-500/60"
-                    : saveCustomerDecision === "yes"
-                    ? "bg-gradient-to-br from-emerald-950/40 via-stone-900/70 to-stone-900 border border-emerald-500/60"
-                    : "bg-stone-900/90 border border-stone-700/80"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Users className={`w-4 h-4 shrink-0 ${saveCustomerDecision === "yes" ? "text-emerald-400" : "text-amber-400"}`} />
-                      <p className="text-xs font-black text-amber-300">
-                        ¿Deseas agregar a "{customerName.trim()}" al sistema?
-                      </p>
-                      {isCustomerDecisionPending ? (
-                        <span className="text-[9px] bg-amber-400 text-stone-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          Requerido antes de guardar
-                        </span>
-                      ) : (
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${saveCustomerDecision === "yes" ? "bg-emerald-500 text-white" : "bg-stone-700 text-amber-200"}`}>
-                          {saveCustomerDecision === "yes" ? "✓ Se guardará" : "✓ Solo este pedido"}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-stone-300 mt-1">
-                      Para que la próxima vez sea más fácil buscarlo por su nombre o teléfono al levantar pedidos.
-                    </p>
-                  </div>
-                  {saveCustomerDecision !== "ask" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSaveCustomerDecision("ask");
-                        setMustChooseCustomerAlert(false);
-                      }}
-                      className="text-[10px] text-amber-400 underline hover:text-amber-300 cursor-pointer shrink-0 font-bold ml-1"
-                    >
-                      Cambiar
-                    </button>
-                  )}
-                </div>
-
-                {mustChooseCustomerAlert && isCustomerDecisionPending && (
-                  <div className="bg-amber-400 text-stone-950 text-xs font-black p-2.5 rounded-xl flex items-center gap-2 animate-in fade-in">
-                    <span className="text-base">⚠️</span>
-                    <span>Debes elegir una de las 2 opciones siguientes antes de poder apartar el pedido:</span>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSaveCustomerDecision("yes");
-                      setMustChooseCustomerAlert(false);
-                    }}
-                    className={`py-3 px-3.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer border ${
-                      saveCustomerDecision === "yes"
-                        ? "bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-black shadow-lg ring-2 ring-emerald-400 border-emerald-400 scale-[1.01]"
-                        : "bg-stone-800/90 text-stone-200 hover:bg-stone-700 hover:text-white border-stone-700 hover:border-emerald-500/50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span>⭐</span>
-                      <span>Sí, guardar cliente</span>
-                      {saveCustomerDecision === "yes" && <Check className="w-3.5 h-3.5 text-white ml-1" />}
-                    </div>
-                    <span className={`text-[10px] font-normal ${saveCustomerDecision === "yes" ? "text-emerald-100" : "text-stone-400"}`}>
-                      Se registrará en el catálogo
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSaveCustomerDecision("no");
-                      setMustChooseCustomerAlert(false);
-                    }}
-                    className={`py-3 px-3.5 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer border ${
-                      saveCustomerDecision === "no"
-                        ? "bg-stone-700 text-amber-200 font-black shadow-lg ring-2 ring-amber-400 border-amber-400/80 scale-[1.01]"
-                        : "bg-stone-800/90 text-stone-300 hover:bg-stone-700 hover:text-white border-stone-700 hover:border-amber-500/50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span>❌</span>
-                      <span>No, solo este pedido</span>
-                      {saveCustomerDecision === "no" && <Check className="w-3.5 h-3.5 text-amber-300 ml-1" />}
-                    </div>
-                    <span className={`text-[10px] font-normal ${saveCustomerDecision === "no" ? "text-amber-100/70" : "text-stone-400"}`}>
-                      Continuar como cliente invitado
-                    </span>
-                  </button>
-                </div>
-              </div>
-            ) : null}
           </div>
 
-          {/* BOTÓN FINAL GIGANTE Y TÁCTIL */}
-          <div className="pt-2">
+          {/* PASO 5: DAR ACCESO A LA COMPRA (CONFIRMACIÓN FINAL PARA VALIDAR) */}
+          <div className="bg-stone-900 text-white rounded-2xl p-4 sm:p-5 border-2 border-emerald-500/80 shadow-xl space-y-3.5">
+            <div className="flex items-center justify-between pb-2 border-b border-stone-800">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-emerald-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
+                  5
+                </span>
+                <h3 className="font-black text-sm uppercase tracking-wide text-white">
+                  5. Dar Acceso a la Compra
+                </h3>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-400">Paso Final de Confirmación</span>
+            </div>
+
+            {/* Resumen de validación rápida */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
+                <span className="text-[10px] text-stone-400 block">Cliente:</span>
+                <span className="font-black text-stone-100 truncate block">
+                  {customerName.trim() || "⚠️ Sin cliente"}
+                </span>
+                {!isCustomerInCatalog && customerName.trim() && (
+                  <span className="text-[9px] text-emerald-400 font-bold block truncate">
+                    {saveCustomerDecision === "yes" ? "+ Añadir a catálogo" : "Solo este pedido"}
+                  </span>
+                )}
+              </div>
+
+              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
+                <span className="text-[10px] text-stone-400 block">Entrega:</span>
+                <span className="font-black text-stone-100 truncate block">
+                  {deliveryDate} ({deliveryTime})
+                </span>
+                <span className="text-[9px] text-amber-300 font-bold block truncate">
+                  {deliveryType === "sucursal" ? selectedPickupBranch?.name : "A Domicilio"}
+                </span>
+              </div>
+
+              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
+                <span className="text-[10px] text-stone-400 block">Total:</span>
+                <span className="font-black text-amber-400 text-sm font-mono block">
+                  {formatCurrency(total)}
+                </span>
+              </div>
+
+              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
+                <span className="text-[10px] text-stone-400 block">Anticipo:</span>
+                <span className={`font-black text-sm font-mono block ${isDepositValid ? "text-emerald-400" : "text-amber-400"}`}>
+                  {formatCurrency(numericDeposit)}
+                </span>
+                <span className={`text-[9px] font-bold block truncate ${isDepositValid ? "text-emerald-400" : "text-amber-400"}`}>
+                  {isDepositValid ? `✓ Mínimo 50% cubierto` : `⚠️ Mínimo ${formatCurrency(minRequiredDeposit)}`}
+                </span>
+              </div>
+            </div>
+
+            {/* BOTÓN DEFINITIVO DE VALIDACIÓN */}
             <button
               type="submit"
-              disabled={isSubmitting || !isDepositValid || !customerName.trim() || total <= 0}
+              disabled={isSubmitting || !isReadyToConfirm}
               className={`w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2.5 transition-all ${
                 isSubmitting
                   ? "bg-stone-700 text-stone-400 cursor-wait shadow-none"
                   : !customerName.trim()
-                  ? "bg-stone-850 text-stone-400 border-2 border-stone-700/80 cursor-not-allowed opacity-75 shadow-none"
+                  ? "bg-stone-800 text-stone-400 border-2 border-stone-700 cursor-not-allowed opacity-75 shadow-none"
                   : total <= 0
-                  ? "bg-stone-850 text-stone-400 border-2 border-stone-700/80 cursor-not-allowed opacity-75 shadow-none"
+                  ? "bg-stone-800 text-stone-400 border-2 border-stone-700 cursor-not-allowed opacity-75 shadow-none"
                   : !isDepositValid
-                  ? "bg-stone-850 text-amber-400/80 border-2 border-dashed border-amber-500/40 cursor-not-allowed opacity-80 shadow-none hover:bg-stone-800"
-                  : isCustomerDecisionPending
-                  ? "bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-stone-950 shadow-xl shadow-amber-900/30 ring-4 ring-amber-400/40 active:scale-98 cursor-pointer"
-                  : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/40 border-2 border-emerald-300/90 active:scale-98 cursor-pointer animate-in fade-in"
+                  ? "bg-stone-800 text-amber-400 border-2 border-dashed border-amber-500/50 cursor-not-allowed opacity-80 shadow-none"
+                  : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/40 border-2 border-emerald-300 active:scale-98 cursor-pointer animate-in fade-in"
               }`}
             >
               <span>
                 {isSubmitting ? (
                   "⏳"
-                ) : !customerName.trim() ? (
-                  "👤"
-                ) : total <= 0 ? (
-                  "🎂"
-                ) : !isDepositValid ? (
+                ) : !isReadyToConfirm ? (
                   "🔒"
-                ) : isCustomerDecisionPending ? (
-                  "👥"
                 ) : (
                   <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
                 )}
               </span>
               <span>
                 {isSubmitting
-                  ? "Guardando Pedido..."
+                  ? "Validando y Guardando Pedido..."
                   : !customerName.trim()
-                  ? "Escribe el nombre del cliente para apartar"
+                  ? "Paso 1: Escribe el nombre del cliente"
                   : total <= 0
-                  ? "Indica el monto total del encargo"
-                  : isCustomerDecisionPending
-                  ? `Elige si guardar o no al cliente antes de apartar`
+                  ? "Paso 2: Indica el monto total del pedido"
                   : !isDepositValid
-                  ? `Elige el adelanto (Mínimo 50% — ${formatCurrency(minRequiredDeposit)})`
-                  : numericDeposit >= total
-                  ? `GUARDAR Y APARTAR PEDIDO (100% Liquidado — ${formatCurrency(numericDeposit)})`
-                  : `GUARDAR Y APARTAR PEDIDO (${Math.round((numericDeposit / total) * 100)}% Adelanto: ${formatCurrency(numericDeposit)} — Saldo: ${formatCurrency(remainingBalance)})`}
+                  ? `Paso 4: Requiere mínimo el 50% de anticipo (${formatCurrency(minRequiredDeposit)})`
+                  : `DAR ACCESO A LA COMPRA • VALIDAR PEDIDO (${formatCurrency(numericDeposit)})`}
               </span>
             </button>
           </div>

@@ -244,6 +244,44 @@ const CUENTAS_DESTINO = [
 
 const QUICK_AMOUNTS = [50, 100, 200, 500, 1000];
 
+/**
+ * Muestra el concepto compacto con botón "ver más" / "ver menos" si supera la longitud
+ */
+function ExpandableConceptText({ text, maxChars = 38 }: { text: string; maxChars?: number }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  if (!text) return null;
+
+  const isLong = text.length > maxChars;
+
+  if (!isLong) {
+    return (
+      <div className="font-bold text-stone-950 text-sm sm:text-base leading-snug" title={text}>
+        {text}
+      </div>
+    );
+  }
+
+  const preview = text.slice(0, maxChars).trim() + "...";
+
+  return (
+    <div className="font-bold text-stone-950 text-sm sm:text-base leading-snug" title={text}>
+      <span>{isExpanded ? text : preview}</span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsExpanded((prev) => !prev);
+        }}
+        className="inline-flex items-center text-[11px] font-black text-emerald-700 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 px-1.5 py-0.5 rounded-md ml-1.5 transition-colors cursor-pointer select-none"
+        title={isExpanded ? "Mostrar menos texto" : "Mostrar texto completo"}
+      >
+        {isExpanded ? "ver menos" : "ver más"}
+      </button>
+    </div>
+  );
+}
+
 export default function IngresosPage() {
   const { user } = useAuth();
   const { branches, currentBranch } = useBranch();
@@ -961,20 +999,6 @@ export default function IngresosPage() {
               </select>
             </div>
 
-            {/* Filtro por Categoría */}
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="bg-stone-50 px-3.5 py-2.5 rounded-2xl border-2 border-stone-200 text-sm sm:text-base font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-xs"
-            >
-              <option value="all">Todas las Categorías</option>
-              {CATEGORY_OPTIONS.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.icon} {c.label}
-                </option>
-              ))}
-            </select>
-
             {/* Filtro por Método de Pago */}
             <select
               value={selectedMethod}
@@ -988,7 +1012,7 @@ export default function IngresosPage() {
             </select>
 
             {/* Botón para limpiar filtros */}
-            {(search || selectedBranch !== "all" || selectedCategory !== "all" || selectedMethod !== "all") && (
+            {(search || selectedBranch !== "all" || selectedMethod !== "all") && (
               <button
                 onClick={() => {
                   setSearch("");
@@ -1118,9 +1142,7 @@ export default function IngresosPage() {
 
                       {/* 5. Concepto / Motivo */}
                       <td className="py-3.5 px-4 align-middle max-w-sm">
-                        <div className="font-bold text-stone-950 text-sm sm:text-base" title={inc.concept}>
-                          {inc.concept}
-                        </div>
+                        <ExpandableConceptText text={inc.concept} maxChars={38} />
                         <div className="flex flex-wrap gap-1.5 mt-1">
                           {inc.customerName && (
                             <span className="text-xs text-stone-600 font-medium">
@@ -1180,58 +1202,70 @@ export default function IngresosPage() {
 
                       {/* 10. Acciones */}
                       <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap relative">
-                        <div className="inline-block text-left">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveDropdown(activeDropdown === inc.id ? null : inc.id);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-800 font-bold rounded-xl text-xs sm:text-sm transition-colors cursor-pointer"
+                            type="button"
+                            onClick={() => handlePrintReceipt(inc)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer group"
+                            title="Imprimir Comprobante de Ingreso (80mm)"
                           >
-                            <span>Acciones</span>
-                            <ChevronDown className="w-3.5 h-3.5 text-stone-500" />
+                            <Printer className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                            <span className="hidden sm:inline">Ticket</span>
                           </button>
 
-                          {activeDropdown === inc.id && (
-                            <div className="absolute right-0 mt-1 w-52 bg-white rounded-2xl shadow-xl border border-stone-200 py-1.5 z-30 animate-in fade-in zoom-in-95 text-xs sm:text-sm text-left font-bold">
-                              {/* Ver Detalle */}
-                              <button
-                                onClick={() => {
-                                  setSelectedIncomeForView(inc);
-                                  setIsViewModalOpen(true);
-                                  setActiveDropdown(null);
-                                }}
-                                className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5 cursor-pointer"
-                              >
-                                <Eye className="w-4 h-4 text-blue-600" />
-                                <span>Ver Detalle</span>
-                              </button>
+                          <div className="inline-block text-left">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveDropdown(activeDropdown === inc.id ? null : inc.id);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-800 font-bold rounded-xl text-xs sm:text-sm transition-colors cursor-pointer"
+                            >
+                              <span>Acciones</span>
+                              <ChevronDown className="w-3.5 h-3.5 text-stone-500" />
+                            </button>
 
-                              {/* Imprimir Ticket */}
-                              <button
-                                onClick={() => {
-                                  handlePrintReceipt(inc);
-                                  setActiveDropdown(null);
-                                }}
-                                className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5 cursor-pointer"
-                              >
-                                <Printer className="w-4 h-4 text-emerald-600" />
-                                <span>Imprimir Comprobante (80mm)</span>
-                              </button>
+                            {activeDropdown === inc.id && (
+                              <div className="absolute right-0 mt-1 w-52 bg-white rounded-2xl shadow-xl border border-stone-200 py-1.5 z-30 animate-in fade-in zoom-in-95 text-xs sm:text-sm text-left font-bold">
+                                {/* Ver Detalle */}
+                                <button
+                                  onClick={() => {
+                                    setSelectedIncomeForView(inc);
+                                    setIsViewModalOpen(true);
+                                    setActiveDropdown(null);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <Eye className="w-4 h-4 text-blue-600" />
+                                  <span>Ver Detalle</span>
+                                </button>
 
-                              {/* Eliminar */}
-                              <button
-                                onClick={() => {
-                                  handleDeleteIncome(inc.id);
-                                  setActiveDropdown(null);
-                                }}
-                                className="w-full px-3.5 py-2.5 text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 border-t border-stone-100 cursor-pointer"
-                              >
-                                <Trash2 className="w-4 h-4 text-rose-600" />
-                                <span>Eliminar Ingreso</span>
-                              </button>
-                            </div>
-                          )}
+                                {/* Imprimir Ticket */}
+                                <button
+                                  onClick={() => {
+                                    handlePrintReceipt(inc);
+                                    setActiveDropdown(null);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <Printer className="w-4 h-4 text-emerald-600" />
+                                  <span>Imprimir Comprobante (80mm)</span>
+                                </button>
+
+                                {/* Eliminar */}
+                                <button
+                                  onClick={() => {
+                                    handleDeleteIncome(inc.id);
+                                    setActiveDropdown(null);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 border-t border-stone-100 cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4 text-rose-600" />
+                                  <span>Eliminar Ingreso</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>
