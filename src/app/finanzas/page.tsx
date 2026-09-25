@@ -340,7 +340,12 @@ export default function FinanzasPage() {
           </div>
 
           {/* Gráfica Interactiva y Llamativa de Operaciones */}
-          <OperationsIncomeChart summary={summary} plViewMode={plViewMode} />
+          <OperationsIncomeChart 
+            summary={summary} 
+            plViewMode={plViewMode} 
+            period={period}
+            onPeriodChange={setPeriod}
+          />
 
           {/* Desglose de Canales de Venta */}
           <div className="space-y-4">

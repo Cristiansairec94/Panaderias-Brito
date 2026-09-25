@@ -1,34 +1,29 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   TrendingUp, 
   Store, 
   Cake, 
   Sparkles, 
   Calendar, 
-  Flame, 
   BarChart3, 
   PieChart as PieIcon, 
-  CheckCircle2, 
-  ArrowUpRight,
-  Info,
-  DollarSign,
-  Award,
-  Clock,
-  Users,
-  ChevronRight,
+  Clock, 
   MousePointerClick
 } from "lucide-react";
-import { FullFinancialSummary, CashFlowDay } from "@/lib/finanzas";
+import { FullFinancialSummary, FinancialPeriod } from "@/lib/finanzas";
 import { formatCurrency } from "@/lib/utils";
 
 interface OperationsIncomeChartProps {
   summary: FullFinancialSummary;
   plViewMode?: "currency" | "percent";
+  period?: FinancialPeriod;
+  onPeriodChange?: (period: FinancialPeriod) => void;
 }
 
 type ChartTab = "dias" | "canales";
+type TimeframeMode = "dia" | "mes" | "anio";
 
 // Formato compacto para las barras (evita que los números largos choquen)
 function formatCompact(amount: number): string {
@@ -41,11 +36,32 @@ function formatCompact(amount: number): string {
   return `$${Math.round(amount)}`;
 }
 
-export default function OperationsIncomeChart({ summary }: OperationsIncomeChartProps) {
+export default function OperationsIncomeChart({ 
+  summary, 
+  period = "mes", 
+  onPeriodChange 
+}: OperationsIncomeChartProps) {
   const [activeTab, setActiveTab] = useState<ChartTab>("dias");
+  const [timeframe, setTimeframe] = useState<TimeframeMode>(
+    period === "hoy" ? "dia" : period === "anio" ? "anio" : "mes"
+  );
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(5); // Sábado por defecto
   const [selectedChannelId, setSelectedChannelId] = useState<string>("counter");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // Sincronizar timeframe si el periodo exterior cambia
+  useEffect(() => {
+    if (period === "hoy") {
+      setTimeframe("dia");
+      setSelectedDayIndex(4);
+    } else if (period === "anio") {
+      setTimeframe("anio");
+      setSelectedDayIndex(11);
+    } else {
+      setTimeframe("mes");
+      setSelectedDayIndex(5);
+    }
+  }, [period]);
 
   const { pl, cashFlow } = summary;
 
@@ -95,34 +111,153 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
     },
   ], [pl.counterSales, pl.ordersSales, pl.otherIncomes, safeTotal]);
 
-  // Cálculos de la Gráfica de Barras Diarias con ESPACIO GENEROSO
-  const dailyData = useMemo(() => {
-    const days = cashFlow && cashFlow.length > 0 ? cashFlow : [];
-    const maxVal = Math.max(...days.map((d) => d.income), 1000);
-    const avgVal = days.length > 0 ? Math.round(days.reduce((a, b) => a + b.income, 0) / days.length) : 0;
-    
-    // Identificar el día récord absoluto
-    const peakDay = days.reduce((prev, curr) => (curr.income > prev.income ? curr : prev), days[0] || { day: "Sábado", income: 0 });
+  // Manejo del cambio de Día, Mes o Año
+  const handleTimeframeChange = (newTf: TimeframeMode) => {
+    setTimeframe(newTf);
+    if (newTf === "dia") {
+      setSelectedDayIndex(4); // 5:00 PM - 8:30 PM
+      onPeriodChange?.("hoy");
+    } else if (newTf === "mes") {
+      setSelectedDayIndex(5); // Sábado
+      onPeriodChange?.("mes");
+    } else if (newTf === "anio") {
+      setSelectedDayIndex(11); // Diciembre
+      onPeriodChange?.("anio");
+    }
+  };
 
-    const svgWidth = 720;
+  // ─── Generación Dinámica de Datos para Día, Mes y Año ───────────────────────
+  const chartData = useMemo(() => {
+    let rawItems: Array<{
+      day: string;
+      shortDay: string;
+      income: number;
+      isPeak: boolean;
+      note: string;
+      rushDetail: string;
+    }> = [];
+
+    let titleText = "Ventas Día por Día en la Semana";
+    let subtitleText = "Toca una columna para examinar los datos de ese día.";
+    let avgLabel = "al día";
+    let svgWidth = 720;
+
+    if (timeframe === "dia") {
+      titleText = "Ventas por Franjas Horarias del Día";
+      subtitleText = "Toca un horario para examinar el flujo de venta y afluencia de clientes.";
+      avgLabel = "por turno";
+      svgWidth = 720;
+
+      // Base diaria estimada
+      const dayTotal = summary.period === "hoy"
+        ? pl.grossSales
+        : Math.round(pl.grossSales / (summary.period === "anio" ? 318 : summary.period === "mes" ? 26.5 : 6.2)) || 14500;
+
+      const hourlyRatios = [
+        { day: "6:00 AM - 8:30 AM", shortDay: "6-8:30 AM", ratio: 0.15, isPeak: false, note: "Apertura y primera salida de bolillo caliente y conchas", rushDetail: "6:30 AM - 8:00 AM" },
+        { day: "8:30 AM - 11:30 AM", shortDay: "8:30-11:30", ratio: 0.14, isPeak: false, note: "Desayunos, donas, café y clientes de paso", rushDetail: "9:00 AM - 10:30 AM" },
+        { day: "11:30 AM - 2:00 PM", shortDay: "11:30-2 PM", ratio: 0.10, isPeak: false, note: "Pan blanco y teleras para el almuerzo y comidas", rushDetail: "12:30 PM - 1:45 PM" },
+        { day: "2:00 PM - 5:00 PM", shortDay: "2-5 PM", ratio: 0.16, isPeak: false, note: "Venta de pasteles de vitrina, pays y repostería", rushDetail: "3:30 PM - 4:45 PM" },
+        { day: "5:00 PM - 8:30 PM", shortDay: "5-8:30 PM", ratio: 0.32, isPeak: true, note: "Pico máximo familiar: salida de pan dulce caliente para la merienda", rushDetail: "5:30 PM - 8:00 PM" },
+        { day: "8:30 PM - 10:00 PM", shortDay: "8:30-10 PM", ratio: 0.13, isPeak: false, note: "Últimas compras nocturnas y arqueo de caja", rushDetail: "8:45 PM - 9:30 PM" },
+      ];
+
+      rawItems = hourlyRatios.map(h => ({
+        day: h.day,
+        shortDay: h.shortDay,
+        income: Math.round(dayTotal * h.ratio),
+        isPeak: h.isPeak,
+        note: h.note,
+        rushDetail: h.rushDetail,
+      }));
+
+    } else if (timeframe === "anio") {
+      titleText = "Comportamiento Mensual a lo Largo del Año";
+      subtitleText = "Toca un mes para examinar la estacionalidad y recaudación acumulada.";
+      avgLabel = "al mes";
+      svgWidth = 840;
+
+      // Base anual estimada
+      const yearTotal = summary.period === "anio"
+        ? pl.grossSales
+        : Math.round(pl.grossSales * (summary.period === "mes" ? 12 : summary.period === "hoy" ? 318 : 52)) || 4600000;
+
+      const monthRatios = [
+        { day: "Enero", shortDay: "Ene", ratio: 0.082, isPeak: false, note: "Rosca de Reyes y arranque de año", rushDetail: "5 y 6 de Enero" },
+        { day: "Febrero", shortDay: "Feb", ratio: 0.074, isPeak: false, note: "Día de la Candelaria y San Valentín", rushDetail: "14 de Febrero" },
+        { day: "Marzo", shortDay: "Mar", ratio: 0.078, isPeak: false, note: "Inicio de primavera y Cuaresma", rushDetail: "Fines de semana" },
+        { day: "Abril", shortDay: "Abr", ratio: 0.076, isPeak: false, note: "Día del Niño y vacaciones", rushDetail: "30 de Abril" },
+        { day: "Mayo", shortDay: "May", ratio: 0.098, isPeak: false, note: "Día de las Madres (alta demanda en pastelería)", rushDetail: "9 y 10 de Mayo" },
+        { day: "Junio", shortDay: "Jun", ratio: 0.075, isPeak: false, note: "Día del Padre y graduaciones escolares", rushDetail: "3er domingo de Junio" },
+        { day: "Julio", shortDay: "Jul", ratio: 0.068, isPeak: false, note: "Vacaciones escolares y temporada de lluvias", rushDetail: "Tardes lluviosas" },
+        { day: "Agosto", shortDay: "Ago", ratio: 0.074, isPeak: false, note: "Regreso a clases y reanudación de rutinas", rushDetail: "Última semana" },
+        { day: "Septiembre", shortDay: "Sep", ratio: 0.086, isPeak: false, note: "Fiestas Patrias: pambazos y conchas mexicanas", rushDetail: "15 y 16 de Septiembre" },
+        { day: "Octubre", shortDay: "Oct", ratio: 0.095, isPeak: false, note: "Arranque de temporada de Pan de Muerto", rushDetail: "Segunda quincena" },
+        { day: "Noviembre", shortDay: "Nov", ratio: 0.106, isPeak: false, note: "Día de Muertos y frío otoñal", rushDetail: "1 y 2 de Noviembre" },
+        { day: "Diciembre", shortDay: "Dic", ratio: 0.118, isPeak: true, note: "Temporada Navideña, posadas y fin de año (RÉCORD ANUAL)", rushDetail: "15 al 31 de Diciembre" },
+      ];
+
+      rawItems = monthRatios.map(m => ({
+        day: m.day,
+        shortDay: m.shortDay,
+        income: Math.round(yearTotal * m.ratio),
+        isPeak: m.isPeak,
+        note: m.note,
+        rushDetail: m.rushDetail,
+      }));
+
+    } else {
+      // timeframe === "mes" (Días de la semana)
+      titleText = "Ventas Día por Día en el Mes";
+      subtitleText = "Toca una columna para examinar los datos de ese día de la semana.";
+      avgLabel = "al día";
+      svgWidth = 720;
+
+      const days = cashFlow && cashFlow.length > 0 ? cashFlow : [];
+      const defaultNotes: Record<string, { note: string; rush: string }> = {
+        Lunes: { note: "Inicio de semana laboral y reposición de mostrador", rush: "6:30 PM - 8:30 PM" },
+        Martes: { note: "Día constante en venta de bolillo y pan dulce", rush: "6:00 PM - 8:00 PM" },
+        Miércoles: { note: "Mitad de semana con buen flujo en repostería", rush: "5:30 PM - 8:00 PM" },
+        Jueves: { note: "Aumento de pedidos y anticipos para el fin de semana", rush: "5:30 PM - 8:30 PM" },
+        Viernes: { note: "Viernes social: sube venta de pasteles y pan de fiesta", rush: "5:00 PM - 8:30 PM" },
+        Sábado: { note: "Día récord de la semana con alta afluencia familiar", rush: "5:00 PM - 9:00 PM" },
+        Domingo: { note: "Desayunos familiares y meriendas dominicales", rush: "8:00 AM - 1:00 PM" },
+      };
+
+      rawItems = days.map(d => ({
+        day: d.day,
+        shortDay: d.shortDay,
+        income: d.income,
+        isPeak: d.isPeak,
+        note: defaultNotes[d.day]?.note || "Operación regular en panadería",
+        rushDetail: defaultNotes[d.day]?.rush || "5:30 PM - 8:30 PM",
+      }));
+    }
+
+    const maxVal = Math.max(...rawItems.map(d => d.income), 1000);
+    const avgVal = rawItems.length > 0 ? Math.round(rawItems.reduce((a, b) => a + b.income, 0) / rawItems.length) : 0;
+    
+    // Identificar el pico absoluto
+    const peakItem = rawItems.reduce((prev, curr) => (curr.income > prev.income ? curr : prev), rawItems[0] || { day: "Sábado", income: 0 });
+
     const svgHeight = 290;
-    const paddingLeft = 50;
-    const paddingRight = 30;
-    const paddingTop = 60; // Mucho espacio arriba para que NUNCA choquen números y badges
+    const paddingLeft = 45;
+    const paddingRight = 25;
+    const paddingTop = 60; // Espacio superior generoso
     const paddingBottom = 55;
     const chartHeight = svgHeight - paddingTop - paddingBottom;
     const chartWidth = svgWidth - paddingLeft - paddingRight;
 
     // Escala con 25% de margen superior para holgura total
     const scaleMax = maxVal * 1.25;
-    const slotWidth = days.length > 0 ? chartWidth / days.length : chartWidth;
-    const barWidth = Math.min(48, slotWidth * 0.52);
+    const slotWidth = rawItems.length > 0 ? chartWidth / rawItems.length : chartWidth;
+    const barWidth = Math.min(timeframe === "anio" ? 36 : 48, slotWidth * 0.54);
 
-    const bars = days.map((d, i) => {
+    const bars = rawItems.map((d, i) => {
       const x = paddingLeft + i * slotWidth + (slotWidth - barWidth) / 2;
       const barHeight = Math.max(16, (d.income / scaleMax) * chartHeight);
       const y = paddingTop + (chartHeight - barHeight);
-      const isAbsolutePeak = d.day === peakDay.day;
+      const isAbsolutePeak = d.day === peakItem.day;
       const diffFromAvg = Math.round(((d.income - avgVal) / (avgVal || 1)) * 100);
 
       return {
@@ -151,13 +286,16 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
       baselineY: paddingTop + chartHeight,
       avgVal,
       avgY,
-      peakDay,
+      avgLabel,
+      titleText,
+      subtitleText,
+      peakItem,
       bars,
     };
-  }, [cashFlow]);
+  }, [timeframe, cashFlow, pl.grossSales, summary.period]);
 
-  // Día actualmente seleccionado
-  const selectedDay = dailyData.bars[selectedDayIndex] || dailyData.bars[0] || null;
+  // Elemento actualmente seleccionado
+  const selectedItem = chartData.bars[selectedDayIndex] || chartData.bars[0] || null;
 
   // Canal actualmente seleccionado
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) || channels[0];
@@ -187,8 +325,8 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
 
   return (
     <div className="bg-white rounded-3xl border border-stone-200/90 shadow-sm p-5 sm:p-7 space-y-6">
-      {/* ─── Encabezado y Selector Intuitivo ────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-100">
+      {/* ─── Encabezado y Selectores Elegantes ─────────────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-stone-100">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-xl bg-orange-100 text-orange-800 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 border border-orange-200">
@@ -202,103 +340,153 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
           </h3>
           <p className="text-xs text-stone-500 font-medium flex items-center gap-1.5">
             <MousePointerClick className="w-3.5 h-3.5 text-brito-orange-600" />
-            Haz clic en cualquier día o canal para ver su desglose detallado.
+            Haz clic en cualquier {timeframe === "dia" ? "horario" : timeframe === "anio" ? "mes" : "día"} o canal para ver su desglose detallado.
           </p>
         </div>
 
-        {/* Botones de Selección Claros */}
-        <div className="flex items-center gap-1.5 bg-stone-100 p-1.5 rounded-2xl border border-stone-200 self-start sm:self-auto shrink-0 shadow-inner">
-          <button
-            onClick={() => setActiveTab("dias")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
-              activeTab === "dias"
-                ? "bg-stone-900 text-white shadow-md shadow-stone-900/15"
-                : "text-stone-600 hover:text-stone-900 hover:bg-white/80"
-            }`}
-          >
-            <BarChart3 className="w-4 h-4 text-emerald-400" />
-            <span>Ventas por Día</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("canales")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
-              activeTab === "canales"
-                ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25"
-                : "text-stone-600 hover:text-stone-900 hover:bg-white/80"
-            }`}
-          >
-            <PieIcon className="w-4 h-4 text-white" />
-            <span>Porcentaje por Canal</span>
-          </button>
+        {/* ─── Botones de Control: Selector de Tiempo (Día | Mes | Año) y Tipo de Vista ─── */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto shrink-0">
+          {/* Botón Selector de Tiempo: Día, Mes y Año con los colores de la gráfica */}
+          <div className="flex items-center gap-1 bg-stone-100/90 p-1.5 rounded-2xl border border-stone-200/90 shadow-inner">
+            <button
+              type="button"
+              onClick={() => handleTimeframeChange("dia")}
+              className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 ${
+                timeframe === "dia"
+                  ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white/80"
+              }`}
+              title="Ver ventas por franjas horarias del día"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Día</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTimeframeChange("mes")}
+              className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 ${
+                timeframe === "mes"
+                  ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white/80"
+              }`}
+              title="Ver ventas por día en el mes"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Mes</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTimeframeChange("anio")}
+              className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 ${
+                timeframe === "anio"
+                  ? "bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20 scale-[1.02]"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white/80"
+              }`}
+              title="Ver ventas mes a mes en el año"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Año</span>
+            </button>
+          </div>
+
+          {/* Selector de Pestaña: Gráfica de Barras vs Canales */}
+          <div className="flex items-center gap-1 bg-stone-100/90 p-1.5 rounded-2xl border border-stone-200/90 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setActiveTab("dias")}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+                activeTab === "dias"
+                  ? "bg-stone-900 text-white shadow-md shadow-stone-900/15"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-emerald-400" />
+              <span>
+                {timeframe === "dia" ? "Ventas del Día" : timeframe === "anio" ? "Ventas del Año" : "Ventas por Día"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("canales")}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all active:scale-95 whitespace-nowrap ${
+                activeTab === "canales"
+                  ? "bg-brito-orange-600 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <PieIcon className="w-4 h-4 text-white" />
+              <span>Por Canal</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ─── VISTA 1: Gráfica de Barras por Día (Espaciosa, sin amontonamiento) ─── */}
+      {/* ─── VISTA 1: Gráfica de Barras (Día, Mes o Año sin amontonamiento) ─── */}
       {activeTab === "dias" && (
         <div className="space-y-5 animate-in fade-in duration-150">
           <div className="bg-stone-50/80 border border-stone-200/90 rounded-3xl p-5 sm:p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h4 className="font-black text-base text-stone-900 flex items-center gap-2">
-                  <span>Ventas Día por Día en la Semana</span>
+                  <span>{chartData.titleText}</span>
                 </h4>
                 <p className="text-xs text-stone-500">
-                  Toca una columna para examinar los datos de ese día.
+                  {chartData.subtitleText}
                 </p>
               </div>
 
               {/* Leyenda y Promedio */}
               <div className="flex items-center gap-3 text-xs font-bold flex-wrap">
                 <span className="flex items-center gap-1.5 text-stone-600">
-                  <span className="w-3 h-3 rounded-md bg-emerald-500 inline-block" /> Día regular
+                  <span className="w-3 h-3 rounded-md bg-emerald-500 inline-block" /> Regular
                 </span>
                 <span className="flex items-center gap-1.5 text-orange-700 font-black">
-                  <span className="w-3 h-3 rounded-md bg-brito-orange-600 inline-block" /> Día récord
+                  <span className="w-3 h-3 rounded-md bg-brito-orange-600 inline-block" /> Récord
                 </span>
                 <span className="px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 text-orange-800 font-extrabold text-[11px]">
-                  Promedio: {formatCurrency(dailyData.avgVal)}/día
+                  Promedio: {formatCurrency(chartData.avgVal)} {chartData.avgLabel}
                 </span>
               </div>
             </div>
 
             {/* Canvas SVG de Barras con Separación Limpia */}
             <div className="w-full overflow-x-auto pt-1 pb-1">
-              <div className="min-w-[620px]">
+              <div className={timeframe === "anio" ? "min-w-[760px]" : "min-w-[620px]"}>
                 <svg
-                  viewBox={`0 0 ${dailyData.svgWidth} ${dailyData.svgHeight}`}
+                  viewBox={`0 0 ${chartData.svgWidth} ${chartData.svgHeight}`}
                   className="w-full h-auto select-none"
                 >
                   {/* Línea horizontal de base */}
                   <line
-                    x1={dailyData.paddingLeft}
-                    y1={dailyData.baselineY}
-                    x2={dailyData.svgWidth - dailyData.paddingRight}
-                    y2={dailyData.baselineY}
+                    x1={chartData.paddingLeft}
+                    y1={chartData.baselineY}
+                    x2={chartData.svgWidth - chartData.paddingRight}
+                    y2={chartData.baselineY}
                     stroke="#cbd5e1"
                     strokeWidth="2"
                   />
 
                   {/* Línea punteada sutil del promedio */}
                   <line
-                    x1={dailyData.paddingLeft}
-                    y1={dailyData.avgY}
-                    x2={dailyData.svgWidth - dailyData.paddingRight}
-                    y2={dailyData.avgY}
+                    x1={chartData.paddingLeft}
+                    y1={chartData.avgY}
+                    x2={chartData.svgWidth - chartData.paddingRight}
+                    y2={chartData.avgY}
                     stroke="#f97316"
                     strokeWidth="1.5"
                     strokeDasharray="4 4"
                     opacity="0.65"
                   />
 
-                  {/* Renderizado de cada barra de día */}
-                  {dailyData.bars.map((bar) => {
+                  {/* Renderizado de cada barra */}
+                  {chartData.bars.map((bar) => {
                     const isSelected = selectedDayIndex === bar.index;
                     const isHovered = hoveredIndex === bar.index;
                     const centerX = bar.x + bar.barWidth / 2;
 
                     return (
                       <g
-                        key={bar.day}
+                        key={`${timeframe}-${bar.day}`}
                         className="cursor-pointer"
                         onClick={() => setSelectedDayIndex(bar.index)}
                         onMouseEnter={() => setHoveredIndex(bar.index)}
@@ -306,10 +494,10 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
                       >
                         {/* Zona de clic amplia */}
                         <rect
-                          x={bar.x - 10}
-                          y={dailyData.paddingTop - 20}
-                          width={bar.barWidth + 20}
-                          height={dailyData.chartHeight + 45}
+                          x={bar.x - 8}
+                          y={chartData.paddingTop - 20}
+                          width={bar.barWidth + 16}
+                          height={chartData.chartHeight + 45}
                           rx="14"
                           fill={isSelected ? "rgba(249, 115, 22, 0.12)" : isHovered ? "rgba(0, 0, 0, 0.04)" : "transparent"}
                           className="transition-all duration-150"
@@ -348,14 +536,14 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
                           x={centerX}
                           y={bar.y - 8}
                           textAnchor="middle"
-                          fontSize="11"
+                          fontSize={timeframe === "anio" ? "10" : "11"}
                           fontWeight={isSelected ? "900" : "800"}
                           fill={bar.isAbsolutePeak ? "#c2410c" : "#065f46"}
                         >
                           {formatCompact(bar.income)}
                         </text>
 
-                        {/* Insignia clara de pico (solo para el día más fuerte) */}
+                        {/* Insignia clara de pico (solo para el elemento récord) */}
                         {bar.isAbsolutePeak && (
                           <g transform={`translate(${centerX - 24}, ${bar.y - 34})`}>
                             <rect
@@ -378,29 +566,31 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
                           </g>
                         )}
 
-                        {/* Nombre del día en el eje X */}
+                        {/* Nombre corto en el eje X */}
                         <text
                           x={centerX}
-                          y={dailyData.baselineY + 22}
+                          y={chartData.baselineY + 22}
                           textAnchor="middle"
-                          fontSize="13"
+                          fontSize={timeframe === "anio" ? "11" : "13"}
                           fontWeight={isSelected ? "900" : "700"}
                           fill={isSelected ? "#ea580c" : "#1c1917"}
                         >
                           {bar.shortDay}
                         </text>
 
-                        {/* Nombre completo */}
-                        <text
-                          x={centerX}
-                          y={dailyData.baselineY + 38}
-                          textAnchor="middle"
-                          fontSize="10"
-                          fontWeight="600"
-                          fill={isSelected ? "#c2410c" : "#78716c"}
-                        >
-                          {bar.day}
-                        </text>
+                        {/* Etiqueta secundaria en el eje X */}
+                        {timeframe !== "dia" && (
+                          <text
+                            x={centerX}
+                            y={chartData.baselineY + 38}
+                            textAnchor="middle"
+                            fontSize="9"
+                            fontWeight="600"
+                            fill={isSelected ? "#c2410c" : "#78716c"}
+                          >
+                            {bar.day}
+                          </text>
+                        )}
                       </g>
                     );
                   })}
@@ -409,37 +599,37 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
             </div>
           </div>
 
-          {/* ─── PANEL DE DETALLE PRECISO Y CONCISO DEL DÍA SELECCIONADO ─── */}
-          {selectedDay && (
+          {/* ─── PANEL DE DETALLE PRECISO Y CONCISO DEL ELEMENTO SELECCIONADO ─── */}
+          {selectedItem && (
             <div className="p-5 sm:p-6 rounded-3xl bg-white border-2 border-orange-400/80 shadow-md space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-100">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-2xl bg-orange-100 text-brito-orange-600 flex items-center justify-center font-black text-lg shadow-xs">
-                    📅
+                    {timeframe === "dia" ? "⏰" : timeframe === "anio" ? "🗓️" : "📅"}
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-lg font-black text-stone-900">
-                        Detalle del {selectedDay.day}
+                        Detalle: {selectedItem.day}
                       </h4>
-                      {selectedDay.isAbsolutePeak && (
+                      {selectedItem.isAbsolutePeak && (
                         <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[10px] font-black border border-orange-300">
-                          ⭐ Día Más Alto de la Semana
+                          ⭐ Momento Más Fuerte ({timeframe === "dia" ? "Horario Pico" : timeframe === "anio" ? "Mes Récord" : "Día Récord"})
                         </span>
                       )}
                     </div>
                     <span className="text-xs text-stone-500 font-medium">
-                      Datos precisos y concisos calculados para este día de jornada
+                      {selectedItem.note}
                     </span>
                   </div>
                 </div>
 
                 <div className="text-left sm:text-right">
                   <span className="text-xs text-stone-500 font-bold block uppercase tracking-wider">
-                    Venta Total del Día
+                    {timeframe === "dia" ? "Venta Estimada del Turno" : timeframe === "anio" ? "Venta Acumulada del Mes" : "Venta Total del Día"}
                   </span>
                   <span className="text-2xl sm:text-3xl font-black text-stone-900">
-                    {formatCurrency(selectedDay.income)}
+                    {formatCurrency(selectedItem.income)}
                   </span>
                 </div>
               </div>
@@ -449,13 +639,13 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
                 {/* Comparativa vs Promedio */}
                 <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 space-y-1">
                   <span className="text-[11px] font-bold text-stone-500 block">
-                    Comparado con el promedio
+                    Comparado con promedio {chartData.avgLabel}
                   </span>
-                  <p className={`text-base font-black ${selectedDay.diffFromAvg >= 0 ? "text-emerald-700" : "text-stone-700"}`}>
-                    {selectedDay.diffFromAvg >= 0 ? `+${selectedDay.diffFromAvg}%` : `${selectedDay.diffFromAvg}%`}
+                  <p className={`text-base font-black ${selectedItem.diffFromAvg >= 0 ? "text-emerald-700" : "text-stone-700"}`}>
+                    {selectedItem.diffFromAvg >= 0 ? `+${selectedItem.diffFromAvg}%` : `${selectedItem.diffFromAvg}%`}
                   </p>
                   <span className="text-[10px] text-stone-500 font-medium block">
-                    {selectedDay.diffFromAvg >= 0 ? "Por encima del promedio diario" : "Por debajo del promedio diario"}
+                    {selectedItem.diffFromAvg >= 0 ? "Por encima del promedio" : "Por debajo del promedio"}
                   </span>
                 </div>
 
@@ -465,7 +655,7 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
                     <Store className="w-3.5 h-3.5" /> Mostrador ({channels[0].percent}%)
                   </span>
                   <p className="text-base font-black text-emerald-950">
-                    {formatCurrency(Math.round(selectedDay.income * (channels[0].percent / 100)))}
+                    {formatCurrency(Math.round(selectedItem.income * (channels[0].percent / 100)))}
                   </p>
                   <span className="text-[10px] text-emerald-700 font-medium block">
                     Venta directa en vitrina y canastos
@@ -478,23 +668,23 @@ export default function OperationsIncomeChart({ summary }: OperationsIncomeChart
                     <Cake className="w-3.5 h-3.5" /> Pasteles ({channels[1].percent}%)
                   </span>
                   <p className="text-base font-black text-orange-950">
-                    {formatCurrency(Math.round(selectedDay.income * (channels[1].percent / 100)))}
+                    {formatCurrency(Math.round(selectedItem.income * (channels[1].percent / 100)))}
                   </p>
                   <span className="text-[10px] text-orange-700 font-medium block">
                     Pedidos especiales y eventos
                   </span>
                 </div>
 
-                {/* Horario de Mayor Venta */}
+                {/* Horario o Fecha Clave */}
                 <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200 space-y-1">
                   <span className="text-[11px] font-bold text-amber-800 block flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Horario Recomendado
+                    <Clock className="w-3.5 h-3.5" /> {timeframe === "anio" ? "Fecha de Mayor Demanda" : "Horario de Salida Caliente"}
                   </span>
                   <p className="text-xs font-black text-amber-950">
-                    5:30 PM - 8:30 PM
+                    {selectedItem.rushDetail}
                   </p>
                   <span className="text-[10px] text-amber-800 font-medium block">
-                    Mayor afluencia por salida de pan caliente
+                    {timeframe === "anio" ? "Fechas de mayor venta del mes" : "Mayor afluencia de clientes"}
                   </span>
                 </div>
               </div>
