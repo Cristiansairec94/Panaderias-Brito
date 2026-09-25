@@ -897,7 +897,7 @@ export default function PedidosPage() {
                   <th className="py-4 px-3">Estado</th>
                   <th className="py-4 px-3">Total / Anticipo</th>
                   <th className="py-4 px-3">Falta por Liquidar</th>
-                  <th className="py-4 px-4 text-center whitespace-nowrap min-w-[540px]">Acciones</th>
+                  <th className="py-4 px-4 text-center whitespace-nowrap min-w-[390px]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -1087,55 +1087,11 @@ export default function PedidosPage() {
 
                         {/* 9. Acciones en Letras */}
                         <td
-                          className="py-4 px-4 text-right whitespace-nowrap min-w-[540px]"
+                          className="py-4 px-4 text-right whitespace-nowrap min-w-[390px]"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1.5 flex-nowrap">
-                            {/* 1. Cobrar Saldo */}
-                            {order.remainingBalance > 0 && order.status !== "cancelado" && (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedOrderForPayment(order)}
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                                title="Liquidar saldo o abonar"
-                              >
-                                <DollarSign className="w-3.5 h-3.5" />
-                                <span>Cobrar</span>
-                              </button>
-                            )}
-
-                            {/* 2. Avanzar estado rápido (Listo / Entregar) */}
-                            {order.status !== "entregado" && order.status !== "cancelado" && (
-                              <button
-                                type="button"
-                                onClick={() => handleAdvanceStatus(order)}
-                                className={`px-2.5 py-1.5 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs active:scale-95 ${
-                                  order.status === "listo"
-                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                                }`}
-                                title={
-                                  order.status === "pendiente" || order.status === "en_horno"
-                                    ? "Marcar como Listo en mostrador"
-                                    : "Marcar como Entregado al cliente"
-                                }
-                              >
-                                {(order.status === "pendiente" || order.status === "en_horno") && (
-                                  <>
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span>Listo</span>
-                                  </>
-                                )}
-                                {order.status === "listo" && (
-                                  <>
-                                    <Check className="w-3.5 h-3.5" />
-                                    <span>Entregar</span>
-                                  </>
-                                )}
-                              </button>
-                            )}
-
-                            {/* 3. Ticket térmico */}
+                            {/* 1. Ticket térmico */}
                             <button
                               type="button"
                               onClick={() => setSelectedOrderForReceipt(order)}
