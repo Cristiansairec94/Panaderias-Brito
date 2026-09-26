@@ -85,15 +85,23 @@ export default function PedidosPage() {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
 
+<<<<<<< HEAD
   // State: Default view is "productos" en formato "lista" compacta y ordenada
+=======
+  // State: Default view is "tabla" (modo lista) as requested
+>>>>>>> origin/main
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchFilter, setSelectedBranchFilter] = useState("all");
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
+<<<<<<< HEAD
   const [viewMode, setViewMode] = useState<"productos" | "tabla">("productos");
   const [productLayout, setProductLayout] = useState<"lista" | "cuadricula">("lista");
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "offline">("synced");
+=======
+  const [viewMode, setViewMode] = useState<"productos" | "tabla">("tabla");
+>>>>>>> origin/main
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
@@ -469,10 +477,10 @@ export default function PedidosPage() {
     return list;
   }, [filteredOrders, todayStr, currentMinutes]);
 
-  // Handler que activa la clasificación, abre la vista de productos y desplaza suavemente hacia ella
+  // Handler que activa la clasificación y mantiene la visualización en modo lista
   const handleSelectClassificationCard = (key: OrderClassificationKey) => {
     setClassificationFilter(key);
-    setViewMode("productos");
+    setViewMode("tabla");
     setTimeout(() => {
       productsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 60);
@@ -779,47 +787,6 @@ export default function PedidosPage() {
                 (Haz clic en cualquier botón para ver los pedidos en esa categoría)
               </span>
             </div>
-
-            {/* Quick Date Pills */}
-            <div className="flex items-center gap-1 font-semibold text-xs">
-              <span className="text-[11px] text-stone-400 mr-1">Fecha Entrega:</span>
-              <button
-                type="button"
-                onClick={() => setDateFilter("all")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
-                  dateFilter === "all" ? "bg-amber-100 text-amber-900 font-bold" : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                Todas
-              </button>
-              <button
-                type="button"
-                onClick={() => setDateFilter("hoy")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
-                  dateFilter === "hoy" ? "bg-rose-100 text-rose-800 font-bold" : "text-stone-500 hover:text-rose-700"
-                }`}
-              >
-                Hoy
-              </button>
-              <button
-                type="button"
-                onClick={() => setDateFilter("manana")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
-                  dateFilter === "manana" ? "bg-amber-100 text-amber-800 font-bold" : "text-stone-500 hover:text-amber-700"
-                }`}
-              >
-                Mañana
-              </button>
-              <button
-                type="button"
-                onClick={() => setDateFilter("semana")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
-                  dateFilter === "semana" ? "bg-stone-200 text-stone-800 font-bold" : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                Próximos 7 días
-              </button>
-            </div>
           </div>
 
           {/* Botones de Clasificación en Lista Interactiva */}
@@ -1124,6 +1091,7 @@ export default function PedidosPage() {
             )}
           </div>
 
+<<<<<<< HEAD
           {/* Estado de Vinculación en Tiempo Real con Celulares */}
           <div className="flex items-center gap-2 self-start lg:self-auto">
             <div
@@ -1135,6 +1103,40 @@ export default function PedidosPage() {
                   : "bg-stone-100 text-stone-700 border-stone-300"
               }`}
             >
+=======
+          <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setViewMode("tabla")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                viewMode === "tabla"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+              }`}
+            >
+              <span>📋</span>
+              <span>Modo Lista</span>
+              <span
+                className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                  viewMode === "tabla" ? "bg-amber-700 text-white" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {filteredOrders.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("productos")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                viewMode === "productos"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+              }`}
+            >
+              <span>🥐</span>
+              <span>Fichas de Productos</span>
+>>>>>>> origin/main
               <span
                 className={`w-2 h-2 rounded-full ${
                   syncStatus === "synced"
@@ -1153,6 +1155,7 @@ export default function PedidosPage() {
                   ? "Sincronizando..."
                   : "Modo Local"}
               </span>
+<<<<<<< HEAD
             </div>
 
             <button
@@ -1164,11 +1167,17 @@ export default function PedidosPage() {
             >
               <RefreshCw className={`w-3.5 h-3.5 text-amber-700 ${isSyncing ? "animate-spin" : ""}`} />
               <span className="hidden md:inline">Sincronizar</span>
+=======
+>>>>>>> origin/main
             </button>
           </div>
         </div>
 
+<<<<<<< HEAD
         {/* CONTENIDO PRINCIPAL: LISTA O TABLA O CUADRÍCULA */}
+=======
+        {/* CONTENIDO PRINCIPAL: MODO LISTA O FICHAS */}
+>>>>>>> origin/main
         {filteredOrders.length === 0 ? (
           <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-3">
             <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center mx-auto border border-amber-200 shadow-inner">
