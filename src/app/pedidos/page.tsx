@@ -77,12 +77,12 @@ export default function PedidosPage() {
   const { branches, currentBranch } = useBranch();
   const { user } = useAuth();
 
-  // State: Default view is "productos" (fichas detalladas con características) as requested
+  // State: Default view is "tabla" (modo lista) as requested
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchFilter, setSelectedBranchFilter] = useState("all");
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
-  const [viewMode, setViewMode] = useState<"productos" | "tabla">("productos");
+  const [viewMode, setViewMode] = useState<"productos" | "tabla">("tabla");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
@@ -411,10 +411,10 @@ export default function PedidosPage() {
     return list;
   }, [filteredOrders, todayStr, currentMinutes]);
 
-  // Handler que activa la clasificación, abre la vista de productos y desplaza suavemente hacia ella
+  // Handler que activa la clasificación y mantiene la visualización en modo lista
   const handleSelectClassificationCard = (key: OrderClassificationKey) => {
     setClassificationFilter(key);
-    setViewMode("productos");
+    setViewMode("tabla");
     setTimeout(() => {
       productsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 60);
@@ -956,6 +956,26 @@ export default function PedidosPage() {
           <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
             <button
               type="button"
+              onClick={() => setViewMode("tabla")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                viewMode === "tabla"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+              }`}
+            >
+              <span>📋</span>
+              <span>Modo Lista</span>
+              <span
+                className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                  viewMode === "tabla" ? "bg-amber-700 text-white" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {filteredOrders.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setViewMode("productos")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
                 viewMode === "productos"
@@ -964,7 +984,7 @@ export default function PedidosPage() {
               }`}
             >
               <span>🥐</span>
-              <span>Productos & Características</span>
+              <span>Fichas de Productos</span>
               <span
                 className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
                   viewMode === "productos" ? "bg-amber-700 text-white" : "bg-stone-200 text-stone-700"
@@ -973,30 +993,10 @@ export default function PedidosPage() {
                 {classifiedProducts.length}
               </span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("tabla")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                viewMode === "tabla"
-                  ? "bg-stone-900 text-white shadow-xs"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
-              }`}
-            >
-              <span>📋</span>
-              <span>Tabla de Pedidos</span>
-              <span
-                className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
-                  viewMode === "tabla" ? "bg-stone-800 text-white" : "bg-stone-200 text-stone-700"
-                }`}
-              >
-                {filteredOrders.length}
-              </span>
-            </button>
           </div>
         </div>
 
-        {/* CONTENIDO PRINCIPAL: FICHAS O TABLA */}
+        {/* CONTENIDO PRINCIPAL: MODO LISTA O FICHAS */}
         {filteredOrders.length === 0 ? (
           <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-3">
             <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center mx-auto border border-amber-200 shadow-inner">
@@ -1015,9 +1015,9 @@ export default function PedidosPage() {
           </div>
         ) : viewMode === "productos" ? (
           /* ============================================================ */
-          /* VISTA DE FICHAS DE PRODUCTO CON CARACTERÍSTICAS COMPLETAS    */
+          /* VISTA DE FICHAS DE PRODUCTO EN LISTA VERTICAL               */
           /* ============================================================ */
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="flex flex-col space-y-3.5">
             {classifiedProducts.map((p) => {
               return (
                 <div
