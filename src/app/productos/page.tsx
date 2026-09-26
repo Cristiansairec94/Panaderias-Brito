@@ -68,8 +68,6 @@ export default function ProductosPage() {
   const [quickPriceProduct, setQuickPriceProduct] = useState<Product | null>(null);
   const [isQuickPriceOpen, setIsQuickPriceOpen] = useState(false);
 
-  // Categories visibility (permanent while in use)
-  const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -387,46 +385,24 @@ export default function ProductosPage() {
         </div>
       </div>
 
-      {/* Filters and Search Bar */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-stone-200 space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          {/* Left Category Toggle & Counter */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsCategoriesVisible(!isCategoriesVisible)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border shadow-sm ${
-                isCategoriesVisible || selectedCategory !== "all"
-                  ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 ring-2 ring-amber-700/30"
-                  : "bg-stone-900 text-amber-400 border-amber-500/40 hover:bg-stone-800"
-              }`}
-              title={isCategoriesVisible ? "Ocultar panel de categorías" : "Mostrar panel de categorías"}
-            >
-              <Layers className="w-3.5 h-3.5 text-amber-400" />
-              <span>
-                {selectedCategory === "all"
-                  ? "Categorías"
-                  : PRODUCT_CATEGORIES.find((c) => c.id === selectedCategory)?.label || "Categorías"}
-              </span>
-            </button>
-            <span className="hidden md:inline text-xs font-bold text-stone-500">
-              {filteredProducts.length} productos
-            </span>
-          </div>
-
-          {/* Centered Search Bar */}
-          <div className="relative w-full max-w-xl mx-auto">
+      {/* Filters, Search Bar and Categories Bar (ARRIBA) */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-stone-200 space-y-3.5">
+        {/* Top Controls: Search Bar, Counter & View Toggle */}
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+          {/* Search Bar */}
+          <div className="relative w-full sm:max-w-xl">
             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nombre, descripción o categoría..."
-              className="w-full pl-11 pr-10 py-3 bg-stone-50 hover:bg-stone-100/70 focus:bg-white rounded-2xl border border-stone-200 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-center sm:text-left sm:pl-11"
+              placeholder="Buscar pan, pastel, bebida o código de barras..."
+              className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-stone-50 hover:bg-stone-100/70 focus:bg-white rounded-2xl border border-stone-200 text-xs font-semibold text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-left"
             />
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs p-1"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs p-1 cursor-pointer"
                 title="Limpiar búsqueda"
               >
                 <X className="w-3.5 h-3.5" />
@@ -434,117 +410,108 @@ export default function ProductosPage() {
             )}
           </div>
 
-          {/* View Toggle */}
-          <div className="flex items-center justify-end gap-2 w-full md:w-44 self-end md:self-auto">
-            <span className="text-xs text-stone-500 font-medium mr-1 md:hidden">
-              {filteredProducts.length} de {products.length}
+          {/* Right Controls: Count & View Switcher */}
+          <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+            <span className="text-xs text-stone-500 font-bold whitespace-nowrap">
+              {filteredProducts.length} de {products.length} productos
             </span>
-            <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200">
+
+            <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200 shrink-0">
               <button
+                type="button"
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                className={`p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
                   viewMode === "grid" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
                 }`}
                 title="Vista de Cuadrícula"
               >
                 <Grid className="w-4 h-4" />
+                <span className="hidden md:inline text-[11px]">Cuadrícula</span>
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                className={`p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
                   viewMode === "table" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
                 }`}
                 title="Vista de Lista"
               >
                 <ListIcon className="w-4 h-4" />
+                <span className="hidden md:inline text-[11px]">Lista</span>
               </button>
             </div>
           </div>
         </div>
 
+        {/* BARRA DE CATÁLOGO / CATEGORÍAS (ARRIBA) */}
+        <div className="pt-2 border-t border-stone-100 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-amber-600" />
+              <span>Categorías del Catálogo:</span>
+            </span>
+            <span className="text-[11px] text-stone-400 font-medium hidden sm:inline">
+              (Desliza o toca para filtrar)
+            </span>
+          </div>
+
+          {/* Fila de Categorías Horizontal (Touch-friendly, fluida, sin atorarse) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 scrollbar-none scroll-smooth">
+            {PRODUCT_CATEGORIES.map((cat) => {
+              const isSelected = selectedCategory === cat.id;
+              const count = cat.id === "all" 
+                ? products.length 
+                : products.filter((p) => p.category === cat.id).length;
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`shrink-0 px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border select-none ${
+                    isSelected
+                      ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 shadow-md ring-2 ring-amber-700/25 scale-[1.02]"
+                      : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200 hover:border-stone-300"
+                  }`}
+                  title={`Ver productos de categoría ${cat.label}`}
+                >
+                  <span className="text-base">{cat.icon}</span>
+                  <span>{cat.label}</span>
+                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                    isSelected ? "bg-amber-500 text-stone-950" : "bg-stone-200/80 text-stone-600"
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* Main Catalog Layout: Left Categories List, Right Products Content */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {/* Left Column: Categorías en forma de Lista con Auto-ocultado */}
-        <div className={`transition-all duration-700 ease-in-out shrink-0 overflow-hidden ${
-          isCategoriesVisible
-            ? "w-full lg:w-72 opacity-100 max-h-[900px] mb-4 lg:mb-0"
-            : "w-0 lg:w-0 opacity-0 max-h-0 pointer-events-none p-0 m-0 border-0"
-        }`}>
-          <div className="w-full lg:w-72 bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
-                <Layers className="w-4 h-4 text-amber-600" />
-                <span>Categorías</span>
-              </h3>
-              <button
-                onClick={() => setIsCategoriesVisible(false)}
-                className="text-[10px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
-              >
-                Ocultar
-              </button>
+      {/* Main Products Content Area (Full Width) */}
+      <div className="w-full min-w-0">
+        {filteredProducts.length === 0 ? (
+          <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-sm space-y-4">
+            <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 text-4xl flex items-center justify-center mx-auto text-amber-800">
+              🔍
             </div>
-
-            {/* Lista Vertical de Categorías */}
-            <div className="space-y-1.5">
-              {PRODUCT_CATEGORIES.map((cat) => {
-                const isSelected = selectedCategory === cat.id;
-                const count = cat.id === "all" 
-                  ? products.length 
-                  : products.filter((p) => p.category === cat.id).length;
-
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      setSelectedCategory(cat.id);
-                      if (typeof window !== "undefined" && window.innerWidth < 1024) {
-                        setIsCategoriesVisible(false);
-                      }
-                    }}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2.5 group ${
-                      isSelected
-                        ? "bg-[#3e2723] text-amber-50 shadow-md shadow-amber-950/25 font-black scale-[1.02] border-2 border-amber-500 ring-2 ring-amber-700/30"
-                        : "text-stone-700 hover:bg-stone-50 hover:text-stone-950 border border-transparent hover:border-stone-200"
-                    }`}
-                  >
-                    <span className="text-base shrink-0">{cat.icon}</span>
-                    <span className="truncate">{cat.label}</span>
-                  </button>
-                );
-              })}
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-stone-900">No se encontraron productos</h3>
+              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                No hay productos que coincidan con &ldquo;{searchQuery}&rdquo; en esta categoría. Puedes intentar otra búsqueda o agregar uno nuevo.
+              </p>
             </div>
+            <button
+              onClick={handleOpenCreate}
+              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl inline-flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Crear nuevo producto
+            </button>
           </div>
-        </div>
-
-        {/* Right Column: Products Content Area */}
-        <div className="flex-1 w-full min-w-0">
-          {filteredProducts.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-sm space-y-4">
-              <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 text-4xl flex items-center justify-center mx-auto text-amber-800">
-                🔍
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-stone-900">No se encontraron productos</h3>
-                <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                  No hay productos que coincidan con &ldquo;{searchQuery}&rdquo; en esta categoría. Puedes intentar otra búsqueda o agregar uno nuevo.
-                </p>
-              </div>
-              <button
-                onClick={handleOpenCreate}
-                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl inline-flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" /> Crear nuevo producto
-              </button>
-            </div>
-          ) : viewMode === "grid" ? (
-            /* Grid View (Expands to 4 cols when categories panel is hidden) */
-            <div className={`grid gap-6 transition-all duration-700 ${
-              isCategoriesVisible
-                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
-                : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-            }`}>
+        ) : viewMode === "grid" ? (
+          /* Grid View (Full Width) */
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
           {filteredProducts.map((product) => {
             const catBadge = getCategoryBadge(product.category);
             return (
@@ -807,12 +774,11 @@ export default function ProductosPage() {
           </div>
         </div>
       )}
-        </div>
       </div>
 
       {/* Modal: Crear / Editar Producto */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[200] bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl sm:rounded-[32px] max-w-lg w-full p-5 sm:p-8 shadow-2xl border border-stone-200 relative my-auto max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-stone-100">
@@ -1290,7 +1256,7 @@ export default function ProductosPage() {
 
       {/* Modal: Confirmar Eliminación con "si" o "no" */}
       {deletingProduct && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[200] bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-7 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
             <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-3xl shadow-inner">
               <Trash2 className="w-8 h-8" />

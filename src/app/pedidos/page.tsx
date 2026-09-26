@@ -30,14 +30,21 @@ import {
   Check,
   Eye,
   AlertTriangle,
-  Package
+  Package,
+  LayoutGrid,
+  RefreshCw,
+  Smartphone,
+  Wifi
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import {
   getStoredOrders,
+  syncOrdersWithServer,
   updateOrderStatus,
   deleteCustomOrder
 } from "@/lib/orders";
@@ -76,13 +83,17 @@ export type OrderClassificationKey =
 export default function PedidosPage() {
   const { branches, currentBranch } = useBranch();
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
 
-  // State: Default view is "productos" (fichas detalladas con características) as requested
+  // State: Default view is "productos" en formato "lista" compacta y ordenada
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchFilter, setSelectedBranchFilter] = useState("all");
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
   const [viewMode, setViewMode] = useState<"productos" | "tabla">("productos");
+  const [productLayout, setProductLayout] = useState<"lista" | "cuadricula">("lista");
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "offline">("synced");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
@@ -100,17 +111,64 @@ export default function PedidosPage() {
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<CustomOrder | null>(null);
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<CustomOrder | null>(null);
 
-  // Load orders
+  // Cargar pedidos desde almacenamiento local
   const loadOrders = () => {
     setOrders(getStoredOrders());
   };
 
   useEffect(() => {
     loadOrders();
+
+    // 1. Sincronización bidireccional automática con el servidor (celulares y PC)
+    setIsSyncing(true);
+    syncOrdersWithServer()
+      .then((synced) => {
+        setOrders(synced);
+        setSyncStatus("synced");
+      })
+      .catch(() => setSyncStatus("offline"))
+      .finally(() => setIsSyncing(false));
+
+    // 2. Escuchar cambios locales
     const handleUpdate = () => loadOrders();
     window.addEventListener("brito_orders_updated", handleUpdate);
-    return () => window.removeEventListener("brito_orders_updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+
+    // 3. Escuchar pedidos y actualizaciones transmitidos en tiempo real por WebSocket
+    const unsubOrder = realtimeHub?.onOrder ? realtimeHub.onOrder(() => {
+      loadOrders();
+    }) : undefined;
+
+    return () => {
+      window.removeEventListener("brito_orders_updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+      if (unsubOrder) unsubOrder();
+    };
   }, []);
+
+  // Botón manual de sincronización
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    setSyncStatus("syncing");
+    try {
+      const synced = await syncOrdersWithServer();
+      setOrders(synced);
+      setSyncStatus("synced");
+      addNotification({
+        title: "Celulares & PC Vinculados",
+        description: `Se sincronizaron con éxito ${synced.length} pedidos en vivo con todos los dispositivos.`,
+        senderName: "Sincronización en Vivo",
+        senderAvatar: "🔄",
+        badgeIcon: "pastel",
+        highlightText: `${synced.length} pedidos`,
+        category: "pedidos",
+      });
+    } catch {
+      setSyncStatus("offline");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Auto-sync branch filter with active connected branch (or user assigned branch if not admin)
   useEffect(() => {
@@ -983,61 +1041,134 @@ export default function PedidosPage() {
 
       {/* SECCIÓN DE PRODUCTOS Y PEDIDOS CLASIFICADOS */}
       <div ref={productsSectionRef} className="space-y-4 pt-1">
-        {/* Barra de alternancia: Fichas de Productos vs Tabla */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 px-4 rounded-2xl border border-stone-200 shadow-2xs">
-          <div className="flex items-center gap-2">
+        {/* Barra de alternancia: Fichas de Productos vs Tabla + Switcher Lista/Cuadrícula + Estado Celular */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3 px-4 rounded-2xl border border-stone-200 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-xs font-black text-stone-900 uppercase tracking-wide flex items-center gap-1.5">
               <span>👀</span> Modo de Visualización:
             </span>
-            <span className="text-[11px] text-stone-500 hidden sm:inline">
-              (Elige ver las fichas detalladas de productos o la tabla general de pedidos)
-            </span>
+
+            {/* Alternar Vista: Productos & Características vs Tabla de Pedidos */}
+            <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setViewMode("productos")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  viewMode === "productos"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+                }`}
+              >
+                <span>🥐</span>
+                <span>Productos & Características</span>
+                <span
+                  className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                    viewMode === "productos" ? "bg-amber-700 text-white" : "bg-stone-200 text-stone-700"
+                  }`}
+                >
+                  {classifiedProducts.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode("tabla")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  viewMode === "tabla"
+                    ? "bg-stone-900 text-white shadow-xs"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+                }`}
+              >
+                <span>📋</span>
+                <span>Tabla de Pedidos</span>
+                <span
+                  className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                    viewMode === "tabla" ? "bg-stone-800 text-white" : "bg-stone-200 text-stone-700"
+                  }`}
+                >
+                  {filteredOrders.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Switcher Formato Lista vs Cuadrícula para Productos */}
+            {viewMode === "productos" && (
+              <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setProductLayout("lista")}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    productLayout === "lista"
+                      ? "bg-white text-stone-900 shadow-2xs font-black"
+                      : "text-stone-500 hover:text-stone-900"
+                  }`}
+                  title="Ver en formato de lista compacta y alineada"
+                >
+                  <List className="w-3.5 h-3.5 text-amber-600" />
+                  <span>En Lista</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProductLayout("cuadricula")}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    productLayout === "cuadricula"
+                      ? "bg-white text-stone-900 shadow-2xs font-black"
+                      : "text-stone-500 hover:text-stone-900"
+                  }`}
+                  title="Ver en cuadrícula de tarjetas"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5 text-stone-600" />
+                  <span>Cuadrícula</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setViewMode("productos")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                viewMode === "productos"
-                  ? "bg-amber-600 text-white shadow-xs"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+          {/* Estado de Vinculación en Tiempo Real con Celulares */}
+          <div className="flex items-center gap-2 self-start lg:self-auto">
+            <div
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border shadow-2xs transition-all ${
+                syncStatus === "synced"
+                  ? "bg-emerald-50 text-emerald-900 border-emerald-300"
+                  : syncStatus === "syncing"
+                  ? "bg-amber-50 text-amber-900 border-amber-300"
+                  : "bg-stone-100 text-stone-700 border-stone-300"
               }`}
             >
-              <span>🥐</span>
-              <span>Productos & Características</span>
               <span
-                className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
-                  viewMode === "productos" ? "bg-amber-700 text-white" : "bg-stone-200 text-stone-700"
+                className={`w-2 h-2 rounded-full ${
+                  syncStatus === "synced"
+                    ? "bg-emerald-500 animate-pulse"
+                    : syncStatus === "syncing"
+                    ? "bg-amber-500 animate-spin"
+                    : "bg-stone-400"
                 }`}
-              >
-                {classifiedProducts.length}
+              />
+              <Smartphone className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="hidden sm:inline">Celulares & PC:</span>
+              <span className="font-black">
+                {syncStatus === "synced"
+                  ? "Vinculados al 100%"
+                  : syncStatus === "syncing"
+                  ? "Sincronizando..."
+                  : "Modo Local"}
               </span>
-            </button>
+            </div>
 
             <button
               type="button"
-              onClick={() => setViewMode("tabla")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                viewMode === "tabla"
-                  ? "bg-stone-900 text-white shadow-xs"
-                  : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
-              }`}
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className="p-1.5 px-2 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 hover:text-stone-900 border border-stone-200 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold shadow-2xs"
+              title="Sincronizar ahora con la app de celular y servidor"
             >
-              <span>📋</span>
-              <span>Tabla de Pedidos</span>
-              <span
-                className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
-                  viewMode === "tabla" ? "bg-stone-800 text-white" : "bg-stone-200 text-stone-700"
-                }`}
-              >
-                {filteredOrders.length}
-              </span>
+              <RefreshCw className={`w-3.5 h-3.5 text-amber-700 ${isSyncing ? "animate-spin" : ""}`} />
+              <span className="hidden md:inline">Sincronizar</span>
             </button>
           </div>
         </div>
 
-        {/* CONTENIDO PRINCIPAL: FICHAS O TABLA */}
+        {/* CONTENIDO PRINCIPAL: LISTA O TABLA O CUADRÍCULA */}
         {filteredOrders.length === 0 ? (
           <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-3">
             <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center mx-auto border border-amber-200 shadow-inner">
@@ -1056,170 +1187,108 @@ export default function PedidosPage() {
           </div>
         ) : viewMode === "productos" ? (
           /* ============================================================ */
-          /* VISTA DE FICHAS DE PRODUCTO CON CARACTERÍSTICAS COMPLETAS    */
+          /* VISTA DE PRODUCTOS: LISTA ERGONÓMICA O CUADRÍCULA           */
           /* ============================================================ */
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {classifiedProducts.map((p) => {
-              return (
-                <div
-                  key={p.id}
-                  onClick={() => setSelectedOrderForDetail(p.rawOrder)}
-                  className={`bg-white rounded-2xl border p-4.5 space-y-3.5 transition-all duration-200 shadow-2xs hover:shadow-lg cursor-pointer flex flex-col justify-between group ${
-                    p.isOverdue
-                      ? "border-rose-400 bg-rose-50/15 ring-2 ring-rose-400/30 hover:border-rose-500"
-                      : p.isReady
-                      ? "border-emerald-300 bg-emerald-50/10 hover:border-emerald-500"
-                      : p.isUpcoming
-                      ? "border-blue-300 bg-blue-50/10 hover:border-blue-500"
-                      : p.isPending
-                      ? "border-amber-300 bg-white hover:border-amber-500 hover:ring-2 hover:ring-amber-400/20"
-                      : "border-stone-200 hover:border-amber-400 hover:ring-2 hover:ring-amber-400/20"
-                  }`}
-                >
-                  {/* Header: Folio, Sucursal, Estado y Alertas */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl shadow-2xs font-mono">
-                          {p.orderNumber}
-                        </span>
-                        <span className="text-[11px] font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-lg">
-                          🏬 {p.branchName.replace("Sucursal ", "")}
+          productLayout === "lista" ? (
+            /* FORMATO DE LISTA COMPACTA, ELEGANTE Y ORDENADA (SOLICITADO) */
+            <div className="space-y-2.5">
+              {classifiedProducts.map((p) => {
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => setSelectedOrderForDetail(p.rawOrder)}
+                    className={`bg-white rounded-2xl border p-3 sm:p-4 transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-3 group border-l-4 ${
+                      p.isOverdue
+                        ? "border-l-rose-500 hover:bg-rose-50/20 border-rose-200"
+                        : p.isReady
+                        ? "border-l-emerald-500 hover:bg-emerald-50/20 border-emerald-200"
+                        : p.isUpcoming
+                        ? "border-l-blue-500 hover:bg-blue-50/20 border-blue-200"
+                        : p.isPending
+                        ? "border-l-amber-500 hover:bg-amber-50/20 border-amber-200"
+                        : "border-l-stone-300 hover:bg-stone-50 border-stone-200"
+                    }`}
+                  >
+                    {/* Bloque 1: Piezas, Folio y Producto */}
+                    <div className="flex items-start sm:items-center gap-3 min-w-[260px] lg:w-1/3">
+                      <div className="flex flex-col items-center justify-center bg-amber-500 text-white font-black px-2.5 py-1.5 rounded-xl shadow-2xs shrink-0 min-w-[56px] text-center">
+                        <span className="text-base sm:text-lg leading-none">{p.quantity}</span>
+                        <span className="text-[10px] uppercase tracking-wider font-extrabold">
+                          {p.quantity === 1 ? "pza" : "pzas"}
                         </span>
                       </div>
-                      {getStatusBadge(p.status)}
-                    </div>
 
-                    {/* Alertas destacadas de clasificación */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {p.isOverdue && (
-                        <span className="text-[10px] font-black text-red-900 bg-red-100 border border-red-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1 animate-pulse">
-                          <AlertTriangle className="w-3 h-3 text-red-600" />
-                          ⚠️ REZAGADO (NO HAN PASADO)
-                        </span>
-                      )}
-                      {!p.isOverdue && p.isUpcoming && (
-                        <span className="text-[10px] font-black text-rose-900 bg-rose-100 border border-rose-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-rose-600" />
-                          ⏰ ¡ENTREGA HOY!
-                        </span>
-                      )}
-                      {p.isReady && (
-                        <span className="text-[10px] font-black text-emerald-900 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
-                          <Package className="w-3 h-3 text-emerald-700" />
-                          📦 LISTO EN MOSTRADOR
-                        </span>
-                      )}
-                      {p.isPending && (
-                        <span className="text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-amber-700" />
-                          ⏳ Pendiente de Elaborar
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Nombre del Producto y Cantidad */}
-                  <div className="space-y-1.5 pt-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-2">
-                        <span className="bg-amber-600 text-white font-mono font-black text-xs sm:text-sm px-2.5 py-1 rounded-xl shadow-2xs shrink-0 mt-0.5">
-                          {p.quantity} {p.quantity === 1 ? "pza" : "pzas"}
-                        </span>
-                        <h4 className="text-base sm:text-lg font-black text-stone-900 leading-snug group-hover:text-amber-800 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md shadow-2xs">
+                            {p.orderNumber}
+                          </span>
+                          <span className="text-[11px] font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-md">
+                            🏬 {p.branchName.replace("Sucursal ", "")}
+                          </span>
+                          {getStatusBadge(p.status)}
+                        </div>
+                        <h4 className="font-black text-stone-900 text-sm sm:text-base leading-tight mt-1 line-clamp-1 group-hover:text-amber-800 transition-colors">
                           {p.productName}
                         </h4>
                       </div>
-                      {p.subtotal ? (
-                        <span className="font-mono font-black text-sm text-stone-900 shrink-0">
-                          {formatCurrency(p.subtotal)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {/* CARACTERÍSTICAS DEL PRODUCTO */}
-                  <div className="space-y-2">
-                    {/* Caja de Características / Sabor / Relleno */}
-                    <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 space-y-1 shadow-2xs">
-                      <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-[11px] uppercase tracking-wider">
-                        <Cake className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Características, Sabor & Relleno:</span>
-                      </div>
-                      <p className="text-xs sm:text-sm font-bold text-stone-900 leading-relaxed pl-5">
-                        {p.characteristics || "Especificaciones estándar del producto."}
-                      </p>
                     </div>
 
-                    {/* Dedicatoria solicitada */}
-                    {p.dedication && (
-                      <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-3 space-y-1 shadow-2xs">
-                        <div className="flex items-center gap-1.5 text-rose-900 font-extrabold text-[11px] uppercase tracking-wider">
-                          <Sparkles className="w-3.5 h-3.5 text-rose-600" />
-                          <span>Dedicatoria / Letrero:</span>
+                    {/* Bloque 2: Características / Sabor & Relleno */}
+                    <div className="min-w-0 lg:w-1/4">
+                      <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl px-2.5 py-1.5 text-xs text-stone-800">
+                        <div className="flex items-center gap-1 font-extrabold text-[10px] text-amber-900 uppercase tracking-wider">
+                          <Cake className="w-3 h-3 text-amber-600" />
+                          <span>Sabor & Relleno:</span>
                         </div>
-                        <p className="text-xs sm:text-sm font-black text-rose-950 italic pl-5">
-                          "{p.dedication}"
+                        <p className="font-semibold text-stone-900 text-[11px] leading-snug line-clamp-2 mt-0.5">
+                          {p.characteristics || "Especificaciones estándar del producto."}
                         </p>
+                        {p.dedication && (
+                          <p className="text-[10px] text-rose-800 font-extrabold italic mt-0.5 truncate">
+                            ✨ &quot;{p.dedication}&quot;
+                          </p>
+                        )}
                       </div>
-                    )}
+                    </div>
 
-                    {/* Observaciones de empaque o notas */}
-                    {p.orderNotes && (
-                      <div className="bg-stone-50 border border-stone-200 rounded-2xl p-2.5 text-stone-800">
-                        <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-wider block mb-0.5">
-                          📌 Observaciones / Empaque:
-                        </span>
-                        <p className="text-xs font-medium text-stone-800 pl-3">
-                          {p.orderNotes}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Datos de Entrega y Cliente */}
-                  <div className="bg-stone-50/70 border border-stone-200/70 rounded-2xl p-3 space-y-2 text-xs">
-                    <div className="flex items-center justify-between gap-2 border-b border-stone-200/60 pb-2">
+                    {/* Bloque 3: Fecha, Hora, Cliente y Saldo */}
+                    <div className="flex items-center justify-between lg:flex-col lg:items-end gap-1 text-xs lg:w-1/5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-stone-100">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-stone-400" />
-                        <span className={`font-extrabold ${p.deliveryDate === todayStr ? "text-rose-700 font-black" : "text-stone-900"}`}>
+                        <span
+                          className={`font-black text-xs ${
+                            p.deliveryDate === todayStr ? "text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded" : "text-stone-900"
+                          }`}
+                        >
                           {p.deliveryDate === todayStr ? "¡HOY!" : p.deliveryDate}
                         </span>
+                        <span className="font-mono font-bold text-stone-600 text-xs">
+                          {p.deliveryTime || "16:00"} hrs
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1 font-bold text-stone-700">
-                        <Clock className="w-3.5 h-3.5 text-stone-400" />
-                        <span>{p.deliveryTime || "16:00"} hrs</span>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <span className="text-[10px] font-bold text-stone-400 uppercase block">Cliente:</span>
-                        <strong className="text-xs font-black text-stone-900 block truncate max-w-[170px]">
-                          {p.customerName}
-                        </strong>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold text-stone-400 uppercase block">Cobro:</span>
-                        {p.remainingBalance > 0 ? (
-                          <span className="text-[11px] font-black text-rose-700 font-mono bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg inline-block">
-                            Falta: {formatCurrency(p.remainingBalance)}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-stone-700 truncate max-w-[130px]">
+                          👤 {p.customerName}
+                        </span>
+                        {p.remainingBalance === 0 ? (
+                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            ✓ Liquidado
                           </span>
                         ) : (
-                          <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg inline-block">
-                            ✓ Liquidado
+                          <span className="text-[10px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                            Falta: {formatCurrency(p.remainingBalance)}
                           </span>
                         )}
                       </div>
                     </div>
-                  </div>
 
-                  {/* Botones de Acción */}
-                  <div
-                    className="pt-2 flex items-center justify-between gap-1.5 border-t border-stone-100"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center gap-1.5">
+                    {/* Bloque 4: Botones de Acción directos */}
+                    <div
+                      className="flex items-center justify-end gap-1.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-stone-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
                         type="button"
                         onClick={() => handleSendWhatsApp(p.rawOrder)}
@@ -1227,7 +1296,7 @@ export default function PedidosPage() {
                         title="Mandar WhatsApp al cliente"
                       >
                         <Send className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">WhatsApp</span>
+                        <span className="hidden xl:inline">WhatsApp</span>
                       </button>
 
                       <button
@@ -1237,24 +1306,220 @@ export default function PedidosPage() {
                         title="Imprimir Ticket"
                       >
                         <Receipt className="w-3.5 h-3.5 text-stone-600" />
-                        <span className="hidden sm:inline">Ticket</span>
+                        <span className="hidden xl:inline">Ticket</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderForDetail(p.rawOrder)}
+                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-xl border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-amber-700" />
+                        <span className="hidden sm:inline">Detalles</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
                       </button>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedOrderForDetail(p.rawOrder)}
-                      className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-xl border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs ml-auto"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Ver Detalles</span>
-                      <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
-                    </button>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* FORMATO DE CUADRÍCULA DE FICHAS */
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {classifiedProducts.map((p) => {
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => setSelectedOrderForDetail(p.rawOrder)}
+                    className={`bg-white rounded-2xl border p-4.5 space-y-3.5 transition-all duration-200 shadow-2xs hover:shadow-lg cursor-pointer flex flex-col justify-between group ${
+                      p.isOverdue
+                        ? "border-rose-400 bg-rose-50/15 ring-2 ring-rose-400/30 hover:border-rose-500"
+                        : p.isReady
+                        ? "border-emerald-300 bg-emerald-50/10 hover:border-emerald-500"
+                        : p.isUpcoming
+                        ? "border-blue-300 bg-blue-50/10 hover:border-blue-500"
+                        : p.isPending
+                        ? "border-amber-300 bg-white hover:border-amber-500 hover:ring-2 hover:ring-amber-400/20"
+                        : "border-stone-200 hover:border-amber-400 hover:ring-2 hover:ring-amber-400/20"
+                    }`}
+                  >
+                    {/* Header: Folio, Sucursal, Estado y Alertas */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl shadow-2xs font-mono">
+                            {p.orderNumber}
+                          </span>
+                          <span className="text-[11px] font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-lg">
+                            🏬 {p.branchName.replace("Sucursal ", "")}
+                          </span>
+                        </div>
+                        {getStatusBadge(p.status)}
+                      </div>
+
+                      {/* Alertas destacadas de clasificación */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {p.isOverdue && (
+                          <span className="text-[10px] font-black text-red-900 bg-red-100 border border-red-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1 animate-pulse">
+                            <AlertTriangle className="w-3 h-3 text-red-600" />
+                            ⚠️ REZAGADO (NO HAN PASADO)
+                          </span>
+                        )}
+                        {!p.isOverdue && p.isUpcoming && (
+                          <span className="text-[10px] font-black text-rose-900 bg-rose-100 border border-rose-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-rose-600" />
+                            ⏰ ¡ENTREGA HOY!
+                          </span>
+                        )}
+                        {p.isReady && (
+                          <span className="text-[10px] font-black text-emerald-900 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
+                            <Package className="w-3 h-3 text-emerald-700" />
+                            📦 LISTO EN MOSTRADOR
+                          </span>
+                        )}
+                        {p.isPending && (
+                          <span className="text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-200 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-amber-700" />
+                            ⏳ Pendiente de Elaborar
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Nombre del Producto y Cantidad */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2">
+                          <span className="bg-amber-600 text-white font-mono font-black text-xs sm:text-sm px-2.5 py-1 rounded-xl shadow-2xs shrink-0 mt-0.5">
+                            {p.quantity} {p.quantity === 1 ? "pza" : "pzas"}
+                          </span>
+                          <h4 className="text-base sm:text-lg font-black text-stone-900 leading-snug group-hover:text-amber-800 transition-colors">
+                            {p.productName}
+                          </h4>
+                        </div>
+                        {p.subtotal ? (
+                          <span className="font-mono font-black text-sm text-stone-900 shrink-0">
+                            {formatCurrency(p.subtotal)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* CARACTERÍSTICAS DEL PRODUCTO */}
+                    <div className="space-y-2">
+                      <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 space-y-1 shadow-2xs">
+                        <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-[11px] uppercase tracking-wider">
+                          <Cake className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Características, Sabor & Relleno:</span>
+                        </div>
+                        <p className="text-xs sm:text-sm font-bold text-stone-900 leading-relaxed pl-5">
+                          {p.characteristics || "Especificaciones estándar del producto."}
+                        </p>
+                      </div>
+
+                      {p.dedication && (
+                        <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-3 space-y-1 shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-rose-900 font-extrabold text-[11px] uppercase tracking-wider">
+                            <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Dedicatoria / Letrero:</span>
+                          </div>
+                          <p className="text-xs sm:text-sm font-black text-rose-950 italic pl-5">
+                            &quot;{p.dedication}&quot;
+                          </p>
+                        </div>
+                      )}
+
+                      {p.orderNotes && (
+                        <div className="bg-stone-50 border border-stone-200 rounded-2xl p-2.5 text-stone-800">
+                          <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-wider block mb-0.5">
+                            📌 Observaciones / Empaque:
+                          </span>
+                          <p className="text-xs font-medium text-stone-800 pl-3">
+                            {p.orderNotes}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Datos de Entrega y Cliente */}
+                    <div className="bg-stone-50/70 border border-stone-200/70 rounded-2xl p-3 space-y-2 text-xs">
+                      <div className="flex items-center justify-between gap-2 border-b border-stone-200/60 pb-2">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-stone-400" />
+                          <span className={`font-extrabold ${p.deliveryDate === todayStr ? "text-rose-700 font-black" : "text-stone-900"}`}>
+                            {p.deliveryDate === todayStr ? "¡HOY!" : p.deliveryDate}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 font-bold text-stone-700">
+                          <Clock className="w-3.5 h-3.5 text-stone-400" />
+                          <span>{p.deliveryTime || "16:00"} hrs</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold text-stone-400 uppercase block">Cliente:</span>
+                          <strong className="text-xs font-black text-stone-900 block truncate max-w-[170px]">
+                            {p.customerName}
+                          </strong>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-bold text-stone-400 uppercase block">Cobro:</span>
+                          {p.remainingBalance > 0 ? (
+                            <span className="text-[11px] font-black text-rose-700 font-mono bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg inline-block">
+                              Falta: {formatCurrency(p.remainingBalance)}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg inline-block">
+                              ✓ Liquidado
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botones de Acción */}
+                    <div
+                      className="pt-2 flex items-center justify-between gap-1.5 border-t border-stone-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSendWhatsApp(p.rawOrder)}
+                          className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title="Mandar WhatsApp al cliente"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">WhatsApp</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOrderForReceipt(p.rawOrder)}
+                          className="px-2.5 py-1.5 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title="Imprimir Ticket"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-stone-600" />
+                          <span className="hidden sm:inline">Ticket</span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderForDetail(p.rawOrder)}
+                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-xl border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs ml-auto"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Ver Detalles</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
         ) : (
           /* ============================================================ */
           /* LIST / TABLE VIEW: CLEAN, ELEGANT, ORDERED */

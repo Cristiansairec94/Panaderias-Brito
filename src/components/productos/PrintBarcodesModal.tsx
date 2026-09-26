@@ -267,24 +267,24 @@ export function PrintBarcodesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-stone-200 overflow-hidden my-auto flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 md:p-6 overflow-hidden animate-in fade-in">
+      <div className="bg-white rounded-none sm:rounded-3xl max-w-4xl w-full h-full sm:h-auto sm:max-h-[92vh] shadow-2xl border-0 sm:border border-stone-200 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="p-5 sm:p-6 bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 text-white flex items-center justify-between shrink-0 border-b border-stone-800">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-stone-950 flex items-center justify-center text-xl shadow-lg font-bold shrink-0">
-              <Printer className="w-6 h-6" />
+        <div className="p-4 sm:p-6 pt-[max(1rem,env(safe-area-inset-top))] sm:pt-6 bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 text-white flex items-center justify-between shrink-0 border-b border-stone-800">
+          <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-stone-950 flex items-center justify-center text-lg sm:text-xl shadow-lg font-bold shrink-0">
+              <Printer className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-lg font-black tracking-tight text-white">
+                <h3 className="text-base sm:text-lg font-black tracking-tight text-white truncate">
                   Imprimir Códigos de Barras
                 </h3>
-                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full text-[10px] font-black uppercase">
+                <span className="hidden sm:inline-block px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full text-[10px] font-black uppercase">
                   Todas las categorías o por selección
                 </span>
               </div>
-              <p className="text-xs text-stone-300">
+              <p className="text-[11px] sm:text-xs text-stone-300 truncate sm:whitespace-normal">
                 Imprime hojas de códigos de barra para charolas de pan, mostrador o la caja de cobro.
               </p>
             </div>
@@ -293,14 +293,15 @@ export function PrintBarcodesModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-stone-800 transition-all cursor-pointer"
+            className="p-2.5 rounded-xl text-stone-400 hover:text-white hover:bg-stone-800 transition-all cursor-pointer shrink-0 ml-2"
+            title="Cerrar ventana"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Controls Bar */}
-        <div className="p-4 sm:p-5 bg-stone-50 border-b border-stone-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+        <div className="p-3 sm:p-4 bg-stone-50 border-b border-stone-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0">
           {/* Category Filter */}
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Layers className="w-4 h-4 text-amber-600 shrink-0" />
@@ -308,7 +309,7 @@ export function PrintBarcodesModal({
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 bg-white border-2 border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:border-amber-500 focus:outline-none flex-1 max-w-xs shadow-2xs"
+              className="px-3 py-2 bg-white border-2 border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:border-amber-500 focus:outline-none flex-1 max-w-none sm:max-w-xs shadow-2xs truncate"
             >
               <option value="all">🧺 Todas las Categorías ({products.length} productos)</option>
               {PRODUCT_CATEGORIES.filter((c) => c.id !== "all").map((cat) => {
@@ -323,13 +324,13 @@ export function PrintBarcodesModal({
           </div>
 
           {/* Layout Mode Selector */}
-          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+          <div className="flex items-center justify-between sm:justify-end gap-1.5 shrink-0">
             <span className="text-xs font-bold text-stone-500 mr-1 hidden md:inline">Diseño:</span>
-            <div className="flex bg-white p-1 rounded-xl border border-stone-200 shadow-2xs">
+            <div className="flex bg-white p-1 rounded-xl border border-stone-200 shadow-2xs w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setLayoutStyle("grid")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   layoutStyle === "grid"
                     ? "bg-amber-500 text-stone-950 shadow-xs font-black"
                     : "text-stone-600 hover:text-stone-950"
@@ -342,7 +343,7 @@ export function PrintBarcodesModal({
               <button
                 type="button"
                 onClick={() => setLayoutStyle("list")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                   layoutStyle === "list"
                     ? "bg-amber-500 text-stone-950 shadow-xs font-black"
                     : "text-stone-600 hover:text-stone-950"
@@ -357,10 +358,10 @@ export function PrintBarcodesModal({
         </div>
 
         {/* Live Preview Area */}
-        <div className="p-5 flex-1 overflow-y-auto space-y-4 bg-stone-100/60">
+        <div className="p-3.5 sm:p-5 flex-1 overflow-y-auto space-y-4 bg-stone-100/60 overscroll-contain">
           <div className="flex items-center justify-between text-xs text-stone-500 px-1">
             <span className="font-bold text-stone-700">
-              Vista previa de impresión ({filteredProducts.length} productos):
+              Vista previa ({filteredProducts.length} productos):
             </span>
             <span className="text-[11px] text-amber-900 bg-amber-100/90 border border-amber-300 font-bold px-2 py-0.5 rounded-full">
               Formato Carta / A4 optimizado
@@ -438,11 +439,11 @@ export function PrintBarcodesModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:p-5 bg-white border-t border-stone-200 flex items-center justify-between shrink-0">
+        <div className="p-3 sm:p-5 bg-white border-t border-stone-200 flex items-center justify-between gap-2 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 text-stone-600 font-bold hover:bg-stone-100 rounded-xl text-xs transition-all cursor-pointer"
+            className="px-4 sm:px-5 py-2.5 text-stone-600 font-bold hover:bg-stone-100 rounded-xl text-xs transition-all cursor-pointer"
           >
             Cerrar
           </button>
@@ -452,10 +453,10 @@ export function PrintBarcodesModal({
               type="button"
               disabled={filteredProducts.length === 0}
               onClick={handleExecutePrint}
-              className="px-6 py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black rounded-xl text-xs shadow-lg shadow-orange-500/25 transition-all active:scale-95 cursor-pointer flex items-center gap-2 uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black rounded-xl text-xs shadow-lg shadow-orange-500/25 transition-all active:scale-95 cursor-pointer flex items-center gap-2 uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Printer className="w-4 h-4 stroke-[2.5]" />
-              <span>Imprimir {filteredProducts.length} Códigos de Barra</span>
+              <span>Imprimir {filteredProducts.length} Códigos</span>
             </button>
           </div>
         </div>

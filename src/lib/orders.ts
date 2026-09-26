@@ -306,6 +306,99 @@ export function saveStoredOrders(orders: CustomOrder[]): void {
   }
 }
 
+/**
+ * Sincroniza pedidos bidireccionalmente con el servidor para que los celulares y computadoras
+ * estén vinculados al 100% en todo momento.
+ */
+export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
+  if (typeof window === "undefined") return INITIAL_ORDERS;
+
+  try {
+    const localOrders = getStoredOrders();
+
+    // 1. Consultar pedidos maestros en el servidor
+    const res = await fetch("/api/orders", { method: "GET" });
+    if (!res.ok) {
+      console.warn("[OrdersSync] Servidor no disponible temporalmente, usando cache local");
+      return localOrders;
+    }
+
+    const json = await res.json();
+    const serverOrders: CustomOrder[] = Array.isArray(json.orders) ? json.orders : [];
+
+    // 2. Si el servidor está vacío pero localmente hay pedidos (como los de la PC),
+    // subirlos de inmediato al servidor para respaldarlos y abastecer a los celulares
+    if (serverOrders.length === 0 && localOrders.length > 0) {
+      fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orders: localOrders }),
+      }).catch((e) => console.warn("[OrdersSync] Error sembrando pedidos locales al servidor:", e));
+      return localOrders;
+    }
+
+    // 3. Reconciliación / Merge inteligente de pedidos locales y de servidor
+    const ordersMap = new Map<string, CustomOrder>();
+
+    // Primero los de servidor
+    for (const ord of serverOrders) {
+      const key = ord.orderNumber || ord.id;
+      if (key) ordersMap.set(key, normalizeOrder(ord));
+    }
+
+    // Reconciliar con locales
+    let hasLocalChangesToPush = false;
+    const pendingPushList: CustomOrder[] = [];
+
+    for (const ord of localOrders) {
+      const key = ord.orderNumber || ord.id;
+      if (!key) continue;
+
+      if (!ordersMap.has(key)) {
+        // Pedido creado localmente que no está en el servidor aún
+        ordersMap.set(key, ord);
+        hasLocalChangesToPush = true;
+        pendingPushList.push(ord);
+      } else {
+        const serverOrd = ordersMap.get(key)!;
+        const localTs = ord.timestamp || (ord.createdAt ? new Date(ord.createdAt).getTime() : 0);
+        const serverTs = serverOrd.timestamp || (serverOrd.createdAt ? new Date(serverOrd.createdAt).getTime() : 0);
+
+        if (localTs > serverTs) {
+          // El local es más reciente (por ejemplo se cobró o editó en el dispositivo)
+          ordersMap.set(key, ord);
+          hasLocalChangesToPush = true;
+          pendingPushList.push(ord);
+        }
+      }
+    }
+
+    const mergedList = Array.from(ordersMap.values()).sort((a, b) => {
+      const timeA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const timeB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+      return timeB - timeA;
+    });
+
+    // Guardar en el almacenamiento local del dispositivo (celular o PC)
+    localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(mergedList));
+    window.dispatchEvent(new Event("brito_orders_updated"));
+
+    // Si había cambios locales pendientes, enviarlos al servidor
+    if (hasLocalChangesToPush && pendingPushList.length > 0) {
+      fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orders: pendingPushList }),
+      }).catch((e) => console.warn("[OrdersSync] Error actualizando cambios al servidor:", e));
+    }
+
+    return mergedList;
+  } catch (err) {
+    console.error("[OrdersSync] Error sincronizando pedidos con servidor:", err);
+    return getStoredOrders();
+  }
+}
+
 // Sincronizar reactivamente pedidos especiales recibidos de otros dispositivos
 if (typeof window !== "undefined" && realtimeHub?.onOrder) {
   realtimeHub.onOrder(({ action, order }) => {
@@ -621,6 +714,15 @@ export function addCustomOrder(data: {
 
   saveStoredOrders([newOrder, ...current]);
 
+  // Respaldar y sincronizar con el servidor para que los celulares lo reciban al 100%
+  if (typeof window !== "undefined") {
+    fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: newOrder }),
+    }).catch(() => {});
+  }
+
   // Transmitir pedido en tiempo real a los celulares y computadoras
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
     realtimeHub.broadcastOrder("create", newOrder);
@@ -728,6 +830,23 @@ export function addOrderPayment(
   current[idx] = order;
   saveStoredOrders(current);
 
+  // Sincronizar pago en servidor persistente para reflejo en celulares
+  if (typeof window !== "undefined") {
+    fetch("/api/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderNumber: order.orderNumber,
+        updates: {
+          deposit: order.deposit,
+          remainingBalance: order.remainingBalance,
+          paymentStatus: order.paymentStatus,
+          payments: order.payments,
+        },
+      }),
+    }).catch(() => {});
+  }
+
   // Transmitir abono / liquidación en tiempo real
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
     realtimeHub.broadcastOrder("payment", order);
@@ -769,6 +888,15 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
   };
 
   saveStoredOrders(current);
+
+  // Sincronizar cambio de estado en servidor para que el celular lo reciba de inmediato
+  if (typeof window !== "undefined") {
+    fetch("/api/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, updates: { status } }),
+    }).catch(() => {});
+  }
 
   // Transmitir cambio de estado operativo
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
@@ -829,6 +957,19 @@ export function updateCustomOrder(orderId: string, updates: Partial<CustomOrder>
 
   current[idx] = updated;
   saveStoredOrders(current);
+
+  // Sincronizar actualización con servidor y transmitir a celulares
+  if (typeof window !== "undefined") {
+    fetch("/api/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, updates }),
+    }).catch(() => {});
+    if (realtimeHub?.broadcastOrder) {
+      realtimeHub.broadcastOrder("status", updated);
+    }
+  }
+
   return updated;
 }
 
@@ -840,6 +981,17 @@ export function deleteCustomOrder(orderId: string): boolean {
   const filtered = current.filter(o => o.id !== orderId && o.orderNumber !== orderId);
   if (filtered.length !== current.length) {
     saveStoredOrders(filtered);
+
+    // Eliminar en el servidor y transmitir baja a celulares en tiempo real
+    if (typeof window !== "undefined") {
+      fetch(`/api/orders?id=${encodeURIComponent(orderId)}`, {
+        method: "DELETE",
+      }).catch(() => {});
+      if (realtimeHub?.broadcastOrder) {
+        realtimeHub.broadcastOrder("delete", { id: orderId, orderNumber: orderId } as CustomOrder);
+      }
+    }
+
     return true;
   }
   return false;
