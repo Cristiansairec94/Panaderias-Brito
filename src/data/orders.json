@@ -1,0 +1,204 @@
+[
+  {
+    "id": "PED-101",
+    "orderNumber": "PED-101",
+    "customerId": "cli-3",
+    "customerName": "Sra. María González",
+    "phone": "55 1234 5678",
+    "branchId": "branch-matriz",
+    "branchName": "Sucursal Matriz (Centro)",
+    "description": "Pastel 3 Leches relleno de durazno, 50 personas, temático de XV años (flores lilas)",
+    "items": [
+      {
+        "productId": "prod-8",
+        "name": "Pastel 3 Leches Artesanal Grande (50 personas)",
+        "quantity": 1,
+        "unitPrice": 850,
+        "subtotal": 850,
+        "notes": "Relleno de duraznos en almíbar y cubierta en crema chantilly lila"
+      },
+      {
+        "productId": "prod-9",
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 1,
+        "unitPrice": 100,
+        "subtotal": 100,
+        "notes": "Para mesa de postres"
+      }
+    ],
+    "deliveryDate": "2026-09-27",
+    "deliveryTime": "16:00",
+    "deliveryType": "sucursal",
+    "status": "pendiente",
+    "total": 950,
+    "deposit": 500,
+    "remainingBalance": 450,
+    "paymentStatus": "anticipo",
+    "paymentMethod": "efectivo",
+    "dedication": "¡Mis XV Años Mariana!",
+    "notes": "Entregar en caja alta con base rígida y velas de chispa incluidas.",
+    "createdAt": "2026-09-24T14:58:58.462Z",
+    "cashier": "Lupita Brito",
+    "payments": [
+      {
+        "id": "PAY-101-1",
+        "date": "24/09/26",
+        "amount": 500,
+        "paymentMethod": "efectivo",
+        "cashier": "Lupita Brito",
+        "notes": "Anticipo 50% al levantar pedido"
+      }
+    ]
+  },
+  {
+    "id": "PED-102",
+    "orderNumber": "PED-102",
+    "customerId": "cli-2",
+    "customerName": "Ing. Carlos Mendoza",
+    "phone": "55 8765 4321",
+    "branchId": "branch-benito",
+    "branchName": "Sucursal San Benito (Mercado)",
+    "description": "100 piezas de mini cuernitos rellenos de jamón y queso para evento escolar matutino",
+    "items": [
+      {
+        "productId": "prod-3",
+        "name": "Mini Cuernitos Hojaldrados Jamón y Queso",
+        "quantity": 100,
+        "unitPrice": 12,
+        "subtotal": 1200,
+        "notes": "Horneados a primera hora para entregar tibios"
+      }
+    ],
+    "deliveryDate": "2026-09-26",
+    "deliveryTime": "08:30",
+    "deliveryType": "sucursal",
+    "status": "listo",
+    "total": 1200,
+    "deposit": 1200,
+    "remainingBalance": 0,
+    "paymentStatus": "liquidado",
+    "paymentMethod": "transferencia",
+    "dedication": "Evento Colegio San Benito",
+    "notes": "Cliente pasa en camioneta blanca a recoger en rampa.",
+    "createdAt": "2026-09-23T14:58:58.480Z",
+    "cashier": "Don Toño Brito",
+    "payments": [
+      {
+        "id": "PAY-102-1",
+        "date": "23/09/26",
+        "amount": 1200,
+        "paymentMethod": "transferencia",
+        "cashier": "Don Toño Brito",
+        "notes": "Liquidación total vía transferencia SPEI"
+      }
+    ]
+  },
+  {
+    "id": "PED-103",
+    "orderNumber": "PED-103",
+    "customerId": "cli-1",
+    "customerName": "Familia Brito (Don Toño)",
+    "phone": "55 9988 7766",
+    "branchId": "branch-flores",
+    "branchName": "Sucursal Las Flores (Plaza)",
+    "description": "Pastel Mil Hojas de Chocolate y Café con nuez garapiñada para cumpleaños familiar",
+    "items": [
+      {
+        "productId": "prod-8",
+        "name": "Pastel Mil Hojas Gourmet Mediano (25 personas)",
+        "quantity": 1,
+        "unitPrice": 650,
+        "subtotal": 650,
+        "notes": "Crujiente hojaldre de mantequilla y crema pastelera de café de olla"
+      }
+    ],
+    "deliveryDate": "2026-09-28",
+    "deliveryTime": "18:00",
+    "deliveryType": "sucursal",
+    "status": "pendiente",
+    "total": 650,
+    "deposit": 300,
+    "remainingBalance": 350,
+    "paymentStatus": "anticipo",
+    "paymentMethod": "efectivo",
+    "dedication": "¡Feliz Cumpleaños Don Toño!",
+    "notes": "Elaborar con hojaldre recién horneado ese mismo mediodía.",
+    "createdAt": "2026-09-26T02:58:58.481Z",
+    "cashier": "Elena Brito",
+    "payments": [
+      {
+        "id": "PAY-103-1",
+        "date": "26/09/26",
+        "amount": 300,
+        "paymentMethod": "efectivo",
+        "cashier": "Elena Brito",
+        "notes": "Anticipo recibido en caja"
+      }
+    ]
+  },
+  {
+    "id": "PED-104",
+    "orderNumber": "PED-104",
+    "customerId": "cli-4",
+    "customerName": "Sra. Carmen Salazar",
+    "phone": "55 4567 8901",
+    "branchId": "branch-matriz",
+    "branchName": "Sucursal Matriz (Centro)",
+    "description": "Charola de 50 piezas de pan dulce surtido para desayuno corporativo",
+    "items": [
+      {
+        "productId": "prod-1",
+        "name": "Conchas de Vainilla",
+        "quantity": 20,
+        "unitPrice": 12,
+        "subtotal": 240
+      },
+      {
+        "productId": "prod-7",
+        "name": "Donas Glaseadas",
+        "quantity": 15,
+        "unitPrice": 13,
+        "subtotal": 195
+      },
+      {
+        "productId": "prod-6",
+        "name": "Orejas de Mantequilla",
+        "quantity": 15,
+        "unitPrice": 14,
+        "subtotal": 210
+      }
+    ],
+    "deliveryDate": "2026-09-26",
+    "deliveryTime": "07:30",
+    "deliveryType": "domicilio",
+    "deliveryAddress": "Av. Reforma #500, Piso 4, Corporativo Reforma",
+    "status": "entregado",
+    "total": 645,
+    "deposit": 645,
+    "remainingBalance": 0,
+    "paymentStatus": "liquidado",
+    "paymentMethod": "tarjeta",
+    "dedication": "Reunión Directiva Semanal",
+    "notes": "Llevar terminal para cobro o comprobante.",
+    "createdAt": "2026-09-25T02:58:58.481Z",
+    "cashier": "Lupita Brito",
+    "payments": [
+      {
+        "id": "PAY-104-1",
+        "date": "24/09/26",
+        "amount": 300,
+        "paymentMethod": "tarjeta",
+        "cashier": "Lupita Brito",
+        "notes": "Anticipo inicial"
+      },
+      {
+        "id": "PAY-104-2",
+        "date": "26/09/26",
+        "amount": 345,
+        "paymentMethod": "tarjeta",
+        "cashier": "Lupita Brito",
+        "notes": "Liquidación en entrega"
+      }
+    ]
+  }
+]

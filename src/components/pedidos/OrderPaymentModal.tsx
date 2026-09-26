@@ -15,7 +15,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { CustomOrder } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { addOrderPayment } from "@/lib/orders";
@@ -35,18 +35,17 @@ export default function OrderPaymentModal({
 }: OrderPaymentModalProps) {
   const { user } = useAuth();
   const { currentBranch, registerRealSale } = useBranch();
-  const [amount, setAmount] = useState<number | "">(0);
-  const [isAmountFocused, setIsAmountFocused] = useState(false);
+  const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [markAsDelivered, setMarkAsDelivered] = useState(true);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const numericAmount = typeof amount === "number" ? amount : (amount === "" ? 0 : Number(amount) || 0);
+  const numericAmount = parseFloat(amount) || 0;
 
   useEffect(() => {
     if (order) {
-      setAmount(order.remainingBalance);
+      setAmount(order.remainingBalance > 0 ? order.remainingBalance.toString() : "");
       setMarkAsDelivered(true);
       setNotes("");
     }
@@ -107,7 +106,7 @@ export default function OrderPaymentModal({
     }
   };
 
-  const isFullPayment = amount === order.remainingBalance;
+  const isFullPayment = numericAmount >= order.remainingBalance;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-stone-950/80 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
@@ -161,56 +160,34 @@ export default function OrderPaymentModal({
               </label>
               <button
                 type="button"
-                onClick={() => setAmount(order.remainingBalance)}
-                className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-lg transition-colors"
+                onClick={() => setAmount(order.remainingBalance.toString())}
+                className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-lg transition-colors cursor-pointer"
               >
                 Liquidar todo ({formatCurrency(order.remainingBalance)})
               </button>
             </div>
 
             <div className="relative">
-              <span className="absolute left-4 top-3.5 text-stone-400 font-bold text-lg pointer-events-none">$</span>
+              <span className="absolute left-4 top-3.5 text-stone-400 font-bold text-lg pointer-events-none select-none">$</span>
               <input
-                type="number"
-                min="1"
-                max={order.remainingBalance}
-                step="any"
-                placeholder="0"
-                value={amount === 0 && isAmountFocused ? "" : amount}
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={amount}
                 onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                onFocus={(e) => {
-                  setIsAmountFocused(true);
-                  if (amount === 0) {
-                    setAmount("");
-                  } else {
-                    e.target.select();
-                  }
-                }}
-                onBlur={() => {
-                  setIsAmountFocused(false);
-                  if (amount === "" || isNaN(Number(amount))) {
-                    setAmount(0);
-                  } else {
-                    setAmount(Number(amount));
-                  }
-                }}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "") {
-                    setAmount("");
-                    return;
-                  }
-                  const clean = val.replace(/^0+(?=\d)/, "");
-                  setAmount(clean === "" ? "" : Number(clean));
+                  const clean = cleanDecimalNumbers(e.target.value);
+                  setAmount(clean);
                 }}
-                className="w-full pl-10 pr-10 py-3 border-2 border-stone-300 rounded-2xl font-black text-xl text-stone-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none"
+                className="w-full pl-10 pr-10 py-3 border-2 border-stone-300 rounded-2xl font-black text-xl text-stone-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              {amount !== "" && amount !== 0 && (
+              {amount !== "" && (
                 <button
                   type="button"
-                  onClick={() => setAmount(0)}
+                  onClick={() => setAmount("")}
                   title="Borrar monto"
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-stone-400 hover:text-stone-600"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-stone-400 hover:text-stone-600 cursor-pointer"
                 >
                   <span className="bg-stone-200 hover:bg-stone-300 text-stone-600 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold">
                     ✕
@@ -226,8 +203,8 @@ export default function OrderPaymentModal({
                   <button
                     key={val}
                     type="button"
-                    onClick={() => setAmount(val)}
-                    className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700"
+                    onClick={() => setAmount(val.toString())}
+                    className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 cursor-pointer"
                   >
                     + ${val}
                   </button>
