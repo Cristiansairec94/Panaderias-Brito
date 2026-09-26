@@ -761,21 +761,22 @@ export default function PedidosPage() {
             </select>
           </div>
         </div>
+      </div>
 
-        {/* ============================================================ */}
-        {/* BARRA DE CLASIFICACIÓN CON BOTONES, EMOTICONES Y CONTADORES */}
-        {/* ============================================================ */}
-        <div className="pt-3 border-t border-stone-100 space-y-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider flex items-center gap-1.5">
-                <span>🔘</span> Clasificación de Pedidos:
-              </span>
-              <span className="text-[11px] text-stone-400 font-medium hidden sm:inline">
-                (Haz clic en cualquier botón para ver los pedidos en esa categoría)
-              </span>
-            </div>
+      {/* ============================================================ */}
+      {/* BARRA DE CLASIFICACIÓN FIJA (STICKY) CON BOTONES Y CONTADORES */}
+      {/* ============================================================ */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border border-stone-200/90 rounded-2xl p-3 sm:p-3.5 shadow-md space-y-2.5 transition-all">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-black uppercase text-stone-600 tracking-wider flex items-center gap-1.5">
+              <span>🔘</span> Clasificación de Pedidos:
+            </span>
+            <span className="text-[11px] text-stone-400 font-medium hidden sm:inline">
+              (Haz clic en cualquier botón para ver los pedidos en esa categoría)
+            </span>
           </div>
+        </div>
 
           {/* Botones de Clasificación en Lista Interactiva */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
@@ -951,7 +952,6 @@ export default function PedidosPage() {
               </span>
             </button>
           </div>
-        </div>
       </div>
 
       {/* Ribbon Informativo de Clasificación Activa */}
