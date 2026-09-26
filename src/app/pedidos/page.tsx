@@ -721,47 +721,6 @@ export default function PedidosPage() {
                 (Haz clic en cualquier botón para ver los pedidos en esa categoría)
               </span>
             </div>
-
-            {/* Quick Date Pills */}
-            <div className="flex items-center gap-1 font-semibold text-xs">
-              <span className="text-[11px] text-stone-400 mr-1">Fecha Entrega:</span>
-              <button
-                type="button"
-                onClick={() => setDateFilter("all")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
-                  dateFilter === "all" ? "bg-amber-100 text-amber-900 font-bold" : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                Todas
-              </button>
-              <button
-                type="button"
-                onClick={() => setDateFilter("hoy")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
-                  dateFilter === "hoy" ? "bg-rose-100 text-rose-800 font-bold" : "text-stone-500 hover:text-rose-700"
-                }`}
-              >
-                Hoy
-              </button>
-              <button
-                type="button"
-                onClick={() => setDateFilter("manana")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
-                  dateFilter === "manana" ? "bg-amber-100 text-amber-800 font-bold" : "text-stone-500 hover:text-amber-700"
-                }`}
-              >
-                Mañana
-              </button>
-              <button
-                type="button"
-                onClick={() => setDateFilter("semana")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer ${
-                  dateFilter === "semana" ? "bg-stone-200 text-stone-800 font-bold" : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                Próximos 7 días
-              </button>
-            </div>
           </div>
 
           {/* Botones de Clasificación en Lista Interactiva */}
