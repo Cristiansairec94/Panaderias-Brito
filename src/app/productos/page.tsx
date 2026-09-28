@@ -19,6 +19,8 @@ import {
   Grid, 
   List as ListIcon, 
   Eye, 
+  EyeOff,
+  ChevronDown,
   ArrowUpDown,
   RefreshCw,
   Tag as TagIcon,
@@ -49,6 +51,7 @@ export default function ProductosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(true);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
@@ -443,49 +446,105 @@ export default function ProductosPage() {
           </div>
         </div>
 
-        {/* BARRA DE CATÁLOGO / CATEGORÍAS (ARRIBA) */}
-        <div className="pt-2 border-t border-stone-100 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-amber-600" />
-              <span>Categorías del Catálogo:</span>
-            </span>
-            <span className="text-[11px] text-stone-400 font-medium hidden sm:inline">
-              (Desliza o toca para filtrar)
-            </span>
-          </div>
+        {/* APARTADO DE CATEGORÍAS EN FORMA DE LISTA (OCULTABLE / DESPLEGABLE) */}
+        <div className="pt-2 border-t border-stone-100 space-y-2.5">
+          {/* Barra Superior de Categorías con opción de Ocultar / Mostrar */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase text-stone-700 tracking-wider flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-amber-600" />
+                <span>Categorías del Catálogo:</span>
+              </span>
 
-          {/* Fila de Categorías Horizontal (Touch-friendly, fluida, sin atorarse) */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 scrollbar-none scroll-smooth">
-            {PRODUCT_CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              const count = cat.id === "all" 
-                ? products.length 
-                : products.filter((p) => p.category === cat.id).length;
-
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`shrink-0 px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border select-none ${
-                    isSelected
-                      ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 shadow-md ring-2 ring-amber-700/25 scale-[1.02]"
-                      : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200 hover:border-stone-300"
-                  }`}
-                  title={`Ver productos de categoría ${cat.label}`}
-                >
-                  <span className="text-base">{cat.icon}</span>
-                  <span>{cat.label}</span>
-                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
-                    isSelected ? "bg-amber-500 text-stone-950" : "bg-stone-200/80 text-stone-600"
-                  }`}>
-                    {count}
+              {/* Indicador de categoría seleccionada actualmente */}
+              {selectedCategory === "all" ? (
+                <span className="text-[11px] font-bold text-stone-500 bg-stone-100 border border-stone-200/80 px-2.5 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1">
+                  <span>🧺</span>
+                  <span>Todas ({products.length})</span>
+                </span>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-[11px] font-black">
+                  <span>{PRODUCT_CATEGORIES.find((c) => c.id === selectedCategory)?.icon}</span>
+                  <span className="truncate max-w-[140px] sm:max-w-none">
+                    {PRODUCT_CATEGORIES.find((c) => c.id === selectedCategory)?.label}
                   </span>
-                </button>
-              );
-            })}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("all")}
+                    className="ml-1 w-4 h-4 rounded-full bg-amber-200 hover:bg-amber-300 text-amber-900 flex items-center justify-center text-[10px] font-black cursor-pointer"
+                    title="Mostrar todas las categorías"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Botón de alternancia: Ocultar / Mostrar lista */}
+            <button
+              type="button"
+              onClick={() => setIsCategoriesOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 border border-stone-200 transition-all cursor-pointer shadow-2xs shrink-0 select-none"
+              title={isCategoriesOpen ? "Ocultar lista de categorías" : "Mostrar lista de categorías"}
+            >
+              {isCategoriesOpen ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-stone-500" />
+                  <span>Ocultar Lista</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Mostrar Lista</span>
+                </>
+              )}
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
+                  isCategoriesOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
           </div>
+
+          {/* Lista de Categorías Organizada (Sin scroll horizontal) */}
+          {isCategoriesOpen && (
+            <div className="pt-2 border-t border-stone-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 animate-in fade-in duration-150">
+              {PRODUCT_CATEGORIES.map((cat) => {
+                const isSelected = selectedCategory === cat.id;
+                const count = cat.id === "all" 
+                  ? products.length 
+                  : products.filter((p) => p.category === cat.id).length;
+
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border select-none ${
+                      isSelected
+                        ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 shadow-md ring-2 ring-amber-700/25 scale-[1.01]"
+                        : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200 hover:border-stone-300"
+                    }`}
+                    title={`Ver productos de ${cat.label}`}
+                  >
+                    <span className="flex items-center gap-2.5 truncate">
+                      <span className="text-base shrink-0">{cat.icon}</span>
+                      <span className="truncate">{cat.label}</span>
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md shrink-0 ml-2 ${
+                        isSelected
+                          ? "bg-amber-500 text-stone-950 font-black"
+                          : "bg-stone-200/90 text-stone-700"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
