@@ -101,9 +101,9 @@ export default function PedidosPage() {
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
 
-  // Ref to scroll directly down to the classification bar and products
-  const classificationBarRef = useRef<HTMLDivElement>(null);
-  const productsSectionRef = useRef<HTMLDivElement>(null);
+  // Ref para el contenedor de desplazamiento independiente del catálogo
+  const catalogScrollRef = useRef<HTMLDivElement>(null);
+  const [showKpiSummary, setShowKpiSummary] = useState(true);
 
   // Expanded rows in list view
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
@@ -495,7 +495,7 @@ export default function PedidosPage() {
     return list;
   }, [filteredOrders, todayStr, currentMinutes]);
 
-  // Handler para los 4 cuadros KPI principales: activa el filtro, limpia interferencias y despliega suavemente los pedidos
+  // Handler para los 4 cuadros KPI principales: activa el filtro y resetea el scroll del catálogo
   const handleSelectKPICard = (key: OrderClassificationKey) => {
     if (classificationFilter === key) {
       setClassificationFilter("all");
@@ -505,15 +505,14 @@ export default function PedidosPage() {
       if (dateFilter !== "all") setDateFilter("all");
       if (paymentFilter !== "all") setPaymentFilter("all");
       if (statusFilter !== "all") setStatusFilter("all");
-      setTimeout(() => {
-        classificationBarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 50);
+      catalogScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
-  // Handler que activa la clasificación sin desplazar la página ni saltar de vista (para los botones de la barra fija)
+  // Handler que activa la clasificación y vuelve al inicio del catálogo sin mover la barra superior
   const handleSelectClassificationCard = (key: OrderClassificationKey) => {
     setClassificationFilter((prev) => (prev === key ? "all" : key));
+    catalogScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Handlers for quick actions
@@ -604,35 +603,48 @@ export default function PedidosPage() {
   };
 
   return (
-    <div className="w-full space-y-5 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-amber-600 text-white rounded-2xl shadow-md">
-              <CalendarClock className="w-7 h-7" />
+    <div className="flex-1 flex flex-col min-h-0 w-full max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 pt-2 sm:pt-2.5 pb-20 md:pb-2 overflow-hidden">
+      {/* 1. ZONA SUPERIOR FIJA: Header, Métricas, Buscador y Paleta de Clasificación */}
+      <div className="shrink-0 space-y-2 sm:space-y-2.5">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-amber-600 text-white rounded-xl shadow-xs shrink-0">
+              <CalendarClock className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
+              <h1 className="text-lg sm:text-xl font-black text-stone-900 tracking-tight leading-tight">
                 Encargos & Pedidos de Pastelería
               </h1>
-              <p className="text-xs text-stone-500 font-medium mt-0.5">
+              <p className="text-[11px] text-stone-500 font-medium hidden sm:block">
                 Control de pedidos de pan y pasteles, fechas de entrega, anticipos recibidos y saldos por liquidar.
               </p>
             </div>
           </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setShowKpiSummary((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-stone-600 font-bold text-xs shadow-2xs transition-all cursor-pointer"
+              title={showKpiSummary ? "Ocultar tarjetas de métricas para mayor espacio de catálogo" : "Mostrar tarjetas de métricas"}
+            >
+              <span>{showKpiSummary ? "Ocultar Métricas" : "Ver Métricas"}</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showKpiSummary ? "rotate-180" : ""}`} />
+            </button>
+
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-4 py-2 rounded-xl shadow-md hover:shadow-lg transition-all text-xs tracking-wide shrink-0 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Tomar Nuevo Pedido
+            </button>
+          </div>
         </div>
 
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all text-xs tracking-wide self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" /> Tomar Nuevo Pedido
-        </button>
-      </div>
-
-      {/* KPI Cards (Interactive shortcuts to classification filters) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* KPI Cards (Interactive shortcuts to classification filters) */}
+        {showKpiSummary && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 animate-in fade-in duration-150">
         {/* Cuadro 1: Pedidos Activos */}
         <div
           onClick={() => handleSelectKPICard("activos")}
@@ -729,6 +741,7 @@ export default function PedidosPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Alerta Destacada: Pedidos que dejaron y NO han pasado (Hora o Fecha vencida) */}
       {classificationCounts.no_pasaron > 0 && (
@@ -809,9 +822,9 @@ export default function PedidosPage() {
         </div>
       </div>
 
+      {/* Paleta de Clasificación */}
       <div 
-        ref={classificationBarRef}
-        className="sticky top-0 z-30 bg-white border border-stone-200/90 rounded-2xl p-2 sm:p-2.5 shadow-md space-y-1.5 transition-all scroll-mt-0"
+        className="bg-white border border-stone-200/90 rounded-xl p-2 sm:p-2.5 shadow-xs space-y-1.5 transition-all"
       >
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
           <div className="flex items-center gap-2 min-w-0">
@@ -1101,11 +1114,15 @@ export default function PedidosPage() {
           </div>
         )}
       </div>
+      </div>
 
-      {/* SECCIÓN DE PRODUCTOS Y PEDIDOS CLASIFICADOS */}
-      <div ref={productsSectionRef} className="space-y-4 pt-1">
+      {/* 2. ZONA INFERIOR DE DESPLAZAMIENTO INDEPENDIENTE: Catálogo de Productos y Pedidos */}
+      <div 
+        ref={catalogScrollRef} 
+        className="flex-1 min-h-0 overflow-y-auto space-y-2.5 sm:space-y-3 mt-1.5 pr-1 pb-6 scroll-smooth"
+      >
         {/* Barra de alternancia: Fichas de Productos vs Tabla + Switcher Lista/Cuadrícula + Estado Celular */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 px-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2 sm:p-2.5 px-3 rounded-xl border border-stone-200 shadow-2xs">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-stone-600 uppercase tracking-wide flex items-center gap-1.5">
               <span>👀</span> Vista:

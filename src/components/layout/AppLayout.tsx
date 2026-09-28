@@ -62,7 +62,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 w-full max-w-full max-h-screen overflow-x-hidden overflow-y-hidden">
           <Header />
-          <main className={`flex-1 min-w-0 w-full max-w-full overflow-x-hidden ${pathname === "/pos" ? "overflow-hidden p-0" : "overflow-y-auto bg-stone-50/60 px-3 sm:px-5 lg:px-6 pt-3 sm:pt-5 pb-24 md:pb-6"}`}>
+          <main className={`flex-1 min-w-0 w-full max-w-full overflow-x-hidden ${
+            pathname === "/pos"
+              ? "overflow-hidden p-0"
+              : pathname.startsWith("/pedidos")
+              ? "overflow-hidden flex flex-col p-0 bg-stone-50/60"
+              : "overflow-y-auto bg-stone-50/60 px-3 sm:px-5 lg:px-6 pt-3 sm:pt-5 pb-24 md:pb-6"
+          }`}>
             {isAllowed ? (
               children
             ) : (
