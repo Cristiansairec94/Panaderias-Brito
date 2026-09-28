@@ -101,7 +101,8 @@ export default function PedidosPage() {
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
 
-  // Ref to scroll directly down to the products list section
+  // Ref to scroll directly down to the classification bar and products
+  const classificationBarRef = useRef<HTMLDivElement>(null);
   const productsSectionRef = useRef<HTMLDivElement>(null);
 
   // Expanded rows in list view
@@ -505,7 +506,7 @@ export default function PedidosPage() {
       if (paymentFilter !== "all") setPaymentFilter("all");
       if (statusFilter !== "all") setStatusFilter("all");
       setTimeout(() => {
-        productsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        classificationBarRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 50);
     }
   };
@@ -808,10 +809,10 @@ export default function PedidosPage() {
         </div>
       </div>
 
-      {/* ============================================================ */}
-      {/* BARRA DE CLASIFICACIÓN FIJA (STICKY) CON BOTONES Y CONTADORES */}
-      {/* ============================================================ */}
-      <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-md border border-stone-200/90 rounded-2xl p-2.5 sm:p-3 shadow-md space-y-2 transition-all">
+      <div 
+        ref={classificationBarRef}
+        className="sticky top-0 z-30 bg-white border border-stone-200/90 rounded-2xl p-2.5 sm:p-3 shadow-md space-y-2 transition-all scroll-mt-0"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[11px] font-bold uppercase text-stone-500 tracking-wider flex items-center gap-1 shrink-0">
@@ -1102,7 +1103,7 @@ export default function PedidosPage() {
       </div>
 
       {/* SECCIÓN DE PRODUCTOS Y PEDIDOS CLASIFICADOS */}
-      <div ref={productsSectionRef} className="space-y-4 pt-1 scroll-mt-36">
+      <div ref={productsSectionRef} className="space-y-4 pt-1">
         {/* Barra de alternancia: Fichas de Productos vs Tabla + Switcher Lista/Cuadrícula + Estado Celular */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 px-3.5 rounded-2xl border border-stone-200 shadow-2xs">
           <div className="flex flex-wrap items-center gap-2">
