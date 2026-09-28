@@ -396,13 +396,10 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
   const stats = useMemo(() => {
     const total = usersList.length;
     const activos = usersList.filter((u) => u.status !== "inactivo").length;
-    const horneros = usersList.filter((u) => 
-      (u.jobTitle?.toLowerCase().includes("panader") || u.jobTitle?.toLowerCase().includes("horn") || u.role === "panadero")
-    ).length;
     const atencion = usersList.filter((u) => 
       (u.jobTitle?.toLowerCase().includes("caj") || u.role === "cajero")
     ).length;
-    return { total, activos, horneros, atencion };
+    return { total, activos, atencion };
   }, [usersList]);
 
   // Filtered employees
@@ -461,7 +458,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
         </div>
 
         {/* Quick Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-blue-200/60 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 pt-4 border-t border-blue-200/60 text-xs">
           <div className="bg-white/90 p-3 rounded-2xl border border-blue-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center text-lg font-bold">
               👥
@@ -479,16 +476,6 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
             <div>
               <p className="text-[10px] font-bold text-stone-400 uppercase">Personal Activo</p>
               <p className="text-base font-black text-emerald-900">{stats.activos}</p>
-            </div>
-          </div>
-
-          <div className="bg-white/90 p-3 rounded-2xl border border-amber-100 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-lg font-bold">
-              🥖
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-stone-400 uppercase">Horno & Producción</p>
-              <p className="text-base font-black text-amber-900">{stats.horneros}</p>
             </div>
           </div>
 
