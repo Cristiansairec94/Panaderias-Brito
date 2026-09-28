@@ -522,14 +522,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
             >
               Todos ({usersList.length})
             </button>
-            <button
-              onClick={() => setPuestoFilter("produccion")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                puestoFilter === "produccion" ? "bg-amber-500 text-stone-950 font-black shadow-sm" : "text-stone-500 hover:text-stone-800"
-              }`}
-            >
-              Horno / Producción
-            </button>
+
             <button
               onClick={() => setPuestoFilter("mostrador")}
               className={`px-3 py-1.5 rounded-lg transition-all ${
