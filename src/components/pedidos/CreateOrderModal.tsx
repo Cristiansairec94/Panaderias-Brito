@@ -694,31 +694,56 @@ export default function CreateOrderModal({
     });
   };
 
-  // Lista de 4 opciones rápidas de fecha consecutivas y únicas: Hoy, Mañana y los 2 días siguientes
+  // Lista de 4 botones rápidos de fecha: Hoy, Mañana, Sábado y Domingo
   const upcomingDays = useMemo(() => {
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const fullDayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-    return [0, 1, 2, 3].map((offset) => {
-      const d = new Date();
-      d.setDate(d.getDate() + offset);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
+    const formatDateItem = (targetDate: Date, title: string) => {
+      const year = targetDate.getFullYear();
+      const month = String(targetDate.getMonth() + 1).padStart(2, "0");
+      const day = String(targetDate.getDate()).padStart(2, "0");
       const dateStr = `${year}-${month}-${day}`;
-
-      let label = fullDayNames[d.getDay()];
-      if (offset === 0) label = "Hoy";
-      else if (offset === 1) label = "Mañana";
 
       return {
         dateStr,
-        shortTitle: label,
-        dayOfWeek: fullDayNames[d.getDay()],
-        dayNum: d.getDate(),
-        monthStr: monthNames[d.getMonth()],
+        shortTitle: title,
+        dayOfWeek: fullDayNames[targetDate.getDay()],
+        dayNum: targetDate.getDate(),
+        monthStr: monthNames[targetDate.getMonth()],
       };
-    });
+    };
+
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+
+    // 1. Hoy
+    const hoyDate = new Date(now);
+
+    // 2. Mañana
+    const mananaDate = new Date(now);
+    mananaDate.setDate(mananaDate.getDate() + 1);
+
+    // 3. Sábado (targetDay = 6)
+    // Si hoy es sábado, apunta al próximo sábado (+7 días)
+    let diffSat = (6 - currentDay + 7) % 7;
+    if (diffSat === 0) diffSat = 7;
+    const sabadoDate = new Date(now);
+    sabadoDate.setDate(sabadoDate.getDate() + diffSat);
+
+    // 4. Domingo (targetDay = 0)
+    // Si hoy es domingo, apunta al próximo domingo (+7 días)
+    let diffSun = (0 - currentDay + 7) % 7;
+    if (diffSun === 0) diffSun = 7;
+    const domingoDate = new Date(now);
+    domingoDate.setDate(domingoDate.getDate() + diffSun);
+
+    return [
+      formatDateItem(hoyDate, "Hoy"),
+      formatDateItem(mananaDate, "Mañana"),
+      formatDateItem(sabadoDate, "Sábado"),
+      formatDateItem(domingoDate, "Domingo"),
+    ];
   }, []);
 
   // Formato amigable de la fecha de entrega seleccionada
