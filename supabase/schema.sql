@@ -1,37 +1,71 @@
 -- =========================================================
--- PANADERÍA BRITO - SCHEMA COMPLETO DE BASE DE DATOS SUPABASE
+-- PANADERÍA BRITO - SCHEMA MAESTRO DE BASE DE DATOS SUPABASE
+-- Compatible con Vercel, POS en tiempo real y Celular
 -- =========================================================
 
--- 1. Categorías
+-- 1. EXTENSIÓN PARA UUIDS
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- 2. TABLA DE CATEGORÍAS
 CREATE TABLE IF NOT EXISTS categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  icon TEXT DEFAULT '🥖',
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-INSERT INTO categories (id, name) VALUES
-  ('pan_dulce', 'Pan Dulce'),
-  ('pan_blanco', 'Bolillo y Telera'),
-  ('pasteleria', 'Pasteles y Pays'),
-  ('bebidas', 'Bebidas y Café'),
-  ('temporada', 'Especiales de Temporada')
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO categories (id, name, icon) VALUES
+  ('pan_dulce', 'Pan Dulce Tradicional', '🥖'),
+  ('pan_blanco', 'Bolillo & Telera', '🍞'),
+  ('pasteleria', 'Pastelería & Pays', '🍰'),
+  ('bebidas', 'Cafetería & Bebidas', '☕'),
+  ('temporada', 'Especiales de Temporada', '✨'),
+  ('abarrotes', 'Abarrotes', '🥫'),
+  ('materia_prima', 'Materia Prima', '🌾')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon = EXCLUDED.icon;
 
--- 2. Productos
+-- 3. TABLA DE PRODUCTOS
 CREATE TABLE IF NOT EXISTS products (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id TEXT PRIMARY KEY,
+  code TEXT,
+  barcode TEXT,
   name TEXT NOT NULL,
   price NUMERIC(10, 2) NOT NULL,
-  category_id TEXT REFERENCES categories(id),
+  category TEXT NOT NULL REFERENCES categories(id) ON UPDATE CASCADE,
+  image TEXT,
   icon TEXT DEFAULT '🥖',
   stock INTEGER DEFAULT 0 NOT NULL,
+  description TEXT,
+  unit TEXT DEFAULT 'pieza',
+  has_iva BOOLEAN DEFAULT false,
+  iva_rate NUMERIC(5, 2) DEFAULT 0,
+  has_ieps BOOLEAN DEFAULT false,
+  ieps_rate NUMERIC(5, 2) DEFAULT 0,
+  tax_included BOOLEAN DEFAULT true,
   is_active BOOLEAN DEFAULT true NOT NULL,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 3. Clientes & Mayoristas
+-- 4. TABLA DE SUCURSALES
+CREATE TABLE IF NOT EXISTS branches (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  short_name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  phone TEXT,
+  is_active BOOLEAN DEFAULT true NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+INSERT INTO branches (id, name, short_name, address, phone) VALUES
+  ('branch-matriz', 'Sucursal Matriz (Centro)', 'Matriz', 'Av. Hidalgo #120, Centro Histórico', '55 1234 5678'),
+  ('branch-sanjuan', 'Sucursal San Juan', 'San Juan', 'Calle Morelos #45, Col. San Juan', '55 8765 4321'),
+  ('branch-angeles', 'Sucursal Los Ángeles', 'Los Ángeles', 'Calz. Guadalupe #890, Los Ángeles', '55 4321 8765')
+ON CONFLICT (id) DO NOTHING;
+
+-- 5. TABLA DE CLIENTES Y MAYORISTAS
 CREATE TABLE IF NOT EXISTS customers (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   phone TEXT,
   email TEXT,
@@ -40,47 +74,80 @@ CREATE TABLE IF NOT EXISTS customers (
   credit_limit NUMERIC(10, 2) DEFAULT 0 NOT NULL,
   current_debt NUMERIC(10, 2) DEFAULT 0 NOT NULL,
   total_purchases NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  favorite_product TEXT,
+  purchase_counts JSONB DEFAULT '{}'::jsonb,
+  purchase_history JSONB DEFAULT '[]'::jsonb,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-INSERT INTO customers (name, phone, type, credit_limit, current_debt, total_purchases, notes) VALUES
-  ('Público en General', 'N/A', 'general', 0, 0, 45800, 'Ventas directas de mostrador al contado.'),
-  ('Abarrotes La Guadalupana (Don Pepe)', '55 4433 2211', 'mayoreo', 3000, 850, 18500, 'Compra 150 bolillos y 80 teleras diario.'),
-  ('Taquería El Pastorcito Dorado', '55 9988 1122', 'mayoreo', 2000, 0, 12400, 'Compra 120 teleras cada 2 días.')
-ON CONFLICT DO NOTHING;
-
--- 4. Inventario de Insumos
-CREATE TABLE IF NOT EXISTS inventory_items (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  unit TEXT NOT NULL, -- 'kg', 'litros', 'piezas', 'bultos'
-  current_stock NUMERIC(10, 2) DEFAULT 0 NOT NULL,
-  min_stock NUMERIC(10, 2) DEFAULT 0 NOT NULL,
-  cost_per_unit NUMERIC(10, 2) DEFAULT 0 NOT NULL,
-  category TEXT DEFAULT 'harinas',
+-- 6. TABLA DE VENTAS (TICKETS POS)
+CREATE TABLE IF NOT EXISTS sales (
+  id TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  total NUMERIC(10, 2) NOT NULL,
+  payment_method TEXT DEFAULT 'efectivo' NOT NULL,
+  transfer_account TEXT,
+  card_terminal TEXT,
+  payment_reference TEXT,
+  cashier TEXT DEFAULT 'Caja 1' NOT NULL,
+  cash_given NUMERIC(10, 2),
+  change NUMERIC(10, 2),
+  customer_id TEXT,
+  customer_name TEXT,
+  customer_type TEXT,
+  is_custom_order BOOLEAN DEFAULT false,
+  order_number TEXT,
+  branch_id TEXT DEFAULT 'branch-matriz',
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 5. Movimientos de Inventario (Entradas por compra y Mermas)
-CREATE TABLE IF NOT EXISTS inventory_movements (
+-- 7. TABLA DE PARTIDAS DE VENTA
+CREATE TABLE IF NOT EXISTS sale_items (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  item_id UUID REFERENCES inventory_items(id),
-  item_name TEXT NOT NULL,
-  type TEXT NOT NULL, -- 'entrada_compra', 'merma_horno', 'merma_mostrador', 'ajuste'
+  sale_id TEXT REFERENCES sales(id) ON DELETE CASCADE,
+  product_id TEXT,
+  product_name TEXT NOT NULL,
   quantity NUMERIC(10, 2) NOT NULL,
-  unit TEXT NOT NULL,
-  cost NUMERIC(10, 2),
-  reason TEXT NOT NULL,
-  responsible TEXT NOT NULL,
+  unit_price NUMERIC(10, 2) NOT NULL,
+  subtotal NUMERIC(10, 2) NOT NULL
+);
+
+-- 8. TABLA DE ENCARGOS Y PEDIDOS DE PASTELERÍA
+CREATE TABLE IF NOT EXISTS custom_orders (
+  id TEXT PRIMARY KEY,
+  order_number TEXT UNIQUE NOT NULL,
+  customer_id TEXT,
+  customer_name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  branch_id TEXT DEFAULT 'branch-matriz',
+  branch_name TEXT DEFAULT 'Sucursal Matriz (Centro)',
+  description TEXT NOT NULL,
+  items JSONB DEFAULT '[]'::jsonb,
+  delivery_date DATE NOT NULL,
+  delivery_time TEXT DEFAULT '16:00',
+  delivery_type TEXT DEFAULT 'sucursal',
+  delivery_address TEXT,
+  status TEXT DEFAULT 'pendiente' NOT NULL,
+  total NUMERIC(10, 2) NOT NULL,
+  deposit NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  remaining_balance NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  payment_status TEXT DEFAULT 'anticipo' NOT NULL,
+  payment_method TEXT DEFAULT 'efectivo',
+  payments JSONB DEFAULT '[]'::jsonb,
+  dedication TEXT,
+  notes TEXT,
+  cashier TEXT,
+  shift_name TEXT,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 6. Turnos de Caja
+-- 9. TABLA DE TURNOS Y ARQUEOS DE CAJA
 CREATE TABLE IF NOT EXISTS cash_shifts (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   shift_name TEXT NOT NULL,
   cashier_name TEXT NOT NULL,
+  branch_id TEXT DEFAULT 'branch-matriz',
   opened_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
   closed_at TIMESTAMPTZ,
   initial_cash NUMERIC(10, 2) DEFAULT 1000 NOT NULL,
@@ -92,102 +159,104 @@ CREATE TABLE IF NOT EXISTS cash_shifts (
   expected_cash NUMERIC(10, 2) DEFAULT 0 NOT NULL,
   actual_cash NUMERIC(10, 2),
   difference NUMERIC(10, 2),
-  status TEXT DEFAULT 'abierta' NOT NULL, -- 'abierta', 'cerrada'
+  status TEXT DEFAULT 'abierta' NOT NULL,
   notes TEXT
 );
 
--- 7. Movimientos de Dinero en Caja (Gastos menores, abonos, retiros)
+-- 10. TABLA DE MOVIMIENTOS DE CAJA (GASTOS E INGRESOS)
 CREATE TABLE IF NOT EXISTS cash_movements (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  shift_id UUID REFERENCES cash_shifts(id),
+  id TEXT PRIMARY KEY,
+  shift_id TEXT,
   type TEXT NOT NULL, -- 'entrada', 'salida'
-  category TEXT NOT NULL, -- 'gasto_gas', 'compra_insumos', 'pago_proveedor', 'retiro_dueno', 'abono_cliente', 'otro'
+  category TEXT NOT NULL,
+  category_label TEXT,
   amount NUMERIC(10, 2) NOT NULL,
   reason TEXT NOT NULL,
   authorized_by TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 8. Ventas & Tickets
-CREATE TABLE IF NOT EXISTS sales (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  customer_id UUID REFERENCES customers(id),
-  total NUMERIC(10, 2) NOT NULL,
-  payment_method TEXT DEFAULT 'efectivo' NOT NULL,
-  cashier TEXT DEFAULT 'Caja 1' NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 9. Detalle de Ventas
-CREATE TABLE IF NOT EXISTS sale_items (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  sale_id UUID REFERENCES sales(id) ON DELETE CASCADE,
-  product_id UUID REFERENCES products(id),
-  product_name TEXT NOT NULL,
-  quantity INTEGER NOT NULL,
-  unit_price NUMERIC(10, 2) NOT NULL,
-  subtotal NUMERIC(10, 2) NOT NULL
-);
-
--- 10. Encargos de Pastelería
-CREATE TABLE IF NOT EXISTS custom_orders (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  order_number TEXT UNIQUE NOT NULL,
-  customer_id UUID REFERENCES customers(id),
-  customer_name TEXT NOT NULL,
-  phone TEXT NOT NULL,
   branch_id TEXT DEFAULT 'branch-matriz',
-  branch_name TEXT DEFAULT 'Sucursal Matriz (Centro)',
-  description TEXT NOT NULL,
-  items JSONB DEFAULT '[]'::jsonb,
-  delivery_date DATE NOT NULL,
-  delivery_time TEXT DEFAULT '16:00',
-  delivery_type TEXT DEFAULT 'sucursal', -- 'sucursal', 'domicilio'
-  delivery_address TEXT,
-  status TEXT DEFAULT 'pendiente' NOT NULL, -- 'pendiente', 'en_horno', 'listo', 'entregado', 'cancelado'
-  total NUMERIC(10, 2) NOT NULL,
-  deposit NUMERIC(10, 2) DEFAULT 0 NOT NULL,
-  remaining_balance NUMERIC(10, 2) DEFAULT 0 NOT NULL,
-  payment_status TEXT DEFAULT 'anticipo' NOT NULL, -- 'anticipo', 'liquidado', 'sin_anticipo'
-  payment_method TEXT DEFAULT 'efectivo',
-  dedication TEXT,
-  notes TEXT,
-  cashier TEXT,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 11. Tabla de Gastos y Salidas de Caja en Turno
+-- 11. TABLA DE GASTOS RÁPIDOS DE CAJA
 CREATE TABLE IF NOT EXISTS cash_expenses (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id TEXT PRIMARY KEY,
   amount NUMERIC(10, 2) NOT NULL,
-  category TEXT NOT NULL, -- 'limpieza', 'retiro_personal', 'insumos_menores', 'proveedor', 'otro'
+  category TEXT NOT NULL,
   description TEXT NOT NULL,
-  cashier TEXT DEFAULT 'Caja Principal - Don Toño' NOT NULL,
+  cashier TEXT DEFAULT 'Caja Principal' NOT NULL,
+  branch_id TEXT DEFAULT 'branch-matriz',
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Habilitar RLS
+-- 12. TABLA DE INVENTARIO Y MATERIA PRIMA
+CREATE TABLE IF NOT EXISTS inventory_items (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  unit TEXT NOT NULL,
+  current_stock NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  min_stock NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  cost_per_unit NUMERIC(10, 2) DEFAULT 0 NOT NULL,
+  category TEXT DEFAULT 'harinas',
+  branch_id TEXT DEFAULT 'branch-matriz',
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 13. TABLA DE MOVIMIENTOS DE INVENTARIO
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  id TEXT PRIMARY KEY,
+  item_id TEXT,
+  item_name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  quantity NUMERIC(10, 2) NOT NULL,
+  unit TEXT NOT NULL,
+  cost NUMERIC(10, 2),
+  reason TEXT NOT NULL,
+  responsible TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- =========================================================
+-- HABILITAR ROW LEVEL SECURITY (RLS) Y POLÍTICAS DE ACCESO
+-- =========================================================
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE inventory_movements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cash_shifts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cash_movements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sale_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_shifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_movements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cash_expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_movements ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de lectura y escritura para clientes autorizados
+DO $$ 
+BEGIN
+  DROP POLICY IF EXISTS "anon_categories" ON categories;
+  DROP POLICY IF EXISTS "anon_products" ON products;
+  DROP POLICY IF EXISTS "anon_branches" ON branches;
+  DROP POLICY IF EXISTS "anon_customers" ON customers;
+  DROP POLICY IF EXISTS "anon_sales" ON sales;
+  DROP POLICY IF EXISTS "anon_sale_items" ON sale_items;
+  DROP POLICY IF EXISTS "anon_orders" ON custom_orders;
+  DROP POLICY IF EXISTS "anon_cash_shifts" ON cash_shifts;
+  DROP POLICY IF EXISTS "anon_cash_movements" ON cash_movements;
+  DROP POLICY IF EXISTS "anon_expenses" ON cash_expenses;
+  DROP POLICY IF EXISTS "anon_inventory" ON inventory_items;
+  DROP POLICY IF EXISTS "anon_inventory_mov" ON inventory_movements;
+END $$;
 
 CREATE POLICY "anon_categories" ON categories FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "anon_products" ON products FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_branches" ON branches FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "anon_customers" ON customers FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_inventory" ON inventory_items FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_inventory_mov" ON inventory_movements FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_cash_shifts" ON cash_shifts FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_cash_movements" ON cash_movements FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "anon_sales" ON sales FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "anon_sale_items" ON sale_items FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "anon_orders" ON custom_orders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_cash_shifts" ON cash_shifts FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_cash_movements" ON cash_movements FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "anon_expenses" ON cash_expenses FOR ALL USING (true) WITH CHECK (true);
-
+CREATE POLICY "anon_inventory" ON inventory_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_inventory_mov" ON inventory_movements FOR ALL USING (true) WITH CHECK (true);
