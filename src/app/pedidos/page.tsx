@@ -103,6 +103,7 @@ export default function PedidosPage() {
 
   // Ref para el contenedor de desplazamiento independiente del catálogo
   const catalogScrollRef = useRef<HTMLDivElement>(null);
+  const catalogSectionRef = useRef<HTMLDivElement>(null);
   const [showKpiSummary, setShowKpiSummary] = useState(true);
 
   // Expanded rows in list view
@@ -495,21 +496,22 @@ export default function PedidosPage() {
     return list;
   }, [filteredOrders, todayStr, currentMinutes]);
 
-  // Handler para los 4 cuadros KPI principales: activa el filtro y resetea el scroll del catálogo
+  // Handler para los 4 cuadros KPI principales: activa el filtro y vuelve al inicio del catálogo sin desfasar la cabecera
   const handleSelectKPICard = (key: OrderClassificationKey) => {
     if (classificationFilter === key) {
       setClassificationFilter("all");
     } else {
       setClassificationFilter(key);
-      setIsClassificationOpen(true);
+      setSearchQuery("");
       if (dateFilter !== "all") setDateFilter("all");
       if (paymentFilter !== "all") setPaymentFilter("all");
       if (statusFilter !== "all") setStatusFilter("all");
+      setIsClassificationOpen(true);
       catalogScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
-  // Handler que activa la clasificación y vuelve al inicio del catálogo sin mover la barra superior
+  // Handler que activa la clasificación y vuelve al inicio del catálogo sin desplazar la pantalla
   const handleSelectClassificationCard = (key: OrderClassificationKey) => {
     setClassificationFilter((prev) => (prev === key ? "all" : key));
     catalogScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -603,9 +605,9 @@ export default function PedidosPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 w-full max-w-[1600px] mx-auto px-2 sm:px-4 lg:px-6 pt-2 sm:pt-2.5 pb-20 md:pb-2 overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 w-full max-w-[1600px] mx-auto px-2 sm:px-4 pt-0.5 sm:pt-1 pb-16 md:pb-2 overflow-hidden">
       {/* 1. ZONA SUPERIOR FIJA: Header, Métricas, Buscador y Paleta de Clasificación */}
-      <div className="shrink-0 space-y-2 sm:space-y-2.5">
+      <div className="shrink-0 space-y-1.5 sm:space-y-2">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2.5">
@@ -648,96 +650,164 @@ export default function PedidosPage() {
         {/* Cuadro 1: Pedidos Activos */}
         <div
           onClick={() => handleSelectKPICard("activos")}
-          className={`bg-white border rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none ${
+          className={`bg-white border-2 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none relative group ${
             classificationFilter === "activos"
-              ? "border-amber-500 ring-2 ring-amber-400/40 shadow-md bg-amber-50/20"
+              ? "border-amber-500 ring-4 ring-amber-400/30 shadow-md bg-amber-50/40"
               : "border-stone-200/80 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10"
           }`}
-          title="Clic para ver todos los pedidos activos en proceso de elaboración y mostrador"
+          title="Toca para seleccionar y ver todos los pedidos activos en elaboración"
         >
-          <div>
-            <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
-              ⏳ Pedidos Activos
-            </span>
-            <span className="text-2xl font-black text-stone-900 mt-1 block">
-              {metrics.activeCount}
-            </span>
-            <span className="text-[10px] text-amber-700 font-semibold">En proceso de elaboración</span>
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
+                ⏳ Pedidos Activos
+              </span>
+              <span className="text-2xl sm:text-3xl font-black text-stone-900 mt-1 block">
+                {metrics.activeCount}
+              </span>
+              <span className="text-[10px] text-amber-700 font-semibold">En proceso de elaboración</span>
+            </div>
+            <div className={`p-2.5 sm:p-3 rounded-2xl border transition-colors ${
+              classificationFilter === "activos"
+                ? "bg-amber-500 text-white border-amber-600 shadow-xs"
+                : "bg-amber-50 text-amber-600 border-amber-100 group-hover:bg-amber-100"
+            }`}>
+              <Cake className="w-5 h-5" />
+            </div>
           </div>
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100">
-            <Cake className="w-5 h-5" />
+          <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
+            {classificationFilter === "activos" ? (
+              <span className="font-black text-amber-900 flex items-center gap-1 bg-amber-100 px-2 py-0.5 rounded-md">
+                ✓ Filtro Seleccionado
+              </span>
+            ) : (
+              <span className="font-bold text-stone-400 group-hover:text-amber-700 transition-colors flex items-center gap-1">
+                Toca para ver pedidos <ChevronRight className="w-3 h-3" />
+              </span>
+            )}
           </div>
         </div>
 
         {/* Cuadro 2: ¡Entregas para HOY! */}
         <div
           onClick={() => handleSelectKPICard("hoy")}
-          className={`bg-white border rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none ${
-            classificationFilter === "hoy" || classificationFilter === "proximos"
-              ? "border-rose-500 ring-2 ring-rose-400/40 shadow-md bg-rose-50/20"
+          className={`bg-white border-2 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none relative group ${
+            classificationFilter === "hoy"
+              ? "border-rose-500 ring-4 ring-rose-400/30 shadow-md bg-rose-50/40"
               : "border-stone-200/80 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/10"
           }`}
-          title="Clic para ver todos los pedidos con entrega programada para hoy"
+          title="Toca para seleccionar y ver todas las entregas para hoy"
         >
-          <div>
-            <span className="text-[11px] font-bold uppercase text-rose-500 tracking-wider block">
-              ⏰ ¡Entregas para HOY!
-            </span>
-            <span className="text-2xl font-black text-rose-700 mt-1 block">
-              {metrics.todayCount}
-            </span>
-            <span className="text-[10px] text-stone-500 font-medium">Prioridad en mostrador</span>
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[11px] font-bold uppercase text-rose-500 tracking-wider block">
+                ⏰ ¡Entregas para HOY!
+              </span>
+              <span className="text-2xl sm:text-3xl font-black text-rose-700 mt-1 block">
+                {metrics.todayCount}
+              </span>
+              <span className="text-[10px] text-stone-500 font-medium">Prioridad en mostrador</span>
+            </div>
+            <div className={`p-2.5 sm:p-3 rounded-2xl border transition-colors ${
+              classificationFilter === "hoy"
+                ? "bg-rose-500 text-white border-rose-600 shadow-xs"
+                : "bg-rose-50 text-rose-600 border-rose-100 animate-pulse group-hover:bg-rose-100"
+            }`}>
+              <Clock className="w-5 h-5" />
+            </div>
           </div>
-          <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100 animate-pulse">
-            <Clock className="w-5 h-5" />
+          <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
+            {classificationFilter === "hoy" ? (
+              <span className="font-black text-rose-900 flex items-center gap-1 bg-rose-100 px-2 py-0.5 rounded-md">
+                ✓ Filtro Seleccionado
+              </span>
+            ) : (
+              <span className="font-bold text-stone-400 group-hover:text-rose-700 transition-colors flex items-center gap-1">
+                Toca para ver entregas hoy <ChevronRight className="w-3 h-3" />
+              </span>
+            )}
           </div>
         </div>
 
         {/* Cuadro 3: Falta por Cobrar */}
         <div
           onClick={() => handleSelectKPICard("por_pagar")}
-          className={`bg-white border rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none ${
+          className={`bg-white border-2 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none relative group ${
             classificationFilter === "por_pagar"
-              ? "border-emerald-500 ring-2 ring-emerald-400/40 shadow-md bg-emerald-50/20"
+              ? "border-emerald-500 ring-4 ring-emerald-400/30 shadow-md bg-emerald-50/40"
               : "border-stone-200/80 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/10"
           }`}
-          title="Clic para ver pedidos con saldo pendiente por cobrar"
+          title="Toca para seleccionar y ver los pedidos con saldo pendiente por cobrar"
         >
-          <div>
-            <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
-              💰 Falta por Cobrar
-            </span>
-            <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-1 block font-mono">
-              {formatCurrency(metrics.totalRemainingBalance)}
-            </span>
-            <span className="text-[10px] text-stone-500 font-medium">Falta por liquidar al entregar</span>
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
+                💰 Falta por Cobrar
+              </span>
+              <span className="text-xl sm:text-2xl font-black text-emerald-700 mt-1 block font-mono">
+                {formatCurrency(metrics.totalRemainingBalance)}
+              </span>
+              <span className="text-[10px] text-stone-500 font-medium">Falta por liquidar al entregar</span>
+            </div>
+            <div className={`p-2.5 sm:p-3 rounded-2xl border transition-colors ${
+              classificationFilter === "por_pagar"
+                ? "bg-emerald-500 text-white border-emerald-600 shadow-xs"
+                : "bg-emerald-50 text-emerald-600 border-emerald-100 group-hover:bg-emerald-100"
+            }`}>
+              <DollarSign className="w-5 h-5" />
+            </div>
           </div>
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
-            <DollarSign className="w-5 h-5" />
+          <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
+            {classificationFilter === "por_pagar" ? (
+              <span className="font-black text-emerald-900 flex items-center gap-1 bg-emerald-100 px-2 py-0.5 rounded-md">
+                ✓ Filtro Seleccionado
+              </span>
+            ) : (
+              <span className="font-bold text-stone-400 group-hover:text-emerald-700 transition-colors flex items-center gap-1">
+                Toca para ver pedidos por cobrar <ChevronRight className="w-3 h-3" />
+              </span>
+            )}
           </div>
         </div>
 
         {/* Cuadro 4: Listos en Mostrador */}
         <div
           onClick={() => handleSelectKPICard("no_llevados")}
-          className={`bg-white border rounded-2xl p-4 shadow-2xs flex items-center justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none ${
+          className={`bg-white border-2 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none relative group ${
             classificationFilter === "no_llevados"
-              ? "border-blue-500 ring-2 ring-blue-400/40 shadow-md bg-blue-50/20"
+              ? "border-blue-500 ring-4 ring-blue-400/30 shadow-md bg-blue-50/40"
               : "border-stone-200/80 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10"
           }`}
-          title="Clic para ver pedidos listos esperando al cliente en mostrador"
+          title="Toca para seleccionar y ver los pedidos listos esperando al cliente"
         >
-          <div>
-            <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
-              📦 Listos en Mostrador
-            </span>
-            <span className="text-2xl font-black text-stone-900 mt-1 block">
-              {metrics.readyCount}
-            </span>
-            <span className="text-[10px] text-emerald-700 font-semibold">Esperando al cliente</span>
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
+                📦 Listos en Mostrador
+              </span>
+              <span className="text-2xl sm:text-3xl font-black text-stone-900 mt-1 block">
+                {metrics.readyCount}
+              </span>
+              <span className="text-[10px] text-emerald-700 font-semibold">Esperando al cliente</span>
+            </div>
+            <div className={`p-2.5 sm:p-3 rounded-2xl border transition-colors ${
+              classificationFilter === "no_llevados"
+                ? "bg-blue-500 text-white border-blue-600 shadow-xs"
+                : "bg-blue-50 text-blue-600 border-blue-100 group-hover:bg-blue-100"
+            }`}>
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
           </div>
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100">
-            <CheckCircle2 className="w-5 h-5" />
+          <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
+            {classificationFilter === "no_llevados" ? (
+              <span className="font-black text-blue-900 flex items-center gap-1 bg-blue-100 px-2 py-0.5 rounded-md">
+                ✓ Filtro Seleccionado
+              </span>
+            ) : (
+              <span className="font-bold text-stone-400 group-hover:text-blue-700 transition-colors flex items-center gap-1">
+                Toca para ver pedidos listos <ChevronRight className="w-3 h-3" />
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -747,7 +817,12 @@ export default function PedidosPage() {
       {classificationCounts.no_pasaron > 0 && (
         <div
           onClick={() => handleSelectKPICard("no_pasaron")}
-          className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white p-3.5 px-4 rounded-2xl shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:from-red-700 hover:to-rose-800 transition-all ring-2 ring-red-300 animate-in fade-in duration-200"
+          className={`text-white p-3.5 px-4 rounded-2xl shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all duration-200 select-none ${
+            classificationFilter === "no_pasaron"
+              ? "bg-red-700 ring-4 ring-red-400 border-2 border-white shadow-xl scale-[1.005]"
+              : "bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-700 hover:to-rose-800 ring-2 ring-red-300"
+          }`}
+          title="Toca para seleccionar y ver los pedidos rezagados"
         >
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-xl text-white shrink-0">
@@ -762,8 +837,12 @@ export default function PedidosPage() {
               </p>
             </div>
           </div>
-          <span className="self-end sm:self-auto inline-flex items-center gap-1 text-xs font-black bg-white text-red-700 px-3 py-1.5 rounded-xl shadow-xs shrink-0">
-            Ver rezagados ({classificationCounts.no_pasaron}) →
+          <span className={`self-end sm:self-auto inline-flex items-center gap-1 text-xs font-black px-3.5 py-1.5 rounded-xl shadow-xs shrink-0 transition-all ${
+            classificationFilter === "no_pasaron"
+              ? "bg-stone-900 text-white ring-2 ring-white"
+              : "bg-white text-red-700 hover:bg-stone-100"
+          }`}>
+            {classificationFilter === "no_pasaron" ? "✓ Viendo rezagados (clic para quitar)" : `Ver rezagados (${classificationCounts.no_pasaron}) →`}
           </span>
         </div>
       )}
@@ -1118,11 +1197,61 @@ export default function PedidosPage() {
 
       {/* 2. ZONA INFERIOR DE DESPLAZAMIENTO INDEPENDIENTE: Catálogo de Productos y Pedidos */}
       <div 
-        ref={catalogScrollRef} 
-        className="flex-1 min-h-0 overflow-y-auto space-y-2.5 sm:space-y-3 mt-1.5 pr-1 pb-6 scroll-smooth"
+        ref={catalogSectionRef}
+        id="catalog-results-section"
+        className="flex-1 min-h-0 flex flex-col mt-0.5"
       >
+        <div 
+          ref={catalogScrollRef} 
+          className="flex-1 min-h-0 overflow-y-auto space-y-1.5 sm:space-y-2 pr-1 pb-4 scroll-smooth"
+        >
+          {/* Banner de Cuadro Seleccionado con botón para restablecer */}
+          {classificationFilter !== "all" && (
+            <div className="bg-white border border-amber-300 rounded-xl p-2 sm:p-2.5 px-3 shadow-2xs flex flex-wrap items-center justify-between gap-2 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-500 text-white rounded-lg shadow-2xs">
+                  {classificationFilter === "activos" && <Cake className="w-4 h-4" />}
+                  {classificationFilter === "hoy" && <Clock className="w-4 h-4" />}
+                  {classificationFilter === "por_pagar" && <DollarSign className="w-4 h-4" />}
+                  {classificationFilter === "no_llevados" && <CheckCircle2 className="w-4 h-4" />}
+                  {classificationFilter === "no_pasaron" && <AlertTriangle className="w-4 h-4 text-red-200" />}
+                  {classificationFilter === "pendientes" && <Flame className="w-4 h-4" />}
+                  {classificationFilter === "entregados" && <Check className="w-4 h-4" />}
+                  {classificationFilter === "proximos" && <Calendar className="w-4 h-4" />}
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200">
+                      Filtro Activo
+                    </span>
+                    <h3 className="text-xs sm:text-sm font-black text-stone-900">
+                      {classificationFilter === "activos" && "⏳ Pedidos Activos en Proceso de Elaboración"}
+                      {classificationFilter === "hoy" && "⏰ Entregas Programadas para HOY"}
+                      {classificationFilter === "por_pagar" && `💰 Saldo Falta por Cobrar (${formatCurrency(metrics.totalRemainingBalance)})`}
+                      {classificationFilter === "no_llevados" && "📦 Listos en Mostrador Esperando al Cliente"}
+                      {classificationFilter === "no_pasaron" && `⚠️ ${classificationCounts.no_pasaron} Pedido(s) Rezagados (Fecha u hora vencida)`}
+                      {classificationFilter === "pendientes" && "👨‍🍳 En Preparación / Horno"}
+                      {classificationFilter === "entregados" && "✅ Ya Entregados"}
+                      {classificationFilter === "proximos" && "⏰ Próximos de Hoy"}
+                    </h3>
+                  </div>
+                  <p className="text-[11px] text-stone-500 font-semibold mt-0.5">
+                    Mostrando {filteredOrders.length} pedido(s) {viewMode === "productos" ? `(${classifiedProducts.length} productos desglosados)` : ""}.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setClassificationFilter("all")}
+                className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-800 font-black text-xs rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-2xs border border-stone-200"
+              >
+                <span>✕ Ver todos ({classificationCounts.all})</span>
+              </button>
+            </div>
+          )}
         {/* Barra de alternancia: Fichas de Productos vs Tabla + Switcher Lista/Cuadrícula + Estado Celular */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2 sm:p-2.5 px-3 rounded-xl border border-stone-200 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-1 sm:p-1.5 px-3 rounded-xl border border-stone-200 shadow-2xs">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-stone-600 uppercase tracking-wide flex items-center gap-1.5">
               <span>👀</span> Vista:
@@ -1250,20 +1379,64 @@ export default function PedidosPage() {
 
         {/* CONTENIDO PRINCIPAL: LISTA O TABLA O CUADRÍCULA */}
         {filteredOrders.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center space-y-3">
+          <div className="bg-white rounded-3xl border border-stone-200 p-8 sm:p-12 text-center space-y-3">
             <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center mx-auto border border-amber-200 shadow-inner">
-              <Cake className="w-8 h-8" />
+              {classificationFilter === "hoy" ? (
+                <Clock className="w-8 h-8 text-rose-500" />
+              ) : classificationFilter === "no_llevados" ? (
+                <CheckCircle2 className="w-8 h-8 text-blue-500" />
+              ) : classificationFilter === "por_pagar" ? (
+                <DollarSign className="w-8 h-8 text-emerald-500" />
+              ) : (
+                <Cake className="w-8 h-8 text-amber-600" />
+              )}
             </div>
-            <h3 className="font-extrabold text-lg text-stone-800">No se encontraron productos ni pedidos</h3>
+            <h3 className="font-extrabold text-lg text-stone-900">
+              {classificationFilter === "hoy"
+                ? "No hay entregas programadas para hoy"
+                : classificationFilter === "no_llevados"
+                ? "No hay pedidos listos en mostrador esperando"
+                : classificationFilter === "por_pagar"
+                ? "No hay saldos pendientes por cobrar"
+                : classificationFilter === "no_pasaron"
+                ? "No hay pedidos rezagados con horario vencido"
+                : "No se encontraron productos ni pedidos"}
+            </h3>
             <p className="text-xs text-stone-500 max-w-md mx-auto">
-              No hay productos registrados que coincidan con la clasificación o filtros seleccionados.
+              {classificationFilter === "hoy"
+                ? `Para el día de hoy (${todayStr}) no hay pedidos pendientes de entregar. Puedes revisar los pedidos de días próximos o los pedidos activos.`
+                : classificationFilter === "no_llevados"
+                ? "Todos los pedidos están en proceso de horneado/elaboración o ya fueron entregados a los clientes."
+                : classificationFilter === "por_pagar"
+                ? "Todos los pedidos activos registrados se encuentran 100% liquidados."
+                : classificationFilter === "no_pasaron"
+                ? "Excelente: ningún cliente ha dejado su pedido pasado de la fecha u hora programada."
+                : "No hay productos registrados que coincidan con la clasificación o filtros seleccionados."}
             </p>
-            <button
-              onClick={() => setIsCreateOpen(true)}
-              className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-sm transition-all"
-            >
-              <Plus className="w-4 h-4" /> Tomar Nuevo Pedido
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+              {classificationFilter !== "all" && (
+                <button
+                  onClick={() => setClassificationFilter("all")}
+                  className="inline-flex items-center gap-2 bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
+                >
+                  <span>📋 Ver Todos los Pedidos ({classificationCounts.all})</span>
+                </button>
+              )}
+              {classificationFilter !== "activos" && classificationCounts.activos > 0 && (
+                <button
+                  onClick={() => handleSelectKPICard("activos")}
+                  className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
+                >
+                  <span>⏳ Ver Pedidos Activos ({classificationCounts.activos})</span>
+                </button>
+              )}
+              <button
+                onClick={() => setIsCreateOpen(true)}
+                className="inline-flex items-center gap-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs px-4 py-2.5 rounded-xl shadow-2xs transition-all cursor-pointer border border-stone-200"
+              >
+                <Plus className="w-4 h-4" /> Tomar Nuevo Pedido
+              </button>
+            </div>
           </div>
         ) : viewMode === "productos" ? (
           /* ============================================================ */
@@ -1271,13 +1444,13 @@ export default function PedidosPage() {
           /* ============================================================ */
           productLayout === "lista" ? (
             /* FORMATO DE LISTA COMPACTA, ELEGANTE Y ORDENADA (SOLICITADO) */
-            <div className="space-y-2.5">
+            <div className="space-y-1.5">
               {classifiedProducts.map((p) => {
                 return (
                   <div
                     key={p.id}
                     onClick={() => setSelectedOrderForDetail(p.rawOrder)}
-                    className={`bg-white rounded-2xl border p-3 sm:p-4 transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-3 group border-l-4 ${
+                    className={`bg-white rounded-xl border p-2 sm:p-2.5 transition-all duration-150 shadow-2xs hover:shadow-xs cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-2.5 group border-l-4 ${
                       p.isOverdue
                         ? "border-l-rose-500 hover:bg-rose-50/20 border-rose-200"
                         : p.isReady
@@ -1290,25 +1463,25 @@ export default function PedidosPage() {
                     }`}
                   >
                     {/* Bloque 1: Piezas, Folio y Producto */}
-                    <div className="flex items-start sm:items-center gap-3 min-w-[260px] lg:w-1/3">
-                      <div className="flex flex-col items-center justify-center bg-amber-500 text-white font-black px-2.5 py-1.5 rounded-xl shadow-2xs shrink-0 min-w-[56px] text-center">
-                        <span className="text-base sm:text-lg leading-none">{p.quantity}</span>
-                        <span className="text-[10px] uppercase tracking-wider font-extrabold">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-[240px] lg:w-1/3">
+                      <div className="flex flex-col items-center justify-center bg-amber-500 text-white font-black px-2 py-1 rounded-lg shadow-2xs shrink-0 min-w-[48px] text-center">
+                        <span className="text-sm sm:text-base leading-none">{p.quantity}</span>
+                        <span className="text-[9px] uppercase tracking-wider font-extrabold">
                           {p.quantity === 1 ? "pza" : "pzas"}
                         </span>
                       </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md shadow-2xs">
+                          <span className="font-mono font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-md shadow-2xs">
                             {p.orderNumber}
                           </span>
-                          <span className="text-[11px] font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-md">
+                          <span className="text-[10px] font-bold text-stone-600 bg-stone-100 px-1.5 py-0.2 rounded-md">
                             🏬 {p.branchName.replace("Sucursal ", "")}
                           </span>
                           {getStatusBadge(p.status)}
                         </div>
-                        <h4 className="font-black text-stone-900 text-sm sm:text-base leading-tight mt-1 line-clamp-1 group-hover:text-amber-800 transition-colors">
+                        <h4 className="font-black text-stone-900 text-xs sm:text-sm leading-tight mt-0.5 line-clamp-1 group-hover:text-amber-800 transition-colors">
                           {p.productName}
                         </h4>
                       </div>
@@ -1316,8 +1489,8 @@ export default function PedidosPage() {
 
                     {/* Bloque 2: Características / Sabor & Relleno */}
                     <div className="min-w-0 lg:w-1/4">
-                      <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl px-2.5 py-1.5 text-xs text-stone-800">
-                        <div className="flex items-center gap-1 font-extrabold text-[10px] text-amber-900 uppercase tracking-wider">
+                      <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg px-2 py-1 text-xs text-stone-800">
+                        <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
                           <Cake className="w-3 h-3 text-amber-600" />
                           <span>Sabor & Relleno:</span>
                         </div>
@@ -1325,7 +1498,7 @@ export default function PedidosPage() {
                           {p.characteristics || "Especificaciones estándar del producto."}
                         </p>
                         {p.dedication && (
-                          <p className="text-[10px] text-rose-800 font-extrabold italic mt-0.5 truncate">
+                          <p className="text-[9px] text-rose-800 font-extrabold italic mt-0.5 truncate">
                             ✨ &quot;{p.dedication}&quot;
                           </p>
                         )}
@@ -1333,12 +1506,12 @@ export default function PedidosPage() {
                     </div>
 
                     {/* Bloque 3: Fecha, Hora, Cliente y Saldo */}
-                    <div className="flex items-center justify-between lg:flex-col lg:items-end gap-1 text-xs lg:w-1/5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-stone-100">
+                    <div className="flex items-center justify-between lg:flex-col lg:items-end gap-0.5 text-xs lg:w-1/5 shrink-0 pt-1 lg:pt-0 border-t lg:border-t-0 border-stone-100">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-stone-400" />
                         <span
                           className={`font-black text-xs ${
-                            p.deliveryDate === todayStr ? "text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded" : "text-stone-900"
+                            p.deliveryDate === todayStr ? "text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded" : "text-stone-900"
                           }`}
                         >
                           {p.deliveryDate === todayStr ? "¡HOY!" : p.deliveryDate}
@@ -1348,7 +1521,7 @@ export default function PedidosPage() {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="text-[11px] font-bold text-stone-700 truncate max-w-[130px]">
                           👤 {p.customerName}
                         </span>
@@ -1366,37 +1539,37 @@ export default function PedidosPage() {
 
                     {/* Bloque 4: Botones de Acción directos */}
                     <div
-                      className="flex items-center justify-end gap-1.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-stone-100"
+                      className="flex items-center justify-end gap-1 shrink-0 pt-1 lg:pt-0 border-t lg:border-t-0 border-stone-100"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
                         type="button"
                         onClick={() => handleSendWhatsApp(p.rawOrder)}
-                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                        className="px-2 py-1 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                         title="Mandar WhatsApp al cliente"
                       >
-                        <Send className="w-3.5 h-3.5" />
+                        <Send className="w-3 h-3" />
                         <span className="hidden xl:inline">WhatsApp</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSelectedOrderForReceipt(p.rawOrder)}
-                        className="px-2.5 py-1.5 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                        className="px-2 py-1 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                         title="Imprimir Ticket"
                       >
-                        <Receipt className="w-3.5 h-3.5 text-stone-600" />
+                        <Receipt className="w-3 h-3 text-stone-600" />
                         <span className="hidden xl:inline">Ticket</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSelectedOrderForDetail(p.rawOrder)}
-                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-xl border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-lg border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                       >
-                        <Eye className="w-3.5 h-3.5 text-amber-700" />
+                        <Eye className="w-3 h-3 text-amber-700" />
                         <span className="hidden sm:inline">Detalles</span>
-                        <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
+                        <ChevronRight className="w-3 h-3 text-amber-700" />
                       </button>
                     </div>
                   </div>
@@ -1604,20 +1777,20 @@ export default function PedidosPage() {
           /* ============================================================ */
           /* LIST / TABLE VIEW: CLEAN, ELEGANT, ORDERED */
           /* ============================================================ */
-          <div className="bg-white rounded-3xl border border-stone-200 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-2xs">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1250px] text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-stone-100/90 border-b border-stone-200 text-stone-600 font-extrabold uppercase tracking-wider text-[10px]">
-                  <th className="py-4 px-4">Folio</th>
-                  <th className="py-4 px-3">Fecha y Hora Entrega</th>
-                  <th className="py-4 px-3">Cliente</th>
-                  <th className="py-4 px-3">Sucursal</th>
-                  <th className="py-4 px-3">Productos Encargados</th>
-                  <th className="py-4 px-3">Estado</th>
-                  <th className="py-4 px-3">Total / Anticipo</th>
-                  <th className="py-4 px-3">Falta por Liquidar</th>
-                  <th className="py-4 px-4 text-center whitespace-nowrap min-w-[390px]">Acciones</th>
+                  <th className="py-2.5 px-4">Folio</th>
+                  <th className="py-2.5 px-3">Fecha y Hora Entrega</th>
+                  <th className="py-2.5 px-3">Cliente</th>
+                  <th className="py-2.5 px-3">Sucursal</th>
+                  <th className="py-2.5 px-3">Productos Encargados</th>
+                  <th className="py-2.5 px-3">Estado</th>
+                  <th className="py-2.5 px-3">Total / Anticipo</th>
+                  <th className="py-2.5 px-3">Falta por Liquidar</th>
+                  <th className="py-2.5 px-4 text-center whitespace-nowrap min-w-[390px]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -1649,7 +1822,7 @@ export default function PedidosPage() {
                         onClick={() => setSelectedOrderForDetail(order)}
                       >
                         {/* 1. Folio */}
-                        <td className="py-4 px-4 font-mono">
+                        <td className="py-2 px-4 font-mono">
                           <div className="flex flex-col items-start gap-1">
                             <div className="flex items-center gap-2">
                               <span className="font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl shadow-2xs">
@@ -1673,7 +1846,7 @@ export default function PedidosPage() {
                         </td>
 
                         {/* 2. Fecha y hora */}
-                        <td className="py-4 px-3">
+                        <td className="py-2 px-3">
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5">
                               <Calendar className="w-3.5 h-3.5 text-stone-400" />
@@ -1714,7 +1887,7 @@ export default function PedidosPage() {
                         </td>
 
                         {/* 3. Cliente */}
-                        <td className="py-4 px-3">
+                        <td className="py-2 px-3">
                           <div className="space-y-0.5">
                             <strong className="font-extrabold text-stone-900 text-xs block">
                               {order.customerName}
@@ -1727,14 +1900,14 @@ export default function PedidosPage() {
                         </td>
 
                         {/* 4. Sucursal */}
-                        <td className="py-4 px-3">
+                        <td className="py-2 px-3">
                           <span className="text-xs font-bold text-stone-700 bg-stone-100 px-2.5 py-1 rounded-xl">
                             {order.branchName.replace("Sucursal ", "")}
                           </span>
                         </td>
 
                         {/* 5. Productos Encargados & Características */}
-                        <td className="py-4 px-3 max-w-sm">
+                        <td className="py-2 px-3 max-w-sm">
                           {order.items && order.items.length > 0 ? (
                             <div className="space-y-1">
                               {order.items.slice(0, 3).map((it, idx) => (
@@ -1773,7 +1946,7 @@ export default function PedidosPage() {
                         </td>
 
                         {/* 6. Estado */}
-                        <td className="py-4 px-3">
+                        <td className="py-2 px-3">
                           {getStatusBadge(order.status)}
                           {isReadyNotDelivered && (
                             <div className="text-[10px] text-emerald-800 font-extrabold flex items-center gap-1 mt-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
@@ -1796,7 +1969,7 @@ export default function PedidosPage() {
                         </td>
 
                         {/* 7. Total y Anticipo */}
-                        <td className="py-4 px-3 font-mono">
+                        <td className="py-2 px-3 font-mono">
                           <div className="text-xs font-black text-stone-900">
                             {formatCurrency(order.total)}
                           </div>
@@ -1806,7 +1979,7 @@ export default function PedidosPage() {
                         </td>
 
                         {/* 8. Falta por Liquidar */}
-                        <td className="py-4 px-3 font-mono">
+                        <td className="py-2 px-3 font-mono">
                           <span
                             className={`inline-block font-black text-xs px-2.5 py-1 rounded-xl ${
                               order.remainingBalance === 0
@@ -1830,7 +2003,7 @@ export default function PedidosPage() {
 
                         {/* 9. Acciones en Letras */}
                         <td
-                          className="py-4 px-4 text-right whitespace-nowrap min-w-[390px]"
+                          className="py-2 px-4 text-right whitespace-nowrap min-w-[390px]"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1.5 flex-nowrap">
@@ -2017,6 +2190,7 @@ export default function PedidosPage() {
           </div>
         </div>
         )}
+        </div>
       </div>
 
       {/* Modals */}
