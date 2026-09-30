@@ -1054,7 +1054,7 @@ export default function CajaPage() {
       {activeTab === "historial" && (
         <div className="space-y-6">
           {/* Tarjetas KPI de Auditoría */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white hover:bg-stone-50/50 p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
@@ -1098,23 +1098,6 @@ export default function CajaPage() {
               </div>
               <div className="p-3 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-200/60">
                 <Wallet className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white hover:bg-stone-50/50 p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
-                  Ventas Totales Auditadas
-                </span>
-                <span className="text-2xl font-black text-amber-950 mt-1 block">
-                  {formatCurrency(auditMetrics.totalSalesAudit)}
-                </span>
-                <span className="text-[11px] text-stone-500 font-medium mt-0.5 block">
-                  Efectivo + Tarjeta + Transf.
-                </span>
-              </div>
-              <div className="p-3 bg-amber-100 text-amber-900 rounded-2xl border border-amber-300">
-                <Coins className="w-6 h-6" />
               </div>
             </div>
 
