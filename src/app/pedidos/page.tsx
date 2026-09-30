@@ -962,7 +962,7 @@ export default function PedidosPage() {
                 {classificationFilter === "pendientes" && "👨‍🍳 En Elaboración"}
                 {classificationFilter === "por_pagar" && "💰 Por Pagar"}
                 {classificationFilter === "no_llevados" && "📦 Listos en Mostrador"}
-                {classificationFilter === "no_pasaron" && "⚠️ No Han Pasado"}
+                {classificationFilter === "no_pasaron" && "⚠️ No Han Pasado por Ellos"}
                 {classificationFilter === "proximos" && "⏰ Próximos Hoy"}
                 {classificationFilter === "entregados" && "✅ Ya Entregados"}
               </span>
@@ -1340,7 +1340,7 @@ export default function PedidosPage() {
                 : classificationFilter === "por_pagar"
                 ? "No hay saldos pendientes por cobrar"
                 : classificationFilter === "no_pasaron"
-                ? "No hay pedidos rezagados con horario vencido"
+                ? "No hay pedidos pendientes donde no hayan pasado por ellos"
                 : "No se encontraron productos ni pedidos"}
             </h3>
             <p className="text-xs text-stone-500 max-w-md mx-auto">
@@ -1556,7 +1556,7 @@ export default function PedidosPage() {
                         {p.isOverdue && (
                           <span className="text-[10px] font-black text-red-900 bg-red-100 border border-red-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1 animate-pulse">
                             <AlertTriangle className="w-3 h-3 text-red-600" />
-                            ⚠️ REZAGADO (NO HAN PASADO)
+                            ⚠️ NO HAN PASADO POR ÉL
                           </span>
                         )}
                         {!p.isOverdue && p.isUpcoming && (
@@ -1775,7 +1775,7 @@ export default function PedidosPage() {
                             </div>
                             {isOverdue && (
                               <span className="text-[10px] font-black text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-lg animate-pulse inline-flex items-center gap-1 shadow-2xs">
-                                ⚠️ REZAGADO
+                                ⚠️ NO HAN PASADO
                               </span>
                             )}
                             {!isOverdue && isUpcoming && (
