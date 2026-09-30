@@ -387,114 +387,7 @@ export default function PedidosPage() {
     };
   }, [orders, selectedBranchFilter, todayStr]);
 
-  // Lista detallada de productos desglosados con todas sus características y especificaciones
-  const classifiedProducts = useMemo(() => {
-    const list: Array<{
-      id: string;
-      orderId: string;
-      orderNumber: string;
-      customerName: string;
-      phone: string;
-      branchName: string;
-      deliveryDate: string;
-      deliveryTime?: string;
-      deliveryType?: "sucursal" | "domicilio";
-      deliveryAddress?: string;
-      status: CustomOrder["status"];
-      total: number;
-      deposit: number;
-      remainingBalance: number;
-      dedication?: string;
-      orderNotes?: string;
-      cashier: string;
-      productName: string;
-      quantity: number;
-      unitPrice?: number;
-      subtotal?: number;
-      characteristics?: string;
-      isOverdue: boolean;
-      isUpcoming: boolean;
-      isReady: boolean;
-      isPending: boolean;
-      isUnpaid: boolean;
-      rawOrder: CustomOrder;
-    }> = [];
 
-    for (const order of filteredOrders) {
-      const isOverdue = checkIsOverdue(order);
-      const isUpcoming = checkIsUpcoming(order);
-      const isReady = checkIsReadyNotDelivered(order);
-      const isPending = checkIsPending(order);
-      const isUnpaid = checkIsUnpaid(order);
-
-      if (order.items && order.items.length > 0) {
-        order.items.forEach((it, index) => {
-          list.push({
-            id: `${order.id}-item-${index}`,
-            orderId: order.id,
-            orderNumber: order.orderNumber,
-            customerName: order.customerName,
-            phone: order.phone,
-            branchName: order.branchName,
-            deliveryDate: order.deliveryDate,
-            deliveryTime: order.deliveryTime,
-            deliveryType: order.deliveryType,
-            deliveryAddress: order.deliveryAddress,
-            status: order.status,
-            total: order.total,
-            deposit: order.deposit,
-            remainingBalance: order.remainingBalance,
-            dedication: order.dedication,
-            orderNotes: order.notes,
-            cashier: order.cashier,
-            productName: it.name,
-            quantity: it.quantity,
-            unitPrice: it.unitPrice,
-            subtotal: it.subtotal,
-            characteristics: it.notes,
-            isOverdue,
-            isUpcoming,
-            isReady,
-            isPending,
-            isUnpaid,
-            rawOrder: order,
-          });
-        });
-      } else {
-        list.push({
-          id: `${order.id}-single`,
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          customerName: order.customerName,
-          phone: order.phone,
-          branchName: order.branchName,
-          deliveryDate: order.deliveryDate,
-          deliveryTime: order.deliveryTime,
-          deliveryType: order.deliveryType,
-          deliveryAddress: order.deliveryAddress,
-          status: order.status,
-          total: order.total,
-          deposit: order.deposit,
-          remainingBalance: order.remainingBalance,
-          dedication: order.dedication,
-          orderNotes: order.notes,
-          cashier: order.cashier,
-          productName: order.description || "Pedido Encargado",
-          quantity: 1,
-          subtotal: order.total,
-          characteristics: order.description,
-          isOverdue,
-          isUpcoming,
-          isReady,
-          isPending,
-          isUnpaid,
-          rawOrder: order,
-        });
-      }
-    }
-
-    return list;
-  }, [filteredOrders, todayStr, currentMinutes]);
 
   // Desplazamiento inteligente para llevar directamente a la lista de pedidos al tocar cualquier cuadro
   const scrollToCatalog = () => {
@@ -923,101 +816,8 @@ export default function PedidosPage() {
         </div>
       </div>
 
-      {/* Paleta de Clasificación */}
-      <div 
-        className="bg-white border border-stone-200/90 rounded-xl p-2 sm:p-2.5 shadow-xs space-y-1.5 transition-all"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider flex items-center gap-1 shrink-0">
-              <span>🔘</span> Clasificación:
-            </span>
-
-            {/* Pastilla con la categoría activa */}
-            <span
-              className={`text-xs font-bold px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1.5 border shadow-2xs ${
-                classificationFilter === "all"
-                  ? "bg-amber-100 text-amber-900 border-amber-300 ring-1 ring-amber-400"
-                  : classificationFilter === "activos"
-                  ? "bg-amber-100 text-amber-900 border-amber-300 ring-1 ring-amber-400"
-                  : classificationFilter === "hoy"
-                  ? "bg-rose-100 text-rose-900 border-rose-300 ring-1 ring-rose-400"
-                  : classificationFilter === "pendientes"
-                  ? "bg-amber-100 text-amber-900 border-amber-300"
-                  : classificationFilter === "por_pagar"
-                  ? "bg-emerald-100 text-emerald-900 border-emerald-300 ring-1 ring-emerald-400"
-                  : classificationFilter === "no_llevados"
-                  ? "bg-blue-100 text-blue-900 border-blue-300 ring-1 ring-blue-400"
-                  : classificationFilter === "no_pasaron"
-                  ? "bg-red-100 text-red-950 border-red-300 font-black animate-pulse"
-                  : classificationFilter === "proximos"
-                  ? "bg-blue-100 text-blue-900 border-blue-300"
-                  : "bg-stone-100 text-stone-700 border-stone-300"
-              }`}
-            >
-              <span>
-                {classificationFilter === "all" && "📋 Todos"}
-                {classificationFilter === "activos" && "⏳ Pedidos Activos"}
-                {classificationFilter === "hoy" && "⏰ Entregas para HOY"}
-                {classificationFilter === "pendientes" && "👨‍🍳 En Elaboración"}
-                {classificationFilter === "por_pagar" && "💰 Por Pagar"}
-                {classificationFilter === "no_llevados" && "📦 Listos en Mostrador"}
-                {classificationFilter === "no_pasaron" && "⚠️ No Han Pasado por Ellos"}
-                {classificationFilter === "proximos" && "⏰ Próximos Hoy"}
-                {classificationFilter === "entregados" && "✅ Ya Entregados"}
-              </span>
-              <span className="font-mono bg-white/90 px-1.5 py-0.2 rounded text-[10px] font-black">
-                {classificationFilter === "all"
-                  ? classificationCounts.all
-                  : classificationFilter === "activos"
-                  ? classificationCounts.activos
-                  : classificationFilter === "hoy"
-                  ? classificationCounts.hoy
-                  : classificationFilter === "pendientes"
-                  ? classificationCounts.pendientes
-                  : classificationFilter === "por_pagar"
-                  ? classificationCounts.por_pagar
-                  : classificationFilter === "no_llevados"
-                  ? classificationCounts.no_llevados
-                  : classificationFilter === "no_pasaron"
-                  ? classificationCounts.no_pasaron
-                  : classificationFilter === "proximos"
-                  ? classificationCounts.proximos
-                  : classificationCounts.entregados}
-              </span>
-            </span>
-
-            {classificationFilter !== "all" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setClassificationFilter("all");
-                  setStatusFilter("all");
-                  setPaymentFilter("all");
-                  setDateFilter("all");
-                }}
-                className="text-[11px] font-bold text-stone-500 hover:text-stone-900 underline cursor-pointer ml-0.5"
-                title="Restablecer filtro a Todos"
-              >
-                ✕ Mostrar todos
-              </button>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsClassificationOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 border border-stone-200 transition-all cursor-pointer shadow-2xs shrink-0"
-            title={isClassificationOpen ? "Plegar opciones de clasificación" : "Desplegar todas las categorías"}
-          >
-            <span>{isClassificationOpen ? "Plegar" : "Desplegar Botones"}</span>
-            <ChevronDown className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${isClassificationOpen ? "rotate-180" : ""}`} />
-          </button>
-        </div>
-
-        {/* Botones de Clasificación: Todos, Por Pagar, Para Hoy, Listos */}
-        {isClassificationOpen && (
-          <div className="flex items-stretch w-full bg-stone-100 p-0.5 rounded-xl border border-stone-200/90 shadow-2xs overflow-x-auto divide-x divide-stone-200/80 gap-0 animate-in fade-in duration-150">
+      {/* Botones de Clasificación: Todos, Por Pagar, Para Hoy, Listos */}
+      <div className="flex items-stretch w-full bg-stone-100 p-0.5 rounded-xl border border-stone-200/90 shadow-2xs overflow-x-auto divide-x divide-stone-200/80 gap-0 animate-in fade-in duration-150">
             {/* 0. Todos */}
             <button
               type="button"
@@ -1114,8 +914,6 @@ export default function PedidosPage() {
               </span>
             </button>
           </div>
-        )}
-      </div>
       </div>
 
       {/* 2. ZONA INFERIOR DE DESPLAZAMIENTO INDEPENDIENTE: Catálogo de Productos y Pedidos */}
@@ -1159,7 +957,7 @@ export default function PedidosPage() {
                     </h3>
                   </div>
                   <p className="text-[11px] text-stone-500 font-semibold mt-0.5">
-                    Mostrando {filteredOrders.length} pedido(s) {viewMode === "productos" ? `(${classifiedProducts.length} productos desglosados)` : ""}.
+                    Mostrando {filteredOrders.length} pedido(s) registrado(s).
                   </p>
                 </div>
               </div>
@@ -1194,50 +992,7 @@ export default function PedidosPage() {
               <span>👀</span> Vista:
             </span>
 
-            {/* Alternar Vista: Productos & Características vs Tabla de Pedidos */}
-            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setViewMode("productos")}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                  viewMode === "productos"
-                    ? "bg-amber-600 text-white shadow-xs"
-                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
-                }`}
-              >
-                <span>🥐</span>
-                <span>Productos & Características</span>
-                <span
-                  className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
-                    viewMode === "productos" ? "bg-amber-700 text-white" : "bg-stone-200 text-stone-700"
-                  }`}
-                >
-                  {classifiedProducts.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode("tabla")}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                  viewMode === "tabla"
-                    ? "bg-stone-900 text-white shadow-xs"
-                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
-                }`}
-              >
-                <span>📋</span>
-                <span>Tabla</span>
-                <span
-                  className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
-                    viewMode === "tabla" ? "bg-stone-800 text-white" : "bg-stone-200 text-stone-700"
-                  }`}
-                >
-                  {filteredOrders.length}
-                </span>
-              </button>
-            </div>
-
-            {/* Switcher Formato Lista vs Cuadrícula: SIEMPRE DISPONIBLE Y SELECCIONABLE */}
+            {/* Switcher Formato: En Lista vs Cuadrícula */}
             <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl">
               <button
                 type="button"
@@ -1246,11 +1001,11 @@ export default function PedidosPage() {
                   setProductLayout("lista");
                 }}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === "productos" && productLayout === "lista"
+                  productLayout === "lista"
                     ? "bg-white text-stone-900 shadow-2xs font-black ring-1 ring-stone-200"
                     : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
                 }`}
-                title="Ver productos en formato de lista compacta y alineada"
+                title="Ver pedidos en formato de lista compacta y alineada"
               >
                 <List className="w-3.5 h-3.5 text-amber-600" />
                 <span>En Lista</span>
@@ -1262,11 +1017,11 @@ export default function PedidosPage() {
                   setProductLayout("cuadricula");
                 }}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === "productos" && productLayout === "cuadricula"
+                  productLayout === "cuadricula"
                     ? "bg-white text-stone-900 shadow-2xs font-black ring-1 ring-stone-200"
                     : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
                 }`}
-                title="Ver productos en cuadrícula de tarjetas"
+                title="Ver pedidos en cuadrícula de tarjetas"
               >
                 <LayoutGrid className="w-3.5 h-3.5 text-stone-600" />
                 <span>Cuadrícula</span>
@@ -1384,63 +1139,101 @@ export default function PedidosPage() {
           /* VISTA DE PRODUCTOS: LISTA ERGONÓMICA O CUADRÍCULA           */
           /* ============================================================ */
           productLayout === "lista" ? (
-            /* FORMATO DE LISTA COMPACTA, ELEGANTE Y ORDENADA (SOLICITADO) */
+            /* FORMATO DE LISTA COMPACTA, ELEGANTE Y ORDENADA POR PEDIDO */
             <div className="space-y-1.5">
-              {classifiedProducts.map((p) => {
+              {filteredOrders.map((order) => {
+                const isOverdue = checkIsOverdue(order);
+                const isReady = checkIsReadyNotDelivered(order);
+                const isUpcoming = checkIsUpcoming(order);
+                const isPending = checkIsPending(order);
+                const totalPieces = order.items && order.items.length > 0
+                  ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
+                  : 1;
+
                 return (
                   <div
-                    key={p.id}
-                    onClick={() => setSelectedOrderForDetail(p.rawOrder)}
+                    key={order.id}
+                    onClick={() => setSelectedOrderForDetail(order)}
                     className={`bg-white rounded-xl border p-2 sm:p-2.5 transition-all duration-150 shadow-2xs hover:shadow-xs cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-2.5 group border-l-4 ${
-                      p.isOverdue
+                      isOverdue
                         ? "border-l-rose-500 hover:bg-rose-50/20 border-rose-200"
-                        : p.isReady
+                        : isReady
                         ? "border-l-emerald-500 hover:bg-emerald-50/20 border-emerald-200"
-                        : p.isUpcoming
+                        : isUpcoming
                         ? "border-l-blue-500 hover:bg-blue-50/20 border-blue-200"
-                        : p.isPending
+                        : isPending
                         ? "border-l-amber-500 hover:bg-amber-50/20 border-amber-200"
                         : "border-l-stone-300 hover:bg-stone-50 border-stone-200"
                     }`}
                   >
-                    {/* Bloque 1: Piezas, Folio y Producto */}
+                    {/* Bloque 1: Piezas, Folio y Sucursal */}
                     <div className="flex items-start sm:items-center gap-2.5 min-w-[240px] lg:w-1/3">
                       <div className="flex flex-col items-center justify-center bg-amber-500 text-white font-black px-2 py-1 rounded-lg shadow-2xs shrink-0 min-w-[48px] text-center">
-                        <span className="text-sm sm:text-base leading-none">{p.quantity}</span>
+                        <span className="text-sm sm:text-base leading-none">{totalPieces}</span>
                         <span className="text-[9px] uppercase tracking-wider font-extrabold">
-                          {p.quantity === 1 ? "pza" : "pzas"}
+                          {totalPieces === 1 ? "pza" : "pzas"}
                         </span>
                       </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-mono font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-md shadow-2xs">
-                            {p.orderNumber}
+                            {order.orderNumber}
                           </span>
                           <span className="text-[10px] font-bold text-stone-600 bg-stone-100 px-1.5 py-0.2 rounded-md">
-                            🏬 {p.branchName.replace("Sucursal ", "")}
+                            🏬 {order.branchName.replace("Sucursal ", "")}
                           </span>
-                          {getStatusBadge(p.status)}
+                          {getStatusBadge(order.status)}
                         </div>
                         <h4 className="font-black text-stone-900 text-xs sm:text-sm leading-tight mt-0.5 line-clamp-1 group-hover:text-amber-800 transition-colors">
-                          {p.productName}
+                          {order.items && order.items.length > 0
+                            ? order.items.length === 1
+                              ? order.items[0].name
+                              : `${order.items[0].name} (+${order.items.length - 1} producto${order.items.length - 1 > 1 ? "s" : ""} más)`
+                            : order.description || "Pedido Encargado"}
                         </h4>
                       </div>
                     </div>
 
-                    {/* Bloque 2: Características / Sabor & Relleno */}
-                    <div className="min-w-0 lg:w-1/4">
+                    {/* Bloque 2: Productos y Detalles */}
+                    <div className="min-w-0 lg:w-1/3">
                       <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg px-2 py-1 text-xs text-stone-800">
-                        <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
-                          <Cake className="w-3 h-3 text-amber-600" />
-                          <span>Sabor & Relleno:</span>
-                        </div>
-                        <p className="font-semibold text-stone-900 text-[11px] leading-snug line-clamp-2 mt-0.5">
-                          {p.characteristics || "Especificaciones estándar del producto."}
-                        </p>
-                        {p.dedication && (
-                          <p className="text-[9px] text-rose-800 font-extrabold italic mt-0.5 truncate">
-                            ✨ &quot;{p.dedication}&quot;
+                        {order.items && order.items.length > 0 ? (
+                          <div>
+                            <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider mb-0.5">
+                              <Cake className="w-3 h-3 text-amber-600" />
+                              <span>Productos ({order.items.length}):</span>
+                            </div>
+                            <div className="space-y-0.5 max-h-16 overflow-y-auto pr-1">
+                              {order.items.map((it, idx) => (
+                                <div key={idx} className="flex items-baseline justify-between text-[11px] leading-tight text-stone-800">
+                                  <span className="font-semibold truncate">
+                                    <strong className="text-amber-950 font-black">{it.quantity}x</strong> {it.name}
+                                    {it.notes && <span className="text-stone-500 font-normal italic ml-1">({it.notes})</span>}
+                                  </span>
+                                  {it.subtotal ? (
+                                    <span className="font-mono font-bold text-[10px] text-stone-600 shrink-0 ml-1.5">
+                                      {formatCurrency(it.subtotal)}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
+                              <Cake className="w-3 h-3 text-amber-600" />
+                              <span>Detalle:</span>
+                            </div>
+                            <p className="font-semibold text-stone-900 text-[11px] leading-snug line-clamp-2 mt-0.5">
+                              {order.description || "Especificaciones estándar del pedido."}
+                            </p>
+                          </div>
+                        )}
+                        {order.dedication && (
+                          <p className="text-[9px] text-rose-800 font-extrabold italic mt-0.5 truncate border-t border-amber-200/60 pt-0.5">
+                            ✨ &quot;{order.dedication}&quot;
                           </p>
                         )}
                       </div>
@@ -1452,27 +1245,27 @@ export default function PedidosPage() {
                         <Calendar className="w-3.5 h-3.5 text-stone-400" />
                         <span
                           className={`font-black text-xs ${
-                            p.deliveryDate === todayStr ? "text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded" : "text-stone-900"
+                            order.deliveryDate === todayStr ? "text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded" : "text-stone-900"
                           }`}
                         >
-                          {p.deliveryDate === todayStr ? "¡HOY!" : p.deliveryDate}
+                          {order.deliveryDate === todayStr ? "¡HOY!" : order.deliveryDate}
                         </span>
                         <span className="font-mono font-bold text-stone-600 text-xs">
-                          {p.deliveryTime || "16:00"} hrs
+                          {order.deliveryTime || "16:00"} hrs
                         </span>
                       </div>
 
                       <div className="flex items-center gap-1.5">
                         <span className="text-[11px] font-bold text-stone-700 truncate max-w-[130px]">
-                          👤 {p.customerName}
+                          👤 {order.customerName}
                         </span>
-                        {p.remainingBalance === 0 ? (
+                        {order.remainingBalance === 0 ? (
                           <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                             ✓ Liquidado
                           </span>
                         ) : (
                           <span className="text-[10px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
-                            Falta: {formatCurrency(p.remainingBalance)}
+                            Falta: {formatCurrency(order.remainingBalance)}
                           </span>
                         )}
                       </div>
@@ -1485,7 +1278,7 @@ export default function PedidosPage() {
                     >
                       <button
                         type="button"
-                        onClick={() => handleSendWhatsApp(p.rawOrder)}
+                        onClick={() => handleSendWhatsApp(order)}
                         className="px-2 py-1 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                         title="Mandar WhatsApp al cliente"
                       >
@@ -1495,7 +1288,7 @@ export default function PedidosPage() {
 
                       <button
                         type="button"
-                        onClick={() => setSelectedOrderForReceipt(p.rawOrder)}
+                        onClick={() => setSelectedOrderForReceipt(order)}
                         className="px-2 py-1 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                         title="Imprimir Ticket"
                       >
@@ -1505,7 +1298,7 @@ export default function PedidosPage() {
 
                       <button
                         type="button"
-                        onClick={() => setSelectedOrderForDetail(p.rawOrder)}
+                        onClick={() => setSelectedOrderForDetail(order)}
                         className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-lg border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                       >
                         <Eye className="w-3 h-3 text-amber-700" />
@@ -1518,21 +1311,29 @@ export default function PedidosPage() {
               })}
             </div>
           ) : (
-            /* FORMATO DE CUADRÍCULA DE FICHAS */
+            /* FORMATO DE CUADRÍCULA DE FICHAS POR PEDIDO */
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {classifiedProducts.map((p) => {
+              {filteredOrders.map((order) => {
+                const isOverdue = checkIsOverdue(order);
+                const isReady = checkIsReadyNotDelivered(order);
+                const isUpcoming = checkIsUpcoming(order);
+                const isPending = checkIsPending(order);
+                const totalPieces = order.items && order.items.length > 0
+                  ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
+                  : 1;
+
                 return (
                   <div
-                    key={p.id}
-                    onClick={() => setSelectedOrderForDetail(p.rawOrder)}
+                    key={order.id}
+                    onClick={() => setSelectedOrderForDetail(order)}
                     className={`bg-white rounded-2xl border p-4.5 space-y-3.5 transition-all duration-200 shadow-2xs hover:shadow-lg cursor-pointer flex flex-col justify-between group ${
-                      p.isOverdue
+                      isOverdue
                         ? "border-rose-400 bg-rose-50/15 ring-2 ring-rose-400/30 hover:border-rose-500"
-                        : p.isReady
+                        : isReady
                         ? "border-emerald-300 bg-emerald-50/10 hover:border-emerald-500"
-                        : p.isUpcoming
+                        : isUpcoming
                         ? "border-blue-300 bg-blue-50/10 hover:border-blue-500"
-                        : p.isPending
+                        : isPending
                         ? "border-amber-300 bg-white hover:border-amber-500 hover:ring-2 hover:ring-amber-400/20"
                         : "border-stone-200 hover:border-amber-400 hover:ring-2 hover:ring-amber-400/20"
                     }`}
@@ -1542,36 +1343,36 @@ export default function PedidosPage() {
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-2">
                           <span className="font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl shadow-2xs font-mono">
-                            {p.orderNumber}
+                            {order.orderNumber}
                           </span>
                           <span className="text-[11px] font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-lg">
-                            🏬 {p.branchName.replace("Sucursal ", "")}
+                            🏬 {order.branchName.replace("Sucursal ", "")}
                           </span>
                         </div>
-                        {getStatusBadge(p.status)}
+                        {getStatusBadge(order.status)}
                       </div>
 
                       {/* Alertas destacadas de clasificación */}
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {p.isOverdue && (
+                        {isOverdue && (
                           <span className="text-[10px] font-black text-red-900 bg-red-100 border border-red-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1 animate-pulse">
                             <AlertTriangle className="w-3 h-3 text-red-600" />
                             ⚠️ NO HAN PASADO POR ÉL
                           </span>
                         )}
-                        {!p.isOverdue && p.isUpcoming && (
+                        {!isOverdue && isUpcoming && (
                           <span className="text-[10px] font-black text-rose-900 bg-rose-100 border border-rose-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
                             <Clock className="w-3 h-3 text-rose-600" />
                             ⏰ ¡ENTREGA HOY!
                           </span>
                         )}
-                        {p.isReady && (
+                        {isReady && (
                           <span className="text-[10px] font-black text-emerald-900 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
                             <Package className="w-3 h-3 text-emerald-700" />
                             📦 LISTO EN MOSTRADOR
                           </span>
                         )}
-                        {p.isPending && (
+                        {isPending && (
                           <span className="text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-200 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
                             <Clock className="w-3 h-3 text-amber-700" />
                             ⏳ Pendiente de Elaborar
@@ -1580,56 +1381,83 @@ export default function PedidosPage() {
                       </div>
                     </div>
 
-                    {/* Nombre del Producto y Cantidad */}
+                    {/* Resumen de Piezas y Total */}
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-2">
-                          <span className="bg-amber-600 text-white font-mono font-black text-xs sm:text-sm px-2.5 py-1 rounded-xl shadow-2xs shrink-0 mt-0.5">
-                            {p.quantity} {p.quantity === 1 ? "pza" : "pzas"}
+                        <div className="flex items-center gap-2">
+                          <span className="bg-amber-600 text-white font-mono font-black text-xs sm:text-sm px-2.5 py-1 rounded-xl shadow-2xs shrink-0">
+                            {totalPieces} {totalPieces === 1 ? "pza" : "pzas"}
                           </span>
-                          <h4 className="text-base sm:text-lg font-black text-stone-900 leading-snug group-hover:text-amber-800 transition-colors">
-                            {p.productName}
-                          </h4>
+                          <span className="text-xs sm:text-sm font-bold text-stone-600">
+                            {order.items && order.items.length > 1
+                              ? `${order.items.length} productos en el pedido`
+                              : order.items && order.items.length === 1
+                              ? order.items[0].name
+                              : "1 producto encargado"}
+                          </span>
                         </div>
-                        {p.subtotal ? (
-                          <span className="font-mono font-black text-sm text-stone-900 shrink-0">
-                            {formatCurrency(p.subtotal)}
-                          </span>
-                        ) : null}
+                        <span className="font-mono font-black text-sm text-stone-900 shrink-0">
+                          {formatCurrency(order.total)}
+                        </span>
                       </div>
                     </div>
 
-                    {/* CARACTERÍSTICAS DEL PRODUCTO */}
+                    {/* PRODUCTOS O DESCRIPCIÓN */}
                     <div className="space-y-2">
-                      <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 space-y-1 shadow-2xs">
-                        <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-[11px] uppercase tracking-wider">
-                          <Cake className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Características, Sabor & Relleno:</span>
+                      {order.items && order.items.length > 0 ? (
+                        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                          {order.items.map((it, idx) => (
+                            <div key={idx} className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 text-xs shadow-2xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-black text-stone-900 truncate">
+                                  <span className="text-amber-800 font-extrabold mr-1.5">{it.quantity}x</span>
+                                  {it.name}
+                                </span>
+                                {it.subtotal ? (
+                                  <span className="font-mono font-bold text-stone-700 text-[11px] shrink-0">
+                                    {formatCurrency(it.subtotal)}
+                                  </span>
+                                ) : null}
+                              </div>
+                              {it.notes && (
+                                <p className="text-[11px] text-stone-600 font-medium italic mt-1 pl-4">
+                                  {it.notes}
+                                </p>
+                              )}
+                            </div>
+                          ))}
                         </div>
-                        <p className="text-xs sm:text-sm font-bold text-stone-900 leading-relaxed pl-5">
-                          {p.characteristics || "Especificaciones estándar del producto."}
-                        </p>
-                      </div>
-
-                      {p.dedication && (
-                        <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-3 space-y-1 shadow-2xs">
-                          <div className="flex items-center gap-1.5 text-rose-900 font-extrabold text-[11px] uppercase tracking-wider">
-                            <Sparkles className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Dedicatoria / Letrero:</span>
+                      ) : (
+                        <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 space-y-1 shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-[11px] uppercase tracking-wider">
+                            <Cake className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Características & Sabor:</span>
                           </div>
-                          <p className="text-xs sm:text-sm font-black text-rose-950 italic pl-5">
-                            &quot;{p.dedication}&quot;
+                          <p className="text-xs sm:text-sm font-bold text-stone-900 leading-relaxed pl-5">
+                            {order.description || "Especificaciones estándar del producto."}
                           </p>
                         </div>
                       )}
 
-                      {p.orderNotes && (
+                      {order.dedication && (
+                        <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-2.5 space-y-1 shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-rose-900 font-extrabold text-[10px] uppercase tracking-wider">
+                            <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Dedicatoria / Letrero:</span>
+                          </div>
+                          <p className="text-xs sm:text-sm font-black text-rose-950 italic pl-5">
+                            &quot;{order.dedication}&quot;
+                          </p>
+                        </div>
+                      )}
+
+                      {order.notes && (
                         <div className="bg-stone-50 border border-stone-200 rounded-2xl p-2.5 text-stone-800">
                           <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-wider block mb-0.5">
                             📌 Observaciones / Empaque:
                           </span>
                           <p className="text-xs font-medium text-stone-800 pl-3">
-                            {p.orderNotes}
+                            {order.notes}
                           </p>
                         </div>
                       )}
@@ -1640,13 +1468,13 @@ export default function PedidosPage() {
                       <div className="flex items-center justify-between gap-2 border-b border-stone-200/60 pb-2">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-stone-400" />
-                          <span className={`font-extrabold ${p.deliveryDate === todayStr ? "text-rose-700 font-black" : "text-stone-900"}`}>
-                            {p.deliveryDate === todayStr ? "¡HOY!" : p.deliveryDate}
+                          <span className={`font-extrabold ${order.deliveryDate === todayStr ? "text-rose-700 font-black" : "text-stone-900"}`}>
+                            {order.deliveryDate === todayStr ? "¡HOY!" : order.deliveryDate}
                           </span>
                         </div>
                         <div className="flex items-center gap-1 font-bold text-stone-700">
                           <Clock className="w-3.5 h-3.5 text-stone-400" />
-                          <span>{p.deliveryTime || "16:00"} hrs</span>
+                          <span>{order.deliveryTime || "16:00"} hrs</span>
                         </div>
                       </div>
 
@@ -1654,14 +1482,14 @@ export default function PedidosPage() {
                         <div>
                           <span className="text-[10px] font-bold text-stone-400 uppercase block">Cliente:</span>
                           <strong className="text-xs font-black text-stone-900 block truncate max-w-[170px]">
-                            {p.customerName}
+                            {order.customerName}
                           </strong>
                         </div>
                         <div className="text-right">
                           <span className="text-[10px] font-bold text-stone-400 uppercase block">Cobro:</span>
-                          {p.remainingBalance > 0 ? (
+                          {order.remainingBalance > 0 ? (
                             <span className="text-[11px] font-black text-rose-700 font-mono bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg inline-block">
-                              Falta: {formatCurrency(p.remainingBalance)}
+                              Falta: {formatCurrency(order.remainingBalance)}
                             </span>
                           ) : (
                             <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg inline-block">
@@ -1680,7 +1508,7 @@ export default function PedidosPage() {
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => handleSendWhatsApp(p.rawOrder)}
+                          onClick={() => handleSendWhatsApp(order)}
                           className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                           title="Mandar WhatsApp al cliente"
                         >
@@ -1690,7 +1518,7 @@ export default function PedidosPage() {
 
                         <button
                           type="button"
-                          onClick={() => setSelectedOrderForReceipt(p.rawOrder)}
+                          onClick={() => setSelectedOrderForReceipt(order)}
                           className="px-2.5 py-1.5 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                           title="Imprimir Ticket"
                         >
@@ -1701,7 +1529,7 @@ export default function PedidosPage() {
 
                       <button
                         type="button"
-                        onClick={() => setSelectedOrderForDetail(p.rawOrder)}
+                        onClick={() => setSelectedOrderForDetail(order)}
                         className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-xl border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs ml-auto"
                       >
                         <Eye className="w-3.5 h-3.5 text-amber-700" />
