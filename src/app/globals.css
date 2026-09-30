@@ -66,20 +66,78 @@ body {
     right: 0 !important;
     top: 0 !important;
     margin: 0 auto !important;
-    width: 48mm !important;
-    max-width: 48mm !important;
+    width: 46mm !important;
+    max-width: 46mm !important;
     padding: 1mm 1.5mm !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    background: white !important;
-    color: black !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     font-size: 10px !important;
     line-height: 1.25 !important;
     box-sizing: border-box !important;
     text-align: left !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
+  }
+
+  /* Forzar negro 100% puro en elementos de impresión térmica con trazo engrosado para evitar medios tonos o letras tenues */
+  #thermal-receipt,
+  #thermal-receipt * {
+    color: #000000 !important;
+    font-weight: 900 !important;
+    -webkit-text-stroke: 0.32px #000000 !important;
+    text-shadow: 0.2px 0 0 #000000 !important;
+    letter-spacing: 0.15px !important;
+  }
+
+  /* =========================================================
+     CALIBRACIÓN DE TONO Y CONTRASTE TÉRMICO
+     ========================================================= */
+  #thermal-receipt[data-tone="normal"],
+  #thermal-receipt[data-tone="normal"] * {
+    color: #000000 !important;
+    font-weight: 800 !important;
+    -webkit-text-stroke: 0.2px #000000 !important;
+  }
+
+  #thermal-receipt[data-tone="oscuro"],
+  #thermal-receipt[data-tone="oscuro"] * {
+    color: #000000 !important;
+    font-weight: 900 !important;
+    -webkit-text-stroke: 0.38px #000000 !important;
+    text-shadow: 0.25px 0 0 #000000 !important;
+  }
+
+  #thermal-receipt[data-tone="ultra_oscuro"],
+  #thermal-receipt[data-tone="ultra_oscuro"] * {
+    color: #000000 !important;
+    font-weight: 900 !important;
+    -webkit-text-stroke: 0.52px #000000 !important;
+    text-shadow: 0.35px 0 0 #000000, -0.35px 0 0 #000000 !important;
+  }
+
+  /* Anchos de impresión seguros (evitan cortar texto en la orilla derecha) */
+  #thermal-receipt[data-printable-width="44mm"] {
+    width: 44mm !important;
+    max-width: 44mm !important;
+    padding: 1mm 1.2mm !important;
+    font-size: 9px !important;
+  }
+
+  #thermal-receipt[data-printable-width="46mm"] {
+    width: 46mm !important;
+    max-width: 46mm !important;
+    padding: 1mm 1.5mm !important;
+    font-size: 9.5px !important;
+  }
+
+  #thermal-receipt[data-printable-width="48mm"] {
+    width: 48mm !important;
+    max-width: 48mm !important;
+    padding: 1mm 1mm !important;
+    font-size: 10px !important;
   }
 
   #thermal-receipt[data-paper-width="80mm"],
@@ -97,10 +155,7 @@ body {
   #printable-ticket[data-paper-width="58mm"],
   #thermal-ticket-print[data-paper-width="58mm"],
   .paper-58mm {
-    width: 48mm !important;
-    max-width: 48mm !important;
     font-size: 9.5px !important;
-    padding: 1mm 1.5mm !important;
     line-height: 1.25 !important;
   }
 

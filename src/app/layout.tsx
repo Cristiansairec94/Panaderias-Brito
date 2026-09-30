@@ -42,7 +42,6 @@ export const metadata: Metadata = {
 };
 
 import { SyncProvider } from "@/context/SyncContext";
-import PwaInstallPrompt from "@/components/ui/PwaInstallPrompt";
 
 export default function RootLayout({
   children,
@@ -66,7 +65,6 @@ export default function RootLayout({
               <AppLayout>
                 {children}
               </AppLayout>
-              <PwaInstallPrompt />
             </NotificationProvider>
           </SyncProvider>
         </AuthProvider>

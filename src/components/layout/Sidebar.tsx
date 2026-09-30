@@ -26,7 +26,6 @@ import {
   Building2,
   ShieldCheck,
   CalendarClock,
-  Smartphone,
   X,
   LogOut
 } from "lucide-react";
@@ -145,13 +144,6 @@ const navigationItems: NavItem[] = [
       { name: "Roles", href: "/configuracion?tab=roles", icon: ShieldCheck, badge: "Roles" },
       { name: "Empleados", href: "/configuracion?tab=empleados", icon: Users, badge: "Personal" },
     ],
-  },
-  {
-    type: "link",
-    name: "Simulador Celular",
-    href: "/simulador",
-    icon: Smartphone,
-    badge: "App",
   },
 ];
 

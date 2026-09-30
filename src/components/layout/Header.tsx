@@ -135,8 +135,6 @@ export default function Header() {
         return { title: "Caja & Flujo de Efectivo", subtitle: "Historial de caja, arqueos y registro de movimientos" };
       case "/pedidos":
         return { title: "Pedidos & Encargos", subtitle: "Pasteles para eventos y fechas de entrega programadas" };
-      case "/simulador":
-        return { title: "Simulador Móvil", subtitle: "Prueba interactiva del sistema en teléfonos celulares" };
       default:
         return { title: "Panadería Brito", subtitle: "Sistema Integral ERP & POS" };
     }
