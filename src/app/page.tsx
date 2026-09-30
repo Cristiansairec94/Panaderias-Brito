@@ -12,7 +12,6 @@ import {
   Store, 
   Clock, 
   Receipt, 
-  Flame, 
   CheckCircle2, 
   ArrowUpRight, 
   Sparkles, 
@@ -132,7 +131,6 @@ export default function Home() {
 
   const percentGoal = Math.min(100, Math.round((activeSales / Math.max(1, activeGoal)) * 100));
   const avgTicket = Math.round(activeSales / Math.max(1, activeTickets));
-  const estimatedPieces = Math.round(activeTickets * 8.6);
 
   // Filtered orders for active branch
   const filteredOrders = useMemo(() => {
@@ -313,8 +311,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 4 Hero KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {/* 3 Hero KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
           {/* Card 1: Ventas Totales */}
           <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
             <div className="flex items-center justify-between">
@@ -405,30 +403,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Card 4: Piezas Horneadas & Vendidas */}
-          <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Piezas de Pan Salidas</span>
-              <div className="p-2.5 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200">
-                <Flame className="w-5 h-5" />
-              </div>
-            </div>
-            <div>
-              <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-                {estimatedPieces.toLocaleString("es-MX")} pzas
-              </p>
-              <p className="text-xs text-stone-600 mt-1 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                4 tandas de horneado hoy
-              </p>
-              <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-                <span>Hornos Leña & Gas</span>
-                <Link href="/inventario" className="text-rose-600 font-black hover:underline flex items-center gap-0.5">
-                  Almacén <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-            </div>
-          </div>
         </div>
 
       </div>
