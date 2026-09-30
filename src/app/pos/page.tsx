@@ -232,9 +232,10 @@ const DEFAULT_CARD_TERMINALS: CardTerminalAccount[] = [
 
 /**
  * Input editable directo y fluido para la cantidad de piezas de un producto en la charola.
- * Permite borrar libremente el número 1 (sin trabas ni rebotes instantáneos),
- * auto-selecciona el texto al hacer clic/foco para sobreescribir al instante,
- * y valida con seguridad al desenfocar (blur).
+/**
+ * Control editable de cantidad de piezas para el producto en la charola.
+ * Al dar clic o enfocar, el número actual desaparece inmediatamente, permitiendo que
+ * la primera tecla que presione el cajero sea la nueva cantidad (sin necesidad de borrar con Backspace).
  */
 function CartQuantityInput({
   value,
@@ -244,10 +245,25 @@ function CartQuantityInput({
   onChange: (qty: number) => void;
 }) {
   const [text, setText] = useState<string>(value > 0 ? value.toString() : "");
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    setText(value > 0 ? value.toString() : "");
-  }, [value]);
+    if (!isEditing) {
+      setText(value > 0 ? value.toString() : "");
+    }
+  }, [value, isEditing]);
+
+  const handleFocus = () => {
+    setIsEditing(true);
+    setText(""); // Desaparece inmediatamente al dar clic para escribir directamente cualquier tecla
+  };
+
+  const handleClick = () => {
+    if (!isEditing) {
+      setIsEditing(true);
+      setText("");
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const clean = cleanOnlyNumbers(e.target.value);
@@ -261,9 +277,12 @@ function CartQuantityInput({
   };
 
   const handleBlur = () => {
+    setIsEditing(false);
     if (text === "" || parseInt(text, 10) === 0) {
-      setText("");
-      onChange(0);
+      // Si el usuario no escribió nada o puso 0, restaurar el valor previo (mínimo 1)
+      const restored = value > 0 ? value : 1;
+      setText(restored.toString());
+      onChange(restored);
     } else {
       const num = parseInt(text, 10);
       setText(num.toString());
@@ -277,6 +296,8 @@ function CartQuantityInput({
       inputMode="numeric"
       pattern="[0-9]*"
       value={text}
+      onFocus={handleFocus}
+      onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.currentTarget.blur();
@@ -288,14 +309,15 @@ function CartQuantityInput({
       onBlur={handleBlur}
       placeholder=""
       className="w-11 h-7 text-center font-black text-xs sm:text-sm bg-white border border-amber-400 focus:border-amber-600 rounded-lg focus:outline-none shadow-inner text-stone-900 cursor-text"
-      title="Cantidad de piezas (puedes borrarlo y escribir libremente)"
+      title="Cantidad de piezas (al dar clic el número desaparece para escribir directamente)"
     />
   );
 }
 
 /**
  * Control editable de precio unitario por pieza para el producto en la charola.
- * Permite cambiar el precio c/pieza para esa venta específica de forma completamente editable y fluida.
+ * Permite cambiar el precio c/pieza para esa venta específica de forma 100% editable.
+ * Al dar clic, el precio actual desaparece inmediatamente para escribir el nuevo precio sin borrar manualmente.
  */
 function CartPriceInput({
   value,
@@ -305,10 +327,25 @@ function CartPriceInput({
   onChange: (price: number) => void;
 }) {
   const [text, setText] = useState<string>(value > 0 ? value.toString() : "");
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    setText(value > 0 ? value.toString() : "");
-  }, [value]);
+    if (!isEditing) {
+      setText(value > 0 ? value.toString() : "");
+    }
+  }, [value, isEditing]);
+
+  const handleFocus = () => {
+    setIsEditing(true);
+    setText(""); // Desaparece inmediatamente al dar clic para escribir directamente el nuevo precio
+  };
+
+  const handleClick = () => {
+    if (!isEditing) {
+      setIsEditing(true);
+      setText("");
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const clean = cleanDecimalNumbers(e.target.value);
@@ -322,9 +359,11 @@ function CartPriceInput({
   };
 
   const handleBlur = () => {
+    setIsEditing(false);
     if (text === "" || text === "." || parseFloat(text) === 0) {
-      setText("");
-      onChange(0);
+      // Si quedó vacío o en 0, restaurar el precio original del producto
+      setText(value > 0 ? value.toString() : "");
+      onChange(value);
     } else {
       const num = parseFloat(text);
       setText(num.toString());
@@ -335,13 +374,15 @@ function CartPriceInput({
   return (
     <div
       className="inline-flex items-center gap-0.5 bg-amber-50 hover:bg-amber-100/70 focus-within:bg-white border border-amber-300 focus-within:border-amber-600 rounded-lg px-1.5 py-0.5 transition-all shadow-2xs group"
-      title="Precio por pieza editable (haz clic para cambiar el precio de esta pieza)"
+      title="Precio por pieza editable (al dar clic el número desaparece para escribir directamente)"
     >
       <span className="text-[11px] font-black text-amber-800 select-none">$</span>
       <input
         type="text"
         inputMode="decimal"
         value={text}
+        onFocus={handleFocus}
+        onClick={handleClick}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.currentTarget.blur();
@@ -3323,6 +3364,8 @@ export default function POSPage() {
                     inputMode="decimal"
                     placeholder="Paga con... ($)"
                     value={cashGiven}
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => e.currentTarget.select()}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.currentTarget.blur();
