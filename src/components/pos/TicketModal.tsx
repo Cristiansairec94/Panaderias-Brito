@@ -421,17 +421,9 @@ export default function TicketModal({
 
             {/* Agradecimiento y Pie de Ticket */}
             <div className="text-center pt-2 print:pt-1 space-y-1 font-sans border-t-2 border-dashed border-black my-1">
-              <div className="space-y-0.5">
-                <p className="font-black text-black text-xs sm:text-sm print:text-[12px] tracking-wide uppercase">
-                  ¡GRACIAS POR SU PREFERENCIA!
-                </p>
-                <p className="text-[10px] print:text-[10px] font-black text-black">
-                  Consérvese en un lugar fresco y seco • Panaderías Brito
-                </p>
-                <p className="text-[9px] print:text-[9.5px] font-black text-black uppercase tracking-wider">
-                  Comprobante simplificado de venta
-                </p>
-              </div>
+              <p className="font-black text-black text-xs sm:text-sm print:text-[12px] tracking-wide uppercase">
+                ¡GRACIAS POR SU PREFERENCIA!
+              </p>
             </div>
           </div>
         </div>
