@@ -303,8 +303,8 @@ export default function PedidosPage() {
       pendientes,
       por_pagar: porPagar,
       pagados,
-      no_llevados,
-      no_pasaron,
+      no_llevados: noLlevados,
+      no_pasaron: noPasaron,
       proximos,
       entregados,
     };
@@ -890,7 +890,31 @@ export default function PedidosPage() {
               </span>
             </button>
 
-            {/* 2. Para Hoy */}
+            {/* 2. Pagados */}
+            <button
+              type="button"
+              onClick={() => handleSelectClassificationCard("pagados")}
+              className={`flex-1 min-w-[95px] py-2 sm:py-2.5 px-3 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+                classificationFilter === "pagados"
+                  ? "bg-teal-600 text-white shadow-xs font-black"
+                  : "hover:bg-white/80 text-stone-700"
+              }`}
+              title="Ver pedidos que ya están 100% liquidados y pagados"
+            >
+              <span className="flex items-center gap-1">
+                <span>✅</span>
+                <span className="truncate">Pagados</span>
+              </span>
+              <span
+                className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
+                  classificationFilter === "pagados" ? "bg-white/20 text-white" : "bg-teal-100 text-teal-900 border border-teal-200/80"
+                }`}
+              >
+                {classificationCounts.pagados}
+              </span>
+            </button>
+
+            {/* 3. Para Hoy */}
             <button
               type="button"
               onClick={() => handleSelectClassificationCard("hoy")}
@@ -914,7 +938,7 @@ export default function PedidosPage() {
               </span>
             </button>
 
-            {/* 3. Listos */}
+            {/* 4. Listos */}
             <button
               type="button"
               onClick={() => handleSelectClassificationCard("no_llevados")}
@@ -958,6 +982,7 @@ export default function PedidosPage() {
                   {classificationFilter === "activos" && <Cake className="w-4 h-4" />}
                   {classificationFilter === "hoy" && <Clock className="w-4 h-4" />}
                   {classificationFilter === "por_pagar" && <DollarSign className="w-4 h-4" />}
+                  {classificationFilter === "pagados" && <Check className="w-4 h-4" />}
                   {classificationFilter === "no_llevados" && <CheckCircle2 className="w-4 h-4" />}
                   {classificationFilter === "no_pasaron" && <AlertTriangle className="w-4 h-4 text-red-200" />}
                   {classificationFilter === "pendientes" && <Flame className="w-4 h-4" />}
@@ -973,6 +998,7 @@ export default function PedidosPage() {
                       {classificationFilter === "activos" && "⏳ Pedidos Activos en Proceso de Elaboración"}
                       {classificationFilter === "hoy" && "⏰ Entregas Programadas para HOY"}
                       {classificationFilter === "por_pagar" && `💰 Saldo Falta por Cobrar (${formatCurrency(metrics.totalRemainingBalance)})`}
+                      {classificationFilter === "pagados" && "✅ Pedidos 100% Pagados (Liquidados)"}
                       {classificationFilter === "no_llevados" && "📦 Listos en Mostrador Esperando al Cliente"}
                       {classificationFilter === "no_pasaron" && `⚠️ Pedidos que no han pasado por ellos (${classificationCounts.no_pasaron})`}
                       {classificationFilter === "pendientes" && "👨‍🍳 En Preparación / Horno"}
@@ -1107,6 +1133,8 @@ export default function PedidosPage() {
                 <CheckCircle2 className="w-8 h-8 text-blue-500" />
               ) : classificationFilter === "por_pagar" ? (
                 <DollarSign className="w-8 h-8 text-emerald-500" />
+              ) : classificationFilter === "pagados" ? (
+                <Check className="w-8 h-8 text-teal-600" />
               ) : (
                 <Cake className="w-8 h-8 text-amber-600" />
               )}
@@ -1118,6 +1146,8 @@ export default function PedidosPage() {
                 ? "No hay pedidos listos en mostrador esperando"
                 : classificationFilter === "por_pagar"
                 ? "No hay saldos pendientes por cobrar"
+                : classificationFilter === "pagados"
+                ? "No hay pedidos pagados para mostrar"
                 : classificationFilter === "no_pasaron"
                 ? "No hay pedidos pendientes donde no hayan pasado por ellos"
                 : "No se encontraron productos ni pedidos"}
@@ -1129,6 +1159,8 @@ export default function PedidosPage() {
                 ? "Todos los pedidos están en proceso de horneado/elaboración o ya fueron entregados a los clientes."
                 : classificationFilter === "por_pagar"
                 ? "Todos los pedidos activos registrados se encuentran 100% liquidados."
+                : classificationFilter === "pagados"
+                ? "No se encontraron pedidos con pago completado bajo los criterios o sucursal seleccionada."
                 : classificationFilter === "no_pasaron"
                 ? "Excelente: ningún cliente ha dejado su pedido pasado de la fecha u hora programada."
                 : "No hay productos registrados que coincidan con la clasificación o filtros seleccionados."}
