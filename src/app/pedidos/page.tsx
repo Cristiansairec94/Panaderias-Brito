@@ -992,110 +992,14 @@ export default function PedidosPage() {
           </button>
         </div>
 
-        {/* Botones de Clasificación unidos en barra continua sin espacios intermedios */}
+        {/* Botones de Clasificación: Por Pagar, Para Hoy, Listos */}
         {isClassificationOpen && (
           <div className="flex items-stretch w-full bg-stone-100 p-0.5 rounded-xl border border-stone-200/90 shadow-2xs overflow-x-auto divide-x divide-stone-200/80 gap-0 animate-in fade-in duration-150">
-            {/* 1. Todos */}
-            <button
-              type="button"
-              onClick={() => handleSelectClassificationCard("all")}
-              className={`flex-1 min-w-[95px] sm:min-w-[105px] py-1.5 sm:py-2 px-2 flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
-                classificationFilter === "all"
-                  ? "bg-stone-900 text-white shadow-xs font-black"
-                  : "hover:bg-white/80 text-stone-700"
-              }`}
-              title="Mostrar todos los pedidos y productos"
-            >
-              <span className="flex items-center gap-1">
-                <span>📋</span>
-                <span className="truncate">Todos</span>
-              </span>
-              <span
-                className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
-                  classificationFilter === "all" ? "bg-white/20 text-white" : "bg-stone-200/90 text-stone-800"
-                }`}
-              >
-                {classificationCounts.all}
-              </span>
-            </button>
-
-            {/* 2. Activos */}
-            <button
-              type="button"
-              onClick={() => handleSelectClassificationCard("activos")}
-              className={`flex-1 min-w-[95px] sm:min-w-[105px] py-1.5 sm:py-2 px-2 flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
-                classificationFilter === "activos"
-                  ? "bg-amber-600 text-white shadow-xs font-black"
-                  : "hover:bg-white/80 text-stone-700"
-              }`}
-              title="Ver todos los pedidos activos en proceso de elaboración y mostrador"
-            >
-              <span className="flex items-center gap-1">
-                <span>⏳</span>
-                <span className="truncate">Activos</span>
-              </span>
-              <span
-                className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
-                  classificationFilter === "activos" ? "bg-white/20 text-white" : "bg-amber-200/80 text-amber-900"
-                }`}
-              >
-                {classificationCounts.activos}
-              </span>
-            </button>
-
-            {/* 3. ¡Entregas para HOY! */}
-            <button
-              type="button"
-              onClick={() => handleSelectClassificationCard("hoy")}
-              className={`flex-1 min-w-[95px] sm:min-w-[105px] py-1.5 sm:py-2 px-2 flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
-                classificationFilter === "hoy"
-                  ? "bg-rose-600 text-white shadow-xs font-black"
-                  : "hover:bg-white/80 text-stone-700"
-              }`}
-              title="Ver todos los pedidos programados para entregar hoy"
-            >
-              <span className="flex items-center gap-1">
-                <span>⏰</span>
-                <span className="truncate">Para Hoy</span>
-              </span>
-              <span
-                className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
-                  classificationFilter === "hoy" ? "bg-white/20 text-white" : "bg-rose-200/80 text-rose-900"
-                }`}
-              >
-                {classificationCounts.hoy}
-              </span>
-            </button>
-
-            {/* 4. En Elaboración (Pendientes) */}
-            <button
-              type="button"
-              onClick={() => handleSelectClassificationCard("pendientes")}
-              className={`flex-1 min-w-[95px] sm:min-w-[105px] py-1.5 sm:py-2 px-2 flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
-                classificationFilter === "pendientes"
-                  ? "bg-amber-700 text-white shadow-xs font-black"
-                  : "hover:bg-white/80 text-stone-700"
-              }`}
-              title="Ver productos que están pendientes de elaborar u hornear"
-            >
-              <span className="flex items-center gap-1">
-                <span>👨‍🍳</span>
-                <span className="truncate">Elaborando</span>
-              </span>
-              <span
-                className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
-                  classificationFilter === "pendientes" ? "bg-white/20 text-white" : "bg-amber-200/80 text-amber-900"
-                }`}
-              >
-                {classificationCounts.pendientes}
-              </span>
-            </button>
-
-            {/* 5. Faltan por Pagar */}
+            {/* 1. Por Pagar */}
             <button
               type="button"
               onClick={() => handleSelectClassificationCard("por_pagar")}
-              className={`flex-1 min-w-[95px] sm:min-w-[105px] py-1.5 sm:py-2 px-2 flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+              className={`flex-1 min-w-[100px] py-2 sm:py-2.5 px-3 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
                 classificationFilter === "por_pagar"
                   ? "bg-emerald-600 text-white shadow-xs font-black"
                   : "hover:bg-white/80 text-stone-700"
@@ -1107,7 +1011,7 @@ export default function PedidosPage() {
                 <span className="truncate">Por Pagar</span>
               </span>
               <span
-                className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
+                className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
                   classificationFilter === "por_pagar" ? "bg-white/20 text-white" : "bg-emerald-200/80 text-emerald-900"
                 }`}
               >
@@ -1115,11 +1019,35 @@ export default function PedidosPage() {
               </span>
             </button>
 
-            {/* 6. Listos en Mostrador (No Llevados) */}
+            {/* 2. Para Hoy */}
+            <button
+              type="button"
+              onClick={() => handleSelectClassificationCard("hoy")}
+              className={`flex-1 min-w-[100px] py-2 sm:py-2.5 px-3 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+                classificationFilter === "hoy"
+                  ? "bg-rose-600 text-white shadow-xs font-black"
+                  : "hover:bg-white/80 text-stone-700"
+              }`}
+              title="Ver todos los pedidos programados para entregar hoy"
+            >
+              <span className="flex items-center gap-1">
+                <span>⏰</span>
+                <span className="truncate">Para Hoy</span>
+              </span>
+              <span
+                className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
+                  classificationFilter === "hoy" ? "bg-white/20 text-white" : "bg-rose-200/80 text-rose-900"
+                }`}
+              >
+                {classificationCounts.hoy}
+              </span>
+            </button>
+
+            {/* 3. Listos */}
             <button
               type="button"
               onClick={() => handleSelectClassificationCard("no_llevados")}
-              className={`flex-1 min-w-[95px] sm:min-w-[105px] py-1.5 sm:py-2 px-2 flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+              className={`flex-1 min-w-[100px] py-2 sm:py-2.5 px-3 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
                 classificationFilter === "no_llevados"
                   ? "bg-blue-600 text-white shadow-xs font-black"
                   : "hover:bg-white/80 text-stone-700"
@@ -1131,63 +1059,11 @@ export default function PedidosPage() {
                 <span className="truncate">Listos</span>
               </span>
               <span
-                className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
+                className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
                   classificationFilter === "no_llevados" ? "bg-white/20 text-white" : "bg-blue-200/80 text-blue-900"
                 }`}
               >
                 {classificationCounts.no_llevados}
-              </span>
-            </button>
-
-            {/* 7. No han pasado (Rezagados / Hora Vencida) */}
-            <button
-              type="button"
-              onClick={() => handleSelectClassificationCard("no_pasaron")}
-              className={`flex-1 min-w-[95px] sm:min-w-[105px] py-1.5 sm:py-2 px-2 flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
-                classificationFilter === "no_pasaron"
-                  ? "bg-red-700 text-white shadow-xs font-black"
-                  : "hover:bg-white/80 text-stone-700"
-              }`}
-              title="Ver productos que los dejaron y NO han pasado por ellos (fecha u hora superada)"
-            >
-              <span className="flex items-center gap-1">
-                <span>⚠️</span>
-                <span className="truncate">Rezagados</span>
-              </span>
-              <span
-                className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
-                  classificationFilter === "no_pasaron"
-                    ? "bg-white/20 text-white font-extrabold"
-                    : classificationCounts.no_pasaron > 0
-                    ? "bg-red-200 text-red-950 font-extrabold animate-pulse"
-                    : "bg-stone-200/80 text-stone-700"
-                }`}
-              >
-                {classificationCounts.no_pasaron}
-              </span>
-            </button>
-
-            {/* 8. Ya Entregados */}
-            <button
-              type="button"
-              onClick={() => handleSelectClassificationCard("entregados")}
-              className={`flex-1 min-w-[95px] sm:min-w-[105px] py-1.5 sm:py-2 px-2 flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
-                classificationFilter === "entregados"
-                  ? "bg-stone-700 text-white shadow-xs font-black"
-                  : "hover:bg-white/80 text-stone-700"
-              }`}
-              title="Ver productos ya entregados al cliente"
-            >
-              <span className="flex items-center gap-1">
-                <span>✅</span>
-                <span className="truncate">Entregados</span>
-              </span>
-              <span
-                className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
-                  classificationFilter === "entregados" ? "bg-white/20 text-white" : "bg-stone-200/80 text-stone-700"
-                }`}
-              >
-                {classificationCounts.entregados}
               </span>
             </button>
           </div>
