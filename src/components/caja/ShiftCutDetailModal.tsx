@@ -64,7 +64,7 @@ export default function ShiftCutDetailModal({
       iframe.style.top = "-9999px";
       iframe.style.left = "-9999px";
       iframe.style.width = "400px";
-      iframe.style.height = "800px";
+      iframe.style.height = "1200px";
       iframe.style.border = "none";
       iframe.style.zIndex = "-9999";
       iframe.style.visibility = "visible";
@@ -90,12 +90,14 @@ export default function ShiftCutDetailModal({
   <style>
     @page {
       size: auto;
-      margin: 4mm 6mm;
+      margin: 2mm 3mm;
     }
     *, *::before, *::after {
       box-sizing: border-box !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
     html, body {
       margin: 0 !important;
@@ -103,55 +105,73 @@ export default function ShiftCutDetailModal({
       background: #ffffff !important;
       color: #000000 !important;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+      font-size: 11px !important;
+      line-height: 1.25 !important;
       visibility: visible !important;
       display: block !important;
       width: 100% !important;
-      height: auto !important;
+      height: max-content !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
     body * {
       visibility: visible !important;
     }
     .print-ticket-box {
       width: 100% !important;
-      max-width: 360px !important;
+      max-width: 325px !important;
       margin: 0 auto !important;
-      padding: 16px !important;
+      padding: 8px 10px !important;
       background: #ffffff !important;
       color: #000000 !important;
       box-shadow: none !important;
-      border: 2px dashed #000000 !important;
-      border-radius: 8px !important;
+      border: 1.5px dashed #000000 !important;
+      border-radius: 0 !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      page-break-after: avoid !important;
+      page-break-before: avoid !important;
+    }
+    .print-ticket-box *,
+    .print-ticket-box div,
+    .print-ticket-box p,
+    .print-ticket-box span,
+    .print-ticket-box tr,
+    .print-ticket-box td {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
     .flex { display: flex !important; }
     .justify-between { justify-content: space-between !important; }
     .justify-center { justify-content: center !important; }
     .items-center { align-items: center !important; }
     .text-center { text-align: center !important; }
-    .space-y-1 > * + * { margin-top: 3px !important; }
-    .space-y-1\\.5 > * + * { margin-top: 5px !important; }
-    .space-y-4 > * + * { margin-top: 12px !important; }
+    .space-y-1 > * + * { margin-top: 2px !important; }
+    .space-y-1\\.5 > * + * { margin-top: 3px !important; }
+    .space-y-4 > * + * { margin-top: 6px !important; }
     .font-black, .font-bold { font-weight: 900 !important; }
-    .border-b-2 { border-bottom: 2px dashed #000000 !important; }
-    .border-t-2 { border-top: 2px dashed #000000 !important; }
+    .border-b-2 { border-bottom: 1.5px dashed #000000 !important; }
+    .border-t-2 { border-top: 1.5px dashed #000000 !important; }
     .border-dashed { border-style: dashed !important; }
     .border-dotted { border-style: dotted !important; }
     .border-b { border-bottom: 1px dashed #555555 !important; }
     .border-t { border-top: 1px dashed #555555 !important; }
-    .pb-3 { padding-bottom: 8px !important; }
-    .pt-1 { padding-top: 3px !important; }
-    .pt-2 { padding-top: 6px !important; }
-    .pt-4 { padding-top: 12px !important; }
-    .p-2 { padding: 5px !important; }
-    .p-3 { padding: 8px !important; }
+    .pb-3 { padding-bottom: 4px !important; }
+    .pt-1 { padding-top: 2px !important; }
+    .pt-2 { padding-top: 3px !important; }
+    .pt-4 { padding-top: 5px !important; }
+    .p-2 { padding: 3px 5px !important; }
+    .p-3 { padding: 5px 8px !important; }
     .grid { display: grid !important; }
     .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-    .gap-4 { gap: 12px !important; }
+    .gap-4 { gap: 8px !important; }
+    .h-6 { height: 16px !important; }
     .bg-stone-900 { background-color: #000000 !important; color: #ffffff !important; }
     .text-white { color: #ffffff !important; }
     .bg-stone-50, .bg-amber-50, .bg-amber-50\\/70, .bg-emerald-100, .bg-blue-100, .bg-rose-100 {
       background-color: #f2f2f2 !important;
     }
-    .rounded-md, .rounded-xl, .rounded-2xl, .rounded-3xl { border-radius: 6px !important; }
+    .rounded-md, .rounded-xl, .rounded-2xl, .rounded-3xl { border-radius: 4px !important; }
     .border { border: 1px solid #cccccc !important; }
     .text-emerald-800, .text-emerald-900, .text-emerald-950, .text-amber-950, .text-amber-900, .text-rose-800, .text-rose-950, .text-blue-950 {
       color: #000000 !important;
@@ -159,6 +179,12 @@ export default function ShiftCutDetailModal({
     .text-stone-500, .text-stone-600, .text-stone-400 {
       color: #333333 !important;
     }
+    .text-base { font-size: 13px !important; }
+    .text-sm { font-size: 11.5px !important; }
+    .text-xs { font-size: 10.5px !important; }
+    .text-\\[11px\\] { font-size: 9.5px !important; }
+    .text-\\[10px\\] { font-size: 9px !important; }
+    .text-\\[9px\\] { font-size: 8.5px !important; }
     svg { display: inline-block !important; vertical-align: middle !important; }
   </style>
 </head>
@@ -301,7 +327,7 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
             id="thermal-receipt"
             data-paper-width="80mm"
             ref={ticketRef}
-            className="w-full max-w-[370px] bg-white p-5 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-dashed border-stone-300 shadow-lg space-y-4 font-mono text-stone-900 paper-80mm"
+            className="w-full max-w-[370px] bg-white p-5 sm:p-6 rounded-2xl sm:rounded-3xl border-2 border-dashed border-stone-300 shadow-lg space-y-4 font-mono text-stone-900 paper-80mm break-inside-avoid print:break-inside-avoid print:rounded-none print:shadow-none print:border-none"
           >
             {/* Header del Ticket */}
             <div className="text-center space-y-1 border-b-2 border-dashed border-stone-300 pb-3">
