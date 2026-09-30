@@ -1732,42 +1732,31 @@ export default function CreateOrderModal({
             </div>
 
             {/* BOTÓN DEFINITIVO DE VALIDACIÓN */}
-            <button
-              type="submit"
-              disabled={isSubmitting || !isReadyToConfirm}
-              className={`w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2.5 transition-all ${
-                isSubmitting
-                  ? "bg-stone-700 text-stone-400 cursor-wait shadow-none"
-                  : !customerName.trim()
-                  ? "bg-stone-800 text-stone-400 border-2 border-stone-700 cursor-not-allowed opacity-75 shadow-none"
-                  : total <= 0
-                  ? "bg-stone-800 text-stone-400 border-2 border-stone-700 cursor-not-allowed opacity-75 shadow-none"
-                  : !isDepositValid
-                  ? "bg-stone-800 text-amber-400 border-2 border-dashed border-amber-500/50 cursor-not-allowed opacity-80 shadow-none"
-                  : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/40 border-2 border-emerald-300 active:scale-98 cursor-pointer animate-in fade-in"
-              }`}
-            >
-              <span>
+            <div className="flex justify-center pt-1">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`w-full sm:w-auto sm:min-w-[220px] py-2 sm:py-2.5 px-6 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  isSubmitting
+                    ? "bg-stone-700 text-stone-400 cursor-wait shadow-none"
+                    : !isReadyToConfirm
+                    ? "bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 shadow-sm"
+                    : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/40 active:scale-95"
+                }`}
+              >
                 {isSubmitting ? (
-                  "⏳"
-                ) : !isReadyToConfirm ? (
-                  "🔒"
+                  <>
+                    <span className="text-xs">⏳</span>
+                    <span>Confirmando...</span>
+                  </>
                 ) : (
-                  <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
+                  <>
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span>Confirmar Compra</span>
+                  </>
                 )}
-              </span>
-              <span>
-                {isSubmitting
-                  ? "Validando y Guardando Pedido..."
-                  : !customerName.trim()
-                  ? "Paso 1: Escribe el nombre del cliente"
-                  : total <= 0
-                  ? "Paso 2: Indica el monto total del pedido"
-                  : !isDepositValid
-                  ? `Paso 4: Requiere mínimo el 50% de anticipo (${formatCurrency(minRequiredDeposit)})`
-                  : `DAR ACCESO A LA COMPRA • VALIDAR PEDIDO (${formatCurrency(numericDeposit)})`}
-              </span>
-            </button>
+              </button>
+            </div>
           </div>
         </form>
       </div>
