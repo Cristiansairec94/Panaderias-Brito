@@ -172,7 +172,7 @@ export const PERMISSION_DEFINITIONS: {
     key: "canAccessDashboard",
     title: "Dashboard / Resumen General",
     category: "administracion",
-    description: "Estadísticas globales del día, metas de venta y accesos rápidos.",
+    description: "Estadísticas globales del día, ventas en tiempo real y accesos rápidos.",
     icon: Store,
   },
   {

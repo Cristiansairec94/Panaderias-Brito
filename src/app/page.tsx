@@ -12,7 +12,6 @@ import {
   Store, 
   Clock, 
   Receipt, 
-  CheckCircle2, 
   ArrowUpRight, 
   Sparkles, 
   RefreshCw, 
@@ -125,11 +124,6 @@ export default function Home() {
     ? consolidatedMetrics.totalCashInDrawer 
     : currentBranch?.cashInDrawer || 5120;
 
-  const activeGoal = Math.round(
-    (isAllBranches ? consolidatedMetrics.totalDailyGoal : currentBranch?.dailyGoal || 10000) * periodMultiplier
-  );
-
-  const percentGoal = Math.min(100, Math.round((activeSales / Math.max(1, activeGoal)) * 100));
   const avgTicket = Math.round(activeSales / Math.max(1, activeTickets));
 
   // Filtered orders for active branch
@@ -328,17 +322,11 @@ export default function Home() {
               <div className="flex items-center justify-between text-xs text-stone-500 mt-1 font-semibold">
                 <span className="flex items-center gap-1 text-emerald-700 font-bold">
                   <ArrowUpRight className="w-3.5 h-3.5" />
-                  {activeTickets} tickets
+                  {activeTickets} tickets cobrados
                 </span>
-                <span className="text-stone-700 font-bold">{percentGoal}% de meta</span>
-              </div>
-
-              {/* Goal Progress bar */}
-              <div className="w-full bg-stone-200/70 rounded-full h-2 mt-2 overflow-hidden border border-stone-200/60">
-                <div
-                  className="bg-gradient-to-r from-orange-500 via-rose-500 to-emerald-500 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${percentGoal}%` }}
-                />
+                <span className="text-stone-700 font-bold">
+                  Prom: {formatCurrency(avgTicket)}
+                </span>
               </div>
 
               {/* Payment method pills */}
@@ -424,7 +412,7 @@ export default function Home() {
               </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Comparativa de ventas en tiempo real, cumplimiento de metas, ticket promedio, arqueo y métodos de cobro.
+              Comparativa de ventas en tiempo real, ticket promedio, arqueo y métodos de cobro.
             </p>
           </div>
 
@@ -442,11 +430,6 @@ export default function Home() {
         {/* 3 Branch Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {sortedBranches.map((b, idx) => {
-            // Cálculos precisos y sin truncar
-            const isGoalAchieved = b.todaySales >= b.dailyGoal;
-            const realPct = Math.round((b.todaySales / Math.max(1, b.dailyGoal)) * 100);
-            const barPct = Math.min(100, realPct);
-            const diffGoal = Math.abs(b.todaySales - b.dailyGoal);
             const isSelected = !isAllBranches && currentBranch?.id === b.id;
             const isTopRank = idx === 0;
 
@@ -529,43 +512,17 @@ export default function Home() {
                     </button>
                   </div>
 
-                  {/* Venta Acumulada y Meta Exacta */}
-                  <div className="bg-stone-50/80 rounded-2xl p-3.5 border border-stone-100 space-y-2">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <div>
-                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Venta de hoy</span>
-                        <span className="text-2xl font-black text-stone-900 tracking-tight">{formatCurrency(b.todaySales)}</span>
-                      </div>
-                      <div className="text-right">
-                        {isGoalAchieved ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            {realPct}% (+{formatCurrency(diffGoal)})
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200">
-                            {realPct}% (Faltan {formatCurrency(diffGoal)})
-                          </span>
-                        )}
-                      </div>
+                  {/* Venta Acumulada y Tickets */}
+                  <div className="bg-stone-50/80 rounded-2xl p-3.5 border border-stone-100 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Venta de hoy</span>
+                      <span className="text-2xl font-black text-stone-900 tracking-tight">{formatCurrency(b.todaySales)}</span>
                     </div>
-
-                    {/* Barra de progreso visual */}
-                    <div className="space-y-1">
-                      <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden shadow-inner">
-                        <div
-                          className={`h-full rounded-full transition-all duration-700 ${
-                            isGoalAchieved
-                              ? "bg-gradient-to-r from-emerald-500 to-teal-500"
-                              : "bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500"
-                          }`}
-                          style={{ width: `${barPct}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] text-stone-500 font-semibold">
-                        <span>{b.todayTickets} tickets cobrados</span>
-                        <span>Meta: <strong className="text-stone-700">{formatCurrency(b.dailyGoal)}</strong></span>
-                      </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Transacciones</span>
+                      <span className="text-xs font-black text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200 inline-block">
+                        {b.todayTickets} tickets
+                      </span>
                     </div>
                   </div>
 

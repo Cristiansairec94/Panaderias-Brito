@@ -28,6 +28,7 @@ import { Product, CustomOrder, OrderItem } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown } from "@/lib/utils";
 import { getStoredProducts } from "@/lib/products";
 import { getStoredOrders, addCustomOrder, addOrderPayment, updateOrderStatus } from "@/lib/orders";
+import { useNotifications } from "@/context/NotificationContext";
 
 interface BreadOrdersDrawerProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export default function BreadOrdersDrawer({
   shiftName,
   onSelectOrderForReceipt,
 }: BreadOrdersDrawerProps) {
+  const { addNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState<"new" | "list">("new");
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<CustomOrder[]>([]);
@@ -217,6 +219,23 @@ export default function BreadOrdersDrawer({
       shiftName: shiftName || undefined,
     });
 
+    // Notificación en vivo para todos los dispositivos y dueños
+    try {
+      addNotification({
+        senderName: `🎂 Pedido Registrado (${branchName || "Mostrador"})`,
+        senderAvatar: "🎂",
+        badgeIcon: "pastel",
+        title: `Nuevo Pedido ${newOrder.orderNumber}: Total ${formatCurrency(newOrder.total)}`,
+        highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(newOrder.deposit)}`,
+        description: `${newOrder.description}. Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs (${newOrder.deliveryType === "domicilio" ? `A domicilio: ${newOrder.deliveryAddress}` : `Recoge en ${newOrder.branchName || branchName || "Sucursal"}`}). Saldo restante: ${formatCurrency(newOrder.remainingBalance)}.`,
+        category: "pedidos",
+        actionLabel: "Ver Pedidos",
+        actionLink: "/pedidos",
+      });
+    } catch (e) {
+      console.warn("Could not fire order notification:", e);
+    }
+
     // Reset form
     setCustomerName("");
     setCustomerPhone("");
@@ -253,6 +272,20 @@ export default function BreadOrdersDrawer({
     });
 
     if (updated) {
+      try {
+        addNotification({
+          senderName: `🎂 Pedido Liquidado (${branchName || "Mostrador"})`,
+          senderAvatar: "🎂",
+          badgeIcon: "pastel",
+          title: `Pedido ${order.orderNumber} Liquidado: ${formatCurrency(order.remainingBalance)}`,
+          highlightText: `${order.customerName} - 100% Pagado`,
+          description: `Se liquidó el saldo pendiente de ${formatCurrency(order.remainingBalance)} vía ${liquidationPaymentMethod}. Pedido: ${order.description}. Entregado al cliente.`,
+          category: "pedidos",
+          actionLabel: "Ver Pedido",
+          actionLink: "/pedidos",
+        });
+      } catch (e) {}
+
       setPayingOrderId(null);
       refreshOrders();
       if (onSelectOrderForReceipt) {

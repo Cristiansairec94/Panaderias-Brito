@@ -340,7 +340,7 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
       {
         key: "canAccessDashboard",
         label: "Panel Principal y Resumen Gerencial",
-        description: "Visualizar el balance general diario, ventas en tiempo real y metas de la sucursal.",
+        description: "Visualizar el balance general diario, ventas en tiempo real y rendimiento de la sucursal.",
         icon: BarChart3,
       },
       {

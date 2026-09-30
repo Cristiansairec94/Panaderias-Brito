@@ -445,13 +445,21 @@ export default function CashDrawerShiftModal({
     }
 
     // NOTIFICACIÓN DIRECTA AL ADMINISTRADOR / SISTEMA CON ALTA PRIORIDAD
+    const isSquare = cashDifference === 0;
+    const isShort = cashDifference < 0;
+    const squareStatusTitle = isSquare
+      ? "✓ CAJA CUADRADA EXACTA ($0.00)"
+      : isShort
+      ? `🚨 NO CUADRÓ LA CAJA (Faltante ${formatCurrency(cashDifference)})`
+      : `⚠️ NO CUADRÓ LA CAJA (Sobrante +${formatCurrency(cashDifference)})`;
+
     addNotification({
-      senderName: `🏁 Corte Guardado (${outgoingCashier})`,
-      senderAvatar: "💰",
+      senderName: `🏁 Cierre de Turno (${outgoingCashier})`,
+      senderAvatar: isSquare ? "💰" : "⚠️",
       badgeIcon: "dinero",
-      title: `Corte de Turno ${newFolio}: ${formatCurrency(parsedCountedCash)} en Caja`,
-      highlightText: `${outgoingCashier} entregó a ${incomingCashier}`,
-      description: `Folio ${newFolio} archivado en historial. Horario: ${shiftStartTime} a ${currentTime}. Efectivo contado: ${formatCurrency(parsedCountedCash)} (${cashDifference === 0 ? "Cuadrada Exacta" : cashDifference > 0 ? `Sobrante +${formatCurrency(cashDifference)}` : `Faltante ${formatCurrency(cashDifference)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}, Efectivo entregado/retirado: ${formatCurrency(cashToWithdraw)}.`,
+      title: `Cierre a las ${currentTime} hrs: ${squareStatusTitle}`,
+      highlightText: `Cambio de Turno: ${outgoingCashier} ➔ ${incomingCashier}`,
+      description: `Folio ${newFolio} archivado en historial. Horario de turno: ${shiftStartTime} a ${currentTime} hrs. Efectivo en caja: ${formatCurrency(parsedCountedCash)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(cashDifference)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(cashToWithdraw)}.`,
       category: "caja",
       actionLabel: "Consultar Historial",
       actionLink: "/caja",

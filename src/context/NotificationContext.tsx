@@ -22,83 +22,116 @@ export interface FBNotification {
   category: "inventario" | "pedidos" | "caja" | "produccion" | "clientes";
 }
 
+export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
+  if (!notif) return false;
+
+  const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
+
+  // 1. Bloqueo estricto: Cero notificaciones de almacén, inventario, producción de hornos, insumos o escaneos
+  if (
+    notif.category === "inventario" ||
+    notif.category === "produccion" ||
+    text.includes("almacén") ||
+    text.includes("almacen") ||
+    text.includes("stock") ||
+    text.includes("harina") ||
+    text.includes("insumo") ||
+    text.includes("horno") ||
+    text.includes("camioneta") ||
+    text.includes("código") ||
+    text.includes("codigo") ||
+    text.includes("código de barras")
+  ) {
+    return false;
+  }
+
+  // 2. Permitir exclusivamente Cierres de Turno / Cortes de Caja
+  const isCierreTurno =
+    (notif.category === "caja" &&
+      (text.includes("corte") ||
+       text.includes("turno") ||
+       text.includes("cierre") ||
+       text.includes("cuadró") ||
+       text.includes("cuadro") ||
+       text.includes("entrega") ||
+       text.includes("diferencia"))) ||
+    text.includes("cierre de turno") ||
+    text.includes("corte de turno");
+
+  // 3. Permitir exclusivamente Pedidos / Encargos de pan y pasteles
+  const isPedido =
+    notif.category === "pedidos" ||
+    text.includes("pedido") ||
+    text.includes("encargo") ||
+    text.includes("apartado") ||
+    text.includes("anticipo") ||
+    text.includes("ped-");
+
+  return Boolean(isCierreTurno || isPedido);
+}
+
 const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
   {
-    id: "fb-1",
-    senderName: "Sistema de Almacén",
-    senderAvatar: "📦",
-    badgeIcon: "harina",
-    title: "Alerta de Stock Crítico",
-    highlightText: "Harina de Trigo Extra Fina",
-    description: "Quedan solo 8 bultos en bodega. Se alcanzó el nivel mínimo de reorden.",
-    timeAgo: "Hace 6 min",
+    id: "corte-turno-matutino-cuadro",
+    senderName: "🏁 Cierre de Turno (Lupita Brito)",
+    senderAvatar: "💰",
+    badgeIcon: "dinero",
+    title: "Cierre a las 14:00 hrs: ✓ CAJA CUADRADA EXACTA ($0.00)",
+    highlightText: "Lupita Brito entregó turno a Don Toño Brito",
+    description: "Horario de turno: 06:30 a 14:00 hrs. Efectivo en caja: $4,850.00. Cuadró exacto sin faltante ($0.00 de diferencia). Fondo dejado para nuevo turno: $800.00. Efectivo retirado: $4,050.00.",
+    timeAgo: "Hace 15 min",
     group: "recientes",
     read: false,
-    actionLabel: "Comprar Insumos",
-    actionLink: "/inventario",
-    category: "inventario",
+    actionLabel: "Ver Corte de Caja",
+    actionLink: "/caja",
+    category: "caja",
   },
   {
-    id: "fb-2",
-    senderName: "Pastelería & Encargos",
+    id: "corte-turno-vespertino-alerta",
+    senderName: "🏁 Cierre de Turno (Carlos R.)",
+    senderAvatar: "⚠️",
+    badgeIcon: "dinero",
+    title: "Cierre a las 21:30 hrs: 🚨 NO CUADRÓ LA CAJA (Faltante -$50.00)",
+    highlightText: "Carlos R. entregó turno a Don Toño Brito",
+    description: "Horario de turno: 14:00 a 21:30 hrs. Efectivo esperado: $3,920.00 | Efectivo contado: $3,870.00. Faltante detectado: -$50.00 MXN en entrega de turno. Fondo dejado: $800.00.",
+    timeAgo: "Hace 1 hora",
+    group: "recientes",
+    read: false,
+    actionLabel: "Revisar Historial de Caja",
+    actionLink: "/caja",
+    category: "caja",
+  },
+  {
+    id: "pedido-ped-101",
+    senderName: "🎂 Pedido Registrado (Matriz Centro)",
     senderAvatar: "🎂",
     badgeIcon: "pastel",
-    title: "Entrega Próxima (4:00 PM)",
-    highlightText: "Sra. María González",
-    description: "Pastel 3 Leches XV Años (flores lilas) listo para entrega y cobro de restante $450.",
+    title: "Nuevo Pedido PED-101: Total $950.00",
+    highlightText: "Sra. María González - Anticipo: $500.00",
+    description: "Pastel 3 Leches XV Años. Entrega: Mañana a las 16:00 hrs (Recoge en Sucursal Matriz Centro). Saldo restante: $450.00.",
     timeAgo: "Hace 28 min",
     group: "recientes",
     read: false,
     actionLabel: "Cobrar $450",
     actionLink: "/caja",
-    secondaryActionLabel: "Ver pedido",
+    secondaryActionLabel: "Ver Pedidos",
     secondaryActionLink: "/pedidos",
     category: "pedidos",
   },
   {
-    id: "fb-3",
-    senderName: "Caja Mostrador (Lupita)",
-    senderAvatar: "👩‍💼",
-    badgeIcon: "dinero",
-    title: "Meta de Turno Superada",
-    highlightText: "$4,150.00 MXN en Efectivo",
-    description: "El turno matutino superó la meta diaria estimada de ventas en mostrador.",
-    timeAgo: "Hace 1 hora",
-    group: "recientes",
-    read: false,
-    actionLabel: "Ver Flujo de Caja",
-    actionLink: "/caja",
-    category: "caja",
-  },
-  {
-    id: "fb-4",
-    senderName: "Maestro Panadero Juan",
-    senderAvatar: "👨‍🍳",
-    badgeIcon: "horno",
-    title: "Horno 2 Terminado",
-    highlightText: "Charolas de Conchas y Cuernos",
-    description: "Lote de 80 conchas y 40 cuernos calientes listos para pasar al exhibidor.",
-    timeAgo: "Hace 2 horas",
-    group: "anteriores",
-    read: true,
-    actionLabel: "Ver Mostrador",
-    actionLink: "/pos",
-    category: "produccion",
-  },
-  {
-    id: "fb-5",
-    senderName: "Abarrotes 'La Guadalupana'",
-    senderAvatar: "🏪",
-    badgeIcon: "cliente",
-    title: "Abono a Cuenta Mayorista",
-    highlightText: "Don Pepe abonó $850.00",
-    description: "Se liquidó la nota de 150 bolillos y 80 teleras de la semana pasada.",
+    id: "pedido-ped-102",
+    senderName: "🎂 Pedido Liquidado (San Benito)",
+    senderAvatar: "🎂",
+    badgeIcon: "pastel",
+    title: "Nuevo Pedido PED-102: Total $1,200.00",
+    highlightText: "Ing. Carlos Mendoza - 100% Pagado ($1,200.00)",
+    description: "100 piezas de Mini Cuernitos Hojaldrados. Entrega: Hoy a las 08:30 hrs en Sucursal San Benito. Estado: Listo para entrega.",
     timeAgo: "Ayer a las 6:30 PM",
     group: "anteriores",
     read: true,
-    actionLabel: "Ver Cliente",
-    actionLink: "/clientes",
-    category: "clientes",
+    actionLabel: "Ver Pedido",
+    actionLink: "/pedidos",
+    category: "pedidos",
   },
 ];
 
@@ -130,7 +163,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            // Purgar y excluir estrictamente cualquier notificación vieja de almacén / stock
+            const allowed = parsed.filter(isAllowedNotification);
+            if (allowed.length > 0) {
+              return allowed;
+            }
           }
         }
       } catch (e) {}
@@ -201,10 +238,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             id: `welcome-${Date.now()}`,
             senderName: "🥖 Panadería Brito",
             senderAvatar: "🥖",
-            badgeIcon: "harina",
-            title: "Notificaciones Activadas",
-            highlightText: "¡Alertas en tiempo real activas!",
-            description: "Recibirás avisos de ventas, cobros y encargos al instante en tu celular.",
+            badgeIcon: "dinero",
+            title: "Avisos de Turnos y Pedidos",
+            highlightText: "¡Notificaciones activas en tu celular!",
+            description: "Te avisaremos de inmediato cada corte de caja (si cuadró o no) y nuevos pedidos.",
             timeAgo: "Ahora",
             group: "recientes",
             read: false,
@@ -253,6 +290,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (typeof window === "undefined" || !realtimeHub.onNotification) return;
 
     const unsubNotification = realtimeHub.onNotification((remoteNotif) => {
+      // Filtrar estrictamente: solo Cierres de Turno y Pedidos
+      if (!isAllowedNotification(remoteNotif)) return;
+
       setNotifications((prev) => {
         // Evitar duplicados si ya existe
         if (prev.some((n) => n.id === remoteNotif.id)) return prev;
@@ -278,6 +318,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const addNotification = (notif: Omit<FBNotification, "id" | "read" | "timeAgo" | "group"> & Partial<FBNotification>) => {
+    // Filtrar estrictamente: excluir almacén/inventario y permitir solo Cierres de Turno y Pedidos
+    if (!isAllowedNotification(notif)) {
+      return;
+    }
+
     const newId = notif.id || `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const fullNotif: FBNotification = {
       id: newId,

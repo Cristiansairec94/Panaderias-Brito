@@ -18,6 +18,7 @@ import { CustomOrder } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { addOrderPayment } from "@/lib/orders";
 
 interface OrderPaymentModalProps {
@@ -35,6 +36,7 @@ export default function OrderPaymentModal({
 }: OrderPaymentModalProps) {
   const { user } = useAuth();
   const { currentBranch, registerRealSale } = useBranch();
+  const { addNotification } = useNotifications();
   const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [markAsDelivered, setMarkAsDelivered] = useState(true);
@@ -90,6 +92,21 @@ export default function OrderPaymentModal({
         } catch (saleErr) {
           console.warn("Could not register in registerRealSale:", saleErr);
         }
+
+        try {
+          const isFullyPaid = numericAmount >= order.remainingBalance;
+          addNotification({
+            senderName: `🎂 ${isFullyPaid ? "Pedido Liquidado" : "Abono Recibido"} (${operatingBranchName})`,
+            senderAvatar: "🎂",
+            badgeIcon: "pastel",
+            title: `${isFullyPaid ? "Pedido Liquidado" : "Abono de Pedido"} ${order.orderNumber}: ${formatCurrency(numericAmount)}`,
+            highlightText: `${order.customerName} - ${isFullyPaid ? "100% Pagado" : `Resta: ${formatCurrency(Math.max(0, order.remainingBalance - numericAmount))}`}`,
+            description: `Se cobró ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isFullyPaid ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(Math.max(0, order.remainingBalance - numericAmount))}.`}`,
+            category: "pedidos",
+            actionLabel: "Ver Pedidos",
+            actionLink: "/pedidos",
+          });
+        } catch (notifErr) {}
       }
 
       try {

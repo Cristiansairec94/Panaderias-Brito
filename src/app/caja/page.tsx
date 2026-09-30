@@ -934,13 +934,24 @@ export default function CajaPage() {
     } catch (e) {}
 
     // High priority notification
+    const nowClose = new Date();
+    const closeTimeStr = `${nowClose.getHours().toString().padStart(2, "0")}:${nowClose.getMinutes().toString().padStart(2, "0")}`;
+    const isSquare = diff === 0;
+    const isShort = diff < 0;
+    const squareStatusTitle = isSquare
+      ? "✓ CAJA CUADRADA EXACTA ($0.00)"
+      : isShort
+      ? `🚨 NO CUADRÓ LA CAJA (Faltante ${formatCurrency(diff)})`
+      : `⚠️ NO CUADRÓ LA CAJA (Sobrante +${formatCurrency(diff)})`;
+    const withdrawnCash = Math.max(0, parsedCounted - parsedNextFund);
+
     addNotification({
-      senderName: `🏁 Corte Entregado (${currentShiftResponsible})`,
-      senderAvatar: "💰",
+      senderName: `🏁 Cierre de Turno (${currentShiftResponsible})`,
+      senderAvatar: isSquare ? "💰" : "⚠️",
       badgeIcon: "dinero",
-      title: `Corte de Turno ${newFolio} Registrado`,
-      highlightText: `${currentShiftResponsible} entregó turno a ${recipient} con ${formatCurrency(parsedCounted)}`,
-      description: `Folio ${newFolio} archivado en historial de caja. Efectivo entregado a Don Toño: ${formatCurrency(Math.max(0, parsedCounted - parsedNextFund))}. Diferencia: ${diff === 0 ? "Exacta" : formatCurrency(diff)}.`,
+      title: `Cierre a las ${closeTimeStr} hrs: ${squareStatusTitle}`,
+      highlightText: `Cambio de Turno: ${currentShiftResponsible} ➔ ${recipient}`,
+      description: `Folio ${newFolio} archivado en historial de caja. Horario de cierre: ${closeTimeStr} hrs. Efectivo en caja: ${formatCurrency(parsedCounted)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(diff)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(withdrawnCash)}.`,
       category: "caja",
       actionLabel: "Ver Comprobante",
       actionLink: "/caja?tab=historial",

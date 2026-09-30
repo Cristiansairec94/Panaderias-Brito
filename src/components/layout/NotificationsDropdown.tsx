@@ -98,7 +98,7 @@ function CakeGraphic({ className = "w-10 h-10" }: { className?: string }) {
 
 export default function NotificationsDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">("all");
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
   const [showBanner, setShowBanner] = useState(true);
@@ -144,8 +144,13 @@ export default function NotificationsDropdown() {
     }
   };
 
+  const cortesCount = notifications.filter((n) => n.category === "caja").length;
+  const pedidosCount = notifications.filter((n) => n.category === "pedidos").length;
+
   const filtered = notifications.filter((n) => {
     if (activeTab === "unread") return !n.read;
+    if (activeTab === "cortes") return n.category === "caja";
+    if (activeTab === "pedidos") return n.category === "pedidos";
     return true;
   });
 
@@ -266,27 +271,53 @@ export default function NotificationsDropdown() {
             </div>
 
             {/* Filter Buttons & Mark All Read Link */}
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <div className="flex items-center gap-1.5 mt-3 flex-wrap">
               {/* Todas Pill */}
               <button
                 type="button"
                 onClick={() => setActiveTab("all")}
-                className={`px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
                   activeTab === "all"
-                    ? "bg-[#ebe4dc] text-stone-900 font-semibold shadow-2xs border border-transparent"
+                    ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
                     : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
                 }`}
               >
                 Todas ({notifications.length})
               </button>
 
+              {/* Cierres de Turno Pill */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("cortes")}
+                className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                  activeTab === "cortes"
+                    ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
+                    : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                }`}
+              >
+                🏁 Cierres ({cortesCount})
+              </button>
+
+              {/* Pedidos Pill */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("pedidos")}
+                className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                  activeTab === "pedidos"
+                    ? "bg-purple-100 text-purple-950 font-bold shadow-2xs border border-purple-300"
+                    : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                }`}
+              >
+                🎂 Pedidos ({pedidosCount})
+              </button>
+
               {/* No leídas Pill */}
               <button
                 type="button"
                 onClick={() => setActiveTab("unread")}
-                className={`px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
                   activeTab === "unread"
-                    ? "bg-[#ebe4dc] text-stone-900 font-semibold shadow-2xs border border-transparent"
+                    ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
                     : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
                 }`}
               >
@@ -298,9 +329,9 @@ export default function NotificationsDropdown() {
                 type="button"
                 onClick={markAllAsRead}
                 disabled={unreadCount === 0}
-                className="text-[#c25425] hover:text-[#9e3f18] underline underline-offset-2 font-medium text-xs sm:text-[13px] ml-1.5 cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed transition-colors"
+                className="text-[#c25425] hover:text-[#9e3f18] underline underline-offset-2 font-medium text-xs sm:text-[13px] ml-auto cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed transition-colors"
               >
-                Marcar todo como leído
+                Marcar leídas
               </button>
             </div>
 
@@ -336,8 +367,10 @@ export default function NotificationsDropdown() {
             {filtered.length === 0 ? (
               <div className="p-8 my-4 text-center text-stone-400 flex flex-col items-center justify-center space-y-2 bg-white/70 rounded-2xl border border-[#ede5dc]">
                 <Inbox className="w-10 h-10 text-stone-300 stroke-[1.5]" />
-                <p className="font-bold text-sm text-stone-800">No tienes notificaciones pendientes</p>
-                <p className="text-xs text-stone-400">Te avisaremos cuando haya novedades en horno, pedidos o stock.</p>
+                <p className="font-bold text-sm text-stone-800">No hay notificaciones</p>
+                <p className="text-xs text-stone-500 max-w-xs text-center">
+                  Te avisaremos al instante sobre cierres de turno (si cuadró o no la caja) y nuevos pedidos realizados.
+                </p>
               </div>
             ) : (
               <>
@@ -429,11 +462,72 @@ function NotificationCardItem({
 }) {
   const isMenuOpen = activeItemMenu === notif.id;
 
+  const isShiftCut =
+    notif.category === "caja" ||
+    notif.title.toLowerCase().includes("cierre") ||
+    notif.title.toLowerCase().includes("corte");
+  const isOrder =
+    notif.category === "pedidos" ||
+    notif.title.toLowerCase().includes("pedido");
+
+  const fullText = `${notif.title} ${notif.highlightText} ${notif.description}`.toLowerCase();
+  const isSquare =
+    fullText.includes("cuadrada exacta") ||
+    fullText.includes("cuadró exacta") ||
+    fullText.includes("cuadro exacta") ||
+    fullText.includes("cuadre exacto") ||
+    fullText.includes("cuadre perfecto") ||
+    fullText.includes("($0.00)") ||
+    notif.title.includes("✓");
+  const isShort =
+    fullText.includes("faltante") ||
+    fullText.includes("no cuadró") ||
+    fullText.includes("no cuadro") ||
+    notif.title.includes("🚨");
+  const isOver = !isShort && (fullText.includes("sobrante"));
+
   return (
     <div
       onClick={() => markAsRead(notif.id)}
-      className="bg-white rounded-2xl border border-[#eee6dd] p-4 shadow-xs space-y-3 relative group transition-all"
+      className="bg-white rounded-2xl border border-[#eee6dd] p-4 shadow-xs space-y-2.5 relative group transition-all"
     >
+      {/* Top Header Tag: Status Pill + Time */}
+      <div className="flex items-center justify-between gap-2 flex-wrap pb-1.5 border-b border-stone-100">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {isShiftCut && (
+            <>
+              {isSquare ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  ✓ CAJA CUADRADA EXACTA
+                </span>
+              ) : isShort ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
+                  🚨 NO CUADRÓ LA CAJA (FALTANTE)
+                </span>
+              ) : isOver ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                  ⚠️ NO CUADRÓ LA CAJA (SOBRANTE)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200">
+                  🏁 CIERRE DE TURNO
+                </span>
+              )}
+            </>
+          )}
+
+          {isOrder && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-200">
+              🎂 PEDIDO DE CLIENTE
+            </span>
+          )}
+        </div>
+
+        <span className="text-[11px] font-semibold text-stone-400 shrink-0 ml-auto">
+          {notif.timeAgo}
+        </span>
+      </div>
+
       {/* Top row: Avatar & Description */}
       <div className="flex items-start gap-3.5">
         {/* Avatar Container with Graphic & Overlapping Badge */}
@@ -456,10 +550,12 @@ function NotificationCardItem({
 
         {/* Text Details */}
         <div className="flex-1 min-w-0 pr-1">
+          <h5 className="text-xs font-bold text-stone-900 mb-0.5 leading-snug">
+            {notif.title}
+          </h5>
           <p className="text-xs sm:text-[13px] text-stone-700 leading-snug">
-            <strong className="font-bold text-stone-900">{notif.senderName}: </strong>
-            <span className="text-stone-800 font-medium">{notif.highlightText}</span>
-            <span> — {notif.description}</span>
+            <strong className="font-semibold text-stone-800">{notif.highlightText}: </strong>
+            <span className="text-stone-600">{notif.description}</span>
           </p>
         </div>
 

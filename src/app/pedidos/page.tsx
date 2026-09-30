@@ -22,6 +22,7 @@ import {
   MapPin,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   TrendingUp,
   List,
   Flame,
@@ -114,6 +115,17 @@ export default function PedidosPage() {
 
   // Expanded rows in list view
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+
+  // Estados de expansión de productos por pedido (máximo 2 productos visibles por defecto y desplegables con "ver más")
+  const [expandedProductsOrderIds, setExpandedProductsOrderIds] = useState<Record<string, boolean>>({});
+
+  const toggleOrderProductsExpanded = (orderId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExpandedProductsOrderIds((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId],
+    }));
+  };
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -1277,77 +1289,116 @@ export default function PedidosPage() {
                       </div>
                     </div>
 
-                    {/* Bloque 2: Productos y Detalles */}
-                    <div className="min-w-0 lg:w-1/3">
-                      <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg px-2 py-1 text-xs text-stone-800">
-                        {order.items && order.items.length > 0 ? (
-                          <div>
-                            <div className="flex items-center justify-between gap-1 mb-1">
-                              <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
-                                <Cake className="w-3 h-3 text-amber-600" />
-                                <span>Productos ({order.items.length}):</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedOrderForDetail(order);
-                                }}
-                                className="text-[10px] font-black text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 px-2 py-0.5 rounded-md border border-amber-300 transition-all cursor-pointer flex items-center gap-0.5 shadow-2xs leading-none"
-                                title="Ver más detalles de este pedido"
-                              >
-                                <span>Ver más</span>
-                                <ChevronRight className="w-3 h-3" />
-                              </button>
-                            </div>
-                            <div className="space-y-0.5 max-h-20 overflow-y-auto pr-1">
-                              {order.items.map((it, idx) => (
-                                <div key={idx} className="flex items-baseline justify-between text-[11px] leading-tight text-stone-800">
-                                  <span className="font-semibold truncate">
-                                    <strong className="text-amber-950 font-black">{it.quantity}x</strong> {it.name}
-                                    {it.notes && <span className="text-stone-500 font-normal italic ml-1">({it.notes})</span>}
-                                  </span>
-                                  {it.subtotal ? (
-                                    <span className="font-mono font-bold text-[10px] text-stone-600 shrink-0 ml-1.5">
-                                      {formatCurrency(it.subtotal)}
-                                    </span>
-                                  ) : null}
+                    {/* Bloque 2: Productos y Detalles (Máximo 2 productos visibles por defecto y desplegables con "ver más") */}
+                    {(() => {
+                      const isExpanded = Boolean(expandedProductsOrderIds[order.id]);
+                      const orderItems = order.items || [];
+                      const hasItems = orderItems.length > 0;
+                      const hasMoreThanTwo = orderItems.length > 2;
+                      const itemsToShow = isExpanded ? orderItems : orderItems.slice(0, 2);
+
+                      return (
+                        <div className="min-w-0 lg:w-1/3">
+                          <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-2 text-xs text-stone-800 transition-all">
+                            {hasItems ? (
+                              <div>
+                                <div className="flex items-center justify-between gap-1 mb-1.5">
+                                  <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
+                                    <Cake className="w-3 h-3 text-amber-600" />
+                                    <span>Productos ({orderItems.length}):</span>
+                                  </div>
+                                  {hasMoreThanTwo && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
+                                      className={`text-[10px] font-black px-2 py-0.5 rounded-md border transition-all cursor-pointer flex items-center gap-1 shadow-2xs leading-none ${
+                                        isExpanded
+                                          ? "bg-amber-600 text-white border-amber-700 hover:bg-amber-700"
+                                          : "text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 border-amber-300"
+                                      }`}
+                                      title={isExpanded ? "Mostrar menos productos" : "Desplegar todos los productos y detalles"}
+                                    >
+                                      <span>{isExpanded ? "Ver menos" : "Ver más"}</span>
+                                      <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                                    </button>
+                                  )}
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="flex items-center justify-between gap-1 mb-1">
-                              <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
-                                <Cake className="w-3 h-3 text-amber-600" />
-                                <span>Detalle:</span>
+
+                                {/* Lista de productos (máximo 2 si no está expandido) */}
+                                <div className="space-y-1">
+                                  {itemsToShow.map((it, idx) => (
+                                    <div key={idx} className="flex items-baseline justify-between text-[11px] leading-tight text-stone-800">
+                                      <span className="font-semibold truncate">
+                                        <strong className="text-amber-950 font-black">{it.quantity}x</strong> {it.name}
+                                        {it.notes && <span className="text-stone-500 font-normal italic ml-1">({it.notes})</span>}
+                                      </span>
+                                      {it.subtotal ? (
+                                        <span className="font-mono font-bold text-[10px] text-stone-600 shrink-0 ml-1.5">
+                                          {formatCurrency(it.subtotal)}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Si hay más de 2 productos y está plegado: indicador con "Ver más" */}
+                                {hasMoreThanTwo && !isExpanded && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
+                                    className="w-full mt-1.5 pt-1 border-t border-amber-200/80 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                  >
+                                    <span>... y {orderItems.length - 2} producto{orderItems.length - 2 > 1 ? "s" : ""} más (Toca &quot;Ver más&quot;)</span>
+                                    <ChevronDown className="w-3 h-3 text-amber-700" />
+                                  </button>
+                                )}
+
+                                {/* Si está desplegado: mostrar toda la información completa del pedido */}
+                                {isExpanded && (
+                                  <div className="mt-2 pt-1.5 border-t border-amber-200/80 space-y-1.5 text-[11px] animate-in fade-in duration-150">
+                                    {order.description && (
+                                      <p className="text-stone-700 bg-white/70 p-1.5 rounded border border-amber-200/60">
+                                        <strong className="text-amber-950 font-bold">📝 Observaciones:</strong> {order.description}
+                                      </p>
+                                    )}
+                                    {order.dedication && (
+                                      <p className="text-rose-900 font-bold italic bg-rose-50 border border-rose-200 px-2 py-1 rounded-md">
+                                        ✨ Dedicatoria: &quot;{order.dedication}&quot;
+                                      </p>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
+                                      className="w-full pt-1 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer"
+                                    >
+                                      <span>▲ Ocultar y mostrar solo 2 productos</span>
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedOrderForDetail(order);
-                                }}
-                                className="text-[10px] font-black text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 px-2 py-0.5 rounded-md border border-amber-300 transition-all cursor-pointer flex items-center gap-0.5 shadow-2xs leading-none"
-                                title="Ver más detalles de este pedido"
-                              >
-                                <span>Ver más</span>
-                                <ChevronRight className="w-3 h-3" />
-                              </button>
-                            </div>
-                            <p className="font-semibold text-stone-900 text-[11px] leading-snug line-clamp-2 mt-0.5">
-                              {order.description || "Especificaciones estándar del pedido."}
-                            </p>
+                            ) : (
+                              <div>
+                                <div className="flex items-center justify-between gap-1 mb-1">
+                                  <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
+                                    <Cake className="w-3 h-3 text-amber-600" />
+                                    <span>Detalle:</span>
+                                  </div>
+                                </div>
+                                <p className="font-semibold text-stone-900 text-[11px] leading-snug line-clamp-2 mt-0.5">
+                                  {order.description || "Especificaciones estándar del pedido."}
+                                </p>
+                              </div>
+                            )}
+
+                            {!isExpanded && order.dedication && (
+                              <p className="text-[9px] text-rose-800 font-extrabold italic mt-1 truncate border-t border-amber-200/60 pt-0.5">
+                                ✨ &quot;{order.dedication}&quot;
+                              </p>
+                            )}
                           </div>
-                        )}
-                        {order.dedication && (
-                          <p className="text-[9px] text-rose-800 font-extrabold italic mt-0.5 truncate border-t border-amber-200/60 pt-0.5">
-                            ✨ &quot;{order.dedication}&quot;
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Bloque 3: Fecha, Hora, Cliente y Saldo */}
                     <div className="flex items-center justify-between lg:flex-col lg:items-end gap-0.5 text-xs lg:w-1/5 shrink-0 pt-1 lg:pt-0 border-t lg:border-t-0 border-stone-100">
@@ -1512,72 +1563,111 @@ export default function PedidosPage() {
                       </div>
                     </div>
 
-                    {/* PRODUCTOS O DESCRIPCIÓN */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1">
-                          <Cake className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Productos {order.items ? `(${order.items.length})` : ""}:</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedOrderForDetail(order);
-                          }}
-                          className="text-[10px] font-black text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 px-2 py-0.5 rounded-md border border-amber-300 transition-all cursor-pointer flex items-center gap-0.5 shadow-2xs leading-none"
-                          title="Ver más detalles de este pedido"
-                        >
-                          <span>Ver más</span>
-                          <ChevronRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                      {order.items && order.items.length > 0 ? (
-                        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                          {order.items.map((it, idx) => (
-                            <div key={idx} className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 text-xs shadow-2xs">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-black text-stone-900 truncate">
-                                  <span className="text-amber-800 font-extrabold mr-1.5">{it.quantity}x</span>
-                                  {it.name}
-                                </span>
-                                {it.subtotal ? (
-                                  <span className="font-mono font-bold text-stone-700 text-[11px] shrink-0">
-                                    {formatCurrency(it.subtotal)}
-                                  </span>
-                                ) : null}
-                              </div>
-                              {it.notes && (
-                                <p className="text-[11px] text-stone-600 font-medium italic mt-1 pl-4">
-                                  {it.notes}
-                                </p>
+                    {/* PRODUCTOS O DESCRIPCIÓN (Máximo 2 productos visibles por defecto y desplegables con "ver más") */}
+                    {(() => {
+                      const isExpanded = Boolean(expandedProductsOrderIds[order.id]);
+                      const orderItems = order.items || [];
+                      const hasItems = orderItems.length > 0;
+                      const hasMoreThanTwo = orderItems.length > 2;
+                      const itemsToShow = isExpanded ? orderItems : orderItems.slice(0, 2);
+
+                      return (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                              <Cake className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Productos {hasItems ? `(${orderItems.length})` : ""}:</span>
+                            </span>
+                            {hasMoreThanTwo && (
+                              <button
+                                type="button"
+                                onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
+                                className={`text-[10px] font-black px-2 py-0.5 rounded-md border transition-all cursor-pointer flex items-center gap-1 shadow-2xs leading-none ${
+                                  isExpanded
+                                    ? "bg-amber-600 text-white border-amber-700 hover:bg-amber-700"
+                                    : "text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 border-amber-300"
+                                }`}
+                                title={isExpanded ? "Mostrar menos productos" : "Desplegar todos los productos del pedido"}
+                              >
+                                <span>{isExpanded ? "Ver menos" : "Ver más"}</span>
+                                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                              </button>
+                            )}
+                          </div>
+
+                          {hasItems ? (
+                            <div className="space-y-1.5">
+                              {itemsToShow.map((it, idx) => (
+                                <div key={idx} className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 text-xs shadow-2xs">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-black text-stone-900 truncate">
+                                      <span className="text-amber-800 font-extrabold mr-1.5">{it.quantity}x</span>
+                                      {it.name}
+                                    </span>
+                                    {it.subtotal ? (
+                                      <span className="font-mono font-bold text-stone-700 text-[11px] shrink-0">
+                                        {formatCurrency(it.subtotal)}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {it.notes && (
+                                    <p className="text-[11px] text-stone-600 font-medium italic mt-1 pl-4">
+                                      {it.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+
+                              {/* Barra indicadora cuando hay más de 2 productos y está plegado */}
+                              {hasMoreThanTwo && !isExpanded && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
+                                  className="w-full py-1.5 px-2 bg-amber-100/70 hover:bg-amber-200/80 text-amber-900 text-xs font-black rounded-xl border border-amber-300/80 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                >
+                                  <span>... y {orderItems.length - 2} producto{orderItems.length - 2 > 1 ? "s" : ""} más (Toca &quot;Ver más&quot;)</span>
+                                  <ChevronDown className="w-3.5 h-3.5 text-amber-800" />
+                                </button>
+                              )}
+
+                              {/* Al desplegar: botón para volver a plegar */}
+                              {isExpanded && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
+                                  className="w-full pt-1 text-xs font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer"
+                                >
+                                  <span>▲ Ocultar y mostrar solo 2 productos</span>
+                                </button>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 space-y-1 shadow-2xs">
-                          <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-[11px] uppercase tracking-wider">
-                            <Cake className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Características & Sabor:</span>
-                          </div>
-                          <p className="text-xs sm:text-sm font-bold text-stone-900 leading-relaxed pl-5">
-                            {order.description || "Especificaciones estándar del producto."}
-                          </p>
-                        </div>
-                      )}
+                          ) : (
+                            <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 space-y-1 shadow-2xs">
+                              <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-[11px] uppercase tracking-wider">
+                                <Cake className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Características & Sabor:</span>
+                              </div>
+                              <p className="text-xs sm:text-sm font-bold text-stone-900 leading-relaxed pl-5">
+                                {order.description || "Especificaciones estándar del producto."}
+                              </p>
+                            </div>
+                          )}
 
-                      {order.dedication && (
-                        <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-2.5 space-y-1 shadow-2xs">
-                          <div className="flex items-center gap-1.5 text-rose-900 font-extrabold text-[10px] uppercase tracking-wider">
-                            <Sparkles className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Dedicatoria / Letrero:</span>
-                          </div>
-                          <p className="text-xs sm:text-sm font-black text-rose-950 italic pl-5">
-                            &quot;{order.dedication}&quot;
-                          </p>
+                          {/* Dedicatoria: si está desplegado o si no hay más de 2 productos */}
+                          {order.dedication && (isExpanded || !hasMoreThanTwo) && (
+                            <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-2.5 space-y-1 shadow-2xs animate-in fade-in duration-150">
+                              <div className="flex items-center gap-1.5 text-rose-900 font-extrabold text-[10px] uppercase tracking-wider">
+                                <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+                                <span>Dedicatoria / Letrero:</span>
+                              </div>
+                              <p className="text-xs sm:text-sm font-black text-rose-950 italic pl-5">
+                                &quot;{order.dedication}&quot;
+                              </p>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      );
+                    })()}
 
                       {order.notes && (
                         <div className="bg-stone-50 border border-stone-200 rounded-2xl p-2.5 text-stone-800">
@@ -1589,7 +1679,6 @@ export default function PedidosPage() {
                           </p>
                         </div>
                       )}
-                    </div>
 
                     {/* Datos de Entrega y Cliente */}
                     <div className="bg-stone-50/70 border border-stone-200/70 rounded-2xl p-3 space-y-2 text-xs">
