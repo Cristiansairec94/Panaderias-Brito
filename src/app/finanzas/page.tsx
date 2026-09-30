@@ -27,7 +27,6 @@ import {
   Store, 
   ArrowRight, 
   Receipt, 
-  FileSpreadsheet, 
   RefreshCw, 
   Percent, 
   Phone, 
@@ -38,8 +37,7 @@ import { useBranch } from "@/context/BranchContext";
 import { 
   calculateFinancialSummary, 
   FinancialPeriod, 
-  FullFinancialSummary,
-  exportFinancialSummaryToCSV
+  FullFinancialSummary
 } from "@/lib/finanzas";
 import OperationsIncomeChart from "@/components/finanzas/OperationsIncomeChart";
 
@@ -104,15 +102,6 @@ export default function FinanzasPage() {
 
           {/* Acciones Rápidas */}
           <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
-            {/* Exportar Excel / CSV */}
-            <button
-              onClick={() => exportFinancialSummaryToCSV(summary)}
-              className="flex items-center gap-1.5 bg-stone-50 hover:bg-stone-100 text-stone-800 font-extrabold px-3.5 py-2.5 rounded-2xl text-xs whitespace-nowrap transition-all border border-stone-200 active:scale-95"
-              title="Descargar reporte en Excel o CSV"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span className="hidden sm:inline">Excel/CSV</span>
-            </button>
 
             {/* Refrescar Datos */}
             <button
