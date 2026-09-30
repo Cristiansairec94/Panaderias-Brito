@@ -82,6 +82,7 @@ export type OrderClassificationKey =
   | "hoy"
   | "pendientes"
   | "por_pagar"
+  | "pagados"
   | "no_llevados"
   | "no_pasaron"
   | "proximos"
@@ -248,6 +249,12 @@ export default function PedidosPage() {
     return (order.remainingBalance || 0) > 0 && order.status !== "cancelado" && order.status !== "entregado";
   };
 
+  const checkIsPaid = (order: CustomOrder): boolean => {
+    if (order.status === "cancelado") return false;
+    const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
+    return rem <= 0;
+  };
+
   const checkIsReadyNotDelivered = (order: CustomOrder): boolean => {
     return order.status === "listo";
   };
@@ -270,6 +277,7 @@ export default function PedidosPage() {
     let hoy = 0;
     let pendientes = 0;
     let porPagar = 0;
+    let pagados = 0;
     let noLlevados = 0;
     let noPasaron = 0;
     let proximos = 0;
@@ -281,6 +289,7 @@ export default function PedidosPage() {
       if (oDate === todayStr && o.status !== "cancelado") hoy++;
       if (checkIsPending(o)) pendientes++;
       if (checkIsUnpaid(o)) porPagar++;
+      if (checkIsPaid(o)) pagados++;
       if (checkIsReadyNotDelivered(o)) noLlevados++;
       if (checkIsOverdue(o)) noPasaron++;
       if (checkIsUpcoming(o)) proximos++;
@@ -293,8 +302,9 @@ export default function PedidosPage() {
       hoy,
       pendientes,
       por_pagar: porPagar,
-      no_llevados: noLlevados,
-      no_pasaron: noPasaron,
+      pagados,
+      no_llevados,
+      no_pasaron,
       proximos,
       entregados,
     };
@@ -321,6 +331,7 @@ export default function PedidosPage() {
       }
       if (classificationFilter === "pendientes" && !checkIsPending(order)) return false;
       if (classificationFilter === "por_pagar" && !checkIsUnpaid(order)) return false;
+      if (classificationFilter === "pagados" && !checkIsPaid(order)) return false;
       if (classificationFilter === "no_llevados" && !checkIsReadyNotDelivered(order)) return false;
       if (classificationFilter === "no_pasaron" && !checkIsOverdue(order)) return false;
       if (classificationFilter === "proximos" && !checkIsUpcoming(order)) return false;
@@ -1297,15 +1308,15 @@ export default function PedidosPage() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs sm:text-sm font-black text-stone-900 truncate max-w-[160px] sm:max-w-[220px]" title={order.customerName}>
+                        <span className="text-sm font-black text-stone-950 truncate max-w-[170px] sm:max-w-[240px]" title={order.customerName}>
                           👤 {order.customerName}
                         </span>
                         {order.remainingBalance === 0 ? (
-                          <span className="text-xs sm:text-sm font-black text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-lg border border-emerald-300 shadow-2xs">
+                          <span className="text-xs sm:text-sm font-black text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300 shadow-xs">
                             ✓ Liquidado
                           </span>
                         ) : (
-                          <span className="text-xs sm:text-sm font-black text-rose-800 bg-rose-100/90 px-2.5 py-0.5 rounded-lg border border-rose-300 shadow-2xs font-mono">
+                          <span className="text-xs sm:text-sm font-black text-rose-900 bg-rose-100 px-3 py-1 rounded-lg border-2 border-rose-300/80 shadow-xs font-mono tracking-tight">
                             Falta: {formatCurrency(order.remainingBalance)}
                           </span>
                         )}
