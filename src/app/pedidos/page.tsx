@@ -62,6 +62,11 @@ const getLocalDateISO = (d: Date = new Date()): string => {
   return `${year}-${month}-${day}`;
 };
 
+const normalizeDateStr = (dateStr?: string): string => {
+  if (!dateStr) return "";
+  return dateStr.split("T")[0].split(" ")[0].trim();
+};
+
 const parseTimeToMinutes = (timeStr?: string): number | null => {
   if (!timeStr) return null;
   const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})/);
@@ -214,11 +219,12 @@ export default function PedidosPage() {
   // Classification checkers for any order
   const checkIsOverdue = (order: CustomOrder): boolean => {
     if (order.status === "entregado" || order.status === "cancelado") return false;
-    if (!order.deliveryDate) return false;
+    const orderDate = normalizeDateStr(order.deliveryDate);
+    if (!orderDate) return false;
     // Date was before today
-    if (order.deliveryDate < todayStr) return true;
+    if (orderDate < todayStr) return true;
     // Date is today and time has passed
-    if (order.deliveryDate === todayStr) {
+    if (orderDate === todayStr) {
       const orderMin = parseTimeToMinutes(order.deliveryTime);
       if (orderMin !== null) {
         return currentMinutes > orderMin;
@@ -229,7 +235,8 @@ export default function PedidosPage() {
 
   const checkIsUpcoming = (order: CustomOrder): boolean => {
     if (order.status === "entregado" || order.status === "cancelado") return false;
-    if (order.deliveryDate !== todayStr) return false;
+    const orderDate = normalizeDateStr(order.deliveryDate);
+    if (orderDate !== todayStr) return false;
     return !checkIsOverdue(order);
   };
 
@@ -269,8 +276,9 @@ export default function PedidosPage() {
     let entregados = 0;
 
     for (const o of branchFiltered) {
+      const oDate = normalizeDateStr(o.deliveryDate);
       if (o.status !== "entregado" && o.status !== "cancelado") activos++;
-      if (o.deliveryDate === todayStr && o.status !== "cancelado") hoy++;
+      if (oDate === todayStr && o.status !== "cancelado") hoy++;
       if (checkIsPending(o)) pendientes++;
       if (checkIsUnpaid(o)) porPagar++;
       if (checkIsReadyNotDelivered(o)) noLlevados++;
@@ -302,11 +310,13 @@ export default function PedidosPage() {
         if (!matchesBranch) return false;
       }
 
+      const orderDate = normalizeDateStr(order.deliveryDate);
+
       // Classification Filter (Botones principales con emoticones y cuadros KPI)
       if (classificationFilter === "activos" && (order.status === "entregado" || order.status === "cancelado")) {
         return false;
       }
-      if (classificationFilter === "hoy" && (order.deliveryDate !== todayStr || order.status === "cancelado")) {
+      if (classificationFilter === "hoy" && (orderDate !== todayStr || order.status === "cancelado")) {
         return false;
       }
       if (classificationFilter === "pendientes" && !checkIsPending(order)) return false;
@@ -333,10 +343,10 @@ export default function PedidosPage() {
 
       // Date filter (solo aplica si clasificación es "all")
       if (classificationFilter === "all") {
-        if (dateFilter === "hoy" && order.deliveryDate !== todayStr) {
+        if (dateFilter === "hoy" && orderDate !== todayStr) {
           return false;
         }
-        if (dateFilter === "manana" && order.deliveryDate !== tomorrowStr) {
+        if (dateFilter === "manana" && orderDate !== tomorrowStr) {
           return false;
         }
         if (dateFilter === "semana") {
@@ -375,7 +385,10 @@ export default function PedidosPage() {
     });
 
     const activeOrders = branchFiltered.filter((o) => o.status !== "entregado" && o.status !== "cancelado");
-    const todayOrders = branchFiltered.filter((o) => o.deliveryDate === todayStr && o.status !== "cancelado");
+    const todayOrders = branchFiltered.filter((o) => {
+      const oDate = normalizeDateStr(o.deliveryDate);
+      return oDate === todayStr && o.status !== "cancelado";
+    });
     const totalRemaining = activeOrders.reduce((sum, o) => sum + (o.remainingBalance || 0), 0);
     const readyOrders = branchFiltered.filter((o) => o.status === "listo");
 
@@ -1200,11 +1213,25 @@ export default function PedidosPage() {
                       <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg px-2 py-1 text-xs text-stone-800">
                         {order.items && order.items.length > 0 ? (
                           <div>
-                            <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider mb-0.5">
-                              <Cake className="w-3 h-3 text-amber-600" />
-                              <span>Productos ({order.items.length}):</span>
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
+                                <Cake className="w-3 h-3 text-amber-600" />
+                                <span>Productos ({order.items.length}):</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedOrderForDetail(order);
+                                }}
+                                className="text-[10px] font-black text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 px-2 py-0.5 rounded-md border border-amber-300 transition-all cursor-pointer flex items-center gap-0.5 shadow-2xs leading-none"
+                                title="Ver más detalles de este pedido"
+                              >
+                                <span>Ver más</span>
+                                <ChevronRight className="w-3 h-3" />
+                              </button>
                             </div>
-                            <div className="space-y-0.5 max-h-16 overflow-y-auto pr-1">
+                            <div className="space-y-0.5 max-h-20 overflow-y-auto pr-1">
                               {order.items.map((it, idx) => (
                                 <div key={idx} className="flex items-baseline justify-between text-[11px] leading-tight text-stone-800">
                                   <span className="font-semibold truncate">
@@ -1222,9 +1249,23 @@ export default function PedidosPage() {
                           </div>
                         ) : (
                           <div>
-                            <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
-                              <Cake className="w-3 h-3 text-amber-600" />
-                              <span>Detalle:</span>
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <div className="flex items-center gap-1 font-extrabold text-[9px] text-amber-900 uppercase tracking-wider">
+                                <Cake className="w-3 h-3 text-amber-600" />
+                                <span>Detalle:</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedOrderForDetail(order);
+                                }}
+                                className="text-[10px] font-black text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 px-2 py-0.5 rounded-md border border-amber-300 transition-all cursor-pointer flex items-center gap-0.5 shadow-2xs leading-none"
+                                title="Ver más detalles de este pedido"
+                              >
+                                <span>Ver más</span>
+                                <ChevronRight className="w-3 h-3" />
+                              </button>
                             </div>
                             <p className="font-semibold text-stone-900 text-[11px] leading-snug line-clamp-2 mt-0.5">
                               {order.description || "Especificaciones estándar del pedido."}
@@ -1404,6 +1445,24 @@ export default function PedidosPage() {
 
                     {/* PRODUCTOS O DESCRIPCIÓN */}
                     <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                          <Cake className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Productos {order.items ? `(${order.items.length})` : ""}:</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedOrderForDetail(order);
+                          }}
+                          className="text-[10px] font-black text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 px-2 py-0.5 rounded-md border border-amber-300 transition-all cursor-pointer flex items-center gap-0.5 shadow-2xs leading-none"
+                          title="Ver más detalles de este pedido"
+                        >
+                          <span>Ver más</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
                       {order.items && order.items.length > 0 ? (
                         <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                           {order.items.map((it, idx) => (
