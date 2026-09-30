@@ -217,8 +217,8 @@ export default function CreateOrderModal({
   // 2. Detalle del pedido
   const [description, setDescription] = useState("");
   const [items, setItems] = useState<OrderItem[]>([]);
-  const [showCatalog, setShowCatalog] = useState(false);
-  const [catalogSearch, setCatalogSearch] = useState("");
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+  const productSearchContainerRef = useRef<HTMLDivElement>(null);
 
   // Escáner de código de barras (POS)
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -381,7 +381,7 @@ export default function CreateOrderModal({
       setDeliveryType("sucursal");
       setPickupBranchId(initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz");
       setDeliveryAddress("");
-      setShowCatalog(false);
+      setShowProductSuggestions(false);
       setShowCustomerSearch(false);
       setPaymentMethod("efectivo");
       setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
@@ -511,16 +511,30 @@ export default function CreateOrderModal({
     }
   };
 
-  // Filtro de productos para catálogo opcional
-  const filteredCatalog = useMemo(() => {
-    if (!catalogSearch.trim()) return products.slice(0, 10);
-    const q = catalogSearch.toLowerCase();
-    return products.filter(
-      (p) => p.name.toLowerCase().includes(q) || (p.code && p.code.toLowerCase().includes(q))
-    ).slice(0, 12);
-  }, [products, catalogSearch]);
+  // Buscador y sugerencias rápidas de productos (por nombre, código corto o código de barras)
+  const productSuggestions = useMemo(() => {
+    const q = barcodeInput.trim().toLowerCase();
+    if (!q) return [];
+    const currentStored = getStoredProducts();
+    const seen = new Set<string>();
+    const list: Product[] = [];
+    for (const p of [...products, ...currentStored]) {
+      if (p && p.id && !seen.has(p.id)) {
+        seen.add(p.id);
+        list.push(p);
+      }
+    }
+    return list
+      .filter((p) => {
+        const matchName = p.name && p.name.toLowerCase().includes(q);
+        const matchCode = p.code && p.code.toLowerCase().includes(q);
+        const matchBarcode = p.barcode && p.barcode.includes(q);
+        return matchName || matchCode || matchBarcode;
+      })
+      .slice(0, 8);
+  }, [products, barcodeInput]);
 
-  // Manejo de productos del catálogo
+  // Manejo de productos agregados al pedido
   const handleAddProductFromCatalog = (product: Product) => {
     setItems((prev) => {
       const idx = prev.findIndex((it) => it.productId === product.id);
@@ -543,39 +557,49 @@ export default function CreateOrderModal({
     });
   };
 
-  // Escaneo y verificación de código de barras desde catálogo del POS
+  const handleSelectProduct = (product: Product) => {
+    handleAddProductFromCatalog(product);
+    playScanBeep(true);
+    setLastScannedAlert({
+      success: true,
+      message: `¡Producto agregado: ${product.name}!`,
+      productName: product.name,
+      price: product.price,
+      code: product.barcode || product.code || "",
+    });
+    setBarcodeInput("");
+    setShowProductSuggestions(false);
+    setTimeout(() => {
+      setLastScannedAlert(null);
+    }, 3500);
+  };
+
+  // Escaneo y verificación de código de barras / buscador directo de producto
   const handleBarcodeScan = (rawCode: string) => {
     const code = rawCode.trim();
     if (!code) return;
 
     const currentStored = getStoredProducts();
-    const matched =
+    const allProducts = [...products, ...currentStored];
+    let matched =
       findProductByBarcodeOrCode(code, products) ||
       findProductByBarcodeOrCode(code, currentStored);
 
-    if (matched) {
-      handleAddProductFromCatalog(matched);
-      playScanBeep(true);
-      setLastScannedAlert({
-        success: true,
-        message: `¡Producto verificado y agregado!`,
-        productName: matched.name,
-        price: matched.price,
-        code: matched.barcode || matched.code || code,
-      });
-      setBarcodeInput("");
+    // Si no coincide con código o código de barras, buscar coincidencia por nombre
+    if (!matched) {
+      const qLower = code.toLowerCase();
+      matched = allProducts.find(
+        (p) => p && p.name && p.name.toLowerCase().includes(qLower)
+      );
+    }
 
-      // Limpiar mensaje de éxito tras 4 segundos
-      setTimeout(() => {
-        setLastScannedAlert((prev) =>
-          prev?.code === (matched.barcode || matched.code || code) ? null : prev
-        );
-      }, 4000);
+    if (matched) {
+      handleSelectProduct(matched);
     } else {
       playScanBeep(false);
       setLastScannedAlert({
         success: false,
-        message: `Código "${code}" no encontrado en el catálogo del Punto de Venta.`,
+        message: `No se encontró ningún producto con "${code}".`,
         code,
       });
 
@@ -585,6 +609,22 @@ export default function CreateOrderModal({
       }, 4500);
     }
   };
+
+  // Cierre de sugerencias al hacer clic fuera del buscador de productos
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        productSearchContainerRef.current &&
+        !productSearchContainerRef.current.contains(event.target as Node)
+      ) {
+        setShowProductSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Listener global de teclado para pistola lectora física USB / Bluetooth (Keyboard Wedge)
   useEffect(() => {
@@ -607,25 +647,6 @@ export default function CreateOrderModal({
           handleBarcodeScan(barcodeInput);
         }
         return;
-      }
-
-      // Si está enfocado en el buscador de catálogo y presiona Enter
-      if (
-        isOtherInput &&
-        activeElem &&
-        (activeElem as HTMLElement).getAttribute("data-catalog-search") === "true"
-      ) {
-        if (e.key === "Enter" && catalogSearch.trim()) {
-          const matched =
-            findProductByBarcodeOrCode(catalogSearch.trim(), products) ||
-            findProductByBarcodeOrCode(catalogSearch.trim(), getStoredProducts());
-          if (matched) {
-            e.preventDefault();
-            handleBarcodeScan(catalogSearch.trim());
-            setCatalogSearch("");
-            return;
-          }
-        }
       }
 
       const now = Date.now();
@@ -668,7 +689,7 @@ export default function CreateOrderModal({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, isCustomerModalOpen, isSubmitting, barcodeInput, catalogSearch, products]);
+  }, [isOpen, isCustomerModalOpen, isSubmitting, barcodeInput, products]);
 
   const handleUpdateItemQty = (index: number, delta: number) => {
     setItems((prev) => {
@@ -1149,56 +1170,105 @@ export default function CreateOrderModal({
 
           {/* PASO 2: ¿DE QUÉ SERÁ EL PEDIDO? */}
           <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-stone-900">
-                <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
-                  2
-                </span>
-                <h3 className="font-black text-sm uppercase tracking-wide text-stone-900">
-                  2. ¿De qué será el pedido?
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCatalog(!showCatalog)}
-                className="text-xs font-bold text-stone-700 bg-white hover:bg-stone-100 border border-stone-200 px-2.5 py-1 rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
-              >
-                <ShoppingBag className="w-3.5 h-3.5 text-stone-500" />
-                <span>{showCatalog ? "Cerrar catálogo" : "Ver catálogo"}</span>
-              </button>
+            <div className="flex items-center gap-2 text-stone-900">
+              <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
+                2
+              </span>
+              <h3 className="font-black text-sm uppercase tracking-wide text-stone-900">
+                2. ¿De qué será el pedido?
+              </h3>
             </div>
 
-            {/* Barra rápida de escaneo / búsqueda */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Barcode className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  ref={barcodeInputRef}
-                  type="text"
-                  placeholder="Escanear código de barras o escribir producto..."
-                  value={barcodeInput}
-                  onChange={(e) => setBarcodeInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleBarcodeScan(barcodeInput);
-                    }
-                  }}
-                  className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-mono font-bold text-stone-900 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
+            {/* Buscador de productos y escáner */}
+            <div ref={productSearchContainerRef} className="relative">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    ref={barcodeInputRef}
+                    type="text"
+                    placeholder="Buscar pan, pastel o código de barras..."
+                    value={barcodeInput}
+                    onChange={(e) => {
+                      setBarcodeInput(e.target.value);
+                      setShowProductSuggestions(true);
+                    }}
+                    onFocus={() => setShowProductSuggestions(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleBarcodeScan(barcodeInput);
+                      }
+                      if (e.key === "Escape") {
+                        setShowProductSuggestions(false);
+                      }
+                    }}
+                    className="w-full pl-9 pr-8 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs"
+                  />
+                  {barcodeInput.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBarcodeInput("");
+                        setShowProductSuggestions(false);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleBarcodeScan(barcodeInput)}
+                  disabled={!barcodeInput.trim()}
+                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-stone-950 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Agregar</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleBarcodeScan(barcodeInput)}
-                disabled={!barcodeInput.trim()}
-                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-stone-950 text-xs font-black rounded-xl transition-all flex items-center gap-1 shrink-0 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Agregar</span>
-              </button>
+
+              {/* Sugerencias flotantes en tiempo real del buscador */}
+              {showProductSuggestions && productSuggestions.length > 0 && (
+                <div className="absolute z-30 top-full left-0 right-0 mt-1.5 bg-white border border-stone-200 rounded-xl shadow-2xl overflow-hidden divide-y divide-stone-100 max-h-56 overflow-y-auto animate-in fade-in-50 duration-150">
+                  <div className="px-3 py-1.5 bg-stone-100/90 text-[10px] font-black text-stone-600 uppercase tracking-wider flex items-center justify-between">
+                    <span>Resultados ({productSuggestions.length})</span>
+                    <span className="text-[9px] text-stone-500 font-normal">Clic para agregar al pedido</span>
+                  </div>
+                  {productSuggestions.map((prod) => (
+                    <button
+                      key={prod.id}
+                      type="button"
+                      onClick={() => handleSelectProduct(prod)}
+                      className="w-full px-3 py-2 text-left hover:bg-amber-50 flex items-center justify-between gap-3 text-xs cursor-pointer group transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-base shrink-0">{prod.icon || "🥖"}</span>
+                        <div className="min-w-0 truncate">
+                          <p className="font-bold text-stone-900 group-hover:text-amber-950 truncate">
+                            {prod.name}
+                          </p>
+                          <p className="text-[10px] text-stone-400 font-mono truncate">
+                            {prod.code ? `Cód: ${prod.code}` : ""} {prod.barcode ? `• Barcode: ${prod.barcode}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-black text-xs text-amber-950 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">
+                          {formatCurrency(prod.price)}
+                        </span>
+                        <span className="text-[11px] font-bold text-amber-800 bg-amber-50 group-hover:bg-amber-500 group-hover:text-stone-950 px-2 py-1 rounded-lg border border-amber-300 transition-colors flex items-center gap-0.5">
+                          <Plus className="w-3 h-3" /> Agregar
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Alerta de escaneo */}
+            {/* Alerta de confirmación de producto agregado */}
             {lastScannedAlert && (
               <div
                 className={`rounded-xl p-2 border flex items-center justify-between text-xs animate-in fade-in duration-150 ${
@@ -1219,36 +1289,6 @@ export default function CreateOrderModal({
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
-              </div>
-            )}
-
-            {/* Catálogo rápido desplegable */}
-            {showCatalog && (
-              <div className="bg-white p-3 rounded-xl border border-amber-200 space-y-2 animate-in fade-in duration-150">
-                <input
-                  type="text"
-                  placeholder="Buscar pan o pastel por nombre..."
-                  value={catalogSearch}
-                  onChange={(e) => setCatalogSearch(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto pt-1">
-                  {filteredCatalog.map((prod) => (
-                    <button
-                      key={prod.id}
-                      type="button"
-                      onClick={() => handleAddProductFromCatalog(prod)}
-                      className="p-1.5 bg-stone-50 hover:bg-amber-100/70 border border-stone-200 rounded-lg text-left text-xs transition-colors flex items-center justify-between gap-1 group cursor-pointer"
-                    >
-                      <span className="truncate font-bold text-stone-800 group-hover:text-amber-950">
-                        {prod.name}
-                      </span>
-                      <span className="font-black text-amber-900 shrink-0">
-                        {formatCurrency(prod.price)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -1675,88 +1715,38 @@ export default function CreateOrderModal({
             </div>
           </div>
 
-          {/* PASO 5: DAR ACCESO A LA COMPRA (CONFIRMACIÓN FINAL PARA VALIDAR) */}
-          <div className="bg-stone-900 text-white rounded-2xl p-4 sm:p-5 border-2 border-emerald-500/80 shadow-xl space-y-3.5">
-            <div className="flex items-center justify-between pb-2 border-b border-stone-800">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-emerald-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
-                  5
-                </span>
-                <h3 className="font-black text-sm uppercase tracking-wide text-white">
-                  5. Dar Acceso a la Compra
-                </h3>
-              </div>
-              <span className="text-[11px] font-bold text-emerald-400">Paso Final de Confirmación</span>
-            </div>
-
-            {/* Resumen de validación rápida */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
-                <span className="text-[10px] text-stone-400 block">Cliente:</span>
-                <span className="font-black text-stone-100 truncate block">
-                  {customerName.trim() || "⚠️ Sin cliente"}
-                </span>
-                {!isCustomerInCatalog && customerName.trim() && (
-                  <span className="text-[9px] text-emerald-400 font-bold block truncate">
-                    {saveCustomerDecision === "yes" ? "+ Añadir a catálogo" : "Solo este pedido"}
-                  </span>
-                )}
-              </div>
-
-              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
-                <span className="text-[10px] text-stone-400 block">Entrega:</span>
-                <span className="font-black text-stone-100 truncate block">
-                  {deliveryDate} ({deliveryTime})
-                </span>
-                <span className="text-[9px] text-amber-300 font-bold block truncate">
-                  {deliveryType === "sucursal" ? selectedPickupBranch?.name : "A Domicilio"}
-                </span>
-              </div>
-
-              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
-                <span className="text-[10px] text-stone-400 block">Total:</span>
-                <span className="font-black text-amber-400 text-sm font-mono block">
-                  {formatCurrency(total)}
-                </span>
-              </div>
-
-              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
-                <span className="text-[10px] text-stone-400 block">Anticipo:</span>
-                <span className={`font-black text-sm font-mono block ${isDepositValid ? "text-emerald-400" : "text-amber-400"}`}>
-                  {formatCurrency(numericDeposit)}
-                </span>
-                <span className={`text-[9px] font-bold block truncate ${isDepositValid ? "text-emerald-400" : "text-amber-400"}`}>
-                  {isDepositValid ? `✓ Mínimo 50% cubierto` : `⚠️ Mínimo ${formatCurrency(minRequiredDeposit)}`}
-                </span>
-              </div>
-            </div>
-
-            {/* BOTÓN DEFINITIVO DE VALIDACIÓN */}
-            <div className="flex justify-center pt-1">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`w-full sm:w-auto sm:min-w-[220px] py-2 sm:py-2.5 px-6 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  isSubmitting
-                    ? "bg-stone-700 text-stone-400 cursor-wait shadow-none"
-                    : !isReadyToConfirm
-                    ? "bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 shadow-sm"
-                    : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/40 active:scale-95"
-                }`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="text-xs">⏳</span>
-                    <span>Confirmando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 text-emerald-400" />
-                    <span>Confirmar Compra</span>
-                  </>
-                )}
-              </button>
-            </div>
+          {/* BOTÓN DEFINITIVO: CONFIRMAR COMPRA */}
+          <div className="flex flex-col-reverse sm:flex-row items-center sm:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-stone-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full sm:w-auto py-2 sm:py-2.5 px-5 rounded-xl text-xs sm:text-sm font-bold text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-stone-300 transition-all cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`w-full sm:w-auto py-2 sm:py-2.5 px-6 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                isSubmitting
+                  ? "bg-stone-400 text-stone-200 cursor-wait shadow-none"
+                  : !isReadyToConfirm
+                  ? "bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 shadow-sm"
+                  : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/30 active:scale-95"
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="text-xs">⏳</span>
+                  <span>Confirmando...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 text-emerald-300" />
+                  <span>Confirmar Compra</span>
+                </>
+              )}
+            </button>
           </div>
         </form>
       </div>
