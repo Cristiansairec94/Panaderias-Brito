@@ -42,6 +42,7 @@ export const metadata: Metadata = {
 };
 
 import { SyncProvider } from "@/context/SyncContext";
+import { BranchProvider } from "@/context/BranchContext";
 
 export default function RootLayout({
   children,
@@ -61,11 +62,13 @@ export default function RootLayout({
       <body className="antialiased font-sans">
         <AuthProvider>
           <SyncProvider>
-            <NotificationProvider>
-              <AppLayout>
-                {children}
-              </AppLayout>
-            </NotificationProvider>
+            <BranchProvider>
+              <NotificationProvider>
+                <AppLayout>
+                  {children}
+                </AppLayout>
+              </NotificationProvider>
+            </BranchProvider>
           </SyncProvider>
         </AuthProvider>
       </body>
