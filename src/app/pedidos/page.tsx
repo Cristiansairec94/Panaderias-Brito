@@ -496,25 +496,44 @@ export default function PedidosPage() {
     return list;
   }, [filteredOrders, todayStr, currentMinutes]);
 
-  // Handler para los 4 cuadros KPI principales: activa el filtro y vuelve al inicio del catálogo sin desfasar la cabecera
-  const handleSelectKPICard = (key: OrderClassificationKey) => {
-    if (classificationFilter === key) {
-      setClassificationFilter("all");
-    } else {
-      setClassificationFilter(key);
-      setSearchQuery("");
-      if (dateFilter !== "all") setDateFilter("all");
-      if (paymentFilter !== "all") setPaymentFilter("all");
-      if (statusFilter !== "all") setStatusFilter("all");
-      setIsClassificationOpen(true);
+  // Desplazamiento inteligente para llevar directamente a la lista de pedidos al tocar cualquier cuadro
+  const scrollToCatalog = () => {
+    setTimeout(() => {
+      const target = document.getElementById("catalog-results-section");
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      const mainEl = document.querySelector("main");
+      if (mainEl && target) {
+        const rect = target.getBoundingClientRect();
+        const mainRect = mainEl.getBoundingClientRect();
+        const targetTop = rect.top - mainRect.top + mainEl.scrollTop;
+        mainEl.scrollTo({ top: Math.max(0, targetTop - 6), behavior: "smooth" });
+      }
       catalogScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    }, 60);
   };
 
-  // Handler que activa la clasificación y vuelve al inicio del catálogo sin desplazar la pantalla
+  // Handler para los 4 cuadros KPI principales: activa el filtro y lleva directamente a ver los pedidos correspondientes
+  const handleSelectKPICard = (key: OrderClassificationKey) => {
+    setClassificationFilter(key);
+    setSearchQuery("");
+    if (dateFilter !== "all") setDateFilter("all");
+    if (paymentFilter !== "all") setPaymentFilter("all");
+    if (statusFilter !== "all") setStatusFilter("all");
+    setIsClassificationOpen(true);
+    scrollToCatalog();
+  };
+
+  // Handler que activa la clasificación y lleva directamente a la lista de pedidos
   const handleSelectClassificationCard = (key: OrderClassificationKey) => {
-    setClassificationFilter((prev) => (prev === key ? "all" : key));
-    catalogScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    setClassificationFilter((prev) => {
+      const next = prev === key ? "all" : key;
+      if (next !== "all") {
+        scrollToCatalog();
+      }
+      return next;
+    });
   };
 
   // Handlers for quick actions
@@ -1176,37 +1195,41 @@ export default function PedidosPage() {
               </button>
             </div>
 
-            {/* Switcher Formato Lista vs Cuadrícula para Productos */}
-            {viewMode === "productos" && (
-              <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setProductLayout("lista")}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    productLayout === "lista"
-                      ? "bg-white text-stone-900 shadow-2xs font-black"
-                      : "text-stone-500 hover:text-stone-900"
-                  }`}
-                  title="Ver en formato de lista compacta y alineada"
-                >
-                  <List className="w-3.5 h-3.5 text-amber-600" />
-                  <span>En Lista</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProductLayout("cuadricula")}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    productLayout === "cuadricula"
-                      ? "bg-white text-stone-900 shadow-2xs font-black"
-                      : "text-stone-500 hover:text-stone-900"
-                  }`}
-                  title="Ver en cuadrícula de tarjetas"
-                >
-                  <LayoutGrid className="w-3.5 h-3.5 text-stone-600" />
-                  <span>Cuadrícula</span>
-                </button>
-              </div>
-            )}
+            {/* Switcher Formato Lista vs Cuadrícula: SIEMPRE DISPONIBLE Y SELECCIONABLE */}
+            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode("productos");
+                  setProductLayout("lista");
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === "productos" && productLayout === "lista"
+                    ? "bg-white text-stone-900 shadow-2xs font-black ring-1 ring-stone-200"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+                }`}
+                title="Ver productos en formato de lista compacta y alineada"
+              >
+                <List className="w-3.5 h-3.5 text-amber-600" />
+                <span>En Lista</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode("productos");
+                  setProductLayout("cuadricula");
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === "productos" && productLayout === "cuadricula"
+                    ? "bg-white text-stone-900 shadow-2xs font-black ring-1 ring-stone-200"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-stone-200/60"
+                }`}
+                title="Ver productos en cuadrícula de tarjetas"
+              >
+                <LayoutGrid className="w-3.5 h-3.5 text-stone-600" />
+                <span>Cuadrícula</span>
+              </button>
+            </div>
           </div>
 
           {/* Estado de Vinculación en Tiempo Real con Celulares */}
