@@ -25,7 +25,8 @@ import {
   Sparkles,
   MessageCircle,
   Truck,
-  AlertTriangle
+  AlertTriangle,
+  Trash2
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -39,6 +40,7 @@ interface OrderDetailModalProps {
   onOpenEdit?: (order: CustomOrder) => void;
   onAdvanceStatus?: (order: CustomOrder) => void;
   onSendWhatsApp?: (order: CustomOrder) => void;
+  onDarDeBaja?: (order: CustomOrder) => void;
 }
 
 export default function OrderDetailModal({
@@ -50,6 +52,7 @@ export default function OrderDetailModal({
   onOpenEdit,
   onAdvanceStatus,
   onSendWhatsApp,
+  onDarDeBaja,
 }: OrderDetailModalProps) {
   if (!isOpen || !order) return null;
 
@@ -457,6 +460,19 @@ export default function OrderDetailModal({
               >
                 <Edit3 className="w-3.5 h-3.5 text-stone-600" />
                 <span>Editar</span>
+              </button>
+            )}
+
+            {/* Botón Dar de Baja (en rojo) */}
+            {onDarDeBaja && (
+              <button
+                type="button"
+                onClick={() => onDarDeBaja(order)}
+                className="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-rose-300/40"
+                title="Dar de baja este pedido"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Dar de baja</span>
               </button>
             )}
           </div>

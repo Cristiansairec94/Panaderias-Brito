@@ -486,6 +486,32 @@ export default function PedidosPage() {
     }
   };
 
+  const handleDarDeBaja = (order: CustomOrder) => {
+    const isCancelled = order.status === "cancelado";
+    const confirmMsg = isCancelled
+      ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro y no se podrá recuperar.`
+      : `¿Estás seguro de DAR DE BAJA el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEl pedido se marcará como cancelado y se quitará de los pedidos activos y entregas de mostrador.`;
+
+    if (confirm(confirmMsg)) {
+      if (isCancelled) {
+        deleteCustomOrder(order.id);
+      } else {
+        updateOrderStatus(order.id, "cancelado");
+      }
+      loadOrders();
+      setSelectedOrderForDetail(null);
+      addNotification({
+        title: isCancelled ? "Pedido Eliminado" : "Pedido Dado de Baja",
+        description: `El pedido ${order.orderNumber} ha sido ${isCancelled ? "eliminado permanentemente" : "dado de baja exitosamente"}.`,
+        senderName: "Control de Pedidos",
+        senderAvatar: "🗑️",
+        highlightText: order.orderNumber,
+        category: "pedidos",
+        badgeIcon: "pastel",
+      });
+    }
+  };
+
   const handleSendWhatsApp = (order: CustomOrder) => {
     const cleanPhone = order.phone.replace(/\D/g, "");
     const formattedPhone = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
@@ -2131,6 +2157,9 @@ export default function PedidosPage() {
         }}
         onSendWhatsApp={(o) => {
           handleSendWhatsApp(o);
+        }}
+        onDarDeBaja={(o) => {
+          handleDarDeBaja(o);
         }}
       />
     </div>
