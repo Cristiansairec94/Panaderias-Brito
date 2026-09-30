@@ -296,7 +296,7 @@ export default function CajaPage() {
   const [selectedCutForDetail, setSelectedCutForDetail] = useState<ShiftCutRecord | null>(null);
 
   // Filters for history
-  const [filterPeriod, setFilterPeriod] = useState<"dia" | "mes" | "ano" | "todos">("dia");
+  const [filterPeriod, setFilterPeriod] = useState<"dia" | "mes" | "ano" | "todos">("todos");
   const [selectedDayDate, setSelectedDayDate] = useState<string>(() => formatLocalDate());
   const [selectedMonthStr, setSelectedMonthStr] = useState<string>(() => formatLocalMonth());
   const [selectedYearStr, setSelectedYearStr] = useState<string>(() => new Date().getFullYear().toString());
@@ -709,6 +709,11 @@ export default function CajaPage() {
       diffCutsCount,
     };
   }, [filteredCuts]);
+
+  // Latest Cut for quick preview in empty state
+  const latestCut = useMemo(() => {
+    return cutsHistory.length > 0 ? cutsHistory[0] : null;
+  }, [cutsHistory]);
 
   // Export History to CSV
   const handleExportCSV = () => {
@@ -1815,43 +1820,160 @@ export default function CajaPage() {
           </div>
 
           {/* Tabla / Listado de Cortes */}
-          <div className="bg-white rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+          <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+            {/* Header del Bloque de Cortes */}
+            <div className="p-4 sm:p-5 border-b border-stone-100 bg-stone-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black shadow-xs shrink-0">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-black text-sm sm:text-base text-stone-900">
+                      Comprobantes y Cortes Registrados
+                    </h3>
+                    <span className="bg-amber-100 text-amber-950 font-black text-[10px] px-2.5 py-0.5 rounded-full border border-amber-300">
+                      {filteredCuts.length} {filteredCuts.length === 1 ? "corte" : "cortes"}
+                    </span>
+                    {filterPeriod !== "todos" && (
+                      <span className="bg-stone-200/80 text-stone-700 font-extrabold text-[10px] px-2 py-0.5 rounded-md">
+                        {filterPeriod === "dia" ? `Día: ${selectedDayDate}` :
+                         filterPeriod === "mes" ? `Mes: ${selectedMonthStr}` : `Año: ${selectedYearStr}`}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-stone-500 font-medium mt-0.5">
+                    {filterPeriod === "dia"
+                      ? `Auditoría del día ${selectedDayDate} • Registros de turno oficial`
+                      : filterPeriod === "mes"
+                      ? `Auditoría acumulada del mes ${selectedMonthStr}`
+                      : filterPeriod === "ano"
+                      ? `Auditoría consolidada del año ${selectedYearStr}`
+                      : `Histórico completo (${cutsHistory.length} cortes archivados)`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Botones de acción rápida en cabecera */}
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                {filterPeriod !== "todos" && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterPeriod("todos")}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs border border-stone-200 shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5"
+                    title="Ver todos los cortes archivados"
+                  >
+                    <span>📂 Ver Todos ({cutsHistory.length})</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleOpenCorteModal}
+                  className="px-3.5 py-1.5 rounded-xl bg-stone-900 hover:bg-black text-amber-400 font-black text-xs shadow-xs transition-transform active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>+ Nuevo Corte</span>
+                </button>
+              </div>
+            </div>
+
             {filteredCuts.length === 0 ? (
-              <div className="p-12 text-center space-y-3">
-                <div className="text-5xl">📜</div>
-                <h4 className="font-black text-base text-stone-800">No se encontraron cortes de caja</h4>
-                <p className="text-xs text-stone-500 max-w-md mx-auto">
-                  {filterPeriod !== "todos" || searchQuery || !isAllResponsiblesSelected || selectedResponsibles.includes("__none__") || filterStatus !== "all"
-                    ? "Ningún corte coincide con el período o filtros seleccionados. Puedes cambiar de fecha, mes o ver todos los registros."
-                    : "No hay registros de cortes de caja archivados aún."}
-                </p>
-                <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+              <div className="py-10 px-4 sm:px-8 text-center space-y-4 max-w-xl mx-auto">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center mx-auto shadow-2xs">
+                  <Receipt className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200">
+                    Sin cortes para este filtro
+                  </span>
+                  <h4 className="font-black text-base text-stone-900 mt-2">
+                    {filterPeriod === "dia" 
+                      ? `No hay cortes registrados para el día ${selectedDayDate}` 
+                      : filterPeriod === "mes" 
+                      ? `No hay cortes registrados para el mes ${selectedMonthStr}`
+                      : "No se encontraron cortes de caja"}
+                  </h4>
+                  <p className="text-xs text-stone-500 max-w-md mx-auto mt-1">
+                    {filterPeriod === "dia"
+                      ? "El turno actual continúa abierto o aún no se ha generado el corte de hoy. Puedes ver los comprobantes anteriores o realizar el corte oficial de tu turno."
+                      : "Ningún corte coincide con los filtros o la búsqueda seleccionada. Puedes restablecer los filtros para ver todos los comprobantes."}
+                  </p>
+                </div>
+
+                {/* Botones de acción rápida */}
+                <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
                   {filterPeriod !== "todos" && (
                     <button
+                      type="button"
                       onClick={() => setFilterPeriod("todos")}
-                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 font-black rounded-xl text-xs transition-colors shadow-xs cursor-pointer"
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black rounded-xl text-xs transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                     >
-                      Ver Todos los Cortes ({cutsHistory.length})
+                      <span>📂 Ver Histórico Completo ({cutsHistory.length})</span>
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={handleOpenCorteModal}
+                    className="px-4 py-2 bg-stone-900 hover:bg-black text-white font-bold rounded-xl text-xs transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Realizar Corte de Turno</span>
+                  </button>
                   {(searchQuery || !isAllResponsiblesSelected || selectedResponsibles.includes("__none__") || filterStatus !== "all") && (
                     <button
+                      type="button"
                       onClick={() => {
                         setSearchQuery("");
                         setSelectedResponsibles([]);
                         setFilterStatus("all");
                       }}
-                      className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                      className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
                     >
                       Restablecer Filtros
                     </button>
                   )}
                 </div>
+
+                {/* Tarjeta de Acceso al Último Corte Registrado */}
+                {latestCut && (
+                  <div className="pt-2">
+                    <div 
+                      onClick={() => setSelectedCutForDetail(latestCut)}
+                      className="p-3.5 bg-stone-50 hover:bg-amber-50/80 rounded-2xl border border-stone-200 hover:border-amber-300 transition-all text-left flex items-center justify-between gap-3 cursor-pointer shadow-2xs group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-white border border-stone-200 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
+                          🧾
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide block">
+                            Último corte archivado en sistema:
+                          </span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <strong className="text-xs font-black text-stone-900">{latestCut.id}</strong>
+                            <span className="text-[11px] text-stone-500 font-medium">({latestCut.date})</span>
+                            <span className="text-[10px] bg-amber-100 text-amber-950 font-black px-1.5 py-0.2 rounded">
+                              {latestCut.responsible || latestCut.outgoingCashier}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-black text-emerald-700 block">
+                          {formatCurrency(latestCut.countedCash)}
+                        </span>
+                        <span className="text-[10px] text-amber-800 font-bold group-hover:underline">
+                          Ver Ticket ➔
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[640px] overflow-y-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-stone-50 text-stone-500 font-black border-b border-stone-200 uppercase tracking-wider text-[10px]">
+                  <thead className="sticky top-0 bg-stone-50/95 backdrop-blur-xs text-stone-500 font-black border-b border-stone-200 uppercase tracking-wider text-[10px] z-10 shadow-2xs">
                     <tr>
                       <th className="p-4">Folio & Fecha</th>
                       <th className="p-4">Responsable del Turno</th>
@@ -1984,6 +2106,20 @@ export default function CajaPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Footer de Resumen cuando hay registros */}
+            {filteredCuts.length > 0 && (
+              <div className="p-3.5 bg-stone-50 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-stone-500">
+                <div className="flex items-center gap-2">
+                  <span>Mostrando <strong className="text-stone-800">{filteredCuts.length}</strong> de {cutsHistory.length} comprobantes</span>
+                  <span className="text-stone-300">•</span>
+                  <span className="text-[11px] text-stone-400">Total ventas auditadas: <strong className="text-stone-700">{formatCurrency(auditMetrics.totalSalesAudit)}</strong></span>
+                </div>
+                <span className="text-[11px] text-stone-400">
+                  Haz clic sobre cualquier fila o en <strong>"Reimprimir"</strong> para ver el comprobante oficial
+                </span>
               </div>
             )}
           </div>
