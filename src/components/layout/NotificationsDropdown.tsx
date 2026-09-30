@@ -18,9 +18,14 @@ import {
   AlertTriangle,
   ArrowRight,
   Inbox,
-  X
+  X,
+  Clock,
+  Wallet,
+  Receipt,
+  ShieldCheck
 } from "lucide-react";
-import { useNotifications, FBNotification } from "@/context/NotificationContext";
+import { useNotifications, FBNotification, findShiftCutForNotification } from "@/context/NotificationContext";
+import { formatCurrency } from "@/lib/utils";
 
 // Graphic illustration for Flour Sack matching user mockup
 function FlourSackGraphic({ className = "w-10 h-10" }: { className?: string }) {
@@ -460,6 +465,7 @@ function NotificationCardItem({
   setActiveItemMenu: (id: string | null) => void;
   onCloseDropdown: () => void;
 }) {
+  const { openOrderDetail, openOrderPayment, openShiftCutDetail } = useNotifications();
   const isMenuOpen = activeItemMenu === notif.id;
 
   const isShiftCut =
@@ -470,8 +476,11 @@ function NotificationCardItem({
     notif.category === "pedidos" ||
     notif.title.toLowerCase().includes("pedido");
 
+  const cutData = isShiftCut ? findShiftCutForNotification(notif) : null;
+
   const fullText = `${notif.title} ${notif.highlightText} ${notif.description}`.toLowerCase();
   const isSquare =
+    cutData?.difference === 0 ||
     fullText.includes("cuadrada exacta") ||
     fullText.includes("cuadró exacta") ||
     fullText.includes("cuadro exacta") ||
@@ -480,16 +489,28 @@ function NotificationCardItem({
     fullText.includes("($0.00)") ||
     notif.title.includes("✓");
   const isShort =
+    (cutData && cutData.difference < 0) ||
     fullText.includes("faltante") ||
     fullText.includes("no cuadró") ||
     fullText.includes("no cuadro") ||
     notif.title.includes("🚨");
-  const isOver = !isShort && (fullText.includes("sobrante"));
+  const isOver = !isShort && ((cutData && cutData.difference > 0) || fullText.includes("sobrante"));
 
   return (
     <div
-      onClick={() => markAsRead(notif.id)}
-      className="bg-white rounded-2xl border border-[#eee6dd] p-4 shadow-xs space-y-2.5 relative group transition-all"
+      onClick={() => {
+        markAsRead(notif.id);
+        if (isOrder) {
+          onCloseDropdown();
+          openOrderDetail(notif);
+        } else if (isShiftCut) {
+          onCloseDropdown();
+          openShiftCutDetail(notif);
+        }
+      }}
+      className={`bg-white rounded-2xl border border-[#eee6dd] p-4 shadow-xs space-y-2.5 relative group transition-all ${
+        isOrder || isShiftCut ? "cursor-pointer hover:border-amber-400 hover:shadow-md" : ""
+      }`}
     >
       {/* Top Header Tag: Status Pill + Time */}
       <div className="flex items-center justify-between gap-2 flex-wrap pb-1.5 border-b border-stone-100">
@@ -572,7 +593,7 @@ function NotificationCardItem({
                 e.stopPropagation();
                 setActiveItemMenu(isMenuOpen ? null : notif.id);
               }}
-              className="w-6 h-6 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 flex items-center justify-center transition-colors"
+              className="w-6 h-6 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 flex items-center justify-center transition-colors cursor-pointer"
               title="Opciones de notificación"
             >
               <MoreHorizontal className="w-3.5 h-3.5" />
@@ -622,10 +643,220 @@ function NotificationCardItem({
         </div>
       </div>
 
+      {/* Shift Cut Detailed Card: Horario, Con cuánto dinero se quedó en caja, Dictamen de cuadre / Faltante / Sobrante */}
+      {isShiftCut && cutData && (
+        <div className="bg-[#fcfaf7] border border-[#ebe1d5] rounded-2xl p-3 sm:p-3.5 space-y-2.5 text-xs shadow-2xs">
+          {/* 1. HORARIO DEL TURNO & RELEVO */}
+          <div className="flex items-center justify-between gap-2 border-b border-stone-200/80 pb-2">
+            <div className="flex items-center gap-1.5 font-bold text-stone-800">
+              <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-800 flex items-center justify-center text-xs shrink-0">
+                ⏰
+              </span>
+              <span>
+                Horario de Turno:{" "}
+                <span className="text-amber-950 font-black">{cutData.shiftRange}</span>
+              </span>
+            </div>
+            <div className="text-[11px] font-semibold text-stone-500 truncate" title={`${cutData.outgoingCashier} ➔ ${cutData.incomingCashier}`}>
+              {cutData.outgoingCashier} ➔ {cutData.incomingCashier}
+            </div>
+          </div>
+
+          {/* 2. CON CUÁNTO DINERO SE QUEDÓ EN LA CAJA */}
+          <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-amber-50 to-orange-50/60 border border-amber-200/80 rounded-xl px-3 py-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-900 flex items-center justify-center font-bold shrink-0">
+                <Wallet className="w-4 h-4 text-amber-700" />
+              </div>
+              <div>
+                <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider block leading-tight">
+                  Dinero que se quedó en caja
+                </span>
+                <span className="text-xs font-bold text-stone-700">
+                  Fondo para el siguiente turno
+                </span>
+              </div>
+            </div>
+            <span className="text-sm sm:text-base font-black text-amber-950 tabular-nums">
+              {formatCurrency(cutData.nextFund ?? 0)}
+            </span>
+          </div>
+
+          {/* 3. DICTAMEN DE CUADRE: EXACTO, FALTANTE O SOBRANTE */}
+          <div
+            className={`p-2.5 sm:p-3 rounded-xl border flex flex-col gap-1.5 transition-all ${
+              cutData.difference === 0
+                ? "bg-emerald-50/90 border-emerald-300 text-emerald-950"
+                : cutData.difference < 0
+                ? "bg-rose-50 border-rose-300 text-rose-950"
+                : "bg-amber-50 border-amber-300 text-amber-950"
+            }`}
+          >
+            <div className="flex items-center justify-between font-black gap-2">
+              <span className="flex items-center gap-1.5 text-xs sm:text-[13px]">
+                {cutData.difference === 0 ? (
+                  <>
+                    <CheckCheck className="w-4 h-4 text-emerald-600 stroke-[2.5] shrink-0" />
+                    <span className="text-emerald-800">✓ CAJA CUADRADA EXACTA</span>
+                  </>
+                ) : cutData.difference < 0 ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-rose-600 stroke-[2.5] shrink-0" />
+                    <span className="text-rose-700">🚨 NO CUADRÓ • FALTÓ DINERO EN CAJA</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-amber-600 stroke-[2.5] shrink-0" />
+                    <span className="text-amber-800">⚠️ NO CUADRÓ • SOBRÓ DINERO EN CAJA</span>
+                  </>
+                )}
+              </span>
+
+              <span
+                className={`text-xs sm:text-sm font-black tabular-nums px-2 py-0.5 rounded-lg shrink-0 ${
+                  cutData.difference === 0
+                    ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                    : cutData.difference < 0
+                    ? "bg-rose-100 text-rose-900 border border-rose-300"
+                    : "bg-amber-100 text-amber-900 border border-amber-300"
+                }`}
+              >
+                {cutData.difference === 0
+                  ? "$0.00 MXN"
+                  : cutData.difference < 0
+                  ? `Faltante: ${formatCurrency(cutData.difference)}`
+                  : `Sobrante: +${formatCurrency(cutData.difference)}`}
+              </span>
+            </div>
+
+            {/* Comparativa: Esperado vs Físico Contado */}
+            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-current/15 opacity-90 font-medium">
+              <span>
+                Efectivo esperado: <strong className="font-bold">{formatCurrency(cutData.expectedCash)}</strong>
+              </span>
+              <span>
+                Físico contado: <strong className="font-bold">{formatCurrency(cutData.countedCash)}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* 4. EFECTIVO RETIRADO / ENTREGADO */}
+          {cutData.countedCash > (cutData.nextFund ?? 0) && (
+            <div className="flex items-center justify-between text-[11px] text-stone-600 px-1 pt-0.5">
+              <span>Efectivo entregado a Don Toño / Saliente:</span>
+              <strong className="text-stone-900 font-bold tabular-nums">
+                {formatCurrency(Math.max(0, cutData.countedCash - (cutData.nextFund ?? 0)))}
+              </strong>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action Buttons */}
-      {notif.secondaryActionLabel ? (
+      {isShiftCut ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            markAsRead(notif.id);
+            onCloseDropdown();
+            openShiftCutDetail(notif);
+          }}
+          className="w-full bg-[#c25425] hover:bg-[#a8441b] text-white font-black text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer active:scale-98"
+        >
+          <span>Ver Corte de Caja</span>
+          <span className="text-sm font-bold leading-none">➔</span>
+        </button>
+      ) : notif.secondaryActionLabel ? (
         /* Dual action buttons matching Card 2 in user mockup */
         <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+          {isOrder ? (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  markAsRead(notif.id);
+                  onCloseDropdown();
+                  const label = (notif.actionLabel || "").toLowerCase();
+                  if (label.includes("cobrar") || label.includes("pagar")) {
+                    openOrderPayment(notif);
+                  } else {
+                    openOrderDetail(notif);
+                  }
+                }}
+                className="bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate cursor-pointer active:scale-95"
+              >
+                {notif.actionLabel || "Ver Detalle"}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  markAsRead(notif.id);
+                  onCloseDropdown();
+                  openOrderDetail(notif);
+                }}
+                className="bg-[#fdfbf9] border border-[#c25425] text-[#c25425] hover:bg-[#faeee6] font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate cursor-pointer active:scale-95"
+              >
+                {notif.secondaryActionLabel === "Ver Pedidos" || notif.secondaryActionLabel === "Ver Pedido"
+                  ? "Ver Detalle"
+                  : notif.secondaryActionLabel}
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href={notif.actionLink || "#"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  markAsRead(notif.id);
+                  onCloseDropdown();
+                }}
+                className="bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate"
+              >
+                {notif.actionLabel}
+              </Link>
+              <Link
+                href={notif.secondaryActionLink || "#"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  markAsRead(notif.id);
+                  onCloseDropdown();
+                }}
+                className="bg-[#fdfbf9] border border-[#c25425] text-[#c25425] hover:bg-[#faeee6] font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate"
+              >
+                {notif.secondaryActionLabel}
+              </Link>
+            </>
+          )}
+        </div>
+      ) : notif.actionLabel ? (
+        /* Single full-width action button matching Card 1 in user mockup */
+        isOrder ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              markAsRead(notif.id);
+              onCloseDropdown();
+              const label = (notif.actionLabel || "").toLowerCase();
+              if (label.includes("cobrar") || label.includes("pagar")) {
+                openOrderPayment(notif);
+              } else {
+                openOrderDetail(notif);
+              }
+            }}
+            className="w-full bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer active:scale-98"
+          >
+            <span>
+              {notif.actionLabel === "Ver Pedidos" || notif.actionLabel === "Ver Pedido"
+                ? "Ver Detalle del Pedido"
+                : notif.actionLabel}
+            </span>
+            <span className="text-sm font-bold leading-none">➔</span>
+          </button>
+        ) : (
           <Link
             href={notif.actionLink || "#"}
             onClick={(e) => {
@@ -633,36 +864,12 @@ function NotificationCardItem({
               markAsRead(notif.id);
               onCloseDropdown();
             }}
-            className="bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate"
+            className="w-full bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors"
           >
-            {notif.actionLabel}
+            <span>{notif.actionLabel}</span>
+            <span className="text-sm font-bold leading-none">➔</span>
           </Link>
-          <Link
-            href={notif.secondaryActionLink || "#"}
-            onClick={(e) => {
-              e.stopPropagation();
-              markAsRead(notif.id);
-              onCloseDropdown();
-            }}
-            className="bg-[#fdfbf9] border border-[#c25425] text-[#c25425] hover:bg-[#faeee6] font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate"
-          >
-            {notif.secondaryActionLabel}
-          </Link>
-        </div>
-      ) : notif.actionLabel ? (
-        /* Single full-width action button matching Card 1 in user mockup */
-        <Link
-          href={notif.actionLink || "#"}
-          onClick={(e) => {
-            e.stopPropagation();
-            markAsRead(notif.id);
-            onCloseDropdown();
-          }}
-          className="w-full bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors"
-        >
-          <span>{notif.actionLabel}</span>
-          <span className="text-sm font-bold leading-none">➔</span>
-        </Link>
+        )
       ) : null}
     </div>
   );

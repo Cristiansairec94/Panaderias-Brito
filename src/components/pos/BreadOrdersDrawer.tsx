@@ -221,16 +221,20 @@ export default function BreadOrdersDrawer({
 
     // Notificación en vivo para todos los dispositivos y dueños
     try {
+      const remaining = newOrder.remainingBalance || 0;
       addNotification({
         senderName: `🎂 Pedido Registrado (${branchName || "Mostrador"})`,
         senderAvatar: "🎂",
         badgeIcon: "pastel",
         title: `Nuevo Pedido ${newOrder.orderNumber}: Total ${formatCurrency(newOrder.total)}`,
         highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(newOrder.deposit)}`,
-        description: `${newOrder.description}. Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs (${newOrder.deliveryType === "domicilio" ? `A domicilio: ${newOrder.deliveryAddress}` : `Recoge en ${newOrder.branchName || branchName || "Sucursal"}`}). Saldo restante: ${formatCurrency(newOrder.remainingBalance)}.`,
+        description: `${newOrder.description}. Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs (${newOrder.deliveryType === "domicilio" ? `A domicilio: ${newOrder.deliveryAddress}` : `Recoge en ${newOrder.branchName || branchName || "Sucursal"}`}). Saldo restante: ${formatCurrency(remaining)}.`,
         category: "pedidos",
-        actionLabel: "Ver Pedidos",
+        orderId: newOrder.id,
+        actionLabel: remaining > 0 ? `Cobrar ${formatCurrency(remaining)}` : "Ver Detalle",
         actionLink: "/pedidos",
+        secondaryActionLabel: remaining > 0 ? "Ver Detalle" : undefined,
+        secondaryActionLink: remaining > 0 ? "/pedidos" : undefined,
       });
     } catch (e) {
       console.warn("Could not fire order notification:", e);
@@ -281,7 +285,8 @@ export default function BreadOrdersDrawer({
           highlightText: `${order.customerName} - 100% Pagado`,
           description: `Se liquidó el saldo pendiente de ${formatCurrency(order.remainingBalance)} vía ${liquidationPaymentMethod}. Pedido: ${order.description}. Entregado al cliente.`,
           category: "pedidos",
-          actionLabel: "Ver Pedido",
+          orderId: order.id,
+          actionLabel: "Ver Detalle",
           actionLink: "/pedidos",
         });
       } catch (e) {}

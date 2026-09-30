@@ -876,16 +876,20 @@ export default function CreateOrderModal({
 
       // 4. NOTIFICACIÓN AUDITIVA Y VISUAL CON CHIME Y BANNER (CON RESGUARDO)
       try {
+        const remaining = newOrder.remainingBalance || 0;
         addNotification({
           senderName: `🎂 Pedido Apartado (${finalPickupBranch?.name || "Sucursal"})`,
           senderAvatar: "🎂",
           badgeIcon: "pastel",
-          title: `Nuevo Pedido ${newOrder.orderNumber}`,
+          title: `Nuevo Pedido ${newOrder.orderNumber}: Total ${formatCurrency(newOrder.total)}`,
           highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(numericDeposit)}`,
-          description: `${newOrder.description}. ${deliveryType === "sucursal" ? `Recoge en: ${finalPickupBranch?.name}. ` : "Entrega a domicilio. "}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(newOrder.remainingBalance)}.`,
+          description: `${newOrder.description}. ${deliveryType === "sucursal" ? `Recoge en: ${finalPickupBranch?.name}. ` : "Entrega a domicilio. "}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(remaining)}.`,
           category: "pedidos",
-          actionLabel: "Ver Pedidos",
+          orderId: newOrder.id,
+          actionLabel: remaining > 0 ? `Cobrar ${formatCurrency(remaining)}` : "Ver Detalle",
           actionLink: "/pedidos",
+          secondaryActionLabel: remaining > 0 ? "Ver Detalle" : undefined,
+          secondaryActionLink: remaining > 0 ? "/pedidos" : undefined,
         });
       } catch (notifErr) {
         console.warn("Could not fire notification:", notifErr);

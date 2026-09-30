@@ -449,6 +449,28 @@ export default function CajaPage() {
 
   useEffect(() => {
     loadCutsHistory();
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      const corteIdParam = params.get("corteId");
+
+      if (tabParam === "historial" || tabParam === "turno") {
+        setActiveTab(tabParam as "historial" | "turno");
+      }
+
+      if (corteIdParam) {
+        try {
+          const raw = localStorage.getItem("brito_shift_cuts_history");
+          const list = raw ? JSON.parse(raw) : SAMPLE_HISTORICAL_CUTS;
+          const found = list.find((c: ShiftCutRecord) => c.id.toLowerCase() === corteIdParam.toLowerCase());
+          if (found) {
+            setSelectedCutForDetail(found);
+          }
+        } catch {}
+      }
+    }
+
     const handleSync = () => {
       loadCutsHistory();
       setInitialCash(getStoredCajaInitialFund(0));
@@ -953,8 +975,10 @@ export default function CajaPage() {
       highlightText: `Cambio de Turno: ${currentShiftResponsible} ➔ ${recipient}`,
       description: `Folio ${newFolio} archivado en historial de caja. Horario de cierre: ${closeTimeStr} hrs. Efectivo en caja: ${formatCurrency(parsedCounted)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(diff)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(withdrawnCash)}.`,
       category: "caja",
-      actionLabel: "Ver Comprobante",
-      actionLink: "/caja?tab=historial",
+      actionLabel: "Ver Corte de Caja",
+      actionLink: `/caja?tab=historial&corteId=${newCut.id}`,
+      shiftCutData: newCut,
+      cutId: newCut.id,
     });
 
     setIsCorteModalOpen(false);

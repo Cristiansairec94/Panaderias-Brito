@@ -26,6 +26,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import { useBranch } from "@/context/BranchContext";
 import { useSync } from "@/context/SyncContext";
 import { formatCurrency } from "@/lib/utils";
+import NotificationsDropdown from "./NotificationsDropdown";
 
 export default function Header() {
   const pathname = usePathname();
@@ -388,7 +389,8 @@ export default function Header() {
           <span className="tabular-nums whitespace-nowrap">{time || "Cargando..."}</span>
         </div>
 
-
+        {/* Notifications Dropdown */}
+        <NotificationsDropdown />
 
         {/* User Session Dropdown */}
         <div ref={userMenuRef} className="relative z-[110] shrink-0">

@@ -95,16 +95,20 @@ export default function OrderPaymentModal({
 
         try {
           const isFullyPaid = numericAmount >= order.remainingBalance;
+          const newRemaining = Math.max(0, order.remainingBalance - numericAmount);
           addNotification({
             senderName: `🎂 ${isFullyPaid ? "Pedido Liquidado" : "Abono Recibido"} (${operatingBranchName})`,
             senderAvatar: "🎂",
             badgeIcon: "pastel",
             title: `${isFullyPaid ? "Pedido Liquidado" : "Abono de Pedido"} ${order.orderNumber}: ${formatCurrency(numericAmount)}`,
-            highlightText: `${order.customerName} - ${isFullyPaid ? "100% Pagado" : `Resta: ${formatCurrency(Math.max(0, order.remainingBalance - numericAmount))}`}`,
-            description: `Se cobró ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isFullyPaid ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(Math.max(0, order.remainingBalance - numericAmount))}.`}`,
+            highlightText: `${order.customerName} - ${isFullyPaid ? "100% Pagado" : `Resta: ${formatCurrency(newRemaining)}`}`,
+            description: `Se cobró ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isFullyPaid ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`,
             category: "pedidos",
-            actionLabel: "Ver Pedidos",
+            orderId: order.id,
+            actionLabel: newRemaining > 0 ? `Cobrar ${formatCurrency(newRemaining)}` : "Ver Detalle",
             actionLink: "/pedidos",
+            secondaryActionLabel: newRemaining > 0 ? "Ver Detalle" : undefined,
+            secondaryActionLink: newRemaining > 0 ? "/pedidos" : undefined,
           });
         } catch (notifErr) {}
       }

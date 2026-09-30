@@ -3539,21 +3539,6 @@ export default function POSPage() {
           )}
 
 
-          {/* Botón para Apartar la charola como Pedido Especial (cualquier pan, incluso 1 sola pieza o el de menor valor) */}
-          {cart.length > 0 && (
-            <div className="pt-0.5">
-              <button
-                type="button"
-                onClick={() => handleOpenCreateOrder(true)}
-                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#881337] via-[#be123c] to-[#9a3412] hover:from-[#9f1239] hover:via-[#e11d48] hover:to-[#c2410c] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-rose-950/20 border-2 border-amber-300/80 hover:border-amber-200 cursor-pointer active:scale-98 transition-all group"
-                title="Apartar estos productos de la charola como Pedido Especial para otra fecha"
-              >
-                <Cake className="w-4 h-4 text-amber-200 group-hover:scale-110 transition-transform" />
-                <span className="truncate">🎂 Apartar como Pedido Especial ({totalPieces} {totalPieces === 1 ? "pz" : "pzs"})</span>
-                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
-              </button>
-            </div>
-          )}
 
           {/* Botones de Acción */}
           <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">

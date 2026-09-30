@@ -461,8 +461,10 @@ export default function CashDrawerShiftModal({
       highlightText: `Cambio de Turno: ${outgoingCashier} ➔ ${incomingCashier}`,
       description: `Folio ${newFolio} archivado en historial. Horario de turno: ${shiftStartTime} a ${currentTime} hrs. Efectivo en caja: ${formatCurrency(parsedCountedCash)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(cashDifference)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(cashToWithdraw)}.`,
       category: "caja",
-      actionLabel: "Consultar Historial",
-      actionLink: "/caja",
+      actionLabel: "Ver Corte de Caja",
+      actionLink: `/caja?tab=historial&corteId=${cutRecord.id}`,
+      shiftCutData: cutRecord,
+      cutId: cutRecord.id,
     });
 
     // Actualizar al nuevo cajero y turno

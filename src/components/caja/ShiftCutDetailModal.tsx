@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import Link from "next/link";
 import { 
   X, 
   Printer, 
@@ -481,20 +482,30 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
         </div>
 
         {/* Footer Modal */}
-        <div className="p-4 px-6 bg-white border-t border-stone-200 flex items-center justify-between shrink-0">
-          <button
+        <div className="p-4 px-6 bg-white border-t border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+          <Link
+            href="/caja?tab=historial"
             onClick={onClose}
-            className="px-5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl text-xs transition-colors"
+            className="text-xs font-bold text-amber-800 hover:text-amber-950 hover:underline flex items-center gap-1.5 order-2 sm:order-1 transition-colors"
           >
-            Cerrar Ventana
-          </button>
-          <button
-            onClick={handlePrint}
-            className="flex items-center gap-2 px-6 py-2.5 bg-stone-900 hover:bg-black text-white font-extrabold rounded-xl text-xs shadow-md transition-all active:scale-95"
-          >
-            <Printer className="w-4 h-4 text-amber-400" />
-            <span>🖨️ Imprimir Ticket Oficial</span>
-          </button>
+            <span>Ir a Historial Completo de Cortes de Caja</span>
+            <ArrowRight className="w-3.5 h-3.5 text-amber-600" />
+          </Link>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end order-1 sm:order-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+            >
+              Cerrar Ventana
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-5 py-2.5 bg-stone-900 hover:bg-black text-white font-extrabold rounded-xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <Printer className="w-4 h-4 text-amber-400" />
+              <span>🖨️ Imprimir Ticket Oficial</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

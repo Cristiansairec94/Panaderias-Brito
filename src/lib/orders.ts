@@ -742,8 +742,11 @@ export function addCustomOrder(data: {
       group: "recientes",
       read: false,
       category: "pedidos",
-      actionLabel: "Ver Pedido",
+      orderId: newOrder.id,
+      actionLabel: newOrder.remainingBalance > 0 ? `Cobrar $${newOrder.remainingBalance}` : "Ver Detalle",
       actionLink: "/pedidos",
+      secondaryActionLabel: newOrder.remainingBalance > 0 ? "Ver Detalle" : undefined,
+      secondaryActionLink: newOrder.remainingBalance > 0 ? "/pedidos" : undefined,
     });
   }
 
@@ -866,8 +869,11 @@ export function addOrderPayment(
       group: "recientes",
       read: false,
       category: "pedidos",
-      actionLabel: "Ver Pedido",
+      orderId: order.id,
+      actionLabel: newRemaining > 0 ? `Cobrar $${newRemaining}` : "Ver Detalle",
       actionLink: "/pedidos",
+      secondaryActionLabel: newRemaining > 0 ? "Ver Detalle" : undefined,
+      secondaryActionLink: newRemaining > 0 ? "/pedidos" : undefined,
     });
   }
 
@@ -923,7 +929,8 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       group: "recientes",
       read: false,
       category: "pedidos",
-      actionLabel: "Ver Pedido",
+      orderId: current[idx].id,
+      actionLabel: "Ver Detalle",
       actionLink: "/pedidos",
     });
   }

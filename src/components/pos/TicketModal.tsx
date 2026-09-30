@@ -419,40 +419,9 @@ export default function TicketModal({
               )}
             </div>
 
-            {/* Horarios de Pan Calientito */}
-            <div className="p-2 print:p-1 border-2 border-black rounded-xl text-center space-y-0.5 font-sans bg-white my-1.5">
-              <div className="flex items-center justify-center gap-1 text-xs sm:text-sm print:text-[11px] font-black text-black uppercase tracking-wider">
-                <span>★</span>
-                <span>¡PAN CALIENTITO RECIÉN HORNEADO!</span>
-                <span>★</span>
-              </div>
-              <p className="text-xs sm:text-sm print:text-[11px] font-black text-black">
-                🥐 De 6:00 AM a 10:00 PM 🥐
-              </p>
-              <p className="text-[10px] sm:text-xs print:text-[10px] text-black uppercase font-black">
-                Horneado continuo todos los días
-              </p>
-            </div>
-
-            {/* Pedidos Especiales y Agradecimiento */}
-            <div className="text-center pt-1.5 print:pt-1 space-y-1.5 font-sans border-t-2 border-dashed border-black">
-              <div className="space-y-0.5 border-2 border-black rounded-xl p-2 print:p-1 bg-white">
-                <p className="text-xs sm:text-sm print:text-[11px] font-black text-black uppercase tracking-wider flex items-center justify-center gap-1">
-                  <span>🎉</span>
-                  <span>¿TIENES FIESTA O EVENTO?</span>
-                  <span>🎂</span>
-                </p>
-                <p className="text-xs sm:text-sm print:text-[10.5px] font-black text-black leading-tight px-1">
-                  ¡Endulzamos tus mejores momentos! Horneamos pedidos especiales con auténtico sabor tradicional.
-                </p>
-                <div className="pt-0.5">
-                  <span className="inline-block px-2 py-0.5 bg-white text-black font-black text-[10px] sm:text-xs print:text-[10px] rounded border border-black uppercase">
-                    ✨ 50% DE ANTICIPO EN MOSTRADOR ✨
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-0.5 space-y-0.5">
+            {/* Agradecimiento y Pie de Ticket */}
+            <div className="text-center pt-2 print:pt-1 space-y-1 font-sans border-t-2 border-dashed border-black my-1">
+              <div className="space-y-0.5">
                 <p className="font-black text-black text-xs sm:text-sm print:text-[12px] tracking-wide uppercase">
                   ¡GRACIAS POR SU PREFERENCIA!
                 </p>
