@@ -624,9 +624,9 @@ export default function PedidosPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 w-full max-w-[1600px] mx-auto px-2 sm:px-4 pt-0.5 sm:pt-1 pb-16 md:pb-2 overflow-hidden">
-      {/* 1. ZONA SUPERIOR FIJA: Header, Métricas, Buscador y Paleta de Clasificación */}
-      <div className="shrink-0 space-y-1.5 sm:space-y-2">
+    <div className="flex-1 flex flex-col min-h-0 w-full max-w-[1600px] mx-auto px-2 sm:px-4 pt-0.5 sm:pt-1 pb-24 md:pb-2 lg:overflow-hidden overflow-visible">
+      {/* 1. ZONA SUPERIOR: Header, Métricas, Buscador y Paleta de Clasificación */}
+      <div className="lg:shrink-0 space-y-1.5 sm:space-y-2">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2.5">
@@ -696,8 +696,8 @@ export default function PedidosPage() {
           </div>
           <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
             {classificationFilter === "activos" ? (
-              <span className="font-black text-amber-900 flex items-center gap-1 bg-amber-100 px-2 py-0.5 rounded-md">
-                ✓ Filtro Seleccionado
+              <span className="font-black text-amber-900 flex items-center gap-1 bg-amber-100 px-2 py-0.5 rounded-md animate-pulse">
+                ✓ Viendo {metrics.activeCount} pedidos abajo ↓
               </span>
             ) : (
               <span className="font-bold text-stone-400 group-hover:text-amber-700 transition-colors flex items-center gap-1">
@@ -737,8 +737,8 @@ export default function PedidosPage() {
           </div>
           <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
             {classificationFilter === "hoy" ? (
-              <span className="font-black text-rose-900 flex items-center gap-1 bg-rose-100 px-2 py-0.5 rounded-md">
-                ✓ Filtro Seleccionado
+              <span className="font-black text-rose-900 flex items-center gap-1 bg-rose-100 px-2 py-0.5 rounded-md animate-pulse">
+                ✓ Viendo {metrics.todayCount} entregas abajo ↓
               </span>
             ) : (
               <span className="font-bold text-stone-400 group-hover:text-rose-700 transition-colors flex items-center gap-1">
@@ -778,8 +778,8 @@ export default function PedidosPage() {
           </div>
           <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
             {classificationFilter === "por_pagar" ? (
-              <span className="font-black text-emerald-900 flex items-center gap-1 bg-emerald-100 px-2 py-0.5 rounded-md">
-                ✓ Filtro Seleccionado
+              <span className="font-black text-emerald-900 flex items-center gap-1 bg-emerald-100 px-2 py-0.5 rounded-md animate-pulse">
+                ✓ Viendo pedidos por cobrar abajo ↓
               </span>
             ) : (
               <span className="font-bold text-stone-400 group-hover:text-emerald-700 transition-colors flex items-center gap-1">
@@ -819,8 +819,8 @@ export default function PedidosPage() {
           </div>
           <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
             {classificationFilter === "no_llevados" ? (
-              <span className="font-black text-blue-900 flex items-center gap-1 bg-blue-100 px-2 py-0.5 rounded-md">
-                ✓ Filtro Seleccionado
+              <span className="font-black text-blue-900 flex items-center gap-1 bg-blue-100 px-2 py-0.5 rounded-md animate-pulse">
+                ✓ Viendo {metrics.readyCount} pedidos listos abajo ↓
               </span>
             ) : (
               <span className="font-bold text-stone-400 group-hover:text-blue-700 transition-colors flex items-center gap-1">
@@ -858,10 +858,10 @@ export default function PedidosPage() {
           </div>
           <span className={`self-end sm:self-auto inline-flex items-center gap-1 text-xs font-black px-3.5 py-1.5 rounded-xl shadow-xs shrink-0 transition-all ${
             classificationFilter === "no_pasaron"
-              ? "bg-stone-900 text-white ring-2 ring-white"
+              ? "bg-stone-900 text-white ring-2 ring-white animate-pulse"
               : "bg-white text-red-700 hover:bg-stone-100"
           }`}>
-            {classificationFilter === "no_pasaron" ? "✓ Viendo rezagados (clic para quitar)" : `Ver rezagados (${classificationCounts.no_pasaron}) →`}
+            {classificationFilter === "no_pasaron" ? `✓ Viendo ${classificationCounts.no_pasaron} rezagados abajo ↓` : `Ver rezagados (${classificationCounts.no_pasaron}) →`}
           </span>
         </div>
       )}
@@ -1098,7 +1098,7 @@ export default function PedidosPage() {
       >
         <div 
           ref={catalogScrollRef} 
-          className="flex-1 min-h-0 overflow-y-auto space-y-1.5 sm:space-y-2 pr-1 pb-4 scroll-smooth"
+          className="flex-1 min-h-0 lg:overflow-y-auto space-y-1.5 sm:space-y-2 pr-1 pb-4 scroll-smooth"
         >
           {/* Banner de Cuadro Seleccionado con botón para restablecer */}
           {classificationFilter !== "all" && (
@@ -1136,13 +1136,27 @@ export default function PedidosPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setClassificationFilter("all")}
-                className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-800 font-black text-xs rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-2xs border border-stone-200"
-              >
-                <span>✕ Ver todos ({classificationCounts.all})</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const mainEl = document.querySelector("main");
+                    mainEl?.scrollTo({ top: 0, behavior: "smooth" });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 font-bold text-xs rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-2xs border border-stone-200"
+                  title="Subir a ver tarjetas métricas"
+                >
+                  <span>↑ Ver Cuadros</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setClassificationFilter("all")}
+                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black text-xs rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                >
+                  <span>✕ Ver todos ({classificationCounts.all})</span>
+                </button>
+              </div>
             </div>
           )}
         {/* Barra de alternancia: Fichas de Productos vs Tabla + Switcher Lista/Cuadrícula + Estado Celular */}

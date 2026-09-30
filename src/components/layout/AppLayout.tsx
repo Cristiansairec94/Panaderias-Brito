@@ -66,7 +66,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             pathname === "/pos"
               ? "overflow-hidden p-0"
               : pathname.startsWith("/pedidos")
-              ? "overflow-hidden flex flex-col p-0 bg-stone-50/60"
+              ? "lg:overflow-hidden overflow-y-auto flex flex-col p-0 bg-stone-50/60"
               : "overflow-y-auto bg-stone-50/60 px-3 sm:px-5 lg:px-6 pt-3 sm:pt-5 pb-24 md:pb-6"
           }`}>
             {isAllowed ? (
