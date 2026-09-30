@@ -1285,27 +1285,27 @@ export default function PedidosPage() {
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-stone-400" />
                         <span
-                          className={`font-black text-xs ${
-                            order.deliveryDate === todayStr ? "text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded" : "text-stone-900"
+                          className={`font-black text-xs sm:text-sm ${
+                            normalizeDateStr(order.deliveryDate) === todayStr ? "text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded font-black" : "text-stone-900"
                           }`}
                         >
-                          {order.deliveryDate === todayStr ? "¡HOY!" : order.deliveryDate}
+                          {normalizeDateStr(order.deliveryDate) === todayStr ? "¡HOY!" : order.deliveryDate}
                         </span>
-                        <span className="font-mono font-bold text-stone-600 text-xs">
+                        <span className="font-mono font-black text-stone-700 text-xs sm:text-sm">
                           {order.deliveryTime || "16:00"} hrs
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-bold text-stone-700 truncate max-w-[130px]">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs sm:text-sm font-black text-stone-900 truncate max-w-[160px] sm:max-w-[220px]" title={order.customerName}>
                           👤 {order.customerName}
                         </span>
                         {order.remainingBalance === 0 ? (
-                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                          <span className="text-xs sm:text-sm font-black text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-lg border border-emerald-300 shadow-2xs">
                             ✓ Liquidado
                           </span>
                         ) : (
-                          <span className="text-[10px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                          <span className="text-xs sm:text-sm font-black text-rose-800 bg-rose-100/90 px-2.5 py-0.5 rounded-lg border border-rose-300 shadow-2xs font-mono">
                             Falta: {formatCurrency(order.remainingBalance)}
                           </span>
                         )}
@@ -1527,8 +1527,8 @@ export default function PedidosPage() {
                       <div className="flex items-center justify-between gap-2 border-b border-stone-200/60 pb-2">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-stone-400" />
-                          <span className={`font-extrabold ${order.deliveryDate === todayStr ? "text-rose-700 font-black" : "text-stone-900"}`}>
-                            {order.deliveryDate === todayStr ? "¡HOY!" : order.deliveryDate}
+                          <span className={`font-extrabold ${normalizeDateStr(order.deliveryDate) === todayStr ? "text-rose-700 font-black" : "text-stone-900"}`}>
+                            {normalizeDateStr(order.deliveryDate) === todayStr ? "¡HOY!" : order.deliveryDate}
                           </span>
                         </div>
                         <div className="flex items-center gap-1 font-bold text-stone-700">
@@ -1539,19 +1539,19 @@ export default function PedidosPage() {
 
                       <div className="flex items-center justify-between gap-2">
                         <div>
-                          <span className="text-[10px] font-bold text-stone-400 uppercase block">Cliente:</span>
-                          <strong className="text-xs font-black text-stone-900 block truncate max-w-[170px]">
+                          <span className="text-[11px] font-bold text-stone-400 uppercase block">Cliente:</span>
+                          <strong className="text-sm font-black text-stone-900 block truncate max-w-[170px]">
                             {order.customerName}
                           </strong>
                         </div>
                         <div className="text-right">
-                          <span className="text-[10px] font-bold text-stone-400 uppercase block">Cobro:</span>
+                          <span className="text-[11px] font-bold text-stone-400 uppercase block">Cobro:</span>
                           {order.remainingBalance > 0 ? (
-                            <span className="text-[11px] font-black text-rose-700 font-mono bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg inline-block">
+                            <span className="text-xs sm:text-sm font-black text-rose-800 font-mono bg-rose-100/90 border border-rose-300 px-2.5 py-0.5 rounded-lg inline-block shadow-2xs">
                               Falta: {formatCurrency(order.remainingBalance)}
                             </span>
                           ) : (
-                            <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg inline-block">
+                            <span className="text-xs sm:text-sm font-black text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2.5 py-0.5 rounded-lg inline-block shadow-2xs">
                               ✓ Liquidado
                             </span>
                           )}
@@ -1623,8 +1623,9 @@ export default function PedidosPage() {
               </thead>
               <tbody className="divide-y divide-stone-100">
                 {filteredOrders.map((order) => {
-                  const isToday = order.deliveryDate === todayStr;
-                  const isTomorrow = order.deliveryDate === tomorrowStr;
+                  const orderDate = normalizeDateStr(order.deliveryDate);
+                  const isToday = orderDate === todayStr;
+                  const isTomorrow = orderDate === tomorrowStr;
                   const isExpanded = expandedRowId === order.id;
 
                   const isOverdue = checkIsOverdue(order);
