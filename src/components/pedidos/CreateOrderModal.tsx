@@ -1755,23 +1755,6 @@ export default function CreateOrderModal({
                   />
                 </div>
               )}
-
-              {/* Detalle Tarjeta */}
-              {paymentMethod === "tarjeta" && (
-                <div className="p-3 bg-stone-950 rounded-xl border border-stone-800 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-stone-400">Terminal:</span>
-                    <span className="font-bold text-white">{selectedCardTerminal.name} ({selectedCardTerminal.bank})</span>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="No. de autorización / voucher (Opcional)"
-                    value={paymentReference}
-                    onChange={(e) => setPaymentReference(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-xs font-mono text-white placeholder:text-stone-500"
-                  />
-                </div>
-              )}
             </div>
           </div>
 
