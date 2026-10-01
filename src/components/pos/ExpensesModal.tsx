@@ -54,7 +54,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
-import { getStoredOrders, updateOrderStatus } from "@/lib/orders";
+import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import { getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import TicketModal from "@/components/pos/TicketModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
@@ -1202,11 +1202,18 @@ export default function ExpensesModal({
   };
 
   const handleCancelOrder = (order: CustomOrder) => {
+    const isHistory = order.status === "cancelado" || order.status === "entregado";
     const ok = confirm(
-      `¿Confirmas DAR DE BAJA / CANCELAR el pedido #${order.orderNumber} de "${order.customerName}"?\n\nDesaparecerá de la lista de pedidos por entregar.`
+      isHistory
+        ? `¿Confirmas ELIMINAR PERMANENTEMENTE el pedido #${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro.`
+        : `¿Confirmas DAR DE BAJA / CANCELAR el pedido #${order.orderNumber} de "${order.customerName}"?\n\nDesaparecerá de la lista de pedidos por entregar.`
     );
     if (!ok) return;
-    updateOrderStatus(order.id, "cancelado");
+    if (isHistory) {
+      deleteCustomOrder(order.id);
+    } else {
+      updateOrderStatus(order.id, "cancelado");
+    }
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
@@ -3736,6 +3743,15 @@ export default function ExpensesModal({
                                           >
                                             <Printer className="w-3.5 h-3.5 text-amber-800" />
                                             <span className="hidden sm:inline">Ticket</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleCancelOrder(order)}
+                                            className="p-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center cursor-pointer"
+                                            title="Eliminar pedido permanentemente"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
                                           </button>
                                         </>
                                       ) : (

@@ -559,7 +559,16 @@ export default function PedidosPage() {
   const handleAdvanceStatus = (order: CustomOrder) => {
     let nextStatus: CustomOrder["status"] = order.status;
     if (order.status === "pendiente" || order.status === "en_horno") nextStatus = "listo";
-    else if (order.status === "listo") nextStatus = "entregado";
+    else if (order.status === "listo") {
+      if (order.remainingBalance > 0) {
+        alert(
+          `⛔ No se puede entregar el pedido #${order.orderNumber}.\n\nTiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\nPara poder entregarlo, primero debe estar 100% pagado sin faltante.`
+        );
+        setSelectedOrderForPayment(order);
+        return;
+      }
+      nextStatus = "entregado";
+    }
 
     if (nextStatus !== order.status) {
       updateOrderStatus(order.id, nextStatus);
@@ -578,17 +587,27 @@ export default function PedidosPage() {
     if (confirm(`¿Estás seguro de ELIMINAR PERMANENTEMENTE ${label}?\n\nEsta acción borrará el pedido por completo del registro y no se podrá recuperar.`)) {
       deleteCustomOrder(orderId);
       loadOrders();
+      setSelectedOrderForDetail(null);
+      addNotification({
+        title: "Pedido Eliminado",
+        description: `El pedido ${orderNumber || ""} ha sido eliminado permanentemente del sistema.`,
+        senderName: "Control de Pedidos",
+        senderAvatar: "🗑️",
+        highlightText: orderNumber || "",
+        category: "pedidos",
+        badgeIcon: "pastel",
+      });
     }
   };
 
   const handleDarDeBaja = (order: CustomOrder) => {
-    const isCancelled = order.status === "cancelado";
-    const confirmMsg = isCancelled
+    const isPermanent = order.status === "cancelado" || order.status === "entregado" || checkIsOverdue(order);
+    const confirmMsg = isPermanent
       ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro y no se podrá recuperar.`
-      : `¿Estás seguro de DAR DE BAJA el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEl pedido se marcará como cancelado y se quitará de los pedidos activos y entregas de mostrador.`;
+      : `¿Estás seguro de DAR DE BAJA / CANCELAR el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEl pedido se marcará como cancelado y se moverá al historial.`;
 
     if (confirm(confirmMsg)) {
-      if (isCancelled) {
+      if (isPermanent) {
         deleteCustomOrder(order.id);
       } else {
         updateOrderStatus(order.id, "cancelado");
@@ -596,8 +615,8 @@ export default function PedidosPage() {
       loadOrders();
       setSelectedOrderForDetail(null);
       addNotification({
-        title: isCancelled ? "Pedido Eliminado" : "Pedido Dado de Baja",
-        description: `El pedido ${order.orderNumber} ha sido ${isCancelled ? "eliminado permanentemente" : "dado de baja exitosamente"}.`,
+        title: isPermanent ? "Pedido Eliminado" : "Pedido Dado de Baja",
+        description: `El pedido ${order.orderNumber} ha sido ${isPermanent ? "eliminado permanentemente" : "dado de baja exitosamente"}.`,
         senderName: "Control de Pedidos",
         senderAvatar: "🗑️",
         highlightText: order.orderNumber,
@@ -1716,6 +1735,16 @@ export default function PedidosPage() {
 
                       <button
                         type="button"
+                        onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
+                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                        title="Eliminar este pedido permanentemente"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Eliminar</span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => setSelectedOrderForDetail(order)}
                         className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-lg border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                       >
@@ -2049,6 +2078,19 @@ export default function PedidosPage() {
                             <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeletePermanent(order.id, order.orderNumber, order.customerName);
+                          }}
+                          className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title="Eliminar este pedido permanentemente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Eliminar</span>
+                        </button>
                       </div>
 
                       <button
@@ -2380,21 +2422,19 @@ export default function PedidosPage() {
                               </button>
                             )}
 
-                            {/* 5. Eliminar Pedido (disponible para todos los pedidos activos en catálogo) */}
-                            {!isConcludedOrHistory && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeletePermanent(order.id, order.orderNumber, order.customerName);
-                                }}
-                                className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
-                                title="Eliminar Pedido"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>Eliminar</span>
-                              </button>
-                            )}
+                            {/* 5. Eliminar Pedido (disponible para todos los pedidos) */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePermanent(order.id, order.orderNumber, order.customerName);
+                              }}
+                              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+                              title="Eliminar Pedido"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Eliminar</span>
+                            </button>
 
                             {/* 6. Pantalla de detalles del pedido */}
                             <button
@@ -2609,6 +2649,13 @@ export default function PedidosPage() {
           if (updated) setSelectedOrderForDetail(updated);
         }}
         onDeliverOrder={(o) => {
+          if (o.remainingBalance > 0) {
+            alert(
+              `⛔ No se puede entregar el pedido #${o.orderNumber}.\n\nTiene un saldo pendiente de ${formatCurrency(o.remainingBalance)}.\n\nPara poder entregarlo, primero debe estar 100% pagado sin faltante.`
+            );
+            setSelectedOrderForPayment(o);
+            return;
+          }
           updateOrderStatus(o.id, "entregado");
           loadOrders();
           setSelectedOrderForDetail(null);

@@ -545,6 +545,18 @@ export default function OrderHistoryDashboardModal({
                         >
                           <MessageCircle className="w-4 h-4" />
                         </button>
+
+                        {onDeleteOrderPermanently && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteOrderPermanently(order)}
+                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                            title="Eliminar este pedido permanentemente"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Eliminar</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -652,6 +664,17 @@ export default function OrderHistoryDashboardModal({
                               >
                                 <MessageCircle className="w-3.5 h-3.5" />
                               </button>
+                              {onDeleteOrderPermanently && (
+                                <button
+                                  type="button"
+                                  onClick={() => onDeleteOrderPermanently(order)}
+                                  className="px-2 py-1 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 rounded-lg transition-colors cursor-pointer font-bold flex items-center gap-1 text-[11px]"
+                                  title="Eliminar Pedido"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Eliminar</span>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>

@@ -27,7 +27,8 @@ import {
   Truck,
   AlertTriangle,
   Trash2,
-  PackageCheck
+  PackageCheck,
+  Lock
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -124,14 +125,18 @@ export default function OrderDetailModal({
   const handleDeliver = () => {
     if (!order) return;
     if (order.remainingBalance > 0) {
-      const ok = confirm(
-        `⚠️ El pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\n¿Estás seguro de marcarlo como ENTREGADO sin cobrar el saldo restante?`
+      alert(
+        `⛔ No se puede entregar el pedido #${order.orderNumber}.\n\nEl pedido aún tiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\nPara poder entregarlo, primero debe estar 100% pagado sin faltante.`
       );
-      if (!ok) return;
-    } else {
-      const ok = confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?`);
-      if (!ok) return;
+      if (onOpenPayment) {
+        onClose();
+        onOpenPayment(order);
+      }
+      return;
     }
+
+    const ok = confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?`);
+    if (!ok) return;
 
     if (onDeliverOrder) {
       onDeliverOrder(order);
@@ -426,12 +431,12 @@ export default function OrderDetailModal({
         {/* ── Barra de Acciones del Pie ── */}
         <div className="p-4 sm:p-5 bg-stone-50 border-t border-stone-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Indicador Informativo solo si el pedido está en Historial (ya entregado o cancelado) */}
+            {/* Indicador Informativo solo si el pedido está en Historial (ya entregado o cancelado o caducado) */}
             {isHistoryOrder && (
               <div className="px-3.5 py-2 bg-amber-50 border border-amber-300 text-amber-950 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs">
                 <span>🥖</span>
                 <span>
-                  <strong>Historial ({order.status === "entregado" ? "Entregado" : "Dado de baja"}):</strong> Solo consulta de ticket y liquidación de saldo.
+                  <strong>Historial (Solo Informativo):</strong> No se puede editar ni reactivar. Si se necesita revivir el pedido, hacer uno nuevo en sucursal.
                 </span>
               </div>
             )}
@@ -460,7 +465,7 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Pagar Restante si tiene saldo pendiente (tanto en activos como en historial si vuelven a liquidar) */}
+            {/* Botón Pagar Restante si tiene saldo pendiente (obligatorio antes de entregar) */}
             {!isLiquidado && onOpenPayment && order.status !== "cancelado" && (
               <button
                 type="button"
@@ -469,6 +474,7 @@ export default function OrderDetailModal({
                   onOpenPayment(order);
                 }}
                 className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                title="Cobrar saldo restante al cliente para poder entregar"
               >
                 <DollarSign className="w-4 h-4" />
                 <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
@@ -492,17 +498,29 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Entregado */}
+            {/* Botón Entregado (requiere estar 100% pagado sin faltante) */}
             {!isHistoryOrder && order.status !== "entregado" && order.status !== "cancelado" && (
-              <button
-                type="button"
-                onClick={handleDeliver}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-emerald-400/40"
-                title="Marcar pedido como entregado"
-              >
-                <PackageCheck className="w-4 h-4" />
-                <span>Entregado</span>
-              </button>
+              isLiquidado ? (
+                <button
+                  type="button"
+                  onClick={handleDeliver}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-emerald-400/40"
+                  title="Marcar pedido como entregado (100% Pagado)"
+                >
+                  <PackageCheck className="w-4 h-4" />
+                  <span>Entregado</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleDeliver}
+                  className="px-3.5 py-2.5 bg-stone-100 hover:bg-rose-50 text-stone-500 hover:text-rose-700 border border-stone-300 hover:border-rose-300 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs group"
+                  title="No se puede entregar: requiere estar 100% pagado sin faltante"
+                >
+                  <Lock className="w-3.5 h-3.5 text-stone-400 group-hover:text-rose-600" />
+                  <span>Entregar (Requiere Pago 100%)</span>
+                </button>
+              )
             )}
 
             {/* Botón Editar */}
@@ -520,16 +538,16 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Dar de Baja */}
-            {!isHistoryOrder && onDarDeBaja && order.status !== "entregado" && order.status !== "cancelado" && (
+            {/* Botón Eliminar / Dar de Baja (disponible para todos los pedidos) */}
+            {onDarDeBaja && (
               <button
                 type="button"
                 onClick={() => onDarDeBaja(order)}
                 className="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-rose-300/40"
-                title="Dar de baja este pedido"
+                title={isHistoryOrder || order.status === "cancelado" ? "Eliminar pedido definitivamente del registro" : "Dar de baja o eliminar este pedido"}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Dar de baja</span>
+                <span>{isHistoryOrder || order.status === "cancelado" ? "Eliminar Pedido" : "Dar de baja"}</span>
               </button>
             )}
           </div>
