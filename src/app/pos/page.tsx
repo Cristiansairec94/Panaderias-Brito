@@ -757,7 +757,11 @@ export default function POSPage() {
       setShiftVersion((v) => v + 1);
     };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
-    return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
+    window.addEventListener("storage", handleOrdersUpdated);
+    return () => {
+      window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
+      window.removeEventListener("storage", handleOrdersUpdated);
+    };
   }, []);
 
   // Sincronizar en tiempo real el dinero ingresado del turno activo
@@ -1694,6 +1698,8 @@ export default function POSPage() {
     try {
       return getStoredOrders().filter((o) => {
         if (!o) return false;
+        // Los pedidos entregados y cancelados desaparecen por completo de la vista activa y del turno
+        if (o.status === "entregado" || o.status === "cancelado") return false;
         if (activeBranch) {
           const matchBranch = !o.branchId || o.branchId === activeBranch.id || (o as any).operatingBranchId === activeBranch.id;
           if (!matchBranch) return false;
@@ -1715,11 +1721,16 @@ export default function POSPage() {
     const posCash = (currentShiftSales || [])
       .filter((s) => s && s.paymentMethod === "efectivo")
       .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
-    const ordersCash = (currentShiftOrders || [])
-      .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id))
-      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+    // Para el conteo de efectivo en cajón, sumar anticipos cobrados en efectivo en este turno
+    const allShiftOrdersForCash = getStoredOrders().filter((o) => {
+      if (!o) return false;
+      const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
+      if (shiftStartBoundary > 0 && (!t || t < shiftStartBoundary - 60000)) return false;
+      return (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id);
+    });
+    const ordersCash = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
     return posCash + ordersCash;
-  }, [currentShiftSales, currentShiftOrders]);
+  }, [currentShiftSales, shiftStartBoundary, shiftVersion]);
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])

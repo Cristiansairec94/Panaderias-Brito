@@ -67,10 +67,11 @@ export default function PosOrdersDrawer({
 
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  // Filtrar pedidos de esta sucursal (o todas las sucursales si se selecciona)
+  // Filtrar pedidos de esta sucursal (excluyendo 100% pedidos entregados y dados de baja)
   const branchOrders = useMemo(() => {
-    if (branchScope === "todas") return orders;
-    return orders.filter((o) => {
+    const activeList = orders.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
+    if (branchScope === "todas") return activeList;
+    return activeList.filter((o) => {
       if (!branchId) return true;
       const orderBranch = (o as any).operatingBranchId || o.branchId;
       return !o.branchId || o.branchId === branchId || orderBranch === branchId;
@@ -80,6 +81,7 @@ export default function PosOrdersDrawer({
   // Filtrado simple
   const filteredOrders = useMemo(() => {
     return branchOrders.filter((order) => {
+      if (order.status === "entregado" || order.status === "cancelado") return false;
       if (filterMode === "hoy" && order.deliveryDate !== todayStr) return false;
       if (filterMode === "saldo" && order.remainingBalance <= 0) return false;
 

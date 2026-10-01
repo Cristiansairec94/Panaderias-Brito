@@ -46,7 +46,7 @@ export default function SpecialOrdersDrawer({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const loadOrders = () => {
-    const all = getStoredOrders();
+    const all = getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
     setOrders(all);
   };
 
@@ -65,6 +65,9 @@ export default function SpecialOrdersDrawer({
   // Filtered orders for this branch
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
+      // Excluir 100% pedidos entregados o cancelados
+      if (order.status === "entregado" || order.status === "cancelado") return false;
+
       // Branch filter if specified
       if (branchId && order.branchId && order.branchId !== branchId) {
         return false;

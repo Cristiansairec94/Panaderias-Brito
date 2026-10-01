@@ -31,7 +31,9 @@ export default function RecentSalesDrawer({
 
   if (!isOpen) return null;
 
-  const effectiveOrders = Array.isArray(orders) ? orders : [];
+  const effectiveOrders = Array.isArray(orders)
+    ? orders.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado")
+    : [];
 
   const filteredSales = sales.filter((s) => {
     if (typeFilter === "pedidos") return false;
@@ -48,6 +50,7 @@ export default function RecentSalesDrawer({
   });
 
   const filteredOrders = effectiveOrders.filter((o) => {
+    if (o.status === "entregado" || o.status === "cancelado") return false;
     if (typeFilter === "ventas") return false;
     if (filterMethod !== "all" && o.paymentMethod !== filterMethod) return false;
     if (searchQuery.trim()) {
