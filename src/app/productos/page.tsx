@@ -27,9 +27,7 @@ import {
   CheckCircle2,
   Scale,
   Barcode,
-  Printer,
-  Receipt,
-  Percent
+  Printer
 } from "lucide-react";
 import { Product } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
@@ -43,8 +41,7 @@ import {
   deleteProduct, 
   PRODUCT_CATEGORIES,
   generateProductCode,
-  generateProductBarcode,
-  calculateProductTaxes
+  generateProductBarcode
 } from "@/lib/products";
 
 export default function ProductosPage() {
@@ -144,14 +141,6 @@ export default function ProductosPage() {
     });
   }, [products, searchQuery, selectedCategory]);
 
-  // Tax calculation preview in real-time
-  const calculatedPreview = useMemo(() => {
-    const p = parseFloat(formData.price) || 0;
-    if (p <= 0) return null;
-    const ivaNum = formData.hasIva ? Math.max(0, parseFloat(formData.ivaRate) || 0) : 0;
-    const iepsNum = formData.hasIeps ? Math.max(0, parseFloat(formData.iepsRate) || 0) : 0;
-    return calculateProductTaxes(p, formData.hasIva, ivaNum, formData.hasIeps, iepsNum, formData.taxIncluded);
-  }, [formData.price, formData.hasIva, formData.ivaRate, formData.hasIeps, formData.iepsRate, formData.taxIncluded]);
 
   // Open Create Modal
   const handleOpenCreate = () => {
@@ -1046,238 +1035,6 @@ export default function ProductosPage() {
                 </div>
               )}
 
-              {/* Configuración de Impuestos (IVA / IEPS) */}
-              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3.5 animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-200 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-700 flex items-center justify-center font-black">
-                      <Receipt className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-                        <span>Configuración de Impuestos (IVA / IEPS)</span>
-                        <span className="text-[10px] text-amber-700 font-semibold bg-amber-100/80 px-1.5 py-0.2 rounded">SAT</span>
-                      </h4>
-                      <p className="text-[10px] text-stone-500">
-                        Indica si el producto grava IVA o IEPS y personaliza su porcentaje o tasa aplicable.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Modalidad de Impuestos */}
-                  <button
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, taxIncluded: !prev.taxIncluded }))}
-                    className={`self-start sm:self-auto px-2.5 py-1 rounded-xl text-[10px] font-black transition-all border flex items-center gap-1.5 cursor-pointer ${
-                      formData.taxIncluded
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
-                        : "bg-stone-200/80 text-stone-700 border-stone-300 hover:bg-stone-300"
-                    }`}
-                    title="Alternar si el precio de venta capturado ya incluye los impuestos o si se cobran adicionalmente"
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${formData.taxIncluded ? "bg-emerald-600 animate-pulse" : "bg-stone-400"}`} />
-                    <span>{formData.taxIncluded ? "Precios con impuestos incluidos" : "+ Impuestos al precio base"}</span>
-                  </button>
-                </div>
-
-                {/* Tarjetas de IVA e IEPS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Tarjeta IVA */}
-                  <div className={`p-3.5 rounded-2xl border transition-all ${
-                    formData.hasIva 
-                      ? "bg-white border-blue-400/80 shadow-xs ring-1 ring-blue-400/20" 
-                      : "bg-stone-100/70 border-stone-200"
-                  }`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-black text-stone-900">Grava IVA</span>
-                        <span className="text-[10px] font-medium text-stone-400">(Tasa Valor Agregado)</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormData((prev) => ({ 
-                          ...prev, 
-                          hasIva: !prev.hasIva,
-                          ivaRate: !prev.hasIva && (!prev.ivaRate || prev.ivaRate === "0") ? "16" : prev.ivaRate
-                        }))}
-                        className={`px-3 py-1 rounded-full text-[10px] font-black tracking-wider transition-all cursor-pointer ${
-                          formData.hasIva
-                            ? "bg-blue-600 text-white shadow-sm shadow-blue-500/25"
-                            : "bg-stone-200 text-stone-600 hover:bg-stone-300"
-                        }`}
-                      >
-                        {formData.hasIva ? "SÍ GRAVA" : "NO GRAVA"}
-                      </button>
-                    </div>
-
-                    {formData.hasIva ? (
-                      <div className="space-y-2 pt-1 animate-in fade-in duration-150">
-                        <div className="flex items-center gap-2">
-                          <label className="text-[11px] font-bold text-stone-600 whitespace-nowrap">
-                            Porcentaje (%):
-                          </label>
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={formData.ivaRate}
-                              onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                              onChange={(e) => setFormData((prev) => ({ ...prev, ivaRate: cleanDecimalNumbers(e.target.value) }))}
-                              placeholder="16"
-                              className="w-full pl-3 pr-7 py-1.5 bg-stone-50 rounded-lg border border-blue-200 text-xs font-black text-stone-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            />
-                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">%</span>
-                          </div>
-                        </div>
-
-                        {/* Botones de selección rápida */}
-                        <div className="flex items-center gap-1">
-                          {[
-                            { rate: "16", label: "16% (General)" },
-                            { rate: "8", label: "8% (Frontera)" },
-                            { rate: "0", label: "0% (Tasa Cero)" },
-                          ].map((item) => (
-                            <button
-                              key={item.rate}
-                              type="button"
-                              onClick={() => setFormData((prev) => ({ ...prev, ivaRate: item.rate }))}
-                              className={`flex-1 py-1 px-1 text-[10px] font-bold rounded-lg border transition-all text-center ${
-                                formData.ivaRate === item.rate
-                                  ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                                  : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
-                              }`}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        {calculatedPreview && (
-                          <div className="text-[10px] text-blue-800 font-medium bg-blue-50/80 px-2 py-1 rounded-md flex items-center justify-between">
-                            <span>Monto de IVA:</span>
-                            <span className="font-mono font-black">${calculatedPreview.ivaAmount.toFixed(2)} MXN</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-stone-500 leading-snug">
-                        Exento o Tasa 0% (común en panadería de consumo básico tradicional).
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Tarjeta IEPS */}
-                  <div className={`p-3.5 rounded-2xl border transition-all ${
-                    formData.hasIeps 
-                      ? "bg-white border-amber-400/80 shadow-xs ring-1 ring-amber-400/20" 
-                      : "bg-stone-100/70 border-stone-200"
-                  }`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-black text-stone-900">Grava IEPS</span>
-                        <span className="text-[10px] font-medium text-stone-400">(Alimentos & Bebidas)</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormData((prev) => ({ 
-                          ...prev, 
-                          hasIeps: !prev.hasIeps,
-                          iepsRate: !prev.hasIeps && (!prev.iepsRate || prev.iepsRate === "0") ? "8" : prev.iepsRate
-                        }))}
-                        className={`px-3 py-1 rounded-full text-[10px] font-black tracking-wider transition-all cursor-pointer ${
-                          formData.hasIeps
-                            ? "bg-amber-500 text-stone-950 shadow-sm shadow-amber-500/25"
-                            : "bg-stone-200 text-stone-600 hover:bg-stone-300"
-                        }`}
-                      >
-                        {formData.hasIeps ? "SÍ GRAVA" : "NO GRAVA"}
-                      </button>
-                    </div>
-
-                    {formData.hasIeps ? (
-                      <div className="space-y-2 pt-1 animate-in fade-in duration-150">
-                        <div className="flex items-center gap-2">
-                          <label className="text-[11px] font-bold text-stone-600 whitespace-nowrap">
-                            Porcentaje (%):
-                          </label>
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={formData.iepsRate}
-                              onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                              onChange={(e) => setFormData((prev) => ({ ...prev, iepsRate: cleanDecimalNumbers(e.target.value) }))}
-                              placeholder="8"
-                              className="w-full pl-3 pr-7 py-1.5 bg-stone-50 rounded-lg border border-amber-300 text-xs font-black text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                            />
-                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">%</span>
-                          </div>
-                        </div>
-
-                        {/* Botones de selección rápida */}
-                        <div className="flex items-center gap-1">
-                          {[
-                            { rate: "8", label: "8% (Pan Dulce/Calórico)" },
-                            { rate: "7", label: "7%" },
-                            { rate: "26.5", label: "26.5%" },
-                          ].map((item) => (
-                            <button
-                              key={item.rate}
-                              type="button"
-                              onClick={() => setFormData((prev) => ({ ...prev, iepsRate: item.rate }))}
-                              className={`flex-1 py-1 px-1 text-[10px] font-bold rounded-lg border transition-all text-center ${
-                                formData.iepsRate === item.rate
-                                  ? "bg-amber-500 text-stone-950 border-amber-600 shadow-xs"
-                                  : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
-                              }`}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        {calculatedPreview && (
-                          <div className="text-[10px] text-amber-900 font-medium bg-amber-50 px-2 py-1 rounded-md flex items-center justify-between">
-                            <span>Monto de IEPS:</span>
-                            <span className="font-mono font-black">${calculatedPreview.iepsAmount.toFixed(2)} MXN</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-stone-500 leading-snug">
-                        Sin IEPS (aplica a panes básicos con densidad calórica menor a 275 kcal/100g).
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Desglose Matemático en Tiempo Real */}
-                {calculatedPreview && (formData.hasIva || formData.hasIeps) && (
-                  <div className="p-3 bg-amber-50/90 rounded-xl border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
-                    <div className="flex items-center gap-3 flex-wrap text-[11px]">
-                      <span className="font-bold text-stone-700">
-                        Base: <strong className="text-stone-950 font-black">${calculatedPreview.basePrice.toFixed(2)}</strong>
-                      </span>
-                      {formData.hasIva && (
-                        <span className="inline-flex items-center gap-1 font-semibold text-blue-800 bg-blue-100/90 px-2 py-0.5 rounded-md font-mono text-[10px]">
-                          +IVA ({formData.ivaRate}%): ${calculatedPreview.ivaAmount.toFixed(2)}
-                        </span>
-                      )}
-                      {formData.hasIeps && (
-                        <span className="inline-flex items-center gap-1 font-semibold text-amber-950 bg-amber-200/90 px-2 py-0.5 rounded-md font-mono text-[10px]">
-                          +IEPS ({formData.iepsRate}%): ${calculatedPreview.iepsAmount.toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                      <span className="text-[11px] text-stone-600 font-bold">Total Público:</span>
-                      <span className="px-2.5 py-1 rounded-lg bg-stone-900 text-amber-400 font-mono font-black text-xs shadow-sm">
-                        ${calculatedPreview.totalPrice.toFixed(2)} MXN
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
 
               {/* Descripción */}
               <div className="space-y-1">
