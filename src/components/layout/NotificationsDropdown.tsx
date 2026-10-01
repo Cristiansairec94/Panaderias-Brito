@@ -106,8 +106,6 @@ export default function NotificationsDropdown() {
   const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">("all");
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
-  const [showBanner, setShowBanner] = useState(true);
-  const [pushEnabled, setPushEnabled] = useState(false);
 
   const {
     notifications,
@@ -134,20 +132,6 @@ export default function NotificationsDropdown() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleActivateMobilePush = () => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          setPushEnabled(true);
-        } else {
-          setPushEnabled(true);
-        }
-      });
-    } else {
-      setPushEnabled(true);
-    }
-  };
 
   const cortesCount = notifications.filter((n) => n.category === "caja").length;
   const pedidosCount = notifications.filter((n) => n.category === "pedidos").length;
@@ -339,32 +323,6 @@ export default function NotificationsDropdown() {
                 Marcar leídas
               </button>
             </div>
-
-            {/* Mobile Notification Banner */}
-            {showBanner && (
-              <div className="bg-[#f4ede4] border border-[#ebdcd0] rounded-2xl p-2.5 sm:p-3 px-3.5 flex items-center justify-between gap-3 mt-3.5">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => setShowBanner(false)}
-                    className="text-stone-400 hover:text-stone-700 transition-colors p-0.5 shrink-0"
-                    title="Descartar aviso"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                  <span className="text-xs sm:text-[13px] font-medium text-stone-800 truncate">
-                    Activar avisos en celular
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleActivateMobilePush}
-                  className="bg-[#c25425] hover:bg-[#a8441b] text-white text-xs font-semibold px-4 py-1.5 rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
-                >
-                  {pushEnabled ? "Activado" : "Activar"}
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Scrollable Notifications Area */}

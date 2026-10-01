@@ -32,15 +32,12 @@ export default function MobileBottomNav() {
   const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">("all");
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
-  const [showBanner, setShowBanner] = useState(true);
 
   const {
     notifications,
     unreadCount,
     soundEnabled,
-    nativePermission,
     realtimeStatus,
-    requestNativePermission,
     toggleSound,
     markAsRead,
     markAsUnread,
@@ -239,34 +236,6 @@ export default function MobileBottomNav() {
                   Marcar leídas
                 </button>
               </div>
-
-              {/* Banner de aviso móvil */}
-              {showBanner && (
-                <div className="bg-[#f4ede4] border border-[#ebdcd0] rounded-2xl p-2.5 sm:p-3 px-3.5 flex items-center justify-between gap-3 mt-3.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowBanner(false)}
-                      className="text-stone-400 hover:text-stone-700 transition-colors p-0.5 shrink-0"
-                      title="Descartar aviso"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                    <span className="text-xs sm:text-[13px] font-medium text-stone-800 truncate">
-                      Activar avisos en celular
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      requestNativePermission();
-                    }}
-                    className="bg-[#c25425] hover:bg-[#a8441b] text-white text-xs font-semibold px-4 py-1.5 rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
-                  >
-                    {nativePermission === "granted" ? "Activado" : "Activar"}
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Lista con scroll y tarjetas */}

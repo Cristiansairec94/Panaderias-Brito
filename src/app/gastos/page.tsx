@@ -133,7 +133,7 @@ const getExpenseTimestamp = (g: Partial<ExpenseRecord> | null | undefined): numb
 };
 
 const getExpenseDateTimeInfo = (g: { date?: string; timestamp?: string; displayDate?: string } | null | undefined) => {
-  if (!g) return { isHoy: false, isAyer: false, formattedDate: "-" };
+  if (!g) return { isHoy: false, isAyer: false, formattedDate: "-", timeStr: "", cleanDate: "-" };
   const todayStr = getLocalDateISO(new Date());
   const yest = new Date();
   yest.setDate(yest.getDate() - 1);
@@ -159,23 +159,28 @@ const getExpenseDateTimeInfo = (g: { date?: string; timestamp?: string; displayD
   }
 
   let formattedDate = "";
+  let cleanDate = "";
   if (isHoy) {
     formattedDate = timeStr ? `Hoy, ${timeStr}` : "Hoy";
+    cleanDate = "Hoy";
   } else if (isAyer) {
     formattedDate = timeStr ? `Ayer, ${timeStr}` : "Ayer";
+    cleanDate = "Ayer";
   } else if (rawDate) {
     const parts = rawDate.split("-");
     if (parts.length === 3) {
-      const ddmmyyyy = `${parts[2]}/${parts[1]}/${parts[0]}`;
-      formattedDate = timeStr ? `${ddmmyyyy}, ${timeStr}` : ddmmyyyy;
+      cleanDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      formattedDate = timeStr ? `${cleanDate}, ${timeStr}` : cleanDate;
     } else {
+      cleanDate = rawDate;
       formattedDate = rawDate;
     }
   } else {
     formattedDate = g.displayDate || "-";
+    cleanDate = g.displayDate || "-";
   }
 
-  return { isHoy, isAyer, formattedDate };
+  return { isHoy, isAyer, formattedDate, timeStr, cleanDate };
 };
 
 // ─── Catálogo de Categorías Especializado en Panadería ──────────────────────
@@ -1627,7 +1632,7 @@ export default function GastosPage() {
                   filteredGastos.map((g, idx) => {
                     const isAnulado = g.status === "anulado";
                     const catInfo = getCategoryInfo(g.category);
-                    const { isHoy, formattedDate } = getExpenseDateTimeInfo(g);
+                    const { isHoy, formattedDate, timeStr, cleanDate } = getExpenseDateTimeInfo(g);
                     const isNearBottom = idx >= filteredGastos.length - 2;
 
                     return (
@@ -1648,13 +1653,26 @@ export default function GastosPage() {
 
                         {/* 2. Fecha */}
                         <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">
-                          <span className={`font-bold text-xs sm:text-sm ${isAnulado ? "line-through text-stone-400" : isHoy ? "text-stone-950 font-black" : "text-stone-700"}`}>
-                            {formattedDate}
-                          </span>
-                          {isHoy && !isAnulado && (
-                            <span className="ml-1.5 bg-amber-500 text-white font-black text-[10px] px-1.5 py-0.2 rounded-md uppercase tracking-wider shadow-xs inline-flex items-center justify-center">
-                              Hoy
-                            </span>
+                          {isHoy ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`font-mono font-black text-xs ${isAnulado ? "line-through text-stone-400" : "text-stone-900"}`}>{timeStr || "Hoy"}</span>
+                              {!isAnulado && (
+                                <span className="bg-amber-500 text-white font-black text-[10px] px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-2xs">
+                                  HOY
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col">
+                              <span className={`font-bold text-xs ${isAnulado ? "line-through text-stone-400" : "text-stone-800"}`}>
+                                {cleanDate}
+                              </span>
+                              {timeStr && (
+                                <span className="text-[11px] font-mono text-stone-400 font-semibold">
+                                  {timeStr}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
 
@@ -1835,7 +1853,7 @@ export default function GastosPage() {
                 {filteredGastos.map((g) => {
                   const isAnulado = g.status === "anulado";
                   const catInfo = getCategoryInfo(g.category);
-                  const { isHoy, formattedDate } = getExpenseDateTimeInfo(g);
+                  const { isHoy, formattedDate, timeStr, cleanDate } = getExpenseDateTimeInfo(g);
 
                   return (
                     <div
