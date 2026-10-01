@@ -26,10 +26,12 @@ import {
   MessageCircle,
   Truck,
   AlertTriangle,
-  Trash2
+  Trash2,
+  PackageCheck
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { updateOrderStatus } from "@/lib/orders";
 
 interface OrderDetailModalProps {
   isOpen: boolean;
@@ -39,6 +41,7 @@ interface OrderDetailModalProps {
   onOpenPayment?: (order: CustomOrder) => void;
   onOpenEdit?: (order: CustomOrder) => void;
   onAdvanceStatus?: (order: CustomOrder) => void;
+  onDeliverOrder?: (order: CustomOrder) => void;
   onSendWhatsApp?: (order: CustomOrder) => void;
   onDarDeBaja?: (order: CustomOrder) => void;
 }
@@ -51,6 +54,7 @@ export default function OrderDetailModal({
   onOpenPayment,
   onOpenEdit,
   onAdvanceStatus,
+  onDeliverOrder,
   onSendWhatsApp,
   onDarDeBaja,
 }: OrderDetailModalProps) {
@@ -109,6 +113,29 @@ export default function OrderDetailModal({
 
   const isLiquidado = order.remainingBalance <= 0;
   const deliveryFormatted = formatDeliveryDate(order.deliveryDate);
+
+  const handleDeliver = () => {
+    if (!order) return;
+    if (order.remainingBalance > 0) {
+      const ok = confirm(
+        `⚠️ El pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\n¿Estás seguro de marcarlo como ENTREGADO sin cobrar el saldo restante?`
+      );
+      if (!ok) return;
+    } else {
+      const ok = confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?`);
+      if (!ok) return;
+    }
+
+    if (onDeliverOrder) {
+      onDeliverOrder(order);
+    } else {
+      updateOrderStatus(order.id, "entregado");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("brito_orders_updated"));
+      }
+      onClose();
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
@@ -431,8 +458,8 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Avanzar Estado */}
-            {onAdvanceStatus && order.status !== "entregado" && order.status !== "cancelado" && (
+            {/* Botón Marcar Listo (solo cuando aún no está listo ni entregado) */}
+            {onAdvanceStatus && (order.status === "pendiente" || order.status === "en_horno") && (
               <button
                 type="button"
                 onClick={() => {
@@ -440,12 +467,32 @@ export default function OrderDetailModal({
                   onClose();
                 }}
                 className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Marcar como listo para entrega en mostrador"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>
-                  {order.status === "pendiente" || order.status === "en_horno" ? "Marcar Listo" : "Marcar Entregado"}
-                </span>
+                <span>Marcar Listo</span>
               </button>
+            )}
+
+            {/* Botón Entregado */}
+            {order.status !== "entregado" && order.status !== "cancelado" && (
+              <button
+                type="button"
+                onClick={handleDeliver}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-emerald-400/40"
+                title="Marcar pedido como entregado"
+              >
+                <PackageCheck className="w-4 h-4" />
+                <span>Entregado</span>
+              </button>
+            )}
+
+            {/* Indicador de Pedido ya Entregado */}
+            {order.status === "entregado" && (
+              <div className="px-3.5 py-2.5 bg-stone-100 border border-stone-200 text-stone-600 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs">
+                <Check className="w-4 h-4 text-emerald-600" />
+                <span>Entregado</span>
+              </div>
             )}
 
             {/* Botón Editar */}

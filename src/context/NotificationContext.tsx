@@ -821,6 +821,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             window.dispatchEvent(new Event("brito_orders_updated"));
           }
         }}
+        onDeliverOrder={(o) => {
+          updateOrderStatus(o.id, "entregado");
+          setSelectedOrderForDetail(null);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("brito_orders_updated"));
+          }
+        }}
         onSendWhatsApp={(o) => {
           const phone = (o.phone || "").replace(/\D/g, "");
           if (!phone) {

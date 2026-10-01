@@ -2262,6 +2262,8 @@ export default function PedidosPage() {
             senderName: "Control de Pedidos",
             senderAvatar: "📦",
             highlightText: o.orderNumber,
+            category: "pedidos",
+            badgeIcon: "pastel",
           });
         }}
         onSendWhatsApp={(o) => {
