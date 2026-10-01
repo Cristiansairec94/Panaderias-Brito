@@ -1734,27 +1734,6 @@ export default function CreateOrderModal({
                   </button>
                 ))}
               </div>
-
-              {/* Detalle SPEI */}
-              {paymentMethod === "transferencia" && (
-                <div className="p-3 bg-stone-950 rounded-xl border border-stone-800 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-stone-400">Banco / Cuenta:</span>
-                    <span className="font-bold text-white">{selectedTransferAccount.bank} - {selectedTransferAccount.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-stone-400">CLABE:</span>
-                    <span className="font-mono font-bold text-amber-300">{selectedTransferAccount.clabe}</span>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Folio de rastreo / Referencia de transferencia (Opcional)"
-                    value={paymentReference}
-                    onChange={(e) => setPaymentReference(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-xs font-mono text-white placeholder:text-stone-500"
-                  />
-                </div>
-              )}
             </div>
           </div>
 
