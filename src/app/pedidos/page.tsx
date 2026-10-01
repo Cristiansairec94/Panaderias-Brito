@@ -33,8 +33,6 @@ import {
   AlertTriangle,
   Package,
   LayoutGrid,
-  RefreshCw,
-  Smartphone,
   Wifi,
   History,
   Archive
@@ -80,6 +78,8 @@ const parseTimeToMinutes = (timeStr?: string): number | null => {
   return h * 60 + m;
 };
 
+export type TimePeriodFilter = "todos" | "dia" | "semana" | "mes" | "ano";
+
 export type OrderClassificationKey =
   | "all"
   | "activos"
@@ -105,11 +105,13 @@ export default function PedidosPage() {
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
   const [historialSubFilter, setHistorialSubFilter] = useState<"todos" | "entregados" | "cancelados">("todos");
   const [pagadosSubFilter, setPagadosSubFilter] = useState<"todos" | "pendientes" | "listos">("todos");
+  const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilter>("todos");
+  const [customSelectedDate, setCustomSelectedDate] = useState<string>(() => getLocalDateISO(new Date()));
+  const [customSelectedMonth, setCustomSelectedMonth] = useState<string>(() => getLocalDateISO(new Date()).slice(0, 7));
+  const [customSelectedYear, setCustomSelectedYear] = useState<string>(() => getLocalDateISO(new Date()).slice(0, 4));
   const [isClassificationOpen, setIsClassificationOpen] = useState(true);
   const [viewMode, setViewMode] = useState<"productos" | "tabla">("productos");
   const [productLayout, setProductLayout] = useState<"lista" | "cuadricula">("lista");
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "offline">("synced");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
@@ -151,14 +153,11 @@ export default function PedidosPage() {
     loadOrders();
 
     // 1. Sincronización bidireccional automática con el servidor (celulares y PC)
-    setIsSyncing(true);
     syncOrdersWithServer()
       .then((synced) => {
         setOrders(synced);
-        setSyncStatus("synced");
       })
-      .catch(() => setSyncStatus("offline"))
-      .finally(() => setIsSyncing(false));
+      .catch((err) => console.error("Error sincronizando pedidos:", err));
 
     // 2. Escuchar cambios locales
     const handleUpdate = () => loadOrders();
@@ -176,30 +175,6 @@ export default function PedidosPage() {
       if (unsubOrder) unsubOrder();
     };
   }, []);
-
-  // Botón manual de sincronización
-  const handleManualSync = async () => {
-    setIsSyncing(true);
-    setSyncStatus("syncing");
-    try {
-      const synced = await syncOrdersWithServer();
-      setOrders(synced);
-      setSyncStatus("synced");
-      addNotification({
-        title: "Celulares & PC Vinculados",
-        description: `Se sincronizaron con éxito ${synced.length} pedidos en vivo con todos los dispositivos.`,
-        senderName: "Sincronización en Vivo",
-        senderAvatar: "🔄",
-        badgeIcon: "pastel",
-        highlightText: `${synced.length} pedidos`,
-        category: "pedidos",
-      });
-    } catch {
-      setSyncStatus("offline");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   // Auto-sync branch filter with active connected branch (or user assigned branch if not admin)
   useEffect(() => {
@@ -1350,49 +1325,6 @@ export default function PedidosPage() {
                 <span>Cuadrícula</span>
               </button>
             </div>
-          </div>
-
-          {/* Estado de Vinculación en Tiempo Real con Celulares */}
-          <div className="flex items-center gap-2">
-            <div
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border shadow-2xs transition-all ${
-                syncStatus === "synced"
-                  ? "bg-emerald-50 text-emerald-900 border-emerald-300"
-                  : syncStatus === "syncing"
-                  ? "bg-amber-50 text-amber-900 border-amber-300"
-                  : "bg-stone-100 text-stone-700 border-stone-300"
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  syncStatus === "synced"
-                    ? "bg-emerald-500 animate-pulse"
-                    : syncStatus === "syncing"
-                    ? "bg-amber-500 animate-spin"
-                    : "bg-stone-400"
-                }`}
-              />
-              <Smartphone className="w-3.5 h-3.5 text-emerald-700" />
-              <span className="hidden sm:inline">Celulares & PC:</span>
-              <span className="font-black">
-                {syncStatus === "synced"
-                  ? "Vinculados al 100%"
-                  : syncStatus === "syncing"
-                  ? "Sincronizando..."
-                  : "Modo Local"}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleManualSync}
-              disabled={isSyncing}
-              className="p-1.5 px-2 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 hover:text-stone-900 border border-stone-200 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold shadow-2xs"
-              title="Sincronizar ahora con la app de celular y servidor"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 text-amber-700 ${isSyncing ? "animate-spin" : ""}`} />
-              <span className="hidden md:inline">Sincronizar</span>
-            </button>
           </div>
         </div>
 
