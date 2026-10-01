@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { SyncItem, SyncType } from "@/types";
@@ -13,6 +13,7 @@ import {
   setSimulatedOffline,
   checkRealOnlineStatus,
   processSyncQueue,
+  syncAllLocalDataToSupabase,
   exportLocalEmergencyBackup,
   downloadAllDataToLocalPc,
   getLocalDataStats,
@@ -97,10 +98,11 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setConnectionDetail(res.detail);
   }, [refreshQueueAndStats]);
 
-  // 3. Sincronizar inmediatamente
+  // 3. Sincronizar inmediatamente todos los movimientos locales a la nube
   const syncNow = useCallback(async () => {
     setIsSyncing(true);
     try {
+      await syncAllLocalDataToSupabase();
       const res = await processSyncQueue();
       refreshQueueAndStats();
       const con = await checkRealOnlineStatus();
@@ -111,6 +113,16 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsSyncing(false);
     }
+  }, [refreshQueueAndStats]);
+
+  // Sincronización automática de arranque en segundo plano
+  useEffect(() => {
+    syncAllLocalDataToSupabase().then((res) => {
+      if (res && (res.salesSynced > 0 || res.expensesSynced > 0 || res.incomesSynced > 0 || res.customersSynced > 0)) {
+        console.log("[SyncContext] Movimientos locales sincronizados a Supabase con éxito:", res);
+        refreshQueueAndStats();
+      }
+    }).catch(() => {});
   }, [refreshQueueAndStats]);
 
   // 4. Descargar / actualizar todo el catálogo local en la PC
