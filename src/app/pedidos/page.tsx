@@ -345,10 +345,21 @@ export default function PedidosPage() {
         if (!matchesBranch) return false;
       }
 
-      // Los pedidos entregados y cancelados pertenecen EXCLUSIVAMENTE al Dashboard Independiente de Historial
-      // NUNCA deben aparecer en las secciones de abajo para no mezclar pedidos activos con concluidos/bajas
-      if (order.status === "entregado" || order.status === "cancelado") {
-        return false;
+      // Filtrado según vista activa vs historial
+      if (classificationFilter === "historial") {
+        if (historialSubFilter === "entregados") {
+          if (order.status !== "entregado") return false;
+        } else if (historialSubFilter === "cancelados") {
+          if (order.status !== "cancelado") return false;
+        } else {
+          // Si historialSubFilter === "todos", mostrar concluidos (entregados y cancelados)
+          if (order.status !== "entregado" && order.status !== "cancelado") return false;
+        }
+      } else {
+        // En vistas de pedidos activos, excluir pedidos ya concluidos o cancelados
+        if (order.status === "entregado" || order.status === "cancelado") {
+          return false;
+        }
       }
 
       const orderDate = normalizeDateStr(order.deliveryDate);
@@ -369,8 +380,8 @@ export default function PedidosPage() {
         return false;
       }
 
-      // Payment filter (solo aplica si clasificación es "all")
-      if (classificationFilter === "all") {
+      // Payment filter (aplica en vista "all" o "historial")
+      if (classificationFilter === "all" || classificationFilter === "historial") {
         if (paymentFilter === "pendientes" && order.remainingBalance <= 0) {
           return false;
         }
@@ -1548,9 +1559,33 @@ export default function PedidosPage() {
 
                     {/* Bloque 4: Botones de Acción directos */}
                     <div
-                      className="flex items-center justify-end gap-1 shrink-0 pt-1 lg:pt-0 border-t lg:border-t-0 border-stone-100"
+                      className="flex items-center justify-end gap-1.5 shrink-0 pt-1 lg:pt-0 border-t lg:border-t-0 border-stone-100 flex-wrap"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {/* 1. Imprimir Ticket (siempre disponible) */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderForReceipt(order)}
+                        className="px-2.5 py-1 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                        title="Imprimir Ticket"
+                      >
+                        <Receipt className="w-3.5 h-3.5 text-stone-600" />
+                        <span>Ticket</span>
+                      </button>
+
+                      {/* 2. Pagar Restante (únicamente si no han pagado) */}
+                      {order.remainingBalance > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOrderForPayment(order)}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                          title={`Cobrar saldo restante de ${formatCurrency(order.remainingBalance)}`}
+                        >
+                          <DollarSign className="w-3 h-3" />
+                          <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => handleSendWhatsApp(order)}
@@ -1563,22 +1598,12 @@ export default function PedidosPage() {
 
                       <button
                         type="button"
-                        onClick={() => setSelectedOrderForReceipt(order)}
-                        className="px-2 py-1 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                        title="Imprimir Ticket"
-                      >
-                        <Receipt className="w-3 h-3 text-stone-600" />
-                        <span className="hidden xl:inline">Ticket</span>
-                      </button>
-
-                      <button
-                        type="button"
                         onClick={() => setSelectedOrderForDetail(order)}
                         className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-lg border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                       >
-                        <Eye className="w-3 h-3 text-amber-700" />
+                        <Eye className="w-3.5 h-3.5 text-amber-700" />
                         <span className="hidden sm:inline">Detalles</span>
-                        <ChevronRight className="w-3 h-3 text-amber-700" />
+                        <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
                       </button>
                     </div>
                   </div>
@@ -1848,10 +1873,10 @@ export default function PedidosPage() {
 
                     {/* Botones de Acción */}
                     <div
-                      className="pt-2 flex items-center justify-between gap-1.5 border-t border-stone-100"
+                      className="pt-2 flex items-center justify-between gap-1.5 border-t border-stone-100 flex-wrap"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <button
                           type="button"
                           onClick={() => handleSendWhatsApp(order)}
@@ -1871,6 +1896,18 @@ export default function PedidosPage() {
                           <Receipt className="w-3.5 h-3.5 text-stone-600" />
                           <span className="hidden sm:inline">Ticket</span>
                         </button>
+
+                        {order.remainingBalance > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForPayment(order)}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                            title={`Cobrar saldo restante de ${formatCurrency(order.remainingBalance)}`}
+                          >
+                            <DollarSign className="w-3.5 h-3.5" />
+                            <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
+                          </button>
+                        )}
                       </div>
 
                       <button
@@ -1920,6 +1957,7 @@ export default function PedidosPage() {
                   const isReadyNotDelivered = checkIsReadyNotDelivered(order);
                   const isPending = checkIsPending(order);
                   const isUnpaid = checkIsUnpaid(order);
+                  const isHistoryOrRezagado = classificationFilter === "historial" || order.status === "entregado" || order.status === "cancelado" || isOverdue;
 
                   return (
                     <React.Fragment key={order.id}>
@@ -2139,43 +2177,62 @@ export default function PedidosPage() {
                               <span>Ticket</span>
                             </button>
 
-                            {/* 4. WhatsApp */}
-                            <button
-                              type="button"
-                              onClick={() => handleSendWhatsApp(order)}
-                              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
-                              title="Enviar recordatorio / aviso por WhatsApp"
-                            >
-                              <Send className="w-3.5 h-3.5" />
-                              <span>WhatsApp</span>
-                            </button>
+                            {/* 2. Pagar restante si no han liquidado (solo pedidos vigentes) */}
+                            {!isHistoryOrRezagado && order.remainingBalance > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOrderForPayment(order)}
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+                                title={`Cobrar restante de ${formatCurrency(order.remainingBalance)}`}
+                              >
+                                <DollarSign className="w-3.5 h-3.5" />
+                                <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
+                              </button>
+                            )}
 
-                            {/* 5. Editar */}
-                            <button
-                              type="button"
-                              onClick={() => setSelectedOrderForEdit(order)}
-                              className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-800 border border-stone-200 hover:border-stone-300 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
-                              title="Editar pedido"
-                            >
-                              <Edit3 className="w-3.5 h-3.5 text-stone-600" />
-                              <span>Editar</span>
-                            </button>
+                            {/* 3. WhatsApp (solo pedidos vigentes) */}
+                            {!isHistoryOrRezagado && (
+                              <button
+                                type="button"
+                                onClick={() => handleSendWhatsApp(order)}
+                                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+                                title="Enviar recordatorio / aviso por WhatsApp"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>WhatsApp</span>
+                              </button>
+                            )}
 
-                            {/* 6. Eliminar Pedido */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletePermanent(order.id, order.orderNumber, order.customerName);
-                              }}
-                              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
-                              title="Eliminar Pedido"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Eliminar</span>
-                            </button>
+                            {/* 4. Editar (solo para pedidos activos/vigentes) */}
+                            {!isHistoryOrRezagado && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOrderForEdit(order)}
+                                className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-800 border border-stone-200 hover:border-stone-300 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+                                title="Editar pedido"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-stone-600" />
+                                <span>Editar</span>
+                              </button>
+                            )}
 
-                            {/* 7. Pantalla de detalles del pedido */}
+                            {/* 5. Eliminar Pedido (solo para pedidos activos/vigentes) */}
+                            {!isHistoryOrRezagado && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePermanent(order.id, order.orderNumber, order.customerName);
+                                }}
+                                className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+                                title="Eliminar Pedido"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Eliminar</span>
+                              </button>
+                            )}
+
+                            {/* 6. Pantalla de detalles del pedido */}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2276,7 +2333,7 @@ export default function PedidosPage() {
                                 <div className="pt-3 flex flex-wrap items-center justify-between gap-2 border-t-2 border-stone-200 mt-2.5">
                                   <span className="text-xs font-semibold text-stone-500">Atendió: {order.cashier}</span>
                                   <div className="flex items-center gap-2">
-                                    {order.status !== "cancelado" && (
+                                    {!isHistoryOrRezagado && order.status !== "cancelado" && (
                                       <button
                                         type="button"
                                         onClick={() => handleCancelOrder(order.id)}
@@ -2287,15 +2344,17 @@ export default function PedidosPage() {
                                         <span>Cancelar Pedido</span>
                                       </button>
                                     )}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
-                                      className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs sm:text-sm rounded-xl shadow-md border-2 border-rose-700 flex items-center gap-2 transition-all cursor-pointer ring-2 ring-rose-300/50"
-                                      title="Eliminar este pedido permanentemente"
-                                    >
-                                      <Trash2 className="w-4 h-4 text-white" />
-                                      <span>ELIMINAR PEDIDO</span>
-                                    </button>
+                                    {!isHistoryOrRezagado && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
+                                        className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs sm:text-sm rounded-xl shadow-md border-2 border-rose-700 flex items-center gap-2 transition-all cursor-pointer ring-2 ring-rose-300/50"
+                                        title="Eliminar este pedido permanentemente"
+                                      >
+                                        <Trash2 className="w-4 h-4 text-white" />
+                                        <span>ELIMINAR PEDIDO</span>
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -2363,6 +2422,14 @@ export default function PedidosPage() {
         isOpen={!!selectedOrderForDetail}
         onClose={() => setSelectedOrderForDetail(null)}
         order={selectedOrderForDetail}
+        isHistoryMode={
+          classificationFilter === "historial" ||
+          (selectedOrderForDetail
+            ? selectedOrderForDetail.status === "entregado" ||
+              selectedOrderForDetail.status === "cancelado" ||
+              checkIsOverdue(selectedOrderForDetail)
+            : false)
+        }
         onPrintReceipt={(o) => {
           setSelectedOrderForReceipt(o);
         }}
@@ -2412,6 +2479,9 @@ export default function PedidosPage() {
         }}
         onPrintReceipt={(order) => {
           setSelectedOrderForReceipt(order);
+        }}
+        onOpenPayment={(order) => {
+          setSelectedOrderForPayment(order);
         }}
         onSendWhatsApp={(order) => {
           handleSendWhatsApp(order);

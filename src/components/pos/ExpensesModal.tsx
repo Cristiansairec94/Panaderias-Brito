@@ -3594,6 +3594,8 @@ export default function ExpensesModal({
                               const cleanDate = (order.deliveryDate || "").split("T")[0].split(" ")[0].trim();
                               const isToday = cleanDate === todayDateStr || (order.deliveryDate || "").toLowerCase().includes("hoy");
                               const isExpanded = !!expandedAllOrdersIds[order.id];
+                              const isDatePast = cleanDate && /^\d{4}-\d{2}-\d{2}$/.test(cleanDate) && cleanDate < todayDateStr;
+                              const isHistoryOrder = order.status === "entregado" || order.status === "cancelado" || isDatePast;
                               const items = order.items || [];
                               const visibleItems = isExpanded ? items : items.slice(0, 2);
                               const hasMore = items.length > 2;
@@ -3679,7 +3681,7 @@ export default function ExpensesModal({
                                         <span className="font-black text-stone-900 text-sm">
                                           👤 {order.customerName}
                                         </span>
-                                        {order.phone && order.phone !== "N/A" && (
+                                        {order.phone && order.phone !== "N/A" && !isHistoryOrder && (
                                           <button
                                             type="button"
                                             onClick={() => handleSendOrderWhatsApp(order)}
@@ -3706,56 +3708,90 @@ export default function ExpensesModal({
 
                                     {/* Acciones Rápidas para la Cajera */}
                                     <div className="flex items-center gap-1.5 shrink-0 pt-1 sm:pt-0 flex-wrap justify-end">
-                                      {remaining > 0 && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handlePayOrder(order)}
-                                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
-                                          title="Cobrar saldo restante al cliente"
-                                        >
-                                          <DollarSign className="w-3.5 h-3.5" />
-                                          <span>Cobrar Saldo</span>
-                                        </button>
+                                      {isHistoryOrder ? (
+                                        <>
+                                          <span className="text-[10px] font-black text-amber-900 bg-amber-50 border border-amber-300 px-2 py-1 rounded-xl">
+                                            {order.status === "entregado"
+                                              ? "✓ Entregado"
+                                              : order.status === "cancelado"
+                                              ? "✕ Cancelado"
+                                              : "📜 En Historial / Vencido"}
+                                          </span>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleViewOrderDetail(order)}
+                                            className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                            title="Ver detalles completos del pedido"
+                                          >
+                                            <Eye className="w-3.5 h-3.5 text-stone-500" />
+                                            <span>Detalle</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => setPreviewOrder(order)}
+                                            className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                            title="Reimprimir comprobante del pedido"
+                                          >
+                                            <Printer className="w-3.5 h-3.5 text-amber-800" />
+                                            <span className="hidden sm:inline">Ticket</span>
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          {remaining > 0 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handlePayOrder(order)}
+                                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                                              title="Cobrar saldo restante al cliente"
+                                            >
+                                              <DollarSign className="w-3.5 h-3.5" />
+                                              <span>Cobrar Saldo</span>
+                                            </button>
+                                          )}
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeliverOrder(order)}
+                                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                                            title="Marcar como entregado (desaparecerá de pedidos por entregar)"
+                                          >
+                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                            <span>Entregar</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleViewOrderDetail(order)}
+                                            className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                            title="Ver detalles completos del pedido"
+                                          >
+                                            <Eye className="w-3.5 h-3.5 text-stone-500" />
+                                            <span>Detalle</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => setPreviewOrder(order)}
+                                            className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                            title="Reimprimir comprobante del pedido"
+                                          >
+                                            <Printer className="w-3.5 h-3.5 text-amber-800" />
+                                            <span className="hidden sm:inline">Ticket</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleCancelOrder(order)}
+                                            className="p-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center cursor-pointer"
+                                            title="Dar de baja / cancelar pedido"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </>
                                       )}
-
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeliverOrder(order)}
-                                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
-                                        title="Marcar como entregado (desaparecerá de pedidos por entregar)"
-                                      >
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                        <span>Entregar</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => handleViewOrderDetail(order)}
-                                        className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                        title="Ver detalles completos del pedido"
-                                      >
-                                        <Eye className="w-3.5 h-3.5 text-stone-500" />
-                                        <span>Detalle</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewOrder(order)}
-                                        className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                        title="Reimprimir comprobante del pedido"
-                                      >
-                                        <Printer className="w-3.5 h-3.5 text-amber-800" />
-                                        <span className="hidden sm:inline">Ticket</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => handleCancelOrder(order)}
-                                        className="p-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center cursor-pointer"
-                                        title="Dar de baja / cancelar pedido"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
                                     </div>
                                   </div>
 

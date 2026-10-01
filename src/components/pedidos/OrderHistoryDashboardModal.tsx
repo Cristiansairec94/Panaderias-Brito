@@ -42,6 +42,7 @@ interface OrderHistoryDashboardModalProps {
   onViewOrderDetail: (order: CustomOrder) => void;
   onPrintReceipt: (order: CustomOrder) => void;
   onSendWhatsApp: (order: CustomOrder) => void;
+  onOpenPayment?: (order: CustomOrder) => void;
   onRestoreOrder?: (order: CustomOrder) => void;
   onDeleteOrderPermanently?: (order: CustomOrder) => void;
 }
@@ -55,6 +56,7 @@ export default function OrderHistoryDashboardModal({
   onViewOrderDetail,
   onPrintReceipt,
   onSendWhatsApp,
+  onOpenPayment,
   onRestoreOrder,
   onDeleteOrderPermanently,
 }: OrderHistoryDashboardModalProps) {
@@ -501,25 +503,38 @@ export default function OrderHistoryDashboardModal({
                         </span>
                       </div>
 
-                      {/* Botones de acción rápida */}
+                      {/* Botones de acción rápida: solo ticket, pagar restante, ver detalle y whatsapp */}
                       <div className="flex items-center gap-1.5 flex-wrap pt-1">
                         <button
                           type="button"
-                          onClick={() => onViewOrderDetail(order)}
-                          className="flex-1 min-w-[100px] py-1.5 px-2 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
-                          title="Ver detalle completo del pedido"
+                          onClick={() => onPrintReceipt(order)}
+                          className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl transition-all cursor-pointer font-bold text-xs flex items-center gap-1"
+                          title="Imprimir ticket del pedido"
                         >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Ver Detalle</span>
+                          <Receipt className="w-3.5 h-3.5 text-stone-600" />
+                          <span>Ticket</span>
                         </button>
+
+                        {order.remainingBalance > 0 && onOpenPayment && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenPayment(order)}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                            title={`Cobrar saldo restante de ${formatCurrency(order.remainingBalance)}`}
+                          >
+                            <DollarSign className="w-3.5 h-3.5" />
+                            <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
+                          </button>
+                        )}
 
                         <button
                           type="button"
-                          onClick={() => onPrintReceipt(order)}
-                          className="p-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300 rounded-xl transition-all cursor-pointer"
-                          title="Reimprimir ticket de pedido"
+                          onClick={() => onViewOrderDetail(order)}
+                          className="py-1.5 px-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs ml-auto"
+                          title="Ver detalle completo del pedido"
                         >
-                          <Receipt className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Detalles</span>
                         </button>
 
                         <button
@@ -530,17 +545,6 @@ export default function OrderHistoryDashboardModal({
                         >
                           <MessageCircle className="w-4 h-4" />
                         </button>
-
-                        {onRestoreOrder && (
-                          <button
-                            type="button"
-                            onClick={() => onRestoreOrder(order)}
-                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl transition-all cursor-pointer"
-                            title="Regresar a pedidos activos (si fue marcado por error)"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                          </button>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -623,11 +627,23 @@ export default function OrderHistoryDashboardModal({
                               <button
                                 type="button"
                                 onClick={() => onPrintReceipt(order)}
-                                className="p-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg transition-colors cursor-pointer"
-                                title="Reimprimir Ticket"
+                                className="px-2 py-1 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-200 rounded-lg transition-colors cursor-pointer font-bold flex items-center gap-1 text-[11px]"
+                                title="Imprimir Ticket"
                               >
                                 <Receipt className="w-3.5 h-3.5" />
+                                <span>Ticket</span>
                               </button>
+                              {order.remainingBalance > 0 && onOpenPayment && (
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenPayment(order)}
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer font-bold flex items-center gap-1 text-[11px]"
+                                  title={`Pagar saldo restante de ${formatCurrency(order.remainingBalance)}`}
+                                >
+                                  <DollarSign className="w-3 h-3" />
+                                  <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => onSendWhatsApp(order)}
@@ -636,16 +652,6 @@ export default function OrderHistoryDashboardModal({
                               >
                                 <MessageCircle className="w-3.5 h-3.5" />
                               </button>
-                              {onRestoreOrder && (
-                                <button
-                                  type="button"
-                                  onClick={() => onRestoreOrder(order)}
-                                  className="p-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg transition-colors cursor-pointer"
-                                  title="Restaurar a Activos"
-                                >
-                                  <RotateCcw className="w-3.5 h-3.5" />
-                                </button>
-                              )}
                             </div>
                           </td>
                         </tr>
