@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { useAuth, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
-import { onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
+import { onlyNumbersKeyDown, cleanOnlyNumbers, compressImageFile } from "@/lib/utils";
 import { UserRole } from "@/types";
 
 const PUESTOS_PANADERIA = [
@@ -258,8 +258,8 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
     setIsModalOpen(true);
   };
 
-  // Upload Photo
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload Photo con compresión automática para evitar exceder el límite de almacenamiento
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -267,20 +267,29 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
       alert("Por favor selecciona una imagen válida (JPG, PNG o WebP).");
       return;
     }
-    if (file.size > 3 * 1024 * 1024) {
-      alert("La imagen excede los 3MB recomendados.");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("La imagen excede los 10MB permitidos.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setFormPhotoUrl(result);
-        showToast("Fotografía cargada correctamente.");
+    try {
+      const compressed = await compressImageFile(file, 200, 200, 0.75);
+      if (compressed) {
+        setFormPhotoUrl(compressed);
+        showToast("Fotografía optimizada y cargada correctamente.");
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Error optimizando imagen:", err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        if (result) {
+          setFormPhotoUrl(result);
+          showToast("Fotografía cargada correctamente.");
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleRemovePhoto = () => {

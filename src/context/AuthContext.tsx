@@ -216,19 +216,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [rolePermissionsMap, setRolePermissionsMap] = useState<Record<UserRole, RolePermissions>>(ROLE_PERMISSIONS);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load custom users from localStorage on mount
+  // Load custom users from localStorage on mount & synchronize with server API
   useEffect(() => {
+    // 1. Carga inmediata desde almacenamiento local
     try {
       const savedCustom = localStorage.getItem("brito_custom_users");
       if (savedCustom) {
         const parsed = JSON.parse(savedCustom);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           setUsersList(parsed);
         }
       }
     } catch (e) {
-      console.error("Error loading custom users:", e);
+      console.error("Error loading custom users from localStorage:", e);
     }
+
+    // 2. Sincronización duradera con el servidor (/api/users)
+    const syncUsersWithServer = async () => {
+      try {
+        const res = await fetch("/api/users");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.users) && data.users.length > 0) {
+            setUsersList((localUsers) => {
+              const userMap = new Map<string, User>();
+              // Inicializar con defaults
+              DEMO_USERS.forEach((u) => userMap.set(u.id, u));
+              // Aplicar lo guardado en el servidor (users.json)
+              data.users.forEach((u: User) => {
+                const prev = userMap.get(u.id) || {};
+                userMap.set(u.id, { ...prev, ...u });
+              });
+              // Preservar usuarios locales de la sesión activa
+              localUsers.forEach((u: User) => {
+                const prev = userMap.get(u.id) || {};
+                userMap.set(u.id, { ...prev, ...u });
+              });
+
+              const merged = Array.from(userMap.values());
+              try {
+                localStorage.setItem("brito_custom_users", JSON.stringify(merged));
+              } catch (e) {
+                console.warn("[AuthContext] Almacenamiento local lleno al sincronizar usuarios:", e);
+              }
+              return merged;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[AuthContext] No se pudo consultar /api/users:", err);
+      }
+    };
+
+    syncUsersWithServer();
   }, []);
 
   // Load saved role permissions from localStorage on mount
@@ -502,83 +542,132 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addUser = (newUser: User) => {
-    const updated = [...usersList, newUser];
-    setUsersList(updated);
-    try {
-      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Error saving custom user:", e);
-    }
-  };
-
-  const updateUser = (userId: string, updatedData: Partial<User>) => {
-    const updated = usersList.map((u) => {
-      if (u.id === userId) {
-        return { ...u, ...updatedData };
-      }
-      return u;
-    });
-    setUsersList(updated);
-    try {
-      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Error updating user:", e);
-    }
-
-    if (user && user.id === userId) {
-      const updatedCurrentUser = { ...user, ...updatedData };
-      setUser(updatedCurrentUser);
+  const addUser = useCallback((newUser: User) => {
+    setUsersList((prevUsers) => {
+      const exists = prevUsers.some((u) => u.id === newUser.id);
+      const updated = exists
+        ? prevUsers.map((u) => (u.id === newUser.id ? { ...u, ...newUser } : u))
+        : [...prevUsers, newUser];
       try {
-        localStorage.setItem("brito_user", JSON.stringify(updatedCurrentUser));
+        localStorage.setItem("brito_custom_users", JSON.stringify(updated));
       } catch (e) {
-        console.error("Error updating active session:", e);
+        console.warn("Storage quota warning saving user:", e);
       }
-    }
-  };
+      return updated;
+    });
 
-  const deleteUser = (userId: string): { success: boolean; message?: string } => {
+    // Persistir de forma duradera en el servidor
+    fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newUser),
+    }).catch((err) => {
+      console.warn("[AuthContext] No se pudo guardar usuario en servidor:", err);
+    });
+  }, []);
+
+  const updateUser = useCallback((userId: string, updatedData: Partial<User>) => {
+    setUsersList((prevUsers) => {
+      const updated = prevUsers.map((u) => {
+        if (u.id === userId) {
+          return { ...u, ...updatedData };
+        }
+        return u;
+      });
+      try {
+        localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Storage quota warning updating user:", e);
+      }
+      return updated;
+    });
+
+    setUser((currUser) => {
+      if (currUser && currUser.id === userId) {
+        const updatedCurrentUser = { ...currUser, ...updatedData };
+        try {
+          localStorage.setItem("brito_user", JSON.stringify(updatedCurrentUser));
+        } catch (e) {
+          console.error("Error updating active session:", e);
+        }
+        return updatedCurrentUser;
+      }
+      return currUser;
+    });
+
+    // Persistir en el servidor
+    fetch("/api/users", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: userId, updates: updatedData }),
+    }).catch((err) => {
+      console.warn("[AuthContext] Error actualizando usuario en servidor:", err);
+    });
+  }, []);
+
+  const deleteUser = useCallback((userId: string): { success: boolean; message?: string } => {
     if (user && user.id === userId) {
       return { success: false, message: "No puedes eliminar tu propia cuenta en sesión activa." };
     }
-    const target = usersList.find((u) => u.id === userId);
-    if (target && (target.id === "usr-1" || (target.role === "admin" && target.username === "admin"))) {
+    if (userId === "usr-1") {
       return { success: false, message: "No se permite eliminar la cuenta principal del Administrador Don Toño." };
     }
 
-    const updated = usersList.filter((u) => u.id !== userId);
-    setUsersList(updated);
-    try {
-      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Error deleting user:", e);
-    }
-    return { success: true };
-  };
+    setUsersList((prevUsers) => {
+      const updated = prevUsers.filter((u) => u.id !== userId);
+      try {
+        localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Storage quota warning deleting user:", e);
+      }
+      return updated;
+    });
 
-  const toggleUserStatus = (userId: string) => {
+    // Eliminar en el servidor
+    fetch(`/api/users?id=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }).catch((err) => {
+      console.warn("[AuthContext] Error eliminando usuario en servidor:", err);
+    });
+
+    return { success: true };
+  }, [user]);
+
+  const toggleUserStatus = useCallback((userId: string) => {
     if (user && user.id === userId) {
       return; // Cannot deactivate own account while logged in
     }
-    const target = usersList.find((u) => u.id === userId);
-    if (target && (target.id === "usr-1" || (target.role === "admin" && target.username === "admin"))) {
+    if (userId === "usr-1") {
       return; // Protect primary admin
     }
 
-    const updated = usersList.map((u) => {
-      if (u.id === userId) {
-        const nextStatus: "activo" | "inactivo" = u.status === "inactivo" ? "activo" : "inactivo";
-        return { ...u, status: nextStatus };
+    let nextStatus: "activo" | "inactivo" = "activo";
+
+    setUsersList((prevUsers) => {
+      const updated = prevUsers.map((u) => {
+        if (u.id === userId) {
+          nextStatus = u.status === "inactivo" ? "activo" : "inactivo";
+          return { ...u, status: nextStatus };
+        }
+        return u;
+      });
+      try {
+        localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Storage quota warning toggling user status:", e);
       }
-      return u;
+      return updated;
     });
-    setUsersList(updated);
-    try {
-      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Error toggling user status:", e);
-    }
-  };
+
+    // Persistir en servidor
+    fetch("/api/users", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: userId, updates: { status: nextStatus } }),
+    }).catch((err) => {
+      console.warn("[AuthContext] Error toggling user status en servidor:", err);
+    });
+  }, [user]);
 
   // Dynamically update permissions and labels for a role in the system
   const updateRolePermissions = useCallback((role: UserRole, newPermissions: RolePermissions, roleLabel?: string) => {
@@ -618,6 +707,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.error("Error updating users with new role permissions:", e);
       }
+      fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedList),
+      }).catch(() => {});
       return updatedList;
     });
 

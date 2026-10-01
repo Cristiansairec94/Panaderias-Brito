@@ -430,3 +430,69 @@ export function deduplicateIncomes<T extends { id?: string; amount?: number; con
   return result;
 }
 
+/**
+ * Comprime y redimensiona una imagen subida por el usuario utilizando un canvas HTML5.
+ * Reduce el peso de varios MBs a ~10-15KB en formato JPEG para evitar exceder el límite de almacenamiento (localStorage / quota).
+ */
+export function compressImageFile(
+  file: File,
+  maxWidth = 200,
+  maxHeight = 200,
+  quality = 0.75
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") {
+      resolve("");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = (err) => reject(err);
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (!result) {
+        resolve("");
+        return;
+      }
+
+      const img = new Image();
+      img.onerror = (err) => reject(err);
+      img.onload = () => {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(width, 1);
+        canvas.height = Math.max(height, 1);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(result);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        try {
+          const compressed = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressed);
+        } catch {
+          resolve(result);
+        }
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
