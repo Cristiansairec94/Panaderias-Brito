@@ -162,19 +162,19 @@ export default function Header() {
   const current = getPageTitle();
 
   return (
-    <header className="h-16 shrink-0 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-2.5 sm:px-5 lg:px-6 flex items-center justify-between sticky top-0 z-[100] shadow-xs w-full max-w-full overflow-visible">
+    <header className="h-16 shrink-0 bg-gradient-to-r from-[#1c0e08] via-[#24130b] to-[#1c0e08] border-b border-[#3d2014] text-white px-2.5 sm:px-5 lg:px-6 flex items-center justify-between sticky top-0 z-[100] shadow-md w-full max-w-full overflow-visible">
       {/* Left: Desktop Collapse Toggle + Page Title */}
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 mr-2">
         {/* Desktop Quick Toggle Button */}
         <button
           onClick={toggleCollapse}
-          className="hidden md:flex p-2 rounded-xl bg-stone-100/80 hover:bg-stone-200/80 text-stone-600 hover:text-stone-900 transition-colors border border-stone-200/80 shrink-0"
+          className="hidden md:flex p-2 rounded-xl bg-[#2c170d] hover:bg-[#3d2012] text-amber-200 hover:text-white transition-colors border border-amber-900/60 shrink-0 cursor-pointer"
           title={isCollapsed ? "Desplegar menú lateral" : "Contraer menú lateral"}
         >
           {isCollapsed ? (
             <PanelLeftOpen className="w-4 h-4 text-orange-600" />
           ) : (
-            <PanelLeftClose className="w-4 h-4" />
+            <PanelLeftClose className="w-4 h-4 text-amber-300" />
           )}
         </button>
 
@@ -206,18 +206,18 @@ export default function Header() {
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-black text-stone-900 tracking-tight leading-tight whitespace-nowrap truncate">
+              <h2 className="text-base sm:text-lg font-black text-amber-50 tracking-tight leading-tight whitespace-nowrap truncate">
                 {current.title}
               </h2>
-              <div className="hidden 2xl:inline-flex items-center gap-1.5 text-[11px] font-bold text-stone-800 bg-gradient-to-r from-orange-50 via-rose-50 to-orange-50 px-3 py-0.5 rounded-full border border-rose-200/80 shadow-xs group cursor-default shrink-0">
+              <div className="hidden 2xl:inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-200 bg-gradient-to-r from-orange-500/20 via-amber-500/15 to-orange-500/20 px-3 py-0.5 rounded-full border border-amber-500/30 shadow-xs group cursor-default shrink-0">
                 <Sparkles className="w-3 h-3 text-orange-500 group-hover:rotate-180 transition-transform duration-500" />
-                <span className="font-extrabold text-stone-700">Panadería</span>
-                <span className="text-xs font-black bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
+                <span className="font-extrabold text-amber-200">Panadería</span>
+                <span className="text-xs font-black bg-gradient-to-r from-orange-400 to-amber-300 bg-clip-text text-transparent">
                   Brito
                 </span>
               </div>
             </div>
-            <p className="text-[10px] sm:text-[11px] text-stone-500 font-medium truncate max-w-[170px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[420px] leading-tight mt-0.5">
+            <p className="text-[10px] sm:text-[11px] text-amber-200/70 font-medium truncate max-w-[170px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[420px] leading-tight mt-0.5">
               {current.subtitle}
             </p>
           </div>
@@ -283,7 +283,7 @@ export default function Header() {
         <div ref={branchMenuRef} className="relative z-[110] shrink-0">
           <button
             onClick={toggleBranchMenu}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50/80 hover:bg-stone-100 text-stone-800 text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap"
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl border border-amber-900/60 bg-[#2c170d] hover:bg-[#3d2012] text-amber-100 text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer"
             title="Cambiar sucursal activa"
           >
             <span className="relative flex h-2 w-2 shrink-0">
@@ -294,16 +294,16 @@ export default function Header() {
             <span className="max-w-[65px] sm:max-w-[110px] md:max-w-[140px] truncate">
               {isAllBranches ? "Todas" : currentBranch?.shortName}
             </span>
-            <ChevronDown className="w-3 h-3 text-stone-400 shrink-0 hidden sm:inline" />
+            <ChevronDown className="w-3 h-3 text-amber-400/80 shrink-0 hidden sm:inline" />
           </button>
 
           {/* Branch Dropdown Menu */}
           {showBranchMenu && (
-            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-[150] animate-in fade-in zoom-in-95">
-              <div className="p-2 border-b border-stone-100 flex items-center justify-between">
+            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-32px)] bg-[#1c0e08] rounded-2xl shadow-2xl border border-amber-900/60 p-2.5 z-[150] animate-in fade-in zoom-in-95 text-stone-200">
+              <div className="p-2 border-b border-amber-900/40 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Red de Sucursales</p>
-                  <p className="text-xs font-black text-stone-900">Seleccionar Tienda</p>
+                  <p className="text-xs font-black text-white">Seleccionar Tienda</p>
                 </div>
                 <Link
                   href="/sucursales"
@@ -384,8 +384,8 @@ export default function Header() {
         </div>
 
         {/* Live Clock */}
-        <div className="hidden xl:flex items-center gap-1.5 bg-stone-100/80 px-2.5 py-1.5 rounded-xl border border-stone-200/80 text-stone-700 text-xs font-bold shadow-xs shrink-0 whitespace-nowrap">
-          <Clock className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+        <div className="hidden xl:flex items-center gap-1.5 bg-[#2c170d] px-2.5 py-1.5 rounded-xl border border-amber-900/60 text-amber-200 text-xs font-bold shadow-xs shrink-0 whitespace-nowrap">
+          <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
           <span className="tabular-nums whitespace-nowrap">{time || "Cargando..."}</span>
         </div>
 
@@ -397,7 +397,7 @@ export default function Header() {
           <button
             type="button"
             onClick={toggleUserMenu}
-            className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-stone-100 transition-all border border-stone-200/80 bg-stone-50/70 shadow-xs shrink-0 cursor-pointer"
+            className="flex items-center gap-2 p-1 sm:pr-3 rounded-xl hover:bg-[#3d2012] transition-all border border-amber-900/60 bg-[#2c170d] shadow-xs shrink-0 cursor-pointer"
             title="Cambiar perfil o usuario"
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#f97316] via-[#fb7185] to-[#e11d48] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-rose-500/20 overflow-hidden shrink-0">
@@ -408,10 +408,10 @@ export default function Header() {
               )}
             </div>
             <div className="text-left hidden sm:block min-w-0 max-w-[85px] md:max-w-[110px]">
-              <p className="text-xs font-black text-stone-900 leading-tight truncate">{user?.name || "Invitado"}</p>
-              <p className="text-[9px] text-rose-700 font-bold uppercase tracking-wider truncate">{user?.roleLabel || "Sin Rol"}</p>
+              <p className="text-xs font-black text-amber-50 leading-tight truncate">{user?.name || "Invitado"}</p>
+              <p className="text-[9px] text-amber-400 font-bold uppercase tracking-wider truncate">{user?.roleLabel || "Sin Rol"}</p>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-amber-400/80 shrink-0" />
           </button>
 
           {/* User & Role Switcher Menu */}
@@ -423,10 +423,10 @@ export default function Header() {
                 onClick={() => setShowUserMenu(false)}
               />
 
-              <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-24px)] bg-white rounded-2xl shadow-2xl border border-stone-200 p-2.5 z-[150] animate-in fade-in zoom-in-95">
-                <div className="p-2.5 border-b border-stone-100 bg-stone-50/60 rounded-xl mb-1.5">
+              <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-24px)] bg-[#1c0e08] rounded-2xl shadow-2xl border border-amber-900/60 p-2.5 z-[150] animate-in fade-in zoom-in-95 text-stone-200">
+                <div className="p-2.5 border-b border-amber-900/40 bg-[#24130b] rounded-xl mb-1.5">
                   <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Sesión activa:</p>
-                  <p className="text-xs font-black text-stone-900">{user?.name}</p>
+                  <p className="text-xs font-black text-white">{user?.name}</p>
                   <p className="text-[11px] text-stone-500">{user?.email}</p>
                 </div>
 
