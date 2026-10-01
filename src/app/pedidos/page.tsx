@@ -104,6 +104,7 @@ export default function PedidosPage() {
   const [selectedBranchFilter, setSelectedBranchFilter] = useState("all");
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
   const [historialSubFilter, setHistorialSubFilter] = useState<"todos" | "entregados" | "cancelados">("todos");
+  const [pagadosSubFilter, setPagadosSubFilter] = useState<"todos" | "pendientes" | "listos">("todos");
   const [isClassificationOpen, setIsClassificationOpen] = useState(true);
   const [viewMode, setViewMode] = useState<"productos" | "tabla">("productos");
   const [productLayout, setProductLayout] = useState<"lista" | "cuadricula">("lista");
@@ -297,6 +298,8 @@ export default function PedidosPage() {
     let pendientes = 0;
     let porPagar = 0;
     let pagados = 0;
+    let pagadosListos = 0;
+    let pagadosPendientes = 0;
     let noLlevados = 0;
     let noPasaron = 0;
     let proximos = 0;
@@ -310,7 +313,14 @@ export default function PedidosPage() {
       if (oDate === todayStr && o.status !== "cancelado" && o.status !== "entregado") hoy++;
       if (checkIsPending(o)) pendientes++;
       if (checkIsUnpaid(o)) porPagar++;
-      if (checkIsPaid(o)) pagados++;
+      if (checkIsPaid(o)) {
+        pagados++;
+        if (o.status === "listo") {
+          pagadosListos++;
+        } else {
+          pagadosPendientes++;
+        }
+      }
       if (checkIsReadyNotDelivered(o)) noLlevados++;
       if (checkIsOverdue(o)) noPasaron++;
       if (checkIsUpcoming(o)) proximos++;
@@ -326,6 +336,8 @@ export default function PedidosPage() {
       pendientes,
       por_pagar: porPagar,
       pagados,
+      pagados_listos: pagadosListos,
+      pagados_pendientes: pagadosPendientes,
       no_llevados: noLlevados,
       no_pasaron: noPasaron,
       proximos,
@@ -369,8 +381,11 @@ export default function PedidosPage() {
         return false;
       }
       if (classificationFilter === "pendientes" && !checkIsPending(order)) return false;
-      if (classificationFilter === "por_pagar" && !checkIsUnpaid(order)) return false;
-      if (classificationFilter === "pagados" && !checkIsPaid(order)) return false;
+      if (classificationFilter === "pagados") {
+        if (!checkIsPaid(order)) return false;
+        if (pagadosSubFilter === "pendientes" && order.status === "listo") return false;
+        if (pagadosSubFilter === "listos" && order.status !== "listo") return false;
+      }
       if (classificationFilter === "no_llevados" && !checkIsReadyNotDelivered(order)) return false;
       if (classificationFilter === "no_pasaron" && !checkIsOverdue(order)) return false;
       if (classificationFilter === "proximos" && !checkIsUpcoming(order)) return false;
@@ -421,7 +436,7 @@ export default function PedidosPage() {
 
       return true;
     });
-  }, [orders, selectedBranchFilter, classificationFilter, historialSubFilter, statusFilter, paymentFilter, dateFilter, searchQuery, todayStr, tomorrowStr, currentMinutes]);
+  }, [orders, selectedBranchFilter, classificationFilter, historialSubFilter, pagadosSubFilter, statusFilter, paymentFilter, dateFilter, searchQuery, todayStr, tomorrowStr, currentMinutes]);
 
   // Metrics (reactivos a la sucursal seleccionada para coincidir con los pedidos)
   const metrics = useMemo(() => {
@@ -472,6 +487,7 @@ export default function PedidosPage() {
   // Handler para los 4 cuadros KPI principales: activa el filtro y lleva directamente a ver los pedidos correspondientes
   const handleSelectKPICard = (key: OrderClassificationKey) => {
     setClassificationFilter(key);
+    setPagadosSubFilter("todos");
     setSearchQuery("");
     if (dateFilter !== "all") setDateFilter("all");
     if (paymentFilter !== "all") setPaymentFilter("all");
@@ -482,6 +498,7 @@ export default function PedidosPage() {
 
   // Handler que activa la clasificación y lleva directamente a la lista de pedidos
   const handleSelectClassificationCard = (key: OrderClassificationKey) => {
+    setPagadosSubFilter("todos");
     if (key === "all") {
       setClassificationFilter("all");
       setStatusFilter("all");
@@ -505,6 +522,40 @@ export default function PedidosPage() {
   };
 
   // Handlers for quick actions
+  const handleMarkAsReady = (order: CustomOrder) => {
+    updateOrderStatus(order.id, "listo");
+    loadOrders();
+    addNotification({
+      title: "¡Pedido Listo en Sucursal!",
+      description: `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal.`,
+      senderName: "Control de Pedidos",
+      senderAvatar: "🎂",
+      highlightText: order.orderNumber,
+      category: "pedidos",
+      badgeIcon: "pastel",
+    });
+  };
+
+  const handleToggleReady = (order: CustomOrder) => {
+    if (order.status === "listo") {
+      if (confirm(`El pedido ${order.orderNumber} ya está marcado como "Listo en Sucursal".\n\n¿Deseas regresarlo a "En Preparación"?`)) {
+        updateOrderStatus(order.id, "pendiente");
+        loadOrders();
+        addNotification({
+          title: "Estado Actualizado",
+          description: `El pedido ${order.orderNumber} regresó a "En Preparación".`,
+          senderName: "Control de Pedidos",
+          senderAvatar: "👨‍🍳",
+          highlightText: order.orderNumber,
+          category: "pedidos",
+          badgeIcon: "pastel",
+        });
+      }
+    } else {
+      handleMarkAsReady(order);
+    }
+  };
+
   const handleAdvanceStatus = (order: CustomOrder) => {
     let nextStatus: CustomOrder["status"] = order.status;
     if (order.status === "pendiente" || order.status === "en_horno") nextStatus = "listo";
@@ -600,7 +651,7 @@ export default function PedidosPage() {
       case "listo":
         return (
           <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Listo en Tienda
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Listo en Sucursal
           </span>
         );
       case "entregado":
@@ -1165,9 +1216,53 @@ export default function PedidosPage() {
                       {classificationFilter === "proximos" && "⏰ Próximos de Hoy"}
                     </h3>
                   </div>
-                  <p className="text-[11px] text-stone-500 font-semibold mt-0.5">
-                    Mostrando {filteredOrders.length} pedido(s) activo(s) en proceso.
-                  </p>
+                  {classificationFilter === "pagados" ? (
+                    <div className="mt-1 space-y-1.5">
+                      <p className="text-[11px] text-amber-900 font-bold bg-amber-50/90 border border-amber-200/80 px-2 py-1 rounded-md">
+                        ⚠️ <strong>Control de Sucursal:</strong> El pedido está pagado, pero puede que aún no haya llegado a la sucursal. Revisa cada uno y pulsa <strong>&quot;Marcar como Listo&quot;</strong> cuando ya esté físicamente en tienda.
+                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-black uppercase text-stone-500">Subfiltro:</span>
+                        <button
+                          type="button"
+                          onClick={() => setPagadosSubFilter("todos")}
+                          className={`px-2 py-0.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                            pagadosSubFilter === "todos"
+                              ? "bg-amber-600 text-white shadow-2xs"
+                              : "bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200"
+                          }`}
+                        >
+                          Todos pagados ({classificationCounts.pagados})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPagadosSubFilter("pendientes")}
+                          className={`px-2 py-0.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
+                            pagadosSubFilter === "pendientes"
+                              ? "bg-amber-600 text-white shadow-2xs"
+                              : "bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300"
+                          }`}
+                        >
+                          <span>⏳ Por llegar a sucursal ({classificationCounts.pagados_pendientes})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPagadosSubFilter("listos")}
+                          className={`px-2 py-0.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
+                            pagadosSubFilter === "listos"
+                              ? "bg-emerald-700 text-white shadow-2xs"
+                              : "bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300"
+                          }`}
+                        >
+                          <span>🎂 Ya listos en sucursal ({classificationCounts.pagados_listos})</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-stone-500 font-semibold mt-0.5">
+                      Mostrando {filteredOrders.length} pedido(s) activo(s) en proceso.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1562,6 +1657,29 @@ export default function PedidosPage() {
                       className="flex items-center justify-end gap-1.5 shrink-0 pt-1 lg:pt-0 border-t lg:border-t-0 border-stone-100 flex-wrap"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {/* Botón: Marcar como Listo / Listo en Sucursal */}
+                      {order.status !== "listo" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkAsReady(order)}
+                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Marcar como Listo</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleReady(order)}
+                          className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
+                        >
+                          <Check className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>✓ Listo en Sucursal</span>
+                        </button>
+                      )}
+
                       {/* 1. Imprimir Ticket (siempre disponible) */}
                       <button
                         type="button"
@@ -1877,6 +1995,29 @@ export default function PedidosPage() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Botón: Marcar como Listo / Listo en Sucursal */}
+                        {order.status !== "listo" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkAsReady(order)}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                            title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Marcar como Listo</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReady(order)}
+                            className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                            title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
+                          >
+                            <Check className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>✓ Listo en Sucursal</span>
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => handleSendWhatsApp(order)}
@@ -1957,7 +2098,7 @@ export default function PedidosPage() {
                   const isReadyNotDelivered = checkIsReadyNotDelivered(order);
                   const isPending = checkIsPending(order);
                   const isUnpaid = checkIsUnpaid(order);
-                  const isHistoryOrRezagado = classificationFilter === "historial" || order.status === "entregado" || order.status === "cancelado" || isOverdue;
+                  const isConcludedOrHistory = classificationFilter === "historial" || order.status === "entregado" || order.status === "cancelado";
 
                   return (
                     <React.Fragment key={order.id}>
@@ -2166,6 +2307,31 @@ export default function PedidosPage() {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1.5 flex-nowrap">
+                            {/* Botón: Marcar como Listo / Listo en Sucursal */}
+                            {!isConcludedOrHistory && (
+                              order.status !== "listo" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkAsReady(order)}
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                                  title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Marcar como Listo</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleReady(order)}
+                                  className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                                  title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
+                                >
+                                  <Check className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>✓ Listo en Sucursal</span>
+                                </button>
+                              )
+                            )}
+
                             {/* 1. Ticket térmico */}
                             <button
                               type="button"
@@ -2177,8 +2343,8 @@ export default function PedidosPage() {
                               <span>Ticket</span>
                             </button>
 
-                            {/* 2. Pagar restante si no han liquidado (solo pedidos vigentes) */}
-                            {!isHistoryOrRezagado && order.remainingBalance > 0 && (
+                            {/* 2. Pagar restante si no han liquidado */}
+                            {order.remainingBalance > 0 && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedOrderForPayment(order)}
@@ -2190,21 +2356,19 @@ export default function PedidosPage() {
                               </button>
                             )}
 
-                            {/* 3. WhatsApp (solo pedidos vigentes) */}
-                            {!isHistoryOrRezagado && (
-                              <button
-                                type="button"
-                                onClick={() => handleSendWhatsApp(order)}
-                                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
-                                title="Enviar recordatorio / aviso por WhatsApp"
-                              >
-                                <Send className="w-3.5 h-3.5" />
-                                <span>WhatsApp</span>
-                              </button>
-                            )}
+                            {/* 3. WhatsApp */}
+                            <button
+                              type="button"
+                              onClick={() => handleSendWhatsApp(order)}
+                              className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+                              title="Enviar recordatorio / aviso por WhatsApp"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>WhatsApp</span>
+                            </button>
 
-                            {/* 4. Editar (solo para pedidos activos/vigentes) */}
-                            {!isHistoryOrRezagado && (
+                            {/* 4. Editar (disponible para todos los pedidos activos en catálogo) */}
+                            {!isConcludedOrHistory && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedOrderForEdit(order)}
@@ -2216,8 +2380,8 @@ export default function PedidosPage() {
                               </button>
                             )}
 
-                            {/* 5. Eliminar Pedido (solo para pedidos activos/vigentes) */}
-                            {!isHistoryOrRezagado && (
+                            {/* 5. Eliminar Pedido (disponible para todos los pedidos activos en catálogo) */}
+                            {!isConcludedOrHistory && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -2333,7 +2497,7 @@ export default function PedidosPage() {
                                 <div className="pt-3 flex flex-wrap items-center justify-between gap-2 border-t-2 border-stone-200 mt-2.5">
                                   <span className="text-xs font-semibold text-stone-500">Atendió: {order.cashier}</span>
                                   <div className="flex items-center gap-2">
-                                    {!isHistoryOrRezagado && order.status !== "cancelado" && (
+                                    {!isConcludedOrHistory && order.status !== "cancelado" && (
                                       <button
                                         type="button"
                                         onClick={() => handleCancelOrder(order.id)}
@@ -2344,7 +2508,7 @@ export default function PedidosPage() {
                                         <span>Cancelar Pedido</span>
                                       </button>
                                     )}
-                                    {!isHistoryOrRezagado && (
+                                    {!isConcludedOrHistory && (
                                       <button
                                         type="button"
                                         onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
@@ -2426,8 +2590,7 @@ export default function PedidosPage() {
           classificationFilter === "historial" ||
           (selectedOrderForDetail
             ? selectedOrderForDetail.status === "entregado" ||
-              selectedOrderForDetail.status === "cancelado" ||
-              checkIsOverdue(selectedOrderForDetail)
+              selectedOrderForDetail.status === "cancelado"
             : false)
         }
         onPrintReceipt={(o) => {

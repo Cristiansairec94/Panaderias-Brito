@@ -95,7 +95,7 @@ export default function OrderDetailModal({
       case "listo":
         return (
           <span className="bg-emerald-100 text-emerald-900 border-2 border-emerald-300 px-3 py-1.5 rounded-2xl font-black text-xs inline-flex items-center gap-1.5 shadow-2xs">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Listo para Entrega
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Listo en Sucursal
           </span>
         );
       case "entregado":
@@ -114,29 +114,10 @@ export default function OrderDetailModal({
   };
 
   const isLiquidado = order.remainingBalance <= 0;
-
-  // Fecha actual en formato local YYYY-MM-DD
-  const todayLocalDateStr = (() => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  })();
-
-  const isDeliveryDatePast = Boolean(
-    order.deliveryDate &&
-    (() => {
-      const clean = order.deliveryDate.split("T")[0].split(" ")[0].trim();
-      return /^\d{4}-\d{2}-\d{2}$/.test(clean) && clean < todayLocalDateStr;
-    })()
-  );
-
   const isHistoryOrder = Boolean(
     isHistoryMode ||
     order.status === "entregado" ||
-    order.status === "cancelado" ||
-    isDeliveryDatePast
+    order.status === "cancelado"
   );
   const deliveryFormatted = formatDeliveryDate(order.deliveryDate);
 
@@ -444,117 +425,119 @@ export default function OrderDetailModal({
 
         {/* ── Barra de Acciones del Pie ── */}
         <div className="p-4 sm:p-5 bg-stone-50 border-t border-stone-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          {isHistoryOrder ? (
-            <div className="px-4 py-2.5 bg-amber-50 border border-amber-300 text-amber-950 font-bold text-xs rounded-xl flex items-center gap-2 shadow-2xs max-w-xl">
-              <span className="text-base">🥖</span>
-              <span>
-                <strong>Historial (Solo Informativo):</strong> Ya no se puede editar ni eliminar. Si se necesita revivir el pedido, hacer uno nuevo en sucursal.
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Botón Imprimir Ticket */}
-              {onPrintReceipt && (
-                <button
-                  type="button"
-                  onClick={() => onPrintReceipt(order)}
-                  className="px-4 py-2.5 bg-stone-900 hover:bg-black text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-                >
-                  <Printer className="w-4 h-4 text-amber-400" />
-                  <span>Imprimir Ticket (80mm)</span>
-                </button>
-              )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Indicador Informativo solo si el pedido está en Historial (ya entregado o cancelado) */}
+            {isHistoryOrder && (
+              <div className="px-3.5 py-2 bg-amber-50 border border-amber-300 text-amber-950 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs">
+                <span>🥖</span>
+                <span>
+                  <strong>Historial ({order.status === "entregado" ? "Entregado" : "Dado de baja"}):</strong> Solo consulta de ticket y liquidación de saldo.
+                </span>
+              </div>
+            )}
 
-              {/* Botón WhatsApp */}
-              {onSendWhatsApp && (
-                <button
-                  type="button"
-                  onClick={() => onSendWhatsApp(order)}
-                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Aviso WhatsApp</span>
-                </button>
-              )}
+            {/* Botón Imprimir Ticket (disponible siempre: activos y en historial) */}
+            {onPrintReceipt && (
+              <button
+                type="button"
+                onClick={() => onPrintReceipt(order)}
+                className="px-4 py-2.5 bg-stone-900 hover:bg-black text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Printer className="w-4 h-4 text-amber-400" />
+                <span>Imprimir Ticket (80mm)</span>
+              </button>
+            )}
 
-              {/* Botón Pagar Restante si tiene saldo pendiente */}
-              {!isLiquidado && onOpenPayment && order.status !== "cancelado" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenPayment(order);
-                  }}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-                >
-                  <DollarSign className="w-4 h-4" />
-                  <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
-                </button>
-              )}
+            {/* Botón WhatsApp */}
+            {onSendWhatsApp && (
+              <button
+                type="button"
+                onClick={() => onSendWhatsApp(order)}
+                className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Send className="w-4 h-4" />
+                <span>Aviso WhatsApp</span>
+              </button>
+            )}
 
-              {/* Botón Marcar Listo (solo para pedidos activos, nunca en historial) */}
-              {onAdvanceStatus && (order.status === "pendiente" || order.status === "en_horno") && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onAdvanceStatus(order);
-                    onClose();
-                  }}
-                  className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                  title="Marcar como listo para entrega en sucursal"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Marcar Listo</span>
-                </button>
-              )}
+            {/* Botón Pagar Restante si tiene saldo pendiente (tanto en activos como en historial si vuelven a liquidar) */}
+            {!isLiquidado && onOpenPayment && order.status !== "cancelado" && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenPayment(order);
+                }}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <DollarSign className="w-4 h-4" />
+                <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
+              </button>
+            )}
 
-              {/* Botón Entregado (solo para pedidos activos, nunca en historial) */}
-              {order.status !== "entregado" && order.status !== "cancelado" && (
-                <button
-                  type="button"
-                  onClick={handleDeliver}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-emerald-400/40"
-                  title="Marcar pedido como entregado"
-                >
-                  <PackageCheck className="w-4 h-4" />
-                  <span>Entregado</span>
-                </button>
-              )}
+            {/* === ACCIONES OPERATIVAS EXCLUSIVAS DE PEDIDOS ACTIVOS === */}
+            {/* Botón Marcar Listo */}
+            {!isHistoryOrder && onAdvanceStatus && (order.status === "pendiente" || order.status === "en_horno") && (
+              <button
+                type="button"
+                onClick={() => {
+                  onAdvanceStatus(order);
+                  onClose();
+                }}
+                className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Marcar como listo para entrega en sucursal"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Marcar Listo</span>
+              </button>
+            )}
 
-              {/* Botón Editar (solo pedidos activos, no en historial) */}
-              {onOpenEdit && order.status !== "cancelado" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenEdit(order);
-                  }}
-                  className="px-3.5 py-2.5 bg-white hover:bg-stone-100 text-stone-700 border border-stone-200 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-stone-600" />
-                  <span>Editar</span>
-                </button>
-              )}
+            {/* Botón Entregado */}
+            {!isHistoryOrder && order.status !== "entregado" && order.status !== "cancelado" && (
+              <button
+                type="button"
+                onClick={handleDeliver}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-600/30 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-emerald-400/40"
+                title="Marcar pedido como entregado"
+              >
+                <PackageCheck className="w-4 h-4" />
+                <span>Entregado</span>
+              </button>
+            )}
 
-              {/* Botón Dar de Baja (solo para pedidos activos) */}
-              {onDarDeBaja && order.status !== "entregado" && order.status !== "cancelado" && (
-                <button
-                  type="button"
-                  onClick={() => onDarDeBaja(order)}
-                  className="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-rose-300/40"
-                  title="Dar de baja este pedido"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Dar de baja</span>
-                </button>
-              )}
-            </div>
-          )}
+            {/* Botón Editar */}
+            {!isHistoryOrder && onOpenEdit && order.status !== "cancelado" && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenEdit(order);
+                }}
+                className="px-3.5 py-2.5 bg-white hover:bg-stone-100 text-stone-700 border border-stone-200 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-stone-600" />
+                <span>Editar</span>
+              </button>
+            )}
+
+            {/* Botón Dar de Baja */}
+            {!isHistoryOrder && onDarDeBaja && order.status !== "entregado" && order.status !== "cancelado" && (
+              <button
+                type="button"
+                onClick={() => onDarDeBaja(order)}
+                className="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-rose-300/40"
+                title="Dar de baja este pedido"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Dar de baja</span>
+              </button>
+            )}
+          </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 bg-stone-200 hover:bg-stone-300 text-stone-800 font-black text-xs rounded-xl transition-all cursor-pointer"
+            className="px-5 py-2.5 bg-stone-200 hover:bg-stone-300 text-stone-800 font-black text-xs rounded-xl transition-all cursor-pointer ml-auto"
           >
             Cerrar
           </button>
