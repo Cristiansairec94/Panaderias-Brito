@@ -278,6 +278,34 @@ export default function PedidosPage() {
     return `${monthNames[mIdx] || month} ${year}`;
   }, [customSelectedMonth]);
 
+  const formattedDayLabel = useMemo(() => {
+    if (!customSelectedDate) return "";
+    const [y, m, d] = customSelectedDate.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    const days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const isToday = customSelectedDate === todayStr;
+    const isTomorrow = customSelectedDate === tomorrowStr;
+    const prefix = isToday ? "Hoy • " : isTomorrow ? "Mañana • " : "";
+    return `${prefix}${days[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
+  }, [customSelectedDate, todayStr, tomorrowStr]);
+
+  const handlePrevDay = () => {
+    if (!customSelectedDate) return;
+    const [y, m, d] = customSelectedDate.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() - 1);
+    setCustomSelectedDate(getLocalDateISO(dt));
+  };
+
+  const handleNextDay = () => {
+    if (!customSelectedDate) return;
+    const [y, m, d] = customSelectedDate.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + 1);
+    setCustomSelectedDate(getLocalDateISO(dt));
+  };
+
   // Classification checkers for any order
   const checkIsOverdue = (order: CustomOrder): boolean => {
     if (order.status === "entregado" || order.status === "cancelado") return false;
