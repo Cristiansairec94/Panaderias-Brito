@@ -117,8 +117,15 @@ export default function SpecialOrdersDrawer({
   };
 
   const handleQuickDeliver = (order: CustomOrder) => {
-    updateOrderStatus(order.id, "entregado");
-    loadOrders();
+    if (order.remainingBalance > 0) {
+      alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de $${order.remainingBalance.toFixed(2)} MXN.\n\nDebe estar 100% pagado antes de poder entregarse.`);
+      setSelectedOrderForPayment(order);
+      return;
+    }
+    if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
+      updateOrderStatus(order.id, "entregado");
+      loadOrders();
+    }
   };
 
   const handleDeleteOrder = (order: CustomOrder) => {
@@ -448,7 +455,15 @@ export default function SpecialOrdersDrawer({
           onAdvanceStatus={(o) => {
             let nextStatus: CustomOrder["status"] = o.status;
             if (o.status === "pendiente" || o.status === "en_horno") nextStatus = "listo";
-            else if (o.status === "listo") nextStatus = "entregado";
+            else if (o.status === "listo") {
+              if (o.remainingBalance > 0) {
+                alert(`⛔ No se puede entregar:\n\nEl pedido #${o.orderNumber} aún tiene un saldo pendiente de $${o.remainingBalance.toFixed(2)} MXN.\n\nDebe estar 100% pagado antes de entregarse.`);
+                setSelectedOrderForDetail(null);
+                setSelectedOrderForPayment(o);
+                return;
+              }
+              nextStatus = "entregado";
+            }
             if (nextStatus !== o.status) {
               updateOrderStatus(o.id, nextStatus);
               loadOrders();
@@ -457,9 +472,17 @@ export default function SpecialOrdersDrawer({
             }
           }}
           onDeliverOrder={(o) => {
-            updateOrderStatus(o.id, "entregado");
-            setSelectedOrderForDetail(null);
-            loadOrders();
+            if (o.remainingBalance > 0) {
+              alert(`⛔ No se puede entregar:\n\nEl pedido #${o.orderNumber} aún tiene un saldo pendiente de $${o.remainingBalance.toFixed(2)} MXN.\n\nDebe estar 100% pagado antes de entregarse.`);
+              setSelectedOrderForDetail(null);
+              setSelectedOrderForPayment(o);
+              return;
+            }
+            if (confirm(`¿Confirmas marcar el pedido #${o.orderNumber} de "${o.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
+              updateOrderStatus(o.id, "entregado");
+              setSelectedOrderForDetail(null);
+              loadOrders();
+            }
           }}
           onDarDeBaja={(o) => {
             const isCancelled = o.status === "cancelado";

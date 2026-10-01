@@ -1086,12 +1086,6 @@ export default function ExpensesModal({
           return false;
         }
 
-        // 2. Excluir pedidos vencidos con fecha de entrega anterior a hoy (pertenecen al Historial directo de pedidos)
-        const cleanDate = (o.deliveryDate || "").split("T")[0].split(" ")[0].trim();
-        if (cleanDate && /^\d{4}-\d{2}-\d{2}$/.test(cleanDate) && cleanDate < todayDateStr) {
-          return false;
-        }
-
         if (branchId) {
           const orderBranch = (o as any).operatingBranchId || o.branchId;
           if (orderBranch && orderBranch !== branchId && o.branchId !== branchId) return false;
@@ -4442,7 +4436,16 @@ export default function ExpensesModal({
         onAdvanceStatus={(order) => {
           let nextStatus: CustomOrder["status"] = order.status;
           if (order.status === "pendiente" || order.status === "en_horno") nextStatus = "listo";
-          else if (order.status === "listo") nextStatus = "entregado";
+          else if (order.status === "listo") {
+            const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
+            if (rem > 0) {
+              alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\nDebe estar 100% pagado antes de entregarse.`);
+              handleCloseDetailModal();
+              if (onSelectOrderForPayment) onSelectOrderForPayment(order);
+              return;
+            }
+            nextStatus = "entregado";
+          }
           if (nextStatus !== order.status) {
             updateOrderStatus(order.id, nextStatus);
             const updated = getStoredOrders().find((o) => o.id === order.id);
@@ -4450,13 +4453,26 @@ export default function ExpensesModal({
             if (typeof window !== "undefined") {
               window.dispatchEvent(new Event("brito_orders_updated"));
             }
+            setOrdersVersion((v) => v + 1);
+            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
           }
         }}
         onDeliverOrder={(order) => {
-          updateOrderStatus(order.id, "entregado");
-          setSelectedOrderDetail(null);
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new Event("brito_orders_updated"));
+          const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
+          if (rem > 0) {
+            alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\nDebe estar 100% pagado antes de entregarse.`);
+            handleCloseDetailModal();
+            if (onSelectOrderForPayment) onSelectOrderForPayment(order);
+            return;
+          }
+          if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
+            updateOrderStatus(order.id, "entregado");
+            setSelectedOrderDetail(null);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("brito_orders_updated"));
+            }
+            setOrdersVersion((v) => v + 1);
+            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
           }
         }}
         onSendWhatsApp={(order) => {

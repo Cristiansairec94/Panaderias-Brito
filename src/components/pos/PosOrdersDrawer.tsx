@@ -123,8 +123,11 @@ export default function PosOrdersDrawer({
 
   const handleMarkDelivered = (order: CustomOrder) => {
     if (order.remainingBalance > 0) {
+      alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\nDebe estar 100% pagado antes de poder entregarse al cliente.`);
       onSelectOrderForPayment(order);
-    } else {
+      return;
+    }
+    if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
       updateOrderStatus(order.id, "entregado");
       refreshOrders();
     }
