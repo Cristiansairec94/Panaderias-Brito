@@ -1672,11 +1672,11 @@ export default function CajaPage() {
               </div>
 
               {/* 4. Filtro por Estado de Arqueo */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setFilterStatus("all")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                     filterStatus === "all"
                       ? "bg-stone-900 text-white border-stone-900 shadow-xs"
                       : "bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200"
@@ -1687,7 +1687,7 @@ export default function CajaPage() {
                 <button
                   type="button"
                   onClick={() => setFilterStatus("cuadrado")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                     filterStatus === "cuadrado"
                       ? "bg-emerald-900 text-emerald-100 border-emerald-950 shadow-xs ring-2 ring-emerald-500/20"
                       : "bg-stone-50 text-stone-700 hover:bg-emerald-50 border-stone-200"
@@ -1698,7 +1698,7 @@ export default function CajaPage() {
                 <button
                   type="button"
                   onClick={() => setFilterStatus("sobrante")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                     filterStatus === "sobrante"
                       ? "bg-blue-900 text-blue-100 border-blue-950 shadow-xs ring-2 ring-blue-500/20"
                       : "bg-stone-50 text-stone-700 hover:bg-blue-50 border-stone-200"
@@ -1709,7 +1709,7 @@ export default function CajaPage() {
                 <button
                   type="button"
                   onClick={() => setFilterStatus("faltante")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                     filterStatus === "faltante"
                       ? "bg-rose-900 text-rose-100 border-rose-950 shadow-xs ring-2 ring-rose-500/20"
                       : "bg-stone-50 text-stone-700 hover:bg-rose-50 border-stone-200"

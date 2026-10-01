@@ -70,9 +70,24 @@ const parseExpenseDate = (raw: string | Date | undefined | null): Date | null =>
 
   const text = String(raw).trim();
   if (!text) return null;
+
+  if (text.toLowerCase().includes("hoy")) {
+    return new Date();
+  }
+  if (text.toLowerCase().includes("ayer")) {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d;
+  }
+
   const mISO = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (mISO) {
     const dt = new Date(Number(mISO[1]), Number(mISO[2]) - 1, Number(mISO[3]), 12, 0, 0);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  const mDMY = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (mDMY) {
+    const dt = new Date(Number(mDMY[3]), Number(mDMY[2]) - 1, Number(mDMY[1]), 12, 0, 0);
     return isNaN(dt.getTime()) ? null : dt;
   }
   const parsed = new Date(text);
@@ -379,6 +394,8 @@ function ExpandableConceptText({ text, maxChars = 50 }: { text: string; maxChars
   );
 }
 
+export type PeriodoFiltro = "todos" | "dia" | "semana" | "mes" | "anio";
+
 export default function GastosPage() {
   const { user } = useAuth();
   const { branches, currentBranch } = useBranch();
@@ -388,9 +405,10 @@ export default function GastosPage() {
   const [gastos, setGastos] = useState<ExpenseRecord[]>([]);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [mostrarStats, setMostrarStats] = useState(false);
-  const [periodoStats, setPeriodoStats] = useState<"hoy" | "semana" | "mes">("hoy");
+  const [periodoStats, setPeriodoStats] = useState<"hoy" | "semana" | "mes" | "anio">("hoy");
 
   // ── Filtros ──
+  const [filtroPeriodo, setFiltroPeriodo] = useState<PeriodoFiltro>("todos");
   const [search, setSearch] = useState("");
   const [filtroSucursal, setFiltroSucursal] = useState<string>("all");
   const [filtroTipoPago, setFiltroTipoPago] = useState<string>("all");
@@ -583,20 +601,91 @@ export default function GastosPage() {
     );
   };
 
+  // ─── Rangos de Fecha para Filtros y KPIs ───────────────────────────────────
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentDate = now.getDate();
+
+  // 1. Día (Hoy)
+  const todayStart = useMemo(() => new Date(currentYear, currentMonth, currentDate, 0, 0, 0, 0), [currentYear, currentMonth, currentDate]);
+  const todayEnd = useMemo(() => new Date(currentYear, currentMonth, currentDate, 23, 59, 59, 999), [currentYear, currentMonth, currentDate]);
+
+  // 2. Semana (Esta Semana: Lunes a Domingo)
+  const lunesSemana = useMemo(() => {
+    const d = new Date(now);
+    const day = d.getDay() || 7;
+    d.setDate(d.getDate() - day + 1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [currentYear, currentMonth, currentDate]);
+
+  const domingoSemana = useMemo(() => {
+    const d = new Date(lunesSemana);
+    d.setDate(d.getDate() + 6);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, [lunesSemana]);
+
+  // 3. Mes (Este Mes)
+  const primerDiaMes = useMemo(() => new Date(currentYear, currentMonth, 1, 0, 0, 0, 0), [currentYear, currentMonth]);
+  const ultimoDiaMes = useMemo(() => new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999), [currentYear, currentMonth]);
+
+  // 4. Año (Este Año)
+  const primerDiaAnio = useMemo(() => new Date(currentYear, 0, 1, 0, 0, 0, 0), [currentYear]);
+  const ultimoDiaAnio = useMemo(() => new Date(currentYear, 11, 31, 23, 59, 59, 999), [currentYear]);
+
+  // ─── Conteo de Gastos por Período de Tiempo (Día, Semana, Mes, Año, Todos) ──
+  const countsByPeriod = useMemo(() => {
+    let dia = 0;
+    let semana = 0;
+    let mes = 0;
+    let anio = 0;
+    let todos = 0;
+
+    (gastos || []).forEach((g) => {
+      if (!g) return;
+      if (filtroSucursal !== "all" && g.branchId !== filtroSucursal) return;
+      if (filtroTipoPago !== "all" && g.paymentMethod !== filtroTipoPago) return;
+
+      todos++;
+      const d = parseExpenseDate(g.date) || (g.timestamp ? new Date(g.timestamp) : null);
+      if (!d) return;
+
+      if (d >= todayStart && d <= todayEnd) dia++;
+      if (d >= lunesSemana && d <= domingoSemana) semana++;
+      if (d >= primerDiaMes && d <= ultimoDiaMes) mes++;
+      if (d >= primerDiaAnio && d <= ultimoDiaAnio) anio++;
+    });
+
+    return { dia, semana, mes, anio, todos };
+  }, [gastos, filtroSucursal, filtroTipoPago, todayStart, todayEnd, lunesSemana, domingoSemana, primerDiaMes, ultimoDiaMes, primerDiaAnio, ultimoDiaAnio]);
+
   // ─── Filtrado Principal y Ordenamiento Cronológico (Más reciente primero) ─
   const filteredGastos = useMemo(() => {
     return (gastos || [])
       .filter((g) => {
         if (!g) return false;
-        // 1. Filtro por Sucursal
+
+        // 1. Filtro por Período (Día / Semana / Mes / Año / Todos)
+        if (filtroPeriodo !== "todos") {
+          const d = parseExpenseDate(g.date) || (g.timestamp ? new Date(g.timestamp) : null);
+          if (!d) return false;
+          if (filtroPeriodo === "dia" && !(d >= todayStart && d <= todayEnd)) return false;
+          if (filtroPeriodo === "semana" && !(d >= lunesSemana && d <= domingoSemana)) return false;
+          if (filtroPeriodo === "mes" && !(d >= primerDiaMes && d <= ultimoDiaMes)) return false;
+          if (filtroPeriodo === "anio" && !(d >= primerDiaAnio && d <= ultimoDiaAnio)) return false;
+        }
+
+        // 2. Filtro por Sucursal
         if (filtroSucursal !== "all" && g.branchId !== filtroSucursal) {
           return false;
         }
-        // 2. Filtro por Tipo de Pago
+        // 3. Filtro por Tipo de Pago
         if (filtroTipoPago !== "all" && g.paymentMethod !== filtroTipoPago) {
           return false;
         }
-        // 3. Búsqueda libre
+        // 4. Búsqueda libre
         if (search.trim()) {
           const query = search.toLowerCase();
           const haystack = `${g.id || ""} ${g.date || ""} ${g.categoryLabel || ""} ${g.branchName || ""} ${g.description || ""} ${g.paymentMethod || ""} ${g.accountOrigin || ""} ${g.cashier || ""} ${g.supplier || ""}`.toLowerCase();
@@ -605,23 +694,9 @@ export default function GastosPage() {
         return true;
       })
       .sort((a, b) => getExpenseTimestamp(b) - getExpenseTimestamp(a));
-  }, [gastos, filtroSucursal, filtroTipoPago, search]);
+  }, [gastos, filtroPeriodo, filtroSucursal, filtroTipoPago, search, todayStart, todayEnd, lunesSemana, domingoSemana, primerDiaMes, ultimoDiaMes, primerDiaAnio, ultimoDiaAnio]);
 
   // ─── Cálculos de KPIs (Reactivos al filtro de sucursal) ─────────────────────
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-
-  const lunesSemana = (() => {
-    const d = new Date(now);
-    const day = d.getDay() || 7;
-    d.setDate(d.getDate() - day + 1);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  })();
-
-  const primerDiaMes = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-
   // Considerar únicamente los gastos de la sucursal activa en el filtro para los KPIs
   const gastosParaKPIs = useMemo(() => {
     if (filtroSucursal === "all") return gastos;
@@ -647,23 +722,34 @@ export default function GastosPage() {
     return gastosParaKPIs.reduce((acc, g) => {
       if (g.status === "anulado") return acc;
       const d = parseExpenseDate(g.date);
-      if (d && d >= lunesSemana && d <= now) {
+      if (d && d >= lunesSemana && d <= domingoSemana) {
         acc += Number(g.amount || 0);
       }
       return acc;
     }, 0);
-  }, [gastosParaKPIs, lunesSemana, now]);
+  }, [gastosParaKPIs, lunesSemana, domingoSemana]);
 
   const totalMes = useMemo(() => {
     return gastosParaKPIs.reduce((acc, g) => {
       if (g.status === "anulado") return acc;
       const d = parseExpenseDate(g.date);
-      if (d && d >= primerDiaMes && d <= now) {
+      if (d && d >= primerDiaMes && d <= ultimoDiaMes) {
         acc += Number(g.amount || 0);
       }
       return acc;
     }, 0);
-  }, [gastosParaKPIs, primerDiaMes, now]);
+  }, [gastosParaKPIs, primerDiaMes, ultimoDiaMes]);
+
+  const totalAnio = useMemo(() => {
+    return gastosParaKPIs.reduce((acc, g) => {
+      if (g.status === "anulado") return acc;
+      const d = parseExpenseDate(g.date);
+      if (d && d >= primerDiaAnio && d <= ultimoDiaAnio) {
+        acc += Number(g.amount || 0);
+      }
+      return acc;
+    }, 0);
+  }, [gastosParaKPIs, primerDiaAnio, ultimoDiaAnio]);
 
   // ─── Estadísticas y Distribución por Categoría ────────────────────────────
   const statsData = useMemo(() => {
@@ -675,9 +761,11 @@ export default function GastosPage() {
       if (periodoStats === "hoy") {
         return d >= todayStart && d <= todayEnd;
       } else if (periodoStats === "semana") {
-        return d >= lunesSemana && d <= now;
+        return d >= lunesSemana && d <= domingoSemana;
       } else if (periodoStats === "mes") {
-        return d >= primerDiaMes && d <= now;
+        return d >= primerDiaMes && d <= ultimoDiaMes;
+      } else if (periodoStats === "anio") {
+        return d >= primerDiaAnio && d <= ultimoDiaAnio;
       }
       return true;
     });
@@ -1074,11 +1162,29 @@ export default function GastosPage() {
       )}
 
       {/* ── KPI Cards Grid ── */}
+      {/* ── KPI Cards Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gastos de Hoy */}
-        <div className="bg-gradient-to-br from-rose-900 via-rose-950 to-stone-950 p-5 rounded-3xl border border-rose-800/60 shadow-xl text-white transition-all duration-200 hover:border-rose-400 hover:shadow-2xl hover:shadow-rose-950/50 hover:ring-2 hover:ring-rose-400/30 hover:-translate-y-0.5 cursor-default relative overflow-hidden">
+        <div
+          onClick={() => setFiltroPeriodo(filtroPeriodo === "dia" ? "todos" : "dia")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para filtrar solo los gastos de hoy"
+          className={`bg-gradient-to-br from-rose-900 via-rose-950 to-stone-950 p-5 rounded-3xl border shadow-xl text-white transition-all duration-200 cursor-pointer relative overflow-hidden select-none hover:scale-[1.01] ${
+            filtroPeriodo === "dia"
+              ? "border-rose-400 ring-4 ring-rose-400/40 shadow-2xl shadow-rose-950/60"
+              : "border-rose-800/60 hover:border-rose-400 hover:shadow-2xl hover:shadow-rose-950/50 hover:ring-2 hover:ring-rose-400/30"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-rose-200 uppercase tracking-wider">Gastos de Hoy</span>
+            <span className="text-xs font-bold text-rose-200 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Gastos de Hoy</span>
+              {filtroPeriodo === "dia" && (
+                <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Activo
+                </span>
+              )}
+            </span>
             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-600/40 text-rose-200 rounded-xl border border-rose-500/30 shadow-sm" title="Símbolo de gastos: Gráfica en caída">
               <TrendingDown className="w-3.5 h-3.5 text-rose-300" />
               <span className="text-[10px] font-black uppercase tracking-wider">En caída</span>
@@ -1109,9 +1215,26 @@ export default function GastosPage() {
         </div>
 
         {/* Gastos de la Semana */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
+        <div
+          onClick={() => setFiltroPeriodo(filtroPeriodo === "semana" ? "todos" : "semana")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para filtrar los gastos de esta semana (Lunes a Domingo)"
+          className={`bg-white p-5 rounded-3xl border shadow-sm transition-all duration-200 cursor-pointer select-none hover:scale-[1.01] ${
+            filtroPeriodo === "semana"
+              ? "border-amber-500 ring-4 ring-amber-400/30 shadow-lg shadow-amber-500/10 bg-amber-50/30"
+              : "border-stone-200/80 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Gastos de la Semana</span>
+            <span className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+              <span>Gastos de la Semana</span>
+              {filtroPeriodo === "semana" && (
+                <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Activo
+                </span>
+              )}
+            </span>
             <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
               <Calendar className="w-4 h-4" />
             </div>
@@ -1125,9 +1248,26 @@ export default function GastosPage() {
         </div>
 
         {/* Gastos del Mes */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20 hover:-translate-y-0.5 cursor-default">
+        <div
+          onClick={() => setFiltroPeriodo(filtroPeriodo === "mes" ? "todos" : "mes")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para filtrar los gastos del mes en curso"
+          className={`bg-white p-5 rounded-3xl border shadow-sm transition-all duration-200 cursor-pointer select-none hover:scale-[1.01] ${
+            filtroPeriodo === "mes"
+              ? "border-blue-500 ring-4 ring-blue-400/30 shadow-lg shadow-blue-500/10 bg-blue-50/30"
+              : "border-stone-200/80 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Gastos del Mes</span>
+            <span className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+              <span>Gastos del Mes</span>
+              {filtroPeriodo === "mes" && (
+                <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Activo
+                </span>
+              )}
+            </span>
             <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
               <DollarSign className="w-4 h-4" />
             </div>
@@ -1140,10 +1280,27 @@ export default function GastosPage() {
           </p>
         </div>
 
-        {/* Total Registros */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20 hover:-translate-y-0.5 cursor-default">
+        {/* Total Registros / Vista General */}
+        <div
+          onClick={() => setFiltroPeriodo("todos")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para mostrar todos los gastos sin filtro temporal"
+          className={`bg-white p-5 rounded-3xl border shadow-sm transition-all duration-200 cursor-pointer select-none hover:scale-[1.01] ${
+            filtroPeriodo === "todos"
+              ? "border-rose-500 ring-4 ring-rose-400/20 shadow-lg shadow-rose-500/10 bg-rose-50/20"
+              : "border-stone-200/80 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Total Registros</span>
+            <span className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+              <span>Total Registros</span>
+              {filtroPeriodo === "todos" && (
+                <span className="bg-stone-700 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider">
+                  Todos
+                </span>
+              )}
+            </span>
             <div className="p-2 bg-stone-100 text-stone-700 rounded-xl">
               <Receipt className="w-4 h-4" />
             </div>
@@ -1157,8 +1314,133 @@ export default function GastosPage() {
         </div>
       </div>
 
-      {/* ── Filtros y Buscador Dinámico (Con Filtro por Sucursal Clave) ── */}
+      {/* ── Filtros y Buscador Dinámico (Con Filtro Temporal por Día, Semana, Mes, Año y Sucursal) ── */}
       <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-4 transition-all duration-200 hover:border-rose-400/80 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20">
+        
+        {/* ── FILA DE BOTONES DE FILTRO TEMPORAL (DÍA, SEMANA, MES, AÑO, TODOS) ── */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-stone-100">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-rose-100 text-rose-700 rounded-xl">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-black text-stone-700 uppercase tracking-wider block">
+                Filtrar Registros por Período
+              </span>
+              <span className="text-[11px] text-stone-400 font-medium">
+                Selecciona un rango para visualizar los gastos correspondientes
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-stone-100/90 rounded-2xl border border-stone-200">
+            {/* Botón Día */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("dia")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "dia"
+                  ? "bg-rose-900 text-white shadow-sm ring-2 ring-rose-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>📅</span>
+              <span>Día (Hoy)</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "dia" ? "bg-rose-700 text-rose-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.dia}
+              </span>
+            </button>
+
+            {/* Botón Semana */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("semana")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "semana"
+                  ? "bg-rose-900 text-white shadow-sm ring-2 ring-rose-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>🗓️</span>
+              <span>Semana</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "semana" ? "bg-rose-700 text-rose-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.semana}
+              </span>
+            </button>
+
+            {/* Botón Mes */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("mes")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "mes"
+                  ? "bg-rose-900 text-white shadow-sm ring-2 ring-rose-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>📆</span>
+              <span>Mes</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "mes" ? "bg-rose-700 text-rose-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.mes}
+              </span>
+            </button>
+
+            {/* Botón Año */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("anio")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "anio"
+                  ? "bg-rose-900 text-white shadow-sm ring-2 ring-rose-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>📊</span>
+              <span>Año ({currentYear})</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "anio" ? "bg-rose-700 text-rose-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.anio}
+              </span>
+            </button>
+
+            {/* Botón Todos */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("todos")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "todos"
+                  ? "bg-stone-800 text-white shadow-sm ring-2 ring-stone-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>🌐</span>
+              <span>Todos</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "todos" ? "bg-stone-600 text-stone-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.todos}
+              </span>
+            </button>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Buscador de Texto Libre */}
           <div className="relative flex-1 w-full">
@@ -1212,12 +1494,13 @@ export default function GastosPage() {
             </select>
 
             {/* Botón para limpiar filtros */}
-            {(search || filtroSucursal !== "all" || filtroTipoPago !== "all") && (
+            {(search || filtroSucursal !== "all" || filtroTipoPago !== "all" || filtroPeriodo !== "todos") && (
               <button
                 onClick={() => {
                   setSearch("");
                   setFiltroSucursal("all");
                   setFiltroTipoPago("all");
+                  setFiltroPeriodo("todos");
                 }}
                 className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border-2 border-rose-200 rounded-2xl text-sm font-black transition-colors shadow-xs"
               >
@@ -1231,6 +1514,11 @@ export default function GastosPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm sm:text-base text-stone-600 font-medium pt-2 border-t border-stone-100">
           <span className="flex items-center gap-1.5 flex-wrap">
             <span>Mostrando <strong className="text-stone-900 font-black">{filteredGastos.length}</strong> de <strong className="text-stone-900 font-bold">{gastos.length}</strong> gastos</span>
+            {filtroPeriodo !== "todos" && (
+              <span className="bg-rose-100 text-rose-900 font-black px-2 py-0.5 rounded-lg text-xs sm:text-sm border border-rose-300">
+                Período: {filtroPeriodo === "dia" ? "Día (Hoy)" : filtroPeriodo === "semana" ? "Semana en curso" : filtroPeriodo === "mes" ? "Mes en curso" : `Año ${currentYear}`}
+              </span>
+            )}
             {filtroSucursal !== "all" && (
               <span className="bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded-lg text-xs sm:text-sm border border-amber-300">
                 en {branches.find((b) => b.id === filtroSucursal)?.name}

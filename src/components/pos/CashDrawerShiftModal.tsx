@@ -1210,11 +1210,11 @@ export default function CashDrawerShiftModal({
                       </div>
 
                       {/* Filtros Rápidos */}
-                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <button
                           type="button"
                           onClick={() => setHistoryFilterType("all")}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                             historyFilterType === "all"
                               ? "bg-amber-950 text-amber-100 border-amber-950 shadow-xs"
                               : "bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200"
@@ -1225,7 +1225,7 @@ export default function CashDrawerShiftModal({
                         <button
                           type="button"
                           onClick={() => setHistoryFilterType("cuadrado")}
-                          className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                          className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                             historyFilterType === "cuadrado"
                               ? "bg-emerald-850 bg-emerald-900 text-emerald-100 border-emerald-950 shadow-xs ring-2 ring-emerald-500/30"
                               : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200"
@@ -1236,7 +1236,7 @@ export default function CashDrawerShiftModal({
                         <button
                           type="button"
                           onClick={() => setHistoryFilterType("diferencia")}
-                          className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                          className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                             historyFilterType === "diferencia"
                               ? "bg-rose-900 text-rose-100 border-rose-950 shadow-xs ring-2 ring-rose-500/30"
                               : "bg-stone-50 text-stone-700 hover:bg-rose-50/60 border-stone-200"

@@ -98,9 +98,17 @@ const parseIncomeDate = (rawDate?: string, rawTimestamp?: string): Date | null =
     return isNaN(dt.getTime()) ? null : dt;
   }
 
+  const mDMY = text.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (mDMY) {
+    const dt = new Date(Number(mDMY[3]), Number(mDMY[2]) - 1, Number(mDMY[1]), 12, 0, 0);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
   const parsed = new Date(text);
   return isNaN(parsed.getTime()) ? null : parsed;
 };
+
+export type PeriodoFiltro = "todos" | "dia" | "semana" | "mes" | "anio";
 
 const getIncomeDateTimeInfo = (inc: Partial<CashIncome> | null | undefined) => {
   if (!inc) return { isHoy: false, isAyer: false, formattedDate: "-" };
@@ -447,9 +455,10 @@ export default function IngresosPage() {
   const [incomes, setIncomes] = useState<CashIncome[]>([]);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [mostrarStats, setMostrarStats] = useState(false);
-  const [periodoStats, setPeriodoStats] = useState<"hoy" | "semana" | "mes">("hoy");
+  const [periodoStats, setPeriodoStats] = useState<"hoy" | "semana" | "mes" | "anio">("hoy");
 
   // ── Filtros ──
+  const [filtroPeriodo, setFiltroPeriodo] = useState<PeriodoFiltro>("todos");
   const [search, setSearch] = useState("");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -575,13 +584,99 @@ export default function IngresosPage() {
     );
   };
 
+  // ─── Rangos de Fecha para Filtros y KPIs ───────────────────────────────────
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentDate = now.getDate();
+
+  // 1. Día (Hoy)
+  const todayStart = useMemo(() => new Date(currentYear, currentMonth, currentDate, 0, 0, 0, 0), [currentYear, currentMonth, currentDate]);
+  const todayEnd = useMemo(() => new Date(currentYear, currentMonth, currentDate, 23, 59, 59, 999), [currentYear, currentMonth, currentDate]);
+
+  // 2. Semana (Esta Semana: Lunes a Domingo)
+  const lunesSemana = useMemo(() => {
+    const d = new Date(now);
+    const day = d.getDay() || 7;
+    d.setDate(d.getDate() - day + 1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [currentYear, currentMonth, currentDate]);
+
+  const domingoSemana = useMemo(() => {
+    const d = new Date(lunesSemana);
+    d.setDate(d.getDate() + 6);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, [lunesSemana]);
+
+  // 3. Mes (Este Mes)
+  const primerDiaMes = useMemo(() => new Date(currentYear, currentMonth, 1, 0, 0, 0, 0), [currentYear, currentMonth]);
+  const ultimoDiaMes = useMemo(() => new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999), [currentYear, currentMonth]);
+
+  // 4. Año (Este Año)
+  const primerDiaAnio = useMemo(() => new Date(currentYear, 0, 1, 0, 0, 0, 0), [currentYear]);
+  const ultimoDiaAnio = useMemo(() => new Date(currentYear, 11, 31, 23, 59, 59, 999), [currentYear]);
+
+  // ─── Conteo de Ingresos por Período de Tiempo (Día, Semana, Mes, Año, Todos) ──
+  const countsByPeriod = useMemo(() => {
+    let dia = 0;
+    let semana = 0;
+    let mes = 0;
+    let anio = 0;
+    let todos = 0;
+
+    (incomes || []).forEach((inc) => {
+      if (!inc) return;
+
+      // Respetar filtro de sucursal si está seleccionado
+      if (selectedBranch !== "all") {
+        const incBranch = (inc.branchName || "").toLowerCase();
+        const target = selectedBranch.toLowerCase();
+        const match =
+          inc.branchName === selectedBranch ||
+          inc.branchId === selectedBranch ||
+          (target.includes("matriz") && incBranch.includes("matriz")) ||
+          (target.includes("benito") && incBranch.includes("benito")) ||
+          (target.includes("mercado") && incBranch.includes("mercado")) ||
+          (target.includes("flores") && incBranch.includes("flores")) ||
+          (target.includes("norte") && incBranch.includes("norte"));
+        if (!match) return;
+      }
+
+      if (selectedMethod !== "all" && inc.paymentMethod !== selectedMethod) return;
+      if (selectedCategory !== "all" && inc.category !== selectedCategory && inc.categoryLabel !== selectedCategory) return;
+
+      todos++;
+      const d = parseIncomeDate(inc.date, inc.timestamp);
+      const isHoyDate = !d && typeof inc.date === "string" && inc.date.toLowerCase().includes("hoy");
+
+      if ((d && d >= todayStart && d <= todayEnd) || isHoyDate) dia++;
+      if ((d && d >= lunesSemana && d <= domingoSemana) || isHoyDate) semana++;
+      if ((d && d >= primerDiaMes && d <= ultimoDiaMes) || isHoyDate) mes++;
+      if ((d && d >= primerDiaAnio && d <= ultimoDiaAnio) || isHoyDate) anio++;
+    });
+
+    return { dia, semana, mes, anio, todos };
+  }, [incomes, selectedBranch, selectedMethod, selectedCategory, todayStart, todayEnd, lunesSemana, domingoSemana, primerDiaMes, ultimoDiaMes, primerDiaAnio, ultimoDiaAnio]);
+
   // ─── Filtrado Principal y Ordenamiento Cronológico (Más reciente primero) ──
   const filteredIncomes = useMemo(() => {
     return (incomes || [])
       .filter((inc) => {
         if (!inc) return false;
 
-        // 1. Filtro por Sucursal
+        // 1. Filtro por Período (Día / Semana / Mes / Año / Todos)
+        if (filtroPeriodo !== "todos") {
+          const d = parseIncomeDate(inc.date, inc.timestamp);
+          const isHoyDate = !d && typeof inc.date === "string" && inc.date.toLowerCase().includes("hoy");
+          if (filtroPeriodo === "dia" && !((d && d >= todayStart && d <= todayEnd) || isHoyDate)) return false;
+          if (filtroPeriodo === "semana" && !((d && d >= lunesSemana && d <= domingoSemana) || isHoyDate)) return false;
+          if (filtroPeriodo === "mes" && !((d && d >= primerDiaMes && d <= ultimoDiaMes) || isHoyDate)) return false;
+          if (filtroPeriodo === "anio" && !((d && d >= primerDiaAnio && d <= ultimoDiaAnio) || isHoyDate)) return false;
+        }
+
+        // 2. Filtro por Sucursal
         if (selectedBranch !== "all") {
           const incBranch = (inc.branchName || "").toLowerCase();
           const target = selectedBranch.toLowerCase();
@@ -596,17 +691,17 @@ export default function IngresosPage() {
           if (!match) return false;
         }
 
-        // 2. Filtro por Categoría
+        // 3. Filtro por Categoría
         if (selectedCategory !== "all" && inc.category !== selectedCategory && inc.categoryLabel !== selectedCategory) {
           return false;
         }
 
-        // 3. Filtro por Método de Pago
+        // 4. Filtro por Método de Pago
         if (selectedMethod !== "all" && inc.paymentMethod !== selectedMethod) {
           return false;
         }
 
-        // 4. Búsqueda libre
+        // 5. Búsqueda libre
         if (search.trim()) {
           const query = search.toLowerCase();
           const haystack = `${inc.id || ""} ${inc.date || ""} ${inc.categoryLabel || ""} ${inc.branchName || ""} ${inc.concept || ""} ${inc.customerName || ""} ${inc.orderNumber || ""} ${inc.saleId || ""} ${inc.paymentMethod || ""} ${inc.referenceNumber || ""} ${inc.cashier || ""}`.toLowerCase();
@@ -616,23 +711,9 @@ export default function IngresosPage() {
         return true;
       })
       .sort((a, b) => getIncomeTimestamp(b) - getIncomeTimestamp(a));
-  }, [incomes, selectedBranch, selectedCategory, selectedMethod, search]);
+  }, [incomes, filtroPeriodo, selectedBranch, selectedCategory, selectedMethod, search, todayStart, todayEnd, lunesSemana, domingoSemana, primerDiaMes, ultimoDiaMes, primerDiaAnio, ultimoDiaAnio]);
 
   // ─── Cálculos de KPIs (Reactivos al filtro de sucursal) ─────────────────────
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-
-  const lunesSemana = (() => {
-    const d = new Date(now);
-    const day = d.getDay() || 7;
-    d.setDate(d.getDate() - day + 1);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  })();
-
-  const primerDiaMes = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-
   // Considerar únicamente los ingresos de la sucursal activa en el filtro para los KPIs
   const incomesParaKPIs = useMemo(() => {
     if (selectedBranch === "all") return incomes;
@@ -671,26 +752,38 @@ export default function IngresosPage() {
   const totalSemana = useMemo(() => {
     return incomesParaKPIs.reduce((acc, inc) => {
       const d = parseIncomeDate(inc.date, inc.timestamp);
-      if (d && d >= lunesSemana && d <= now) {
+      if (d && d >= lunesSemana && d <= domingoSemana) {
         acc += Number(inc.amount || 0);
       } else if (!d && typeof inc.date === "string" && inc.date.toLowerCase().includes("hoy")) {
         acc += Number(inc.amount || 0);
       }
       return acc;
     }, 0);
-  }, [incomesParaKPIs, lunesSemana, now]);
+  }, [incomesParaKPIs, lunesSemana, domingoSemana]);
 
   const totalMes = useMemo(() => {
     return incomesParaKPIs.reduce((acc, inc) => {
       const d = parseIncomeDate(inc.date, inc.timestamp);
-      if (d && d >= primerDiaMes && d <= now) {
+      if (d && d >= primerDiaMes && d <= ultimoDiaMes) {
         acc += Number(inc.amount || 0);
       } else if (!d && typeof inc.date === "string" && inc.date.toLowerCase().includes("hoy")) {
         acc += Number(inc.amount || 0);
       }
       return acc;
     }, 0);
-  }, [incomesParaKPIs, primerDiaMes, now]);
+  }, [incomesParaKPIs, primerDiaMes, ultimoDiaMes]);
+
+  const totalAnio = useMemo(() => {
+    return incomesParaKPIs.reduce((acc, inc) => {
+      const d = parseIncomeDate(inc.date, inc.timestamp);
+      if (d && d >= primerDiaAnio && d <= ultimoDiaAnio) {
+        acc += Number(inc.amount || 0);
+      } else if (!d && typeof inc.date === "string" && inc.date.toLowerCase().includes("hoy")) {
+        acc += Number(inc.amount || 0);
+      }
+      return acc;
+    }, 0);
+  }, [incomesParaKPIs, primerDiaAnio, ultimoDiaAnio]);
 
   // ─── Estadísticas y Distribución por Categoría (Estilo Sairec ERP) ──────────
   const statsData = useMemo(() => {
@@ -700,9 +793,11 @@ export default function IngresosPage() {
       if (periodoStats === "hoy") {
         return (d && d >= todayStart && d <= todayEnd) || isHoyDate;
       } else if (periodoStats === "semana") {
-        return (d && d >= lunesSemana && d <= now) || isHoyDate;
+        return (d && d >= lunesSemana && d <= domingoSemana) || isHoyDate;
       } else if (periodoStats === "mes") {
-        return (d && d >= primerDiaMes && d <= now) || isHoyDate;
+        return (d && d >= primerDiaMes && d <= ultimoDiaMes) || isHoyDate;
+      } else if (periodoStats === "anio") {
+        return (d && d >= primerDiaAnio && d <= ultimoDiaAnio) || isHoyDate;
       }
       return true;
     });
@@ -731,7 +826,7 @@ export default function IngresosPage() {
       .sort((a, b) => b.total - a.total);
 
     return { list, totalPeriodo, totalOps };
-  }, [incomesParaKPIs, periodoStats, todayStart, todayEnd, lunesSemana, primerDiaMes, now]);
+  }, [incomesParaKPIs, periodoStats, todayStart, todayEnd, lunesSemana, domingoSemana, primerDiaMes, ultimoDiaMes, primerDiaAnio, ultimoDiaAnio]);
 
   // ─── Manejo de Formularios y Acciones ───────────────────────────────────────
   const abrirNuevoIngreso = () => {
@@ -1038,9 +1133,26 @@ export default function IngresosPage() {
       {/* ── KPI Cards Grid (4 Tarjetas Gemelas) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Ingresos de Hoy */}
-        <div className="bg-gradient-to-br from-emerald-900 via-emerald-950 to-stone-950 p-5 rounded-3xl border border-emerald-800/60 shadow-xl text-white transition-all duration-200 hover:border-emerald-400 hover:shadow-2xl hover:shadow-emerald-950/50 hover:ring-2 hover:ring-emerald-400/30 hover:-translate-y-0.5 cursor-default relative overflow-hidden">
+        <div
+          onClick={() => setFiltroPeriodo(filtroPeriodo === "dia" ? "todos" : "dia")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para filtrar solo los ingresos de hoy"
+          className={`bg-gradient-to-br from-emerald-900 via-emerald-950 to-stone-950 p-5 rounded-3xl border shadow-xl text-white transition-all duration-200 cursor-pointer relative overflow-hidden select-none hover:scale-[1.01] ${
+            filtroPeriodo === "dia"
+              ? "border-emerald-400 ring-4 ring-emerald-400/40 shadow-2xl shadow-emerald-950/60"
+              : "border-emerald-800/60 hover:border-emerald-400 hover:shadow-2xl hover:shadow-emerald-950/50 hover:ring-2 hover:ring-emerald-400/30"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-emerald-200 uppercase tracking-wider">Ingresos de Hoy</span>
+            <span className="text-xs font-bold text-emerald-200 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Ingresos de Hoy</span>
+              {filtroPeriodo === "dia" && (
+                <span className="bg-emerald-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Activo
+                </span>
+              )}
+            </span>
             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600/40 text-emerald-200 rounded-xl border border-emerald-500/30 shadow-sm" title="Símbolo de ingresos: Gráfica en alza">
               <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
               <span className="text-[10px] font-black uppercase tracking-wider">En alza</span>
@@ -1065,9 +1177,26 @@ export default function IngresosPage() {
         </div>
 
         {/* Ingresos de la Semana */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
+        <div
+          onClick={() => setFiltroPeriodo(filtroPeriodo === "semana" ? "todos" : "semana")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para filtrar los ingresos de esta semana (Lunes a Domingo)"
+          className={`bg-white p-5 rounded-3xl border shadow-sm transition-all duration-200 cursor-pointer select-none hover:scale-[1.01] ${
+            filtroPeriodo === "semana"
+              ? "border-amber-500 ring-4 ring-amber-400/30 shadow-lg shadow-amber-500/10 bg-amber-50/30"
+              : "border-stone-200/80 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Ingresos de la Semana</span>
+            <span className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+              <span>Ingresos de la Semana</span>
+              {filtroPeriodo === "semana" && (
+                <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Activo
+                </span>
+              )}
+            </span>
             <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
               <Calendar className="w-4 h-4" />
             </div>
@@ -1081,9 +1210,26 @@ export default function IngresosPage() {
         </div>
 
         {/* Ingresos del Mes */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20 hover:-translate-y-0.5 cursor-default">
+        <div
+          onClick={() => setFiltroPeriodo(filtroPeriodo === "mes" ? "todos" : "mes")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para filtrar los ingresos del mes en curso"
+          className={`bg-white p-5 rounded-3xl border shadow-sm transition-all duration-200 cursor-pointer select-none hover:scale-[1.01] ${
+            filtroPeriodo === "mes"
+              ? "border-blue-500 ring-4 ring-blue-400/30 shadow-lg shadow-blue-500/10 bg-blue-50/30"
+              : "border-stone-200/80 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Ingresos del Mes</span>
+            <span className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+              <span>Ingresos del Mes</span>
+              {filtroPeriodo === "mes" && (
+                <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Activo
+                </span>
+              )}
+            </span>
             <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
               <DollarSign className="w-4 h-4" />
             </div>
@@ -1096,10 +1242,27 @@ export default function IngresosPage() {
           </p>
         </div>
 
-        {/* Total Registros */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20 hover:-translate-y-0.5 cursor-default">
+        {/* Total Registros / Vista General */}
+        <div
+          onClick={() => setFiltroPeriodo("todos")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para mostrar todos los ingresos sin filtro temporal"
+          className={`bg-white p-5 rounded-3xl border shadow-sm transition-all duration-200 cursor-pointer select-none hover:scale-[1.01] ${
+            filtroPeriodo === "todos"
+              ? "border-emerald-500 ring-4 ring-emerald-400/20 shadow-lg shadow-emerald-500/10 bg-emerald-50/20"
+              : "border-stone-200/80 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Total Registros</span>
+            <span className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+              <span>Total Registros</span>
+              {filtroPeriodo === "todos" && (
+                <span className="bg-stone-700 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider">
+                  Todos
+                </span>
+              )}
+            </span>
             <div className="p-2 bg-stone-100 text-stone-700 rounded-xl">
               <Receipt className="w-4 h-4" />
             </div>
@@ -1113,8 +1276,133 @@ export default function IngresosPage() {
         </div>
       </div>
 
-      {/* ── Filtros y Buscador Dinámico (Idéntico a Gastos) ── */}
+      {/* ── Filtros y Buscador Dinámico (Con Filtro Temporal por Día, Semana, Mes, Año y Sucursal) ── */}
       <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-4 transition-all duration-200 hover:border-emerald-400/80 hover:shadow-lg hover:shadow-emerald-500/10 hover:ring-2 hover:ring-emerald-400/20">
+        
+        {/* ── FILA DE BOTONES DE FILTRO TEMPORAL (DÍA, SEMANA, MES, AÑO, TODOS) ── */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-stone-100">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-xl">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-black text-stone-700 uppercase tracking-wider block">
+                Filtrar Registros por Período
+              </span>
+              <span className="text-[11px] text-stone-400 font-medium">
+                Selecciona un rango para visualizar los ingresos correspondientes
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-stone-100/90 rounded-2xl border border-stone-200">
+            {/* Botón Día */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("dia")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "dia"
+                  ? "bg-emerald-900 text-white shadow-sm ring-2 ring-emerald-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>📅</span>
+              <span>Día (Hoy)</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "dia" ? "bg-emerald-700 text-emerald-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.dia}
+              </span>
+            </button>
+
+            {/* Botón Semana */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("semana")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "semana"
+                  ? "bg-emerald-900 text-white shadow-sm ring-2 ring-emerald-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>🗓️</span>
+              <span>Semana</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "semana" ? "bg-emerald-700 text-emerald-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.semana}
+              </span>
+            </button>
+
+            {/* Botón Mes */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("mes")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "mes"
+                  ? "bg-emerald-900 text-white shadow-sm ring-2 ring-emerald-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>📆</span>
+              <span>Mes</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "mes" ? "bg-emerald-700 text-emerald-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.mes}
+              </span>
+            </button>
+
+            {/* Botón Año */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("anio")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "anio"
+                  ? "bg-emerald-900 text-white shadow-sm ring-2 ring-emerald-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>📊</span>
+              <span>Año ({currentYear})</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "anio" ? "bg-emerald-700 text-emerald-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.anio}
+              </span>
+            </button>
+
+            {/* Botón Todos */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("todos")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "todos"
+                  ? "bg-stone-800 text-white shadow-sm ring-2 ring-stone-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>🌐</span>
+              <span>Todos</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "todos" ? "bg-stone-600 text-stone-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.todos}
+              </span>
+            </button>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Buscador de Texto Libre */}
           <div className="relative flex-1 w-full">
@@ -1168,13 +1456,14 @@ export default function IngresosPage() {
             </select>
 
             {/* Botón para limpiar filtros */}
-            {(search || selectedBranch !== "all" || selectedMethod !== "all") && (
+            {(search || selectedBranch !== "all" || selectedMethod !== "all" || filtroPeriodo !== "todos") && (
               <button
                 onClick={() => {
                   setSearch("");
                   setSelectedBranch("all");
                   setSelectedCategory("all");
                   setSelectedMethod("all");
+                  setFiltroPeriodo("todos");
                 }}
                 className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-2 border-emerald-200 rounded-2xl text-sm font-black transition-colors shadow-xs"
               >
@@ -1188,6 +1477,11 @@ export default function IngresosPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm sm:text-base text-stone-600 font-medium pt-2 border-t border-stone-100">
           <span className="flex items-center gap-1.5 flex-wrap">
             <span>Mostrando <strong className="text-stone-900 font-black">{filteredIncomes.length}</strong> de <strong className="text-stone-900 font-bold">{incomes.length}</strong> ingresos</span>
+            {filtroPeriodo !== "todos" && (
+              <span className="bg-emerald-100 text-emerald-900 font-black px-2 py-0.5 rounded-lg text-xs sm:text-sm border border-emerald-300">
+                Período: {filtroPeriodo === "dia" ? "Día (Hoy)" : filtroPeriodo === "semana" ? "Semana en curso" : filtroPeriodo === "mes" ? "Mes en curso" : `Año ${currentYear}`}
+              </span>
+            )}
             {selectedBranch !== "all" && (
               <span className="bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded-lg text-xs sm:text-sm border border-amber-300">
                 en {selectedBranch}

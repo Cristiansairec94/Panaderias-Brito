@@ -3193,7 +3193,7 @@ export default function ExpensesModal({
                             : "text-emerald-200"
                         }`}>
                           {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
-                            ? "🎂 Historial de Todos los Pedidos (Relevo de Turno)"
+                            ? "📦 Pedidos por Entregar (Relevo de Turno)"
                             : cashMethodFilter === "tarjeta"
                             ? (cashDetailFilter === "pedidos" ? "🎂 Pedidos Cobrados con Tarjeta" : cashDetailFilter === "ventas" ? "💳 Ventas Cobradas con Tarjeta" : "💳 Ventas y Pedidos con Tarjeta")
                             : cashMethodFilter === "transferencia"
@@ -3490,7 +3490,7 @@ export default function ExpensesModal({
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-0.5 text-xs">
                             {[
                               { id: "all", label: "Todos", count: allHistoricalOrders.length },
                               { id: "hoy", label: "📅 Para HOY", count: todayOrdersList.length, highlight: "text-amber-800 border-amber-300 bg-amber-50" },
@@ -3503,7 +3503,7 @@ export default function ExpensesModal({
                                 key={f.id}
                                 type="button"
                                 onClick={() => setAllOrdersStatusFilter(f.id as any)}
-                                className={`px-2.5 py-1 rounded-xl font-bold text-xs shrink-0 border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                className={`px-2.5 sm:px-3 py-1.5 rounded-xl font-bold text-xs border transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-2xs ${
                                   allOrdersStatusFilter === f.id
                                     ? "bg-stone-900 text-white border-stone-900 shadow-xs"
                                     : f.highlight || "bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100"
