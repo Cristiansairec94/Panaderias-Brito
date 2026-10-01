@@ -795,7 +795,8 @@ export function addOrderPayment(
   order.paymentStatus = isFullLiquidation ? "liquidado" : "anticipo";
   order.payments = [...(order.payments || []), newPayment];
 
-  if (params.markAsDelivered || (isFullLiquidation && order.status === "listo")) {
+  // Solo marcar como entregado si se solicitó explícitamente la entrega inmediata
+  if (params.markAsDelivered) {
     order.status = "entregado";
   }
 

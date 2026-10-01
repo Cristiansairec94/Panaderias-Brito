@@ -806,6 +806,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         isOpen={!!selectedOrderForDetail}
         onClose={() => setSelectedOrderForDetail(null)}
         order={selectedOrderForDetail}
+        isHistoryMode={selectedOrderForDetail?.status === "entregado" || selectedOrderForDetail?.status === "cancelado"}
         onPrintReceipt={(o) => {
           setSelectedOrderForReceipt(o);
         }}
@@ -813,6 +814,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           setSelectedOrderForPayment(o);
         }}
         onAdvanceStatus={(o) => {
+          if (o.status === "entregado" || o.status === "cancelado") {
+            alert("Este pedido pertenece al historial y no puede ser modificado.");
+            return;
+          }
           const nextStatus = o.status === "pendiente" ? "en_horno" : o.status === "en_horno" ? "listo" : "entregado";
           updateOrderStatus(o.id, nextStatus);
           const updated = getStoredOrders().find((item) => item.id === o.id);
@@ -822,6 +827,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           }
         }}
         onDeliverOrder={(o) => {
+          if (o.status === "entregado" || o.status === "cancelado") {
+            alert("Este pedido pertenece al historial.");
+            return;
+          }
           updateOrderStatus(o.id, "entregado");
           setSelectedOrderForDetail(null);
           if (typeof window !== "undefined") {

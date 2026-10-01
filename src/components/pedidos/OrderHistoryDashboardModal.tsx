@@ -515,18 +515,6 @@ export default function OrderHistoryDashboardModal({
                           <span>Ticket</span>
                         </button>
 
-                        {order.remainingBalance > 0 && onOpenPayment && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenPayment(order)}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-                            title={`Cobrar saldo restante de ${formatCurrency(order.remainingBalance)}`}
-                          >
-                            <DollarSign className="w-3.5 h-3.5" />
-                            <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
-                          </button>
-                        )}
-
                         <button
                           type="button"
                           onClick={() => onViewOrderDetail(order)}
@@ -645,17 +633,6 @@ export default function OrderHistoryDashboardModal({
                                 <Receipt className="w-3.5 h-3.5" />
                                 <span>Ticket</span>
                               </button>
-                              {order.remainingBalance > 0 && onOpenPayment && (
-                                <button
-                                  type="button"
-                                  onClick={() => onOpenPayment(order)}
-                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer font-bold flex items-center gap-1 text-[11px]"
-                                  title={`Pagar saldo restante de ${formatCurrency(order.remainingBalance)}`}
-                                >
-                                  <DollarSign className="w-3 h-3" />
-                                  <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
-                                </button>
-                              )}
                               <button
                                 type="button"
                                 onClick={() => onSendWhatsApp(order)}

@@ -110,6 +110,7 @@ export default function PedidosPage() {
   const [customSelectedMonth, setCustomSelectedMonth] = useState<string>(() => getLocalDateISO(new Date()).slice(0, 7));
   const [customSelectedYear, setCustomSelectedYear] = useState<string>(() => getLocalDateISO(new Date()).slice(0, 4));
   const [isClassificationOpen, setIsClassificationOpen] = useState(true);
+  const [isTimeClassificationOpen, setIsTimeClassificationOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"productos" | "tabla">("productos");
   const [productLayout, setProductLayout] = useState<"lista" | "cuadricula">("lista");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -629,6 +630,10 @@ export default function PedidosPage() {
 
   // Handlers for quick actions
   const handleMarkAsReady = (order: CustomOrder) => {
+    if (order.status === "entregado" || order.status === "cancelado") {
+      alert("Este pedido pertenece al historial y no puede ser modificado.");
+      return;
+    }
     updateOrderStatus(order.id, "listo");
     loadOrders();
     alert("El producto ya está en sucursal");
@@ -644,6 +649,10 @@ export default function PedidosPage() {
   };
 
   const handleToggleReady = (order: CustomOrder) => {
+    if (order.status === "entregado" || order.status === "cancelado") {
+      alert("Este pedido pertenece al historial y no puede ser modificado.");
+      return;
+    }
     if (order.status === "listo") {
       if (confirm(`El pedido ${order.orderNumber} ya está marcado como "Listo en Sucursal".\n\n¿Deseas regresarlo a "En Preparación"?`)) {
         updateOrderStatus(order.id, "pendiente");
@@ -664,6 +673,10 @@ export default function PedidosPage() {
   };
 
   const handleAdvanceStatus = (order: CustomOrder) => {
+    if (order.status === "entregado" || order.status === "cancelado") {
+      alert("Este pedido pertenece al historial y no puede ser modificado.");
+      return;
+    }
     let nextStatus: CustomOrder["status"] = order.status;
     if (order.status === "pendiente" || order.status === "en_horno") nextStatus = "listo";
     else if (order.status === "listo") {
@@ -1314,21 +1327,64 @@ export default function PedidosPage() {
       </div>
 
       {/* 1.5. CLASIFICACIÓN TEMPORAL DE PEDIDOS (Día, Semana, Mes, Año, Todos) */}
-      <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-stone-200 shadow-2xs space-y-2.5 animate-in fade-in duration-200">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-2xs overflow-hidden transition-all duration-200">
+        {/* Barra superior interactiva para Desplegar / Ocultar */}
+        <div
+          onClick={() => setIsTimeClassificationOpen((prev) => !prev)}
+          className="p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-2 cursor-pointer hover:bg-stone-50 select-none transition-colors"
+          title={isTimeClassificationOpen ? "Ocultar clasificación por tiempo" : "Desplegar clasificación por tiempo (Día, Semana, Mes, Año)"}
+        >
           <div className="flex items-center gap-2">
-            <span className="p-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300">
-              <Calendar className="w-3.5 h-3.5" />
+            <span className="p-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+              <Calendar className="w-3.5 h-3.5 text-amber-700" />
             </span>
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-black text-stone-900 uppercase tracking-wide">
                 Clasificación por Tiempo:
               </span>
-              <span className="text-[11px] font-bold text-stone-500">
+              <span className="text-[11px] font-bold text-stone-500 hidden sm:inline">
                 (Día, Semana, Mes, Año)
               </span>
+              {timePeriodFilter !== "todos" ? (
+                <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
+                  <span>Activo:</span>
+                  <span className="capitalize">{timePeriodFilter}</span>
+                  <span className="bg-amber-200 px-1 rounded text-amber-950 font-mono">
+                    {timePeriodCounts[timePeriodFilter]}
+                  </span>
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-stone-400 hidden sm:inline">
+                  • Todos ({timePeriodCounts.todos})
+                </span>
+              )}
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsTimeClassificationOpen((prev) => !prev);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-200 font-bold text-xs transition-colors cursor-pointer shadow-2xs"
+          >
+            <span>{isTimeClassificationOpen ? "Ocultar" : "Desplegar"}</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform duration-200 text-amber-700 ${
+                isTimeClassificationOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Zona Desplegable */}
+        {isTimeClassificationOpen && (
+          <div className="p-2.5 sm:p-3 pt-2 border-t border-stone-100 space-y-2.5 animate-in fade-in duration-150">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-bold text-stone-500">
+                Filtros por período:
+              </span>
 
           {/* Controles dinámicos según el período seleccionado */}
           {timePeriodFilter === "dia" && (
@@ -1517,6 +1573,8 @@ export default function PedidosPage() {
           </button>
         </div>
       </div>
+    )}
+  </div>
 
       {/* 2. Catálogo de Productos y Pedidos */}
       <div 
@@ -1541,11 +1599,12 @@ export default function PedidosPage() {
                   {classificationFilter === "no_pasaron" && <AlertTriangle className="w-4 h-4 text-red-200" />}
                   {classificationFilter === "pendientes" && <Flame className="w-4 h-4" />}
                   {classificationFilter === "proximos" && <Calendar className="w-4 h-4" />}
+                  {classificationFilter === "historial" && <History className="w-4 h-4 text-amber-200" />}
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[9px] font-black uppercase tracking-wider text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200">
-                      Filtro Activo
+                      {classificationFilter === "historial" ? "📜 Historial de Pedidos" : "Filtro Activo"}
                     </span>
                     <h3 className="text-xs sm:text-sm font-black text-stone-900">
                       {classificationFilter === "activos" && "⏳ Pedidos Activos en Proceso de Elaboración"}
@@ -1556,9 +1615,22 @@ export default function PedidosPage() {
                       {classificationFilter === "no_pasaron" && `⚠️ Pedidos que no han pasado por ellos (${classificationCounts.no_pasaron})`}
                       {classificationFilter === "pendientes" && "👨‍🍳 En Preparación / Horno"}
                       {classificationFilter === "proximos" && "⏰ Próximos de Hoy"}
+                      {classificationFilter === "historial" && (
+                        historialSubFilter === "entregados"
+                          ? "✓ Historial: Pedidos entregados con éxito"
+                          : historialSubFilter === "cancelados"
+                          ? "✕ Historial: Pedidos dados de baja"
+                          : "📜 Historial Completo de Pedidos Concluidos"
+                      )}
                     </h3>
                   </div>
-                  {classificationFilter === "pagados" ? (
+                  {classificationFilter === "historial" ? (
+                    <div className="mt-1 space-y-1">
+                      <p className="text-[11px] text-stone-600 font-semibold">
+                        Registro histórico de consulta informativa ({filteredOrders.length} pedido(s)). Los pedidos concluidos no tienen opciones para entregar, pagar ni mover a otras categorías.
+                      </p>
+                    </div>
+                  ) : classificationFilter === "pagados" ? (
                     <div className="mt-1 space-y-1.5">
                       <p className="text-[11px] text-amber-900 font-bold bg-amber-50/90 border border-amber-200/80 px-2 py-1 rounded-md">
                         ⚠️ <strong>Control de Sucursal:</strong> El pedido está pagado, pero puede que aún no haya llegado a la sucursal. Revisa cada uno y pulsa <strong>&quot;Marcar como Listo&quot;</strong> cuando ya esté físicamente en tienda.
@@ -1993,8 +2065,8 @@ export default function PedidosPage() {
                         <span>Ticket</span>
                       </button>
 
-                      {/* 2. Pagar Restante (únicamente si no han pagado) */}
-                      {order.remainingBalance > 0 && (
+                      {/* 2. Pagar Restante (únicamente pedidos activos si no han pagado) */}
+                      {!isConcludedOrHistory && order.remainingBalance > 0 && (
                         <button
                           type="button"
                           onClick={() => setSelectedOrderForPayment(order)}
@@ -2355,7 +2427,8 @@ export default function PedidosPage() {
                           <span className="hidden sm:inline">Ticket</span>
                         </button>
 
-                        {order.remainingBalance > 0 && (
+                        {/* Pagar restante solo para pedidos activos */}
+                        {!isConcludedOrHistory && order.remainingBalance > 0 && (
                           <button
                             type="button"
                             onClick={() => setSelectedOrderForPayment(order)}
@@ -2675,8 +2748,8 @@ export default function PedidosPage() {
                               <span>Ticket</span>
                             </button>
 
-                            {/* 2. Pagar restante si no han liquidado */}
-                            {order.remainingBalance > 0 && (
+                            {/* 2. Pagar restante si no han liquidado (solo pedidos activos) */}
+                            {!isConcludedOrHistory && order.remainingBalance > 0 && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedOrderForPayment(order)}

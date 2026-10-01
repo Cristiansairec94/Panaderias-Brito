@@ -434,9 +434,9 @@ export default function OrderDetailModal({
             {/* Indicador Informativo solo si el pedido está en Historial (ya entregado o cancelado o caducado) */}
             {isHistoryOrder && (
               <div className="px-3.5 py-2 bg-amber-50 border border-amber-300 text-amber-950 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs">
-                <span>🥖</span>
+                <span>📜</span>
                 <span>
-                  <strong>Historial (Solo Informativo):</strong> No se puede editar ni reactivar. Si se necesita revivir el pedido, hacer uno nuevo en sucursal.
+                  <strong>Historial (Solo Informativo):</strong> Este pedido ya concluyó ({order.status === "entregado" ? "Entregado con éxito" : "Dado de baja"}). No tiene opciones para entregar, cobrar, editar ni cambiar de categoría.
                 </span>
               </div>
             )}
@@ -465,8 +465,8 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Pagar Restante si tiene saldo pendiente (obligatorio antes de entregar) */}
-            {!isLiquidado && onOpenPayment && order.status !== "cancelado" && (
+            {/* Botón Pagar Restante (solo para pedidos activos antes de entregar) */}
+            {!isHistoryOrder && !isLiquidado && onOpenPayment && order.status !== "cancelado" && (
               <button
                 type="button"
                 onClick={() => {

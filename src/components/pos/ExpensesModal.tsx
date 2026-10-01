@@ -1189,10 +1189,9 @@ export default function ExpensesModal({
   };
 
   const handleViewOrderDetail = (order: CustomOrder) => {
+    setSelectedOrderDetail(order);
     if (openOrderDetail) {
       openOrderDetail(order);
-    } else {
-      toggleExpandAllOrder(order.id);
     }
   };
 
@@ -3792,12 +3791,12 @@ export default function ExpensesModal({
 
                                       <button
                                         type="button"
-                                        onClick={() => handleViewOrderDetail(order)}
-                                        className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                        onClick={() => setSelectedOrderDetail(order)}
+                                        className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 hover:border-amber-400 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
                                         title="Ver detalles completos del pedido"
                                       >
-                                        <Eye className="w-3.5 h-3.5 text-stone-500" />
-                                        <span>Detalle</span>
+                                        <Eye className="w-3.5 h-3.5 text-amber-800" />
+                                        <span>Detalles</span>
                                       </button>
 
                                       <button
@@ -4089,28 +4088,31 @@ export default function ExpensesModal({
                                           Cobrar
                                         </button>
                                       )}
+                                      {/* 1. Botón Detalles Completos */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedOrderDetail(order)}
+                                        className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 hover:border-amber-400 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+                                        title="Ver detalles completos del pedido"
+                                      >
+                                        <Eye className="w-3.5 h-3.5 text-amber-800" />
+                                        <span>Detalles</span>
+                                      </button>
+
+                                      {/* 2. Reimprimir Ticket */}
                                       {(onSelectOrderForReceipt || true) && (
                                         <button
                                           type="button"
                                           onClick={() => {
                                             setPreviewOrder(order);
                                           }}
-                                          className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                                          className="px-2.5 py-1.5 bg-stone-100 hover:bg-amber-100 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
                                           title="Ver comprobante de pedido"
                                         >
-                                          <Printer className="w-3.5 h-3.5 text-amber-800" />
+                                          <Printer className="w-3.5 h-3.5 text-stone-600" />
                                           <span className="hidden sm:inline">Ticket</span>
                                         </button>
                                       )}
-                                      <button
-                                        type="button"
-                                        onClick={() => setSelectedOrderDetail(order)}
-                                        className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
-                                        title="Ver detalles completos del pedido"
-                                      >
-                                        <Eye className="w-3.5 h-3.5 text-amber-700" />
-                                        <span>Detalles</span>
-                                      </button>
                                     </div>
                                   </div>
                                 </div>

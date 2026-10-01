@@ -39,7 +39,7 @@ export default function OrderPaymentModal({
   const { addNotification } = useNotifications();
   const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
-  const [markAsDelivered, setMarkAsDelivered] = useState(true);
+  const [markAsDelivered, setMarkAsDelivered] = useState(false);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -48,7 +48,7 @@ export default function OrderPaymentModal({
   useEffect(() => {
     if (order) {
       setAmount(order.remainingBalance > 0 ? order.remainingBalance.toString() : "");
-      setMarkAsDelivered(true);
+      setMarkAsDelivered(false);
       setNotes("");
     }
   }, [order]);
