@@ -71,37 +71,22 @@ export default function OrderHistoryDashboardModal({
     }
   }, [isOpen, initialTab]);
 
-  // Filtrar exclusivamente los pedidos del historial (entregados y cancelados)
+  // Filtrar exclusivamente los pedidos del historial de bajas (excluyendo 100% los entregados)
   const allHistoryOrders = useMemo(() => {
     return orders.filter(
-      (order) => order.status === "entregado" || order.status === "cancelado"
+      (order) => order.status === "cancelado"
     );
   }, [orders]);
 
-  // Contadores globales del historial
+  // Contadores globales del historial de bajas
   const counts = useMemo(() => {
-    let entregados = 0;
-    let cancelados = 0;
-    let totalDineroEntregado = 0;
-
-    for (const o of allHistoryOrders) {
-      if (o.status === "entregado") {
-        entregados++;
-        totalDineroEntregado += o.total || 0;
-      } else if (o.status === "cancelado") {
-        cancelados++;
-      }
-    }
-
-    const total = entregados + cancelados;
-    const efectividad = total > 0 ? Math.round((entregados / total) * 100) : 100;
-
+    const cancelados = allHistoryOrders.length;
     return {
-      total,
-      entregados,
+      total: cancelados,
+      entregados: 0,
       cancelados,
-      totalDineroEntregado,
-      efectividad,
+      totalDineroEntregado: 0,
+      efectividad: 100,
     };
   }, [allHistoryOrders]);
 
@@ -176,14 +161,14 @@ export default function OrderHistoryDashboardModal({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-black text-white tracking-wide">
-                  Dashboard de Historial de Pedidos
+                  Historial de Pedidos Dados de Baja
                 </h2>
-                <span className="text-[10px] font-black uppercase tracking-wider bg-stone-800 text-stone-300 px-2 py-0.5 rounded-full border border-stone-700">
-                  Totalmente Independiente
+                <span className="text-[10px] font-black uppercase tracking-wider bg-rose-950 text-rose-300 px-2 py-0.5 rounded-full border border-rose-800">
+                  Cancelados
                 </span>
               </div>
               <p className="text-xs text-stone-400 font-medium hidden sm:block mt-0.5">
-                Auditoría completa de pedidos entregados y cancelados. No interfiere con las secciones de pedidos activos.
+                Auditoría de pedidos dados de baja o cancelados. Puedes consultar sus detalles o reactivarlos si el cliente regresa por ellos.
               </p>
             </div>
           </div>
@@ -201,62 +186,15 @@ export default function OrderHistoryDashboardModal({
         </div>
 
         {/* 2. BARRA DE MÉTRICAS KPI DEL HISTORIAL */}
-        <div className="bg-white px-5 sm:px-7 py-3 border-b border-stone-200 shrink-0 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
-          {/* KPI 1: Total Recaudado */}
-          <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-bold uppercase text-emerald-800 tracking-wider block">
-                Total Recaudado
-              </span>
-              <span className="text-base sm:text-xl font-black text-emerald-950 block mt-0.5 font-mono">
-                {formatCurrency(counts.totalDineroEntregado)}
-              </span>
-              <span className="text-[10px] text-emerald-700 font-semibold">
-                Ventas de pedidos concluidos
-              </span>
-            </div>
-            <div className="p-2 bg-emerald-500/10 text-emerald-700 rounded-xl">
-              <DollarSign className="w-5 h-5" />
-            </div>
-          </div>
-
-          {/* KPI 2: Pedidos Entregados con Éxito */}
-          <div
-            onClick={() => setActiveTab("entregados")}
-            className={`border rounded-2xl p-2.5 sm:p-3 flex items-center justify-between cursor-pointer transition-all ${
-              activeTab === "entregados"
-                ? "bg-teal-50 border-teal-500 ring-2 ring-teal-400/40 shadow-xs"
-                : "bg-stone-50 border-stone-200 hover:border-teal-300"
-            }`}
-          >
-            <div>
-              <span className="text-[10px] font-bold uppercase text-teal-800 tracking-wider block">
-                Entregados con Éxito
-              </span>
-              <span className="text-base sm:text-xl font-black text-teal-950 block mt-0.5">
-                {counts.entregados}
-              </span>
-              <span className="text-[10px] text-teal-700 font-semibold">
-                {counts.efectividad}% efectividad
-              </span>
-            </div>
-            <div className="p-2 bg-teal-500/10 text-teal-700 rounded-xl">
-              <Check className="w-5 h-5" />
-            </div>
-          </div>
-
-          {/* KPI 3: Dados de Baja / Cancelados */}
+        <div className="bg-white px-5 sm:px-7 py-3 border-b border-stone-200 shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+          {/* KPI 1: Dados de Baja / Cancelados */}
           <div
             onClick={() => setActiveTab("cancelados")}
-            className={`border rounded-2xl p-2.5 sm:p-3 flex items-center justify-between cursor-pointer transition-all ${
-              activeTab === "cancelados"
-                ? "bg-rose-50 border-rose-500 ring-2 ring-rose-400/40 shadow-xs"
-                : "bg-stone-50 border-stone-200 hover:border-rose-300"
-            }`}
+            className="bg-rose-50/80 border border-rose-300 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between cursor-pointer"
           >
             <div>
               <span className="text-[10px] font-bold uppercase text-rose-800 tracking-wider block">
-                Dados de Baja
+                Pedidos Dados de Baja
               </span>
               <span className="text-base sm:text-xl font-black text-rose-950 block mt-0.5">
                 {counts.cancelados}
@@ -270,24 +208,20 @@ export default function OrderHistoryDashboardModal({
             </div>
           </div>
 
-          {/* KPI 4: Total en Historial */}
+          {/* KPI 2: Total en Historial */}
           <div
             onClick={() => setActiveTab("todos")}
-            className={`border rounded-2xl p-2.5 sm:p-3 flex items-center justify-between cursor-pointer transition-all ${
-              activeTab === "todos"
-                ? "bg-stone-100 border-stone-700 ring-2 ring-stone-400/40 shadow-xs"
-                : "bg-stone-50 border-stone-200 hover:border-stone-400"
-            }`}
+            className="bg-stone-50 border border-stone-200 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between cursor-pointer"
           >
             <div>
               <span className="text-[10px] font-bold uppercase text-stone-700 tracking-wider block">
-                Total Histórico
+                Total en Historial
               </span>
               <span className="text-base sm:text-xl font-black text-stone-900 block mt-0.5">
                 {counts.total}
               </span>
               <span className="text-[10px] text-stone-500 font-semibold">
-                Registros totales
+                Registros dados de baja
               </span>
             </div>
             <div className="p-2 bg-stone-200 text-stone-700 rounded-xl">
@@ -305,38 +239,7 @@ export default function OrderHistoryDashboardModal({
                 type="button"
                 onClick={() => setActiveTab("todos")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                  activeTab === "todos"
-                    ? "bg-stone-900 text-white shadow-xs"
-                    : "text-stone-700 hover:bg-white/70"
-                }`}
-              >
-                <span>📋 Todo el Historial</span>
-                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-md bg-stone-800 text-stone-200">
-                  {counts.total}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("entregados")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                  activeTab === "entregados"
-                    ? "bg-teal-700 text-white shadow-xs"
-                    : "text-teal-900 hover:bg-white/70"
-                }`}
-              >
-                <Check className="w-3.5 h-3.5 text-teal-300" />
-                <span>Entregados con Éxito</span>
-                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-md bg-teal-900 text-teal-200">
-                  {counts.entregados}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("cancelados")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                  activeTab === "cancelados"
+                  activeTab === "todos" || activeTab === "cancelados"
                     ? "bg-rose-700 text-white shadow-xs"
                     : "text-rose-900 hover:bg-white/70"
                 }`}

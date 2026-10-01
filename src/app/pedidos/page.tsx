@@ -627,23 +627,7 @@ export default function PedidosPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            {/* Botón de Historial: Dados de baja */}
-            <button
-              type="button"
-              onClick={() => {
-                setHistoryDashboardTab("cancelados");
-                setIsHistoryDashboardOpen(true);
-              }}
-              className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white shadow-xs border border-stone-800 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer select-none"
-              title="Abrir Historial de pedidos dados de baja"
-            >
-              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              <span>Historial (Dados de Baja)</span>
-              <span className="font-mono font-black text-[10px] px-1.5 py-0.2 rounded-md bg-rose-950 text-rose-300 border border-rose-700/60">
-                {classificationCounts.cancelados}
-              </span>
-            </button>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
 
             <button
               type="button"
@@ -913,6 +897,96 @@ export default function PedidosPage() {
               <option value="liquidados">✓ 100% Liquidados</option>
             </select>
           </div>
+        </div>
+      </div>
+
+      {/* Barra Destacada de Historial con 2 Apartados: Pedidos entregados con éxito y Pedidos dados de baja */}
+      <div className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white p-2.5 sm:p-3 px-4 sm:px-5 rounded-2xl shadow-md border border-stone-800 flex flex-col md:flex-row md:items-center justify-between gap-3 animate-in fade-in duration-200">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl shadow-inner shrink-0">
+            <History className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+              <span>📜 Historial de Pedidos</span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.2 rounded-full bg-stone-800 text-stone-300 border border-stone-700">
+                {classificationCounts.historial} registros
+              </span>
+            </div>
+            <div className="text-xs sm:text-sm font-black text-stone-100">
+              Consulta de pedidos finalizados
+            </div>
+          </div>
+        </div>
+
+        {/* Los 2 Apartados Llamativos y Grandes */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+          {/* Apartado 1: Pedidos entregados con éxito */}
+          <button
+            type="button"
+            onClick={() => {
+              if (classificationFilter === "historial" && historialSubFilter === "entregados") {
+                setClassificationFilter("all");
+              } else {
+                setHistorialSubFilter("entregados");
+                setClassificationFilter("historial");
+                scrollToCatalog();
+              }
+            }}
+            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer select-none border ${
+              classificationFilter === "historial" && historialSubFilter === "entregados"
+                ? "bg-teal-600 hover:bg-teal-500 text-white border-teal-300 ring-4 ring-teal-400/40 shadow-lg shadow-teal-900/50 scale-[1.02]"
+                : "bg-stone-800/90 hover:bg-stone-800 text-teal-300 border-teal-700/60 hover:border-teal-400 hover:text-white"
+            }`}
+            title="Ver pedidos que se entregaron con éxito al cliente"
+          >
+            <div className="p-1 rounded-md bg-teal-500/20 text-teal-300 shrink-0">
+              <Check className="w-4 h-4 text-teal-400 font-black" />
+            </div>
+            <span className="truncate">Pedidos entregados con éxito</span>
+            <span className="font-mono font-black text-xs px-2.5 py-0.5 rounded-lg bg-teal-950 text-teal-200 border border-teal-600 shrink-0">
+              {classificationCounts.entregados}
+            </span>
+          </button>
+
+          {/* Apartado 2: Pedidos que se dieron de baja */}
+          <button
+            type="button"
+            onClick={() => {
+              if (classificationFilter === "historial" && historialSubFilter === "cancelados") {
+                setClassificationFilter("all");
+              } else {
+                setHistorialSubFilter("cancelados");
+                setClassificationFilter("historial");
+                scrollToCatalog();
+              }
+            }}
+            className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer select-none border ${
+              classificationFilter === "historial" && historialSubFilter === "cancelados"
+                ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-300 ring-4 ring-rose-400/40 shadow-lg shadow-rose-900/50 scale-[1.02]"
+                : "bg-stone-800/90 hover:bg-stone-800 text-rose-300 border-rose-700/60 hover:border-rose-400 hover:text-white"
+            }`}
+            title="Ver pedidos que se dieron de baja o cancelaron"
+          >
+            <div className="p-1 rounded-md bg-rose-500/20 text-rose-300 shrink-0">
+              <Trash2 className="w-4 h-4 text-rose-400 font-black" />
+            </div>
+            <span className="truncate">Pedidos que se dieron de baja</span>
+            <span className="font-mono font-black text-xs px-2.5 py-0.5 rounded-lg bg-rose-950 text-rose-200 border border-rose-600 shrink-0">
+              {classificationCounts.cancelados}
+            </span>
+          </button>
+
+          {classificationFilter === "historial" && (
+            <button
+              type="button"
+              onClick={() => setClassificationFilter("all")}
+              className="px-3 py-2 rounded-xl text-xs font-black bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white border border-stone-700 transition-all cursor-pointer shrink-0"
+              title="Volver a ver todos los pedidos activos"
+            >
+              ✕ Ver Activos
+            </button>
+          )}
         </div>
       </div>
 
