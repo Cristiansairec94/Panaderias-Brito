@@ -56,6 +56,7 @@ import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import EditOrderModal from "@/components/pedidos/EditOrderModal";
 import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
+import OrderHistoryDashboardModal from "@/components/pedidos/OrderHistoryDashboardModal";
 
 // Helper functions for date and time calculations in local timezone
 const getLocalDateISO = (d: Date = new Date()): string => {
@@ -137,6 +138,8 @@ export default function PedidosPage() {
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<CustomOrder | null>(null);
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<CustomOrder | null>(null);
+  const [isHistoryDashboardOpen, setIsHistoryDashboardOpen] = useState(false);
+  const [historyDashboardTab, setHistoryDashboardTab] = useState<"todos" | "entregados" | "cancelados">("todos");
 
   // Cargar pedidos desde almacenamiento local
   const loadOrders = () => {
@@ -342,20 +345,16 @@ export default function PedidosPage() {
         if (!matchesBranch) return false;
       }
 
-      // Los pedidos entregados y cancelados desaparecen de las vistas activas
-      if (classificationFilter !== "entregados" && classificationFilter !== "historial") {
-        if (order.status === "entregado" || order.status === "cancelado") {
-          return false;
-        }
+      // Los pedidos entregados y cancelados pertenecen EXCLUSIVAMENTE al Dashboard Independiente de Historial
+      // NUNCA deben aparecer en las secciones de abajo para no mezclar pedidos activos con concluidos/bajas
+      if (order.status === "entregado" || order.status === "cancelado") {
+        return false;
       }
 
       const orderDate = normalizeDateStr(order.deliveryDate);
 
       // Classification Filter (Botones principales con emoticones y cuadros KPI)
-      if (classificationFilter === "activos" && (order.status === "entregado" || order.status === "cancelado")) {
-        return false;
-      }
-      if (classificationFilter === "hoy" && (orderDate !== todayStr || order.status === "cancelado" || order.status === "entregado")) {
+      if (classificationFilter === "hoy" && orderDate !== todayStr) {
         return false;
       }
       if (classificationFilter === "pendientes" && !checkIsPending(order)) return false;
@@ -364,12 +363,6 @@ export default function PedidosPage() {
       if (classificationFilter === "no_llevados" && !checkIsReadyNotDelivered(order)) return false;
       if (classificationFilter === "no_pasaron" && !checkIsOverdue(order)) return false;
       if (classificationFilter === "proximos" && !checkIsUpcoming(order)) return false;
-      if (classificationFilter === "entregados" && !checkIsDelivered(order)) return false;
-      if (classificationFilter === "historial") {
-        if (order.status !== "entregado" && order.status !== "cancelado") return false;
-        if (historialSubFilter === "entregados" && order.status !== "entregado") return false;
-        if (historialSubFilter === "cancelados" && order.status !== "cancelado") return false;
-      }
 
       // Status filter (solo aplica si clasificación es "all")
       if (classificationFilter === "all" && statusFilter !== "all" && order.status !== statusFilter) {
@@ -486,10 +479,9 @@ export default function PedidosPage() {
       scrollToCatalog();
       return;
     }
-    if (key === "historial") {
-      setHistorialSubFilter("todos");
-      setClassificationFilter((prev) => (prev === "historial" ? "all" : "historial"));
-      scrollToCatalog();
+    if (key === "historial" || key === "entregados") {
+      setHistoryDashboardTab(key === "entregados" ? "entregados" : "todos");
+      setIsHistoryDashboardOpen(true);
       return;
     }
     setClassificationFilter((prev) => {
@@ -638,29 +630,28 @@ export default function PedidosPage() {
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
             {/* Botón de Historial con 2 apartados: Entregados con éxito y Dados de baja */}
             <div className="flex items-center rounded-xl bg-stone-900 text-white shadow-xs p-0.5 border border-stone-800 text-xs">
-              <div className="px-2.5 py-1.5 flex items-center gap-1.5 font-black text-amber-400 border-r border-stone-800 shrink-0 select-none">
+              <button
+                type="button"
+                onClick={() => {
+                  setHistoryDashboardTab("todos");
+                  setIsHistoryDashboardOpen(true);
+                }}
+                className="px-2.5 py-1.5 flex items-center gap-1.5 font-black text-amber-400 border-r border-stone-800 shrink-0 select-none cursor-pointer hover:bg-stone-800 rounded-l-lg transition-colors"
+                title="Abrir Dashboard Independiente del Historial"
+              >
                 <History className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">Historial:</span>
-              </div>
+              </button>
 
               {/* Apartado 1: Pedidos entregados con éxito */}
               <button
                 type="button"
                 onClick={() => {
-                  if (classificationFilter === "historial" && historialSubFilter === "entregados") {
-                    setClassificationFilter("all");
-                  } else {
-                    setHistorialSubFilter("entregados");
-                    setClassificationFilter("historial");
-                    scrollToCatalog();
-                  }
+                  setHistoryDashboardTab("entregados");
+                  setIsHistoryDashboardOpen(true);
                 }}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none ${
-                  classificationFilter === "historial" && historialSubFilter === "entregados"
-                    ? "bg-teal-600 text-white shadow-xs font-black ring-1 ring-white/60"
-                    : "text-stone-300 hover:text-white hover:bg-stone-800"
-                }`}
-                title="Ver pedidos que se entregaron con éxito"
+                className="px-2.5 sm:px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none text-stone-300 hover:text-white hover:bg-stone-800"
+                title="Abrir Dashboard Independiente de pedidos entregados con éxito"
               >
                 <Check className="w-3.5 h-3.5 text-teal-400" />
                 <span>
@@ -678,20 +669,11 @@ export default function PedidosPage() {
               <button
                 type="button"
                 onClick={() => {
-                  if (classificationFilter === "historial" && historialSubFilter === "cancelados") {
-                    setClassificationFilter("all");
-                  } else {
-                    setHistorialSubFilter("cancelados");
-                    setClassificationFilter("historial");
-                    scrollToCatalog();
-                  }
+                  setHistoryDashboardTab("cancelados");
+                  setIsHistoryDashboardOpen(true);
                 }}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none ${
-                  classificationFilter === "historial" && historialSubFilter === "cancelados"
-                    ? "bg-rose-600 text-white shadow-xs font-black ring-1 ring-white/60"
-                    : "text-stone-300 hover:text-white hover:bg-stone-800"
-                }`}
-                title="Ver pedidos que se dieron de baja"
+                className="px-2.5 sm:px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none text-stone-300 hover:text-white hover:bg-stone-800"
+                title="Abrir Dashboard Independiente de pedidos dados de baja"
               >
                 <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                 <span>
@@ -1120,8 +1102,6 @@ export default function PedidosPage() {
                   {classificationFilter === "no_llevados" && <CheckCircle2 className="w-4 h-4" />}
                   {classificationFilter === "no_pasaron" && <AlertTriangle className="w-4 h-4 text-red-200" />}
                   {classificationFilter === "pendientes" && <Flame className="w-4 h-4" />}
-                  {classificationFilter === "entregados" && <Check className="w-4 h-4" />}
-                  {classificationFilter === "historial" && <History className="w-4 h-4 text-white" />}
                   {classificationFilter === "proximos" && <Calendar className="w-4 h-4" />}
                 </div>
                 <div>
@@ -1137,55 +1117,12 @@ export default function PedidosPage() {
                       {classificationFilter === "no_llevados" && "📦 Listos en Sucursal Esperando al Cliente"}
                       {classificationFilter === "no_pasaron" && `⚠️ Pedidos que no han pasado por ellos (${classificationCounts.no_pasaron})`}
                       {classificationFilter === "pendientes" && "👨‍🍳 En Preparación / Horno"}
-                      {classificationFilter === "entregados" && "✅ Ya Entregados"}
-                      {classificationFilter === "historial" && historialSubFilter === "entregados" && "✓ Pedidos que se entregaron con éxito"}
-                      {classificationFilter === "historial" && historialSubFilter === "cancelados" && "✕ Pedidos que se dieron de baja"}
-                      {classificationFilter === "historial" && historialSubFilter === "todos" && "📜 Historial: Pedidos Entregados y Dados de Baja"}
                       {classificationFilter === "proximos" && "⏰ Próximos de Hoy"}
                     </h3>
                   </div>
                   <p className="text-[11px] text-stone-500 font-semibold mt-0.5">
-                    Mostrando {filteredOrders.length} pedido(s) registrado(s).
+                    Mostrando {filteredOrders.length} pedido(s) activo(s) en proceso.
                   </p>
-                  {classificationFilter === "historial" && (
-                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => setHistorialSubFilter("entregados")}
-                        className={`text-[11px] font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-                          historialSubFilter === "entregados"
-                            ? "bg-teal-700 text-white shadow-xs font-black ring-2 ring-teal-400"
-                            : "bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200"
-                        }`}
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Pedidos entregados con éxito ({classificationCounts.entregados})</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHistorialSubFilter("cancelados")}
-                        className={`text-[11px] font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-                          historialSubFilter === "cancelados"
-                            ? "bg-rose-700 text-white shadow-xs font-black ring-2 ring-rose-400"
-                            : "bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200"
-                        }`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Pedidos que se dieron de baja ({classificationCounts.cancelados})</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHistorialSubFilter("todos")}
-                        className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${
-                          historialSubFilter === "todos"
-                            ? "bg-stone-900 text-white shadow-xs font-black"
-                            : "bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200"
-                        }`}
-                      >
-                        <span>Ver ambos ({classificationCounts.historial})</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -1312,8 +1249,6 @@ export default function PedidosPage() {
                 <DollarSign className="w-8 h-8 text-emerald-500" />
               ) : classificationFilter === "pagados" ? (
                 <Check className="w-8 h-8 text-teal-600" />
-              ) : classificationFilter === "historial" ? (
-                <History className="w-8 h-8 text-stone-600" />
               ) : (
                 <Cake className="w-8 h-8 text-amber-600" />
               )}
@@ -1329,23 +1264,19 @@ export default function PedidosPage() {
                 ? "No hay pedidos pagados para mostrar"
                 : classificationFilter === "no_pasaron"
                 ? "No hay pedidos pendientes donde no hayan pasado por ellos"
-                : classificationFilter === "historial"
-                ? "No hay pedidos en el historial"
                 : "No se encontraron productos ni pedidos"}
             </h3>
             <p className="text-xs text-stone-500 max-w-md mx-auto">
               {classificationFilter === "hoy"
                 ? `Para el día de hoy (${todayStr}) no hay pedidos pendientes de entregar. Puedes revisar los pedidos de días próximos o los pedidos activos.`
                 : classificationFilter === "no_llevados"
-                ? "Todos los pedidos están en proceso de horneado/elaboración o ya fueron entregados a los clientes."
+                ? "Todos los pedidos están en proceso de horneado/elaboración o esperando entrega en sucursal."
                 : classificationFilter === "por_pagar"
                 ? "Todos los pedidos activos registrados se encuentran 100% liquidados."
                 : classificationFilter === "pagados"
                 ? "No se encontraron pedidos con pago completado bajo los criterios o sucursal seleccionada."
                 : classificationFilter === "no_pasaron"
                 ? "Excelente: ningún cliente ha dejado su pedido pasado de la fecha u hora programada."
-                : classificationFilter === "historial"
-                ? "No se encontraron pedidos entregados ni dados de baja (cancelados) en la sucursal o criterios seleccionados."
                 : "No hay productos registrados que coincidan con la clasificación o filtros seleccionados."}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
@@ -2432,6 +2363,43 @@ export default function PedidosPage() {
         }}
         onDarDeBaja={(o) => {
           handleDarDeBaja(o);
+        }}
+      />
+
+      {/* Dashboard Independiente de Historial de Pedidos (Entregados y Cancelados) */}
+      <OrderHistoryDashboardModal
+        isOpen={isHistoryDashboardOpen}
+        onClose={() => setIsHistoryDashboardOpen(false)}
+        initialTab={historyDashboardTab}
+        orders={orders}
+        branches={branches}
+        onViewOrderDetail={(order) => {
+          setSelectedOrderForDetail(order);
+        }}
+        onPrintReceipt={(order) => {
+          setSelectedOrderForReceipt(order);
+        }}
+        onSendWhatsApp={(order) => {
+          handleSendWhatsApp(order);
+        }}
+        onRestoreOrder={(order) => {
+          const confirmMsg = `¿Deseas reactivar el pedido ${order.orderNumber} (${order.customerName}) y regresarlo a la sección de pedidos activos?`;
+          if (confirm(confirmMsg)) {
+            updateOrderStatus(order.id, "listo");
+            loadOrders();
+            addNotification({
+              title: "Pedido Reactivado",
+              description: `El pedido ${order.orderNumber} ha regresado a la sección de pedidos activos.`,
+              senderName: "Control de Pedidos",
+              senderAvatar: "🔄",
+              highlightText: order.orderNumber,
+              category: "pedidos",
+              badgeIcon: "pastel",
+            });
+          }
+        }}
+        onDeleteOrderPermanently={(order) => {
+          handleDarDeBaja(order);
         }}
       />
     </div>
