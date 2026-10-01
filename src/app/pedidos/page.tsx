@@ -36,10 +36,11 @@ import {
   LayoutGrid,
   Wifi,
   History,
-  Archive
+  Archive,
+  X
 } from "lucide-react";
 import { CustomOrder } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, playScanBeep } from "@/lib/utils";
 import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
@@ -138,6 +139,7 @@ export default function PedidosPage() {
   };
 
   // Modals state
+  const [readyNotificationOrder, setReadyNotificationOrder] = useState<CustomOrder | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
@@ -150,6 +152,18 @@ export default function PedidosPage() {
   const loadOrders = () => {
     setOrders(getStoredOrders());
   };
+
+  // Cerrar modal de confirmación de "Listo en sucursal" con tecla Escape o Enter
+  useEffect(() => {
+    if (!readyNotificationOrder) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || e.key === "Enter") {
+        setReadyNotificationOrder(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [readyNotificationOrder]);
 
   useEffect(() => {
     loadOrders();
@@ -652,7 +666,10 @@ export default function PedidosPage() {
     }
     updateOrderStatus(order.id, "listo");
     loadOrders();
-    alert("El producto ya está en sucursal");
+    setReadyNotificationOrder(order);
+    try {
+      playScanBeep(true);
+    } catch (e) {}
     addNotification({
       title: "El producto ya está en sucursal",
       description: `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal.`,
@@ -738,6 +755,10 @@ export default function PedidosPage() {
       updateOrderStatus(order.id, nextStatus);
       loadOrders();
       if (nextStatus === "listo") {
+        setReadyNotificationOrder(order);
+        try {
+          playScanBeep(true);
+        } catch (e) {}
         addNotification({
           title: "El producto ya está en sucursal",
           description: `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal.`,
@@ -3124,6 +3145,7 @@ export default function PedidosPage() {
         }}
         onAdvanceStatus={(o) => {
           handleAdvanceStatus(o);
+          setReadyNotificationOrder(o);
           loadOrders();
           const updated = getStoredOrders().find((item) => item.id === o.id);
           if (updated) setSelectedOrderForDetail(updated);
@@ -3196,6 +3218,126 @@ export default function PedidosPage() {
           handleDarDeBaja(order);
         }}
       />
+
+      {/* ── Mensaje Personalizado con Color: "El producto ya está en sucursal" ── */}
+      {readyNotificationOrder && (
+        <div
+          className="fixed inset-0 bg-stone-950/65 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
+          onClick={() => setReadyNotificationOrder(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full shadow-2xl border-2 border-emerald-500/40 overflow-hidden animate-in zoom-in-95 duration-200 ring-8 ring-emerald-500/10 text-stone-900 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Botón Cerrar 'X' en la esquina */}
+            <button
+              type="button"
+              onClick={() => setReadyNotificationOrder(null)}
+              className="absolute top-3.5 right-3.5 z-10 w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors cursor-pointer"
+              title="Cerrar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Encabezado con Gradiente Esmeralda y Animación */}
+            <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-6 text-white text-center relative overflow-hidden">
+              {/* Círculos decorativos luminosos */}
+              <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/15 rounded-full blur-xl pointer-events-none" />
+              <div className="absolute -bottom-10 -left-10 w-28 h-28 bg-emerald-300/20 rounded-full blur-xl pointer-events-none" />
+
+              {/* Icono animado */}
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg ring-4 ring-white/30">
+                <CheckCircle2 className="w-9 h-9 text-white animate-pulse" />
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 text-emerald-100 rounded-full text-[11px] font-black uppercase tracking-wider mb-2">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Aviso de Sucursal</span>
+              </div>
+
+              <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                El producto ya está en sucursal
+              </h3>
+              <p className="text-emerald-100 text-xs sm:text-sm font-medium mt-1">
+                El pedido llegó con éxito y está listo para ser entregado
+              </p>
+            </div>
+
+            {/* Ficha de Detalles del Pedido */}
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="bg-emerald-50/70 rounded-2xl p-4 border border-emerald-200/90 space-y-3">
+                {/* Folio y Sucursal */}
+                <div className="flex items-center justify-between gap-2 border-b border-emerald-200/70 pb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Folio:</span>
+                    <span className="font-mono tabular-nums font-black text-xs text-emerald-950 bg-white border border-emerald-300 px-2 py-0.5 rounded-lg shadow-2xs">
+                      {readyNotificationOrder.orderNumber}
+                    </span>
+                  </div>
+                  <span className="text-xs font-extrabold text-emerald-800 bg-white px-2.5 py-0.5 rounded-lg border border-emerald-300 shadow-2xs flex items-center gap-1">
+                    🏬 {readyNotificationOrder.branchName.replace("Sucursal ", "")}
+                  </span>
+                </div>
+
+                {/* Cliente */}
+                <div className="flex items-start gap-2">
+                  <User className="w-4 h-4 text-emerald-700 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">Cliente:</p>
+                    <p className="font-black text-stone-900 text-sm sm:text-base leading-tight">
+                      {readyNotificationOrder.customerName}
+                    </p>
+                    {readyNotificationOrder.phone && (
+                      <p className="font-mono text-xs text-stone-600 font-semibold mt-0.5">
+                        📞 {readyNotificationOrder.phone}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Productos */}
+                <div className="flex items-start gap-2 pt-1 border-t border-emerald-200/50">
+                  <Cake className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">Contenido:</p>
+                    <p className="font-bold text-stone-800 text-xs sm:text-sm leading-snug">
+                      {readyNotificationOrder.items && readyNotificationOrder.items.length > 0
+                        ? readyNotificationOrder.items.map((it) => `${it.quantity}x ${it.name}`).join(", ")
+                        : readyNotificationOrder.description || "Pedido Encargado"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Saldo y Estado */}
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-emerald-200/70">
+                  <span className="text-stone-500 font-semibold">Estado de Pago:</span>
+                  {readyNotificationOrder.remainingBalance === 0 ? (
+                    <span className="font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-lg shadow-2xs inline-flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5 text-emerald-700" />
+                      100% Liquidado
+                    </span>
+                  ) : (
+                    <span className="font-mono font-black text-rose-900 bg-rose-100 border-2 border-rose-300 px-2.5 py-0.5 rounded-lg shadow-2xs inline-flex items-center gap-1">
+                      Falta: {formatCurrency(readyNotificationOrder.remainingBalance)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Botón Principal: Aceptar */}
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setReadyNotificationOrder(null)}
+                className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.98] text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Check className="w-4 h-4 text-white" />
+                <span>Aceptar y Continuar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

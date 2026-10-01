@@ -3667,7 +3667,7 @@ export default function ExpensesModal({
                             </p>
                           </div>
                         ) : (
-                          <div className="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
+                          <div className="space-y-2.5">
                             {filteredAllOrders.map((order) => {
                               const cleanDate = (order.deliveryDate || "").split("T")[0].split(" ")[0].trim();
                               const isToday = cleanDate === todayDateStr || (order.deliveryDate || "").toLowerCase().includes("hoy");
@@ -3971,7 +3971,7 @@ export default function ExpensesModal({
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
+                        <div className="space-y-2">
                           {visibleCashMovements.map((item) => {
                             if (item.type === "venta" && item.sale) {
                               const sale = item.sale;
@@ -4220,7 +4220,7 @@ export default function ExpensesModal({
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                        <div className="space-y-2">
                           {shiftIncomes.map((inc) => (
                             <div
                               key={inc.id}
@@ -4302,7 +4302,7 @@ export default function ExpensesModal({
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                        <div className="space-y-2">
                           {shiftExpenses.map((exp) => (
                             <div
                               key={exp.id}

@@ -226,7 +226,7 @@ export default function Sidebar() {
 
       {/* Main Modern Sidebar: Deep Onyx with Brito Brand Orange & Crimson accents */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-[200] md:z-30 flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl border-r border-white/[0.08] bg-[#090a0f] text-stone-200 ${
+        className={`fixed md:static inset-y-0 left-0 z-[200] md:z-30 flex flex-col justify-between h-full md:h-screen md:max-h-screen transition-all duration-300 ease-in-out select-none shadow-2xl border-r border-white/[0.08] bg-[#090a0f] text-stone-200 ${
           isCollapsed ? "w-20" : "w-[84vw] max-w-[325px] md:w-64"
         } ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"

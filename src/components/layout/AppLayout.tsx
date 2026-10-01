@@ -66,7 +66,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <BranchProvider>
       <SidebarProvider>
-        <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
+        <div className="flex h-screen max-h-screen w-full max-w-full overflow-hidden bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 w-full max-w-full max-h-screen overflow-x-hidden overflow-y-hidden">
           <Header />
