@@ -102,17 +102,6 @@ const SYSTEM_ROLES: SystemRoleOption[] = [
     activeBg: "bg-purple-50",
   },
   {
-    id: "panadero",
-    label: "Jefe de Horno / Panadero",
-    shortLabel: "Producción",
-    badge: "Horno & Recetas",
-    icon: "🥖",
-    description: "Consulta de recetas, catálogo de panes y registro de producción diaria.",
-    badgeBg: "bg-amber-100 text-amber-900 border-amber-300",
-    activeBorder: "border-amber-500 ring-2 ring-amber-400/40",
-    activeBg: "bg-amber-50",
-  },
-  {
     id: "admin",
     label: "Administrador General",
     shortLabel: "Administrador",
@@ -148,7 +137,7 @@ function suggestRoleFromJobTitle(jobTitle: string): UserRole {
   if (lower.includes("caj") || lower.includes("mostrador") || lower.includes("tienda")) return "cajero";
   if (lower.includes("admin") || lower.includes("auxiliar")) return "auxiliar_admin";
   if (lower.includes("superv") || lower.includes("encargad") || lower.includes("gerent")) return "supervisor";
-  if (lower.includes("panader") || lower.includes("horn") || lower.includes("pastel")) return "panadero";
+  if (lower.includes("panader") || lower.includes("horn") || lower.includes("pastel")) return "cajero";
   return "cajero";
 }
 
@@ -228,7 +217,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
     setFormHasAccess(true);
     setFormUsername("");
     setFormPassword("1234");
-    setFormRole("panadero");
+    setFormRole("cajero");
     setShowFormPassword(false);
     setCopiedPass(false);
     setIsModalOpen(true);
@@ -1128,7 +1117,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                         <span className="text-[10px] font-medium text-stone-500">Define qué módulos podrá ver este usuario</span>
                       </label>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                         {SYSTEM_ROLES.map((role) => {
                           const isSelected = formRole === role.id;
                           return (
