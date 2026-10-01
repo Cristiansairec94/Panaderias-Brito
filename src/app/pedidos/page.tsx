@@ -631,8 +631,9 @@ export default function PedidosPage() {
   const handleMarkAsReady = (order: CustomOrder) => {
     updateOrderStatus(order.id, "listo");
     loadOrders();
+    alert("El producto ya está en sucursal");
     addNotification({
-      title: "¡Pedido Listo en Sucursal!",
+      title: "El producto ya está en sucursal",
       description: `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal.`,
       senderName: "Control de Pedidos",
       senderAvatar: "🎂",
@@ -679,6 +680,17 @@ export default function PedidosPage() {
     if (nextStatus !== order.status) {
       updateOrderStatus(order.id, nextStatus);
       loadOrders();
+      if (nextStatus === "listo") {
+        addNotification({
+          title: "El producto ya está en sucursal",
+          description: `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal.`,
+          senderName: "Control de Pedidos",
+          senderAvatar: "🎂",
+          highlightText: order.orderNumber,
+          category: "pedidos",
+          badgeIcon: "pastel",
+        });
+      }
     }
   };
 
