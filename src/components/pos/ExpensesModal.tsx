@@ -54,7 +54,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
-import { getStoredOrders } from "@/lib/orders";
+import { getStoredOrders, updateOrderStatus } from "@/lib/orders";
 import { getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import TicketModal from "@/components/pos/TicketModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
@@ -442,7 +442,7 @@ export default function ExpensesModal({
 
   // Estados específicos para el historial completo de pedidos (entrega de turno)
   const [allOrdersSearch, setAllOrdersSearch] = useState<string>("");
-  const [allOrdersStatusFilter, setAllOrdersStatusFilter] = useState<"all" | "hoy" | "listos" | "pendientes" | "por_pagar" | "entregados">("all");
+  const [allOrdersStatusFilter, setAllOrdersStatusFilter] = useState<"all" | "hoy" | "listos" | "pendientes" | "por_pagar">("all");
   const [expandedAllOrdersIds, setExpandedAllOrdersIds] = useState<Record<string, boolean>>({});
 
   const toggleExpandAllOrder = (orderId: string) => {
@@ -598,14 +598,21 @@ export default function ExpensesModal({
     }
   }, [orders, isOpen]);
 
+  const [ordersVersion, setOrdersVersion] = useState(0);
+
   useEffect(() => {
     const handleOrdersUpdated = () => {
+      setOrdersVersion((v) => v + 1);
       if (!Array.isArray(orders)) {
         setInternalOrders(getStoredOrders());
       }
     };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
-    return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
+    window.addEventListener("storage", handleOrdersUpdated);
+    return () => {
+      window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
+      window.removeEventListener("storage", handleOrdersUpdated);
+    };
   }, [orders]);
 
   // Sincronizar ventas de mostrador en memoria y desde almacenamiento local
@@ -1040,11 +1047,16 @@ export default function ExpensesModal({
   // Alias para mantener compatibilidad
   const unifiedCashMovements = unifiedShiftMovements;
 
-  // Historial global de pedidos de la panadería para la entrega de turno entre cajeras
+  // Historial global de pedidos por entregar de la panadería para la entrega de turno entre cajeras
   const allHistoricalOrders = useMemo(() => {
-    const list = Array.isArray(internalOrders) && internalOrders.length > 0 ? internalOrders : getStoredOrders();
+    const list = getStoredOrders();
     return list
       .filter((o) => {
+        // Excluir 100% los pedidos que ya fueron entregados o cancelados/dados de baja
+        if (o.status === "entregado" || o.status === "cancelado") {
+          return false;
+        }
+
         if (branchId) {
           const orderBranch = (o as any).operatingBranchId || o.branchId;
           if (orderBranch && orderBranch !== branchId && o.branchId !== branchId) return false;
@@ -1056,7 +1068,7 @@ export default function ExpensesModal({
         const dateB = b.deliveryDate || b.createdAt || "";
         return dateB.localeCompare(dateA);
       });
-  }, [internalOrders, branchId]);
+  }, [ordersVersion, internalOrders, branchId]);
 
   const todayDateStr = useMemo(() => {
     const d = new Date();
@@ -1083,14 +1095,9 @@ export default function ExpensesModal({
 
   const unpaidOrdersList = useMemo(() => {
     return allHistoricalOrders.filter((o) => {
-      if (o.status === "cancelado" || o.status === "entregado") return false;
       const rem = o.remainingBalance !== undefined ? o.remainingBalance : Math.max(0, (o.total || 0) - (o.deposit || 0));
       return rem > 0;
     });
-  }, [allHistoricalOrders]);
-
-  const deliveredOrdersList = useMemo(() => {
-    return allHistoricalOrders.filter((o) => o.status === "entregado");
   }, [allHistoricalOrders]);
 
   const totalUnpaidBalance = useMemo(() => {
@@ -1115,8 +1122,6 @@ export default function ExpensesModal({
       list = inPrepOrdersList;
     } else if (allOrdersStatusFilter === "por_pagar") {
       list = unpaidOrdersList;
-    } else if (allOrdersStatusFilter === "entregados") {
-      list = deliveredOrdersList;
     }
 
     if (allOrdersSearch.trim()) {
@@ -1133,7 +1138,7 @@ export default function ExpensesModal({
     }
 
     return list;
-  }, [allHistoricalOrders, allOrdersStatusFilter, todayOrdersList, readyOrdersList, inPrepOrdersList, unpaidOrdersList, deliveredOrdersList, allOrdersSearch]);
+  }, [allHistoricalOrders, allOrdersStatusFilter, todayOrdersList, readyOrdersList, inPrepOrdersList, unpaidOrdersList, allOrdersSearch]);
 
   const handleSelectDetailFilter = (filterId: "all" | "ventas" | "pedidos" | "todos_pedidos") => {
     setCashDetailFilter(filterId);
@@ -1168,6 +1173,38 @@ export default function ExpensesModal({
     } else {
       toggleExpandAllOrder(order.id);
     }
+  };
+
+  const handleDeliverOrder = (order: CustomOrder) => {
+    const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
+    if (rem > 0) {
+      const ok = confirm(
+        `⚠️ El pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\n¿Deseas marcarlo como ENTREGADO al cliente ahora? Desaparecerá de la sección de pedidos por entregar.`
+      );
+      if (!ok) return;
+    } else {
+      const ok = confirm(
+        `¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nDesaparecerá de la sección de pedidos por entregar.`
+      );
+      if (!ok) return;
+    }
+    updateOrderStatus(order.id, "entregado");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_orders_updated"));
+    }
+    setOrdersVersion((v) => v + 1);
+  };
+
+  const handleCancelOrder = (order: CustomOrder) => {
+    const ok = confirm(
+      `¿Confirmas DAR DE BAJA / CANCELAR el pedido #${order.orderNumber} de "${order.customerName}"?\n\nDesaparecerá de la lista de pedidos por entregar.`
+    );
+    if (!ok) return;
+    updateOrderStatus(order.id, "cancelado");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_orders_updated"));
+    }
+    setOrdersVersion((v) => v + 1);
   };
 
   const handleSendOrderWhatsApp = (order: CustomOrder) => {
@@ -3026,7 +3063,7 @@ export default function ExpensesModal({
               }
             }}
           >
-            <div className="bg-white rounded-3xl shadow-2xl max-w-3xl sm:max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border-2 border-stone-200 animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl sm:max-w-5xl lg:max-w-6xl w-full max-h-[92vh] flex flex-col overflow-hidden border-2 border-stone-200 animate-in zoom-in-95 duration-200">
               {/* Cabecera del Modal Emergente */}
               <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white shrink-0">
                 <div className="flex items-center gap-3">
@@ -3337,7 +3374,7 @@ export default function ExpensesModal({
                                 { id: "all", label: "Todos", icon: "📋", count: unifiedShiftMovements.length },
                                 { id: "ventas", label: "Ventas en Caja", icon: "🥖", count: allShiftPureSales.length },
                                 { id: "pedidos", label: "Pedidos del Turno", icon: "🎂", count: allShiftOrdersList.length },
-                                { id: "todos_pedidos", label: "pedidos por entregar", icon: "📦", count: allHistoricalOrders.length },
+                                { id: "todos_pedidos", label: "Pedidos por Entregar", icon: "📦", count: allHistoricalOrders.length },
                               ].map((tab) => {
                                 const isSpecial = tab.id === "todos_pedidos";
                                 const isSelected = cashDetailFilter === tab.id;
@@ -3346,7 +3383,7 @@ export default function ExpensesModal({
                                     key={tab.id}
                                     type="button"
                                     onClick={() => handleSelectDetailFilter(tab.id as any)}
-                                    className={`py-2.5 px-2 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 text-center active:scale-98 ${
+                                    className={`py-2.5 px-3 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 text-center active:scale-98 ${
                                       isSpecial
                                         ? isSelected
                                           ? "bg-gradient-to-r from-stone-950 via-amber-950 to-stone-950 text-amber-300 border-amber-400 shadow-xl ring-4 ring-amber-500/50 scale-[1.02]"
@@ -3357,7 +3394,7 @@ export default function ExpensesModal({
                                     }`}
                                   >
                                     <span className="text-base sm:text-lg">{tab.icon}</span>
-                                    <span className="line-clamp-1">{tab.label}</span>
+                                    <span className="whitespace-normal leading-tight font-black">{tab.label}</span>
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
                                       isSpecial
                                         ? isSelected
@@ -3375,7 +3412,7 @@ export default function ExpensesModal({
                             </div>
                           </div>
 
-                          {/* Fila B: Método de Pago (5 columnas / 2 en móvil) */}
+                          {/* Fila B: Método de Pago (6 columnas con cuadro expandido para Pedidos por Entregar) */}
                           <div>
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
                               <span>2. Método de Cobro y Acceso a Pedidos:</span>
@@ -3383,13 +3420,13 @@ export default function ExpensesModal({
                                 {cashMethodFilter === "all" ? "todos los métodos" : cashMethodFilter === "todos_pedidos" ? "pedidos por entregar" : `solo ${cashMethodFilter}`}
                               </span>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                               {[
-                                { id: "all", label: "Todos", icon: "🌐", count: detailMethodCounts.all, activeClass: "bg-stone-900 text-white border-stone-950 ring-2 ring-stone-900/20" },
-                                { id: "efectivo", label: "Efectivo", icon: "💵", count: detailMethodCounts.efectivo, activeClass: "bg-gradient-to-r from-emerald-700 to-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-600/30" },
-                                { id: "tarjeta", label: "Tarjeta", icon: "💳", count: detailMethodCounts.tarjeta, activeClass: "bg-gradient-to-r from-blue-700 to-blue-800 text-white border-blue-900 ring-2 ring-blue-600/30" },
-                                { id: "transferencia", label: "Transf.", icon: "📱", count: detailMethodCounts.transferencia, activeClass: "bg-gradient-to-r from-purple-700 to-purple-800 text-white border-purple-900 ring-2 ring-purple-600/30" },
-                                { id: "todos_pedidos", label: "pedidos por entregar", icon: "📦", count: allHistoricalOrders.length, activeClass: "bg-gradient-to-r from-stone-950 via-amber-950 to-stone-950 text-amber-300 border-amber-400 ring-4 ring-amber-500/50 shadow-xl" },
+                                { id: "all", label: "Todos", icon: "🌐", count: detailMethodCounts.all, activeClass: "bg-stone-900 text-white border-stone-950 ring-2 ring-stone-900/20", span: "col-span-1" },
+                                { id: "efectivo", label: "Efectivo", icon: "💵", count: detailMethodCounts.efectivo, activeClass: "bg-gradient-to-r from-emerald-700 to-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-600/30", span: "col-span-1" },
+                                { id: "tarjeta", label: "Tarjeta", icon: "💳", count: detailMethodCounts.tarjeta, activeClass: "bg-gradient-to-r from-blue-700 to-blue-800 text-white border-blue-900 ring-2 ring-blue-600/30", span: "col-span-1" },
+                                { id: "transferencia", label: "Transf.", icon: "📱", count: detailMethodCounts.transferencia, activeClass: "bg-gradient-to-r from-purple-700 to-purple-800 text-white border-purple-900 ring-2 ring-purple-600/30", span: "col-span-1" },
+                                { id: "todos_pedidos", label: "Pedidos por Entregar", icon: "📦", count: allHistoricalOrders.length, activeClass: "bg-gradient-to-r from-stone-950 via-amber-950 to-stone-950 text-amber-300 border-amber-400 ring-4 ring-amber-500/50 shadow-xl", span: "col-span-2 sm:col-span-2" },
                               ].map((m) => {
                                 const isSpecial = m.id === "todos_pedidos";
                                 const isSelected = cashMethodFilter === m.id;
@@ -3398,7 +3435,7 @@ export default function ExpensesModal({
                                     key={m.id}
                                     type="button"
                                     onClick={() => handleSelectMethodFilter(m.id as any)}
-                                    className={`py-2 px-2.5 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
+                                    className={`${m.span} py-2.5 px-3 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
                                       isSpecial
                                         ? isSelected
                                           ? `${m.activeClass} shadow-md`
@@ -3409,8 +3446,8 @@ export default function ExpensesModal({
                                     }`}
                                   >
                                     <div className="flex items-center gap-1.5 min-w-0">
-                                      <span className="text-sm shrink-0">{m.icon}</span>
-                                      <span className="truncate">{m.label}</span>
+                                      <span className="text-base shrink-0">{m.icon}</span>
+                                      <span className="whitespace-normal leading-tight font-black">{m.label}</span>
                                     </div>
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
                                       isSpecial
@@ -3486,9 +3523,9 @@ export default function ExpensesModal({
                             <span className="text-[10px] text-rose-800 font-black block">Resta: {formatCurrency(totalUnpaidBalance)}</span>
                           </div>
                           <div className="bg-stone-50 border-2 border-stone-300/80 rounded-2xl p-2.5 text-center shadow-2xs">
-                            <span className="text-[10px] font-black uppercase text-stone-700 block">📦 Total Historial</span>
+                            <span className="text-[10px] font-black uppercase text-stone-700 block">📦 Por Entregar</span>
                             <span className="text-xl font-black text-stone-950">{allHistoricalOrders.length}</span>
-                            <span className="text-[10px] text-stone-600 font-bold block">pedidos registrados</span>
+                            <span className="text-[10px] text-stone-600 font-bold block">pedidos pendientes</span>
                           </div>
                         </div>
 
@@ -3521,7 +3558,6 @@ export default function ExpensesModal({
                               { id: "listos", label: "🎂 Listos en Mostrador", count: readyOrdersList.length, highlight: "text-emerald-800 border-emerald-300 bg-emerald-50" },
                               { id: "pendientes", label: "⏳ En Horno / Pendientes", count: inPrepOrdersList.length },
                               { id: "por_pagar", label: "⚠️ Saldo Pendiente", count: unpaidOrdersList.length, highlight: "text-rose-800 border-rose-300 bg-rose-50" },
-                              { id: "entregados", label: "📦 Entregados", count: deliveredOrdersList.length },
                             ].map((f) => (
                               <button
                                 key={f.id}
@@ -3672,7 +3708,7 @@ export default function ExpensesModal({
                                     </div>
 
                                     {/* Acciones Rápidas para la Cajera */}
-                                    <div className="flex items-center gap-1.5 shrink-0 pt-1 sm:pt-0">
+                                    <div className="flex items-center gap-1.5 shrink-0 pt-1 sm:pt-0 flex-wrap justify-end">
                                       {remaining > 0 && (
                                         <button
                                           type="button"
@@ -3684,6 +3720,16 @@ export default function ExpensesModal({
                                           <span>Cobrar Saldo</span>
                                         </button>
                                       )}
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeliverOrder(order)}
+                                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                                        title="Marcar como entregado (desaparecerá de pedidos por entregar)"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>Entregar</span>
+                                      </button>
 
                                       <button
                                         type="button"
@@ -3703,6 +3749,15 @@ export default function ExpensesModal({
                                       >
                                         <Printer className="w-3.5 h-3.5 text-amber-800" />
                                         <span className="hidden sm:inline">Ticket</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCancelOrder(order)}
+                                        className="p-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center cursor-pointer"
+                                        title="Dar de baja / cancelar pedido"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
                                   </div>
