@@ -1577,7 +1577,7 @@ export default function IngresosPage() {
                 <th className="py-3.5 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[130px]">Forma de Pago</th>
                 <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[130px] hidden xl:table-cell">Cuenta / Destino</th>
                 <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[130px]">Cajero</th>
-                <th className="py-3.5 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[135px]">Acciones</th>
+                <th className="py-3.5 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[135px] sticky right-0 bg-stone-100/95 z-20 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 text-sm">
@@ -1597,7 +1597,7 @@ export default function IngresosPage() {
                   return (
                     <tr
                       key={inc.id}
-                      className={`transition-colors min-h-16 ${
+                      className={`transition-colors min-h-16 group ${
                         isHoy
                           ? "border-l-4 border-l-emerald-500 bg-emerald-50/40 hover:bg-emerald-100/50 shadow-xs"
                           : "border-l-4 border-l-transparent hover:bg-stone-50/70"
@@ -1700,7 +1700,7 @@ export default function IngresosPage() {
                       </td>
 
                       {/* 10. Acciones */}
-                      <td className="py-3 px-3 sm:px-4 align-middle text-center whitespace-nowrap relative">
+                      <td className="py-3 px-3 sm:px-4 align-middle text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-stone-50 z-10 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
