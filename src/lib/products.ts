@@ -269,8 +269,14 @@ export const DEFAULT_PRODUCTS: Product[] = [
   }
 ];
 
-export const PRODUCT_CATEGORIES = [
-  { id: "all", label: "Todas las Categorías", priceTag: "", icon: "🧺" },
+export interface ProductCategory {
+  id: string;
+  label: string;
+  priceTag?: string;
+  icon: string;
+}
+
+export const DEFAULT_PRODUCT_CATEGORIES: ProductCategory[] = [
   { id: "pan_dulce", label: "Pan Dulce Tradicional", priceTag: "", icon: "🥖" },
   { id: "pan_blanco", label: "Bolillo & Telera", priceTag: "", icon: "🍞" },
   { id: "pasteleria", label: "Pastelería & Pays", priceTag: "", icon: "🍰" },
@@ -279,6 +285,116 @@ export const PRODUCT_CATEGORIES = [
   { id: "abarrotes", label: "Abarrotes", priceTag: "", icon: "🥫" },
   { id: "materia_prima", label: "Materia Prima", priceTag: "", icon: "🌾" },
 ];
+
+export const PRODUCT_CATEGORIES = [
+  { id: "all", label: "Todas las Categorías", priceTag: "", icon: "🧺" },
+  ...DEFAULT_PRODUCT_CATEGORIES,
+];
+
+const CATEGORIES_STORAGE_KEY = "brito_categories_v1";
+
+export function getStoredCategories(): ProductCategory[] {
+  if (typeof window === "undefined") {
+    return DEFAULT_PRODUCT_CATEGORIES;
+  }
+  try {
+    const raw = localStorage.getItem(CATEGORIES_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCT_CATEGORIES));
+      return DEFAULT_PRODUCT_CATEGORIES;
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCT_CATEGORIES));
+      return DEFAULT_PRODUCT_CATEGORIES;
+    }
+    return parsed;
+  } catch {
+    return DEFAULT_PRODUCT_CATEGORIES;
+  }
+}
+
+export function saveStoredCategories(categories: ProductCategory[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+    window.dispatchEvent(new Event("brito_categories_updated"));
+  } catch (err) {
+    console.error("Error saving categories:", err);
+  }
+}
+
+export function addCategory(data: { label: string; icon?: string; id?: string }): ProductCategory {
+  const current = getStoredCategories();
+  let cleanId = (data.id || data.label)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  if (!cleanId) cleanId = `cat_${Date.now()}`;
+
+  let candidate = cleanId;
+  let counter = 1;
+  while (current.some((c) => c.id === candidate) || candidate === "all") {
+    candidate = `${cleanId}_${counter}`;
+    counter++;
+  }
+
+  const newCat: ProductCategory = {
+    id: candidate,
+    label: data.label.trim(),
+    icon: data.icon?.trim() || "🏷️",
+    priceTag: "",
+  };
+
+  const updated = [...current, newCat];
+  saveStoredCategories(updated);
+  return newCat;
+}
+
+export function updateCategory(id: string, updates: { label?: string; icon?: string }): ProductCategory | null {
+  const current = getStoredCategories();
+  const index = current.findIndex((c) => c.id === id);
+  if (index === -1) return null;
+
+  const updatedCat: ProductCategory = {
+    ...current[index],
+    label: updates.label !== undefined ? updates.label.trim() : current[index].label,
+    icon: updates.icon !== undefined ? updates.icon.trim() || "🏷️" : current[index].icon,
+  };
+
+  current[index] = updatedCat;
+  saveStoredCategories(current);
+  return updatedCat;
+}
+
+export function deleteCategory(id: string, reassignToCatId?: string): boolean {
+  const current = getStoredCategories();
+  if (!current.some((c) => c.id === id)) return false;
+
+  const filtered = current.filter((c) => c.id !== id);
+  saveStoredCategories(filtered);
+
+  // Reasignar productos de la categoría eliminada
+  const targetCategory = reassignToCatId || (filtered[0]?.id ?? "pan_dulce");
+  const prods = getStoredProducts();
+  let modified = false;
+  const updatedProds = prods.map((p) => {
+    if (p.category === id) {
+      modified = true;
+      return { ...p, category: targetCategory };
+    }
+    return p;
+  });
+  if (modified) {
+    saveStoredProducts(updatedProds);
+  }
+
+  return true;
+}
 
 const STORAGE_KEY = "brito_products_v6";
 
@@ -382,7 +498,8 @@ export function generateProductCode(category?: string): string {
     abarrotes: "AB",
     materia_prima: "MP",
   };
-  const prefix = (category && prefixMap[category]) || "PRD";
+  const customPrefix = category ? category.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() : "";
+  const prefix = (category && prefixMap[category]) || (customPrefix.length >= 2 ? customPrefix : "PRD");
   const existingInCat = current.filter((p) => p.code?.startsWith(prefix) || p.category === category);
   const nextNum = existingInCat.length + 1;
   let codeCandidate = `${prefix}-${String(nextNum).padStart(3, "0")}`;

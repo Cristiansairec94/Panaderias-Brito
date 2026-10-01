@@ -34,21 +34,25 @@ import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/u
 import { BarcodeCard } from "@/components/productos/BarcodeCard";
 import { PrintBarcodesModal } from "@/components/productos/PrintBarcodesModal";
 import { QuickPriceModal } from "@/components/productos/QuickPriceModal";
+import { ManageCategoriesModal } from "@/components/productos/ManageCategoriesModal";
 import { 
   getStoredProducts, 
   createProduct, 
   updateProduct, 
   deleteProduct, 
-  PRODUCT_CATEGORIES,
-  generateProductCode,
-  generateProductBarcode
+  generateProductCode, 
+  generateProductBarcode,
+  getStoredCategories,
+  ProductCategory
 } from "@/lib/products";
 
 export default function ProductosPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(true);
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
@@ -90,10 +94,11 @@ export default function ProductosPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load products on mount & listen to updates
+  // Load products & categories on mount & listen to updates
   useEffect(() => {
     const load = () => {
       setProducts(getStoredProducts());
+      setCategories(getStoredCategories());
     };
     load();
 
@@ -102,8 +107,19 @@ export default function ProductosPage() {
     };
 
     window.addEventListener("brito_products_updated", handleUpdate);
-    return () => window.removeEventListener("brito_products_updated", handleUpdate);
+    window.addEventListener("brito_categories_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("brito_products_updated", handleUpdate);
+      window.removeEventListener("brito_categories_updated", handleUpdate);
+    };
   }, []);
+
+  // Ensure selectedCategory is valid
+  useEffect(() => {
+    if (selectedCategory !== "all" && categories.length > 0 && !categories.some(c => c.id === selectedCategory)) {
+      setSelectedCategory("all");
+    }
+  }, [categories, selectedCategory]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -146,10 +162,13 @@ export default function ProductosPage() {
   const handleOpenCreate = () => {
     setModalMode("create");
     setEditingId(null);
-    const initialCat = (selectedCategory !== "all" ? selectedCategory : "pan_dulce") as Product["category"];
+    const initialCat = (selectedCategory !== "all" 
+      ? selectedCategory 
+      : (categories[0]?.id || "pan_dulce")) as Product["category"];
     const autoBarcode = generateProductBarcode();
     const isPanDulce = initialCat === "pan_dulce" || initialCat === "pasteleria" || initialCat === "temporada";
     const isBebida = initialCat === "bebidas";
+    const defaultCatIcon = categories.find((c) => c.id === initialCat)?.icon || (initialCat === "abarrotes" ? "🥫" : initialCat === "materia_prima" ? "🌾" : "🥖");
 
     setFormData({
       code: autoBarcode,
@@ -160,7 +179,7 @@ export default function ProductosPage() {
       unit: initialCat === "materia_prima" ? "kg" : "pieza",
       description: "",
       image: "",
-      icon: initialCat === "abarrotes" ? "🥫" : initialCat === "materia_prima" ? "🌾" : "🥖",
+      icon: defaultCatIcon,
       hasIva: isBebida,
       ivaRate: isBebida ? "16" : "0",
       hasIeps: isPanDulce,
@@ -453,9 +472,9 @@ export default function ProductosPage() {
                 </span>
               ) : (
                 <div className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-[11px] font-black">
-                  <span>{PRODUCT_CATEGORIES.find((c) => c.id === selectedCategory)?.icon}</span>
+                  <span>{categories.find((c) => c.id === selectedCategory)?.icon || "🏷️"}</span>
                   <span className="truncate max-w-[140px] sm:max-w-none">
-                    {PRODUCT_CATEGORIES.find((c) => c.id === selectedCategory)?.label}
+                    {categories.find((c) => c.id === selectedCategory)?.label || selectedCategory}
                   </span>
                   <button
                     type="button"
@@ -469,40 +488,78 @@ export default function ProductosPage() {
               )}
             </div>
 
-            {/* Botón de alternancia: Ocultar / Mostrar lista */}
-            <button
-              type="button"
-              onClick={() => setIsCategoriesOpen((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 border border-stone-200 transition-all cursor-pointer shadow-2xs shrink-0 select-none"
-              title={isCategoriesOpen ? "Ocultar lista de categorías" : "Mostrar lista de categorías"}
-            >
-              {isCategoriesOpen ? (
-                <>
-                  <EyeOff className="w-3.5 h-3.5 text-stone-500" />
-                  <span>Ocultar Lista</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Mostrar Lista</span>
-                </>
-              )}
-              <ChevronDown
-                className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
-                  isCategoriesOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+            {/* Controles de la barra: Gestionar Categorías + Ocultar / Mostrar lista */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setIsManageCategoriesOpen(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-stone-950 transition-all cursor-pointer shadow-xs shrink-0 select-none border border-amber-600/20"
+                title="Añadir, editar o eliminar categorías del catálogo"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span className="hidden xs:inline">Gestionar</span>
+                <span>Categorías</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCategoriesOpen((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 border border-stone-200 transition-all cursor-pointer shadow-2xs shrink-0 select-none"
+                title={isCategoriesOpen ? "Ocultar lista de categorías" : "Mostrar lista de categorías"}
+              >
+                {isCategoriesOpen ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5 text-stone-500" />
+                    <span>Ocultar Lista</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Mostrar Lista</span>
+                  </>
+                )}
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
+                    isCategoriesOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            </div>
           </div>
 
           {/* Lista de Categorías Organizada (Sin scroll horizontal) */}
           {isCategoriesOpen && (
             <div className="pt-2 border-t border-stone-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 animate-in fade-in duration-150">
-              {PRODUCT_CATEGORIES.map((cat) => {
+              {/* Botón de 'Todas las Categorías' */}
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("all")}
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border select-none ${
+                  selectedCategory === "all"
+                    ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 shadow-md ring-2 ring-amber-700/25 scale-[1.01]"
+                    : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200 hover:border-stone-300"
+                }`}
+                title="Ver todas las categorías"
+              >
+                <span className="flex items-center gap-2.5 truncate">
+                  <span className="text-base shrink-0">🧺</span>
+                  <span className="truncate">Todas las Categorías</span>
+                </span>
+                <span
+                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md shrink-0 ml-2 ${
+                    selectedCategory === "all"
+                      ? "bg-amber-500 text-stone-950 font-black"
+                      : "bg-stone-200/90 text-stone-700"
+                  }`}
+                >
+                  {products.length}
+                </span>
+              </button>
+
+              {/* Botones dinámicos de cada categoría */}
+              {categories.map((cat) => {
                 const isSelected = selectedCategory === cat.id;
-                const count = cat.id === "all" 
-                  ? products.length 
-                  : products.filter((p) => p.category === cat.id).length;
+                const count = products.filter((p) => p.category === cat.id).length;
 
                 return (
                   <button
@@ -532,6 +589,17 @@ export default function ProductosPage() {
                   </button>
                 );
               })}
+
+              {/* Botón rápido "+ Añadir Categoría" */}
+              <button
+                type="button"
+                onClick={() => setIsManageCategoriesOpen(true)}
+                className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-2 border-dashed border-amber-300 hover:border-amber-500 bg-amber-50/50 hover:bg-amber-100/70 text-amber-900 active:scale-98 select-none"
+                title="Añadir una nueva categoría al catálogo"
+              >
+                <Plus className="w-3.5 h-3.5 text-amber-700 stroke-[3]" />
+                <span>+ Nueva Categoría</span>
+              </button>
             </div>
           )}
         </div>
@@ -952,21 +1020,21 @@ export default function ProductosPage() {
                     value={formData.category}
                     onChange={(e) => {
                       const newCat = e.target.value as any;
+                      const catObj = categories.find((c) => c.id === newCat);
                       setFormData({ 
                         ...formData, 
                         category: newCat,
+                        icon: catObj?.icon || formData.icon,
                         unit: newCat === "materia_prima" ? "kg" : (formData.unit || "pieza")
                       });
                     }}
                     className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   >
-                    <option value="pan_dulce">🥖 Pan Dulce Tradicional</option>
-                    <option value="pan_blanco">🍞 Bolillo & Telera</option>
-                    <option value="pasteleria">🍰 Pastelería & Pays</option>
-                    <option value="bebidas">☕ Cafetería & Bebidas</option>
-                    <option value="temporada">✨ Especiales de Temporada</option>
-                    <option value="abarrotes">🥫 Abarrotes</option>
-                    <option value="materia_prima">🌾 Materia Prima</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1181,6 +1249,18 @@ export default function ProductosPage() {
           setQuickPriceProduct(null);
         }}
         onSave={handleSaveQuickPrice}
+      />
+
+      {/* Modal de Administración de Categorías (Añadir, Editar, Eliminar) */}
+      <ManageCategoriesModal
+        isOpen={isManageCategoriesOpen}
+        onClose={() => setIsManageCategoriesOpen(false)}
+        categories={categories}
+        products={products}
+        onCategoriesChanged={() => {
+          setCategories(getStoredCategories());
+          setProducts(getStoredProducts());
+        }}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { 
   X, 
   Printer, 
@@ -13,7 +13,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product } from "@/types";
-import { PRODUCT_CATEGORIES } from "@/lib/products";
+import { getStoredCategories, ProductCategory } from "@/lib/products";
 import { formatCurrency } from "@/lib/utils";
 import { BarcodeSvg, renderBarcodeSvgString, buildEAN13 } from "@/components/productos/BarcodeCard";
 
@@ -28,8 +28,16 @@ export function PrintBarcodesModal({
   onClose,
   products,
 }: PrintBarcodesModalProps) {
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [layoutStyle, setLayoutStyle] = useState<"grid" | "list">("grid");
+
+  useEffect(() => {
+    setCategories(getStoredCategories());
+    const handleUpdate = () => setCategories(getStoredCategories());
+    window.addEventListener("brito_categories_updated", handleUpdate);
+    return () => window.removeEventListener("brito_categories_updated", handleUpdate);
+  }, []);
 
   const filteredProducts = useMemo(() => {
     if (selectedCategory === "all") return products;
@@ -40,7 +48,7 @@ export function PrintBarcodesModal({
 
   const currentCategoryLabel = selectedCategory === "all"
     ? "Todas las categorías"
-    : PRODUCT_CATEGORIES.find((c) => c.id === selectedCategory)?.label || selectedCategory;
+    : categories.find((c) => c.id === selectedCategory)?.label || selectedCategory;
 
   const handleExecutePrint = () => {
     if (typeof window === "undefined") return;
@@ -312,7 +320,7 @@ export function PrintBarcodesModal({
               className="px-3 py-2 bg-white border-2 border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:border-amber-500 focus:outline-none flex-1 max-w-none sm:max-w-xs shadow-2xs truncate"
             >
               <option value="all">🧺 Todas las Categorías ({products.length} productos)</option>
-              {PRODUCT_CATEGORIES.filter((c) => c.id !== "all").map((cat) => {
+              {categories.map((cat) => {
                 const count = products.filter((p) => p.category === cat.id).length;
                 return (
                   <option key={cat.id} value={cat.id}>
