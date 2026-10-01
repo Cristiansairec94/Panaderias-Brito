@@ -31,6 +31,8 @@ import {
   Ban,
   Building2,
   ChevronDown,
+  Table,
+  LayoutGrid,
   BarChart3,
   Flame,
   Wheat,
@@ -408,6 +410,7 @@ export default function GastosPage() {
   const [periodoStats, setPeriodoStats] = useState<"hoy" | "semana" | "mes" | "anio">("hoy");
 
   // ── Filtros ──
+  const [viewMode, setViewMode] = useState<"tabla" | "fichas">("tabla");
   const [filtroPeriodo, setFiltroPeriodo] = useState<PeriodoFiltro>("todos");
   const [search, setSearch] = useState("");
   const [filtroSucursal, setFiltroSucursal] = useState<string>("all");
@@ -1534,238 +1537,444 @@ export default function GastosPage() {
         </div>
       </div>
 
-      {/* ── Tabla de Gastos con Diseño Panadería Brito ── */}
+      {/* ── Tabla / Fichas de Gastos Adaptable a Cualquier Resolución ── */}
       <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden transition-all duration-200 hover:border-rose-400/80 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20">
-        <div className="p-5 sm:p-6 border-b border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Cabecera Responsiva con Selector de Vista */}
+        <div className="p-4 sm:p-5 lg:p-6 border-b border-stone-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-rose-100 text-rose-700 rounded-2xl">
-              <Receipt className="w-6 h-6" />
+            <div className="p-2.5 sm:p-3 bg-rose-100 text-rose-700 rounded-2xl shrink-0">
+              <Receipt className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h3 className="font-black text-xl sm:text-2xl text-stone-900">Historial Detallado de Gastos</h3>
+              <h3 className="font-black text-lg sm:text-xl lg:text-2xl text-stone-900 leading-tight">
+                Historial Detallado de Gastos
+              </h3>
               <p className="text-xs sm:text-sm text-stone-500 font-medium mt-0.5">
                 Todas las salidas de dinero (desde $1.00) de cualquier sucursal registradas en tiempo real • {filteredGastos.length} registros
               </p>
             </div>
           </div>
-          <span className="text-sm sm:text-base font-mono font-bold text-stone-700 bg-stone-100 px-4 py-2 rounded-xl border border-stone-200 self-start sm:self-auto">
-            Total filtrado: <span className="text-rose-700 font-black text-base sm:text-lg">{formatCurrency(filteredGastos.filter(g => g.status !== "anulado").reduce((sum, g) => sum + g.amount, 0))}</span>
-          </span>
+
+          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+            {/* Selector de Vista: Tabla Completa vs Fichas Adaptables */}
+            <div className="flex items-center bg-stone-100 p-1 rounded-xl border border-stone-200 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("tabla")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  viewMode === "tabla"
+                    ? "bg-white text-stone-900 shadow-xs"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+                }`}
+                title="Ver en formato de tabla (ideal para escritorio y laptops)"
+              >
+                <Table className="w-3.5 h-3.5" />
+                <span>Tabla</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("fichas")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  viewMode === "fichas"
+                    ? "bg-white text-stone-900 shadow-xs"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+                }`}
+                title="Ver en formato de fichas cuadradas (ideal para pantallas compactas, tablets y móviles)"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Fichas</span>
+              </button>
+            </div>
+
+            {/* Total Filtrado */}
+            <span className="text-xs sm:text-sm font-mono font-bold text-stone-700 bg-stone-100 px-3.5 py-1.5 rounded-xl border border-stone-200">
+              Total filtrado:{" "}
+              <span className="text-rose-700 font-black text-sm sm:text-base tabular-nums">
+                {formatCurrency(filteredGastos.filter(g => g.status !== "anulado").reduce((sum, g) => sum + g.amount, 0))}
+              </span>
+            </span>
+          </div>
         </div>
 
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left border-collapse min-w-[1100px]">
-            <thead className="bg-stone-100/90 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-xs sm:text-sm select-none">
-              <tr>
-                <th className="py-4 px-4 align-middle">Folio</th>
-                <th className="py-4 px-4 align-middle">Fecha</th>
-                <th className="py-4 px-4 align-middle">Sucursal</th>
-                <th className="py-4 px-4 align-middle">Categoría</th>
-                <th className="py-4 px-4 align-middle min-w-[280px]">Concepto / Motivo</th>
-                <th className="py-4 px-4 align-middle text-right">Monto</th>
-                <th className="py-4 px-4 align-middle text-center">Forma de Pago</th>
-                <th className="py-4 px-4 align-middle">Cuenta / Origen</th>
-                <th className="py-4 px-4 align-middle">Cajero</th>
-                <th className="py-4 px-4 align-middle text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100 text-sm">
-              {filteredGastos.length === 0 ? (
+        {/* ── MODO 1: TABLA FLUIDA CON COLUMNA DE ACCIONES FIJA (STICKY) ── */}
+        {viewMode === "tabla" ? (
+          <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-stone-200 scrollbar-track-stone-50">
+            <table className="w-full text-left border-collapse min-w-[940px] lg:min-w-full table-auto">
+              <thead className="bg-stone-100/90 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] lg:text-xs select-none sticky top-0 z-10">
                 <tr>
-                  <td colSpan={10} className="text-center py-16 text-stone-400">
-                    <Receipt className="w-12 h-12 mx-auto text-stone-300 mb-3" />
-                    <p className="font-black text-base sm:text-lg text-stone-700">No se encontraron gastos con los filtros aplicados</p>
-                    <p className="text-sm text-stone-500 mt-1">Prueba cambiando la sucursal o los filtros de búsqueda.</p>
-                  </td>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Folio</th>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Fecha</th>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Sucursal</th>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Categoría</th>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle min-w-[150px] max-w-[260px]">Concepto / Motivo</th>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle text-right whitespace-nowrap">Monto</th>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle text-center whitespace-nowrap">Forma de Pago</th>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle min-w-[130px] max-w-[220px]">Cuenta / Origen</th>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Cajero</th>
+                  <th className="py-3 px-3 sm:px-3.5 align-middle text-center whitespace-nowrap sticky right-0 bg-stone-100 z-20 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">Acciones</th>
                 </tr>
-              ) : (
-                filteredGastos.map((g) => {
+              </thead>
+              <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
+                {filteredGastos.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="text-center py-16 text-stone-400">
+                      <Receipt className="w-12 h-12 mx-auto text-stone-300 mb-3" />
+                      <p className="font-black text-base sm:text-lg text-stone-700">No se encontraron gastos con los filtros aplicados</p>
+                      <p className="text-sm text-stone-500 mt-1">Prueba cambiando la sucursal o los filtros de búsqueda.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredGastos.map((g, idx) => {
+                    const isAnulado = g.status === "anulado";
+                    const catInfo = getCategoryInfo(g.category);
+                    const { isHoy, formattedDate } = getExpenseDateTimeInfo(g);
+                    const isNearBottom = idx >= filteredGastos.length - 2;
+
+                    return (
+                      <tr
+                        key={g.id}
+                        className={`transition-colors group ${
+                          isAnulado
+                            ? "bg-stone-50/80 opacity-60 border-l-4 border-l-stone-300"
+                            : isHoy
+                            ? "border-l-4 border-l-amber-500 bg-amber-50/40 hover:bg-amber-100/60 shadow-xs"
+                            : "border-l-4 border-l-transparent hover:bg-stone-50/70"
+                        }`}
+                      >
+                        {/* 1. Folio */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle font-mono tabular-nums font-black text-xs sm:text-sm text-stone-900 whitespace-nowrap">
+                          #{g.id}
+                        </td>
+
+                        {/* 2. Fecha */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">
+                          <span className={`font-bold text-xs sm:text-sm ${isAnulado ? "line-through text-stone-400" : isHoy ? "text-stone-950 font-black" : "text-stone-700"}`}>
+                            {formattedDate}
+                          </span>
+                          {isHoy && !isAnulado && (
+                            <span className="ml-1.5 bg-amber-500 text-white font-black text-[10px] px-1.5 py-0.2 rounded-md uppercase tracking-wider shadow-xs inline-flex items-center justify-center">
+                              Hoy
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 3. Sucursal */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200/80">
+                            <Store className="w-3.5 h-3.5 text-brito-orange-600 shrink-0" />
+                            <span>{(g.branchName || "Matriz (Centro)").replace("Sucursal ", "")}</span>
+                          </span>
+                        </td>
+
+                        {/* 4. Categoría */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 border ${
+                              isAnulado
+                                ? "bg-stone-200 text-stone-600 border-stone-300 line-through"
+                                : `${catInfo.bg} ${catInfo.text} ${catInfo.border}`
+                            }`}
+                          >
+                            <span className="text-xs">{catInfo.icon}</span>
+                            <span>{g.categoryLabel || catInfo.label}</span>
+                          </span>
+                        </td>
+
+                        {/* 5. Concepto / Motivo */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle min-w-[150px] max-w-[260px]">
+                          <div className={isAnulado ? "line-through text-stone-500" : ""}>
+                            <ExpandableConceptText text={g.description} maxChars={45} />
+                          </div>
+                          {g.supplier && (
+                            <div className="text-[11px] sm:text-xs text-stone-500 truncate mt-0.5">
+                              Prov: <strong className="text-stone-700 font-semibold">{g.supplier}</strong>
+                            </div>
+                          )}
+                          {isAnulado && g.cancelReason && (
+                            <span className="inline-block mt-1 px-1.5 py-0.2 bg-red-100 text-red-800 font-bold text-[10px] rounded border border-red-200">
+                              Motivo: {g.cancelReason}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 6. Monto */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-right font-mono tabular-nums font-black text-sm sm:text-base whitespace-nowrap">
+                          <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700"}>
+                            -{formatCurrency(g.amount)}
+                          </span>
+                        </td>
+
+                        {/* 7. Forma de Pago */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-center whitespace-nowrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-lg font-black text-[11px] uppercase inline-flex items-center gap-1.5 border ${
+                              g.paymentMethod === "efectivo"
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                : g.paymentMethod === "tarjeta"
+                                ? "bg-blue-100 text-blue-800 border-blue-200"
+                                : "bg-purple-100 text-purple-800 border-purple-200"
+                            }`}
+                          >
+                            {g.paymentMethod === "efectivo" && <Wallet className="w-3.5 h-3.5 shrink-0" />}
+                            {g.paymentMethod === "tarjeta" && <CreditCard className="w-3.5 h-3.5 shrink-0" />}
+                            {g.paymentMethod === "transferencia" && <Building className="w-3.5 h-3.5 shrink-0" />}
+                            <span>{g.paymentMethod}</span>
+                          </span>
+                        </td>
+
+                        {/* 8. Origen / Cuenta (Sin truncamiento forzado; muestra el texto completo) */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-stone-800 font-bold text-xs sm:text-sm whitespace-normal min-w-[130px] max-w-[220px] leading-tight" title={g.accountOrigin}>
+                          {g.accountOrigin}
+                        </td>
+
+                        {/* 9. Cajero */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-stone-800 font-black whitespace-nowrap text-xs sm:text-sm">
+                          {g.cashier}
+                        </td>
+
+                        {/* 10. Acciones (Sticky para nunca perderse al hacer scroll horizontal) */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-stone-50 z-10 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-100">
+                          <div className="relative inline-block text-left">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveDropdown(activeDropdown === g.id ? null : g.id);
+                              }}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 active:scale-95 border border-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-2xs"
+                            >
+                              <span>Acciones</span>
+                              <ChevronDown className="w-3 h-3 text-stone-500" />
+                            </button>
+
+                            {activeDropdown === g.id && (
+                              <div
+                                className={`absolute right-0 w-48 bg-white rounded-2xl shadow-2xl border border-stone-200 py-1.5 z-40 animate-in fade-in zoom-in-95 text-xs text-left font-bold ${
+                                  isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
+                                }`}
+                              >
+                                {/* Ver Detalle */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setGastoSeleccionado(g);
+                                    setModalVerOpen(true);
+                                    setActiveDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-stone-700 hover:bg-stone-50 flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Ver Detalle</span>
+                                </button>
+
+                                {/* Imprimir Vale */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setGastoSeleccionado(g);
+                                    setModalReceiptOpen(true);
+                                    setActiveDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-stone-700 hover:bg-stone-50 flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Printer className="w-3.5 h-3.5 text-stone-600" />
+                                  <span>Imprimir Vale (80mm)</span>
+                                </button>
+
+                                {!isAnulado && (
+                                  <>
+                                    {/* Editar */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        abrirEditarGasto(g);
+                                        setActiveDropdown(null);
+                                      }}
+                                      className="w-full px-3 py-2 text-stone-700 hover:bg-stone-50 flex items-center gap-2 cursor-pointer"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                                      <span>Editar Gasto</span>
+                                    </button>
+
+                                    {/* Anular */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        abrirAnularGasto(g);
+                                        setActiveDropdown(null);
+                                      }}
+                                      className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 border-t border-stone-100 cursor-pointer"
+                                    >
+                                      <Ban className="w-3.5 h-3.5 text-rose-600" />
+                                      <span>Anular Gasto</span>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* ── MODO 2: FICHAS RESPONSIVAS (MÓVIL, TABLET Y PANTALLAS COMPACTAS) ── */
+          <div className="p-3 sm:p-4 lg:p-5">
+            {filteredGastos.length === 0 ? (
+              <div className="text-center py-16 text-stone-400">
+                <Receipt className="w-12 h-12 mx-auto text-stone-300 mb-3" />
+                <p className="font-black text-base sm:text-lg text-stone-700">No se encontraron gastos con los filtros aplicados</p>
+                <p className="text-sm text-stone-500 mt-1">Prueba cambiando la sucursal o los filtros de búsqueda.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+                {filteredGastos.map((g) => {
                   const isAnulado = g.status === "anulado";
                   const catInfo = getCategoryInfo(g.category);
                   const { isHoy, formattedDate } = getExpenseDateTimeInfo(g);
 
                   return (
-                    <tr
+                    <div
                       key={g.id}
-                      className={`transition-colors min-h-16 ${
+                      className={`bg-white rounded-2xl border p-3.5 sm:p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between gap-3 border-l-4 ${
                         isAnulado
-                          ? "bg-stone-50/80 opacity-60 border-l-4 border-l-stone-300"
+                          ? "border-l-stone-300 opacity-60 bg-stone-50/60"
                           : isHoy
-                          ? "border-l-4 border-l-amber-500 bg-amber-50/50 hover:bg-amber-100/60 shadow-xs"
-                          : "border-l-4 border-l-transparent hover:bg-stone-50/70"
+                          ? "border-l-amber-500 bg-amber-50/20 hover:bg-amber-50/40"
+                          : "border-l-rose-500 hover:bg-rose-50/20"
                       }`}
                     >
-                      {/* 1. Folio */}
-                      <td className="py-3.5 px-4 align-middle font-mono font-black text-sm sm:text-base text-stone-900 whitespace-nowrap">
-                        #{g.id}
-                      </td>
-
-                      {/* 2. Fecha */}
-                      <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                        <span className={`font-bold text-xs sm:text-sm ${isAnulado ? "line-through text-stone-400" : isHoy ? "text-stone-950 font-black" : "text-stone-700"}`}>
-                          {formattedDate}
-                        </span>
-                        {isHoy && !isAnulado && (
-                          <span className="ml-1.5 bg-amber-500 text-white font-black text-xs px-2 py-0.5 rounded-md uppercase tracking-wider shadow-xs inline-flex items-center justify-center">
-                            Hoy
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 3. Sucursal */}
-                      <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-stone-800 bg-stone-100 px-3 py-1.5 rounded-xl border border-stone-200/80">
-                          <Store className="w-4 h-4 text-brito-orange-600" />
-                          <span>{(g.branchName || "Matriz (Centro)").replace("Sucursal ", "")}</span>
-                        </span>
-                      </td>
-
-                      {/* 4. Categoría */}
-                      <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                        <span
-                          className={`px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 border ${
-                            isAnulado
-                              ? "bg-stone-200 text-stone-600 border-stone-300 line-through"
-                              : `${catInfo.bg} ${catInfo.text} ${catInfo.border}`
-                          }`}
-                        >
-                          <span className="text-sm">{catInfo.icon}</span>
-                          <span>{g.categoryLabel || catInfo.label}</span>
-                        </span>
-                      </td>
-
-                      {/* 5. Concepto / Motivo */}
-                      <td className="py-3.5 px-4 align-middle max-w-sm">
-                        <div className={isAnulado ? "line-through text-stone-500" : ""}>
-                          <ExpandableConceptText text={g.description} maxChars={50} />
-                        </div>
-                        {g.supplier && (
-                          <div className="text-xs sm:text-sm text-stone-500 truncate mt-1">
-                            Prov: <strong className="text-stone-700 font-semibold">{g.supplier}</strong>
+                      {/* Cabecera: Folio, Sucursal, Fecha y Monto */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono tabular-nums font-black text-xs text-stone-900 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-lg shadow-2xs">
+                              #{g.id}
+                            </span>
+                            <span className="text-[10px] font-bold text-stone-600 bg-stone-50 border border-stone-200 px-1.5 py-0.5 rounded-md">
+                              🏬 {(g.branchName || "Matriz").replace("Sucursal ", "")}
+                            </span>
+                            {isHoy && !isAnulado && (
+                              <span className="bg-amber-500 text-white font-black text-[10px] px-1.5 py-0.2 rounded-md uppercase tracking-wider">
+                                Hoy
+                              </span>
+                            )}
                           </div>
+                          <p className="text-xs text-stone-500 font-semibold mt-1">
+                            📅 {formattedDate}
+                          </p>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className={`font-mono tabular-nums font-black text-base sm:text-lg block ${isAnulado ? "line-through text-stone-400" : "text-rose-700"}`}>
+                            -{formatCurrency(g.amount)}
+                          </span>
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md inline-block border mt-0.5 ${
+                            g.paymentMethod === "efectivo"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : g.paymentMethod === "tarjeta"
+                              ? "bg-blue-50 text-blue-800 border-blue-200"
+                              : "bg-purple-50 text-purple-800 border-purple-200"
+                          }`}>
+                            {g.paymentMethod}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Concepto y Categoría */}
+                      <div className="bg-stone-50/80 rounded-xl p-2.5 border border-stone-200/70 text-xs">
+                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                          <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 border ${catInfo.bg} ${catInfo.text} ${catInfo.border}`}>
+                            <span>{catInfo.icon}</span>
+                            <span>{g.categoryLabel || catInfo.label}</span>
+                          </span>
+                        </div>
+                        <p className="font-bold text-stone-900 text-xs sm:text-sm leading-snug">
+                          {g.description}
+                        </p>
+                        {g.supplier && (
+                          <p className="text-[11px] text-stone-500 mt-1">
+                            Prov: <strong className="text-stone-700">{g.supplier}</strong>
+                          </p>
                         )}
                         {isAnulado && g.cancelReason && (
-                          <span className="inline-block mt-1 px-2 py-0.5 bg-red-100 text-red-800 font-bold text-xs rounded-md border border-red-200">
+                          <span className="inline-block mt-1 px-1.5 py-0.2 bg-red-100 text-red-800 font-bold text-[10px] rounded border border-red-200">
                             Motivo: {g.cancelReason}
                           </span>
                         )}
-                      </td>
+                      </div>
 
-                      {/* 6. Monto (Directamente al lado de Concepto) */}
-                      <td className="py-3.5 px-4 align-middle text-right font-mono font-black text-base sm:text-lg whitespace-nowrap">
-                        <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700"}>
-                          -{formatCurrency(g.amount)}
-                        </span>
-                      </td>
+                      {/* Cuenta / Origen & Cajero */}
+                      <div className="space-y-0.5 text-xs">
+                        <p className="text-[11px] text-stone-700 font-bold leading-tight" title={g.accountOrigin}>
+                          🏦 {g.accountOrigin}
+                        </p>
+                        <p className="text-[11px] text-stone-500 font-medium">
+                          👤 Cajero: <strong className="text-stone-800 font-bold">{g.cashier}</strong>
+                        </p>
+                      </div>
 
-                      {/* 7. Forma de Pago */}
-                      <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
-                        <span
-                          className={`px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm uppercase inline-flex items-center gap-1.5 border ${
-                            g.paymentMethod === "efectivo"
-                              ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                              : g.paymentMethod === "tarjeta"
-                              ? "bg-blue-100 text-blue-800 border-blue-200"
-                              : "bg-purple-100 text-purple-800 border-purple-200"
-                          }`}
+                      {/* Botonera Directa de Acciones */}
+                      <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-stone-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGastoSeleccionado(g);
+                            setModalVerOpen(true);
+                          }}
+                          className="flex-1 py-1.5 px-2 bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                          title="Ver Detalle Completo"
                         >
-                          {g.paymentMethod === "efectivo" && <Wallet className="w-4 h-4" />}
-                          {g.paymentMethod === "tarjeta" && <CreditCard className="w-4 h-4" />}
-                          {g.paymentMethod === "transferencia" && <Building className="w-4 h-4" />}
-                          <span>{g.paymentMethod}</span>
-                        </span>
-                      </td>
+                          <Eye className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>Detalle</span>
+                        </button>
 
-                      {/* 8. Origen / Cuenta */}
-                      <td className="py-3.5 px-4 align-middle text-stone-800 font-bold whitespace-nowrap text-xs sm:text-sm max-w-[160px] truncate" title={g.accountOrigin}>
-                        {g.accountOrigin}
-                      </td>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGastoSeleccionado(g);
+                            setModalReceiptOpen(true);
+                          }}
+                          className="flex-1 py-1.5 px-2 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                          title="Imprimir Vale de Caja"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                          <span>Vale</span>
+                        </button>
 
-                      {/* 9. Cajero */}
-                      <td className="py-3.5 px-4 align-middle text-stone-800 font-black whitespace-nowrap text-xs sm:text-sm">
-                        {g.cashier}
-                      </td>
+                        {!isAnulado && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => abrirEditarGasto(g)}
+                              className="py-1.5 px-2.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                              title="Editar Gasto"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                            </button>
 
-                      {/* 10. Acciones */}
-                      <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap relative">
-                        <div className="inline-block text-left">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveDropdown(activeDropdown === g.id ? null : g.id);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-800 font-bold rounded-xl text-xs sm:text-sm transition-colors"
-                          >
-                            <span>Acciones</span>
-                            <ChevronDown className="w-3.5 h-3.5 text-stone-500" />
-                          </button>
-
-                          {activeDropdown === g.id && (
-                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-2xl shadow-xl border border-stone-200 py-1.5 z-30 animate-in fade-in zoom-in-95 text-xs sm:text-sm text-left font-bold">
-                              {/* Ver Detalle */}
-                              <button
-                                onClick={() => {
-                                  setGastoSeleccionado(g);
-                                  setModalVerOpen(true);
-                                  setActiveDropdown(null);
-                                }}
-                                className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5"
-                              >
-                                <Eye className="w-4 h-4 text-blue-600" />
-                                <span>Ver Detalle</span>
-                              </button>
-
-                              {/* Imprimir Vale */}
-                              <button
-                                onClick={() => {
-                                  setGastoSeleccionado(g);
-                                  setModalReceiptOpen(true);
-                                  setActiveDropdown(null);
-                                }}
-                                className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5"
-                              >
-                                <Printer className="w-4 h-4 text-stone-600" />
-                                <span>Imprimir Vale (80mm)</span>
-                              </button>
-
-                              {!isAnulado && (
-                                <>
-                                  {/* Editar */}
-                                  <button
-                                    onClick={() => {
-                                      abrirEditarGasto(g);
-                                      setActiveDropdown(null);
-                                    }}
-                                    className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5"
-                                  >
-                                    <Edit3 className="w-4 h-4 text-amber-600" />
-                                    <span>Editar Gasto</span>
-                                  </button>
-
-                                  {/* Anular */}
-                                  <button
-                                    onClick={() => {
-                                      abrirAnularGasto(g);
-                                      setActiveDropdown(null);
-                                    }}
-                                    className="w-full px-3.5 py-2.5 text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 border-t border-stone-100"
-                                  >
-                                    <Ban className="w-4 h-4 text-rose-600" />
-                                    <span>Anular Gasto</span>
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                            <button
+                              type="button"
+                              onClick={() => abrirAnularGasto(g)}
+                              className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 border border-rose-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                              title="Anular Gasto"
+                            >
+                              <Ban className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Modal: Registrar Nuevo Gasto ── */}
