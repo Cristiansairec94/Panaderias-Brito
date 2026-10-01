@@ -32,6 +32,7 @@ import {
   Eye,
   AlertTriangle,
   Package,
+  PackageCheck,
   LayoutGrid,
   Wifi,
   History,
@@ -684,6 +685,34 @@ export default function PedidosPage() {
       }
     } else {
       handleMarkAsReady(order);
+    }
+  };
+
+  const handleDeliverOrder = (order: CustomOrder) => {
+    if (order.status === "entregado" || order.status === "cancelado") {
+      alert("Este pedido ya pertenece al historial y no puede ser modificado.");
+      return;
+    }
+    if (order.remainingBalance > 0) {
+      alert(
+        `⛔ No se puede entregar el pedido #${order.orderNumber}.\n\nTiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\nPara poder entregarlo, primero debe estar 100% pagado sin faltante.`
+      );
+      setSelectedOrderForPayment(order);
+      return;
+    }
+    if (confirm(`¿Entregar el pedido #${order.orderNumber} a "${order.customerName}"?\n\nAl marcarlo como entregado, el pedido se completará y se trasladará al Historial de Pedidos.`)) {
+      updateOrderStatus(order.id, "entregado");
+      loadOrders();
+      setSelectedOrderForDetail(null);
+      addNotification({
+        title: "Pedido Entregado con Éxito",
+        description: `El pedido ${order.orderNumber} de "${order.customerName}" fue entregado satisfactoriamente.`,
+        senderName: "Control de Pedidos",
+        senderAvatar: "📦",
+        highlightText: order.orderNumber,
+        category: "pedidos",
+        badgeIcon: "pastel",
+      });
     }
   };
 
@@ -1870,7 +1899,7 @@ export default function PedidosPage() {
                   <div
                     key={order.id}
                     onClick={() => setSelectedOrderForDetail(order)}
-                    className={`bg-white rounded-2xl border p-3 sm:p-3.5 transition-all duration-150 shadow-2xs hover:shadow-md cursor-pointer flex flex-col gap-2.5 sm:gap-3 group border-l-4 ${
+                    className={`bg-white rounded-2xl border p-3 sm:p-3.5 transition-all duration-150 shadow-2xs hover:shadow-md cursor-pointer group border-l-4 ${
                       order.status === "cancelado"
                         ? "border-l-rose-500 hover:bg-rose-50/20 border-rose-200"
                         : order.status === "entregado"
@@ -1886,39 +1915,55 @@ export default function PedidosPage() {
                         : "border-l-stone-300 hover:bg-stone-50 border-stone-200"
                     }`}
                   >
-                    {/* Nivel 1: Cuadrícula principal (Folio, Productos, Entrega & Saldo) */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
-                      {/* Bloque 1: Piezas, Folio, Sucursal y Título (md:col-span-4 lg:col-span-3) */}
-                      <div className="md:col-span-4 lg:col-span-3 min-w-0 flex items-start gap-2.5">
-                        <div className="flex flex-col items-center justify-center bg-amber-500 text-white font-black px-2 py-1 rounded-lg shadow-2xs shrink-0 min-w-[48px] text-center">
-                          <span className="text-sm sm:text-base leading-none">{totalPieces}</span>
-                          <span className="text-[9px] uppercase tracking-wider font-extrabold">
-                            {totalPieces === 1 ? "pza" : "pzas"}
-                          </span>
-                        </div>
-
-                        <div className="min-w-0 flex-1">
+                    {/* Cuadrícula Maestra de 4 Columnas Alineadas (Desktop xl:grid-cols-12) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-3.5 items-stretch">
+                      {/* COLUMNA 1: Identificación, Folio, Sucursal, Título y Total (xl:col-span-3) */}
+                      <div className="md:col-span-1 xl:col-span-3 min-w-0 flex flex-col justify-between gap-1.5 h-full">
+                        <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono font-black text-xs text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded-md shadow-2xs">
+                            <span className="font-mono tabular-nums font-black text-xs text-amber-950 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs">
                               {order.orderNumber}
                             </span>
-                            <span className="text-[10px] font-bold text-stone-600 bg-stone-100 px-1.5 py-0.2 rounded-md">
+                            <span className="text-[10px] font-bold text-stone-600 bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-md">
                               🏬 {order.branchName.replace("Sucursal ", "")}
                             </span>
                             {getStatusBadge(order.status)}
                           </div>
-                          <h4 className="font-black text-stone-900 text-xs sm:text-sm leading-tight mt-1 line-clamp-2 group-hover:text-amber-800 transition-colors">
+
+                          <h4
+                            className="font-black text-stone-900 text-sm leading-snug line-clamp-1 group-hover:text-amber-700 transition-colors mt-1.5"
+                            title={order.items?.[0]?.name || order.description || "Pedido Encargado"}
+                          >
                             {order.items && order.items.length > 0
                               ? order.items.length === 1
                                 ? order.items[0].name
-                                : `${order.items[0].name} (+${order.items.length - 1} producto${order.items.length - 1 > 1 ? "s" : ""} más)`
+                                : `${order.items[0].name} (+${order.items.length - 1} más)`
                               : order.description || "Pedido Encargado"}
                           </h4>
+
+                          {order.dedication && (
+                            <p className="text-[11px] font-semibold text-rose-700 italic truncate mt-0.5" title={order.dedication}>
+                              ✨ &quot;{order.dedication}&quot;
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Piezas y Total del Pedido perfectamente alineados */}
+                        <div className="flex items-center gap-2 pt-1.5 border-t border-stone-100 mt-1">
+                          <span className="font-mono tabular-nums font-black text-xs px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 border border-amber-300 shrink-0">
+                            📦 {totalPieces} {totalPieces === 1 ? "pza" : "pzas"}
+                          </span>
+                          <div className="flex items-baseline gap-1 min-w-0">
+                            <span className="text-[10px] font-bold uppercase text-stone-400">Total:</span>
+                            <span className="font-mono tabular-nums font-black text-sm text-stone-900 truncate">
+                              {formatCurrency(order.total)}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Bloque 2: Productos y Detalles (Caja Ámbar con amplio espacio md:col-span-5 lg:col-span-6) */}
-                      <div className="md:col-span-5 lg:col-span-6 min-w-0">
+                      {/* COLUMNA 2: Comanda y Desglose de Productos Cuadrado (xl:col-span-4) */}
+                      <div className="md:col-span-1 xl:col-span-4 min-w-0 h-full flex flex-col justify-between">
                         {(() => {
                           const isExpanded = Boolean(expandedProductsOrderIds[order.id]);
                           const orderItems = order.items || [];
@@ -1927,259 +1972,290 @@ export default function PedidosPage() {
                           const itemsToShow = isExpanded ? orderItems : orderItems.slice(0, 2);
 
                           return (
-                            <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-2 sm:p-2.5 text-xs text-stone-800 transition-all">
-                              {hasItems ? (
-                                <div>
-                                  <div className="flex items-center justify-between gap-1 mb-1.5">
-                                    <div className="flex items-center gap-1 font-extrabold text-[10px] text-amber-900 uppercase tracking-wider">
-                                      <Cake className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                      <span>Productos ({orderItems.length}):</span>
-                                    </div>
-                                    {hasMoreThanTwo && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                        className={`text-[10px] font-black px-2 py-0.5 rounded-md border transition-all cursor-pointer flex items-center gap-1 shadow-2xs leading-none ${
-                                          isExpanded
-                                            ? "bg-amber-600 text-white border-amber-700 hover:bg-amber-700"
-                                            : "text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 border-amber-300"
-                                        }`}
-                                        title={isExpanded ? "Mostrar menos productos" : "Desplegar todos los productos y detalles"}
-                                      >
-                                        <span>{isExpanded ? "Ver menos" : "Ver más"}</span>
-                                        <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
-                                      </button>
-                                    )}
+                            <div className="bg-amber-50/50 border border-amber-200/90 rounded-xl p-2.5 flex flex-col justify-between h-full transition-all shadow-2xs">
+                              <div>
+                                {/* Cabecera de Comanda */}
+                                <div className="flex items-center justify-between gap-1 mb-1.5 pb-1 border-b border-amber-200/60">
+                                  <div className="flex items-center gap-1.5 font-black text-[10px] text-amber-950 uppercase tracking-wider">
+                                    <Cake className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span>Comanda ({orderItems.length} {orderItems.length === 1 ? "producto" : "productos"})</span>
                                   </div>
-
-                                  {/* Lista de productos */}
-                                  <div className="space-y-1">
-                                    {itemsToShow.map((it, idx) => (
-                                      <div key={idx} className="flex items-baseline justify-between text-[11px] leading-tight text-stone-800 gap-2">
-                                        <span className="font-semibold truncate min-w-0">
-                                          <strong className="text-amber-950 font-black">{it.quantity}x</strong> {it.name}
-                                          {it.notes && <span className="text-stone-500 font-normal italic ml-1">({it.notes})</span>}
-                                        </span>
-                                        {it.subtotal ? (
-                                          <span className="font-mono font-bold text-[10px] sm:text-[11px] text-stone-600 shrink-0 ml-1.5">
-                                            {formatCurrency(it.subtotal)}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    ))}
-                                  </div>
-
-                                  {/* Si hay más de 2 productos y está plegado */}
-                                  {hasMoreThanTwo && !isExpanded && (
+                                  {hasMoreThanTwo && (
                                     <button
                                       type="button"
                                       onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                      className="w-full mt-1.5 pt-1 border-t border-amber-200/80 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                      className={`text-[10px] font-black px-2 py-0.5 rounded-md border transition-all cursor-pointer flex items-center gap-1 shadow-2xs leading-none ${
+                                        isExpanded
+                                          ? "bg-amber-600 text-white border-amber-700 hover:bg-amber-700"
+                                          : "text-amber-900 hover:text-white bg-amber-100 hover:bg-amber-600 border-amber-300"
+                                      }`}
+                                      title={isExpanded ? "Mostrar menos productos" : "Desplegar todos los productos y detalles"}
                                     >
-                                      <span>... y {orderItems.length - 2} producto{orderItems.length - 2 > 1 ? "s" : ""} más (Toca &quot;Ver más&quot;)</span>
-                                      <ChevronDown className="w-3 h-3 text-amber-700" />
+                                      <span>{isExpanded ? "Ver menos" : "Ver más"}</span>
+                                      <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                                     </button>
                                   )}
+                                </div>
 
-                                  {/* Si está desplegado: mostrar toda la información completa del pedido */}
-                                  {isExpanded && (
-                                    <div className="mt-2 pt-1.5 border-t border-amber-200/80 space-y-1.5 text-[11px] animate-in fade-in duration-150">
-                                      {order.description && (
-                                        <p className="text-stone-700 bg-white/70 p-1.5 rounded border border-amber-200/60">
-                                          <strong className="text-amber-950 font-bold">📝 Observaciones:</strong> {order.description}
-                                        </p>
-                                      )}
-                                      {order.dedication && (
-                                        <p className="text-rose-900 font-bold italic bg-rose-50 border border-rose-200 px-2 py-1 rounded-md">
-                                          ✨ Dedicatoria: &quot;{order.dedication}&quot;
-                                        </p>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
-                                        className="w-full pt-1 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer"
-                                      >
-                                        <span>▲ Ocultar y mostrar solo 2 productos</span>
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <div>
-                                  <div className="flex items-center justify-between gap-1 mb-1">
-                                    <div className="flex items-center gap-1 font-extrabold text-[10px] text-amber-900 uppercase tracking-wider">
-                                      <Cake className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                                      <span>Detalle:</span>
-                                    </div>
+                                {/* Lista con Columnas Cuadradas y Números Tabulares */}
+                                {hasItems ? (
+                                  <div className="space-y-1">
+                                    {itemsToShow.map((it, idx) => (
+                                      <div key={idx} className="flex items-center justify-between text-xs gap-2 leading-tight">
+                                        {/* 1. Cantidad fija centrada */}
+                                        <span className="font-mono tabular-nums font-black text-[11px] text-amber-950 bg-amber-100 border border-amber-300 px-1 py-0.2 rounded w-10 text-center shrink-0">
+                                          {it.quantity}x
+                                        </span>
+                                        {/* 2. Nombre de producto */}
+                                        <span className="font-medium text-stone-800 text-[11px] truncate flex-1 min-w-0" title={it.name}>
+                                          {it.name}
+                                          {it.notes && <span className="text-stone-500 font-normal italic ml-1">({it.notes})</span>}
+                                        </span>
+                                        {/* 3. Subtotal alineado a la derecha en ancho fijo */}
+                                        <span className="font-mono tabular-nums font-bold text-[11px] text-stone-700 w-20 text-right shrink-0">
+                                          {it.subtotal ? formatCurrency(it.subtotal) : ""}
+                                        </span>
+                                      </div>
+                                    ))}
                                   </div>
-                                  <p className="font-semibold text-stone-900 text-xs leading-snug line-clamp-2 mt-0.5">
-                                    {order.description || "Especificaciones estándar del pedido."}
+                                ) : (
+                                  <p className="font-medium text-stone-700 text-xs leading-snug line-clamp-2">
+                                    {order.description || "Especificaciones generales del pedido."}
                                   </p>
-                                </div>
+                                )}
+                              </div>
+
+                              {/* Pie de comanda si hay más de 2 productos y está plegado */}
+                              {hasMoreThanTwo && !isExpanded && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
+                                  className="w-full mt-1.5 pt-1 border-t border-amber-200/80 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <span>... y {orderItems.length - 2} producto{orderItems.length - 2 > 1 ? "s" : ""} más (Toca &quot;Ver más&quot;)</span>
+                                  <ChevronDown className="w-3 h-3 text-amber-700" />
+                                </button>
                               )}
 
-                              {!isExpanded && order.dedication && (
-                                <p className="text-[10px] text-rose-800 font-extrabold italic mt-1 truncate border-t border-amber-200/60 pt-0.5">
-                                  ✨ &quot;{order.dedication}&quot;
-                                </p>
+                              {/* Desplegable con observaciones si está expandido */}
+                              {isExpanded && (
+                                <div className="mt-2 pt-1.5 border-t border-amber-200/80 space-y-1.5 text-[11px] animate-in fade-in duration-150">
+                                  {order.description && (
+                                    <p className="text-stone-700 bg-white/80 p-1.5 rounded border border-amber-200/70">
+                                      <strong className="text-amber-950 font-bold">📝 Observaciones:</strong> {order.description}
+                                    </p>
+                                  )}
+                                  {order.dedication && (
+                                    <p className="text-rose-900 font-bold italic bg-rose-50 border border-rose-200 px-2 py-1 rounded-md">
+                                      ✨ Dedicatoria: &quot;{order.dedication}&quot;
+                                    </p>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => toggleOrderProductsExpanded(order.id, e)}
+                                    className="w-full pt-1 text-[10px] font-black text-amber-800 hover:text-amber-950 flex items-center justify-center gap-1 cursor-pointer"
+                                  >
+                                    <span>▲ Ocultar y mostrar solo 2</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
                           );
                         })()}
                       </div>
 
-                      {/* Bloque 3: Fecha, Hora, Cliente y Saldo (md:col-span-3 lg:col-span-3) */}
-                      <div className="md:col-span-3 lg:col-span-3 min-w-0 flex flex-col justify-start md:items-end gap-1.5 text-xs">
-                        {/* Fecha y hora */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Calendar className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                          <span
-                            className={`font-black text-xs sm:text-sm ${
-                              normalizeDateStr(order.deliveryDate) === todayStr
-                                ? "text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-black"
-                                : "text-stone-900"
-                            }`}
-                          >
-                            {normalizeDateStr(order.deliveryDate) === todayStr ? "¡HOY!" : order.deliveryDate}
-                          </span>
-                          <span className="font-mono font-black text-stone-700 text-xs sm:text-sm">
-                            {order.deliveryTime || "16:00"} hrs
-                          </span>
-                        </div>
-
-                        {/* Cliente */}
-                        <div className="flex items-center gap-1.5 max-w-full">
-                          <span className="text-xs sm:text-sm font-black text-stone-950 truncate" title={order.customerName}>
-                            👤 {order.customerName}
-                          </span>
-                        </div>
-
-                        {/* Saldo / Liquidado */}
+                      {/* COLUMNA 3: Entrega, Cliente y Saldo Cuadrado (xl:col-span-2) */}
+                      <div className="md:col-span-1 xl:col-span-2 min-w-0 flex flex-col justify-between gap-1.5 h-full py-0.5">
+                        {/* Fecha y Hora de Entrega */}
                         <div>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-400 block mb-0.5">Entrega</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {normalizeDateStr(order.deliveryDate) === todayStr ? (
+                              <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-md shadow-2xs animate-pulse">
+                                ¡HOY!
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-1 text-stone-700 font-bold text-xs bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-md">
+                                <Calendar className="w-3 h-3 text-stone-400 shrink-0" />
+                                <span>{order.deliveryDate}</span>
+                              </div>
+                            )}
+                            <span className="font-mono tabular-nums font-black text-stone-900 text-xs sm:text-sm bg-stone-50 border border-stone-200 px-1.5 py-0.5 rounded-md">
+                              {order.deliveryTime || "16:00"} hrs
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Cliente & Teléfono */}
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-400 block mb-0.5">Cliente</span>
+                          <p className="font-black text-xs text-stone-900 truncate" title={order.customerName}>
+                            👤 {order.customerName}
+                          </p>
+                          {order.phone && (
+                            <p className="font-mono tabular-nums text-[11px] font-bold text-stone-500 truncate flex items-center gap-1 mt-0.5">
+                              <Phone className="w-3 h-3 text-stone-400 shrink-0" />
+                              {order.phone}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Estado Financiero / Saldo */}
+                        <div className="pt-1 border-t border-stone-100">
                           {order.remainingBalance === 0 ? (
-                            <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300 shadow-2xs inline-flex items-center gap-1">
-                              ✓ Liquidado
+                            <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300 shadow-2xs inline-flex items-center gap-1">
+                              <Check className="w-3 h-3 text-emerald-700" />
+                              Liquidado
                             </span>
                           ) : (
-                            <span className="text-xs font-black text-rose-900 bg-rose-100 px-2.5 py-1 rounded-lg border-2 border-rose-300/80 shadow-2xs font-mono tracking-tight inline-flex items-center gap-1">
-                              Falta: {formatCurrency(order.remainingBalance)}
-                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-mono tabular-nums font-black text-rose-950 bg-rose-100 border-2 border-rose-300 px-2 py-0.5 rounded-lg shadow-2xs inline-flex items-center gap-1">
+                                Falta: {formatCurrency(order.remainingBalance)}
+                              </span>
+                              {order.deposit && order.deposit > 0 ? (
+                                <span className="text-[10px] font-mono tabular-nums font-medium text-stone-500">
+                                  Anticipo: {formatCurrency(order.deposit)}
+                                </span>
+                              ) : null}
+                            </div>
                           )}
                         </div>
                       </div>
-                    </div>
 
-                    {/* Nivel 2: Barra Inferior Completa de Acciones y Finanzas */}
-                    <div
-                      className="pt-2 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* Resumen financiero y contacto */}
-                      <div className="flex items-center gap-2 sm:gap-3 text-xs text-stone-600 flex-wrap">
-                        <div className="flex items-center gap-1">
-                          <span className="text-stone-400 font-medium text-[11px]">Total:</span>
-                          <strong className="text-stone-900 font-mono font-black text-xs sm:text-sm">{formatCurrency(order.total)}</strong>
-                        </div>
-                        <span className="text-stone-300">·</span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-stone-400 font-medium text-[11px]">Anticipo:</span>
-                          <strong className="text-emerald-700 font-mono font-black text-xs">{formatCurrency(order.deposit || 0)}</strong>
-                        </div>
-                        {order.phone && (
-                          <>
-                            <span className="text-stone-300">·</span>
-                            <span className="flex items-center gap-1 font-mono text-[11px] text-stone-600 font-bold">
-                              <Phone className="w-3 h-3 text-stone-400" /> {order.phone}
-                            </span>
-                          </>
+                      {/* COLUMNA 4: Botonera Cuadrada, Fija y Alineada (xl:col-span-3) */}
+                      <div
+                        className="md:col-span-1 xl:col-span-3 min-w-0 flex flex-col justify-center gap-2 h-full py-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Fila 1: Botón Principal de Flujo Operativo */}
+                        {!isConcludedOrHistory ? (
+                          order.remainingBalance > 0 ? (
+                            /* Tiene saldo pendiente -> Botón de Cobro Destacado + Botón de Listo */
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOrderForPayment(order)}
+                                className="flex-1 py-2 px-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                                title={`Cobrar saldo restante de ${formatCurrency(order.remainingBalance)}`}
+                              >
+                                <DollarSign className="w-3.5 h-3.5 shrink-0" />
+                                <span className="font-mono tabular-nums">Cobrar {formatCurrency(order.remainingBalance)}</span>
+                              </button>
+
+                              {order.status !== "listo" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkAsReady(order)}
+                                  className="py-2 px-2.5 bg-amber-100 hover:bg-emerald-100 active:scale-95 text-amber-900 hover:text-emerald-950 border border-amber-300 hover:border-emerald-300 font-extrabold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs"
+                                  title="Marcar que el pedido ya llegó y está listo en sucursal"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                  <span>Listo</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleReady(order)}
+                                  className="py-2 px-2.5 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shadow-2xs"
+                                  title="El pedido ya está en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
+                                >
+                                  <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                                  <span>En Sucursal</span>
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            /* 100% Liquidado -> Botón 'Entregar Pedido' (Requerimiento Prompt 6) */
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleDeliverOrder(order)}
+                                className="flex-1 py-2 px-3 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                                title="Entregar pedido al cliente y archivarlo en el Historial"
+                              >
+                                <PackageCheck className="w-4 h-4 shrink-0 text-white" />
+                                <span>📦 Entregar Pedido</span>
+                              </button>
+
+                              {order.status !== "listo" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkAsReady(order)}
+                                  className="py-2 px-2 bg-amber-100 hover:bg-emerald-100 active:scale-95 text-amber-900 hover:text-emerald-950 border border-amber-300 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  title="Marcar que ya llegó a la sucursal"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>Listo</span>
+                                </button>
+                              ) : (
+                                <span className="py-2 px-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-black text-[11px] rounded-xl flex items-center gap-1 shrink-0">
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>En Sucursal</span>
+                                </span>
+                              )}
+                            </div>
+                          )
+                        ) : (
+                          /* Si ya está en historial */
+                          <div className="w-full py-1.5 px-3 bg-stone-100 text-stone-600 border border-stone-200 text-center font-bold text-xs rounded-xl">
+                            {order.status === "entregado" ? "✓ Pedido Entregado (Historial)" : "✕ Pedido Cancelado (Historial)"}
+                          </div>
                         )}
-                      </div>
 
-                      {/* Botones de Acción */}
-                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        {/* Botón: Marcar como Listo / Listo en Sucursal (solo pedidos activos) */}
-                        {!isConcludedOrHistory && (
-                          order.status !== "listo" ? (
+                        {/* Fila 2: Botonera Secundaria Cuadrada y Uniforme (4 Botones con Ancho Idéntico) */}
+                        <div className="grid grid-cols-4 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForReceipt(order)}
+                            className="py-1.5 px-1 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-700 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                            title="Imprimir Ticket"
+                          >
+                            <Receipt className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                            <span>Ticket</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsApp(order)}
+                            className="py-1.5 px-1 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                            title="Enviar WhatsApp al cliente"
+                          >
+                            <Send className="w-3.5 h-3.5 shrink-0" />
+                            <span>WA</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForDetail(order)}
+                            className="py-1.5 px-1 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-bold text-xs rounded-xl border border-amber-300 hover:border-amber-400 transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                            title="Ver detalles completos del pedido"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                            <span>Ver</span>
+                          </button>
+
+                          {!isConcludedOrHistory ? (
                             <button
                               type="button"
-                              onClick={() => handleMarkAsReady(order)}
-                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                              title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
+                              onClick={() => handleDarDeBaja(order)}
+                              className="py-1.5 px-1 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                              title="Dar de baja este pedido"
                             >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Marcar como Listo</span>
+                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                              <span>Baja</span>
                             </button>
                           ) : (
                             <button
                               type="button"
-                              onClick={() => handleToggleReady(order)}
-                              className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                              title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
+                              onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
+                              className="py-1.5 px-1 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                              title="Eliminar permanentemente del historial"
                             >
-                              <Check className="w-3.5 h-3.5 text-emerald-700" />
-                              <span>✓ Listo en Sucursal</span>
+                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                              <span>Borrar</span>
                             </button>
-                          )
-                        )}
-
-                        {/* 1. Imprimir Ticket (siempre disponible) */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrderForReceipt(order)}
-                          className="px-2.5 py-1.5 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                          title="Imprimir Ticket"
-                        >
-                          <Receipt className="w-3.5 h-3.5 text-stone-600" />
-                          <span>Ticket</span>
-                        </button>
-
-                        {/* 2. Pagar Restante (únicamente pedidos activos si no han pagado) */}
-                        {!isConcludedOrHistory && order.remainingBalance > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedOrderForPayment(order)}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                            title={`Cobrar saldo restante de ${formatCurrency(order.remainingBalance)}`}
-                          >
-                            <DollarSign className="w-3.5 h-3.5" />
-                            <span>Pagar Restante ({formatCurrency(order.remainingBalance)})</span>
-                          </button>
-                        )}
-
-                        {/* 3. WhatsApp */}
-                        <button
-                          type="button"
-                          onClick={() => handleSendWhatsApp(order)}
-                          className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 active:scale-95 text-emerald-800 hover:text-white border border-emerald-200 hover:border-emerald-600 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                          title="Mandar WhatsApp al cliente"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">WhatsApp</span>
-                        </button>
-
-                        {/* 4. Eliminar (solo pedidos activos) */}
-                        {!isConcludedOrHistory && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
-                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                            title="Eliminar este pedido permanentemente"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Eliminar</span>
-                          </button>
-                        )}
-
-                        {/* 5. Detalles */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrderForDetail(order)}
-                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-950 font-black text-xs rounded-xl border border-amber-300 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-amber-700" />
-                          <span className="hidden sm:inline">Detalles</span>
-                          <ChevronRight className="w-3.5 h-3.5 text-amber-700" />
-                        </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2509,7 +2585,8 @@ export default function PedidosPage() {
                 );
               })}
             </div>
-          ) : (
+          )
+        ) : (
           /* ============================================================ */
           /* LIST / TABLE VIEW: CLEAN, ELEGANT, ORDERED */
           /* ============================================================ */
