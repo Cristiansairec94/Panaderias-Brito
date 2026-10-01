@@ -290,19 +290,33 @@ export interface SimulatedSale {
 export type UserRole = "admin" | "auxiliar_admin" | "cajero" | "panadero" | "supervisor" | (string & {});
 
 export interface RolePermissions {
+  // 1. DashBoard
   canAccessDashboard: boolean;
-  canAccessPos: boolean;
-  canAccessCaja: boolean;
-  canAccessInventario: boolean;
+  // 2. Sucursales
+  canAccessSucursales?: boolean;
+  // 3. Pedidos
   canAccessPedidos: boolean;
+  // 4. Clientes
   canAccessClientes: boolean;
-  canAccessFinanzas: boolean;
-  canAccessReportes: boolean;
-  canAccessConfiguracion: boolean;
+  // 5. Productos
   canAccessProductos: boolean;
-  canViewProfitMargins: boolean;
   canEditPrices: boolean;
+  // 6. Ingresos
+  canAccessIngresos?: boolean;
+  // 7. Gastos
+  canAccessGastos?: boolean;
+  // 8. Finanzas
+  canAccessFinanzas: boolean;
+  canAccessCaja: boolean;
+  canViewProfitMargins: boolean;
+  canAccessReportes?: boolean;
+  // 9. Configuración
+  canAccessConfiguracion: boolean;
   canManageUsers: boolean;
+  // 10. Punto de Venta (POS)
+  canAccessPos: boolean;
+  // Compatibilidad adicional
+  canAccessInventario?: boolean;
 }
 
 export interface AppUser {

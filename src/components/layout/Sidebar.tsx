@@ -150,7 +150,7 @@ const navigationItems: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loginAs, logout, canAccessRoute } = useAuth();
+  const { user, permissions, loginAs, logout, canAccessRoute } = useAuth();
   const { currentBranch, isAllBranches, branches } = useBranch();
   const { 
     isCollapsed, 
@@ -184,6 +184,16 @@ export default function Sidebar() {
       }
       const allowedChildren = item.items.filter((sub) => {
         const [cleanHref] = sub.href.split("?");
+        if (cleanHref === "/configuracion") {
+          if (sub.href.includes("tab=roles") || sub.href.includes("tab=empleados")) {
+            if (user?.role !== "admin" && permissions && permissions.canManageUsers === false) {
+              return false;
+            }
+          }
+          if (sub.href.includes("tab=general") && user?.role !== "admin" && permissions && permissions.canAccessConfiguracion === false) {
+            return false;
+          }
+        }
         return canAccessRoute ? canAccessRoute(cleanHref) : true;
       });
       if (allowedChildren.length === 0) return null;
