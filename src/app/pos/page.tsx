@@ -1758,16 +1758,21 @@ export default function POSPage() {
     const posCash = (currentShiftSales || [])
       .filter((s) => s && s.paymentMethod === "efectivo")
       .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
-    // Para el conteo de efectivo en cajón, sumar anticipos cobrados en efectivo en este turno
+    // Para el conteo de efectivo en cajón, sumar anticipos cobrados en efectivo en este turno y sucursal
     const allShiftOrdersForCash = getStoredOrders().filter((o) => {
       if (!o) return false;
+      if (activeBranch) {
+        const orderOperating = (o as any).operatingBranchId;
+        const orderBranch = orderOperating || o.branchId;
+        if (orderBranch && orderBranch !== activeBranch.id) return false;
+      }
       const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
       if (shiftStartBoundary > 0 && (!t || t < shiftStartBoundary - 60000)) return false;
       return (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id);
     });
     const ordersCash = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
     return posCash + ordersCash;
-  }, [currentShiftSales, shiftStartBoundary, shiftVersion]);
+  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])

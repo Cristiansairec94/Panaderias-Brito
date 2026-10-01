@@ -37,6 +37,7 @@ import {
   Wifi,
   History,
   Archive,
+  Building2,
   X
 } from "lucide-react";
 import { CustomOrder } from "@/types";
@@ -113,6 +114,7 @@ export default function PedidosPage() {
   const [customSelectedYear, setCustomSelectedYear] = useState<string>(() => getLocalDateISO(new Date()).slice(0, 4));
   const [isClassificationOpen, setIsClassificationOpen] = useState(true);
   const [isTimeClassificationOpen, setIsTimeClassificationOpen] = useState(false);
+  const [isBranchClassificationOpen, setIsBranchClassificationOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"productos" | "tabla">("productos");
   const [productLayout, setProductLayout] = useState<"lista" | "cuadricula">("lista");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -583,6 +585,210 @@ export default function PedidosPage() {
       readyCount: readyOrders.length,
     };
   }, [orders, selectedBranchFilter, todayStr]);
+
+  // Desglose de sumas por sucursal (para que las sumas de pedidos estén separadas por tienda y no revueltas)
+  const branchOrdersBreakdown = useMemo(() => {
+    // Pedidos base según el filtro de clasificación/historial activo
+    const baseOrders = orders.filter((o) => {
+      if (classificationFilter === "historial") {
+        if (historialSubFilter === "entregados") return o.status === "entregado";
+        if (historialSubFilter === "cancelados") return o.status === "cancelado";
+        return o.status === "entregado" || o.status === "cancelado";
+      }
+      return o.status !== "entregado" && o.status !== "cancelado";
+    });
+
+    // Filtro por período de tiempo (Día, Semana, Mes, Año, Todos)
+    const periodOrders = baseOrders.filter((order) => {
+      const orderDate = normalizeDateStr(order.deliveryDate) || (order.createdAt ? normalizeDateStr(order.createdAt) : "");
+      if (timePeriodFilter !== "todos") {
+        if (!orderDate) return false;
+        if (timePeriodFilter === "dia" && orderDate !== customSelectedDate) return false;
+        if (timePeriodFilter === "semana" && (orderDate < startOfWeekStr || orderDate > endOfWeekStr)) return false;
+        if (timePeriodFilter === "mes" && !orderDate.startsWith(customSelectedMonth)) return false;
+        if (timePeriodFilter === "ano" && !orderDate.startsWith(customSelectedYear)) return false;
+      }
+      return true;
+    });
+
+    // Mapear cada sucursal
+    const branchMap = new Map<string, {
+      branchId: string;
+      branchName: string;
+      shortName: string;
+      code: string;
+      totalOrders: number;
+      totalAmount: number;
+      totalDeposits: number;
+      totalRemaining: number;
+      todayCount: number;
+      readyCount: number;
+      unpaidCount: number;
+    }>();
+
+    branches.forEach((b) => {
+      branchMap.set(b.id, {
+        branchId: b.id,
+        branchName: b.name,
+        shortName: b.shortName || b.name.replace("Sucursal ", ""),
+        code: b.code || "",
+        totalOrders: 0,
+        totalAmount: 0,
+        totalDeposits: 0,
+        totalRemaining: 0,
+        todayCount: 0,
+        readyCount: 0,
+        unpaidCount: 0,
+      });
+    });
+
+    periodOrders.forEach((o) => {
+      const bId = o.branchId || (o as any).operatingBranchId || "branch-matriz";
+      let item = branchMap.get(bId);
+      if (!item) {
+        item = {
+          branchId: bId,
+          branchName: o.branchName || "Sucursal",
+          shortName: (o.branchName || "Sucursal").replace("Sucursal ", ""),
+          code: "",
+          totalOrders: 0,
+          totalAmount: 0,
+          totalDeposits: 0,
+          totalRemaining: 0,
+          todayCount: 0,
+          readyCount: 0,
+          unpaidCount: 0,
+        };
+        branchMap.set(bId, item);
+      }
+      const rem = o.remainingBalance !== undefined ? o.remainingBalance : Math.max(0, (o.total || 0) - (o.deposit || 0));
+      item.totalOrders++;
+      item.totalAmount += Number(o.total) || 0;
+      item.totalDeposits += Number(o.deposit) || 0;
+      item.totalRemaining += Number(rem) || 0;
+      if (normalizeDateStr(o.deliveryDate) === todayStr) {
+        item.todayCount++;
+      }
+      if (o.status === "listo") {
+        item.readyCount++;
+      }
+      if (rem > 0) {
+        item.unpaidCount++;
+      }
+    });
+
+    const list = Array.from(branchMap.values());
+    const grandTotalOrders = list.reduce((sum, b) => sum + b.totalOrders, 0);
+    const grandTotalAmount = list.reduce((sum, b) => sum + b.totalAmount, 0);
+    const grandTotalDeposits = list.reduce((sum, b) => sum + b.totalDeposits, 0);
+    const grandTotalRemaining = list.reduce((sum, b) => sum + b.totalRemaining, 0);
+
+    return {
+      branches: list,
+      grandTotalOrders,
+      grandTotalAmount,
+      grandTotalDeposits,
+      grandTotalRemaining,
+    };
+  }, [
+    orders,
+    branches,
+    classificationFilter,
+    historialSubFilter,
+    timePeriodFilter,
+    customSelectedDate,
+    customSelectedMonth,
+    customSelectedYear,
+    startOfWeekStr,
+    endOfWeekStr,
+    todayStr,
+  ]);
+
+  // Agrupación de pedidos filtrados por sucursal para que no aparezcan revueltos en ninguna vista
+  const ordersGroupedByBranch = useMemo(() => {
+    if (selectedBranchFilter !== "all") {
+      const bObj = branches.find((b) => b.id === selectedBranchFilter);
+      const bName = bObj?.name || filteredOrders[0]?.branchName || "Sucursal Seleccionada";
+      const totalAmount = filteredOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      const totalDeposits = filteredOrders.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+      const totalRemaining = filteredOrders.reduce((sum, o) => {
+        const rem = o.remainingBalance !== undefined ? o.remainingBalance : Math.max(0, (o.total || 0) - (o.deposit || 0));
+        return sum + Number(rem);
+      }, 0);
+
+      return [{
+        branchId: selectedBranchFilter,
+        branchName: bName,
+        shortName: bObj?.shortName || bName.replace("Sucursal ", ""),
+        orders: filteredOrders,
+        totalAmount,
+        totalDeposits,
+        totalRemaining,
+      }];
+    }
+
+    const map = new Map<string, {
+      branchId: string;
+      branchName: string;
+      shortName: string;
+      orders: CustomOrder[];
+      totalAmount: number;
+      totalDeposits: number;
+      totalRemaining: number;
+    }>();
+
+    branches.forEach((b) => {
+      map.set(b.id, {
+        branchId: b.id,
+        branchName: b.name,
+        shortName: b.shortName || b.name.replace("Sucursal ", ""),
+        orders: [],
+        totalAmount: 0,
+        totalDeposits: 0,
+        totalRemaining: 0,
+      });
+    });
+
+    filteredOrders.forEach((o) => {
+      const bId = o.branchId || (o as any).operatingBranchId || "branch-matriz";
+      let g = map.get(bId);
+      if (!g) {
+        g = {
+          branchId: bId,
+          branchName: o.branchName || "Sucursal",
+          shortName: (o.branchName || "Sucursal").replace("Sucursal ", ""),
+          orders: [],
+          totalAmount: 0,
+          totalDeposits: 0,
+          totalRemaining: 0,
+        };
+        map.set(bId, g);
+      }
+      g.orders.push(o);
+      const rem = o.remainingBalance !== undefined ? o.remainingBalance : Math.max(0, (o.total || 0) - (o.deposit || 0));
+      g.totalAmount += Number(o.total) || 0;
+      g.totalDeposits += Number(o.deposit) || 0;
+      g.totalRemaining += Number(rem) || 0;
+    });
+
+    const result: {
+      branchId: string;
+      branchName: string;
+      shortName: string;
+      orders: CustomOrder[];
+      totalAmount: number;
+      totalDeposits: number;
+      totalRemaining: number;
+    }[] = [];
+
+    map.forEach((g) => {
+      if (g.orders.length > 0) {
+        result.push(g);
+      }
+    });
+
+    return result;
+  }, [filteredOrders, selectedBranchFilter, branches]);
 
 
 
@@ -1410,6 +1616,193 @@ export default function PedidosPage() {
           </div>
       </div>
 
+      {/* 1.4. BOTÓN E INDICADOR INTERACTIVO: PEDIDOS POR SUCURSAL */}
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-2xs overflow-hidden transition-all duration-200">
+        <div
+          onClick={() => setIsBranchClassificationOpen((prev) => !prev)}
+          className="p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-2.5 cursor-pointer hover:bg-stone-50/80 select-none transition-colors"
+          title={isBranchClassificationOpen ? "Ocultar desglose por sucursal" : "Desplegar balance y desglose por sucursal"}
+        >
+          {/* Izquierda: Icono + Título + Pills interactivas de cada sucursal con sus pedidos */}
+          <div className="flex items-center gap-2.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+            <div 
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => setIsBranchClassificationOpen((prev) => !prev)}
+            >
+              <span className="p-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                <Building2 className="w-3.5 h-3.5 text-amber-700" />
+              </span>
+              <span className="text-xs font-black text-stone-900 uppercase tracking-wide">
+                Pedidos por Sucursal:
+              </span>
+            </div>
+
+            {/* Pills Rápidas e Interactivas de Sucursales */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Botón: Todas */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBranchFilter("all");
+                  scrollToCatalog();
+                }}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95 ${
+                  selectedBranchFilter === "all"
+                    ? "bg-amber-600 text-white font-black shadow-xs ring-2 ring-amber-400/40"
+                    : "bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200"
+                }`}
+                title="Ver pedidos de todas las sucursales"
+              >
+                <span>🏬 Todas</span>
+                <span className={`font-mono text-[10px] font-black px-1.5 py-0.2 rounded-md ${
+                  selectedBranchFilter === "all" ? "bg-white/20 text-white" : "bg-stone-200 text-stone-800"
+                }`}>
+                  {branchOrdersBreakdown.grandTotalOrders}
+                </span>
+              </button>
+
+              {/* Botones de cada Sucursal con sus pedidos individuales */}
+              {branchOrdersBreakdown.branches.map((b) => {
+                const isSelected = selectedBranchFilter === b.branchId;
+                return (
+                  <button
+                    key={b.branchId}
+                    type="button"
+                    onClick={() => {
+                      if (user?.role === "admin") {
+                        setSelectedBranchFilter(isSelected ? "all" : b.branchId);
+                        scrollToCatalog();
+                      }
+                    }}
+                    disabled={user?.role !== "admin" && (user?.assignedBranchId || currentBranch?.id) !== b.branchId}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95 ${
+                      isSelected
+                        ? "bg-amber-600 text-white font-black shadow-xs ring-2 ring-amber-400/40"
+                        : "bg-amber-50/80 hover:bg-amber-100 text-amber-950 border border-amber-200/90"
+                    }`}
+                    title={
+                      user?.role === "admin"
+                        ? `Filtrar pedidos de ${b.branchName}`
+                        : `Sucursal asignada: ${b.branchName}`
+                    }
+                  >
+                    <span>🏬 {b.shortName}</span>
+                    <span className={`font-mono text-[10px] font-black px-1.5 py-0.2 rounded-md ${
+                      isSelected ? "bg-white/20 text-white" : "bg-amber-200 text-amber-950 border border-amber-300"
+                    }`}>
+                      {b.totalOrders}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Derecha: Botón interactivo para Desplegar / Ocultar el Desglose Financiero */}
+          <button
+            type="button"
+            onClick={() => setIsBranchClassificationOpen((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-200 font-bold text-xs transition-colors cursor-pointer shadow-2xs"
+          >
+            <span>{isBranchClassificationOpen ? "Ocultar Balance" : "Ver Balance y Sumas"}</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform duration-200 text-amber-700 ${
+                isBranchClassificationOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Zona Desplegable con las Fichas de Cada Sucursal */}
+        {isBranchClassificationOpen && (
+          <div className="p-3 sm:p-4 bg-stone-50/70 border-t border-stone-200 animate-in fade-in duration-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div>
+                <p className="font-bold text-stone-800">
+                  Balance financiero de pedidos separado por tienda:
+                </p>
+                <p className="text-[11px] text-stone-500 font-medium">
+                  Suma total de pedidos encargados, anticipos cobrados en mostrador y saldo pendiente por cobrar.
+                </p>
+              </div>
+
+              {selectedBranchFilter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedBranchFilter("all");
+                    scrollToCatalog();
+                  }}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-amber-800 hover:text-white bg-amber-100 hover:bg-amber-600 border border-amber-300 transition-all cursor-pointer self-start sm:self-auto"
+                >
+                  ✕ Quitar filtro de sucursal
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {branchOrdersBreakdown.branches.map((b) => {
+                const isSelected = selectedBranchFilter === b.branchId;
+                return (
+                  <div
+                    key={b.branchId}
+                    onClick={() => {
+                      if (user?.role === "admin") {
+                        setSelectedBranchFilter(isSelected ? "all" : b.branchId);
+                        scrollToCatalog();
+                      }
+                    }}
+                    className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer select-none flex flex-col justify-between gap-2.5 relative group ${
+                      isSelected
+                        ? "bg-amber-50/90 border-amber-500 shadow-md ring-4 ring-amber-400/25"
+                        : "bg-white hover:bg-amber-50/40 border-stone-200 hover:border-amber-300 hover:shadow-xs"
+                    }`}
+                    title="Toca para filtrar y ver únicamente los pedidos de esta sucursal"
+                  >
+                    <div className="flex items-start justify-between gap-1.5">
+                      <div className="min-w-0">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-amber-900 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md">
+                          {b.code || "TIENDA"}
+                        </span>
+                        <h4 className="font-black text-stone-900 text-xs sm:text-sm mt-1 truncate">
+                          {b.branchName}
+                        </h4>
+                      </div>
+                      <span className="font-mono font-black text-xs bg-amber-50 border border-amber-200 text-amber-950 px-2 py-0.5 rounded-lg shrink-0 shadow-2xs">
+                        {b.totalOrders} {b.totalOrders === 1 ? "pedido" : "pedidos"}
+                      </span>
+                    </div>
+
+                    {/* Desglose Contable de la Sucursal */}
+                    <div className="space-y-1 pt-1.5 border-t border-stone-100 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-stone-500 font-bold text-[11px]">Suma de Pedidos:</span>
+                        <span className="font-mono font-black text-stone-900 text-xs">{formatCurrency(b.totalAmount)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-emerald-700 font-bold text-[11px]">Anticipos Cobrados:</span>
+                        <span className="font-mono font-black text-emerald-700 text-xs">+{formatCurrency(b.totalDeposits)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-rose-700 font-bold text-[11px]">Resta por Cobrar:</span>
+                        <span className="font-mono font-black text-rose-700 text-xs">{formatCurrency(b.totalRemaining)}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-1.5 border-t border-stone-100 flex items-center justify-between text-[11px] font-bold">
+                      <span className={isSelected ? "text-amber-900 font-black" : "text-stone-400 group-hover:text-amber-700"}>
+                        {isSelected ? "✓ Tienda seleccionada" : "Filtrar esta tienda"}
+                      </span>
+                      <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isSelected ? "text-amber-800 translate-x-0.5" : "text-stone-400 group-hover:translate-x-0.5"}`} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* 1.5. CLASIFICACIÓN TEMPORAL DE PEDIDOS (Día, Semana, Mes, Año, Todos) */}
       <div className="bg-white rounded-2xl border border-stone-200 shadow-2xs overflow-hidden transition-all duration-200">
         {/* Barra superior interactiva para Desplegar / Ocultar */}
@@ -1904,9 +2297,50 @@ export default function PedidosPage() {
           /* VISTA DE PRODUCTOS: LISTA ERGONÓMICA O CUADRÍCULA           */
           /* ============================================================ */
           productLayout === "lista" ? (
-            /* FORMATO DE LISTA RESPONSIVA, BALANCEADA Y CUADRADA POR PEDIDO */
-            <div className="space-y-2.5 sm:space-y-3">
-              {filteredOrders.map((order) => {
+            /* FORMATO DE LISTA RESPONSIVA, BALANCEADA Y CUADRADA POR PEDIDO AGRUPADA POR SUCURSAL */
+            <div className="space-y-6">
+              {ordersGroupedByBranch.map((branchGroup) => (
+                <div key={branchGroup.branchId} className="space-y-2.5 sm:space-y-3">
+                  {/* Encabezado elegante de la Sucursal con Totales y Sumas específicas */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white px-4 py-3 rounded-2xl shadow-sm border border-stone-800">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                        <Store className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-black tracking-wide text-amber-300 uppercase">
+                            {branchGroup.branchName}
+                          </h3>
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-stone-800 text-stone-300 border border-stone-700">
+                            {branchGroup.orders.length} {branchGroup.orders.length === 1 ? "pedido" : "pedidos"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-stone-400">
+                          Suma y pedidos correspondientes a esta sucursal
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs">
+                      <div className="bg-stone-800/90 px-3 py-1.5 rounded-xl border border-stone-700/60 flex items-center gap-2">
+                        <span className="text-stone-400 text-[10px] uppercase font-bold">Total Pedidos:</span>
+                        <span className="font-mono font-black text-amber-400">{formatCurrency(branchGroup.totalAmount)}</span>
+                      </div>
+                      <div className="bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-700/40 flex items-center gap-2">
+                        <span className="text-emerald-400 text-[10px] uppercase font-bold">Anticipos:</span>
+                        <span className="font-mono font-black text-emerald-300">+{formatCurrency(branchGroup.totalDeposits)}</span>
+                      </div>
+                      <div className="bg-rose-950/40 px-3 py-1.5 rounded-xl border border-rose-700/40 flex items-center gap-2">
+                        <span className="text-rose-400 text-[10px] uppercase font-bold">Por Cobrar:</span>
+                        <span className="font-mono font-black text-rose-300">{formatCurrency(branchGroup.totalRemaining)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Listado de tarjetas de la sucursal */}
+                  <div className="space-y-2.5 sm:space-y-3">
+                    {branchGroup.orders.map((order) => {
                 const isOverdue = checkIsOverdue(order);
                 const isReady = checkIsReadyNotDelivered(order);
                 const isUpcoming = checkIsUpcoming(order);
@@ -2281,12 +2715,56 @@ export default function PedidosPage() {
                     </div>
                   </div>
                 );
-              })}
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
-            /* FORMATO DE CUADRÍCULA DE FICHAS POR PEDIDO - DISEÑO MODERNO Y ADAPTABLE */
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 min-[1800px]:grid-cols-4 gap-4 sm:gap-5">
-              {filteredOrders.map((order) => {
+            /* FORMATO DE CUADRÍCULA DE FICHAS POR PEDIDO AGRUPADA POR SUCURSAL */
+            <div className="space-y-6">
+              {ordersGroupedByBranch.map((branchGroup) => (
+                <div key={branchGroup.branchId} className="space-y-3">
+                  {/* Encabezado elegante de la Sucursal con Totales y Sumas específicas */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white px-4 py-3 rounded-2xl shadow-sm border border-stone-800">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                        <Store className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-black tracking-wide text-amber-300 uppercase">
+                            {branchGroup.branchName}
+                          </h3>
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-stone-800 text-stone-300 border border-stone-700">
+                            {branchGroup.orders.length} {branchGroup.orders.length === 1 ? "pedido" : "pedidos"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-stone-400">
+                          Suma y pedidos correspondientes a esta sucursal
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap text-xs">
+                      <div className="bg-stone-800/90 px-3 py-1.5 rounded-xl border border-stone-700/60 flex items-center gap-2">
+                        <span className="text-stone-400 text-[10px] uppercase font-bold">Total Pedidos:</span>
+                        <span className="font-mono font-black text-amber-400">{formatCurrency(branchGroup.totalAmount)}</span>
+                      </div>
+                      <div className="bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-700/40 flex items-center gap-2">
+                        <span className="text-emerald-400 text-[10px] uppercase font-bold">Anticipos:</span>
+                        <span className="font-mono font-black text-emerald-300">+{formatCurrency(branchGroup.totalDeposits)}</span>
+                      </div>
+                      <div className="bg-rose-950/40 px-3 py-1.5 rounded-xl border border-rose-700/40 flex items-center gap-2">
+                        <span className="text-rose-400 text-[10px] uppercase font-bold">Por Cobrar:</span>
+                        <span className="font-mono font-black text-rose-300">{formatCurrency(branchGroup.totalRemaining)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cuadrícula de tarjetas de la sucursal */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 min-[1800px]:grid-cols-4 gap-4 sm:gap-5">
+                    {branchGroup.orders.map((order) => {
                 const isOverdue = checkIsOverdue(order);
                 const isReady = checkIsReadyNotDelivered(order);
                 const isUpcoming = checkIsUpcoming(order);
@@ -2604,7 +3082,10 @@ export default function PedidosPage() {
                     </div>
                   </div>
                 );
-              })}
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )
         ) : (
@@ -2628,7 +3109,39 @@ export default function PedidosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
-                {filteredOrders.map((order) => {
+                {ordersGroupedByBranch.map((branchGroup) => (
+                  <React.Fragment key={branchGroup.branchId}>
+                    {/* Fila Encabezado de Sucursal con sus Sumas y Totales Individuales */}
+                    <tr className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white">
+                      <td colSpan={9} className="py-2.5 px-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Store className="w-4 h-4 text-amber-400" />
+                            <span className="font-black text-xs text-amber-300 uppercase tracking-wide">
+                              {branchGroup.branchName}
+                            </span>
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-stone-800 text-stone-300 border border-stone-700">
+                              {branchGroup.orders.length} {branchGroup.orders.length === 1 ? "pedido" : "pedidos"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 sm:gap-4 text-xs font-bold flex-wrap">
+                            <div className="bg-stone-800/90 px-2.5 py-1 rounded-lg border border-stone-700/60 flex items-center gap-1.5">
+                              <span className="text-stone-400 text-[10px] uppercase">Total Pedidos:</span>
+                              <span className="font-mono font-black text-amber-400">{formatCurrency(branchGroup.totalAmount)}</span>
+                            </div>
+                            <div className="bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-700/40 flex items-center gap-1.5">
+                              <span className="text-emerald-400 text-[10px] uppercase">Anticipos:</span>
+                              <span className="font-mono font-black text-emerald-300">+{formatCurrency(branchGroup.totalDeposits)}</span>
+                            </div>
+                            <div className="bg-rose-950/50 px-2.5 py-1 rounded-lg border border-rose-700/40 flex items-center gap-1.5">
+                              <span className="text-rose-400 text-[10px] uppercase">Por Cobrar:</span>
+                              <span className="font-mono font-black text-rose-300">{formatCurrency(branchGroup.totalRemaining)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    {branchGroup.orders.map((order) => {
                   const orderDate = normalizeDateStr(order.deliveryDate);
                   const isToday = orderDate === todayStr;
                   const isTomorrow = orderDate === tomorrowStr;
@@ -3070,6 +3583,8 @@ export default function PedidosPage() {
                     </React.Fragment>
                   );
                 })}
+                  </React.Fragment>
+                ))}
               </tbody>
             </table>
           </div>
