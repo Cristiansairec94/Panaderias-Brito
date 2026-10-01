@@ -1193,6 +1193,7 @@ export default function ExpensesModal({
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
     setOrdersVersion((v) => v + 1);
+    setInternalOrders(getStoredOrders());
   };
 
   const handleCancelOrder = (order: CustomOrder) => {
@@ -1205,6 +1206,7 @@ export default function ExpensesModal({
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
     setOrdersVersion((v) => v + 1);
+    setInternalOrders(getStoredOrders());
   };
 
   const handleSendOrderWhatsApp = (order: CustomOrder) => {
@@ -1281,6 +1283,7 @@ export default function ExpensesModal({
     if (ticketTypeFilter === "ventas") return [];
     return ordersPool
       .filter((order) => {
+        if (order.status === "entregado" || order.status === "cancelado") return false;
         if (ticketMethodFilter !== "all" && order.paymentMethod !== ticketMethodFilter) return false;
         if (ticketSearch.trim()) {
           const q = ticketSearch.toLowerCase().trim();
@@ -3317,7 +3320,7 @@ export default function ExpensesModal({
                               Filtros de Clasificación
                             </span>
                             <span className="text-[11px] text-stone-500 font-bold block">
-                              {cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : "Pedidos del Turno"} • {cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : "Transferencia"} ({visibleCashMovements.length})
+                              {cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : cashDetailFilter === "pedidos" ? "Pedidos del Turno" : "Historial de Pedidos"} • {cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : cashMethodFilter === "todos_pedidos" ? "Historial de pedidos" : "Transferencia"} ({visibleCashMovements.length})
                             </span>
                           </div>
                         </div>
@@ -3334,6 +3337,7 @@ export default function ExpensesModal({
                               <option value="all">📋 Tipo: Todos ({unifiedShiftMovements.length})</option>
                               <option value="ventas">🥖 Tipo: Ventas ({allShiftPureSales.length})</option>
                               <option value="pedidos">🎂 Tipo: Pedidos Turno ({allShiftOrdersList.length})</option>
+                              <option value="todos_pedidos">📦 Tipo: Historial de Pedidos ({allHistoricalOrders.length})</option>
                             </select>
                             <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
@@ -3357,36 +3361,48 @@ export default function ExpensesModal({
 
                       {/* 2. Cuadros organizados en cuadrículas limpias (SIN deslizar horizontalmente, SIN barras de desplazamiento) */}
                       <div className="space-y-3 pt-2.5 border-t border-stone-200">
-                          {/* Fila A: Tipo de Registro (3 columnas limpias) */}
+                          {/* Fila A: Tipo de Registro (4 columnas limpias) */}
                           <div>
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
                               <span>1. Tipo de Movimiento:</span>
                               <span className="text-[10px] font-bold lowercase text-stone-400">
-                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : "pedidos del turno"}
+                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : cashDetailFilter === "pedidos" ? "pedidos del turno" : "historial de pedidos"}
                               </span>
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                               {[
                                 { id: "all", label: "Todos", icon: "📋", count: unifiedShiftMovements.length },
                                 { id: "ventas", label: "Ventas en Caja", icon: "🥖", count: allShiftPureSales.length },
                                 { id: "pedidos", label: "Pedidos del Turno", icon: "🎂", count: allShiftOrdersList.length },
+                                { id: "todos_pedidos", label: "historial de pedidos", icon: "📦", count: allHistoricalOrders.length },
                               ].map((tab) => {
+                                const isSpecial = tab.id === "todos_pedidos";
                                 const isSelected = cashDetailFilter === tab.id;
                                 return (
                                   <button
                                     key={tab.id}
                                     type="button"
                                     onClick={() => handleSelectDetailFilter(tab.id as any)}
-                                    className={`py-2.5 px-3 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 text-center active:scale-98 ${
-                                      isSelected
+                                    className={`py-2.5 px-3 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
+                                      isSpecial
+                                        ? isSelected
+                                          ? "bg-gradient-to-r from-stone-950 via-amber-950 to-stone-950 text-amber-300 border-amber-400 shadow-xl ring-4 ring-amber-500/50 scale-[1.02]"
+                                          : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white border-orange-600 shadow-md shadow-orange-500/30 ring-2 ring-orange-300/50 hover:brightness-110 hover:shadow-lg"
+                                        : isSelected
                                         ? "bg-stone-900 text-white border-stone-950 shadow-md ring-2 ring-stone-900/20"
                                         : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
                                     }`}
                                   >
-                                    <span className="text-base sm:text-lg">{tab.icon}</span>
-                                    <span className="whitespace-normal leading-tight font-black">{tab.label}</span>
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                                      isSelected
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-base sm:text-lg shrink-0">{tab.icon}</span>
+                                      <span className="whitespace-normal leading-tight font-black">{tab.label}</span>
+                                    </div>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
+                                      isSpecial
+                                        ? isSelected
+                                          ? "bg-amber-400 text-stone-950 font-black"
+                                          : "bg-black/25 text-white font-black border border-white/20"
+                                        : isSelected
                                         ? "bg-white/20 text-white"
                                         : "bg-stone-100 text-stone-600 font-bold"
                                     }`}>
@@ -3531,7 +3547,7 @@ export default function ExpensesModal({
                             {[
                               { id: "all", label: "Todos", count: allHistoricalOrders.length },
                               { id: "hoy", label: "📅 Para HOY", count: todayOrdersList.length, highlight: "text-amber-800 border-amber-300 bg-amber-50" },
-                              { id: "listos", label: "🎂 Listos en Mostrador", count: readyOrdersList.length, highlight: "text-emerald-800 border-emerald-300 bg-emerald-50" },
+                              { id: "listos", label: "🎂 Listos en Sucursal", count: readyOrdersList.length, highlight: "text-emerald-800 border-emerald-300 bg-emerald-50" },
                               { id: "pendientes", label: "⏳ En Horno / Pendientes", count: inPrepOrdersList.length },
                               { id: "por_pagar", label: "⚠️ Saldo Pendiente", count: unpaidOrdersList.length, highlight: "text-rose-800 border-rose-300 bg-rose-50" },
                             ].map((f) => (

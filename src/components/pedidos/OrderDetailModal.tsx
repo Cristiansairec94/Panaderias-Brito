@@ -98,14 +98,14 @@ export default function OrderDetailModal({
         );
       case "entregado":
         return (
-          <span className="bg-stone-100 text-stone-700 border-2 border-stone-300 px-3 py-1.5 rounded-2xl font-black text-xs inline-flex items-center gap-1.5">
-            <Check className="w-4 h-4 text-stone-600" /> Entregado al Cliente
+          <span className="bg-teal-100 text-teal-900 border-2 border-teal-300 px-3 py-1.5 rounded-2xl font-black text-xs inline-flex items-center gap-1.5 shadow-2xs">
+            <Check className="w-4 h-4 text-teal-700" /> Entregado al Cliente
           </span>
         );
       case "cancelado":
         return (
-          <span className="bg-rose-100 text-rose-800 border-2 border-rose-300 px-3 py-1.5 rounded-2xl font-black text-xs inline-flex items-center gap-1.5">
-            ✕ Cancelado
+          <span className="bg-rose-100 text-rose-900 border-2 border-rose-300 px-3 py-1.5 rounded-2xl font-black text-xs inline-flex items-center gap-1.5 shadow-2xs">
+            ✕ Dado de Baja / Cancelado
           </span>
         );
     }
@@ -467,7 +467,7 @@ export default function OrderDetailModal({
                   onClose();
                 }}
                 className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Marcar como listo para entrega en mostrador"
+                title="Marcar como listo para entrega en sucursal"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Marcar Listo</span>
@@ -489,14 +489,21 @@ export default function OrderDetailModal({
 
             {/* Indicador de Pedido ya Entregado */}
             {order.status === "entregado" && (
-              <div className="px-3.5 py-2.5 bg-stone-100 border border-stone-200 text-stone-600 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs">
-                <Check className="w-4 h-4 text-emerald-600" />
-                <span>Entregado</span>
+              <div className="px-3.5 py-2.5 bg-teal-50 border border-teal-200 text-teal-800 font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs">
+                <Check className="w-4 h-4 text-teal-600" />
+                <span>Pedido Ya Entregado al Cliente</span>
               </div>
             )}
 
-            {/* Botón Editar */}
-            {onOpenEdit && (
+            {/* Indicador de Pedido Dado de Baja */}
+            {order.status === "cancelado" && (
+              <div className="px-3.5 py-2.5 bg-rose-50 border border-rose-200 text-rose-800 font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs">
+                <span>✕ Pedido Dado de Baja / Cancelado</span>
+              </div>
+            )}
+
+            {/* Botón Editar (solo si no está cancelado) */}
+            {onOpenEdit && order.status !== "cancelado" && (
               <button
                 type="button"
                 onClick={() => {
@@ -510,8 +517,8 @@ export default function OrderDetailModal({
               </button>
             )}
 
-            {/* Botón Dar de Baja (en rojo) */}
-            {onDarDeBaja && (
+            {/* Botón Dar de Baja (en rojo para pedidos activos) */}
+            {onDarDeBaja && order.status !== "entregado" && order.status !== "cancelado" && (
               <button
                 type="button"
                 onClick={() => onDarDeBaja(order)}
@@ -520,6 +527,19 @@ export default function OrderDetailModal({
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Dar de baja</span>
+              </button>
+            )}
+
+            {/* Botón Eliminar Permanente (si ya está cancelado/dado de baja) */}
+            {onDarDeBaja && order.status === "cancelado" && (
+              <button
+                type="button"
+                onClick={() => onDarDeBaja(order)}
+                className="px-3.5 py-2.5 bg-rose-100 hover:bg-rose-200 active:scale-95 text-rose-900 border border-rose-300 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Eliminar permanentemente del registro"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-700" />
+                <span>Eliminar Registro Definitivamente</span>
               </button>
             )}
           </div>

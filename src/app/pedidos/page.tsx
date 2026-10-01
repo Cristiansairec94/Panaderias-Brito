@@ -35,7 +35,9 @@ import {
   LayoutGrid,
   RefreshCw,
   Smartphone,
-  Wifi
+  Wifi,
+  History,
+  Archive
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -87,7 +89,8 @@ export type OrderClassificationKey =
   | "no_llevados"
   | "no_pasaron"
   | "proximos"
-  | "entregados";
+  | "entregados"
+  | "historial";
 
 export default function PedidosPage() {
   const { branches, currentBranch } = useBranch();
@@ -99,6 +102,7 @@ export default function PedidosPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBranchFilter, setSelectedBranchFilter] = useState("all");
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
+  const [historialSubFilter, setHistorialSubFilter] = useState<"todos" | "entregados" | "cancelados">("todos");
   const [isClassificationOpen, setIsClassificationOpen] = useState(true);
   const [viewMode, setViewMode] = useState<"productos" | "tabla">("productos");
   const [productLayout, setProductLayout] = useState<"lista" | "cuadricula">("lista");
@@ -294,6 +298,8 @@ export default function PedidosPage() {
     let noPasaron = 0;
     let proximos = 0;
     let entregados = 0;
+    let cancelados = 0;
+    let historial = 0;
 
     for (const o of branchFiltered) {
       const oDate = normalizeDateStr(o.deliveryDate);
@@ -305,7 +311,9 @@ export default function PedidosPage() {
       if (checkIsReadyNotDelivered(o)) noLlevados++;
       if (checkIsOverdue(o)) noPasaron++;
       if (checkIsUpcoming(o)) proximos++;
-      if (checkIsDelivered(o)) entregados++;
+      if (o.status === "entregado") entregados++;
+      if (o.status === "cancelado") cancelados++;
+      if (o.status === "entregado" || o.status === "cancelado") historial++;
     }
 
     return {
@@ -319,6 +327,8 @@ export default function PedidosPage() {
       no_pasaron: noPasaron,
       proximos,
       entregados,
+      cancelados,
+      historial,
     };
   }, [orders, selectedBranchFilter, todayStr, currentMinutes]);
 
@@ -333,7 +343,7 @@ export default function PedidosPage() {
       }
 
       // Los pedidos entregados y cancelados desaparecen de las vistas activas
-      if (classificationFilter !== "entregados") {
+      if (classificationFilter !== "entregados" && classificationFilter !== "historial") {
         if (order.status === "entregado" || order.status === "cancelado") {
           return false;
         }
@@ -355,6 +365,11 @@ export default function PedidosPage() {
       if (classificationFilter === "no_pasaron" && !checkIsOverdue(order)) return false;
       if (classificationFilter === "proximos" && !checkIsUpcoming(order)) return false;
       if (classificationFilter === "entregados" && !checkIsDelivered(order)) return false;
+      if (classificationFilter === "historial") {
+        if (order.status !== "entregado" && order.status !== "cancelado") return false;
+        if (historialSubFilter === "entregados" && order.status !== "entregado") return false;
+        if (historialSubFilter === "cancelados" && order.status !== "cancelado") return false;
+      }
 
       // Status filter (solo aplica si clasificación es "all")
       if (classificationFilter === "all" && statusFilter !== "all" && order.status !== statusFilter) {
@@ -402,7 +417,7 @@ export default function PedidosPage() {
 
       return true;
     });
-  }, [orders, selectedBranchFilter, classificationFilter, statusFilter, paymentFilter, dateFilter, searchQuery, todayStr, tomorrowStr, currentMinutes]);
+  }, [orders, selectedBranchFilter, classificationFilter, historialSubFilter, statusFilter, paymentFilter, dateFilter, searchQuery, todayStr, tomorrowStr, currentMinutes]);
 
   // Metrics (reactivos a la sucursal seleccionada para coincidir con los pedidos)
   const metrics = useMemo(() => {
@@ -468,6 +483,12 @@ export default function PedidosPage() {
       setStatusFilter("all");
       setPaymentFilter("all");
       setDateFilter("all");
+      scrollToCatalog();
+      return;
+    }
+    if (key === "historial") {
+      setHistorialSubFilter("todos");
+      setClassificationFilter((prev) => (prev === "historial" ? "all" : "historial"));
       scrollToCatalog();
       return;
     }
@@ -542,7 +563,7 @@ export default function PedidosPage() {
     if (isOverdue) {
       statusText = "tenía horario programado para entrega y ya se encuentra listo esperando por ti en la sucursal. ¿Pasas hoy a recogerlo?";
     } else if (order.status === "listo") {
-      statusText = "¡ya está LISTO para entrega en mostrador!";
+      statusText = "¡ya está LISTO para entrega en sucursal!";
     } else if (order.status === "entregado") {
       statusText = "ha sido marcado como entregado. ¡Esperamos lo disfruten!";
     }
@@ -581,14 +602,14 @@ export default function PedidosPage() {
         );
       case "entregado":
         return (
-          <span className="bg-stone-100 text-stone-700 border border-stone-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5 text-stone-600" /> Entregado
+          <span className="bg-teal-100 text-teal-900 border border-teal-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
+            <Check className="w-3.5 h-3.5 text-teal-700" /> Ya Entregado
           </span>
         );
       case "cancelado":
         return (
-          <span className="bg-rose-100 text-rose-800 border border-rose-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5">
-            ✕ Cancelado
+          <span className="bg-rose-100 text-rose-900 border border-rose-300 px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 shadow-2xs">
+            ✕ Dado de Baja / Cancelado
           </span>
         );
     }
@@ -760,7 +781,7 @@ export default function PedidosPage() {
           </div>
         </div>
 
-        {/* Cuadro 4: Listos en Mostrador */}
+        {/* Cuadro 4: Listos en Sucursal */}
         <div
           onClick={() => handleSelectKPICard("no_llevados")}
           className={`bg-white border-2 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none relative group ${
@@ -773,7 +794,7 @@ export default function PedidosPage() {
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[11px] font-bold uppercase text-stone-400 tracking-wider block">
-                📦 Listos en Mostrador
+                📦 Listos en Sucursal
               </span>
               <span className="text-2xl sm:text-3xl font-black text-stone-900 mt-1 block">
                 {metrics.readyCount}
@@ -1007,6 +1028,30 @@ export default function PedidosPage() {
                 {classificationCounts.no_llevados}
               </span>
             </button>
+
+            {/* 5. Historial (Entregados y Bajas) */}
+            <button
+              type="button"
+              onClick={() => handleSelectClassificationCard("historial")}
+              className={`flex-1 min-w-[130px] py-2 sm:py-2.5 px-3 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+                classificationFilter === "historial"
+                  ? "bg-stone-900 text-white shadow-xs font-black ring-2 ring-stone-900/30"
+                  : "hover:bg-white/80 text-stone-700"
+              }`}
+              title="Ver el historial completo de pedidos entregados o que se dieron de baja"
+            >
+              <span className="flex items-center gap-1">
+                <span>📜</span>
+                <span className="truncate">Historial (Entregados y Bajas)</span>
+              </span>
+              <span
+                className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
+                  classificationFilter === "historial" ? "bg-white/20 text-white" : "bg-stone-200/90 text-stone-800"
+                }`}
+              >
+                {classificationCounts.historial}
+              </span>
+            </button>
           </div>
       </div>
 
@@ -1033,6 +1078,7 @@ export default function PedidosPage() {
                   {classificationFilter === "no_pasaron" && <AlertTriangle className="w-4 h-4 text-red-200" />}
                   {classificationFilter === "pendientes" && <Flame className="w-4 h-4" />}
                   {classificationFilter === "entregados" && <Check className="w-4 h-4" />}
+                  {classificationFilter === "historial" && <History className="w-4 h-4 text-white" />}
                   {classificationFilter === "proximos" && <Calendar className="w-4 h-4" />}
                 </div>
                 <div>
@@ -1045,16 +1091,55 @@ export default function PedidosPage() {
                       {classificationFilter === "hoy" && "⏰ Entregas Programadas para HOY"}
                       {classificationFilter === "por_pagar" && `💰 Saldo Falta por Cobrar (${formatCurrency(metrics.totalRemainingBalance)})`}
                       {classificationFilter === "pagados" && "✅ Pedidos 100% Pagados (Liquidados)"}
-                      {classificationFilter === "no_llevados" && "📦 Listos en Mostrador Esperando al Cliente"}
+                      {classificationFilter === "no_llevados" && "📦 Listos en Sucursal Esperando al Cliente"}
                       {classificationFilter === "no_pasaron" && `⚠️ Pedidos que no han pasado por ellos (${classificationCounts.no_pasaron})`}
                       {classificationFilter === "pendientes" && "👨‍🍳 En Preparación / Horno"}
                       {classificationFilter === "entregados" && "✅ Ya Entregados"}
+                      {classificationFilter === "historial" && "📜 Historial Completo: Pedidos Entregados y Dados de Baja"}
                       {classificationFilter === "proximos" && "⏰ Próximos de Hoy"}
                     </h3>
                   </div>
                   <p className="text-[11px] text-stone-500 font-semibold mt-0.5">
                     Mostrando {filteredOrders.length} pedido(s) registrado(s).
                   </p>
+                  {classificationFilter === "historial" && (
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setHistorialSubFilter("todos")}
+                        className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                          historialSubFilter === "todos"
+                            ? "bg-stone-900 text-white shadow-xs"
+                            : "bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200"
+                        }`}
+                      >
+                        📋 Todos en Historial ({classificationCounts.historial})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistorialSubFilter("entregados")}
+                        className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                          historialSubFilter === "entregados"
+                            ? "bg-teal-700 text-white shadow-xs"
+                            : "bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200"
+                        }`}
+                      >
+                        <Check className="w-3 h-3 text-teal-600" />
+                        <span>Solo Entregados ({classificationCounts.entregados})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistorialSubFilter("cancelados")}
+                        className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                          historialSubFilter === "cancelados"
+                            ? "bg-rose-700 text-white shadow-xs"
+                            : "bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200"
+                        }`}
+                      >
+                        <span>✕ Solo Dados de Baja ({classificationCounts.cancelados})</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1181,6 +1266,8 @@ export default function PedidosPage() {
                 <DollarSign className="w-8 h-8 text-emerald-500" />
               ) : classificationFilter === "pagados" ? (
                 <Check className="w-8 h-8 text-teal-600" />
+              ) : classificationFilter === "historial" ? (
+                <History className="w-8 h-8 text-stone-600" />
               ) : (
                 <Cake className="w-8 h-8 text-amber-600" />
               )}
@@ -1189,13 +1276,15 @@ export default function PedidosPage() {
               {classificationFilter === "hoy"
                 ? "No hay entregas programadas para hoy"
                 : classificationFilter === "no_llevados"
-                ? "No hay pedidos listos en mostrador esperando"
+                ? "No hay pedidos listos en sucursal esperando"
                 : classificationFilter === "por_pagar"
                 ? "No hay saldos pendientes por cobrar"
                 : classificationFilter === "pagados"
                 ? "No hay pedidos pagados para mostrar"
                 : classificationFilter === "no_pasaron"
                 ? "No hay pedidos pendientes donde no hayan pasado por ellos"
+                : classificationFilter === "historial"
+                ? "No hay pedidos en el historial"
                 : "No se encontraron productos ni pedidos"}
             </h3>
             <p className="text-xs text-stone-500 max-w-md mx-auto">
@@ -1209,6 +1298,8 @@ export default function PedidosPage() {
                 ? "No se encontraron pedidos con pago completado bajo los criterios o sucursal seleccionada."
                 : classificationFilter === "no_pasaron"
                 ? "Excelente: ningún cliente ha dejado su pedido pasado de la fecha u hora programada."
+                : classificationFilter === "historial"
+                ? "No se encontraron pedidos entregados ni dados de baja (cancelados) en la sucursal o criterios seleccionados."
                 : "No hay productos registrados que coincidan con la clasificación o filtros seleccionados."}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
@@ -1257,7 +1348,11 @@ export default function PedidosPage() {
                     key={order.id}
                     onClick={() => setSelectedOrderForDetail(order)}
                     className={`bg-white rounded-xl border p-2 sm:p-2.5 transition-all duration-150 shadow-2xs hover:shadow-xs cursor-pointer flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-2.5 group border-l-4 ${
-                      isOverdue
+                      order.status === "cancelado"
+                        ? "border-l-rose-500 hover:bg-rose-50/20 border-rose-200"
+                        : order.status === "entregado"
+                        ? "border-l-teal-600 hover:bg-teal-50/20 border-teal-200"
+                        : isOverdue
                         ? "border-l-rose-500 hover:bg-rose-50/20 border-rose-200"
                         : isReady
                         ? "border-l-emerald-500 hover:bg-emerald-50/20 border-emerald-200"
@@ -1496,7 +1591,11 @@ export default function PedidosPage() {
                     key={order.id}
                     onClick={() => setSelectedOrderForDetail(order)}
                     className={`bg-white rounded-2xl border p-4.5 space-y-3.5 transition-all duration-200 shadow-2xs hover:shadow-lg cursor-pointer flex flex-col justify-between group ${
-                      isOverdue
+                      order.status === "cancelado"
+                        ? "border-rose-300 bg-rose-50/20 hover:border-rose-400"
+                        : order.status === "entregado"
+                        ? "border-teal-300 bg-teal-50/15 hover:border-teal-400"
+                        : isOverdue
                         ? "border-rose-400 bg-rose-50/15 ring-2 ring-rose-400/30 hover:border-rose-500"
                         : isReady
                         ? "border-emerald-300 bg-emerald-50/10 hover:border-emerald-500"
@@ -1523,25 +1622,36 @@ export default function PedidosPage() {
 
                       {/* Alertas destacadas de clasificación */}
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {isOverdue && (
+                        {order.status === "cancelado" && (
+                          <span className="text-[10px] font-black text-rose-900 bg-rose-100 border border-rose-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
+                            ✕ DADO DE BAJA / CANCELADO
+                          </span>
+                        )}
+                        {order.status === "entregado" && (
+                          <span className="text-[10px] font-black text-teal-900 bg-teal-100 border border-teal-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
+                            <Check className="w-3 h-3 text-teal-700" />
+                            ✓ YA ENTREGADO
+                          </span>
+                        )}
+                        {order.status !== "cancelado" && order.status !== "entregado" && isOverdue && (
                           <span className="text-[10px] font-black text-red-900 bg-red-100 border border-red-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1 animate-pulse">
                             <AlertTriangle className="w-3 h-3 text-red-600" />
                             ⚠️ NO HAN PASADO POR ÉL
                           </span>
                         )}
-                        {!isOverdue && isUpcoming && (
+                        {order.status !== "cancelado" && order.status !== "entregado" && !isOverdue && isUpcoming && (
                           <span className="text-[10px] font-black text-rose-900 bg-rose-100 border border-rose-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
                             <Clock className="w-3 h-3 text-rose-600" />
                             ⏰ ¡ENTREGA HOY!
                           </span>
                         )}
-                        {isReady && (
+                        {order.status !== "cancelado" && order.status !== "entregado" && isReady && (
                           <span className="text-[10px] font-black text-emerald-900 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
                             <Package className="w-3 h-3 text-emerald-700" />
-                            📦 LISTO EN MOSTRADOR
+                            📦 LISTO EN SUCURSAL
                           </span>
                         )}
-                        {isPending && (
+                        {order.status !== "cancelado" && order.status !== "entregado" && isPending && (
                           <span className="text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-200 px-2.5 py-0.5 rounded-lg inline-flex items-center gap-1">
                             <Clock className="w-3 h-3 text-amber-700" />
                             ⏳ Pendiente de Elaborar
@@ -1956,9 +2066,14 @@ export default function PedidosPage() {
                             </div>
                           )}
                           {order.status === "entregado" && (
-                            <div className="text-[10px] text-stone-500 font-medium flex items-center gap-1 mt-1">
-                              <Check className="w-3 h-3 text-stone-500" />
+                            <div className="text-[10px] text-teal-700 font-bold flex items-center gap-1 mt-1 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                              <Check className="w-3 h-3 text-teal-600" />
                               <span>Ya entregado</span>
+                            </div>
+                          )}
+                          {order.status === "cancelado" && (
+                            <div className="text-[10px] text-rose-700 font-bold flex items-center gap-1 mt-1 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                              <span>✕ Dado de baja</span>
                             </div>
                           )}
                         </td>
