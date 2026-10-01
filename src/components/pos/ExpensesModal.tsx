@@ -3281,7 +3281,7 @@ export default function ExpensesModal({
                             </span>
                             <span className="text-[11px] text-stone-500 font-bold block">
                               {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
-                                ? `Historial de todos los pedidos (${filteredAllOrders.length} visibles de ${allHistoricalOrders.length})`
+                                ? `Pedidos por entregar (${filteredAllOrders.length} visibles de ${allHistoricalOrders.length})`
                                 : `${cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : "Pedidos Especiales"} • ${cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : "Transferencia"} (${visibleCashMovements.length})`}
                             </span>
                           </div>
@@ -3299,7 +3299,7 @@ export default function ExpensesModal({
                               <option value="all">📋 Tipo: Todos ({unifiedShiftMovements.length})</option>
                               <option value="ventas">🥖 Tipo: Ventas ({allShiftPureSales.length})</option>
                               <option value="pedidos">🎂 Tipo: Pedidos Turno ({allShiftOrdersList.length})</option>
-                              <option value="todos_pedidos">📋 Historial: Todos los Pedidos ({allHistoricalOrders.length})</option>
+                              <option value="todos_pedidos">📦 Tipo: Pedidos por Entregar ({allHistoricalOrders.length})</option>
                             </select>
                             <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
@@ -3315,7 +3315,7 @@ export default function ExpensesModal({
                               <option value="efectivo">💵 Pago: Efectivo ({detailMethodCounts.efectivo})</option>
                               <option value="tarjeta">💳 Pago: Tarjeta ({detailMethodCounts.tarjeta})</option>
                               <option value="transferencia">📱 Pago: Transf. ({detailMethodCounts.transferencia})</option>
-                              <option value="todos_pedidos">🎂 Historial: Todos los Pedidos ({allHistoricalOrders.length})</option>
+                              <option value="todos_pedidos">📦 Pedidos por Entregar ({allHistoricalOrders.length})</option>
                             </select>
                             <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
@@ -3329,7 +3329,7 @@ export default function ExpensesModal({
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
                               <span>1. Tipo de Movimiento:</span>
                               <span className="text-[10px] font-bold lowercase text-stone-400">
-                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : cashDetailFilter === "pedidos" ? "pedidos del turno" : "historial completo de pedidos"}
+                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : cashDetailFilter === "pedidos" ? "pedidos del turno" : "pedidos por entregar"}
                               </span>
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -3337,29 +3337,41 @@ export default function ExpensesModal({
                                 { id: "all", label: "Todos", icon: "📋", count: unifiedShiftMovements.length },
                                 { id: "ventas", label: "Ventas en Caja", icon: "🥖", count: allShiftPureSales.length },
                                 { id: "pedidos", label: "Pedidos del Turno", icon: "🎂", count: allShiftOrdersList.length },
-                                { id: "todos_pedidos", label: "Todos los Pedidos", icon: "🎂", count: allHistoricalOrders.length },
-                              ].map((tab) => (
-                                <button
-                                  key={tab.id}
-                                  type="button"
-                                  onClick={() => handleSelectDetailFilter(tab.id as any)}
-                                  className={`py-2.5 px-2 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 text-center active:scale-98 ${
-                                    cashDetailFilter === tab.id
-                                      ? "bg-stone-900 text-white border-stone-950 shadow-md ring-2 ring-stone-900/20"
-                                      : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
-                                  }`}
-                                >
-                                  <span className="text-base sm:text-lg">{tab.icon}</span>
-                                  <span className="line-clamp-1">{tab.label}</span>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                                    cashDetailFilter === tab.id
-                                      ? "bg-white/20 text-white"
-                                      : "bg-stone-100 text-stone-600"
-                                  }`}>
-                                    {tab.count}
-                                  </span>
-                                </button>
-                              ))}
+                                { id: "todos_pedidos", label: "pedidos por entregar", icon: "📦", count: allHistoricalOrders.length },
+                              ].map((tab) => {
+                                const isSpecial = tab.id === "todos_pedidos";
+                                const isSelected = cashDetailFilter === tab.id;
+                                return (
+                                  <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => handleSelectDetailFilter(tab.id as any)}
+                                    className={`py-2.5 px-2 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 text-center active:scale-98 ${
+                                      isSpecial
+                                        ? isSelected
+                                          ? "bg-gradient-to-r from-stone-950 via-amber-950 to-stone-950 text-amber-300 border-amber-400 shadow-xl ring-4 ring-amber-500/50 scale-[1.02]"
+                                          : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white border-orange-600 shadow-md shadow-orange-500/30 ring-2 ring-orange-300/50 hover:brightness-110 hover:shadow-lg"
+                                        : isSelected
+                                        ? "bg-stone-900 text-white border-stone-950 shadow-md ring-2 ring-stone-900/20"
+                                        : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
+                                    }`}
+                                  >
+                                    <span className="text-base sm:text-lg">{tab.icon}</span>
+                                    <span className="line-clamp-1">{tab.label}</span>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                                      isSpecial
+                                        ? isSelected
+                                          ? "bg-amber-400 text-stone-950 font-black"
+                                          : "bg-black/25 text-white font-black border border-white/20"
+                                        : isSelected
+                                        ? "bg-white/20 text-white"
+                                        : "bg-stone-100 text-stone-600 font-bold"
+                                    }`}>
+                                      {tab.count}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
 
@@ -3368,7 +3380,7 @@ export default function ExpensesModal({
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
                               <span>2. Método de Cobro y Acceso a Pedidos:</span>
                               <span className="text-[10px] font-bold lowercase text-stone-400">
-                                {cashMethodFilter === "all" ? "todos los métodos" : cashMethodFilter === "todos_pedidos" ? "todos los pedidos" : `solo ${cashMethodFilter}`}
+                                {cashMethodFilter === "all" ? "todos los métodos" : cashMethodFilter === "todos_pedidos" ? "pedidos por entregar" : `solo ${cashMethodFilter}`}
                               </span>
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -3377,31 +3389,43 @@ export default function ExpensesModal({
                                 { id: "efectivo", label: "Efectivo", icon: "💵", count: detailMethodCounts.efectivo, activeClass: "bg-gradient-to-r from-emerald-700 to-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-600/30" },
                                 { id: "tarjeta", label: "Tarjeta", icon: "💳", count: detailMethodCounts.tarjeta, activeClass: "bg-gradient-to-r from-blue-700 to-blue-800 text-white border-blue-900 ring-2 ring-blue-600/30" },
                                 { id: "transferencia", label: "Transf.", icon: "📱", count: detailMethodCounts.transferencia, activeClass: "bg-gradient-to-r from-purple-700 to-purple-800 text-white border-purple-900 ring-2 ring-purple-600/30" },
-                                { id: "todos_pedidos", label: "Todos los Pedidos", icon: "🎂", count: allHistoricalOrders.length, activeClass: "bg-gradient-to-r from-amber-600 to-amber-700 text-white border-amber-800 ring-2 ring-amber-500/30 shadow-md" },
-                              ].map((m) => (
-                                <button
-                                  key={m.id}
-                                  type="button"
-                                  onClick={() => handleSelectMethodFilter(m.id as any)}
-                                  className={`py-2 px-2.5 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
-                                    cashMethodFilter === m.id
-                                      ? `${m.activeClass} shadow-md`
-                                      : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-sm shrink-0">{m.icon}</span>
-                                    <span className="truncate">{m.label}</span>
-                                  </div>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${
-                                    cashMethodFilter === m.id
-                                      ? "bg-white/20 text-white"
-                                      : "bg-stone-100 text-stone-600"
-                                  }`}>
-                                    {m.count}
-                                  </span>
-                                </button>
-                              ))}
+                                { id: "todos_pedidos", label: "pedidos por entregar", icon: "📦", count: allHistoricalOrders.length, activeClass: "bg-gradient-to-r from-stone-950 via-amber-950 to-stone-950 text-amber-300 border-amber-400 ring-4 ring-amber-500/50 shadow-xl" },
+                              ].map((m) => {
+                                const isSpecial = m.id === "todos_pedidos";
+                                const isSelected = cashMethodFilter === m.id;
+                                return (
+                                  <button
+                                    key={m.id}
+                                    type="button"
+                                    onClick={() => handleSelectMethodFilter(m.id as any)}
+                                    className={`py-2 px-2.5 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
+                                      isSpecial
+                                        ? isSelected
+                                          ? `${m.activeClass} shadow-md`
+                                          : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white border-orange-600 shadow-md shadow-orange-500/30 ring-2 ring-orange-300/50 hover:brightness-110"
+                                        : isSelected
+                                        ? `${m.activeClass} shadow-md`
+                                        : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-sm shrink-0">{m.icon}</span>
+                                      <span className="truncate">{m.label}</span>
+                                    </div>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
+                                      isSpecial
+                                        ? isSelected
+                                          ? "bg-amber-400 text-stone-950 font-black"
+                                          : "bg-black/25 text-white font-black border border-white/20"
+                                        : isSelected
+                                        ? "bg-white/20 text-white"
+                                        : "bg-stone-100 text-stone-600 font-bold"
+                                    }`}>
+                                      {m.count}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
                         </div>
@@ -3418,7 +3442,7 @@ export default function ExpensesModal({
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h4 className="font-black text-amber-950 text-sm">
-                                  Historial y Pendientes para el Turno
+                                  Pedidos por Entregar para el Turno
                                 </h4>
                                 <span className="text-[10px] font-black uppercase bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md">
                                   Relevo de Caja

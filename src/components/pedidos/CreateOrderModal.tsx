@@ -562,7 +562,7 @@ export default function CreateOrderModal({
     });
   };
 
-  const handleSelectProduct = (product: Product) => {
+  const handleSelectProduct = (product: Product, keepOpen = true) => {
     handleAddProductFromCatalog(product);
     playScanBeep(true);
     setLastScannedAlert({
@@ -572,8 +572,10 @@ export default function CreateOrderModal({
       price: product.price,
       code: product.barcode || product.code || "",
     });
-    setBarcodeInput("");
-    setShowProductSuggestions(false);
+    if (!keepOpen) {
+      setBarcodeInput("");
+      setShowProductSuggestions(false);
+    }
     setTimeout(() => {
       setLastScannedAlert(null);
     }, 3500);
@@ -599,7 +601,7 @@ export default function CreateOrderModal({
     }
 
     if (matched) {
-      handleSelectProduct(matched);
+      handleSelectProduct(matched, false);
     } else {
       playScanBeep(false);
       setLastScannedAlert({
@@ -1237,6 +1239,11 @@ export default function CreateOrderModal({
                       setShowProductSuggestions(true);
                     }}
                     onFocus={() => setShowProductSuggestions(true)}
+                    onClick={() => {
+                      if (barcodeInput.trim()) {
+                        setShowProductSuggestions(true);
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -1274,39 +1281,72 @@ export default function CreateOrderModal({
 
               {/* Sugerencias flotantes en tiempo real del buscador */}
               {showProductSuggestions && productSuggestions.length > 0 && (
-                <div className="absolute z-30 top-full left-0 right-0 mt-1.5 bg-white border border-stone-200 rounded-xl shadow-2xl overflow-hidden divide-y divide-stone-100 max-h-56 overflow-y-auto animate-in fade-in-50 duration-150">
-                  <div className="px-3 py-1.5 bg-stone-100/90 text-[10px] font-black text-stone-600 uppercase tracking-wider flex items-center justify-between">
-                    <span>Resultados ({productSuggestions.length})</span>
-                    <span className="text-[9px] text-stone-500 font-normal">Clic para agregar al pedido</span>
+                <div className="absolute z-30 top-full left-0 right-0 mt-1.5 bg-white border border-stone-200 rounded-xl shadow-2xl overflow-hidden divide-y divide-stone-100 max-h-64 overflow-y-auto animate-in fade-in-50 duration-150">
+                  <div className="px-3 py-1.5 bg-stone-100 border-b border-stone-200 text-[10px] font-black text-stone-600 uppercase tracking-wider flex items-center justify-between sticky top-0 z-10">
+                    <div className="flex items-center gap-2">
+                      <span className="text-stone-800 font-black">Resultados ({productSuggestions.length})</span>
+                      <span className="text-[9px] text-stone-500 font-normal normal-case hidden sm:inline">
+                        • Clic en cada pan para agregarlo
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-stone-500 font-normal normal-case sm:hidden">
+                        Clic para agregar
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowProductSuggestions(false);
+                        }}
+                        className="p-1 -mr-1 text-stone-500 hover:text-rose-600 hover:bg-rose-100/70 rounded-md transition-colors cursor-pointer flex items-center gap-1 font-bold text-[10px] normal-case"
+                        title="Cerrar lista"
+                        aria-label="Cerrar lista de resultados"
+                      >
+                        <span className="text-stone-600 hover:text-rose-600 font-bold">Cerrar</span>
+                        <X className="w-3.5 h-3.5 text-stone-600 hover:text-rose-600" />
+                      </button>
+                    </div>
                   </div>
-                  {productSuggestions.map((prod) => (
-                    <button
-                      key={prod.id}
-                      type="button"
-                      onClick={() => handleSelectProduct(prod)}
-                      className="w-full px-3 py-2 text-left hover:bg-amber-50 flex items-center justify-between gap-3 text-xs cursor-pointer group transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-base shrink-0">{prod.icon || "🥖"}</span>
-                        <div className="min-w-0 truncate">
-                          <p className="font-bold text-stone-900 group-hover:text-amber-950 truncate">
-                            {prod.name}
-                          </p>
-                          <p className="text-[10px] text-stone-400 font-mono truncate">
-                            {prod.code ? `Cód: ${prod.code}` : ""} {prod.barcode ? `• Barcode: ${prod.barcode}` : ""}
-                          </p>
+                  {productSuggestions.map((prod) => {
+                    const itemInOrder = items.find((it) => it.productId === prod.id);
+                    return (
+                      <button
+                        key={prod.id}
+                        type="button"
+                        onClick={() => handleSelectProduct(prod, true)}
+                        className="w-full px-3 py-2 text-left hover:bg-amber-50 active:bg-amber-100 flex items-center justify-between gap-3 text-xs cursor-pointer group transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-base shrink-0">{prod.icon || "🥖"}</span>
+                          <div className="min-w-0 truncate">
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-stone-900 group-hover:text-amber-950 truncate">
+                                {prod.name}
+                              </p>
+                              {itemInOrder && (
+                                <span className="text-[9px] font-black text-amber-950 bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300 shrink-0">
+                                  {itemInOrder.quantity} en pedido
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-stone-400 font-mono truncate">
+                              {prod.code ? `Cód: ${prod.code}` : ""} {prod.barcode ? `• Barcode: ${prod.barcode}` : ""}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-black text-xs text-amber-950 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">
-                          {formatCurrency(prod.price)}
-                        </span>
-                        <span className="text-[11px] font-bold text-amber-800 bg-amber-50 group-hover:bg-amber-500 group-hover:text-stone-950 px-2 py-1 rounded-lg border border-amber-300 transition-colors flex items-center gap-0.5">
-                          <Plus className="w-3 h-3" /> Agregar
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-black text-xs text-amber-950 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">
+                            {formatCurrency(prod.price)}
+                          </span>
+                          <span className="text-[11px] font-bold text-amber-800 bg-amber-50 group-hover:bg-amber-500 group-hover:text-stone-950 px-2 py-1 rounded-lg border border-amber-300 transition-colors flex items-center gap-0.5">
+                            <Plus className="w-3 h-3" /> Agregar
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
