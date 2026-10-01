@@ -290,7 +290,7 @@ export default function OrderReceiptModal({ isOpen, onClose, order }: OrderRecei
                   <div className="flex justify-between">
                     <span>Método de anticipo:</span>
                     <span className="font-bold text-stone-800 uppercase">
-                      {order.paymentMethod === "transferencia" ? "Transferencia SPEI" : order.paymentMethod === "tarjeta" ? "Tarjeta en Terminal" : "Efectivo"}
+                      {order.paymentMethod === "transferencia" ? "Transferencia" : order.paymentMethod === "tarjeta" ? "Tarjeta en Terminal" : "Efectivo"}
                     </span>
                   </div>
                   {order.transferAccount && (

@@ -3315,7 +3315,7 @@ export default function POSPage() {
               {[
                 { id: "efectivo", label: "Efectivo", icon: DollarSign },
                 { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
-                { id: "transferencia", label: "SPEI", icon: Send },
+                { id: "transferencia", label: "Transferencia", icon: Send },
               ].map((m) => {
                 const Icon = m.icon;
                 const isSelected = paymentMethod === m.id;

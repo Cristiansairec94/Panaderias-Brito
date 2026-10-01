@@ -763,7 +763,7 @@ export default function BreadOrdersDrawer({
                     {[
                       { id: "efectivo", label: "Efectivo", icon: Banknote },
                       { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
-                      { id: "transferencia", label: "SPEI / Transf.", icon: Send },
+                      { id: "transferencia", label: "Transferencia", icon: Send },
                     ].map((m) => {
                       const Icon = m.icon;
                       const isSel = paymentMethod === m.id;

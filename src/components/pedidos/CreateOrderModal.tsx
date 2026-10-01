@@ -1718,7 +1718,7 @@ export default function CreateOrderModal({
                 {[
                   { id: "efectivo", label: "💵 Efectivo" },
                   { id: "tarjeta", label: "💳 Tarjeta" },
-                  { id: "transferencia", label: "📱 SPEI" },
+                  { id: "transferencia", label: "📱 Transferencia" },
                 ].map((m) => (
                   <button
                     key={m.id}
@@ -1748,7 +1748,7 @@ export default function CreateOrderModal({
                   </div>
                   <input
                     type="text"
-                    placeholder="Folio de rastreo SPEI / Referencia (Opcional)"
+                    placeholder="Folio de rastreo / Referencia de transferencia (Opcional)"
                     value={paymentReference}
                     onChange={(e) => setPaymentReference(e.target.value)}
                     className="w-full px-3 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-xs font-mono text-white placeholder:text-stone-500"

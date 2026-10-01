@@ -276,7 +276,7 @@ export default function OrderPaymentModal({
                     : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                <Store className="w-5 h-5 text-purple-600" /> SPEI
+                <Store className="w-5 h-5 text-purple-600" /> Transferencia
               </button>
             </div>
           </div>
