@@ -746,7 +746,12 @@ export default function ExpensesModal({
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos creados en el turno activo)
   const relevantOrders = useMemo(() => {
     const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
-    const sourceOrders = Array.isArray(orders) && orders.length > 0 ? orders : (internalOrders || []);
+    const rawList = Array.isArray(orders) && orders.length > 0 ? orders : (internalOrders || []);
+    const stored = getStoredOrders();
+    const sourceOrders = rawList.map((o) => {
+      const match = stored.find((s) => s.id === o.id || s.orderNumber === o.orderNumber);
+      return match || o;
+    });
     return sourceOrders.filter((o) => {
       if (!o) return false;
       if (o.status === "entregado" || o.status === "cancelado") return false;
@@ -767,7 +772,7 @@ export default function ExpensesModal({
       }
       return true;
     });
-  }, [orders, internalOrders, branchId, shiftStartBoundary, shiftVersion]);
+  }, [orders, internalOrders, branchId, shiftStartBoundary, shiftVersion, ordersVersion]);
 
   const effectiveOrders = relevantOrders;
 
@@ -921,13 +926,16 @@ export default function ExpensesModal({
   // Todos los pedidos especiales del turno activo (anticipos y liquidaciones de todos los métodos, excluyendo entregados/bajas)
   const allShiftOrdersList = useMemo(() => {
     const ordersMap = new Map<string, CustomOrder>();
+    const storedAll = getStoredOrders();
 
     // 1. Pedidos desde effectiveOrders
     effectiveOrders.forEach((o) => {
-      if (o.status === "entregado" || o.status === "cancelado") return;
-      const hasDeposit = (Number(o.deposit) || 0) > 0 || (Number(o.total) || 0) > 0;
+      if (!o) return;
+      const latest = storedAll.find((sto) => sto.id === o.id || sto.orderNumber === o.orderNumber) || o;
+      if (latest.status === "entregado" || latest.status === "cancelado") return;
+      const hasDeposit = (Number(latest.deposit) || 0) > 0 || (Number(latest.total) || 0) > 0;
       if (hasDeposit) {
-        ordersMap.set(o.orderNumber || o.id, o);
+        ordersMap.set(latest.orderNumber || latest.id, latest);
       }
     });
 
@@ -936,8 +944,12 @@ export default function ExpensesModal({
       if (s.isCustomOrder) {
         const orderKey = s.orderNumber || s.id;
         // Si ya está entregado o cancelado en el almacén de pedidos, no agregarlo a la lista de pedidos
-        const storedMatch = getStoredOrders().find((ord) => ord.id === s.id || ord.orderNumber === s.orderNumber);
+        const storedMatch = storedAll.find((ord) => ord.id === s.id || ord.orderNumber === s.orderNumber);
         if (storedMatch && (storedMatch.status === "entregado" || storedMatch.status === "cancelado")) {
+          return;
+        }
+        if (storedMatch) {
+          ordersMap.set(orderKey, storedMatch);
           return;
         }
         if (!ordersMap.has(orderKey)) {
@@ -975,7 +987,7 @@ export default function ExpensesModal({
     });
 
     return Array.from(ordersMap.values());
-  }, [effectiveOrders, effectiveSales]);
+  }, [effectiveOrders, effectiveSales, ordersVersion]);
 
   // Listados específicos en efectivo para compatibilidad
   const cashSalesList = useMemo(() => {
@@ -1930,14 +1942,27 @@ export default function ExpensesModal({
                 <span>Detalles</span>
               </button>
 
-              {order.remainingBalance > 0 && onSelectOrderForPayment && (
+              {order.remainingBalance > 0 ? (
+                onSelectOrderForPayment && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectOrderForPayment(order)}
+                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
+                    title="Cobrar saldo restante de este pedido"
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span>Cobrar</span>
+                  </button>
+                )
+              ) : (
                 <button
                   type="button"
-                  onClick={() => onSelectOrderForPayment(order)}
-                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95"
-                  title="Cobrar saldo restante de este pedido"
+                  onClick={() => handleDeliverOrder(order)}
+                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
+                  title="Marcar como entregado (se archivará en el historial directo de pedidos)"
                 >
-                  Cobrar
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Entregar</span>
                 </button>
               )}
 
@@ -4043,12 +4068,12 @@ export default function ExpensesModal({
                                       </span>
                                       <span
                                         className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                                          order.paymentStatus === "liquidado"
+                                          order.paymentStatus === "liquidado" || order.remainingBalance <= 0
                                             ? "bg-emerald-100 text-emerald-900 border-emerald-300"
                                             : "bg-amber-100 text-amber-900 border-amber-300"
                                         }`}
                                       >
-                                        {order.paymentStatus === "liquidado" ? "✅ Liquidado" : "💵 Con Anticipo"}
+                                        {order.paymentStatus === "liquidado" || order.remainingBalance <= 0 ? "✅ Liquidado" : "💵 Con Anticipo"}
                                       </span>
                                       <span className="text-[11px] font-black text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                                         🎂 {orderPieces} {orderPieces === 1 ? "artículo" : "artículos"}
@@ -4071,21 +4096,38 @@ export default function ExpensesModal({
                                       </span>
                                       <span className="text-[10px] text-stone-400 font-bold block">
                                         Total: {formatCurrency(order.total)}
-                                        {order.remainingBalance > 0 && ` • Resta: ${formatCurrency(order.remainingBalance)}`}
+                                        {order.remainingBalance > 0 ? (
+                                          <span className="text-rose-600 font-black"> • Resta: {formatCurrency(order.remainingBalance)}</span>
+                                        ) : (
+                                          <span className="text-emerald-700 font-bold"> • ✅ 100% Pagado</span>
+                                        )}
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                      {onSelectOrderForPayment && order.remainingBalance > 0 && (
+                                      {order.remainingBalance > 0 ? (
+                                        onSelectOrderForPayment && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              handleCloseDetailModal();
+                                              onSelectOrderForPayment(order);
+                                            }}
+                                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
+                                            title="Cobrar saldo restante"
+                                          >
+                                            <DollarSign className="w-3.5 h-3.5" />
+                                            <span>Cobrar</span>
+                                          </button>
+                                        )
+                                      ) : (
                                         <button
                                           type="button"
-                                          onClick={() => {
-                                            handleCloseDetailModal();
-                                            onSelectOrderForPayment(order);
-                                          }}
-                                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
-                                          title="Cobrar saldo restante"
+                                          onClick={() => handleDeliverOrder(order)}
+                                          className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xs rounded-xl transition-all shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-blue-400/40"
+                                          title="Marcar como entregado (se archivará en el historial de pedidos)"
                                         >
-                                          Cobrar
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-200" />
+                                          <span>Entregar</span>
                                         </button>
                                       )}
                                       {/* 1. Botón Detalles Completos */}

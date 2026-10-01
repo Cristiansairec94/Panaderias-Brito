@@ -751,6 +751,7 @@ export default function POSPage() {
   const [specialOrderInitialItems, setSpecialOrderInitialItems] = useState<OrderItem[]>([]);
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
+  const [reopenExpensesAfterPayment, setReopenExpensesAfterPayment] = useState(false);
 
   useEffect(() => {
     const handleOrdersUpdated = () => {
@@ -3826,6 +3827,7 @@ export default function POSPage() {
           }}
           onSelectOrderForPayment={(order) => {
             setShowExpensesModal(false);
+            setReopenExpensesAfterPayment(true);
             setSelectedOrderForPayment(order);
           }}
           cashSalesTotal={totalCashSales}
@@ -3949,7 +3951,13 @@ export default function POSPage() {
       {/* Modal de Liquidación / Cobro de Saldo de Pedido Especial */}
       <OrderPaymentModal
         isOpen={Boolean(selectedOrderForPayment)}
-        onClose={() => setSelectedOrderForPayment(null)}
+        onClose={() => {
+          setSelectedOrderForPayment(null);
+          if (reopenExpensesAfterPayment) {
+            setShowExpensesModal(true);
+            setReopenExpensesAfterPayment(false);
+          }
+        }}
         order={selectedOrderForPayment}
         onPaymentSuccess={() => {
           try {
@@ -3968,9 +3976,9 @@ export default function POSPage() {
             senderName: "💰 Pedido Liquidado",
             senderAvatar: "🥖",
             badgeIcon: "dinero",
-            title: "Saldo Cobrado & Pedido Entregado",
+            title: "Saldo Cobrado con Éxito",
             highlightText: "Ingreso registrado en caja",
-            description: "El saldo restante ha sido cobrado y sumado al turno actual.",
+            description: "El saldo restante ha sido cobrado. El pedido sigue listo en sucursal para entregarse.",
             category: "caja",
           });
         }}
