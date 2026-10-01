@@ -19,24 +19,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading || !user) return;
 
+    const defaultRoute = getDefaultRouteForUser(user);
+
     try {
       const sessionActive = sessionStorage.getItem("brito_session_active");
       if (!sessionActive) {
-        // Al inicio en el sistema: marcar sesión como activa y empezar siempre en el Dashboard (/)
         sessionStorage.setItem("brito_session_active", "true");
-        if (pathname !== "/") {
-          router.replace("/");
+        if (pathname !== defaultRoute) {
+          router.replace(defaultRoute);
+          return;
         }
       }
     } catch (e) {
       console.error("Error accessing sessionStorage:", e);
     }
-  }, [user, isLoading, pathname, router]);
 
+    // Si está en "/" pero no tiene permiso para el Dashboard, redirigir a su ruta por defecto (ej. /pos)
+    if (pathname === "/" && canAccessRoute && !canAccessRoute("/")) {
+      router.replace(defaultRoute);
+    }
+  }, [user, isLoading, pathname, router, canAccessRoute, getDefaultRouteForUser]);
+
+  const targetDefault = user ? getDefaultRouteForUser(user) : "/";
   const isPendingInitialRedirect =
     typeof window !== "undefined" &&
     !sessionStorage.getItem("brito_session_active") &&
-    pathname !== "/";
+    pathname !== targetDefault;
 
   if (isLoading || (user && isPendingInitialRedirect)) {
     return (

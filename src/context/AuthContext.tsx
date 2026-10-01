@@ -245,8 +245,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           sanitized[key] = {
             ...defaultRolePerms,
             ...parsed[key],
-            canAccessDashboard: true,
           };
+          if (key === "admin") {
+            sanitized[key].canAccessDashboard = true;
+          }
         });
         setRolePermissionsMap((prev) => ({
           ...prev,
@@ -278,7 +280,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Compute active permissions combining role defaults (dynamically configured) and user overrides
   const permissions: RolePermissions = user
-    ? { ...(rolePermissionsMap[user.role] || ROLE_PERMISSIONS[user.role] || ROLE_PERMISSIONS.cajero), ...(user.permissions || {}), canAccessDashboard: true }
+    ? {
+        ...(rolePermissionsMap[user.role] || ROLE_PERMISSIONS[user.role] || ROLE_PERMISSIONS.cajero),
+        ...(user.permissions || {}),
+        ...(user.role === "admin" ? { canAccessDashboard: true } : {}),
+      }
     : {
         canAccessDashboard: false,
         canAccessPos: false,
@@ -328,10 +334,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const getDefaultRouteForUser = useCallback(
-    (_targetUser?: User | null): string => {
-      return "/";
+    (targetUser?: User | null): string => {
+      const u = targetUser !== undefined ? targetUser : user;
+      if (!u) return "/";
+      if (u.role === "admin") return "/";
+
+      const effective = {
+        ...(rolePermissionsMap[u.role] || ROLE_PERMISSIONS[u.role] || ROLE_PERMISSIONS.cajero),
+        ...(u.permissions || {}),
+      };
+
+      if (effective.canAccessDashboard) {
+        return "/";
+      }
+      if (effective.canAccessPos) {
+        return "/pos";
+      }
+      if (effective.canAccessPedidos) {
+        return "/pedidos";
+      }
+      if (effective.canAccessCaja) {
+        return "/caja";
+      }
+      if (effective.canAccessClientes) {
+        return "/clientes";
+      }
+      if (effective.canAccessProductos) {
+        return "/productos";
+      }
+      if (effective.canAccessIngresos) {
+        return "/ingresos";
+      }
+      if (effective.canAccessGastos) {
+        return "/gastos";
+      }
+      if (effective.canAccessFinanzas) {
+        return "/finanzas";
+      }
+      if (effective.canAccessSucursales) {
+        return "/sucursales";
+      }
+      if (effective.canAccessConfiguracion) {
+        return "/configuracion";
+      }
+
+      return "/pos";
     },
-    []
+    [user, rolePermissionsMap]
   );
 
   const login = (identifier: string, pass: string, rememberMe: boolean = true) => {
