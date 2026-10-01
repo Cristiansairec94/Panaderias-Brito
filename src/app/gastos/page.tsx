@@ -858,11 +858,13 @@ export default function GastosPage() {
     try {
       const supabase = createClient();
       await supabase.from("cash_movements").insert({
+        id: nuevoGasto.id,
         type: "salida",
         category: form.categoriaId,
         amount: nuevoGasto.amount,
         reason: `[${nuevoGasto.id}] ${nuevoGasto.categoryLabel}: ${nuevoGasto.description} (${nuevoGasto.branchName})`,
         authorized_by: nuevoGasto.cashier,
+        branch_id: nuevoGasto.branchId || "branch-matriz",
       });
     } catch (err) {
       console.log("Offline mode, saved locally", err);

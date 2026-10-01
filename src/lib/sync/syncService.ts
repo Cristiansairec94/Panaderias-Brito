@@ -216,16 +216,24 @@ export async function processSyncQueue(): Promise<{
   for (const item of queue) {
     try {
       if (item.type === "sale") {
-        const { total, paymentMethod, cashier, items } = item.data;
+        const { saleId, date, total, paymentMethod, cashier, items, customerId, customerName, customerType, branchId } = item.data;
+        const sId = saleId || `POS-${Date.now().toString().slice(-6)}`;
+        const sDate = date || item.createdAt || new Date().toISOString();
 
         // 1. Intentar insertar encabezado de venta en Supabase
         const { data: saleData, error: saleErr } = await supabase
           .from("sales")
-          .insert({
+          .upsert({
+            id: sId,
+            date: sDate,
             total: Number(total),
             payment_method: paymentMethod || "efectivo",
             cashier: cashier || "Caja Mostrador",
-          })
+            customer_id: customerId && !customerId.startsWith("cli-") ? customerId : null,
+            customer_name: customerName || "Público General",
+            customer_type: customerType || "general",
+            branch_id: branchId || item.branchId || "branch-matriz",
+          }, { onConflict: "id" })
           .select()
           .single();
 
@@ -278,13 +286,15 @@ export async function processSyncQueue(): Promise<{
 
         syncedCount++;
       } else if (item.type === "expense") {
-        const { amount, category, description, cashier } = item.data;
-        const { error: expErr } = await supabase.from("cash_expenses").insert({
+        const { id: expId, amount, category, description, cashier, branchId } = item.data || {};
+        const { error: expErr } = await supabase.from("cash_expenses").upsert({
+          id: expId || item.id || `exp-${Date.now()}`,
           amount: Number(amount),
           category: category || "general",
           description: description || "Gasto de caja",
           cashier: cashier || "Don Toño Brito",
-        });
+          branch_id: branchId || item.branchId || "branch-matriz",
+        }, { onConflict: "id" });
 
         if (expErr && (expErr.code === "PGRST205" || expErr.message?.includes("schema cache"))) {
           archiveOfflineItem(item, "Gasto archivado en disco local");
@@ -295,14 +305,16 @@ export async function processSyncQueue(): Promise<{
         if (expErr) throw new Error(expErr.message);
         syncedCount++;
       } else if (item.type === "income") {
-        const { amount, category, concept, cashier } = item.data;
-        const { error: incErr } = await supabase.from("cash_movements").insert({
+        const { id: incId, amount, category, concept, cashier, branchId } = item.data || {};
+        const { error: incErr } = await supabase.from("cash_movements").upsert({
+          id: incId || item.id || `mov-${Date.now()}`,
           type: "entrada",
           category: category || "general",
           amount: Number(amount),
           reason: concept || "Entrada de caja",
           authorized_by: cashier || "Don Toño Brito",
-        });
+          branch_id: branchId || item.branchId || "branch-matriz",
+        }, { onConflict: "id" });
 
         if (incErr && (incErr.code === "PGRST205" || incErr.message?.includes("schema cache"))) {
           archiveOfflineItem(item, "Entrada archivada en disco local");

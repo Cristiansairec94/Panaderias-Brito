@@ -1,5 +1,6 @@
 import { Product, Sale } from "@/types";
 import { formatDateTimeSafe } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 export function calculateEan13CheckDigit(digits12: string): number {
   const d = digits12.replace(/\D/g, "").slice(0, 12);
@@ -626,14 +627,30 @@ export function saveStoredProducts(products: Product[]): void {
 
 export function updateProductStock(id: string, newStock: number): void {
   const current = getStoredProducts();
-  const updated = current.map((p) => (p.id === id ? { ...p, stock: Math.max(0, newStock) } : p));
+  const safeStock = Math.max(0, newStock);
+  const updated = current.map((p) => (p.id === id ? { ...p, stock: safeStock } : p));
   saveStoredProducts(updated);
+
+  if (typeof window !== "undefined") {
+    try {
+      const supabase = createClient();
+      supabase.from("products").update({ stock: safeStock }).eq("id", id).then();
+    } catch {}
+  }
 }
 
 export function updateProductPrice(id: string, newPrice: number): void {
   const current = getStoredProducts();
-  const updated = current.map((p) => (p.id === id ? { ...p, price: Math.max(0, newPrice) } : p));
+  const safePrice = Math.max(0, newPrice);
+  const updated = current.map((p) => (p.id === id ? { ...p, price: safePrice } : p));
   saveStoredProducts(updated);
+
+  if (typeof window !== "undefined") {
+    try {
+      const supabase = createClient();
+      supabase.from("products").update({ price: safePrice }).eq("id", id).then();
+    } catch {}
+  }
 }
 
 export function addProduct(product: Omit<Product, "id">): Product {
@@ -647,6 +664,32 @@ export function addProduct(product: Omit<Product, "id">): Product {
     id: `prod-${Date.now()}`,
   };
   saveStoredProducts([...current, newProduct]);
+
+  if (typeof window !== "undefined") {
+    try {
+      const supabase = createClient();
+      supabase.from("products").upsert({
+        id: newProduct.id,
+        code: newProduct.code,
+        barcode: newProduct.barcode,
+        name: newProduct.name,
+        price: Number(newProduct.price),
+        category: newProduct.category,
+        image: newProduct.image || null,
+        icon: newProduct.icon || "🥖",
+        stock: Number(newProduct.stock) || 0,
+        description: newProduct.description || null,
+        unit: newProduct.unit || "pieza",
+        has_iva: !!newProduct.hasIva,
+        iva_rate: Number(newProduct.ivaRate) || 0,
+        has_ieps: !!newProduct.hasIeps,
+        ieps_rate: Number(newProduct.iepsRate) || 0,
+        tax_included: newProduct.taxIncluded !== undefined ? newProduct.taxIncluded : true,
+        is_active: true,
+      }, { onConflict: "id" }).then();
+    } catch {}
+  }
+
   return newProduct;
 }
 
@@ -665,11 +708,83 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
     return p;
   });
   saveStoredProducts(updated);
+
+  if (typeof window !== "undefined" && updatedItem) {
+    try {
+      const supabase = createClient();
+      const payload: any = {};
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.price !== undefined) payload.price = Number(updates.price);
+      if (updates.category !== undefined) payload.category = updates.category;
+      if (updates.code !== undefined) payload.code = updates.code;
+      if (updates.barcode !== undefined) payload.barcode = updates.barcode;
+      if (updates.stock !== undefined) payload.stock = Number(updates.stock);
+      if (updates.image !== undefined) payload.image = updates.image;
+      if (updates.icon !== undefined) payload.icon = updates.icon;
+      if (updates.description !== undefined) payload.description = updates.description;
+      if (updates.unit !== undefined) payload.unit = updates.unit;
+      if (updates.hasIva !== undefined) payload.has_iva = !!updates.hasIva;
+      if (updates.ivaRate !== undefined) payload.iva_rate = Number(updates.ivaRate);
+      if (updates.hasIeps !== undefined) payload.has_ieps = !!updates.hasIeps;
+      if (updates.iepsRate !== undefined) payload.ieps_rate = Number(updates.iepsRate);
+      if (updates.taxIncluded !== undefined) payload.tax_included = updates.taxIncluded;
+
+      if (Object.keys(payload).length > 0) {
+        supabase.from("products").update(payload).eq("id", id).then();
+      }
+    } catch {}
+  }
+
   return updatedItem;
 }
 
 export function deleteProduct(id: string): void {
   const current = getStoredProducts();
   saveStoredProducts(current.filter((p) => p.id !== id));
+
+  if (typeof window !== "undefined") {
+    try {
+      const supabase = createClient();
+      supabase.from("products").update({ is_active: false }).eq("id", id).then();
+    } catch {}
+  }
+}
+
+export async function fetchProductsFromDb(): Promise<Product[]> {
+  if (typeof window === "undefined") return getStoredProducts();
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("is_active", true)
+      .order("name");
+
+    if (data && data.length > 0 && !error) {
+      const mapped: Product[] = data.map((p: any) => ({
+        id: p.id,
+        code: p.code || `PRD-${p.id}`,
+        barcode: p.barcode,
+        name: p.name,
+        price: Number(p.price),
+        category: p.category,
+        icon: p.icon || "🥖",
+        stock: typeof p.stock === "number" ? p.stock : 0,
+        description: p.description,
+        image: p.image,
+        unit: p.unit || "pieza",
+        hasIva: !!p.has_iva,
+        ivaRate: Number(p.iva_rate) || 0,
+        hasIeps: !!p.has_ieps,
+        iepsRate: Number(p.ieps_rate) || 0,
+        taxIncluded: p.tax_included !== undefined ? p.tax_included : true,
+      }));
+      saveStoredProducts(mapped);
+      return mapped;
+    }
+  } catch (e) {
+    console.warn("fetchProductsFromDb fallback to local:", e);
+  }
+  return getStoredProducts();
 }
 

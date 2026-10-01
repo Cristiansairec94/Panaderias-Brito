@@ -43,8 +43,10 @@ import {
   generateProductCode, 
   generateProductBarcode,
   getStoredCategories,
+  fetchProductsFromDb,
   ProductCategory
 } from "@/lib/products";
+import { createClient } from "@/lib/supabase/client";
 
 export default function ProductosPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -102,15 +104,51 @@ export default function ProductosPage() {
     };
     load();
 
+    // Sincronizar catálogo real desde Supabase
+    fetchProductsFromDb().then((prods) => {
+      if (prods && prods.length > 0) {
+        setProducts(prods);
+      }
+    });
+
     const handleUpdate = () => {
       load();
     };
 
     window.addEventListener("brito_products_updated", handleUpdate);
     window.addEventListener("brito_categories_updated", handleUpdate);
+
+    // Suscripción en tiempo real de Supabase para cambios de productos y precios
+    let channel: any = null;
+    try {
+      const supabase = createClient();
+      channel = supabase
+        .channel("products_realtime_sync")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "products" },
+          () => {
+            fetchProductsFromDb().then((prods) => {
+              if (prods && prods.length > 0) {
+                setProducts(prods);
+              }
+            });
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn("Could not subscribe to products realtime channel:", e);
+    }
+
     return () => {
       window.removeEventListener("brito_products_updated", handleUpdate);
       window.removeEventListener("brito_categories_updated", handleUpdate);
+      if (channel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(channel);
+        } catch {}
+      }
     };
   }, []);
 

@@ -1546,19 +1546,23 @@ export default function ExpensesModal({
         const { error: expError } = await supabase
           .from("cash_expenses")
           .insert({
+            id: newExpense.id,
             amount: newExpense.amount,
             category: newExpense.category,
             description: newExpense.description,
             cashier: newExpense.cashier,
+            branch_id: branchId || "branch-matriz",
           });
 
         if (!expError) {
           await supabase.from("cash_movements").insert({
+            id: `mov-${newExpense.id}`,
             type: "salida",
             category: newExpense.category,
             amount: newExpense.amount,
             reason: newExpense.description,
             authorized_by: isOwnerWithdrawal ? (authorizedBy.trim() || "Don Toño Brito") : cashierName,
+            branch_id: branchId || "branch-matriz",
           });
           savedToDb = true;
         }
@@ -1656,11 +1660,13 @@ export default function ExpensesModal({
       try {
         const supabase = createClient();
         const { error: incError } = await supabase.from("cash_movements").insert({
+          id: newIncome.id,
           type: "entrada",
           category: newIncome.category,
           amount: newIncome.amount,
           reason: newIncome.concept,
           authorized_by: cashierName,
+          branch_id: branchId || "branch-matriz",
         });
         if (!incError) {
           savedIncomeToDb = true;

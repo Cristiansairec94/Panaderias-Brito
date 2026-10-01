@@ -2,19 +2,28 @@
 -- PANADERÍA BRITO - SCHEMA MAESTRO DE BASE DE DATOS SUPABASE
 -- Compatible con Vercel, POS en tiempo real y Celular
 -- =========================================================
+-- NOTA IMPORTANTE:
+-- Para ejecutar este script en Supabase:
+-- 1. Abre el "SQL Editor" en Supabase.
+-- 2. Crea una consulta nueva ("New query").
+-- 3. Borra cualquier texto que haya en el editor.
+-- 4. Pega TODO este contenido (Ctrl + A -> Pegar).
+-- 5. Asegúrate de NO tener nada seleccionado con el ratón.
+-- 6. Presiona el botón verde "RUN".
+-- =========================================================
 
 -- 1. EXTENSIÓN PARA UUIDS
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- 2. TABLA DE CATEGORÍAS
-CREATE TABLE IF NOT EXISTS categories (
+CREATE TABLE IF NOT EXISTS public.categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   icon TEXT DEFAULT '🥖',
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
-INSERT INTO categories (id, name, icon) VALUES
+INSERT INTO public.categories (id, name, icon) VALUES
   ('pan_dulce', 'Pan Dulce Tradicional', '🥖'),
   ('pan_blanco', 'Bolillo & Telera', '🍞'),
   ('pasteleria', 'Pastelería & Pays', '🍰'),
@@ -24,14 +33,39 @@ INSERT INTO categories (id, name, icon) VALUES
   ('materia_prima', 'Materia Prima', '🌾')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon = EXCLUDED.icon;
 
--- 3. TABLA DE PRODUCTOS
-CREATE TABLE IF NOT EXISTS products (
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_categories" ON public.categories;
+CREATE POLICY "anon_categories" ON public.categories FOR ALL USING (true) WITH CHECK (true);
+
+-- 3. TABLA DE SUCURSALES
+CREATE TABLE IF NOT EXISTS public.branches (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  short_name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  phone TEXT,
+  is_active BOOLEAN DEFAULT true NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+INSERT INTO public.branches (id, name, short_name, address, phone) VALUES
+  ('branch-matriz', 'Sucursal Matriz (Centro)', 'Matriz', 'Av. Hidalgo #120, Centro Histórico', '55 1234 5678'),
+  ('branch-sanjuan', 'Sucursal San Juan', 'San Juan', 'Calle Morelos #45, Col. San Juan', '55 8765 4321'),
+  ('branch-angeles', 'Sucursal Los Ángeles', 'Los Ángeles', 'Calz. Guadalupe #890, Los Ángeles', '55 4321 8765')
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.branches ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_branches" ON public.branches;
+CREATE POLICY "anon_branches" ON public.branches FOR ALL USING (true) WITH CHECK (true);
+
+-- 4. TABLA DE PRODUCTOS
+CREATE TABLE IF NOT EXISTS public.products (
   id TEXT PRIMARY KEY,
   code TEXT,
   barcode TEXT,
   name TEXT NOT NULL,
   price NUMERIC(10, 2) NOT NULL,
-  category TEXT NOT NULL REFERENCES categories(id) ON UPDATE CASCADE,
+  category TEXT NOT NULL REFERENCES public.categories(id) ON UPDATE CASCADE,
   image TEXT,
   icon TEXT DEFAULT '🥖',
   stock INTEGER DEFAULT 0 NOT NULL,
@@ -46,25 +80,12 @@ CREATE TABLE IF NOT EXISTS products (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 4. TABLA DE SUCURSALES
-CREATE TABLE IF NOT EXISTS branches (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  short_name TEXT NOT NULL,
-  address TEXT NOT NULL,
-  phone TEXT,
-  is_active BOOLEAN DEFAULT true NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-INSERT INTO branches (id, name, short_name, address, phone) VALUES
-  ('branch-matriz', 'Sucursal Matriz (Centro)', 'Matriz', 'Av. Hidalgo #120, Centro Histórico', '55 1234 5678'),
-  ('branch-sanjuan', 'Sucursal San Juan', 'San Juan', 'Calle Morelos #45, Col. San Juan', '55 8765 4321'),
-  ('branch-angeles', 'Sucursal Los Ángeles', 'Los Ángeles', 'Calz. Guadalupe #890, Los Ángeles', '55 4321 8765')
-ON CONFLICT (id) DO NOTHING;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_products" ON public.products;
+CREATE POLICY "anon_products" ON public.products FOR ALL USING (true) WITH CHECK (true);
 
 -- 5. TABLA DE CLIENTES Y MAYORISTAS
-CREATE TABLE IF NOT EXISTS customers (
+CREATE TABLE IF NOT EXISTS public.customers (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   phone TEXT,
@@ -81,8 +102,12 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_customers" ON public.customers;
+CREATE POLICY "anon_customers" ON public.customers FOR ALL USING (true) WITH CHECK (true);
+
 -- 6. TABLA DE VENTAS (TICKETS POS)
-CREATE TABLE IF NOT EXISTS sales (
+CREATE TABLE IF NOT EXISTS public.sales (
   id TEXT PRIMARY KEY,
   date TEXT NOT NULL,
   total NUMERIC(10, 2) NOT NULL,
@@ -102,10 +127,14 @@ CREATE TABLE IF NOT EXISTS sales (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_sales" ON public.sales;
+CREATE POLICY "anon_sales" ON public.sales FOR ALL USING (true) WITH CHECK (true);
+
 -- 7. TABLA DE PARTIDAS DE VENTA
-CREATE TABLE IF NOT EXISTS sale_items (
+CREATE TABLE IF NOT EXISTS public.sale_items (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  sale_id TEXT REFERENCES sales(id) ON DELETE CASCADE,
+  sale_id TEXT REFERENCES public.sales(id) ON DELETE CASCADE,
   product_id TEXT,
   product_name TEXT NOT NULL,
   quantity NUMERIC(10, 2) NOT NULL,
@@ -113,8 +142,12 @@ CREATE TABLE IF NOT EXISTS sale_items (
   subtotal NUMERIC(10, 2) NOT NULL
 );
 
+ALTER TABLE public.sale_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_sale_items" ON public.sale_items;
+CREATE POLICY "anon_sale_items" ON public.sale_items FOR ALL USING (true) WITH CHECK (true);
+
 -- 8. TABLA DE ENCARGOS Y PEDIDOS DE PASTELERÍA
-CREATE TABLE IF NOT EXISTS custom_orders (
+CREATE TABLE IF NOT EXISTS public.custom_orders (
   id TEXT PRIMARY KEY,
   order_number TEXT UNIQUE NOT NULL,
   customer_id TEXT,
@@ -142,8 +175,12 @@ CREATE TABLE IF NOT EXISTS custom_orders (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+ALTER TABLE public.custom_orders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_orders" ON public.custom_orders;
+CREATE POLICY "anon_orders" ON public.custom_orders FOR ALL USING (true) WITH CHECK (true);
+
 -- 9. TABLA DE TURNOS Y ARQUEOS DE CAJA
-CREATE TABLE IF NOT EXISTS cash_shifts (
+CREATE TABLE IF NOT EXISTS public.cash_shifts (
   id TEXT PRIMARY KEY,
   shift_name TEXT NOT NULL,
   cashier_name TEXT NOT NULL,
@@ -163,8 +200,12 @@ CREATE TABLE IF NOT EXISTS cash_shifts (
   notes TEXT
 );
 
+ALTER TABLE public.cash_shifts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_cash_shifts" ON public.cash_shifts;
+CREATE POLICY "anon_cash_shifts" ON public.cash_shifts FOR ALL USING (true) WITH CHECK (true);
+
 -- 10. TABLA DE MOVIMIENTOS DE CAJA (GASTOS E INGRESOS)
-CREATE TABLE IF NOT EXISTS cash_movements (
+CREATE TABLE IF NOT EXISTS public.cash_movements (
   id TEXT PRIMARY KEY,
   shift_id TEXT,
   type TEXT NOT NULL, -- 'entrada', 'salida'
@@ -177,8 +218,12 @@ CREATE TABLE IF NOT EXISTS cash_movements (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+ALTER TABLE public.cash_movements ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_cash_movements" ON public.cash_movements;
+CREATE POLICY "anon_cash_movements" ON public.cash_movements FOR ALL USING (true) WITH CHECK (true);
+
 -- 11. TABLA DE GASTOS RÁPIDOS DE CAJA
-CREATE TABLE IF NOT EXISTS cash_expenses (
+CREATE TABLE IF NOT EXISTS public.cash_expenses (
   id TEXT PRIMARY KEY,
   amount NUMERIC(10, 2) NOT NULL,
   category TEXT NOT NULL,
@@ -188,8 +233,12 @@ CREATE TABLE IF NOT EXISTS cash_expenses (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+ALTER TABLE public.cash_expenses ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_expenses" ON public.cash_expenses;
+CREATE POLICY "anon_expenses" ON public.cash_expenses FOR ALL USING (true) WITH CHECK (true);
+
 -- 12. TABLA DE INVENTARIO Y MATERIA PRIMA
-CREATE TABLE IF NOT EXISTS inventory_items (
+CREATE TABLE IF NOT EXISTS public.inventory_items (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   unit TEXT NOT NULL,
@@ -201,8 +250,12 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+ALTER TABLE public.inventory_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_inventory" ON public.inventory_items;
+CREATE POLICY "anon_inventory" ON public.inventory_items FOR ALL USING (true) WITH CHECK (true);
+
 -- 13. TABLA DE MOVIMIENTOS DE INVENTARIO
-CREATE TABLE IF NOT EXISTS inventory_movements (
+CREATE TABLE IF NOT EXISTS public.inventory_movements (
   id TEXT PRIMARY KEY,
   item_id TEXT,
   item_name TEXT NOT NULL,
@@ -215,48 +268,6 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- =========================================================
--- HABILITAR ROW LEVEL SECURITY (RLS) Y POLÍTICAS DE ACCESO
--- =========================================================
-ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sale_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE custom_orders ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cash_shifts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cash_movements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cash_expenses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE inventory_movements ENABLE ROW LEVEL SECURITY;
-
--- Políticas de lectura y escritura para clientes autorizados
-DO $$ 
-BEGIN
-  DROP POLICY IF EXISTS "anon_categories" ON categories;
-  DROP POLICY IF EXISTS "anon_products" ON products;
-  DROP POLICY IF EXISTS "anon_branches" ON branches;
-  DROP POLICY IF EXISTS "anon_customers" ON customers;
-  DROP POLICY IF EXISTS "anon_sales" ON sales;
-  DROP POLICY IF EXISTS "anon_sale_items" ON sale_items;
-  DROP POLICY IF EXISTS "anon_orders" ON custom_orders;
-  DROP POLICY IF EXISTS "anon_cash_shifts" ON cash_shifts;
-  DROP POLICY IF EXISTS "anon_cash_movements" ON cash_movements;
-  DROP POLICY IF EXISTS "anon_expenses" ON cash_expenses;
-  DROP POLICY IF EXISTS "anon_inventory" ON inventory_items;
-  DROP POLICY IF EXISTS "anon_inventory_mov" ON inventory_movements;
-END $$;
-
-CREATE POLICY "anon_categories" ON categories FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_products" ON products FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_branches" ON branches FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_customers" ON customers FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_sales" ON sales FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_sale_items" ON sale_items FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_orders" ON custom_orders FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_cash_shifts" ON cash_shifts FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_cash_movements" ON cash_movements FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_expenses" ON cash_expenses FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_inventory" ON inventory_items FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "anon_inventory_mov" ON inventory_movements FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE public.inventory_movements ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_inventory_mov" ON public.inventory_movements;
+CREATE POLICY "anon_inventory_mov" ON public.inventory_movements FOR ALL USING (true) WITH CHECK (true);

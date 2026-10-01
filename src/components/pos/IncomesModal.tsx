@@ -110,6 +110,7 @@ export default function IncomesModal({
     try {
       const supabase = createClient();
       await supabase.from("cash_movements").insert({
+        id: newIncome.id,
         type: "entrada",
         category: newIncome.category,
         amount: newIncome.amount,

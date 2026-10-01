@@ -52,7 +52,7 @@ import {
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
+import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb } from "@/lib/products";
 import { 
   DEFAULT_GENERAL_CUSTOMER, 
   getStoredCustomers, 
@@ -1358,6 +1358,41 @@ export default function POSPage() {
       }
     }
     loadInitialData();
+
+    let channel: any = null;
+    try {
+      const supabase = createClient();
+      channel = supabase
+        .channel("pos_supabase_realtime")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "products" },
+          () => {
+            fetchProductsFromDb().then((prods) => {
+              if (prods && prods.length > 0) setProducts(prods);
+            });
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "sales" },
+          () => {
+            window.dispatchEvent(new Event("brito_sales_updated"));
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn("Could not subscribe to pos realtime channel:", e);
+    }
+
+    return () => {
+      if (channel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(channel);
+        } catch {}
+      }
+    };
   }, []);
 
   const filteredProducts = products.filter((prod) => {
@@ -1952,12 +1987,25 @@ export default function POSPage() {
         try {
           const supabase = createClient();
           const saleInsertPayload: any = {
+            id: createdSaleId,
+            date: newSaleRecord.date,
             total: currentTotal,
             payment_method: currentPaymentMethod,
             cashier: cashierName,
+            branch_id: activeBranch?.id || "branch-matriz",
+            payment_reference: paymentReference.trim() || null,
+            transfer_account: currentPaymentMethod === "transferencia" && selectedTransferAccount ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})` : null,
+            card_terminal: currentPaymentMethod === "tarjeta" && selectedCardTerminal ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})` : null,
+            cash_given: currentCashGiven || null,
+            change: currentChange || null,
           };
           if (selectedCustomer.id && !selectedCustomer.id.startsWith("cli-")) {
             saleInsertPayload.customer_id = selectedCustomer.id;
+            saleInsertPayload.customer_name = selectedCustomer.name;
+            saleInsertPayload.customer_type = selectedCustomer.type;
+          } else {
+            saleInsertPayload.customer_name = "Público General";
+            saleInsertPayload.customer_type = "general";
           }
 
           const { data: saleData, error: saleErr } = await supabase
@@ -1968,6 +2016,8 @@ export default function POSPage() {
 
           if (saleData && !saleErr) {
             savedToCloud = true;
+            console.log("[POS] Venta guardada con éxito en Supabase:", saleData.id);
+
             const saleItemsToInsert = currentItems.map((item) => ({
               sale_id: saleData.id,
               product_id: item.product.id.includes("-") ? item.product.id : null,
@@ -1987,9 +2037,11 @@ export default function POSPage() {
                   .eq("id", item.product.id);
               }
             }
+          } else if (saleErr) {
+            console.error("[POS] Error al insertar venta en Supabase:", saleErr);
           }
         } catch (e) {
-          console.log("Offline sale background pending", e);
+          console.error("[POS] Excepción en guardado de venta en Supabase:", e);
         }
       }
 
@@ -2002,9 +2054,14 @@ export default function POSPage() {
           branchId: activeBranch?.id,
           data: {
             saleId: createdSaleId,
+            date: newSaleRecord.date,
             total: currentTotal,
             paymentMethod: currentPaymentMethod,
             cashier: cashierName,
+            customerId: selectedCustomer.id,
+            customerName: selectedCustomer.name,
+            customerType: selectedCustomer.type,
+            branchId: activeBranch?.id || "branch-matriz",
             items: currentItems.map((item) => ({
               productId: item.product.id,
               name: item.product.name,

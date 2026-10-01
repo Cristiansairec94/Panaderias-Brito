@@ -880,11 +880,13 @@ export default function IngresosPage() {
     try {
       const supabase = createClient();
       await supabase.from("cash_movements").insert({
+        id: newIncome.id,
         type: "entrada",
         category: newIncome.category,
         amount: newIncome.amount,
         reason: `${newIncome.categoryLabel}: ${newIncome.concept} (${newIncome.customerName || "General"}) [${newIncome.paymentMethod}]`,
         authorized_by: newIncome.cashier,
+        branch_id: branches.find((b) => b.name === newIncome.branchName)?.id || "branch-matriz",
       });
     } catch (err) {
       console.log("Offline mode, saved locally", err);
