@@ -87,7 +87,7 @@ export default function SpecialOrdersDrawer({
         return order.deliveryDate === todayStr;
       }
       if (filterMode === "saldo") {
-        return order.remainingBalance > 0 && order.status !== "cancelado";
+        return order.remainingBalance > 0;
       }
 
       return true;
