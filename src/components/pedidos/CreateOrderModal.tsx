@@ -11,6 +11,7 @@ import {
   User,
   Phone,
   Store,
+  Building2,
   MapPin,
   DollarSign,
   Cake,
@@ -244,6 +245,8 @@ export default function CreateOrderModal({
   const [deliveryType, setDeliveryType] = useState<"sucursal" | "domicilio">("sucursal");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [pickupBranchId, setPickupBranchId] = useState<string>("");
+  const [operatingBranchId, setOperatingBranchId] = useState<string>("");
+  const [openBranchDashboard, setOpenBranchDashboard] = useState<"levantamiento" | "recoleccion" | null>(null);
 
   // Estado y sincronización para el calendario ampliado desplegable
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
@@ -306,7 +309,16 @@ export default function CreateOrderModal({
     setIsCalendarExpanded(false);
   };
 
-  // Sucursal seleccionada resuelta
+  // Sucursal seleccionada resuelta para Levantamiento de Pedido
+  const selectedOperatingBranch = useMemo(() => {
+    return (
+      branches.find((b) => b.id === (operatingBranchId || activeBranch?.id)) ||
+      activeBranch ||
+      branches[0]
+    );
+  }, [branches, operatingBranchId, activeBranch]);
+
+  // Sucursal seleccionada resuelta para Recolección de Pedido
   const selectedPickupBranch = useMemo(() => {
     return (
       branches.find((b) => b.id === (pickupBranchId || activeBranch?.id)) ||
@@ -384,6 +396,8 @@ export default function CreateOrderModal({
       setDeliveryTime("16:00");
       setDeliveryType("sucursal");
       setPickupBranchId(initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz");
+      setOperatingBranchId(initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz");
+      setOpenBranchDashboard(null);
       setDeliveryAddress("");
       setShowProductSuggestions(false);
       setShowCustomerSearch(false);
@@ -881,8 +895,12 @@ export default function CreateOrderModal({
       // Determinar la sucursal de recolección elegida
       const finalPickupBranch =
         deliveryType === "sucursal"
-          ? (branches.find((b) => b.id === pickupBranchId) || activeBranch)
+          ? (branches.find((b) => b.id === pickupBranchId) || selectedPickupBranch || activeBranch)
           : activeBranch;
+
+      // Determinar la sucursal de levantamiento de pedido elegida
+      const finalOperatingBranch =
+        branches.find((b) => b.id === operatingBranchId) || selectedOperatingBranch || activeBranch;
 
       // 2. CREACIÓN DEL PEDIDO (BASE CENTRAL)
       const newOrder = addCustomOrder({
@@ -891,8 +909,8 @@ export default function CreateOrderModal({
         customerId: finalCustomerId,
         branchId: finalPickupBranch?.id || "branch-matriz",
         branchName: finalPickupBranch?.name || "Sucursal Matriz (Centro)",
-        operatingBranchId: activeBranch?.id || "branch-matriz",
-        operatingBranchName: activeBranch?.name || "Sucursal Matriz (Centro)",
+        operatingBranchId: finalOperatingBranch?.id || activeBranch?.id || "branch-matriz",
+        operatingBranchName: finalOperatingBranch?.name || activeBranch?.name || "Sucursal Matriz (Centro)",
         description: finalDescription,
         items: finalItems,
         deliveryDate: deliveryDate || tomorrowStr,
@@ -909,7 +927,7 @@ export default function CreateOrderModal({
           ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})`
           : undefined,
         paymentReference: paymentReference.trim() || undefined,
-        cashier: cashierName || user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
+        cashier: cashierName || user?.name || finalOperatingBranch?.currentShift?.cashier || activeBranch?.currentShift?.cashier || "Cajero en Turno",
         shiftName: shiftName || activeBranch?.currentShift?.name || undefined,
       });
 
@@ -917,10 +935,10 @@ export default function CreateOrderModal({
       if (numericDeposit > 0) {
         try {
           registerRealSale(
-            activeBranch?.id || "branch-matriz",
+            finalOperatingBranch?.id || activeBranch?.id || "branch-matriz",
             numericDeposit,
             paymentMethod,
-            cashierName || user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
+            cashierName || user?.name || finalOperatingBranch?.currentShift?.cashier || activeBranch?.currentShift?.cashier || "Cajero en Turno",
             `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()} (${deliveryType === "sucursal" ? `Recoge en ${finalPickupBranch?.name}` : "A Domicilio"})`
           );
         } catch (saleErr) {
@@ -1080,7 +1098,7 @@ export default function CreateOrderModal({
               </h2>
               <p className="text-xs text-amber-300 font-bold flex items-center gap-1.5 mt-0.5">
                 <Store className="w-3.5 h-3.5 text-amber-400" />
-                <span>{activeBranch.name}</span>
+                <span>{selectedOperatingBranch?.name || activeBranch.name}</span>
               </p>
             </div>
           </div>

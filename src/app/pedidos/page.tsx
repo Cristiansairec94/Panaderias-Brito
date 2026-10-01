@@ -635,7 +635,74 @@ export default function PedidosPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            {/* Botón de Historial con 2 apartados: Entregados con éxito y Dados de baja */}
+            <div className="flex items-center rounded-xl bg-stone-900 text-white shadow-xs p-0.5 border border-stone-800 text-xs">
+              <div className="px-2.5 py-1.5 flex items-center gap-1.5 font-black text-amber-400 border-r border-stone-800 shrink-0 select-none">
+                <History className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Historial:</span>
+              </div>
+
+              {/* Apartado 1: Pedidos entregados con éxito */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (classificationFilter === "historial" && historialSubFilter === "entregados") {
+                    setClassificationFilter("all");
+                  } else {
+                    setHistorialSubFilter("entregados");
+                    setClassificationFilter("historial");
+                    scrollToCatalog();
+                  }
+                }}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none ${
+                  classificationFilter === "historial" && historialSubFilter === "entregados"
+                    ? "bg-teal-600 text-white shadow-xs font-black ring-1 ring-white/60"
+                    : "text-stone-300 hover:text-white hover:bg-stone-800"
+                }`}
+                title="Ver pedidos que se entregaron con éxito"
+              >
+                <Check className="w-3.5 h-3.5 text-teal-400" />
+                <span>
+                  <span className="hidden lg:inline">Pedidos </span>entregados con éxito
+                </span>
+                <span className="font-mono font-black text-[10px] px-1.5 py-0.2 rounded-md bg-teal-950 text-teal-300 border border-teal-700/60">
+                  {classificationCounts.entregados}
+                </span>
+              </button>
+
+              {/* Separador */}
+              <div className="h-4 w-px bg-stone-800" />
+
+              {/* Apartado 2: Pedidos que se dieron de baja */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (classificationFilter === "historial" && historialSubFilter === "cancelados") {
+                    setClassificationFilter("all");
+                  } else {
+                    setHistorialSubFilter("cancelados");
+                    setClassificationFilter("historial");
+                    scrollToCatalog();
+                  }
+                }}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none ${
+                  classificationFilter === "historial" && historialSubFilter === "cancelados"
+                    ? "bg-rose-600 text-white shadow-xs font-black ring-1 ring-white/60"
+                    : "text-stone-300 hover:text-white hover:bg-stone-800"
+                }`}
+                title="Ver pedidos que se dieron de baja"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>
+                  <span className="hidden lg:inline">Pedidos </span>que se dieron de baja
+                </span>
+                <span className="font-mono font-black text-[10px] px-1.5 py-0.2 rounded-md bg-rose-950 text-rose-300 border border-rose-700/60">
+                  {classificationCounts.cancelados}
+                </span>
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => setShowKpiSummary((prev) => !prev)}
@@ -1005,20 +1072,20 @@ export default function PedidosPage() {
               </span>
             </button>
 
-            {/* 4. Listos */}
+            {/* 4. Listos en Sucursal */}
             <button
               type="button"
               onClick={() => handleSelectClassificationCard("no_llevados")}
-              className={`flex-1 min-w-[95px] py-2 sm:py-2.5 px-3 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+              className={`flex-1 min-w-[115px] sm:min-w-[130px] py-2 sm:py-2.5 px-3 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
                 classificationFilter === "no_llevados"
                   ? "bg-blue-600 text-white shadow-xs font-black"
                   : "hover:bg-white/80 text-stone-700"
               }`}
-              title="Ver productos listos en tienda esperando al cliente"
+              title="Ver productos listos en sucursal esperando al cliente"
             >
               <span className="flex items-center gap-1">
                 <span>📦</span>
-                <span className="truncate">Listos</span>
+                <span className="truncate">Listos en Sucursal</span>
               </span>
               <span
                 className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
@@ -1026,30 +1093,6 @@ export default function PedidosPage() {
                 }`}
               >
                 {classificationCounts.no_llevados}
-              </span>
-            </button>
-
-            {/* 5. Historial (Entregados y Bajas) */}
-            <button
-              type="button"
-              onClick={() => handleSelectClassificationCard("historial")}
-              className={`flex-1 min-w-[130px] py-2 sm:py-2.5 px-3 flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
-                classificationFilter === "historial"
-                  ? "bg-stone-900 text-white shadow-xs font-black ring-2 ring-stone-900/30"
-                  : "hover:bg-white/80 text-stone-700"
-              }`}
-              title="Ver el historial completo de pedidos entregados o que se dieron de baja"
-            >
-              <span className="flex items-center gap-1">
-                <span>📜</span>
-                <span className="truncate">Historial (Entregados y Bajas)</span>
-              </span>
-              <span
-                className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
-                  classificationFilter === "historial" ? "bg-white/20 text-white" : "bg-stone-200/90 text-stone-800"
-                }`}
-              >
-                {classificationCounts.historial}
               </span>
             </button>
           </div>
@@ -1095,7 +1138,9 @@ export default function PedidosPage() {
                       {classificationFilter === "no_pasaron" && `⚠️ Pedidos que no han pasado por ellos (${classificationCounts.no_pasaron})`}
                       {classificationFilter === "pendientes" && "👨‍🍳 En Preparación / Horno"}
                       {classificationFilter === "entregados" && "✅ Ya Entregados"}
-                      {classificationFilter === "historial" && "📜 Historial Completo: Pedidos Entregados y Dados de Baja"}
+                      {classificationFilter === "historial" && historialSubFilter === "entregados" && "✓ Pedidos que se entregaron con éxito"}
+                      {classificationFilter === "historial" && historialSubFilter === "cancelados" && "✕ Pedidos que se dieron de baja"}
+                      {classificationFilter === "historial" && historialSubFilter === "todos" && "📜 Historial: Pedidos Entregados y Dados de Baja"}
                       {classificationFilter === "proximos" && "⏰ Próximos de Hoy"}
                     </h3>
                   </div>
@@ -1106,37 +1151,38 @@ export default function PedidosPage() {
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                       <button
                         type="button"
-                        onClick={() => setHistorialSubFilter("todos")}
-                        className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                          historialSubFilter === "todos"
-                            ? "bg-stone-900 text-white shadow-xs"
-                            : "bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200"
-                        }`}
-                      >
-                        📋 Todos en Historial ({classificationCounts.historial})
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => setHistorialSubFilter("entregados")}
-                        className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                        className={`text-[11px] font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                           historialSubFilter === "entregados"
-                            ? "bg-teal-700 text-white shadow-xs"
+                            ? "bg-teal-700 text-white shadow-xs font-black ring-2 ring-teal-400"
                             : "bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200"
                         }`}
                       >
-                        <Check className="w-3 h-3 text-teal-600" />
-                        <span>Solo Entregados ({classificationCounts.entregados})</span>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Pedidos entregados con éxito ({classificationCounts.entregados})</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setHistorialSubFilter("cancelados")}
-                        className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                        className={`text-[11px] font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                           historialSubFilter === "cancelados"
-                            ? "bg-rose-700 text-white shadow-xs"
+                            ? "bg-rose-700 text-white shadow-xs font-black ring-2 ring-rose-400"
                             : "bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200"
                         }`}
                       >
-                        <span>✕ Solo Dados de Baja ({classificationCounts.cancelados})</span>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Pedidos que se dieron de baja ({classificationCounts.cancelados})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistorialSubFilter("todos")}
+                        className={`text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition-all cursor-pointer ${
+                          historialSubFilter === "todos"
+                            ? "bg-stone-900 text-white shadow-xs font-black"
+                            : "bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200"
+                        }`}
+                      >
+                        <span>Ver ambos ({classificationCounts.historial})</span>
                       </button>
                     </div>
                   )}
