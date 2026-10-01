@@ -262,7 +262,7 @@ export default function PedidosPage() {
   };
 
   const checkIsPaid = (order: CustomOrder): boolean => {
-    if (order.status === "cancelado") return false;
+    if (order.status === "cancelado" || order.status === "entregado") return false;
     const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
     return rem <= 0;
   };
@@ -298,7 +298,7 @@ export default function PedidosPage() {
     for (const o of branchFiltered) {
       const oDate = normalizeDateStr(o.deliveryDate);
       if (o.status !== "entregado" && o.status !== "cancelado") activos++;
-      if (oDate === todayStr && o.status !== "cancelado") hoy++;
+      if (oDate === todayStr && o.status !== "cancelado" && o.status !== "entregado") hoy++;
       if (checkIsPending(o)) pendientes++;
       if (checkIsUnpaid(o)) porPagar++;
       if (checkIsPaid(o)) pagados++;
@@ -309,7 +309,7 @@ export default function PedidosPage() {
     }
 
     return {
-      all: branchFiltered.length,
+      all: activos,
       activos,
       hoy,
       pendientes,
@@ -332,13 +332,20 @@ export default function PedidosPage() {
         if (!matchesBranch) return false;
       }
 
+      // Los pedidos entregados y cancelados desaparecen de las vistas activas
+      if (classificationFilter !== "entregados") {
+        if (order.status === "entregado" || order.status === "cancelado") {
+          return false;
+        }
+      }
+
       const orderDate = normalizeDateStr(order.deliveryDate);
 
       // Classification Filter (Botones principales con emoticones y cuadros KPI)
       if (classificationFilter === "activos" && (order.status === "entregado" || order.status === "cancelado")) {
         return false;
       }
-      if (classificationFilter === "hoy" && (orderDate !== todayStr || order.status === "cancelado")) {
+      if (classificationFilter === "hoy" && (orderDate !== todayStr || order.status === "cancelado" || order.status === "entregado")) {
         return false;
       }
       if (classificationFilter === "pendientes" && !checkIsPending(order)) return false;
@@ -410,7 +417,7 @@ export default function PedidosPage() {
     const activeOrders = branchFiltered.filter((o) => o.status !== "entregado" && o.status !== "cancelado");
     const todayOrders = branchFiltered.filter((o) => {
       const oDate = normalizeDateStr(o.deliveryDate);
-      return oDate === todayStr && o.status !== "cancelado";
+      return oDate === todayStr && o.status !== "cancelado" && o.status !== "entregado";
     });
     const totalRemaining = activeOrders.reduce((sum, o) => sum + (o.remainingBalance || 0), 0);
     const readyOrders = branchFiltered.filter((o) => o.status === "listo");
@@ -481,6 +488,7 @@ export default function PedidosPage() {
 
     if (nextStatus !== order.status) {
       updateOrderStatus(order.id, nextStatus);
+      loadOrders();
     }
   };
 
@@ -2243,6 +2251,18 @@ export default function PedidosPage() {
           loadOrders();
           const updated = getStoredOrders().find((item) => item.id === o.id);
           if (updated) setSelectedOrderForDetail(updated);
+        }}
+        onDeliverOrder={(o) => {
+          updateOrderStatus(o.id, "entregado");
+          loadOrders();
+          setSelectedOrderForDetail(null);
+          addNotification({
+            title: "Pedido Entregado",
+            description: `El pedido ${o.orderNumber} (${o.customerName}) ha sido marcado como entregado exitosamente.`,
+            senderName: "Control de Pedidos",
+            senderAvatar: "📦",
+            highlightText: o.orderNumber,
+          });
         }}
         onSendWhatsApp={(o) => {
           handleSendWhatsApp(o);
