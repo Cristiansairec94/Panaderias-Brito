@@ -448,7 +448,7 @@ export default function OrderDetailModal({
             <div className="px-4 py-2.5 bg-amber-50 border border-amber-300 text-amber-950 font-bold text-xs rounded-xl flex items-center gap-2 shadow-2xs max-w-xl">
               <span className="text-base">🥖</span>
               <span>
-                <strong>Historial de Pedidos:</strong> Este pedido ya concluyó o su fecha caducó. Por ser pan perecedero, no se puede reenviar a sucursal, surtir ni modificar. Si el cliente requiere pan, debe levantarse un nuevo pedido.
+                <strong>Historial (Solo Informativo):</strong> Ya no se puede editar ni eliminar. Si se necesita revivir el pedido, hacer uno nuevo en sucursal.
               </span>
             </div>
           ) : (
