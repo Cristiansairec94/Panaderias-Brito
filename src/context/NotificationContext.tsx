@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { realtimeHub, RealtimeStatus } from "@/lib/realtime/realtimeHub";
 import { CustomOrder, ShiftCutRecord } from "@/types";
-import { getStoredOrders, updateOrderStatus } from "@/lib/orders";
+import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
@@ -846,6 +846,26 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               `Hola ${o.customerName}, le saludamos de Panadería Brito con respecto a su pedido ${o.orderNumber}.`
             );
             window.open(`https://wa.me/52${phone}?text=${message}`, "_blank");
+          }
+        }}
+        onDarDeBaja={(o) => {
+          const isCancelled = o.status === "cancelado";
+          const confirmMsg = isCancelled
+            ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`
+            : `¿Estás seguro de DAR DE BAJA el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEl pedido se marcará como dado de baja y te mandaremos directo al historial de "Productos que se dieron de baja".`;
+          if (confirm(confirmMsg)) {
+            if (isCancelled) {
+              deleteCustomOrder(o.id);
+            } else {
+              updateOrderStatus(o.id, "cancelado");
+            }
+            setSelectedOrderForDetail(null);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("brito_orders_updated"));
+              if (!isCancelled) {
+                window.location.href = "/pedidos?filter=cancelados";
+              }
+            }
           }
         }}
       />

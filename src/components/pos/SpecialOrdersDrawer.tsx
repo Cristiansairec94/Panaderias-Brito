@@ -487,8 +487,8 @@ export default function SpecialOrdersDrawer({
           onDarDeBaja={(o) => {
             const isCancelled = o.status === "cancelado";
             const confirmMsg = isCancelled
-              ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${o.orderNumber} de "${o.customerName}"?`
-              : `¿Estás seguro de DAR DE BAJA el pedido ${o.orderNumber} de "${o.customerName}"?`;
+              ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`
+              : `¿Estás seguro de DAR DE BAJA el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEl pedido se marcará como dado de baja y te mandaremos directo al historial de "Productos que se dieron de baja".`;
             if (confirm(confirmMsg)) {
               if (isCancelled) {
                 deleteCustomOrder(o.id);
@@ -497,6 +497,9 @@ export default function SpecialOrdersDrawer({
               }
               setSelectedOrderForDetail(null);
               loadOrders();
+              if (!isCancelled && typeof window !== "undefined") {
+                window.location.href = "/pedidos?filter=cancelados";
+              }
             }
           }}
         />

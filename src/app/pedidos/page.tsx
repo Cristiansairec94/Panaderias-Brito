@@ -165,6 +165,21 @@ export default function PedidosPage() {
     window.addEventListener("brito_orders_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
 
+    // Revisar si viene de URL ?filter=cancelados o ?filter=bajas para mandar directo al historial
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const filterParam = params.get("filter") || params.get("tab") || params.get("subfilter");
+      if (filterParam === "cancelados" || filterParam === "bajas") {
+        setClassificationFilter("historial");
+        setHistorialSubFilter("cancelados");
+        setTimeout(() => scrollToCatalog(), 200);
+      } else if (filterParam === "entregados") {
+        setClassificationFilter("historial");
+        setHistorialSubFilter("entregados");
+        setTimeout(() => scrollToCatalog(), 200);
+      }
+    } catch (e) {}
+
     // 3. Escuchar pedidos y actualizaciones transmitidos en tiempo real por WebSocket
     const unsubOrder = realtimeHub?.onOrder ? realtimeHub.onOrder(() => {
       loadOrders();
@@ -732,28 +747,47 @@ export default function PedidosPage() {
   };
 
   const handleDarDeBaja = (order: CustomOrder) => {
-    const isPermanent = order.status === "cancelado" || order.status === "entregado" || checkIsOverdue(order);
+    const isPermanent = order.status === "cancelado";
     const confirmMsg = isPermanent
-      ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro y no se podrá recuperar.`
-      : `¿Estás seguro de DAR DE BAJA / CANCELAR el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEl pedido se marcará como cancelado y se moverá al historial.`;
+      ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`
+      : `¿Estás seguro de DAR DE BAJA el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEl pedido se marcará como dado de baja y te mandaremos directo al historial de "Productos que se dieron de baja".`;
 
     if (confirm(confirmMsg)) {
       if (isPermanent) {
         deleteCustomOrder(order.id);
+        loadOrders();
+        setSelectedOrderForDetail(null);
+        addNotification({
+          title: "Pedido Eliminado",
+          description: `El pedido ${order.orderNumber} ha sido eliminado permanentemente del registro.`,
+          senderName: "Control de Pedidos",
+          senderAvatar: "🗑️",
+          highlightText: order.orderNumber,
+          category: "pedidos",
+          badgeIcon: "pastel",
+        });
       } else {
         updateOrderStatus(order.id, "cancelado");
+        loadOrders();
+        setSelectedOrderForDetail(null);
+
+        // Mandar DIRECTO al apartado del historial de productos que se dieron de baja
+        setClassificationFilter("historial");
+        setHistorialSubFilter("cancelados");
+        setTimeout(() => {
+          scrollToCatalog();
+        }, 120);
+
+        addNotification({
+          title: "Pedido Dado de Baja",
+          description: `El pedido ${order.orderNumber} se dio de baja y se mandó directo al historial de productos que se dieron de baja.`,
+          senderName: "Control de Pedidos",
+          senderAvatar: "🗑️",
+          highlightText: order.orderNumber,
+          category: "pedidos",
+          badgeIcon: "pastel",
+        });
       }
-      loadOrders();
-      setSelectedOrderForDetail(null);
-      addNotification({
-        title: isPermanent ? "Pedido Eliminado" : "Pedido Dado de Baja",
-        description: `El pedido ${order.orderNumber} ha sido ${isPermanent ? "eliminado permanentemente" : "dado de baja exitosamente"}.`,
-        senderName: "Control de Pedidos",
-        senderAvatar: "🗑️",
-        highlightText: order.orderNumber,
-        category: "pedidos",
-        badgeIcon: "pastel",
-      });
     }
   };
 
@@ -1178,12 +1212,12 @@ export default function PedidosPage() {
                 ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-300 ring-4 ring-rose-400/40 shadow-lg shadow-rose-900/50 scale-[1.02]"
                 : "bg-stone-800/90 hover:bg-stone-800 text-rose-300 border-rose-700/60 hover:border-rose-400 hover:text-white"
             }`}
-            title="Ver pedidos que se dieron de baja o cancelaron"
+            title="Ver productos y pedidos que se dieron de baja o cancelaron"
           >
             <div className="p-1 rounded-md bg-rose-500/20 text-rose-300 shrink-0">
               <Trash2 className="w-4 h-4 text-rose-400 font-black" />
             </div>
-            <span className="truncate">Pedidos que se dieron de baja</span>
+            <span className="truncate">Productos que se dieron de baja</span>
             <span className="font-mono font-black text-xs px-2.5 py-0.5 rounded-lg bg-rose-950 text-rose-200 border border-rose-600 shrink-0">
               {classificationCounts.cancelados}
             </span>
@@ -1619,7 +1653,7 @@ export default function PedidosPage() {
                         historialSubFilter === "entregados"
                           ? "✓ Historial: Pedidos entregados con éxito"
                           : historialSubFilter === "cancelados"
-                          ? "✕ Historial: Pedidos dados de baja"
+                          ? "✕ Historial: Productos que se dieron de baja"
                           : "📜 Historial Completo de Pedidos Concluidos"
                       )}
                     </h3>

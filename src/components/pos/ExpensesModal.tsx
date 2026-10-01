@@ -4528,8 +4528,8 @@ export default function ExpensesModal({
         onDarDeBaja={(order) => {
           const isCancelled = order.status === "cancelado";
           const confirmMsg = isCancelled
-            ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?`
-            : `¿Estás seguro de DAR DE BAJA el pedido ${order.orderNumber} de "${order.customerName}"?`;
+            ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`
+            : `¿Estás seguro de DAR DE BAJA el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEl pedido se marcará como dado de baja y te mandaremos directo al historial de "Productos que se dieron de baja".`;
           if (confirm(confirmMsg)) {
             if (isCancelled) {
               deleteCustomOrder(order.id);
@@ -4539,6 +4539,9 @@ export default function ExpensesModal({
             setSelectedOrderDetail(null);
             if (typeof window !== "undefined") {
               window.dispatchEvent(new Event("brito_orders_updated"));
+              if (!isCancelled) {
+                window.location.href = "/pedidos?filter=cancelados";
+              }
             }
           }
         }}

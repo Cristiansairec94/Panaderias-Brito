@@ -545,10 +545,10 @@ export default function OrderDetailModal({
                 type="button"
                 onClick={() => onDarDeBaja(order)}
                 className="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-rose-300/40"
-                title={isHistoryOrder || order.status === "cancelado" ? "Eliminar pedido definitivamente del registro" : "Dar de baja o eliminar este pedido"}
+                title={order.status === "cancelado" ? "Eliminar pedido definitivamente del registro histórico" : "Dar de baja y enviar directo al historial de productos que se dieron de baja"}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>{isHistoryOrder || order.status === "cancelado" ? "Eliminar Pedido" : "Dar de baja"}</span>
+                <span>{order.status === "cancelado" ? "Eliminar Pedido" : "Dar de baja"}</span>
               </button>
             )}
           </div>
