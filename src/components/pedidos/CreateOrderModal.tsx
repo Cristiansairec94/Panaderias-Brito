@@ -242,11 +242,9 @@ export default function CreateOrderModal({
   const tomorrowStr = useMemo(() => getLocalDateStr(1), []);
   const [deliveryDate, setDeliveryDate] = useState<string>(tomorrowStr);
   const [deliveryTime, setDeliveryTime] = useState<string>("16:00");
-  const [deliveryType, setDeliveryType] = useState<"sucursal" | "domicilio">("sucursal");
-  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const deliveryType = "sucursal" as const;
   const [pickupBranchId, setPickupBranchId] = useState<string>("");
   const [operatingBranchId, setOperatingBranchId] = useState<string>("");
-  const [openBranchDashboard, setOpenBranchDashboard] = useState<"levantamiento" | "recoleccion" | null>(null);
 
   // Estado y sincronización para el calendario ampliado desplegable
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
@@ -394,11 +392,9 @@ export default function CreateOrderModal({
 
       setDeliveryDate(tomorrowStr);
       setDeliveryTime("16:00");
-      setDeliveryType("sucursal");
       setPickupBranchId(initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz");
       setOperatingBranchId(initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz");
-      setOpenBranchDashboard(null);
-      setDeliveryAddress("");
+      
       setShowProductSuggestions(false);
       setShowCustomerSearch(false);
       setPaymentMethod("efectivo");
@@ -533,9 +529,7 @@ export default function CreateOrderModal({
     setCustomerName(c.name);
     setCustomerPhone(c.phone && c.phone !== "N/A" ? c.phone : "");
     setSelectedCustomerId(c.id);
-    if (c.address && (!deliveryAddress || deliveryAddress.trim() === "")) {
-      setDeliveryAddress(c.address);
-    }
+    
     setIsCustomerModalOpen(false);
     setShowCustomerSearch(false);
     setSaveCustomerDecision("ask");
@@ -815,9 +809,7 @@ export default function CreateOrderModal({
 
       // Determinar la sucursal de recolección elegida
       const finalPickupBranch =
-        deliveryType === "sucursal"
-          ? (branches.find((b) => b.id === pickupBranchId) || selectedPickupBranch || activeBranch)
-          : activeBranch;
+        branches.find((b) => b.id === pickupBranchId) || selectedPickupBranch || activeBranch;
 
       // Determinar la sucursal de levantamiento de pedido elegida
       const finalOperatingBranch =
@@ -836,8 +828,8 @@ export default function CreateOrderModal({
         items: finalItems,
         deliveryDate: deliveryDate || tomorrowStr,
         deliveryTime: deliveryTime || "16:00",
-        deliveryType: deliveryType,
-        deliveryAddress: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
+        deliveryType: "sucursal",
+        deliveryAddress: undefined,
         total: total,
         deposit: numericDeposit,
         paymentMethod: paymentMethod,
@@ -860,7 +852,7 @@ export default function CreateOrderModal({
             numericDeposit,
             paymentMethod,
             cashierName || user?.name || finalOperatingBranch?.currentShift?.cashier || activeBranch?.currentShift?.cashier || "Cajero en Turno",
-            `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()} (${deliveryType === "sucursal" ? `Recoge en ${finalPickupBranch?.name}` : "A Domicilio"})`
+            `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()} (Recoge en ${finalPickupBranch?.name})`
           );
         } catch (saleErr) {
           console.warn("Could not record in registerRealSale:", saleErr);
@@ -925,7 +917,7 @@ export default function CreateOrderModal({
         const created = await createCustomerInDb({
           name: cleanName,
           phone: customerPhone.trim() || undefined,
-          address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
+          address: undefined,
           type: "evento",
           notes: "Cliente registrado desde Pedido Especial",
         });
@@ -1514,369 +1506,78 @@ export default function CreateOrderModal({
               </div>
             </div>
 
-            {/* Entrega: Sucursal vs Domicilio */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setDeliveryType("sucursal")}
-                className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  deliveryType === "sucursal"
-                    ? "bg-stone-900 text-white border-stone-900 shadow-sm"
-                    : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-                }`}
-              >
-                <Store className="w-4 h-4" /> Recoge en Tienda
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeliveryType("domicilio")}
-                className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  deliveryType === "domicilio"
-                    ? "bg-stone-900 text-white border-stone-900 shadow-sm"
-                    : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-                }`}
-              >
-                <MapPin className="w-4 h-4" /> A Domicilio
-              </button>
-            </div>
-
-            {/* Selector de sucursales: Levantamiento de Pedido y Recolección de Pedido */}
-            {deliveryType === "sucursal" ? (
-              <div className="space-y-2.5 pt-1">
-                {/* Los dos botones juntos con las mismas opciones de sucursales */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {/* Botón 1: Levantamiento de pedido */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpenBranchDashboard((prev) =>
-                        prev === "levantamiento" ? null : "levantamiento"
-                      )
-                    }
-                    className={`p-3 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 relative ${
-                      openBranchDashboard === "levantamiento"
-                        ? "bg-amber-500/10 border-amber-500 shadow-md ring-2 ring-amber-500/30"
-                        : "bg-white border-stone-200 hover:border-amber-400 hover:bg-stone-50/80 shadow-xs"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-amber-600" />
-                        Levantamiento de pedido
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-bold transition-transform duration-200 flex items-center gap-1 ${
-                          openBranchDashboard === "levantamiento"
-                            ? "bg-amber-500 text-stone-950 rotate-180"
-                            : "bg-stone-100 text-stone-600"
-                        }`}
-                      >
-                        <ChevronDown className="w-3 h-3" />
-                      </span>
-                    </div>
-
-                    <div>
-                      <div className="text-xs sm:text-sm font-black text-stone-900 truncate">
-                        {selectedOperatingBranch?.name || "Seleccionar sucursal"}
-                      </div>
-                      <div className="text-[11px] font-semibold text-stone-500 flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3 text-stone-400 shrink-0" />
-                        <span className="truncate">
-                          {selectedOperatingBranch?.address || "Donde se toma el pedido"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="pt-1 flex items-center gap-1.5 text-[10px] font-bold">
-                      {selectedOperatingBranch?.id === activeBranch?.id ? (
-                        <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md border border-amber-200 font-extrabold">
-                          ★ Esta tienda (Actual)
-                        </span>
-                      ) : (
-                        <span className="bg-stone-100 text-stone-600 px-2 py-0.5 rounded-md font-bold">
-                          {selectedOperatingBranch?.code || "Sucursal"}
-                        </span>
-                      )}
-                      <span className="text-amber-700 font-black ml-auto text-[10px]">
-                        {openBranchDashboard === "levantamiento" ? "Ocultar panel ▲" : "Ver sucursales ▼"}
-                      </span>
-                    </div>
-                  </button>
-
-                  {/* Botón 2: Recolección de pedido */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpenBranchDashboard((prev) =>
-                        prev === "recoleccion" ? null : "recoleccion"
-                      )
-                    }
-                    className={`p-3 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 relative ${
-                      openBranchDashboard === "recoleccion"
-                        ? "bg-amber-500/10 border-amber-500 shadow-md ring-2 ring-amber-500/30"
-                        : "bg-white border-stone-200 hover:border-amber-400 hover:bg-stone-50/80 shadow-xs"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
-                        <ShoppingBag className="w-3.5 h-3.5 text-amber-600" />
-                        Recolección de pedido
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-bold transition-transform duration-200 flex items-center gap-1 ${
-                          openBranchDashboard === "recoleccion"
-                            ? "bg-amber-500 text-stone-950 rotate-180"
-                            : "bg-stone-100 text-stone-600"
-                        }`}
-                      >
-                        <ChevronDown className="w-3 h-3" />
-                      </span>
-                    </div>
-
-                    <div>
-                      <div className="text-xs sm:text-sm font-black text-stone-900 truncate">
-                        {selectedPickupBranch?.name || "Seleccionar sucursal"}
-                      </div>
-                      <div className="text-[11px] font-semibold text-stone-500 flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3 text-stone-400 shrink-0" />
-                        <span className="truncate">
-                          {selectedPickupBranch?.address || "Donde el cliente recoge"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="pt-1 flex items-center gap-1.5 text-[10px] font-bold">
-                      {selectedPickupBranch?.id === activeBranch?.id ? (
-                        <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md border border-amber-200 font-extrabold">
-                          ★ Esta tienda (Actual)
-                        </span>
-                      ) : (
-                        <span className="bg-stone-100 text-stone-600 px-2 py-0.5 rounded-md font-bold">
-                          {selectedPickupBranch?.code || "Sucursal"}
-                        </span>
-                      )}
-                      <span className="text-amber-700 font-black ml-auto text-[10px]">
-                        {openBranchDashboard === "recoleccion" ? "Ocultar panel ▲" : "Ver sucursales ▼"}
-                      </span>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Dashboard Desplegable de Sucursales */}
-                {openBranchDashboard && (
-                  <div className="p-3.5 sm:p-4 bg-white border-2 border-amber-500/50 rounded-2xl shadow-md space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-stone-200">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-                        <h4 className="text-xs sm:text-sm font-black text-stone-900 uppercase tracking-wide">
-                          Dashboard de Sucursales —{" "}
-                          <span className="text-amber-700">
-                            {openBranchDashboard === "levantamiento"
-                              ? "Levantamiento de Pedido"
-                              : "Recolección de Pedido"}
-                          </span>
-                        </h4>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        {/* Selector de pestañas rápido */}
-                        <div className="bg-stone-100 p-0.5 rounded-lg flex items-center text-[10px] font-black">
-                          <button
-                            type="button"
-                            onClick={() => setOpenBranchDashboard("levantamiento")}
-                            className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                              openBranchDashboard === "levantamiento"
-                                ? "bg-amber-500 text-stone-950 shadow-xs"
-                                : "text-stone-600 hover:text-stone-900"
-                            }`}
-                          >
-                            Levantamiento
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setOpenBranchDashboard("recoleccion")}
-                            className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                              openBranchDashboard === "recoleccion"
-                                ? "bg-amber-500 text-stone-950 shadow-xs"
-                                : "text-stone-600 hover:text-stone-900"
-                            }`}
-                          >
-                            Recolección
-                          </button>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setOpenBranchDashboard(null)}
-                          className="w-7 h-7 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-600 hover:text-stone-900 flex items-center justify-center cursor-pointer transition-colors"
-                          title="Cerrar dashboard"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-stone-500 font-medium">
-                      {openBranchDashboard === "levantamiento"
-                        ? "Selecciona la sucursal donde se genera la orden y se registra el cobro inicial en caja:"
-                        : "Selecciona la sucursal donde el cliente acudirá a recoger su pedido listo:"}
-                    </p>
-
-                    {/* Mismas opciones de sucursales en tarjetas interactivas */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      {branches.map((b) => {
-                        const isSelected =
-                          openBranchDashboard === "levantamiento"
-                            ? (operatingBranchId ? operatingBranchId === b.id : b.id === activeBranch?.id)
-                            : (pickupBranchId ? pickupBranchId === b.id : b.id === activeBranch?.id);
-
-                        const isCurrentStore = b.id === activeBranch?.id;
-
-                        return (
-                          <button
-                            key={b.id}
-                            type="button"
-                            onClick={() => {
-                              if (openBranchDashboard === "levantamiento") {
-                                setOperatingBranchId(b.id);
-                              } else {
-                                setPickupBranchId(b.id);
-                              }
-                            }}
-                            className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between relative group ${
-                              isSelected
-                                ? "bg-amber-50 border-amber-500 shadow-sm ring-1 ring-amber-500/30"
-                                : "bg-stone-50/70 hover:bg-white border-stone-200 hover:border-amber-300"
-                            }`}
-                          >
-                            <div>
-                              <div className="flex items-start justify-between gap-1 mb-1">
-                                <span className="text-xs font-black text-stone-900 group-hover:text-amber-800 transition-colors">
-                                  {b.name}
-                                </span>
-                                {isSelected ? (
-                                  <span className="w-5 h-5 rounded-full bg-amber-500 text-stone-950 flex items-center justify-center shrink-0 shadow-xs">
-                                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                  </span>
-                                ) : (
-                                  <span className="w-5 h-5 rounded-full border-2 border-stone-300 group-hover:border-amber-400 shrink-0" />
-                                )}
-                              </div>
-
-                              <p className="text-[11px] text-stone-600 leading-tight mb-2 flex items-start gap-1">
-                                <MapPin className="w-3 h-3 text-stone-400 mt-0.5 shrink-0" />
-                                <span>{b.address || "Dirección de la sucursal"}</span>
-                              </p>
-                            </div>
-
-                            <div className="flex items-center flex-wrap gap-1.5 pt-2 border-t border-stone-200/80 mt-auto text-[10px] font-bold">
-                              {isCurrentStore && (
-                                <span className="bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded font-black">
-                                  Esta tienda
-                                </span>
-                              )}
-                              <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                {b.status === "abierta" ? "Abierta" : "Activa"}
-                              </span>
-                              {b.phone && (
-                                <span className="text-stone-500 ml-auto flex items-center gap-0.5">
-                                  <Phone className="w-2.5 h-2.5" /> {b.phone}
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Barra inferior del dashboard */}
-                    <div className="pt-2 border-t border-stone-200 flex items-center justify-between">
-                      <span className="text-[11px] text-stone-600">
-                        Sucursal elegida:{" "}
-                        <strong className="text-stone-900 font-black">
-                          {openBranchDashboard === "levantamiento"
-                            ? selectedOperatingBranch?.name
-                            : selectedPickupBranch?.name}
-                        </strong>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setOpenBranchDashboard(null)}
-                        className="px-3.5 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-xl font-black text-xs cursor-pointer transition-colors shadow-xs"
-                      >
-                        Aceptar
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Dirección si es a domicilio */
-              <div className="space-y-2.5 pt-1">
-                <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">
-                    Dirección de entrega a domicilio:
+            {/* Sucursales: Levantamiento y Recolección en lista desplegable limpia (Ahorro de espacio) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {/* 1. Levantamiento de Pedido */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                    Levantamiento de pedido
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Calle, número, colonia y referencias..."
-                    value={deliveryAddress}
-                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                    className="w-full py-2 px-3 bg-white border border-stone-300 rounded-xl text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-
-                {/* Sucursal de Levantamiento también configurable para pedido a domicilio */}
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpenBranchDashboard((prev) =>
-                        prev === "levantamiento" ? null : "levantamiento"
-                      )
-                    }
-                    className="w-full py-2 px-3 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded-xl text-xs font-bold text-stone-800 flex items-center justify-between cursor-pointer transition-colors"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-amber-600" />
-                      Levantamiento de pedido: <strong>{selectedOperatingBranch?.name}</strong>
+                  {selectedOperatingBranch?.id === activeBranch?.id && (
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.5 rounded">
+                      Esta tienda
                     </span>
-                    <span className="text-[10px] text-amber-700 font-black">
-                      {openBranchDashboard === "levantamiento" ? "Ocultar ▲" : "Cambiar sucursal ▼"}
-                    </span>
-                  </button>
-
-                  {openBranchDashboard === "levantamiento" && (
-                    <div className="mt-2 p-3 bg-white border border-amber-400 rounded-xl shadow-sm">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {branches.map((b) => {
-                          const isSel = (operatingBranchId ? operatingBranchId === b.id : b.id === activeBranch?.id);
-                          return (
-                            <button
-                              key={b.id}
-                              type="button"
-                              onClick={() => {
-                                setOperatingBranchId(b.id);
-                                setOpenBranchDashboard(null);
-                              }}
-                              className={`p-2.5 rounded-lg border text-left text-xs transition-colors cursor-pointer ${
-                                isSel
-                                  ? "bg-amber-100 border-amber-500 font-black text-amber-900"
-                                  : "bg-stone-50 border-stone-200 hover:bg-stone-100 text-stone-800"
-                              }`}
-                            >
-                              <div className="font-black truncate">{b.name}</div>
-                              <div className="text-[10px] text-stone-500 truncate">{b.address}</div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
                   )}
                 </div>
+                <div className="relative">
+                  <select
+                    value={operatingBranchId || activeBranch?.id || ""}
+                    onChange={(e) => setOperatingBranchId(e.target.value)}
+                    className="w-full appearance-none bg-white hover:bg-stone-50 text-stone-900 font-bold text-xs py-2.5 px-3 pr-8 rounded-xl border border-stone-300 shadow-2xs cursor-pointer focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all truncate"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} {b.id === activeBranch?.id ? "★ (Esta tienda)" : ""} {b.address ? `— ${b.address}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                {selectedOperatingBranch?.address && (
+                  <p className="text-[10px] text-stone-500 font-medium truncate flex items-center gap-1 px-1">
+                    <MapPin className="w-2.5 h-2.5 text-stone-400 shrink-0" />
+                    <span className="truncate">{selectedOperatingBranch.address}</span>
+                  </p>
+                )}
               </div>
-            )}
+
+              {/* 2. Recolección de Pedido */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
+                    <ShoppingBag className="w-3.5 h-3.5 text-amber-600" />
+                    Recolección de pedido
+                  </label>
+                  {selectedPickupBranch?.id === activeBranch?.id && (
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.5 rounded">
+                      Esta tienda
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <select
+                    value={pickupBranchId || activeBranch?.id || ""}
+                    onChange={(e) => setPickupBranchId(e.target.value)}
+                    className="w-full appearance-none bg-white hover:bg-stone-50 text-stone-900 font-bold text-xs py-2.5 px-3 pr-8 rounded-xl border border-stone-300 shadow-2xs cursor-pointer focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all truncate"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} {b.id === activeBranch?.id ? "★ (Esta tienda)" : ""} {b.address ? `— ${b.address}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                {selectedPickupBranch?.address && (
+                  <p className="text-[10px] text-stone-500 font-medium truncate flex items-center gap-1 px-1">
+                    <MapPin className="w-2.5 h-2.5 text-stone-400 shrink-0" />
+                    <span className="truncate">{selectedPickupBranch.address}</span>
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* PASO 4: ¿CUÁNTO DINERO VA A DEJAR? (MÍNIMO 50%) */}

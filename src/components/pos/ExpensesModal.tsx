@@ -585,17 +585,15 @@ export default function ExpensesModal({
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  // Sincronizar pedidos especiales en memoria y desde almacenamiento
+  // Sincronizar pedidos especiales en memoria y desde almacenamiento (excluyendo 100% entregados y cancelados)
   const [internalOrders, setInternalOrders] = useState<CustomOrder[]>(() => {
-    return Array.isArray(orders) ? orders : getStoredOrders();
+    const raw = Array.isArray(orders) ? orders : getStoredOrders();
+    return raw.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
   });
 
   useEffect(() => {
-    if (Array.isArray(orders)) {
-      setInternalOrders(orders);
-    } else {
-      setInternalOrders(getStoredOrders());
-    }
+    const raw = Array.isArray(orders) ? orders : getStoredOrders();
+    setInternalOrders(raw.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
   }, [orders, isOpen]);
 
   const [ordersVersion, setOrdersVersion] = useState(0);
@@ -603,9 +601,7 @@ export default function ExpensesModal({
   useEffect(() => {
     const handleOrdersUpdated = () => {
       setOrdersVersion((v) => v + 1);
-      if (!Array.isArray(orders)) {
-        setInternalOrders(getStoredOrders());
-      }
+      setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
     };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
     window.addEventListener("storage", handleOrdersUpdated);
@@ -613,7 +609,7 @@ export default function ExpensesModal({
       window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
       window.removeEventListener("storage", handleOrdersUpdated);
     };
-  }, [orders]);
+  }, []);
 
   // Sincronizar ventas de mostrador en memoria y desde almacenamiento local
   const [internalSales, setInternalSales] = useState<Sale[]>(() => {
@@ -749,6 +745,7 @@ export default function ExpensesModal({
     const sourceOrders = Array.isArray(orders) && orders.length > 0 ? orders : (internalOrders || []);
     return sourceOrders.filter((o) => {
       if (!o) return false;
+      if (o.status === "entregado" || o.status === "cancelado") return false;
       if (branchId) {
         const orderBranch = (o as any).operatingBranchId || o.branchId;
         if (orderBranch && orderBranch !== branchId && o.branchId !== branchId) {
@@ -790,6 +787,8 @@ export default function ExpensesModal({
   // 4. Todos los pedidos especiales históricos de la cajera/operador en turno
   const operatorAllOrders = useMemo(() => {
     return (internalOrders || []).filter((o) => {
+      if (!o) return false;
+      if (o.status === "entregado" || o.status === "cancelado") return false;
       if (branchId) {
         const orderBranch = (o as any).operatingBranchId || o.branchId;
         if (orderBranch && orderBranch !== branchId && o.branchId !== branchId) {
@@ -821,7 +820,7 @@ export default function ExpensesModal({
   const ordersPool = useMemo(() => {
     if (ticketScopeFilter === "turno") return effectiveOrders;
     if (ticketScopeFilter === "por_dia") return operatorAllOrders.length > 0 ? operatorAllOrders : effectiveOrders;
-    return getStoredOrders();
+    return getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
   }, [ticketScopeFilter, effectiveOrders, operatorAllOrders]);
 
   // Métricas superiores sincronizadas con el alcance activo (ventas de mostrador sin pedidos)
@@ -915,12 +914,13 @@ export default function ExpensesModal({
     return effectiveSales.filter((s) => !s.isCustomOrder);
   }, [effectiveSales]);
 
-  // Todos los pedidos especiales del turno activo (anticipos y liquidaciones de todos los métodos)
+  // Todos los pedidos especiales del turno activo (anticipos y liquidaciones de todos los métodos, excluyendo entregados/bajas)
   const allShiftOrdersList = useMemo(() => {
     const ordersMap = new Map<string, CustomOrder>();
 
     // 1. Pedidos desde effectiveOrders
     effectiveOrders.forEach((o) => {
+      if (o.status === "entregado" || o.status === "cancelado") return;
       const hasDeposit = (Number(o.deposit) || 0) > 0 || (Number(o.total) || 0) > 0;
       if (hasDeposit) {
         ordersMap.set(o.orderNumber || o.id, o);
@@ -931,6 +931,11 @@ export default function ExpensesModal({
     effectiveSales.forEach((s) => {
       if (s.isCustomOrder) {
         const orderKey = s.orderNumber || s.id;
+        // Si ya está entregado o cancelado en el almacén de pedidos, no agregarlo a la lista de pedidos
+        const storedMatch = getStoredOrders().find((ord) => ord.id === s.id || ord.orderNumber === s.orderNumber);
+        if (storedMatch && (storedMatch.status === "entregado" || storedMatch.status === "cancelado")) {
+          return;
+        }
         if (!ordersMap.has(orderKey)) {
           const synthOrder: CustomOrder = {
             id: s.id,
@@ -1193,7 +1198,7 @@ export default function ExpensesModal({
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
     setOrdersVersion((v) => v + 1);
-    setInternalOrders(getStoredOrders());
+    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
   };
 
   const handleCancelOrder = (order: CustomOrder) => {
@@ -1206,7 +1211,7 @@ export default function ExpensesModal({
       window.dispatchEvent(new Event("brito_orders_updated"));
     }
     setOrdersVersion((v) => v + 1);
-    setInternalOrders(getStoredOrders());
+    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
   };
 
   const handleSendOrderWhatsApp = (order: CustomOrder) => {
