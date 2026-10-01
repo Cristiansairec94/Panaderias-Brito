@@ -251,31 +251,76 @@ interface BranchContextType {
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
-  const [branches, setBranches] = useState<Branch[]>(DEFAULT_BRANCHES);
+  const [branches, setBranches] = useState<Branch[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedBranches = localStorage.getItem("brito_branches_data");
+        if (savedBranches) {
+          const parsed = JSON.parse(savedBranches);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch {}
+    }
+    return DEFAULT_BRANCHES;
+  });
   const [currentBranchId, setCurrentBranchId] = useState<string>("branch-matriz");
   const [isLiveSimulating, setIsLiveSimulating] = useState(false);
   const [recentSimulatedSales, setRecentSimulatedSales] = useState<SimulatedSale[]>([]);
   const [cashMovements, setCashMovements] = useState<BranchCashMovement[]>(DEFAULT_CASH_MOVEMENTS);
 
-  // Load state from localStorage
+  // Load state from localStorage & Server API
   useEffect(() => {
+    // 1. Sincronización con el servidor para persistencia entre computadoras y teléfonos
+    const syncBranchesWithServer = async () => {
+      try {
+        const res = await fetch("/api/branches");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.branches) && data.branches.length > 0) {
+            setBranches((localBranches) => {
+              const branchMap = new Map<string, Branch>();
+              // Sembrar defaults
+              DEFAULT_BRANCHES.forEach((d) => branchMap.set(d.id, d));
+              // Aplicar lo del servidor (para traer nuevas sucursales creadas en otros dispositivos)
+              data.branches.forEach((b: Branch) => {
+                const existing = branchMap.get(b.id);
+                branchMap.set(b.id, { ...existing, ...b });
+              });
+              // Preservar ventas en curso locales
+              localBranches.forEach((b: Branch) => {
+                const existing = branchMap.get(b.id);
+                branchMap.set(b.id, { ...existing, ...b });
+              });
+              const merged = Array.from(branchMap.values());
+              try {
+                localStorage.setItem("brito_branches_data", JSON.stringify(merged));
+              } catch {}
+              return merged;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[BranchContext] No se pudo consultar /api/branches:", err);
+      }
+    };
+
+    syncBranchesWithServer();
+
+    // 2. Cargar estado de almacenamiento local
     try {
       const savedBranches = localStorage.getItem("brito_branches_data");
       if (savedBranches) {
         const parsed = JSON.parse(savedBranches);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const merged = parsed.map((b: Branch) => {
-            const def = DEFAULT_BRANCHES.find((d) => d.id === b.id);
-            return {
-              ...def,
-              ...b,
-              topProduct: b.topProduct || def?.topProduct,
-              assignedUserId: b.assignedUserId || def?.assignedUserId,
-              assignedUserName: b.assignedUserName || def?.assignedUserName,
-              assignedUserEmail: b.assignedUserEmail || def?.assignedUserEmail,
-            };
+          setBranches((prev) => {
+            const map = new Map<string, Branch>();
+            DEFAULT_BRANCHES.forEach((d) => map.set(d.id, d));
+            parsed.forEach((b: Branch) => map.set(b.id, { ...map.get(b.id), ...b }));
+            prev.forEach((b: Branch) => map.set(b.id, { ...map.get(b.id), ...b }));
+            return Array.from(map.values());
           });
-          setBranches(merged);
         }
       }
       const savedCurrent = localStorage.getItem("brito_current_branch_id");
@@ -416,19 +461,60 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       });
     });
 
+    // 3. Escuchar sucursales creadas, modificadas o eliminadas en tiempo real desde otros dispositivos
+    const unsubBranch = realtimeHub.onBranch
+      ? realtimeHub.onBranch((payload) => {
+          const { action, branch } = payload;
+          if (!branch || !branch.id) return;
+
+          setBranches((prev) => {
+            let updated: Branch[];
+            if (action === "create") {
+              if (prev.some((b) => b.id === branch.id || (branch.code && b.code === branch.code))) {
+                updated = prev.map((b) =>
+                  b.id === branch.id || (branch.code && b.code === branch.code) ? { ...b, ...branch } : b
+                );
+              } else {
+                updated = [...prev, branch];
+              }
+            } else if (action === "update") {
+              updated = prev.map((b) => (b.id === branch.id ? { ...b, ...branch } : b));
+            } else if (action === "delete") {
+              if (prev.length <= 1) return prev;
+              updated = prev.filter((b) => b.id !== branch.id);
+            } else {
+              updated = prev;
+            }
+
+            try {
+              localStorage.setItem("brito_branches_data", JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
+        })
+      : undefined;
+
     return () => {
       unsubSale();
       unsubCashMovement();
+      if (unsubBranch) unsubBranch();
     };
   }, []);
 
-  // Save branches changes
+  // Save branches changes to localStorage and server
   const persistBranches = (updated: Branch[]) => {
-    setBranches(updated);
     try {
       localStorage.setItem("brito_branches_data", JSON.stringify(updated));
     } catch {
       // Ignore
+    }
+
+    if (typeof window !== "undefined") {
+      fetch("/api/branches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      }).catch((e) => console.warn("[BranchContext] Error syncing with /api/branches:", e));
     }
   };
 
@@ -443,27 +529,53 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
   const addBranch = useCallback((newBranch: Branch) => {
     setBranches((prev) => {
+      if (prev.some((b) => b.id === newBranch.id || (newBranch.code && b.code === newBranch.code))) {
+        return prev;
+      }
       const updated = [...prev, newBranch];
       persistBranches(updated);
       return updated;
     });
+
+    // Transmitir en tiempo real a teléfonos y laptops conectados
+    if (realtimeHub.broadcastBranch) {
+      realtimeHub.broadcastBranch("create", newBranch);
+    }
   }, []);
 
   const updateBranch = useCallback((branchId: string, updates: Partial<Branch>) => {
+    let updatedBranch: Branch | null = null;
     setBranches((prev) => {
-      const updated = prev.map((b) => (b.id === branchId ? { ...b, ...updates } : b));
+      const updated = prev.map((b) => {
+        if (b.id === branchId) {
+          updatedBranch = { ...b, ...updates };
+          return updatedBranch;
+        }
+        return b;
+      });
       persistBranches(updated);
       return updated;
     });
+
+    if (updatedBranch && realtimeHub.broadcastBranch) {
+      realtimeHub.broadcastBranch("update", updatedBranch);
+    }
   }, []);
 
   const deleteBranch = useCallback((branchId: string) => {
+    let deletedBranch: Branch | null = null;
     setBranches((prev) => {
       if (prev.length <= 1) return prev;
+      deletedBranch = prev.find((b) => b.id === branchId) || null;
       const updated = prev.filter((b) => b.id !== branchId);
       persistBranches(updated);
       return updated;
     });
+
+    if (deletedBranch && realtimeHub.broadcastBranch) {
+      realtimeHub.broadcastBranch("delete", deletedBranch);
+    }
+
     setCurrentBranchId((current) => {
       if (current === branchId) {
         const remaining = branches.filter((b) => b.id !== branchId);

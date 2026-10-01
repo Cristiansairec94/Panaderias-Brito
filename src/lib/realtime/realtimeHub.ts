@@ -2,7 +2,14 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { FBNotification } from "@/context/NotificationContext";
-import { BranchCashMovement, CustomOrder } from "@/types";
+import { BranchCashMovement, CustomOrder, Branch } from "@/types";
+
+export interface RealtimeBranchPayload {
+  action: "create" | "update" | "delete";
+  branch: Branch;
+  senderDeviceId: string;
+  timestamp: string;
+}
 
 export interface RealtimeSalePayload {
   id: string;
@@ -54,6 +61,7 @@ type SaleListener = (sale: RealtimeSalePayload) => void;
 type CashMovementListener = (movement: RealtimeCashMovementPayload) => void;
 type OrderListener = (payload: RealtimeOrderPayload) => void;
 type BreadDeliveryListener = (delivery: RealtimeBreadDeliveryPayload) => void;
+type BranchListener = (payload: RealtimeBranchPayload) => void;
 type StatusListener = (status: RealtimeStatus) => void;
 
 const CHANNEL_NAME = "panaderia_brito_realtime";
@@ -71,6 +79,7 @@ class RealtimeHub {
   private cashMovementListeners = new Set<CashMovementListener>();
   private orderListeners = new Set<OrderListener>();
   private breadDeliveryListeners = new Set<BreadDeliveryListener>();
+  private branchListeners = new Set<BranchListener>();
   private statusListeners = new Set<StatusListener>();
 
   constructor() {
@@ -184,6 +193,17 @@ class RealtimeHub {
               listener(payload);
             } catch (err) {
               console.error("[RealtimeHub] Error in bread delivery listener:", err);
+            }
+          });
+        })
+        .on("broadcast", { event: "branch" }, ({ payload }: { payload: any }) => {
+          if (!payload) return;
+          if (payload.senderDeviceId && payload.senderDeviceId === this.getDeviceId()) return;
+          this.branchListeners.forEach((listener) => {
+            try {
+              listener(payload);
+            } catch (err) {
+              console.error("[RealtimeHub] Error in branch listener:", err);
             }
           });
         })
@@ -302,6 +322,18 @@ class RealtimeHub {
     this.postToSyncEndpoint("bread_delivery", payload);
   }
 
+  public async broadcastBranch(action: RealtimeBranchPayload["action"], branch: Branch) {
+    const payload: RealtimeBranchPayload = {
+      action,
+      branch,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+
+    this.sendBroadcast("branch", payload);
+    this.postToSyncEndpoint("branch", payload);
+  }
+
   private sendBroadcast(event: string, payload: any) {
     if (!this.channel) {
       this.initChannel();
@@ -364,6 +396,8 @@ class RealtimeHub {
           this.orderListeners.forEach((fn) => fn(item.payload));
         } else if (item.type === "bread_delivery") {
           this.breadDeliveryListeners.forEach((fn) => fn(item.payload));
+        } else if (item.type === "branch") {
+          this.branchListeners.forEach((fn) => fn(item.payload));
         }
       }
     } catch {
@@ -405,6 +439,13 @@ class RealtimeHub {
     this.breadDeliveryListeners.add(listener);
     return () => {
       this.breadDeliveryListeners.delete(listener);
+    };
+  }
+
+  public onBranch(listener: BranchListener) {
+    this.branchListeners.add(listener);
+    return () => {
+      this.branchListeners.delete(listener);
     };
   }
 

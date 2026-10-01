@@ -63,6 +63,13 @@ export default function SucursalesPage() {
   const [lastSimulatedSale, setLastSimulatedSale] = useState<SimulatedSale | null>(null);
   const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
   const [editingShiftBranch, setEditingShiftBranch] = useState<Branch | null>(null);
+  const [branchSuccessBanner, setBranchSuccessBanner] = useState<string | null>(null);
+
+  const handleAddBranch = (newBranch: Branch) => {
+    addBranch(newBranch);
+    setBranchSuccessBanner(`¡Sucursal "${newBranch.name}" (${newBranch.code}) guardada con éxito en la red!`);
+    setTimeout(() => setBranchSuccessBanner(null), 5000);
+  };
 
   // Fecha del día actual formateada
   const [todayDateFormatted, setTodayDateFormatted] = useState<string>(() => {
@@ -332,6 +339,21 @@ export default function SucursalesPage() {
                 {formatCurrency(lastSimulatedSale.total)}
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Branch Creation Success Banner */}
+        {branchSuccessBanner && (
+          <div className="mt-6 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <p className="font-bold text-emerald-200">
+                {branchSuccessBanner}
+              </p>
+            </div>
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/30 text-emerald-200 border border-emerald-400/30">
+              Sincronizada en Red
+            </span>
           </div>
         )}
 
@@ -1386,7 +1408,7 @@ export default function SucursalesPage() {
       <CreateBranchModal
         isOpen={isCreateBranchOpen}
         onClose={() => setIsCreateBranchOpen(false)}
-        onAddBranch={addBranch}
+        onAddBranch={handleAddBranch}
         existingCount={branches.length}
       />
 

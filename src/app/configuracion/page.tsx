@@ -174,6 +174,12 @@ function ConfiguracionContent() {
       todayTickets: 0,
       cashInDrawer: fund,
       color: bColor,
+      topProduct: {
+        name: "Bolillo Tradicional",
+        piecesSold: 0,
+        category: "Pan Salado",
+        icon: "🥖",
+      },
       currentShift: {
         id: `shift-${newId}-1`,
         name: "Turno Matutino (06:00 - 14:00)",
