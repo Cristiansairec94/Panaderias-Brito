@@ -480,7 +480,7 @@ export default function PedidosPage() {
       return;
     }
     if (key === "historial" || key === "entregados") {
-      setHistoryDashboardTab(key === "entregados" ? "entregados" : "todos");
+      setHistoryDashboardTab("cancelados");
       setIsHistoryDashboardOpen(true);
       return;
     }
@@ -628,62 +628,22 @@ export default function PedidosPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            {/* Botón de Historial con 2 apartados: Entregados con éxito y Dados de baja */}
-            <div className="flex items-center rounded-xl bg-stone-900 text-white shadow-xs p-0.5 border border-stone-800 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setHistoryDashboardTab("todos");
-                  setIsHistoryDashboardOpen(true);
-                }}
-                className="px-2.5 py-1.5 flex items-center gap-1.5 font-black text-amber-400 border-r border-stone-800 shrink-0 select-none cursor-pointer hover:bg-stone-800 rounded-l-lg transition-colors"
-                title="Abrir Dashboard Independiente del Historial"
-              >
-                <History className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Historial:</span>
-              </button>
-
-              {/* Apartado 1: Pedidos entregados con éxito */}
-              <button
-                type="button"
-                onClick={() => {
-                  setHistoryDashboardTab("entregados");
-                  setIsHistoryDashboardOpen(true);
-                }}
-                className="px-2.5 sm:px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none text-stone-300 hover:text-white hover:bg-stone-800"
-                title="Abrir Dashboard Independiente de pedidos entregados con éxito"
-              >
-                <Check className="w-3.5 h-3.5 text-teal-400" />
-                <span>
-                  <span className="hidden lg:inline">Pedidos </span>entregados con éxito
-                </span>
-                <span className="font-mono font-black text-[10px] px-1.5 py-0.2 rounded-md bg-teal-950 text-teal-300 border border-teal-700/60">
-                  {classificationCounts.entregados}
-                </span>
-              </button>
-
-              {/* Separador */}
-              <div className="h-4 w-px bg-stone-800" />
-
-              {/* Apartado 2: Pedidos que se dieron de baja */}
-              <button
-                type="button"
-                onClick={() => {
-                  setHistoryDashboardTab("cancelados");
-                  setIsHistoryDashboardOpen(true);
-                }}
-                className="px-2.5 sm:px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer select-none text-stone-300 hover:text-white hover:bg-stone-800"
-                title="Abrir Dashboard Independiente de pedidos dados de baja"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                <span>
-                  <span className="hidden lg:inline">Pedidos </span>que se dieron de baja
-                </span>
-                <span className="font-mono font-black text-[10px] px-1.5 py-0.2 rounded-md bg-rose-950 text-rose-300 border border-rose-700/60">
-                  {classificationCounts.cancelados}
-                </span>
-              </button>
-            </div>
+            {/* Botón de Historial: Dados de baja */}
+            <button
+              type="button"
+              onClick={() => {
+                setHistoryDashboardTab("cancelados");
+                setIsHistoryDashboardOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white shadow-xs border border-stone-800 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer select-none"
+              title="Abrir Historial de pedidos dados de baja"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Historial (Dados de Baja)</span>
+              <span className="font-mono font-black text-[10px] px-1.5 py-0.2 rounded-md bg-rose-950 text-rose-300 border border-rose-700/60">
+                {classificationCounts.cancelados}
+              </span>
+            </button>
 
             <button
               type="button"

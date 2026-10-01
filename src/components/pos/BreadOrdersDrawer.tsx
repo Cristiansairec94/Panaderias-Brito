@@ -88,14 +88,14 @@ export default function BreadOrdersDrawer({
   useEffect(() => {
     if (isOpen) {
       setProducts(getStoredProducts());
-      setOrders(getStoredOrders());
+      setOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
       setDepositInput(0);
     }
   }, [isOpen]);
 
   // Refresh orders from storage
   const refreshOrders = () => {
-    setOrders(getStoredOrders());
+    setOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
   };
 
   // Total calculation
@@ -320,7 +320,7 @@ export default function BreadOrdersDrawer({
 
   if (!isOpen) return null;
 
-  const activeOrders = orders.filter((o) => o.status !== "entregado");
+  const activeOrders = orders.filter((o) => o.status !== "entregado" && o.status !== "cancelado");
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
