@@ -3317,9 +3317,7 @@ export default function ExpensesModal({
                               Filtros de Clasificación
                             </span>
                             <span className="text-[11px] text-stone-500 font-bold block">
-                              {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
-                                ? `Pedidos por entregar (${filteredAllOrders.length} visibles de ${allHistoricalOrders.length})`
-                                : `${cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : "Pedidos Especiales"} • ${cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : "Transferencia"} (${visibleCashMovements.length})`}
+                              {cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : "Pedidos del Turno"} • {cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : "Transferencia"} ({visibleCashMovements.length})
                             </span>
                           </div>
                         </div>
@@ -3336,7 +3334,6 @@ export default function ExpensesModal({
                               <option value="all">📋 Tipo: Todos ({unifiedShiftMovements.length})</option>
                               <option value="ventas">🥖 Tipo: Ventas ({allShiftPureSales.length})</option>
                               <option value="pedidos">🎂 Tipo: Pedidos Turno ({allShiftOrdersList.length})</option>
-                              <option value="todos_pedidos">📦 Tipo: Pedidos por Entregar ({allHistoricalOrders.length})</option>
                             </select>
                             <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
@@ -3352,7 +3349,6 @@ export default function ExpensesModal({
                               <option value="efectivo">💵 Pago: Efectivo ({detailMethodCounts.efectivo})</option>
                               <option value="tarjeta">💳 Pago: Tarjeta ({detailMethodCounts.tarjeta})</option>
                               <option value="transferencia">📱 Pago: Transf. ({detailMethodCounts.transferencia})</option>
-                              <option value="todos_pedidos">📦 Pedidos por Entregar ({allHistoricalOrders.length})</option>
                             </select>
                             <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
@@ -3361,22 +3357,20 @@ export default function ExpensesModal({
 
                       {/* 2. Cuadros organizados en cuadrículas limpias (SIN deslizar horizontalmente, SIN barras de desplazamiento) */}
                       <div className="space-y-3 pt-2.5 border-t border-stone-200">
-                          {/* Fila A: Tipo de Registro (4 columnas) */}
+                          {/* Fila A: Tipo de Registro (3 columnas limpias) */}
                           <div>
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
                               <span>1. Tipo de Movimiento:</span>
                               <span className="text-[10px] font-bold lowercase text-stone-400">
-                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : cashDetailFilter === "pedidos" ? "pedidos del turno" : "pedidos por entregar"}
+                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : "pedidos del turno"}
                               </span>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div className="grid grid-cols-3 gap-2">
                               {[
                                 { id: "all", label: "Todos", icon: "📋", count: unifiedShiftMovements.length },
                                 { id: "ventas", label: "Ventas en Caja", icon: "🥖", count: allShiftPureSales.length },
                                 { id: "pedidos", label: "Pedidos del Turno", icon: "🎂", count: allShiftOrdersList.length },
-                                { id: "todos_pedidos", label: "Pedidos por Entregar", icon: "📦", count: allHistoricalOrders.length },
                               ].map((tab) => {
-                                const isSpecial = tab.id === "todos_pedidos";
                                 const isSelected = cashDetailFilter === tab.id;
                                 return (
                                   <button
@@ -3384,11 +3378,7 @@ export default function ExpensesModal({
                                     type="button"
                                     onClick={() => handleSelectDetailFilter(tab.id as any)}
                                     className={`py-2.5 px-3 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 text-center active:scale-98 ${
-                                      isSpecial
-                                        ? isSelected
-                                          ? "bg-gradient-to-r from-stone-950 via-amber-950 to-stone-950 text-amber-300 border-amber-400 shadow-xl ring-4 ring-amber-500/50 scale-[1.02]"
-                                          : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white border-orange-600 shadow-md shadow-orange-500/30 ring-2 ring-orange-300/50 hover:brightness-110 hover:shadow-lg"
-                                        : isSelected
+                                      isSelected
                                         ? "bg-stone-900 text-white border-stone-950 shadow-md ring-2 ring-stone-900/20"
                                         : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
                                     }`}
@@ -3396,11 +3386,7 @@ export default function ExpensesModal({
                                     <span className="text-base sm:text-lg">{tab.icon}</span>
                                     <span className="whitespace-normal leading-tight font-black">{tab.label}</span>
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                                      isSpecial
-                                        ? isSelected
-                                          ? "bg-amber-400 text-stone-950 font-black"
-                                          : "bg-black/25 text-white font-black border border-white/20"
-                                        : isSelected
+                                      isSelected
                                         ? "bg-white/20 text-white"
                                         : "bg-stone-100 text-stone-600 font-bold"
                                     }`}>
@@ -3412,35 +3398,29 @@ export default function ExpensesModal({
                             </div>
                           </div>
 
-                          {/* Fila B: Método de Pago (6 columnas con cuadro expandido para Pedidos por Entregar) */}
+                          {/* Fila B: Método de Pago (4 columnas limpias) */}
                           <div>
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
-                              <span>2. Método de Cobro y Acceso a Pedidos:</span>
+                              <span>2. Método de Cobro:</span>
                               <span className="text-[10px] font-bold lowercase text-stone-400">
-                                {cashMethodFilter === "all" ? "todos los métodos" : cashMethodFilter === "todos_pedidos" ? "pedidos por entregar" : `solo ${cashMethodFilter}`}
+                                {cashMethodFilter === "all" ? "todos los métodos" : `solo ${cashMethodFilter}`}
                               </span>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                               {[
-                                { id: "all", label: "Todos", icon: "🌐", count: detailMethodCounts.all, activeClass: "bg-stone-900 text-white border-stone-950 ring-2 ring-stone-900/20", span: "col-span-1" },
-                                { id: "efectivo", label: "Efectivo", icon: "💵", count: detailMethodCounts.efectivo, activeClass: "bg-gradient-to-r from-emerald-700 to-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-600/30", span: "col-span-1" },
-                                { id: "tarjeta", label: "Tarjeta", icon: "💳", count: detailMethodCounts.tarjeta, activeClass: "bg-gradient-to-r from-blue-700 to-blue-800 text-white border-blue-900 ring-2 ring-blue-600/30", span: "col-span-1" },
-                                { id: "transferencia", label: "Transf.", icon: "📱", count: detailMethodCounts.transferencia, activeClass: "bg-gradient-to-r from-purple-700 to-purple-800 text-white border-purple-900 ring-2 ring-purple-600/30", span: "col-span-1" },
-                                { id: "todos_pedidos", label: "Pedidos por Entregar", icon: "📦", count: allHistoricalOrders.length, activeClass: "bg-gradient-to-r from-stone-950 via-amber-950 to-stone-950 text-amber-300 border-amber-400 ring-4 ring-amber-500/50 shadow-xl", span: "col-span-2 sm:col-span-2" },
+                                { id: "all", label: "Todos", icon: "🌐", count: detailMethodCounts.all, activeClass: "bg-stone-900 text-white border-stone-950 ring-2 ring-stone-900/20" },
+                                { id: "efectivo", label: "Efectivo", icon: "💵", count: detailMethodCounts.efectivo, activeClass: "bg-gradient-to-r from-emerald-700 to-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-600/30" },
+                                { id: "tarjeta", label: "Tarjeta", icon: "💳", count: detailMethodCounts.tarjeta, activeClass: "bg-gradient-to-r from-blue-700 to-blue-800 text-white border-blue-900 ring-2 ring-blue-600/30" },
+                                { id: "transferencia", label: "Transf.", icon: "📱", count: detailMethodCounts.transferencia, activeClass: "bg-gradient-to-r from-purple-700 to-purple-800 text-white border-purple-900 ring-2 ring-purple-600/30" },
                               ].map((m) => {
-                                const isSpecial = m.id === "todos_pedidos";
                                 const isSelected = cashMethodFilter === m.id;
                                 return (
                                   <button
                                     key={m.id}
                                     type="button"
                                     onClick={() => handleSelectMethodFilter(m.id as any)}
-                                    className={`${m.span} py-2.5 px-3 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
-                                      isSpecial
-                                        ? isSelected
-                                          ? `${m.activeClass} shadow-md`
-                                          : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white border-orange-600 shadow-md shadow-orange-500/30 ring-2 ring-orange-300/50 hover:brightness-110"
-                                        : isSelected
+                                    className={`py-2.5 px-3 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
+                                      isSelected
                                         ? `${m.activeClass} shadow-md`
                                         : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
                                     }`}
@@ -3450,11 +3430,7 @@ export default function ExpensesModal({
                                       <span className="whitespace-normal leading-tight font-black">{m.label}</span>
                                     </div>
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
-                                      isSpecial
-                                        ? isSelected
-                                          ? "bg-amber-400 text-stone-950 font-black"
-                                          : "bg-black/25 text-white font-black border border-white/20"
-                                        : isSelected
+                                      isSelected
                                         ? "bg-white/20 text-white"
                                         : "bg-stone-100 text-stone-600 font-bold"
                                     }`}>
