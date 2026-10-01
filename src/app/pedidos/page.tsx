@@ -212,6 +212,39 @@ export default function PedidosPage() {
     return getLocalDateISO(d);
   }, []);
 
+  // Time period boundaries (Semana, Mes, Año)
+  const { startOfWeekStr, endOfWeekStr, formattedWeekRange } = useMemo(() => {
+    const now = new Date();
+    const dayOfWeek = (now.getDay() + 6) % 7; // Monday = 0
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+    const startStr = getLocalDateISO(start);
+    const endStr = getLocalDateISO(end);
+    const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const formatted = `${start.getDate()} ${months[start.getMonth()]} - ${end.getDate()} ${months[end.getMonth()]} ${end.getFullYear()}`;
+    return {
+      startOfWeekStr: startStr,
+      endOfWeekStr: endStr,
+      formattedWeekRange: formatted,
+    };
+  }, []);
+
+  const availableYears = useMemo(() => {
+    const curYear = new Date().getFullYear();
+    return [curYear - 1, curYear, curYear + 1].map(String);
+  }, []);
+
+  const formattedMonthLabel = useMemo(() => {
+    if (!customSelectedMonth) return "";
+    const [year, month] = customSelectedMonth.split("-");
+    const monthNames = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+    const mIdx = parseInt(month, 10) - 1;
+    return `${monthNames[mIdx] || month} ${year}`;
+  }, [customSelectedMonth]);
+
   // Classification checkers for any order
   const checkIsOverdue = (order: CustomOrder): boolean => {
     if (order.status === "entregado" || order.status === "cancelado") return false;
@@ -322,6 +355,59 @@ export default function PedidosPage() {
     };
   }, [orders, selectedBranchFilter, todayStr, currentMinutes]);
 
+  // Time period counts (Día, Semana, Mes, Año, Todos) para la sucursal actual
+  const timePeriodCounts = useMemo(() => {
+    const branchFiltered = orders.filter((o) => {
+      if (selectedBranchFilter !== "all") {
+        const orderOperating = (o as any).operatingBranchId;
+        return !o.branchId || o.branchId === selectedBranchFilter || orderOperating === selectedBranchFilter;
+      }
+      return true;
+    });
+
+    const baseOrders = branchFiltered.filter((o) => {
+      if (classificationFilter === "historial") {
+        if (historialSubFilter === "entregados") return o.status === "entregado";
+        if (historialSubFilter === "cancelados") return o.status === "cancelado";
+        return o.status === "entregado" || o.status === "cancelado";
+      }
+      return o.status !== "entregado" && o.status !== "cancelado";
+    });
+
+    let todos = baseOrders.length;
+    let dia = 0;
+    let semana = 0;
+    let mes = 0;
+    let ano = 0;
+
+    for (const o of baseOrders) {
+      const oDate = normalizeDateStr(o.deliveryDate) || (o.createdAt ? normalizeDateStr(o.createdAt) : "");
+      if (!oDate) continue;
+      if (oDate === customSelectedDate) dia++;
+      if (oDate >= startOfWeekStr && oDate <= endOfWeekStr) semana++;
+      if (oDate.startsWith(customSelectedMonth)) mes++;
+      if (oDate.startsWith(customSelectedYear)) ano++;
+    }
+
+    return {
+      todos,
+      dia,
+      semana,
+      mes,
+      ano,
+    };
+  }, [
+    orders,
+    selectedBranchFilter,
+    classificationFilter,
+    historialSubFilter,
+    customSelectedDate,
+    startOfWeekStr,
+    endOfWeekStr,
+    customSelectedMonth,
+    customSelectedYear,
+  ]);
+
   // Filtered orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -349,7 +435,7 @@ export default function PedidosPage() {
         }
       }
 
-      const orderDate = normalizeDateStr(order.deliveryDate);
+      const orderDate = normalizeDateStr(order.deliveryDate) || (order.createdAt ? normalizeDateStr(order.createdAt) : "");
 
       // Classification Filter (Botones principales con emoticones y cuadros KPI)
       if (classificationFilter === "hoy" && orderDate !== todayStr) {
@@ -364,6 +450,15 @@ export default function PedidosPage() {
       if (classificationFilter === "no_llevados" && !checkIsReadyNotDelivered(order)) return false;
       if (classificationFilter === "no_pasaron" && !checkIsOverdue(order)) return false;
       if (classificationFilter === "proximos" && !checkIsUpcoming(order)) return false;
+
+      // Time Period Filter: día, semana, mes, año, todos
+      if (timePeriodFilter !== "todos") {
+        if (!orderDate) return false;
+        if (timePeriodFilter === "dia" && orderDate !== customSelectedDate) return false;
+        if (timePeriodFilter === "semana" && (orderDate < startOfWeekStr || orderDate > endOfWeekStr)) return false;
+        if (timePeriodFilter === "mes" && !orderDate.startsWith(customSelectedMonth)) return false;
+        if (timePeriodFilter === "ano" && !orderDate.startsWith(customSelectedYear)) return false;
+      }
 
       // Status filter (solo aplica si clasificación es "all")
       if (classificationFilter === "all" && statusFilter !== "all" && order.status !== statusFilter) {
@@ -411,7 +506,26 @@ export default function PedidosPage() {
 
       return true;
     });
-  }, [orders, selectedBranchFilter, classificationFilter, historialSubFilter, pagadosSubFilter, statusFilter, paymentFilter, dateFilter, searchQuery, todayStr, tomorrowStr, currentMinutes]);
+  }, [
+    orders,
+    selectedBranchFilter,
+    classificationFilter,
+    historialSubFilter,
+    pagadosSubFilter,
+    statusFilter,
+    paymentFilter,
+    dateFilter,
+    timePeriodFilter,
+    customSelectedDate,
+    customSelectedMonth,
+    customSelectedYear,
+    startOfWeekStr,
+    endOfWeekStr,
+    searchQuery,
+    todayStr,
+    tomorrowStr,
+    currentMinutes,
+  ]);
 
   // Metrics (reactivos a la sucursal seleccionada para coincidir con los pedidos)
   const metrics = useMemo(() => {
@@ -455,8 +569,21 @@ export default function PedidosPage() {
         const targetTop = rect.top - mainRect.top + mainEl.scrollTop;
         mainEl.scrollTo({ top: Math.max(0, targetTop - 6), behavior: "smooth" });
       }
-      catalogScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }, 60);
+  };
+
+  // Handler para la clasificación por período de tiempo (Día, Semana, Mes, Año, Todos)
+  const handleSelectTimePeriod = (period: TimePeriodFilter) => {
+    setTimePeriodFilter(period);
+    if (period === "dia") {
+      setCustomSelectedDate(todayStr);
+    }
+    // Si el usuario tenía "hoy" en la clasificación general y cambia a semana, mes o año,
+    // restablecemos classificationFilter a "all" para que vea el universo de ese período
+    if (classificationFilter === "hoy" && period !== "dia") {
+      setClassificationFilter("all");
+    }
+    scrollToCatalog();
   };
 
   // Handler para los 4 cuadros KPI principales: activa el filtro y lleva directamente a ver los pedidos correspondientes
@@ -481,6 +608,10 @@ export default function PedidosPage() {
       setDateFilter("all");
       scrollToCatalog();
       return;
+    }
+    if (key === "hoy") {
+      setTimePeriodFilter("dia");
+      setCustomSelectedDate(todayStr);
     }
     if (key === "historial" || key === "entregados") {
       setHistoryDashboardTab("cancelados");
@@ -664,9 +795,9 @@ export default function PedidosPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 w-full max-w-[1600px] mx-auto px-2 sm:px-4 pt-0.5 sm:pt-1 pb-24 md:pb-2 lg:overflow-hidden overflow-visible">
+    <div className="w-full max-w-[1600px] mx-auto px-2 sm:px-4 pt-0.5 sm:pt-1 pb-24 md:pb-8 flex flex-col">
       {/* 1. ZONA SUPERIOR: Header, Métricas, Buscador y Paleta de Clasificación */}
-      <div className="lg:shrink-0 space-y-1.5 sm:space-y-2">
+      <div className="space-y-1.5 sm:space-y-2">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2.5">
@@ -1170,15 +1301,220 @@ export default function PedidosPage() {
           </div>
       </div>
 
-      {/* 2. ZONA INFERIOR DE DESPLAZAMIENTO INDEPENDIENTE: Catálogo de Productos y Pedidos */}
+      {/* 1.5. CLASIFICACIÓN TEMPORAL DE PEDIDOS (Día, Semana, Mes, Año, Todos) */}
+      <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-stone-200 shadow-2xs space-y-2.5 animate-in fade-in duration-200">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="p-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300">
+              <Calendar className="w-3.5 h-3.5" />
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-black text-stone-900 uppercase tracking-wide">
+                Clasificación por Tiempo:
+              </span>
+              <span className="text-[11px] font-bold text-stone-500">
+                (Día, Semana, Mes, Año)
+              </span>
+            </div>
+          </div>
+
+          {/* Controles dinámicos según el período seleccionado */}
+          {timePeriodFilter === "dia" && (
+            <div className="flex items-center gap-2 bg-amber-50/90 border border-amber-300 px-2.5 py-1 rounded-xl shadow-2xs">
+              <span className="text-xs font-black text-amber-900">Fecha del Día:</span>
+              <input
+                type="date"
+                value={customSelectedDate}
+                onChange={(e) => setCustomSelectedDate(e.target.value)}
+                className="text-xs font-bold text-stone-900 bg-white border border-amber-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+              />
+              {customSelectedDate !== todayStr ? (
+                <button
+                  type="button"
+                  onClick={() => setCustomSelectedDate(todayStr)}
+                  className="text-[10px] font-black text-amber-900 bg-amber-200 hover:bg-amber-300 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                  title="Volver al día de hoy"
+                >
+                  Ir a Hoy
+                </button>
+              ) : (
+                <span className="text-[10px] font-black uppercase text-amber-800 bg-amber-200/60 px-1.5 py-0.5 rounded">
+                  Hoy
+                </span>
+              )}
+            </div>
+          )}
+
+          {timePeriodFilter === "semana" && (
+            <div className="flex items-center gap-2 bg-blue-50/90 border border-blue-300 px-2.5 py-1 rounded-xl shadow-2xs">
+              <span className="text-xs font-black text-blue-900">Semana Actual:</span>
+              <span className="text-xs font-extrabold text-blue-950 font-mono">
+                {formattedWeekRange}
+              </span>
+            </div>
+          )}
+
+          {timePeriodFilter === "mes" && (
+            <div className="flex items-center gap-2 bg-purple-50/90 border border-purple-300 px-2.5 py-1 rounded-xl shadow-2xs">
+              <span className="text-xs font-black text-purple-900">Mes:</span>
+              <input
+                type="month"
+                value={customSelectedMonth}
+                onChange={(e) => setCustomSelectedMonth(e.target.value)}
+                className="text-xs font-bold text-stone-900 bg-white border border-purple-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+              />
+              <span className="text-xs font-black text-purple-950 capitalize">
+                {formattedMonthLabel}
+              </span>
+            </div>
+          )}
+
+          {timePeriodFilter === "ano" && (
+            <div className="flex items-center gap-2 bg-emerald-50/90 border border-emerald-300 px-2.5 py-1 rounded-xl shadow-2xs">
+              <span className="text-xs font-black text-emerald-900">Año:</span>
+              <select
+                value={customSelectedYear}
+                onChange={(e) => setCustomSelectedYear(e.target.value)}
+                className="text-xs font-bold text-stone-900 bg-white border border-emerald-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              >
+                {availableYears.map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {timePeriodFilter !== "todos" && (
+            <button
+              type="button"
+              onClick={() => handleSelectTimePeriod("todos")}
+              className="text-xs font-bold text-stone-500 hover:text-stone-800 underline cursor-pointer"
+            >
+              Ver todo el tiempo
+            </button>
+          )}
+        </div>
+
+        {/* Botones de Períodos: Todos, Día, Semana, Mes, Año */}
+        <div className="flex items-stretch w-full bg-stone-100 p-0.5 rounded-xl border border-stone-200/90 shadow-2xs divide-x divide-stone-200/80 overflow-x-auto">
+          {/* 1. Todos */}
+          <button
+            type="button"
+            onClick={() => handleSelectTimePeriod("todos")}
+            className={`flex-1 min-w-[90px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+              timePeriodFilter === "todos"
+                ? "bg-stone-900 text-white shadow-xs"
+                : "hover:bg-white/80 text-stone-700"
+            }`}
+            title="Ver todos los pedidos sin restricción de fecha"
+          >
+            <span>🌐 Todos</span>
+            <span
+              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
+                timePeriodFilter === "todos" ? "bg-white/20 text-white" : "bg-stone-200 text-stone-800"
+              }`}
+            >
+              {timePeriodCounts.todos}
+            </span>
+          </button>
+
+          {/* 2. Día */}
+          <button
+            type="button"
+            onClick={() => handleSelectTimePeriod("dia")}
+            className={`flex-1 min-w-[90px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+              timePeriodFilter === "dia"
+                ? "bg-amber-600 text-white shadow-xs"
+                : "hover:bg-white/80 text-stone-700"
+            }`}
+            title="Ver pedidos programados para un día específico (por defecto hoy)"
+          >
+            <span>☀️ Día</span>
+            <span
+              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
+                timePeriodFilter === "dia" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-900 border border-amber-200"
+              }`}
+            >
+              {timePeriodCounts.dia}
+            </span>
+          </button>
+
+          {/* 3. Semana */}
+          <button
+            type="button"
+            onClick={() => handleSelectTimePeriod("semana")}
+            className={`flex-1 min-w-[95px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+              timePeriodFilter === "semana"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "hover:bg-white/80 text-stone-700"
+            }`}
+            title="Ver pedidos programados para esta semana (Lunes a Domingo)"
+          >
+            <span>🗓️ Semana</span>
+            <span
+              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
+                timePeriodFilter === "semana" ? "bg-white/20 text-white" : "bg-blue-100 text-blue-900 border border-blue-200"
+              }`}
+            >
+              {timePeriodCounts.semana}
+            </span>
+          </button>
+
+          {/* 4. Mes */}
+          <button
+            type="button"
+            onClick={() => handleSelectTimePeriod("mes")}
+            className={`flex-1 min-w-[90px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+              timePeriodFilter === "mes"
+                ? "bg-purple-600 text-white shadow-xs"
+                : "hover:bg-white/80 text-stone-700"
+            }`}
+            title="Ver pedidos programados para este mes"
+          >
+            <span>📆 Mes</span>
+            <span
+              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
+                timePeriodFilter === "mes" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-900 border border-purple-200"
+              }`}
+            >
+              {timePeriodCounts.mes}
+            </span>
+          </button>
+
+          {/* 5. Año */}
+          <button
+            type="button"
+            onClick={() => handleSelectTimePeriod("ano")}
+            className={`flex-1 min-w-[90px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+              timePeriodFilter === "ano"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "hover:bg-white/80 text-stone-700"
+            }`}
+            title="Ver pedidos programados para este año"
+          >
+            <span>📅 Año</span>
+            <span
+              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
+                timePeriodFilter === "ano" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-900 border border-emerald-200"
+              }`}
+            >
+              {timePeriodCounts.ano}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Catálogo de Productos y Pedidos */}
       <div 
         ref={catalogSectionRef}
         id="catalog-results-section"
-        className="flex-1 min-h-0 flex flex-col mt-0.5"
+        className="w-full flex flex-col mt-0.5"
       >
         <div 
           ref={catalogScrollRef} 
-          className="flex-1 min-h-0 lg:overflow-y-auto space-y-1.5 sm:space-y-2 pr-1 pb-4 scroll-smooth"
+          className="w-full space-y-1.5 sm:space-y-2 pb-4"
         >
           {/* Banner de Cuadro Seleccionado con botón para restablecer */}
           {classificationFilter !== "all" && (
@@ -1407,6 +1743,7 @@ export default function PedidosPage() {
                 const isReady = checkIsReadyNotDelivered(order);
                 const isUpcoming = checkIsUpcoming(order);
                 const isPending = checkIsPending(order);
+                const isConcludedOrHistory = classificationFilter === "historial" || order.status === "entregado" || order.status === "cancelado";
                 const totalPieces = order.items && order.items.length > 0
                   ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
                   : 1;
@@ -1608,27 +1945,29 @@ export default function PedidosPage() {
                       className="flex items-center justify-end gap-1.5 shrink-0 pt-1 lg:pt-0 border-t lg:border-t-0 border-stone-100 flex-wrap"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {/* Botón: Marcar como Listo / Listo en Sucursal */}
-                      {order.status !== "listo" ? (
-                        <button
-                          type="button"
-                          onClick={() => handleMarkAsReady(order)}
-                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                          title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Marcar como Listo</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleReady(order)}
-                          className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                          title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
-                        >
-                          <Check className="w-3.5 h-3.5 text-emerald-700" />
-                          <span>✓ Listo en Sucursal</span>
-                        </button>
+                      {/* Botón: Marcar como Listo / Listo en Sucursal (solo pedidos activos) */}
+                      {!isConcludedOrHistory && (
+                        order.status !== "listo" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkAsReady(order)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                            title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Marcar como Listo</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReady(order)}
+                            className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                            title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
+                          >
+                            <Check className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>✓ Listo en Sucursal</span>
+                          </button>
+                        )
                       )}
 
                       {/* 1. Imprimir Ticket (siempre disponible) */}
@@ -1665,15 +2004,17 @@ export default function PedidosPage() {
                         <span className="hidden xl:inline">WhatsApp</span>
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
-                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                        title="Eliminar este pedido permanentemente"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Eliminar</span>
-                      </button>
+                      {!isConcludedOrHistory && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePermanent(order.id, order.orderNumber, order.customerName)}
+                          className="px-2.5 py-1 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title="Eliminar este pedido permanentemente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Eliminar</span>
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -1697,6 +2038,7 @@ export default function PedidosPage() {
                 const isReady = checkIsReadyNotDelivered(order);
                 const isUpcoming = checkIsUpcoming(order);
                 const isPending = checkIsPending(order);
+                const isConcludedOrHistory = classificationFilter === "historial" || order.status === "entregado" || order.status === "cancelado";
                 const totalPieces = order.items && order.items.length > 0
                   ? order.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
                   : 1;
@@ -1956,27 +2298,29 @@ export default function PedidosPage() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {/* Botón: Marcar como Listo / Listo en Sucursal */}
-                        {order.status !== "listo" ? (
-                          <button
-                            type="button"
-                            onClick={() => handleMarkAsReady(order)}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                            title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Marcar como Listo</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleReady(order)}
-                            className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                            title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
-                          >
-                            <Check className="w-3.5 h-3.5 text-emerald-700" />
-                            <span>✓ Listo en Sucursal</span>
-                          </button>
+                        {/* Botón: Marcar como Listo / Listo en Sucursal (solo pedidos activos) */}
+                        {!isConcludedOrHistory && (
+                          order.status !== "listo" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleMarkAsReady(order)}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                              title="Marcar que el pedido ya llegó físicamente y está listo en sucursal"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Marcar como Listo</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleReady(order)}
+                              className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 font-black text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                              title="Este pedido ya está listo en sucursal. Haz clic si deseas regresarlo a 'En preparación'."
+                            >
+                              <Check className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>✓ Listo en Sucursal</span>
+                            </button>
+                          )
                         )}
 
                         <button
@@ -2011,18 +2355,20 @@ export default function PedidosPage() {
                           </button>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePermanent(order.id, order.orderNumber, order.customerName);
-                          }}
-                          className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                          title="Eliminar este pedido permanentemente"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Eliminar</span>
-                        </button>
+                        {!isConcludedOrHistory && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePermanent(order.id, order.orderNumber, order.customerName);
+                            }}
+                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                            title="Eliminar este pedido permanentemente"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Eliminar</span>
+                          </button>
+                        )}
                       </div>
 
                       <button
@@ -2354,19 +2700,21 @@ export default function PedidosPage() {
                               </button>
                             )}
 
-                            {/* 5. Eliminar Pedido (disponible para todos los pedidos) */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletePermanent(order.id, order.orderNumber, order.customerName);
-                              }}
-                              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
-                              title="Eliminar Pedido"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Eliminar</span>
-                            </button>
+                            {/* 5. Eliminar Pedido (solo pedidos activos) */}
+                            {!isConcludedOrHistory && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePermanent(order.id, order.orderNumber, order.customerName);
+                                }}
+                                className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 active:scale-95 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shadow-2xs"
+                                title="Eliminar Pedido"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Eliminar</span>
+                              </button>
+                            )}
 
                             {/* 6. Pantalla de detalles del pedido */}
                             <button

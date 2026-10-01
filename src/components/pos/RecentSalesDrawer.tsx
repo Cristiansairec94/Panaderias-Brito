@@ -5,6 +5,7 @@ import { History, X, Receipt, RefreshCw, Printer, DollarSign, CreditCard, Send, 
 import { Sale, CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { getStoredOrders } from "@/lib/orders";
+import { useNotifications } from "@/context/NotificationContext";
 
 interface RecentSalesDrawerProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export default function RecentSalesDrawer({
   onSelectOrderForReceipt,
   onSelectOrderForPayment,
 }: RecentSalesDrawerProps) {
+  const { openOrderDetail } = useNotifications();
   const [filterMethod, setFilterMethod] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "ventas" | "pedidos">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -254,6 +256,14 @@ export default function RecentSalesDrawer({
                           {order.cashier ? `Cajero: ${order.cashier}` : ""}
                         </span>
                         <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openOrderDetail(order)}
+                            className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold rounded-xl text-xs border border-amber-300 shadow-2xs transition-all cursor-pointer"
+                            title="Ver detalles completos del pedido"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-amber-700" /> Detalles
+                          </button>
                           {order.remainingBalance > 0 && onSelectOrderForPayment && (
                             <button
                               type="button"

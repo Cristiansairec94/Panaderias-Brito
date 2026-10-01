@@ -12,13 +12,15 @@ import {
   Send,
   CheckCircle2,
   RefreshCw,
-  Trash2
+  Trash2,
+  Eye
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
+import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 
 interface SpecialOrdersDrawerProps {
@@ -43,6 +45,7 @@ export default function SpecialOrdersDrawer({
   // Submodals
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<CustomOrder | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const loadOrders = () => {
@@ -349,6 +352,17 @@ export default function SpecialOrdersDrawer({
                         <span>Ticket</span>
                       </button>
 
+                      {/* Detalles del Pedido */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderForDetail(order)}
+                        className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] font-bold border border-amber-500/30 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Ver detalles completos del pedido"
+                      >
+                        <Eye className="w-3 h-3 text-amber-400" />
+                        <span>Detalles</span>
+                      </button>
+
                       {/* Eliminar Pedido */}
                       <button
                         type="button"
@@ -414,6 +428,54 @@ export default function SpecialOrdersDrawer({
           isOpen={!!selectedOrderForReceipt}
           onClose={() => setSelectedOrderForReceipt(null)}
           order={selectedOrderForReceipt}
+        />
+      )}
+
+      {/* Submodal: Detalles Completos del Pedido */}
+      {selectedOrderForDetail && (
+        <OrderDetailModal
+          isOpen={!!selectedOrderForDetail}
+          onClose={() => setSelectedOrderForDetail(null)}
+          order={selectedOrderForDetail}
+          onPrintReceipt={(o) => {
+            setSelectedOrderForDetail(null);
+            setSelectedOrderForReceipt(o);
+          }}
+          onOpenPayment={(o) => {
+            setSelectedOrderForDetail(null);
+            setSelectedOrderForPayment(o);
+          }}
+          onAdvanceStatus={(o) => {
+            let nextStatus: CustomOrder["status"] = o.status;
+            if (o.status === "pendiente" || o.status === "en_horno") nextStatus = "listo";
+            else if (o.status === "listo") nextStatus = "entregado";
+            if (nextStatus !== o.status) {
+              updateOrderStatus(o.id, nextStatus);
+              loadOrders();
+              const updated = getStoredOrders().find((item) => item.id === o.id);
+              if (updated) setSelectedOrderForDetail(updated);
+            }
+          }}
+          onDeliverOrder={(o) => {
+            updateOrderStatus(o.id, "entregado");
+            setSelectedOrderForDetail(null);
+            loadOrders();
+          }}
+          onDarDeBaja={(o) => {
+            const isCancelled = o.status === "cancelado";
+            const confirmMsg = isCancelled
+              ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${o.orderNumber} de "${o.customerName}"?`
+              : `¿Estás seguro de DAR DE BAJA el pedido ${o.orderNumber} de "${o.customerName}"?`;
+            if (confirm(confirmMsg)) {
+              if (isCancelled) {
+                deleteCustomOrder(o.id);
+              } else {
+                updateOrderStatus(o.id, "cancelado");
+              }
+              setSelectedOrderForDetail(null);
+              loadOrders();
+            }
+          }}
         />
       )}
 

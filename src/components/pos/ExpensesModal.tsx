@@ -35,7 +35,9 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  Info
+  Info,
+  History,
+  Lock
 } from "lucide-react";
 import { CashExpense, CashIncome, Sale, CustomOrder } from "@/types";
 import { 
@@ -58,6 +60,7 @@ import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/ord
 import { getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import TicketModal from "@/components/pos/TicketModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
+import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
 
 interface UnifiedTicketItem {
@@ -422,6 +425,7 @@ export default function ExpensesModal({
   // Estados locales para previsualizar/reimprimir tickets directamente sin salir de la pestaña
   const [previewSale, setPreviewSale] = useState<Sale | null>(null);
   const [previewOrder, setPreviewOrder] = useState<CustomOrder | null>(null);
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<CustomOrder | null>(null);
   const [showPrinterModal, setShowPrinterModal] = useState(false);
 
   useEffect(() => {
@@ -1052,13 +1056,39 @@ export default function ExpensesModal({
   // Alias para mantener compatibilidad
   const unifiedCashMovements = unifiedShiftMovements;
 
-  // Historial global de pedidos por entregar de la panadería para la entrega de turno entre cajeras
+  const todayDateStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  // Lista de pedidos por entregar de la panadería para la entrega de turno entre cajeras
+  // (Excluye 100% pedidos entregados, cancelados/dados de baja o vencidos, que pertenecen al Historial directo de pedidos)
   const allHistoricalOrders = useMemo(() => {
     const list = getStoredOrders();
     return list
       .filter((o) => {
-        // Excluir 100% los pedidos que ya fueron entregados o cancelados/dados de baja
-        if (o.status === "entregado" || o.status === "cancelado") {
+        if (!o) return false;
+        const normStatus = String(o.status || "").toLowerCase().trim();
+
+        // 1. Excluir 100% los pedidos que ya fueron entregados o cancelados/dados de baja
+        if (
+          normStatus === "entregado" ||
+          normStatus === "cancelado" ||
+          normStatus === "baja" ||
+          normStatus.includes("entreg") ||
+          normStatus.includes("cancel") ||
+          Boolean((o as any).isDelivered) ||
+          Boolean((o as any).isCancelled)
+        ) {
+          return false;
+        }
+
+        // 2. Excluir pedidos vencidos con fecha de entrega anterior a hoy (pertenecen al Historial directo de pedidos)
+        const cleanDate = (o.deliveryDate || "").split("T")[0].split(" ")[0].trim();
+        if (cleanDate && /^\d{4}-\d{2}-\d{2}$/.test(cleanDate) && cleanDate < todayDateStr) {
           return false;
         }
 
@@ -1073,15 +1103,7 @@ export default function ExpensesModal({
         const dateB = b.deliveryDate || b.createdAt || "";
         return dateB.localeCompare(dateA);
       });
-  }, [ordersVersion, internalOrders, branchId]);
-
-  const todayDateStr = useMemo(() => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }, []);
+  }, [ordersVersion, internalOrders, branchId, todayDateStr]);
 
   const todayOrdersList = useMemo(() => {
     return allHistoricalOrders.filter((o) => {
@@ -1183,16 +1205,18 @@ export default function ExpensesModal({
   const handleDeliverOrder = (order: CustomOrder) => {
     const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
     if (rem > 0) {
-      const ok = confirm(
-        `⚠️ El pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\n¿Deseas marcarlo como ENTREGADO al cliente ahora? Desaparecerá de la sección de pedidos por entregar.`
+      alert(
+        `⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\nEl pedido debe estar pagado por completo antes de poder entregarse al cliente. Por favor, presiona "Cobrar Saldo" para registrar el pago.`
       );
-      if (!ok) return;
-    } else {
-      const ok = confirm(
-        `¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nDesaparecerá de la sección de pedidos por entregar.`
-      );
-      if (!ok) return;
+      handlePayOrder(order);
+      return;
     }
+
+    const ok = confirm(
+      `¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y se eliminará de esta sección de pedidos por entregar en caja.`
+    );
+    if (!ok) return;
+
     updateOrderStatus(order.id, "entregado");
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("brito_orders_updated"));
@@ -1896,11 +1920,21 @@ export default function ExpensesModal({
                 type="button"
                 onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
                 className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                title={isExpanded ? "Ocultar desglose" : "Ver detalle del pedido"}
+                title={isExpanded ? "Ocultar desglose rápido" : "Ver desglose rápido de panes"}
               >
                 <Eye className="w-3.5 h-3.5 text-stone-500" />
-                <span>{isExpanded ? "Ocultar" : "Detalle"}</span>
+                <span>{isExpanded ? "Ocultar" : "Desglose"}</span>
                 {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedOrderDetail(order)}
+                className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                title="Abrir ventana con el detalle completo del pedido"
+              >
+                <Eye className="w-3.5 h-3.5 text-amber-700" />
+                <span>Detalles</span>
               </button>
 
               {order.remainingBalance > 0 && onSelectOrderForPayment && (
@@ -3332,7 +3366,7 @@ export default function ExpensesModal({
                               Filtros de Clasificación
                             </span>
                             <span className="text-[11px] text-stone-500 font-bold block">
-                              {cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : cashDetailFilter === "pedidos" ? "Pedidos del Turno" : "Historial de Pedidos"} • {cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : cashMethodFilter === "todos_pedidos" ? "Historial de pedidos" : "Transferencia"} ({visibleCashMovements.length})
+                              {cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : cashDetailFilter === "pedidos" ? "Pedidos del Turno" : "Pedidos por Entregar"} • {cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : cashMethodFilter === "todos_pedidos" ? "Pedidos por Entregar" : "Transferencia"} ({visibleCashMovements.length})
                             </span>
                           </div>
                         </div>
@@ -3349,7 +3383,7 @@ export default function ExpensesModal({
                               <option value="all">📋 Tipo: Todos ({unifiedShiftMovements.length})</option>
                               <option value="ventas">🥖 Tipo: Ventas ({allShiftPureSales.length})</option>
                               <option value="pedidos">🎂 Tipo: Pedidos Turno ({allShiftOrdersList.length})</option>
-                              <option value="todos_pedidos">📦 Tipo: Historial de Pedidos ({allHistoricalOrders.length})</option>
+                              <option value="todos_pedidos">📦 Tipo: Pedidos por Entregar ({allHistoricalOrders.length})</option>
                             </select>
                             <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
@@ -3378,7 +3412,7 @@ export default function ExpensesModal({
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
                               <span>1. Tipo de Movimiento:</span>
                               <span className="text-[10px] font-bold lowercase text-stone-400">
-                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : cashDetailFilter === "pedidos" ? "pedidos del turno" : "historial de pedidos"}
+                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : cashDetailFilter === "pedidos" ? "pedidos del turno" : "pedidos por entregar"}
                               </span>
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -3386,7 +3420,7 @@ export default function ExpensesModal({
                                 { id: "all", label: "Todos", icon: "📋", count: unifiedShiftMovements.length },
                                 { id: "ventas", label: "Ventas en Caja", icon: "🥖", count: allShiftPureSales.length },
                                 { id: "pedidos", label: "Pedidos del Turno", icon: "🎂", count: allShiftOrdersList.length },
-                                { id: "todos_pedidos", label: "historial de pedidos", icon: "📦", count: allHistoricalOrders.length },
+                                { id: "todos_pedidos", label: "Pedidos por Entregar", icon: "📦", count: allHistoricalOrders.length },
                               ].map((tab) => {
                                 const isSpecial = tab.id === "todos_pedidos";
                                 const isSelected = cashDetailFilter === tab.id;
@@ -3494,19 +3528,32 @@ export default function ExpensesModal({
                               </p>
                             </div>
                           </div>
-                          {onOpenCreateOrder && (
-                            <button
-                              type="button"
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            <a
+                              href="/pedidos"
                               onClick={() => {
                                 handleCloseDetailModal();
-                                onOpenCreateOrder();
                               }}
-                              className="px-3.5 py-2 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+                              className="px-3.5 py-2 rounded-2xl bg-stone-900 hover:bg-stone-800 text-amber-300 font-black text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+                              title="Ir a la sección de Pedidos para consultar el Historial Completo"
                             >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Apartar Nuevo Pedido</span>
-                            </button>
-                          )}
+                              <History className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Ver Historial de Pedidos</span>
+                            </a>
+                            {onOpenCreateOrder && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleCloseDetailModal();
+                                  onOpenCreateOrder();
+                                }}
+                                className="px-3.5 py-2 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Apartar Nuevo Pedido</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {/* 2. Mini Tarjetas de Estatus Rápido (KPIs) */}
@@ -3601,8 +3648,6 @@ export default function ExpensesModal({
                               const cleanDate = (order.deliveryDate || "").split("T")[0].split(" ")[0].trim();
                               const isToday = cleanDate === todayDateStr || (order.deliveryDate || "").toLowerCase().includes("hoy");
                               const isExpanded = !!expandedAllOrdersIds[order.id];
-                              const isDatePast = cleanDate && /^\d{4}-\d{2}-\d{2}$/.test(cleanDate) && cleanDate < todayDateStr;
-                              const isHistoryOrder = order.status === "entregado" || order.status === "cancelado" || isDatePast;
                               const items = order.items || [];
                               const visibleItems = isExpanded ? items : items.slice(0, 2);
                               const hasMore = items.length > 2;
@@ -3638,16 +3683,12 @@ export default function ExpensesModal({
                                           ? "bg-emerald-100 text-emerald-900 border-emerald-300"
                                           : order.status === "en_horno"
                                           ? "bg-amber-100 text-amber-900 border-amber-300"
-                                          : order.status === "entregado"
-                                          ? "bg-stone-100 text-stone-700 border-stone-300"
                                           : "bg-blue-100 text-blue-900 border-blue-300"
                                       }`}>
                                         {order.status === "listo"
                                           ? "🎂 Listo en Mostrador"
                                           : order.status === "en_horno"
                                           ? "🔥 En Horno"
-                                          : order.status === "entregado"
-                                          ? "📦 Entregado"
                                           : "⏳ Pendiente"}
                                       </span>
 
@@ -3688,7 +3729,7 @@ export default function ExpensesModal({
                                         <span className="font-black text-stone-900 text-sm">
                                           👤 {order.customerName}
                                         </span>
-                                        {order.phone && order.phone !== "N/A" && !isHistoryOrder && (
+                                        {order.phone && order.phone !== "N/A" && (
                                           <button
                                             type="button"
                                             onClick={() => handleSendOrderWhatsApp(order)}
@@ -3715,99 +3756,74 @@ export default function ExpensesModal({
 
                                     {/* Acciones Rápidas para la Cajera */}
                                     <div className="flex items-center gap-1.5 shrink-0 pt-1 sm:pt-0 flex-wrap justify-end">
-                                      {isHistoryOrder ? (
-                                        <>
-                                          <span className="text-[10px] font-black text-amber-900 bg-amber-50 border border-amber-300 px-2 py-1 rounded-xl">
-                                            {order.status === "entregado"
-                                              ? "✓ Entregado"
-                                              : order.status === "cancelado"
-                                              ? "✕ Cancelado"
-                                              : "📜 En Historial / Vencido"}
-                                          </span>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleViewOrderDetail(order)}
-                                            className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                            title="Ver detalles completos del pedido"
-                                          >
-                                            <Eye className="w-3.5 h-3.5 text-stone-500" />
-                                            <span>Detalle</span>
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => setPreviewOrder(order)}
-                                            className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                            title="Reimprimir comprobante del pedido"
-                                          >
-                                            <Printer className="w-3.5 h-3.5 text-amber-800" />
-                                            <span className="hidden sm:inline">Ticket</span>
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleCancelOrder(order)}
-                                            className="p-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center cursor-pointer"
-                                            title="Eliminar pedido permanentemente"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
-                                        </>
-                                      ) : (
-                                        <>
-                                          {remaining > 0 && (
-                                            <button
-                                              type="button"
-                                              onClick={() => handlePayOrder(order)}
-                                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
-                                              title="Cobrar saldo restante al cliente"
-                                            >
-                                              <DollarSign className="w-3.5 h-3.5" />
-                                              <span>Cobrar Saldo</span>
-                                            </button>
-                                          )}
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDeliverOrder(order)}
-                                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
-                                            title="Marcar como entregado (desaparecerá de pedidos por entregar)"
-                                          >
-                                            <CheckCircle2 className="w-3.5 h-3.5" />
-                                            <span>Entregar</span>
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleViewOrderDetail(order)}
-                                            className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                            title="Ver detalles completos del pedido"
-                                          >
-                                            <Eye className="w-3.5 h-3.5 text-stone-500" />
-                                            <span>Detalle</span>
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => setPreviewOrder(order)}
-                                            className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                                            title="Reimprimir comprobante del pedido"
-                                          >
-                                            <Printer className="w-3.5 h-3.5 text-amber-800" />
-                                            <span className="hidden sm:inline">Ticket</span>
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleCancelOrder(order)}
-                                            className="p-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center cursor-pointer"
-                                            title="Dar de baja / cancelar pedido"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
-                                        </>
+                                      {remaining > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handlePayOrder(order)}
+                                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                                          title={`Cobrar saldo restante de ${formatCurrency(remaining)} al cliente`}
+                                        >
+                                          <DollarSign className="w-3.5 h-3.5" />
+                                          <span>Cobrar Saldo ({formatCurrency(remaining)})</span>
+                                        </button>
                                       )}
+
+                                      {/* Botón Entregar: Activo si 100% Pagado, con bloqueo informativo si tiene saldo pendiente */}
+                                      {remaining <= 0 ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeliverOrder(order)}
+                                          className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-blue-400/40"
+                                          title="Marcar como entregado (se eliminará de esta sección de pedidos por entregar)"
+                                        >
+                                          <CheckCircle2 className="w-4 h-4" />
+                                          <span>Entregar</span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            alert(
+                                              `⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(remaining)}.\n\nEl pedido debe estar 100% pagado antes de poder entregarse al cliente. Presiona "Cobrar Saldo" primero.`
+                                            );
+                                            handlePayOrder(order);
+                                          }}
+                                          className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-rose-50 text-stone-500 hover:text-rose-700 border border-stone-300 font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                                          title="No se puede entregar: requiere estar 100% pagado"
+                                        >
+                                          <Lock className="w-3.5 h-3.5 text-stone-400" />
+                                          <span>Entregar (Requiere Pago 100%)</span>
+                                        </button>
+                                      )}
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleViewOrderDetail(order)}
+                                        className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                        title="Ver detalles completos del pedido"
+                                      >
+                                        <Eye className="w-3.5 h-3.5 text-stone-500" />
+                                        <span>Detalle</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewOrder(order)}
+                                        className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                        title="Reimprimir comprobante del pedido"
+                                      >
+                                        <Printer className="w-3.5 h-3.5 text-amber-800" />
+                                        <span className="hidden sm:inline">Ticket</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCancelOrder(order)}
+                                        className="p-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center cursor-pointer"
+                                        title="Dar de baja / cancelar pedido"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
                                     </div>
                                   </div>
 
@@ -4005,7 +4021,8 @@ export default function ExpensesModal({
                               return (
                                 <div
                                   key={order.id}
-                                  className="bg-white border-2 border-amber-200 hover:border-amber-400 p-3.5 rounded-2xl shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all"
+                                  onClick={() => setSelectedOrderDetail(order)}
+                                  className="bg-white border-2 border-amber-200 hover:border-amber-400 p-3.5 rounded-2xl shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all cursor-pointer group"
                                 >
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
@@ -4064,7 +4081,7 @@ export default function ExpensesModal({
                                         {order.remainingBalance > 0 && ` • Resta: ${formatCurrency(order.remainingBalance)}`}
                                       </span>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                       {onSelectOrderForPayment && order.remainingBalance > 0 && (
                                         <button
                                           type="button"
@@ -4091,6 +4108,15 @@ export default function ExpensesModal({
                                           <span className="hidden sm:inline">Ticket</span>
                                         </button>
                                       )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedOrderDetail(order)}
+                                        className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                                        title="Ver detalles completos del pedido"
+                                      >
+                                        <Eye className="w-3.5 h-3.5 text-amber-700" />
+                                        <span>Detalles</span>
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
@@ -4393,6 +4419,69 @@ export default function ExpensesModal({
         isOpen={Boolean(previewOrder)}
         onClose={() => setPreviewOrder(null)}
         order={previewOrder}
+      />
+    )}
+
+    {/* Modal de Detalle Completo del Pedido */}
+    {selectedOrderDetail && (
+      <OrderDetailModal
+        isOpen={Boolean(selectedOrderDetail)}
+        onClose={() => setSelectedOrderDetail(null)}
+        order={selectedOrderDetail}
+        onPrintReceipt={(order) => {
+          setSelectedOrderDetail(null);
+          setPreviewOrder(order);
+        }}
+        onOpenPayment={(order) => {
+          setSelectedOrderDetail(null);
+          if (onSelectOrderForPayment) {
+            handleCloseDetailModal();
+            onSelectOrderForPayment(order);
+          }
+        }}
+        onAdvanceStatus={(order) => {
+          let nextStatus: CustomOrder["status"] = order.status;
+          if (order.status === "pendiente" || order.status === "en_horno") nextStatus = "listo";
+          else if (order.status === "listo") nextStatus = "entregado";
+          if (nextStatus !== order.status) {
+            updateOrderStatus(order.id, nextStatus);
+            const updated = getStoredOrders().find((o) => o.id === order.id);
+            if (updated) setSelectedOrderDetail(updated);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("brito_orders_updated"));
+            }
+          }
+        }}
+        onDeliverOrder={(order) => {
+          updateOrderStatus(order.id, "entregado");
+          setSelectedOrderDetail(null);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("brito_orders_updated"));
+          }
+        }}
+        onSendWhatsApp={(order) => {
+          const cleanPhone = (order.phone || "").replace(/\D/g, "");
+          const formattedPhone = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
+          const message = `🥖 *PANADERÍA BRITO*\nHola *${order.customerName}*, te saludamos respecto a tu pedido *${order.orderNumber}*.`;
+          window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, "_blank");
+        }}
+        onDarDeBaja={(order) => {
+          const isCancelled = order.status === "cancelado";
+          const confirmMsg = isCancelled
+            ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?`
+            : `¿Estás seguro de DAR DE BAJA el pedido ${order.orderNumber} de "${order.customerName}"?`;
+          if (confirm(confirmMsg)) {
+            if (isCancelled) {
+              deleteCustomOrder(order.id);
+            } else {
+              updateOrderStatus(order.id, "cancelado");
+            }
+            setSelectedOrderDetail(null);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("brito_orders_updated"));
+            }
+          }
+        }}
       />
     )}
 

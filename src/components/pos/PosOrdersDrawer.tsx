@@ -17,11 +17,13 @@ import {
   ShieldCheck,
   RefreshCw,
   AlertCircle,
-  Trash2
+  Trash2,
+  Eye
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
+import { useNotifications } from "@/context/NotificationContext";
 
 interface PosOrdersDrawerProps {
   isOpen: boolean;
@@ -44,6 +46,7 @@ export default function PosOrdersDrawer({
   onSelectOrderForReceipt,
   onSelectOrderForPayment,
 }: PosOrdersDrawerProps) {
+  const { openOrderDetail } = useNotifications();
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<"todos" | "hoy" | "saldo">("todos");
@@ -370,6 +373,14 @@ export default function PosOrdersDrawer({
                   {/* Fila 5: Botones de Acción */}
                   <div className="flex items-center justify-between gap-2 pt-1 border-t border-stone-100">
                     <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openOrderDetail(order)}
+                        className="p-1.5 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                        title="Ver detalles completos del pedido"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-amber-700" /> Detalles
+                      </button>
                       <button
                         type="button"
                         onClick={() => onSelectOrderForReceipt(order)}
