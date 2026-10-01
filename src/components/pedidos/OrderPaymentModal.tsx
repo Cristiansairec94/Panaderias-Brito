@@ -196,7 +196,12 @@ export default function OrderPaymentModal({
                 placeholder="0.00"
                 value={amount}
                 onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                onFocus={(e) => e.target.select()}
+                onFocus={() => {
+                  if (amount !== "") setAmount("");
+                }}
+                onClick={() => {
+                  if (amount !== "") setAmount("");
+                }}
                 onChange={(e) => {
                   const clean = cleanDecimalNumbers(e.target.value);
                   setAmount(clean);

@@ -668,14 +668,29 @@ export default function BreadOrdersDrawer({
                   </div>
 
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-amber-400">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-amber-400 select-none pointer-events-none">$</span>
                     <input
                       type="number"
                       min="0"
                       step="1"
                       required
-                      placeholder="0"
+                      placeholder=""
                       value={depositInput}
+                      onFocus={() => {
+                        if (depositInput !== "" && depositInput !== 0) {
+                          setDepositInput("");
+                        }
+                      }}
+                      onClick={() => {
+                        if (depositInput !== "" && depositInput !== 0) {
+                          setDepositInput("");
+                        }
+                      }}
+                      onBlur={() => {
+                        if (depositInput === "" || depositInput === 0) {
+                          if (minRequiredDeposit > 0) setDepositInput(minRequiredDeposit);
+                        }
+                      }}
                       onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                       onChange={(e) => setDepositInput(e.target.value === "" ? "" : Number(e.target.value))}
                       className="w-full pl-10 pr-4 py-3 bg-white text-stone-900 rounded-2xl text-lg font-black focus:outline-none focus:ring-4 focus:ring-amber-500 shadow-inner"

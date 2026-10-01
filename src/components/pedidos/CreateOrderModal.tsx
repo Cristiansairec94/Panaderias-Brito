@@ -315,8 +315,12 @@ export default function CreateOrderModal({
     );
   }, [branches, pickupBranchId, activeBranch]);
 
-  // 4. Cobro del Anticipo (Editable y siempre por defecto en 0)
+  // 4. Cobro del Anticipo (100% Editable y desaparece al dar clic)
   const [deposit, setDeposit] = useState<string>("0");
+  const [isEditingDeposit, setIsEditingDeposit] = useState(false);
+  const userHasCustomDepositRef = useRef(false);
+  const previousDepositRef = useRef<string>("0");
+  const depositInputRef = useRef<HTMLInputElement>(null);
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [selectedTransferAccountId, setSelectedTransferAccountId] = useState<string>(DEFAULT_TRANSFER_ACCOUNTS[0].id);
   const [selectedCardTerminalId, setSelectedCardTerminalId] = useState<string>(DEFAULT_CARD_TERMINALS[0].id);
@@ -394,6 +398,9 @@ export default function CreateOrderModal({
       setSaveCustomerDecision("ask");
       setMustChooseCustomerAlert(false);
       setDeposit("");
+      setIsEditingDeposit(false);
+      userHasCustomDepositRef.current = false;
+      previousDepositRef.current = "0";
     }
   }, [isOpen, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone, tomorrowStr, initialBranchId, activeBranch, branches]);
 
@@ -412,17 +419,62 @@ export default function CreateOrderModal({
     return total > 0 ? Math.round(total * 0.5 * 100) / 100 : 0;
   }, [total]);
 
-  // Si no se ha ingresado anticipo o cambió el total, pre-asignar el 50%
+  // Si no se ha ingresado anticipo o cambió el total, pre-asignar el 50% (sin sobreescribir si el usuario está editando)
   useEffect(() => {
-    if (total > 0) {
+    if (total > 0 && !isEditingDeposit && !userHasCustomDepositRef.current) {
+      setDeposit(minRequiredDeposit.toString());
+      previousDepositRef.current = minRequiredDeposit.toString();
+    } else if (total > 0 && !isEditingDeposit && userHasCustomDepositRef.current) {
       const num = Number(deposit) || 0;
-      if (deposit === "" || deposit === "0" || num < minRequiredDeposit) {
-        setDeposit(minRequiredDeposit.toString());
-      } else if (num > total) {
+      if (num > total) {
         setDeposit(total.toString());
       }
     }
-  }, [total, minRequiredDeposit]);
+  }, [total, minRequiredDeposit, isEditingDeposit]);
+
+  const handleDepositFocus = () => {
+    setIsEditingDeposit(true);
+    userHasCustomDepositRef.current = true;
+    if (deposit !== "") {
+      previousDepositRef.current = deposit;
+    }
+    setDeposit(""); // Desaparece inmediatamente al dar clic para escribir directamente
+  };
+
+  const handleDepositClick = () => {
+    if (!isEditingDeposit) {
+      setIsEditingDeposit(true);
+      userHasCustomDepositRef.current = true;
+      if (deposit !== "") {
+        previousDepositRef.current = deposit;
+      }
+      setDeposit(""); // Desaparece inmediatamente al dar clic
+    }
+  };
+
+  const handleDepositChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    userHasCustomDepositRef.current = true;
+    const val = cleanDecimalNumbers(e.target.value);
+    if (val !== "" && total > 0 && Number(val) > total) {
+      setDeposit(total.toString());
+    } else {
+      setDeposit(val);
+    }
+  };
+
+  const handleDepositBlur = () => {
+    setIsEditingDeposit(false);
+    if (deposit.trim() === "") {
+      const prevNum = Number(previousDepositRef.current) || 0;
+      if (prevNum > 0 && prevNum <= total) {
+        setDeposit(previousDepositRef.current);
+      } else if (minRequiredDeposit > 0) {
+        setDeposit(minRequiredDeposit.toString());
+      } else {
+        setDeposit("0");
+      }
+    }
+  };
 
   const numericDeposit = deposit === "" ? 0 : Math.max(0, Number(deposit) || 0);
   const isDepositValid = total > 0 && numericDeposit >= minRequiredDeposit && numericDeposit <= total;
@@ -1634,7 +1686,11 @@ export default function CreateOrderModal({
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <button
                 type="button"
-                onClick={() => setDeposit(minRequiredDeposit.toString())}
+                onClick={() => {
+                  userHasCustomDepositRef.current = true;
+                  previousDepositRef.current = minRequiredDeposit.toString();
+                  setDeposit(minRequiredDeposit.toString());
+                }}
                 className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === minRequiredDeposit && total > 0 && numericDeposit > 0
                     ? "bg-amber-500 text-stone-950 border-amber-300 font-black shadow-lg ring-2 ring-amber-400/50 scale-[1.01]"
@@ -1649,7 +1705,11 @@ export default function CreateOrderModal({
 
               <button
                 type="button"
-                onClick={() => setDeposit(total.toString())}
+                onClick={() => {
+                  userHasCustomDepositRef.current = true;
+                  previousDepositRef.current = total.toString();
+                  setDeposit(total.toString());
+                }}
                 className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === total && total > 0
                     ? "bg-emerald-600 text-white border-emerald-300 font-black shadow-lg ring-2 ring-emerald-400/50 scale-[1.01]"
@@ -1663,7 +1723,7 @@ export default function CreateOrderModal({
               </button>
             </div>
 
-            {/* Cantidad personalizada */}
+            {/* Cantidad personalizada 100% editable */}
             <div className="flex items-center justify-between gap-3 pt-1">
               <div>
                 <label className="text-xs font-bold text-stone-300 block">
@@ -1674,33 +1734,30 @@ export default function CreateOrderModal({
                 </span>
               </div>
               <div className="relative w-36">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 font-black">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 font-black select-none pointer-events-none">$</span>
                 <input
+                  ref={depositInputRef}
                   type="text"
                   inputMode="decimal"
-                  placeholder={minRequiredDeposit > 0 ? minRequiredDeposit.toString() : "0"}
+                  placeholder=""
                   value={deposit}
-                  onFocus={() => {
-                    if (deposit === "0") setDeposit("");
-                  }}
-                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                  onChange={(e) => {
-                    const val = cleanDecimalNumbers(e.target.value);
-                    if (val !== "" && total > 0 && Number(val) > total) {
-                      setDeposit(total.toString());
-                    } else {
-                      setDeposit(val);
+                  onFocus={handleDepositFocus}
+                  onClick={handleDepositClick}
+                  onDoubleClick={() => setDeposit("")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                      return;
                     }
+                    onlyNumbersKeyDown(e, true);
                   }}
-                  onBlur={() => {
-                    if (deposit.trim() === "" && minRequiredDeposit > 0) {
-                      setDeposit(minRequiredDeposit.toString());
-                    }
-                  }}
-                  className={`w-full pl-7 pr-3 py-1.5 bg-stone-950 border rounded-xl text-right text-sm font-black focus:outline-none transition-colors ${
+                  onChange={handleDepositChange}
+                  onBlur={handleDepositBlur}
+                  title="Anticipo 100% editable (al dar clic el número desaparece para escribir directamente)"
+                  className={`w-full pl-7 pr-3 py-1.5 bg-stone-950 border rounded-xl text-right text-sm font-black focus:outline-none transition-all cursor-text ${
                     isDepositValid
-                      ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/50"
-                      : "border-stone-700 text-white"
+                      ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/50 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/70"
+                      : "border-stone-700 text-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/50"
                   }`}
                 />
               </div>
