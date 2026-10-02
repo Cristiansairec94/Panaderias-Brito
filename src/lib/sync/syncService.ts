@@ -253,18 +253,19 @@ export async function processSyncQueue(): Promise<{
         if (saleData && Array.isArray(items) && items.length > 0) {
           const itemsPayload = items.map((it: any) => ({
             sale_id: saleData.id,
-            product_id: it.productId && it.productId.includes("-") ? it.productId : null,
+            product_id: it.productId && it.productId !== "temp" ? it.productId : null,
             product_name: it.name || it.productName || "Producto",
             quantity: Number(it.quantity) || 1,
             unit_price: Number(it.price || it.unitPrice) || 0,
             subtotal: Number(it.subtotal) || 0,
           }));
 
+          await supabase.from("sale_items").delete().eq("sale_id", saleData.id);
           await supabase.from("sale_items").insert(itemsPayload);
 
           // 3. Descontar stock en Supabase
           for (const it of items) {
-            if (it.productId && it.productId.includes("-")) {
+            if (it.productId && it.productId !== "temp") {
               try {
                 const { data: currentProd } = await supabase
                   .from("products")
@@ -472,6 +473,7 @@ export async function syncAllLocalDataToSupabase(): Promise<{
               unit_price: Number(it.product?.price || it.unitPrice || it.price) || 0,
               subtotal: Number(it.product?.price || it.unitPrice || it.price || 0) * (Number(it.quantity) || 1),
             }));
+            await supabase.from("sale_items").delete().eq("sale_id", sale.id);
             await supabase.from("sale_items").insert(itemsPayload);
           }
         } else {

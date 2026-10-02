@@ -263,10 +263,17 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setConnectionDetail("Sin conexión a internet (Modo Offline Seguro)");
     };
 
+    const handleNetworkStatusChange = async () => {
+      await refreshConnection();
+      if (!checkSimulatedOffline()) {
+        await syncNow();
+      }
+    };
+
     window.addEventListener("online", handleOnlineEvent);
     window.addEventListener("offline", handleOfflineEvent);
     window.addEventListener("brito_sync_queue_updated", refreshQueueAndStats);
-    window.addEventListener("brito_network_status_changed", refreshConnection);
+    window.addEventListener("brito_network_status_changed", handleNetworkStatusChange);
 
     // Heartbeat cada 25 segundos para mantener estado en vivo
     const interval = setInterval(async () => {
@@ -282,7 +289,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("online", handleOnlineEvent);
       window.removeEventListener("offline", handleOfflineEvent);
       window.removeEventListener("brito_sync_queue_updated", refreshQueueAndStats);
-      window.removeEventListener("brito_network_status_changed", refreshConnection);
+      window.removeEventListener("brito_network_status_changed", handleNetworkStatusChange);
       clearInterval(interval);
     };
   }, [downloadLocalData, refreshConnection, refreshQueueAndStats, syncNow]);
