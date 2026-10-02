@@ -3044,31 +3044,12 @@ export default function POSPage() {
                         </button>
                       </div>
 
-                      {/* Resumen métricas de la sucursal activa */}
-                      <div 
-                        style={{ backgroundColor: "#170c06" }}
-                        className="grid grid-cols-3 gap-1.5 p-2 rounded-xl border border-amber-900/60 text-center"
-                      >
-                        <div style={{ backgroundColor: "#26140b" }} className="p-1.5 rounded-lg border border-amber-900/40">
-                          <span className="text-[9px] font-bold text-amber-400/80 block uppercase leading-none">Venta Hoy</span>
-                          <span className="text-xs font-black text-white font-mono mt-0.5 block">{formatCurrency(activeBranch?.todaySales || 0)}</span>
-                        </div>
-                        <div style={{ backgroundColor: "#26140b" }} className="p-1.5 rounded-lg border border-amber-900/40">
-                          <span className="text-[9px] font-bold text-amber-400/80 block uppercase leading-none">Tickets</span>
-                          <span className="text-xs font-black text-amber-300 font-mono mt-0.5 block">{activeBranch?.todayTickets || 0} tkts</span>
-                        </div>
-                        <div style={{ backgroundColor: "#26140b" }} className="p-1.5 rounded-lg border border-amber-900/40">
-                          <span className="text-[9px] font-bold text-amber-400/80 block uppercase leading-none">En Caja</span>
-                          <span className="text-xs font-black text-emerald-400 font-mono mt-0.5 block">{formatCurrency(activeBranch?.cashInDrawer || activeBranch?.currentShift?.initialFund || 0)}</span>
-                        </div>
-                      </div>
-
                       {/* Lista de Sucursales con diseño de colores corporativos */}
                       <div className="space-y-1.5">
                         <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
                           Seleccionar Tienda Activa:
                         </p>
-                        <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
+                        <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-0.5">
                           {branches.map((b) => {
                             const isSelected = activeBranch?.id === b.id;
                             const isMatriz = b.id.includes("matriz");
