@@ -3018,12 +3018,15 @@ export default function POSPage() {
 
                   {/* Panel Desplegable Flotante (exclusivo para administradores) */}
                   {isAdmin && showBranchDropdown && (
-                    <div className="absolute left-0 mt-2.5 w-[330px] sm:w-[380px] max-w-[calc(100vw-36px)] bg-[#1a0e08]/98 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-amber-700/60 p-3 sm:p-3.5 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-3">
+                    <div 
+                      style={{ backgroundColor: "#21120b" }}
+                      className="absolute left-0 mt-2.5 w-[330px] sm:w-[380px] max-w-[calc(100vw-36px)] rounded-2xl shadow-2xl border-2 border-amber-600/80 p-3 sm:p-3.5 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-3"
+                    >
                       
                       {/* Cabecera del panel */}
                       <div className="flex items-center justify-between pb-2 border-b border-amber-900/60">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-900/40">
+                          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-950/60">
                             <Store className="w-3.5 h-3.5" />
                           </div>
                           <div>
@@ -3034,23 +3037,27 @@ export default function POSPage() {
                         <button
                           type="button"
                           onClick={() => setShowBranchDropdown(false)}
-                          className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 text-stone-400 hover:text-white flex items-center justify-center transition-colors text-xs font-bold cursor-pointer"
+                          className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-colors text-xs font-bold cursor-pointer"
+                          title="Cerrar panel de sucursales"
                         >
                           ✕
                         </button>
                       </div>
 
                       {/* Resumen métricas de la sucursal activa */}
-                      <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-[#231209] border border-amber-900/60 text-center">
-                        <div className="p-1.5 bg-[#170c06] rounded-lg border border-amber-900/40">
+                      <div 
+                        style={{ backgroundColor: "#170c06" }}
+                        className="grid grid-cols-3 gap-1.5 p-2 rounded-xl border border-amber-900/60 text-center"
+                      >
+                        <div style={{ backgroundColor: "#26140b" }} className="p-1.5 rounded-lg border border-amber-900/40">
                           <span className="text-[9px] font-bold text-amber-400/80 block uppercase leading-none">Venta Hoy</span>
                           <span className="text-xs font-black text-white font-mono mt-0.5 block">{formatCurrency(activeBranch?.todaySales || 0)}</span>
                         </div>
-                        <div className="p-1.5 bg-[#170c06] rounded-lg border border-amber-900/40">
+                        <div style={{ backgroundColor: "#26140b" }} className="p-1.5 rounded-lg border border-amber-900/40">
                           <span className="text-[9px] font-bold text-amber-400/80 block uppercase leading-none">Tickets</span>
                           <span className="text-xs font-black text-amber-300 font-mono mt-0.5 block">{activeBranch?.todayTickets || 0} tkts</span>
                         </div>
-                        <div className="p-1.5 bg-[#170c06] rounded-lg border border-amber-900/40">
+                        <div style={{ backgroundColor: "#26140b" }} className="p-1.5 rounded-lg border border-amber-900/40">
                           <span className="text-[9px] font-bold text-amber-400/80 block uppercase leading-none">En Caja</span>
                           <span className="text-xs font-black text-emerald-400 font-mono mt-0.5 block">{formatCurrency(activeBranch?.cashInDrawer || activeBranch?.currentShift?.initialFund || 0)}</span>
                         </div>
@@ -3059,7 +3066,7 @@ export default function POSPage() {
                       {/* Lista de Sucursales con diseño de colores corporativos */}
                       <div className="space-y-1.5">
                         <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
-                          {user?.role === "admin" ? "Seleccionar Tienda Activa:" : "Sucursales de la Red:"}
+                          Seleccionar Tienda Activa:
                         </p>
                         <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
                           {branches.map((b) => {
@@ -3079,13 +3086,13 @@ export default function POSPage() {
                                 onClick={() => {
                                   if (isAdmin) {
                                     switchBranch(b.id);
-                                    setShowBranchDropdown(false);
+                                    // Las opciones no desaparecen al seleccionar, se mantienen abiertas
                                     playScanBeep(true);
                                     addNotification({
                                       senderName: "🏬 Red Brito",
                                       senderAvatar: "🏬",
                                       badgeIcon: "dinero",
-                                      title: "Sucursal Cambiada",
+                                      title: "Sucursal Activa",
                                       highlightText: b.name,
                                       description: "Terminal POS y caja sincronizadas con esta tienda.",
                                       category: "caja",
@@ -3093,12 +3100,13 @@ export default function POSPage() {
                                   }
                                 }}
                                 disabled={!isAdmin}
+                                style={{ backgroundColor: isSelected ? "#3a1e12" : "#28150d" }}
                                 className={`w-full text-left p-2.5 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
                                   isAdmin ? "cursor-pointer active:scale-98" : "cursor-default"
                                 } ${
                                   isSelected
-                                    ? "bg-gradient-to-r from-amber-950 via-[#361a0e] to-amber-900/80 border-amber-400 shadow-md ring-2 ring-amber-400/30"
-                                    : "bg-[#24130a]/80 hover:bg-[#30190d] border-amber-900/50 hover:border-amber-600/70"
+                                    ? "border-amber-400 shadow-lg ring-2 ring-amber-400/30"
+                                    : "hover:bg-[#341d11] border-amber-900/50 hover:border-amber-600/70"
                                 }`}
                               >
                                 <div className="flex items-center justify-between gap-1.5">
@@ -3111,15 +3119,15 @@ export default function POSPage() {
                                     </span>
                                   </div>
                                   {isSelected ? (
-                                    <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/80 border border-emerald-500/50 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                    <span className="text-[10px] font-black text-emerald-300 bg-emerald-950 border border-emerald-500/50 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
                                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                       Activa
                                     </span>
-                                  ) : user?.role === "admin" ? (
+                                  ) : (
                                     <span className="text-[10px] font-bold text-amber-400/80 hover:text-amber-300 shrink-0">
                                       Cambiar ➔
                                     </span>
-                                  ) : null}
+                                  )}
                                 </div>
                                 <div className="flex items-center justify-between text-[10px] text-amber-200/80 pt-1 border-t border-amber-900/40">
                                   <span className="truncate">👤 {b.currentShift?.cashier || b.manager || "En turno"}</span>
@@ -3131,6 +3139,20 @@ export default function POSPage() {
                             );
                           })}
                         </div>
+                      </div>
+
+                      {/* Botón inferior para cerrar cuando termine */}
+                      <div className="pt-2 border-t border-amber-900/60 flex items-center justify-between">
+                        <span className="text-[10px] text-amber-300/70 font-medium">
+                          Sucursal sincronizada para ventas
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowBranchDropdown(false)}
+                          className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-[11px] font-black transition-all shadow-xs active:scale-95 cursor-pointer"
+                        >
+                          Listo ✓
+                        </button>
                       </div>
 
                     </div>
