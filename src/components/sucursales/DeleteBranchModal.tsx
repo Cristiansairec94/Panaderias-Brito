@@ -171,8 +171,8 @@ export default function DeleteBranchModal({
             </div>
           )}
 
-          {/* Advertencia de Seguridad */}
-          {isOnlyBranch ? (
+          {/* Advertencia solo si es la única sucursal */}
+          {isOnlyBranch && (
             <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 space-y-2">
               <div className="flex items-start gap-2.5">
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
@@ -182,20 +182,6 @@ export default function DeleteBranchModal({
                   </h5>
                   <p className="text-xs text-amber-800 mt-1 leading-relaxed">
                     No es posible eliminar <strong>"{currentBranch?.name}"</strong> porque es la <strong>única sucursal activa</strong> de la panadería. El sistema requiere al menos una tienda activa para operar ventas y pedidos.
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 space-y-2">
-              <div className="flex items-start gap-2.5">
-                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                <div>
-                  <h5 className="font-black text-rose-900 text-xs uppercase tracking-wide">
-                    Confirmación de Eliminación Definitiva
-                  </h5>
-                  <p className="text-xs text-rose-700 mt-1 leading-relaxed">
-                    Al confirmar, esta sucursal será <strong>retirada de la red</strong>, de las terminales de venta (POS) y de los reportes en vivo. Esta acción se sincronizará de inmediato en todos los celulares y computadoras conectados.
                   </p>
                 </div>
               </div>
