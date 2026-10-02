@@ -324,6 +324,23 @@ export function recordCashIncome(income: {
       if (!shiftIncomes.some((si) => si.id === newIncome.id)) {
         localStorage.setItem("brito_pos_current_incomes", JSON.stringify([newIncome, ...shiftIncomes]));
       }
+
+      // Transmisión inmediata en tiempo real para supervisión del Administrador
+      if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
+        realtimeHub.broadcastCashMovement({
+          id: newIncome.id,
+          branchId: newIncome.branchId || "branch-matriz",
+          branchName: newIncome.branchName || "Sucursal Matriz",
+          type: "entrada",
+          category: "otro",
+          categoryLabel: newIncome.categoryLabel || "Entrada de Dinero",
+          amount: newIncome.amount,
+          reason: newIncome.concept || "Entrada de dinero a caja",
+          authorizedBy: newIncome.cashier || "Don Toño Brito",
+          cashier: newIncome.cashier,
+          timestamp: newIncome.date || new Date().toLocaleTimeString("es-MX"),
+        });
+      }
     }
   } catch (e) {}
 

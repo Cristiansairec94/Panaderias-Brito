@@ -398,6 +398,9 @@ export interface BranchCashMovement {
   reason: string;
   authorizedBy: string;
   timestamp: string;
+  movementType?: "venta" | "pedido" | "gasto" | "entrada" | "corte";
+  cashier?: string;
+  paymentMethod?: string;
 }
 
 export interface BreadDeliveryItem {
