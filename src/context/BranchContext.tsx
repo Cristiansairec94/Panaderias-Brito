@@ -609,7 +609,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Save branches changes to localStorage and server
-  const persistBranches = (updated: Branch[]) => {
+  const persistBranches = (updated: Branch[], isReplace = false) => {
     try {
       localStorage.setItem("brito_branches_data", JSON.stringify(updated));
     } catch {
@@ -617,7 +617,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (typeof window !== "undefined") {
-      fetch("/api/branches", {
+      fetch(isReplace ? "/api/branches?replace=true" : "/api/branches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updated),
@@ -667,6 +667,14 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     if (updatedBranch && realtimeHub.broadcastBranch) {
       realtimeHub.broadcastBranch("update", updatedBranch);
     }
+
+    if (typeof window !== "undefined") {
+      fetch("/api/branches", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: branchId, updates }),
+      }).catch((e) => console.warn("[BranchContext] Error calling PUT /api/branches:", e));
+    }
   }, []);
 
   const deleteBranch = useCallback((branchId: string) => {
@@ -675,12 +683,18 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       if (prev.length <= 1) return prev;
       deletedBranch = prev.find((b) => b.id === branchId) || null;
       const updated = prev.filter((b) => b.id !== branchId);
-      persistBranches(updated);
+      persistBranches(updated, true);
       return updated;
     });
 
     if (deletedBranch && realtimeHub.broadcastBranch) {
       realtimeHub.broadcastBranch("delete", deletedBranch);
+    }
+
+    if (typeof window !== "undefined") {
+      fetch(`/api/branches?id=${encodeURIComponent(branchId)}`, {
+        method: "DELETE",
+      }).catch((e) => console.warn("[BranchContext] Error calling DELETE /api/branches:", e));
     }
 
     setCurrentBranchId((current) => {

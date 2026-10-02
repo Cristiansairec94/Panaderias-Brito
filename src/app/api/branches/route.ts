@@ -76,14 +76,21 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     let currentBranches = readStoredBranches();
 
+    const isReplace = req.nextUrl.searchParams.get("replace") === "true";
+
     // Caso 1: Sincronización de lista completa
     if (Array.isArray(body)) {
       if (body.length > 0) {
-        // Merge preservation
-        const mergedMap = new Map<string, Branch>();
-        currentBranches.forEach((b) => mergedMap.set(b.id, b));
-        body.forEach((b) => mergedMap.set(b.id, { ...mergedMap.get(b.id), ...b }));
-        const updated = Array.from(mergedMap.values());
+        let updated: Branch[];
+        if (isReplace) {
+          updated = body;
+        } else {
+          // Merge preservation
+          const mergedMap = new Map<string, Branch>();
+          currentBranches.forEach((b) => mergedMap.set(b.id, b));
+          body.forEach((b) => mergedMap.set(b.id, { ...mergedMap.get(b.id), ...b }));
+          updated = Array.from(mergedMap.values());
+        }
         writeStoredBranches(updated);
         return NextResponse.json({ success: true, branches: updated, count: updated.length });
       }
