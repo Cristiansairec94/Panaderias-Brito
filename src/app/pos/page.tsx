@@ -2540,26 +2540,6 @@ export default function POSPage() {
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
               </button>
 
-              {/* Botón Sincronizar Todo a la Nube */}
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await syncNow();
-                    setSyncStatusMsg("¡Ventas, tickets y gastos locales subidos a la base de datos de Supabase!");
-                    setTimeout(() => setSyncStatusMsg(null), 5000);
-                  } catch (e: any) {
-                    setSyncStatusMsg("Error al sincronizar con la nube: " + (e?.message || "Revisa tu conexión"));
-                    setTimeout(() => setSyncStatusMsg(null), 5000);
-                  }
-                }}
-                disabled={isSyncing}
-                className="flex items-center gap-2 px-3 sm:px-4 py-3.5 rounded-2xl border-2 border-stone-200 bg-white hover:bg-stone-50 text-stone-800 text-xs sm:text-sm font-black transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
-                title="Subir y sincronizar todos los tickets, gastos e ingresos de esta máquina a Supabase"
-              >
-                <RefreshCw className={`w-4 h-4 text-amber-600 ${isSyncing ? "animate-spin" : ""}`} />
-                <span className="hidden xl:inline">{isSyncing ? "Sincronizando..." : "Sincronizar a la Nube"}</span>
-              </button>
 
               {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
               {false && (
