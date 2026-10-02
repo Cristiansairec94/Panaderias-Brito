@@ -2586,7 +2586,7 @@ export default function POSPage() {
       {/* Product Catalog Area (Main) con espacio y scrollbar estilizado */}
       <div 
         ref={catalogScrollRef}
-        className="flex-1 flex flex-col min-w-0 px-4 lg:px-5 pb-6 pt-0 pr-3 sm:pr-4 overflow-y-auto scroll-smooth relative"
+        className="flex-1 flex flex-col min-w-0 px-3 sm:px-4 lg:px-5 pb-6 pt-0 overflow-y-auto overflow-x-hidden scroll-smooth relative"
       >
         {/* Alerta flotante de escaneo de código de barras */}
         {lastScannedItem && (
@@ -2624,7 +2624,7 @@ export default function POSPage() {
         )}
 
         {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
-        <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
+        <div className={`sticky top-0 z-30 -mx-3 sm:-mx-4 lg:-mx-5 px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-2.5" : "mb-3"}`}>
           {isSyncing && pendingCount > 0 && (
             <div className="bg-amber-500/15 border border-amber-500/30 text-amber-950 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
               <div className="flex items-center gap-2">
@@ -2652,25 +2652,25 @@ export default function POSPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-3 w-full">
-            {/* Botón Menú Móvil */}
-            <button
-              type="button"
-              onClick={toggleMobile}
-              className="md:hidden p-3 rounded-2xl bg-white hover:bg-stone-50 text-stone-700 transition-colors border-2 border-stone-200 shrink-0 shadow-xs"
-              title="Abrir menú"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+          <div className="flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2 sm:gap-2.5 w-full">
+            {/* Fila 1: Menú móvil (si aplica) + Buscador de Productos & Escáner */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {/* Botón Menú Móvil */}
+              <button
+                type="button"
+                onClick={toggleMobile}
+                className="md:hidden p-2.5 rounded-xl bg-white hover:bg-stone-50 text-stone-700 transition-colors border-2 border-stone-200 shrink-0 shadow-xs"
+                title="Abrir menú"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
 
-            {/* Buscador de Productos & Escáner de Código de Barras */}
-            <div className="flex items-center gap-2 flex-1 max-w-2xl min-w-0">
               {/* Buscador General con Soporte de Enter para Código */}
               <div className="relative flex-1 min-w-0">
-                <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
                   type="text"
-                  placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
+                  placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel o escanea código..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => {
@@ -2683,32 +2683,52 @@ export default function POSPage() {
                       }
                     }
                   }}
-                  className="w-full pl-12 pr-10 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
+                  className="w-full pl-10 sm:pl-11 pr-9 py-2 sm:py-2.5 bg-white rounded-xl sm:rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-xs sm:text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
                 />
                 {search && (
                   <button
                     type="button"
                     onClick={() => setSearch("")}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
+
+              {/* Botón Móvil para Ver Charola / Carrito (visible solo en pantallas pequeñas) */}
+              <div className="relative shrink-0 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsMobileCartOpen(true)}
+                  className="relative flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-md shadow-amber-600/30 active:scale-95 transition-all"
+                  title="Abrir charola de cobro"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span className="hidden sm:inline">Charola</span>
+                  {totalPieces > 0 && (
+                    <span className="w-5 h-5 bg-rose-600 text-white rounded-full text-[10px] font-black flex items-center justify-center border-2 border-white">
+                      {totalPieces}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
 
-            {/* Grupo Catálogo y Pan: Selector de Sucursal para Admin + Categorías y Precios */}
-            <div className="flex items-center gap-2 shrink-0">
-
-              {/* Botón Grande: Categorías y Precios */}
+            {/* Fila 2 (o en fila continua en pantallas 2xl): Botones de Acción */}
+            <div className="grid grid-cols-3 2xl:flex items-center gap-1.5 sm:gap-2 shrink-0 w-full 2xl:w-auto">
+              {/* Botón 1: Categorías y Precios */}
               <button
                 type="button"
                 onClick={() => setShowCategoryPanel(!showCategoryPanel)}
-                className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 border-amber-400 bg-white hover:bg-amber-50 text-stone-900 text-sm sm:text-base font-black transition-all active:scale-95 shadow-sm whitespace-nowrap"
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl border-2 border-amber-400 bg-white hover:bg-amber-50 text-stone-900 text-xs sm:text-sm font-black transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                  selectedCategory !== "all" ? "ring-2 ring-amber-400/40 bg-amber-50/60" : ""
+                }`}
                 title="Mostrar u ocultar panel de categorías y precios"
               >
-                <span className="text-xl">🧺</span>
-                <span>Categorías y Precios</span>
+                <span className="text-base sm:text-lg">🧺</span>
+                <span className="truncate">Categorías</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 text-stone-400 shrink-0 ${showCategoryPanel ? "rotate-180" : ""}`} />
                 {selectedCategory !== "all" && (
                   <span
                     onClick={(e) => {
@@ -2716,53 +2736,15 @@ export default function POSPage() {
                       setSelectedCategory("all");
                       setShowCategoryPanel(false);
                     }}
-                    className="w-5 h-5 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center text-xs font-black transition-transform active:scale-90 ml-0.5"
+                    className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center text-[10px] font-black transition-transform active:scale-90 ml-0.5"
                     title="Ver todo el pan y quitar filtro"
                   >
                     ✕
                   </span>
                 )}
-                <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
               </button>
 
-
-              {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
-              {false && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isShiftLocked) {
-                      addNotification({
-                        senderName: "🔒 Terminal Bloqueada",
-                        senderAvatar: "⚠️",
-                        badgeIcon: "alerta",
-                        title: "Terminal Bloqueada",
-                        highlightText: "Turno cerrado por seguridad",
-                        description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar entrada de pan.",
-                        category: "inventario",
-                      });
-                      return;
-                    }
-                    setShowBreadDeliveryModal(true);
-                  }}
-                  className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
-                    isShiftLocked
-                      ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                      : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black"
-                  }`}
-                  title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
-                >
-                  <span className="text-lg">🚐</span>
-                  <span>Entrada de Pan</span>
-                </button>
-              )}
-
-            </div>
-
-            {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
-            <div className="flex items-center gap-2 shrink-0">
-
-              {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
+              {/* Botón 2: Movimientos de Caja */}
               <button
                 type="button"
                 onClick={() => {
@@ -2780,20 +2762,20 @@ export default function POSPage() {
                   }
                   setShowExpensesModal(true);
                 }}
-                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
                   isShiftLocked
                     ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                    : "border-amber-300 hover:border-amber-400 bg-amber-50 hover:bg-amber-100/90 text-stone-900 text-sm sm:text-base font-black"
+                    : "border-amber-300 hover:border-amber-400 bg-amber-50 hover:bg-amber-100/90 text-stone-900 text-xs sm:text-sm font-black"
                 }`}
                 title={isShiftLocked ? "Terminal bloqueada" : "Registrar gastos, retiros de dueños y entradas para cambio de billetes"}
               >
-                <span className="w-6 h-6 rounded-xl bg-amber-500 text-stone-950 font-black flex items-center justify-center text-xs shadow-xs border border-amber-400 shrink-0">
+                <span className="w-5 h-5 rounded-lg bg-amber-500 text-stone-950 font-black flex items-center justify-center text-[11px] shadow-xs border border-amber-400 shrink-0">
                   $
                 </span>
-                <span>Movimientos de Caja</span>
+                <span className="truncate">Movimientos</span>
               </button>
 
-              {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
+              {/* Botón 3: Cerrar Turno & Bloquear Punto de Venta */}
               <button
                 type="button"
                 onClick={() => {
@@ -2812,40 +2794,22 @@ export default function POSPage() {
                   setShiftModalTab("cambio");
                   setShowCashDrawerModal(true);
                 }}
-                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-md shadow-orange-950/20 whitespace-nowrap ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl border-2 transition-all active:scale-95 shadow-md shadow-orange-950/20 whitespace-nowrap ${
                   isShiftLocked
                     ? "border-amber-900/60 bg-gradient-to-r from-stone-800 to-stone-900 text-amber-300"
-                    : "border-amber-600/80 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white text-sm sm:text-base font-black"
+                    : "border-amber-600/80 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white text-xs sm:text-sm font-black"
                 }`}
                 title={isShiftLocked ? "Turno ya cerrado y bloqueado" : "Cerrar turno de la cajera y bloquear la terminal con candado"}
               >
-                <span>🔒</span>
-                <span>{isShiftLocked ? "Turno Cerrado 🔒" : "Cerrar Turno"}</span>
-              </button>
-            </div>
-
-            {/* Botón Móvil para Ver Charola / Carrito */}
-            <div className="relative shrink-0 lg:hidden">
-              <button
-                type="button"
-                onClick={() => setIsMobileCartOpen(true)}
-                className="relative flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-md shadow-amber-600/30 active:scale-95 transition-all"
-                title="Abrir charola de cobro"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                <span className="hidden sm:inline">Charola</span>
-                {totalPieces > 0 && (
-                  <span className="w-5 h-5 bg-rose-600 text-white rounded-full text-[10px] font-black flex items-center justify-center border-2 border-white">
-                    {totalPieces}
-                  </span>
-                )}
+                <span className="shrink-0">🔒</span>
+                <span className="truncate">{isShiftLocked ? "Bloqueado" : "Cerrar Turno"}</span>
               </button>
             </div>
           </div>
 
           {/* Tarjeta CATEGORÍAS Y PRECIOS COMPACTA (Permite ver el pan y productos simultáneamente) */}
           {showCategoryPanel && (
-            <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-2.5 sm:p-3 border-2 border-amber-200/90 shadow-md space-y-2 shrink-0 animate-in fade-in duration-200">
+            <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-2 sm:p-2.5 border-2 border-amber-200/90 shadow-md space-y-2 shrink-0 animate-in fade-in duration-200">
               {/* Cabecera Compacta */}
               <div className="flex items-center justify-between pb-1.5 border-b border-stone-100 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
@@ -2881,7 +2845,7 @@ export default function POSPage() {
               </div>
 
               {/* Cuadrícula de Categorías y Precios Completos (Sin cortes ni puntos suspensivos) */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7 gap-2 max-h-[190px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-1.5 sm:gap-2 max-h-[150px] sm:max-h-[180px] overflow-y-auto pr-1">
                 {CATEGORIES.map((cat) => {
                   const isSelected = selectedCategory === cat.id;
                   const count = cat.id === "all"
@@ -2941,7 +2905,7 @@ export default function POSPage() {
             </div>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(185px,1fr))] gap-2.5 sm:gap-3 pb-12">
           {filteredProducts.map((product) => {
             const itemInCart = cart.find((i) => i.product.id === product.id);
 
@@ -2953,13 +2917,13 @@ export default function POSPage() {
               >
                 {/* Active in-cart indicator */}
                 {itemInCart && (
-                  <span className="absolute top-2.5 right-2.5 z-20 bg-amber-600 text-white font-black text-xs px-2.5 py-0.5 rounded-full shadow-md border-2 border-white animate-in zoom-in flex items-center gap-1">
+                  <span className="absolute top-2 right-2 z-20 bg-amber-600 text-white font-black text-xs px-2.5 py-0.5 rounded-full shadow-md border-2 border-white animate-in zoom-in flex items-center gap-1">
                     <ShoppingBag className="w-3 h-3" /> {itemInCart.quantity} en charola
                   </span>
                 )}
 
                 {/* Compact Image Container */}
-                <div className="relative h-32 sm:h-36 w-full overflow-hidden bg-stone-100">
+                <div className="relative h-28 sm:h-32 w-full overflow-hidden bg-stone-100 shrink-0">
                   {product.image ? (
                     <img
                       src={product.image}
@@ -2968,7 +2932,7 @@ export default function POSPage() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ease-out"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 text-5xl">
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 text-4xl sm:text-5xl">
                       {product.icon || "🥐"}
                     </div>
                   )}
@@ -2976,7 +2940,7 @@ export default function POSPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10 opacity-60 group-hover:opacity-30 transition-opacity" />
 
                   {/* PROMINENT PRICE BADGE (Top Right) */}
-                  <div className="absolute top-2.5 right-2.5 z-10">
+                  <div className="absolute top-2 right-2 z-10">
                     <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black text-xs px-2.5 py-0.5 rounded-xl shadow-md border border-white/80">
                       <span>{formatCurrency(product.price)}</span>
                       {product.unit && (
@@ -2988,50 +2952,40 @@ export default function POSPage() {
                   </div>
 
                   {/* Tag on Image: Disponible libre sin límites */}
-                  <div className="absolute bottom-2.5 left-2.5 z-10">
+                  <div className="absolute bottom-2 left-2 z-10">
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md shadow-xs bg-black/60 text-stone-100">
-                      {product.stock > 0 ? `${product.stock} piezas` : "Disponible"}
+                      {product.stock > 0 ? `${product.stock} pzs` : "Disponible"}
                     </span>
                   </div>
                 </div>
 
-                {/* Card Content */}
-                <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-1.5">
+                {/* Card Content - Título a ancho completo y pie con precio & código */}
+                <div className="p-2 sm:p-2.5 flex-1 flex flex-col justify-between space-y-1">
                   <div>
-                    <div className="flex items-start justify-between gap-1.5">
-                      <div className="min-w-0">
-                        <h3 className="font-extrabold text-stone-900 text-sm sm:text-base leading-snug group-hover:text-amber-800 transition-colors line-clamp-2 break-words">
-                          {product.name}
-                        </h3>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="font-black text-amber-900 text-base">
-                          {formatCurrency(product.price)}
-                        </span>
-                        {product.unit && (
-                          <span className="text-[11px] font-bold text-amber-700 ml-1">
-                            /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-xs text-stone-500 mt-0.5 line-clamp-1 font-sans">
+                    <h3 className="font-extrabold text-stone-900 text-xs sm:text-sm leading-snug group-hover:text-amber-800 transition-colors line-clamp-2 break-words" title={product.name}>
+                      {product.name}
+                    </h3>
+                    <p className="text-[10px] sm:text-[11px] text-stone-500 mt-0.5 line-clamp-1 font-sans">
                       {product.description || "Panadería artesanal horneada diariamente."}
                     </p>
+                  </div>
 
-                    {/* Código / Código de barras */}
-                    {(product.barcode || product.code) && (
-                      <div className="flex items-center gap-1.5 pt-1">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-50/90 text-amber-900 border border-amber-200/90 shadow-2xs">
-                          <Barcode className="w-3 h-3 text-amber-700 shrink-0" />
-                          <span>{product.barcode || product.code}</span>
+                  {/* Fila Inferior: Precio + Código de barras */}
+                  <div className="flex items-center justify-between pt-1 border-t border-stone-100 gap-1 mt-1">
+                    <span className="font-black text-amber-900 text-xs sm:text-sm">
+                      {formatCurrency(product.price)}
+                      {product.unit && (
+                        <span className="text-[10px] font-bold text-amber-700 ml-0.5">
+                          /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
                         </span>
-                        {product.code && product.barcode && (
-                          <span className="text-[10px] font-bold text-stone-400 font-mono">
-                            [{product.code}]
-                          </span>
-                        )}
-                      </div>
+                      )}
+                    </span>
+
+                    {(product.barcode || product.code) && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 truncate max-w-[95px]" title={product.barcode || product.code}>
+                        <Barcode className="w-2.5 h-2.5 text-amber-700 shrink-0" />
+                        <span className="truncate">{product.barcode || product.code}</span>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -3049,25 +3003,25 @@ export default function POSPage() {
         />
       )}
 
-      {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone - Amplia y Espaciosa) */}
-      <div className={`fixed lg:static inset-y-0 right-0 z-[120] lg:z-10 w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out relative overflow-hidden ${
+      {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone) */}
+      <div className={`fixed lg:static inset-y-0 right-0 z-[120] lg:z-10 w-full sm:w-[380px] lg:w-[370px] xl:w-[395px] 2xl:w-[430px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out relative overflow-hidden lg:overflow-visible ${
         isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       }`}>
         {/* Header con colores de la marca y micro-animación */}
-        <div className="p-2.5 px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative shrink-0">
+        <div className="p-2 px-3 sm:px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative shrink-0">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl" />
           </div>
-          <div className="flex items-center gap-2.5 relative z-10">
-            <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40">
-              <ShoppingBag className="w-4 h-4 text-white" />
+          <div className="flex items-center gap-2 relative z-10">
+            <div className="p-1.5 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40">
+              <ShoppingBag className="w-3.5 h-3.5 text-white" />
             </div>
             <div>
-              <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
+              <h3 className="font-black text-xs sm:text-sm leading-tight tracking-wide text-white flex items-center gap-1.5">
                 Charola de Cobro
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </h3>
-              <div className="flex items-center gap-1.5 text-[11px] text-amber-300 font-bold flex-wrap mt-0.5">
+              <div className="flex items-center gap-1 text-[10px] text-amber-300 font-bold flex-wrap mt-0.5">
 
                 {/* Selector Desplegable de Sucursal con Diseño Artesanal */}
                 <div ref={branchDropdownRef} className="relative inline-block">
@@ -3075,65 +3029,64 @@ export default function POSPage() {
                     <button
                       type="button"
                       onClick={() => setShowBranchDropdown((prev) => !prev)}
-                      className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/25 via-amber-600/20 to-orange-500/25 hover:from-amber-500/40 hover:to-orange-500/40 text-amber-100 hover:text-white px-2.5 py-1 rounded-xl border border-amber-400/40 hover:border-amber-300 text-[11px] font-black tracking-wide shadow-sm transition-all active:scale-95 cursor-pointer group select-none"
+                      className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-500/25 via-amber-600/20 to-orange-500/25 hover:from-amber-500/40 hover:to-orange-500/40 text-amber-100 hover:text-white px-2 py-0.5 rounded-lg border border-amber-400/40 hover:border-amber-300 text-[10px] font-black tracking-wide shadow-sm transition-all active:scale-95 cursor-pointer group select-none"
                       title="Ver red de sucursales y cambiar tienda activa"
                     >
-                      <Store className="w-3.5 h-3.5 text-amber-300 group-hover:text-amber-200 shrink-0" />
-                      <span className="truncate max-w-[130px] sm:max-w-[200px]">
+                      <Store className="w-3 h-3 text-amber-300 group-hover:text-amber-200 shrink-0" />
+                      <span className="truncate max-w-[105px] sm:max-w-[150px]">
                         🏬 {activeBranch ? activeBranch.name : "Sucursal Matriz"}
                       </span>
-                      <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="relative flex h-1.5 w-1.5 shrink-0">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                       </span>
                       <ChevronDown
-                        className={`w-3 h-3 text-amber-300 group-hover:text-amber-100 transition-transform duration-200 shrink-0 ${
+                        className={`w-2.5 h-2.5 text-amber-300 group-hover:text-amber-100 transition-transform duration-200 shrink-0 ${
                           showBranchDropdown ? "rotate-180" : ""
                         }`}
                       />
                     </button>
                   ) : (
                     <div
-                      className="inline-flex items-center gap-1.5 bg-amber-950/70 text-amber-200 px-2.5 py-1 rounded-xl border border-amber-500/30 text-[11px] font-black tracking-wide select-none"
+                      className="inline-flex items-center gap-1 bg-amber-950/70 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-500/30 text-[10px] font-black tracking-wide select-none"
                       title="Sucursal fija asignada a tu turno de cajero"
                     >
-                      <Store className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      <span className="truncate max-w-[150px] sm:max-w-[220px]">
+                      <Store className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span className="truncate max-w-[110px] sm:max-w-[160px]">
                         🏬 {activeBranch ? activeBranch.name : "Sucursal Matriz"}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold border border-amber-500/30">
-                        <Lock className="w-2.5 h-2.5" /> Fija
+                      <span className="inline-flex items-center gap-0.5 text-[8px] bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded font-bold border border-amber-500/30">
+                        <Lock className="w-2 h-2" /> Fija
                       </span>
                     </div>
                   )}
 
-                  {/* Panel Desplegable Flotante (exclusivo para administradores) */}
+                  {/* Panel Desplegable Flotante (exclusivo para administradores) - Especializado y Compacto */}
                   {isAdmin && showBranchDropdown && (
                     <div 
                       style={{ backgroundColor: "#1e1009" }}
-                      className="absolute left-0 mt-2.5 w-[390px] sm:w-[540px] md:w-[620px] max-w-[calc(100vw-20px)] rounded-3xl shadow-2xl border-2 border-amber-600/80 p-3.5 sm:p-4 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-3.5"
+                      className="absolute right-0 top-full mt-2 w-[310px] sm:w-[380px] md:w-[410px] max-w-[calc(100vw-24px)] rounded-2xl shadow-2xl border-2 border-amber-600/80 p-2.5 sm:p-3 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-2.5"
                     >
-                      {/* Cabecera del panel */}
-                      <div className="flex items-center justify-between pb-2.5 border-b border-amber-900/60">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-950/60 ring-2 ring-amber-400/30">
-                            <Store className="w-5 h-5" />
+                      {/* Cabecera compacta del panel */}
+                      <div className="flex items-center justify-between pb-2 border-b border-amber-900/60">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-950/60 ring-2 ring-amber-400/30 shrink-0">
+                            <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </div>
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-wider text-amber-400 leading-tight">Red Panaderías Brito</p>
-                            <p className="text-sm sm:text-base font-black text-white leading-tight">Supervisión y Control Multi-Sucursal</p>
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-black uppercase tracking-wider text-amber-400 leading-none">Red Panaderías Brito</p>
+                            <p className="text-xs sm:text-sm font-black text-white leading-tight truncate">Supervisión Multi-Sucursal</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/50 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[9px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/50 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                             0ms VIVO
                           </span>
                           <button
                             type="button"
                             onClick={() => setShowBranchDropdown(false)}
-                            className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-colors text-xs font-bold cursor-pointer"
+                            className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-colors text-xs font-bold cursor-pointer"
                             title="Cerrar panel de supervisión"
                           >
                             ✕
@@ -3141,49 +3094,49 @@ export default function POSPage() {
                         </div>
                       </div>
 
-                      {/* Selector de Pestañas: 🏬 Sucursales vs ⚡ Movimientos en Vivo */}
-                      <div className="grid grid-cols-2 gap-1.5 p-1 bg-black/40 rounded-xl border border-amber-900/50 text-xs font-black">
+                      {/* Selector de Pestañas: 🏬 Sucursales vs ⚡ Movimientos */}
+                      <div className="grid grid-cols-2 gap-1 p-0.5 bg-black/40 rounded-xl border border-amber-900/50 text-[11px] font-black">
                         <button
                           type="button"
                           onClick={() => setBranchPanelTab("sucursales")}
-                          className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg transition-all cursor-pointer ${
+                          className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
                             branchPanelTab === "sucursales"
                               ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-900/50"
                               : "text-amber-200/70 hover:text-white hover:bg-white/5"
                           }`}
                         >
-                          <Store className="w-4 h-4 shrink-0" />
-                          <span>Red de Sucursales ({branches.length})</span>
+                          <Store className="w-3.5 h-3.5 shrink-0" />
+                          <span>Sucursales ({branches.length})</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setBranchPanelTab("movimientos")}
-                          className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg transition-all cursor-pointer relative ${
+                          className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg transition-all cursor-pointer relative ${
                             branchPanelTab === "movimientos"
                               ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/50"
                               : "text-emerald-300/80 hover:text-emerald-200 hover:bg-white/5"
                           }`}
                         >
-                          <TrendingUp className="w-4 h-4 shrink-0 text-emerald-300" />
-                          <span>Movimientos en Vivo</span>
+                          <TrendingUp className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
+                          <span>Movimientos</span>
                           {cashMovements.length > 0 && (
-                            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black font-mono bg-emerald-400 text-stone-950">
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-black font-mono bg-emerald-400 text-stone-950">
                               {cashMovements.length}
                             </span>
                           )}
                         </button>
                       </div>
 
-                      {/* CONTENIDO PESTAÑA 1: RED DE SUCURSALES (CON NÚMEROS GRANDES Y DETALLADOS) */}
+                      {/* CONTENIDO PESTAÑA 1: RED DE SUCURSALES (ESPECIALIZADA Y COMPACTA) */}
                       {branchPanelTab === "sucursales" && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center justify-between text-[11px] font-bold text-amber-300/90 px-0.5">
-                            <span>Selecciona una sucursal para operar o supervisar:</span>
-                            <span className="text-[10px] text-stone-400">Actualizado al instante</span>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-amber-300/80 px-0.5">
+                            <span>Selecciona sucursal activa:</span>
+                            <span className="text-[9px] text-stone-400">Actualizado en vivo</span>
                           </div>
 
-                          <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-0.5">
+                          <div className="space-y-1.5 max-h-[220px] sm:max-h-[240px] overflow-y-auto pr-0.5">
                             {branches.map((b) => {
                               const isSelected = activeBranch?.id === b.id;
                               const isMatriz = b.id.includes("matriz");
@@ -3215,80 +3168,81 @@ export default function POSPage() {
                                   }}
                                   disabled={!isAdmin}
                                   style={{ backgroundColor: isSelected ? "#3a1e12" : "#28150d" }}
-                                  className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all flex flex-col gap-2 ${
+                                  className={`w-full text-left p-2.5 rounded-xl border transition-all flex flex-col gap-1.5 ${
                                     isAdmin ? "cursor-pointer active:scale-98" : "cursor-default"
                                   } ${
                                     isSelected
-                                      ? "border-amber-400 shadow-xl ring-2 ring-amber-400/40"
+                                      ? "border-amber-400 shadow-lg ring-1 ring-amber-400/50"
                                       : "hover:bg-[#341d11] border-amber-900/50 hover:border-amber-600/70"
                                   }`}
                                 >
-                                  {/* Encabezado de la tienda */}
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className={`text-[11px] font-black px-2 py-0.5 rounded-lg border shrink-0 ${badgeColor}`}>
+                                  {/* Encabezado: Código, Nombre y Estado */}
+                                  <div className="flex items-center justify-between gap-1.5">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-md border shrink-0 ${badgeColor}`}>
                                         {b.code || "TIENDA"}
                                       </span>
-                                      <span className={`font-black text-sm sm:text-base truncate ${isSelected ? "text-white" : "text-stone-200"}`}>
+                                      <span className={`font-black text-xs sm:text-sm truncate ${isSelected ? "text-white" : "text-stone-200"}`}>
                                         {b.name}
                                       </span>
                                     </div>
                                     {isSelected ? (
-                                      <span className="text-[10px] font-black text-emerald-300 bg-emerald-950 border border-emerald-500/60 px-2.5 py-1 rounded-full shrink-0 flex items-center gap-1.5 shadow-sm">
+                                      <span className="text-[9px] font-black text-emerald-300 bg-emerald-950 border border-emerald-500/60 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 shadow-xs">
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                         Activa ✓
                                       </span>
                                     ) : (
-                                      <span className="text-xs font-black text-amber-300/90 hover:text-white shrink-0 flex items-center gap-1 bg-amber-950/80 border border-amber-600/50 px-2.5 py-1 rounded-lg">
+                                      <span className="text-[9px] font-bold text-amber-300/90 hover:text-white shrink-0 flex items-center gap-0.5 bg-amber-950/80 border border-amber-600/50 px-2 py-0.5 rounded-md">
                                         Cambiar ➔
                                       </span>
                                     )}
                                   </div>
 
-                                  {/* MÉTICAS EN GRANDE: VENTAS Y TICKETS */}
-                                  <div className="flex items-center justify-between pt-2 border-t border-amber-900/50">
-                                    <div className="flex items-baseline gap-2">
-                                      <span className="text-[11px] font-black text-amber-400/90 uppercase tracking-wider">Ventas:</span>
-                                      <span className="font-mono font-black text-xl sm:text-2xl text-amber-300 drop-shadow-sm">
+                                  {/* Fila Central: Ventas, Tickets y Caja */}
+                                  <div className="flex items-center justify-between pt-1 border-t border-amber-900/50">
+                                    <div className="flex items-baseline gap-1.5">
+                                      <span className="text-[9px] font-bold text-amber-400/90 uppercase tracking-wider">Ventas:</span>
+                                      <span className="font-mono font-black text-sm sm:text-base text-amber-300">
                                         {formatCurrency(b.todaySales)}
                                       </span>
                                     </div>
-                                    <span className="text-xs sm:text-sm font-black font-mono text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-500/50 shadow-xs">
-                                      {b.todayTickets} {b.todayTickets === 1 ? "ticket" : "tickets"}
-                                    </span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <span className="text-[10px] font-black font-mono text-emerald-300 bg-emerald-950/90 px-1.5 py-0.2 rounded-md border border-emerald-500/50 shadow-xs">
+                                        {b.todayTickets} {b.todayTickets === 1 ? "tkt" : "tkts"}
+                                      </span>
+                                      <div className="flex items-center gap-1 bg-black/40 px-1.5 py-0.2 rounded-md border border-amber-900/40 text-[10px]">
+                                        <span className="text-stone-400">Caja:</span>
+                                        <span className="font-mono font-black text-emerald-400">
+                                          {formatCurrency(b.cashInDrawer)}
+                                        </span>
+                                      </div>
+                                    </div>
                                   </div>
 
-                                  {/* CAJERO EN TURNO Y EFECTIVO EN GAVETA */}
-                                  <div className="flex items-center justify-between text-xs text-amber-200/90 pt-1">
-                                    <span className="truncate max-w-[200px]">
+                                  {/* Cajero en turno */}
+                                  <div className="flex items-center justify-between text-[10px] text-amber-200/80">
+                                    <span className="truncate max-w-[220px]">
                                       👤 {b.currentShift?.cashier || b.manager || "Cajero en turno"}
                                     </span>
-                                    <div className="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-md border border-amber-900/40 text-[11px]">
-                                      <Coins className="w-3 h-3 text-amber-400 shrink-0" />
-                                      <span className="text-stone-300">Caja:</span>
-                                      <span className="font-mono font-black text-emerald-400">
-                                        {formatCurrency(b.cashInDrawer)}
-                                      </span>
-                                    </div>
                                   </div>
                                 </button>
                               );
                             })}
                           </div>
 
-                          {/* Consolidado total de la red */}
-                          <div className="p-2.5 rounded-xl bg-black/50 border border-amber-800/60 flex items-center justify-between flex-wrap gap-2 text-xs">
-                            <span className="text-amber-300 font-black uppercase text-[10px] tracking-wider">
+                          {/* Consolidado total compacto */}
+                          <div className="p-2 rounded-xl bg-black/50 border border-amber-800/60 flex items-center justify-between flex-wrap gap-1.5 text-xs">
+                            <span className="text-amber-300 font-black uppercase text-[9px] tracking-wider">
                               Consolidado Red Brito:
                             </span>
-                            <div className="flex items-center gap-3">
-                              <span className="font-mono font-black text-sm text-amber-300">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-xs sm:text-sm text-amber-300">
                                 {formatCurrency(branches.reduce((sum, b) => sum + (b.todaySales || 0), 0))}
                               </span>
-                              <span className="font-mono font-black text-xs text-emerald-300 bg-emerald-950/90 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                              <span className="font-mono font-black text-[10px] text-emerald-300 bg-emerald-950/90 px-1.5 py-0.2 rounded border border-emerald-500/40">
                                 {branches.reduce((sum, b) => sum + (b.todayTickets || 0), 0)} tkts
                               </span>
-                              <span className="font-mono font-black text-xs text-stone-200">
+                              <span className="font-mono font-black text-[10px] text-stone-200">
                                 💵 {formatCurrency(branches.reduce((sum, b) => sum + (b.cashInDrawer || 0), 0))}
                               </span>
                             </div>
@@ -3298,13 +3252,13 @@ export default function POSPage() {
 
                       {/* CONTENIDO PESTAÑA 2: SUPERVISIÓN DE MOVIMIENTOS EN VIVO */}
                       {branchPanelTab === "movimientos" && (
-                        <div className="space-y-2.5">
+                        <div className="space-y-2">
                           {/* Filtros rápidos por Tipo de Movimiento */}
-                          <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none text-[10px] font-black">
+                          <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none text-[9px] font-black">
                             <button
                               type="button"
                               onClick={() => setMovementFilterType("todos")}
-                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
                                 movementFilterType === "todos"
                                   ? "bg-amber-500 text-stone-950 border-amber-400 shadow-xs"
                                   : "bg-white/5 text-stone-300 border-white/10 hover:bg-white/10"
@@ -3315,7 +3269,7 @@ export default function POSPage() {
                             <button
                               type="button"
                               onClick={() => setMovementFilterType("venta")}
-                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
                                 movementFilterType === "venta"
                                   ? "bg-amber-600 text-white border-amber-400 shadow-xs"
                                   : "bg-white/5 text-amber-200/80 border-amber-900/40 hover:bg-white/10"
@@ -3326,7 +3280,7 @@ export default function POSPage() {
                             <button
                               type="button"
                               onClick={() => setMovementFilterType("pedido")}
-                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
                                 movementFilterType === "pedido"
                                   ? "bg-sky-600 text-white border-sky-400 shadow-xs"
                                   : "bg-white/5 text-sky-200/80 border-sky-900/40 hover:bg-white/10"
@@ -3337,7 +3291,7 @@ export default function POSPage() {
                             <button
                               type="button"
                               onClick={() => setMovementFilterType("gasto")}
-                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
                                 movementFilterType === "gasto"
                                   ? "bg-rose-600 text-white border-rose-400 shadow-xs"
                                   : "bg-white/5 text-rose-200/80 border-rose-900/40 hover:bg-white/10"
@@ -3348,7 +3302,7 @@ export default function POSPage() {
                             <button
                               type="button"
                               onClick={() => setMovementFilterType("entrada")}
-                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
                                 movementFilterType === "entrada"
                                   ? "bg-emerald-600 text-white border-emerald-400 shadow-xs"
                                   : "bg-white/5 text-emerald-200/80 border-emerald-900/40 hover:bg-white/10"
@@ -3359,7 +3313,7 @@ export default function POSPage() {
                             <button
                               type="button"
                               onClick={() => setMovementFilterType("corte")}
-                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
                                 movementFilterType === "corte"
                                   ? "bg-purple-600 text-white border-purple-400 shadow-xs"
                                   : "bg-white/5 text-purple-200/80 border-purple-900/40 hover:bg-white/10"
@@ -3370,13 +3324,13 @@ export default function POSPage() {
                           </div>
 
                           {/* Filtro por Sucursal y Buscador */}
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <select
                               value={movementFilterBranch}
                               onChange={(e) => setMovementFilterBranch(e.target.value)}
-                              className="bg-[#2a170e] text-amber-200 text-xs font-bold border border-amber-800/60 rounded-xl px-2.5 py-1.5 outline-hidden cursor-pointer"
+                              className="bg-[#2a170e] text-amber-200 text-[11px] font-bold border border-amber-800/60 rounded-lg px-2 py-1 outline-hidden cursor-pointer shrink-0"
                             >
-                              <option value="todas">🏬 Todas las Sucursales</option>
+                              <option value="todas">🏬 Todas las Tiendas</option>
                               {branches.map((b) => (
                                 <option key={b.id} value={b.id}>
                                   {b.shortName || b.name}
@@ -3384,14 +3338,14 @@ export default function POSPage() {
                               ))}
                             </select>
 
-                            <div className="flex-1 flex items-center bg-[#2a170e] rounded-xl border border-amber-800/60 px-2.5 py-1 gap-1.5 text-xs">
-                              <Search className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <div className="flex-1 flex items-center bg-[#2a170e] rounded-lg border border-amber-800/60 px-2 py-0.5 gap-1 text-[11px]">
+                              <Search className="w-3 h-3 text-amber-400 shrink-0" />
                               <input
                                 type="text"
                                 value={movementSearchQuery}
                                 onChange={(e) => setMovementSearchQuery(e.target.value)}
-                                placeholder="Filtrar por cajero, ticket, concepto..."
-                                className="w-full bg-transparent text-white placeholder-stone-400 text-xs outline-hidden"
+                                placeholder="Filtrar por cajero, ticket..."
+                                className="w-full bg-transparent text-white placeholder-stone-400 text-[11px] outline-hidden"
                               />
                               {movementSearchQuery && (
                                 <button
@@ -3406,22 +3360,22 @@ export default function POSPage() {
                           </div>
 
                           {/* Barra de Totales Financieros de la Vista */}
-                          <div className="grid grid-cols-3 gap-2 p-2 rounded-xl bg-black/40 border border-amber-900/50 text-center">
+                          <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-lg bg-black/40 border border-amber-900/50 text-center">
                             <div>
-                              <p className="text-[9px] font-black uppercase text-emerald-400">Total Entradas</p>
-                              <p className="font-mono font-black text-xs sm:text-sm text-emerald-300">
+                              <p className="text-[8px] font-black uppercase text-emerald-400">Entradas</p>
+                              <p className="font-mono font-black text-xs text-emerald-300">
                                 +{formatCurrency(movementTotals.entradas)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-[9px] font-black uppercase text-rose-400">Total Salidas</p>
-                              <p className="font-mono font-black text-xs sm:text-sm text-rose-300">
+                              <p className="text-[8px] font-black uppercase text-rose-400">Salidas</p>
+                              <p className="font-mono font-black text-xs text-rose-300">
                                 -{formatCurrency(movementTotals.salidas)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-[9px] font-black uppercase text-amber-400">Flujo Neto</p>
-                              <p className={`font-mono font-black text-xs sm:text-sm ${
+                              <p className="text-[8px] font-black uppercase text-amber-400">Balance</p>
+                              <p className={`font-mono font-black text-xs ${
                                 movementTotals.balance >= 0 ? "text-emerald-300" : "text-rose-300"
                               }`}>
                                 {movementTotals.balance >= 0 ? "+" : ""}{formatCurrency(movementTotals.balance)}
@@ -3430,12 +3384,12 @@ export default function POSPage() {
                           </div>
 
                           {/* Lista con scroll de movimientos en tiempo real */}
-                          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-0.5">
+                          <div className="space-y-1.5 max-h-[200px] sm:max-h-[220px] overflow-y-auto pr-0.5">
                             {filteredCashMovements.length === 0 ? (
-                              <div className="py-8 text-center text-stone-400 space-y-1">
-                                <p className="text-2xl">⚡</p>
-                                <p className="text-xs font-bold text-stone-300">No hay movimientos registrados para este filtro</p>
-                                <p className="text-[10px] text-stone-500">Cualquier venta, pedido, gasto o entrada se reflejará aquí en 0ms.</p>
+                              <div className="py-6 text-center text-stone-400 space-y-1">
+                                <p className="text-xl">⚡</p>
+                                <p className="text-[11px] font-bold text-stone-300">No hay movimientos para este filtro</p>
+                                <p className="text-[9px] text-stone-500">Cualquier transacción se reflejará aquí en 0ms.</p>
                               </div>
                             ) : (
                               filteredCashMovements.map((m) => {
@@ -3456,14 +3410,14 @@ export default function POSPage() {
                                   : "bg-[#122b20] border-emerald-600/50";
 
                                 const typeLabel = isVenta
-                                  ? "🛒 VENTA POS"
+                                  ? "🛒 VENTA"
                                   : isPedido
-                                  ? "📋 PEDIDO / ANTICIPO"
+                                  ? "📋 PEDIDO"
                                   : isGasto
-                                  ? "💸 SALIDA / GASTO"
+                                  ? "💸 SALIDA"
                                   : isCorte
-                                  ? "🔒 CORTE DE TURNO"
-                                  : "📥 ENTRADA DE CAJA";
+                                  ? "🔒 CORTE"
+                                  : "📥 ENTRADA";
 
                                 const badgeColor = isVenta
                                   ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
@@ -3478,41 +3432,41 @@ export default function POSPage() {
                                 return (
                                   <div
                                     key={m.id}
-                                    className={`p-2.5 rounded-xl border transition-all space-y-1.5 ${cardBg}`}
+                                    className={`p-2 rounded-xl border transition-all space-y-1 ${cardBg}`}
                                   >
                                     {/* Fila Superior: Tipo, Sucursal, Hora */}
                                     <div className="flex items-center justify-between gap-1.5">
                                       <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                                        <span className={`text-[8px] font-black px-1.5 py-0.2 rounded border ${badgeColor}`}>
                                           {typeLabel}
                                         </span>
-                                        <span className="text-[10px] font-black text-amber-200/90 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-700/40">
+                                        <span className="text-[9px] font-black text-amber-200/90 bg-amber-950/80 px-1 py-0.2 rounded border border-amber-700/40">
                                           🏬 {m.branchName || "Sucursal"}
                                         </span>
                                       </div>
-                                      <span className="text-[10px] font-mono text-stone-300 shrink-0">
+                                      <span className="text-[9px] font-mono text-stone-300 shrink-0">
                                         🕒 {m.timestamp}
                                       </span>
                                     </div>
 
                                     {/* Fila Media: Detalle / Razón */}
-                                    <p className="text-xs font-semibold text-stone-100 leading-snug">
+                                    <p className="text-[11px] font-semibold text-stone-100 leading-snug truncate">
                                       {m.reason}
                                     </p>
 
                                     {/* Fila Inferior: Cajero / Método y Monto */}
-                                    <div className="flex items-center justify-between pt-1 border-t border-white/10 text-xs">
-                                      <div className="flex items-center gap-2 text-stone-300">
-                                        <span className="text-[11px] truncate max-w-[170px]">
+                                    <div className="flex items-center justify-between pt-0.5 border-t border-white/10 text-[11px]">
+                                      <div className="flex items-center gap-1.5 text-stone-300">
+                                        <span className="text-[10px] truncate max-w-[140px]">
                                           👤 {m.cashier || m.authorizedBy || "Cajero"}
                                         </span>
                                         {m.paymentMethod && (
-                                          <span className="text-[9px] font-black uppercase text-amber-300/80 bg-amber-950/50 px-1.5 py-0.2 rounded border border-amber-800/40">
+                                          <span className="text-[8px] font-black uppercase text-amber-300/80 bg-amber-950/50 px-1 py-0.2 rounded border border-amber-800/40">
                                             {m.paymentMethod}
                                           </span>
                                         )}
                                       </div>
-                                      <span className={`font-mono font-black text-sm sm:text-base ${
+                                      <span className={`font-mono font-black text-xs sm:text-sm ${
                                         isEntrada ? "text-emerald-400" : "text-rose-400"
                                       }`}>
                                         {isEntrada ? "+" : "-"}{formatCurrency(m.amount)}
@@ -3527,14 +3481,14 @@ export default function POSPage() {
                       )}
 
                       {/* Pie del panel */}
-                      <div className="pt-2 border-t border-amber-900/60 flex items-center justify-between">
-                        <span className="text-[11px] text-amber-300/80 font-medium">
+                      <div className="pt-1.5 border-t border-amber-900/60 flex items-center justify-between">
+                        <span className="text-[10px] text-amber-300/80 font-medium">
                           Supervisión centralizada en tiempo real
                         </span>
                         <button
                           type="button"
                           onClick={() => setShowBranchDropdown(false)}
-                          className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-black transition-all shadow-xs active:scale-95 cursor-pointer"
+                          className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-black transition-all shadow-xs active:scale-95 cursor-pointer"
                         >
                           Listo ✓
                         </button>
@@ -3878,35 +3832,33 @@ export default function POSPage() {
         )}
 
         {/* Cart Items List - Optimizado para ver al menos 5 productos simultáneamente */}
-        <div ref={cartContainerRef} className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-1.5 scroll-smooth">
+        <div ref={cartContainerRef} className="flex-1 overflow-y-auto p-2 sm:p-2.5 space-y-1.5 scroll-smooth">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-2 animate-in fade-in zoom-in-95 duration-200">
+            <div className="h-full flex flex-col items-center justify-center text-center p-2 sm:p-3 space-y-1 sm:space-y-1.5 animate-in fade-in zoom-in-95 duration-200">
               <div className="relative">
-                <div className="w-14 h-14 bg-gradient-to-br from-amber-100 via-orange-50 to-amber-50 rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-amber-200">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-amber-100 via-orange-50 to-amber-50 rounded-2xl flex items-center justify-center text-xl sm:text-2xl shadow-xs border border-amber-200">
                   🧺
                 </div>
               </div>
               <div className="space-y-0.5">
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider border border-amber-200">
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[9px] font-black uppercase tracking-wider border border-amber-200">
                   Mostrador Listo
                 </span>
-                <p className="text-sm font-black text-stone-900">Charola vacía</p>
-                <p className="text-[11px] text-stone-500 max-w-[220px] leading-relaxed mx-auto font-medium">
+                <p className="text-xs sm:text-sm font-black text-stone-900">Charola vacía</p>
+                <p className="text-[10px] sm:text-[11px] text-stone-500 max-w-[200px] leading-tight mx-auto font-medium">
                   Escanea el código de barras o toca cualquier pan del mostrador para agregarlo al cobro.
                 </p>
               </div>
-              <div className="pt-3 w-full max-w-xs mx-auto">
+              <div className="pt-1.5 w-full max-w-xs mx-auto">
                 <button
                   type="button"
                   onClick={() => handleOpenCreateOrder(false)}
-                  className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-[#881337] via-[#be123c] to-[#9a3412] hover:from-[#9f1239] hover:via-[#e11d48] hover:to-[#c2410c] text-white font-black text-sm sm:text-base shadow-xl shadow-rose-950/30 hover:shadow-2xl hover:shadow-rose-900/40 transition-all active:scale-95 border-2 border-amber-300/90 hover:border-amber-200 ring-4 ring-amber-400/20 flex items-center justify-center gap-2.5 mx-auto cursor-pointer hover:scale-[1.02] group"
+                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-[#881337] via-[#be123c] to-[#9a3412] hover:from-[#9f1239] hover:via-[#e11d48] hover:to-[#c2410c] text-white font-black text-xs shadow-md shadow-rose-950/20 transition-all active:scale-95 border border-amber-300/80 ring-2 ring-amber-400/20 flex items-center justify-center gap-1.5 mx-auto cursor-pointer group"
                   title="Levantar un pedido especial para otra fecha"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-amber-400/25 border border-amber-300/50 flex items-center justify-center shrink-0 shadow-inner">
-                    <Cake className="w-4 h-4 sm:w-5 sm:h-5 text-amber-200 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <span className="tracking-wide drop-shadow-sm font-black">Hacer Pedido Especial</span>
-                  <Sparkles className="w-4 h-4 text-amber-300 animate-pulse shrink-0 drop-shadow" />
+                  <Cake className="w-3.5 h-3.5 text-amber-200 group-hover:scale-110 transition-transform shrink-0" />
+                  <span className="tracking-wide font-black">Hacer Pedido Especial</span>
+                  <Sparkles className="w-3 h-3 text-amber-300 animate-pulse shrink-0" />
                 </button>
               </div>
             </div>
@@ -4047,22 +3999,22 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* Payment Configuration & Checkout Area (Más grande, números destacados y micro-animaciones) */}
-        <div className="p-3 sm:p-4 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/40 space-y-2.5 shadow-xl shrink-0">
+        {/* Payment Configuration & Checkout Area */}
+        <div className="p-2 sm:p-2.5 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/40 space-y-1.5 sm:space-y-2 shadow-xl shrink-0">
           {/* Fila Principal: Total a Cobrar + Selector de Forma de Pago */}
-          <div className="bg-gradient-to-br from-[#24130c] via-[#2d1810] to-[#1f100a] text-white p-3 sm:p-3.5 px-4 rounded-2xl shadow-lg border-2 border-amber-900/70 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-gradient-to-br from-[#24130c] via-[#2d1810] to-[#1f100a] text-white p-2 sm:p-2.5 px-3 rounded-xl sm:rounded-2xl shadow-md border border-amber-900/70 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-xs font-black uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5">
+              <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-300/90 flex items-center gap-1">
                 <span>Total a Cobrar</span>
                 <span className="text-amber-200/70 font-bold">({totalPieces} {totalPieces === 1 ? "pz" : "pzs"})</span>
               </div>
-              <div className="text-3xl sm:text-4xl font-black text-amber-400 tracking-tight leading-none mt-1 transition-all duration-300">
+              <div className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight leading-none mt-0.5 transition-all duration-300">
                 {formatCurrency(total)}
               </div>
             </div>
 
             {/* Selector de Método de Pago integrado con texto visible siempre */}
-            <div className="flex items-center bg-black/50 p-1.5 rounded-2xl border border-white/10 gap-1.5 flex-wrap">
+            <div className="flex items-center bg-black/50 p-1 rounded-xl border border-white/10 gap-1 flex-wrap">
               {[
                 { id: "efectivo", label: "Efectivo", icon: DollarSign },
                 { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
@@ -4075,13 +4027,13 @@ export default function POSPage() {
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMethod(m.id as any)}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs sm:text-sm font-black transition-all duration-200 active:scale-95 cursor-pointer ${
+                    className={`flex items-center justify-center gap-1 py-1 px-2 sm:px-2.5 rounded-lg text-xs font-black transition-all duration-200 active:scale-95 cursor-pointer ${
                       isSelected
-                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md scale-105 ring-2 ring-amber-300/40"
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-sm ring-1 ring-amber-300/40"
                         : "text-amber-200/80 hover:text-white hover:bg-white/10"
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <Icon className="w-3 h-3 shrink-0" />
                     <span className="font-black whitespace-nowrap">{m.label}</span>
                   </button>
                 );
@@ -4091,26 +4043,26 @@ export default function POSPage() {
 
           {/* Manejo de Efectivo con Números Grandes y Animados */}
           {paymentMethod === "efectivo" && (
-            <div className="p-3 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-300/90 space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
+            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 rounded-xl border border-amber-300/90 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200 shadow-2xs">
               {/* Billetes rápidos + Cobro Exacto con Números Más Grandes */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={handleExactCash}
                   disabled={cart.length === 0}
-                  className="px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-200 to-amber-300 hover:from-amber-300 hover:to-amber-400 text-stone-950 text-xs sm:text-sm font-black shrink-0 transition-all active:scale-90 hover:scale-105 shadow-sm"
+                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-200 to-amber-300 hover:from-amber-300 hover:to-amber-400 text-stone-950 text-xs font-black shrink-0 transition-all active:scale-90 hover:scale-105 shadow-2xs"
                   title="Cobro Exacto"
                 >
                   ⚡ Exacto
                 </button>
-                <div className="grid grid-cols-5 gap-1.5 flex-1">
+                <div className="grid grid-cols-5 gap-1 flex-1">
                   {QUICK_DENOMINATIONS.map((bill) => (
                     <button
                       key={bill}
                       type="button"
                       onClick={() => handleQuickCash(bill)}
                       disabled={cart.length === 0}
-                      className="py-2 sm:py-2.5 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-sm sm:text-base rounded-xl border-2 border-amber-200 shadow-xs transition-all duration-200 active:scale-90 hover:scale-105 text-center"
+                      className="py-1 sm:py-1.5 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-xs sm:text-sm rounded-lg border border-amber-200 shadow-2xs transition-all duration-200 active:scale-90 hover:scale-105 text-center"
                     >
                       ${bill}
                     </button>
@@ -4119,9 +4071,9 @@ export default function POSPage() {
               </div>
 
               {/* Input de cantidad recibida y badge de cambio con Tipografía Grande */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-black text-sm">💵</span>
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400 font-black text-xs">💵</span>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -4137,18 +4089,18 @@ export default function POSPage() {
                       onlyNumbersKeyDown(e, true);
                     }}
                     onChange={(e) => setCashGiven(cleanDecimalNumbers(e.target.value))}
-                    className="w-full pl-9 pr-3 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 text-sm sm:text-base font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all"
+                    className="w-full pl-7 pr-2.5 py-1.5 bg-white rounded-lg border border-amber-400 focus:border-amber-600 focus:ring-1 focus:ring-amber-400/30 text-xs sm:text-sm font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all"
                   />
                 </div>
 
                 {parsedCashGiven > 0 && (
-                  <div className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 shrink-0 shadow-md animate-in zoom-in-95 duration-150 ${
+                  <div className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 shrink-0 shadow-sm animate-in zoom-in-95 duration-150 ${
                     parsedCashGiven >= total
                       ? "bg-emerald-600 text-white"
                       : "bg-rose-600 text-white"
                   }`}>
-                    <span className="text-[11px] opacity-90">{parsedCashGiven >= total ? "Cambio:" : "Falta:"}</span>
-                    <span className="font-black text-sm sm:text-base">
+                    <span className="text-[10px] opacity-90">{parsedCashGiven >= total ? "Cambio:" : "Falta:"}</span>
+                    <span className="font-black text-xs sm:text-sm">
                       {parsedCashGiven >= total ? formatCurrency(change) : formatCurrency(total - parsedCashGiven)}
                     </span>
                   </div>
@@ -4347,7 +4299,7 @@ export default function POSPage() {
 
 
           {/* Botones de Acción */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">
+          <div className="grid grid-cols-2 gap-2 pt-0.5">
             <button
               type="button"
               onClick={() => {
@@ -4356,27 +4308,27 @@ export default function POSPage() {
                 selectCustomer(DEFAULT_GENERAL_CUSTOMER);
               }}
               disabled={cart.length === 0}
-              className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
+              className={`py-2.5 sm:py-3 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all duration-200 shadow-md ${
                 cart.length > 0
                   ? "bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-700 hover:to-rose-800 text-white shadow-red-600/30 hover:shadow-red-600/50 hover:scale-[1.01] active:scale-95 border border-red-400/80 ring-2 ring-red-400/30 cursor-pointer"
                   : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
               }`}
               title="Cancelar compra y vaciar charola"
             >
-              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+              <Trash2 className="w-4 h-4 shrink-0" />
               <span className="truncate">Cancelar Compra</span>
             </button>
             <button
               type="button"
               onClick={handleCheckout}
               disabled={cart.length === 0 || !isPaymentValid || isSubmitting}
-              className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
+              className={`py-2.5 sm:py-3 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all duration-200 shadow-md ${
                 cart.length > 0 && isPaymentValid && !isSubmitting
                   ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-2 ring-amber-400/40 cursor-pointer"
                   : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
               }`}
             >
-              <CheckCircle className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
+              <CheckCircle className={`w-4 h-4 shrink-0 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
               <span className="truncate">{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
             </button>
           </div>

@@ -1606,21 +1606,21 @@ export default function GastosPage() {
           </div>
         </div>
 
-        {/* ── MODO 1: TABLA FLUIDA CON COLUMNA DE ACCIONES FIJA (STICKY) ── */}
+        {/* ── MODO 1: TABLA FLUIDA QUE ENCAJA 100% AL ZOOM ESTÁNDAR ── */}
         {viewMode === "tabla" ? (
           <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-stone-300 scrollbar-track-stone-100/60 pb-1">
-            <table className="w-full text-left border-collapse table-auto">
+            <table className="w-full text-left border-collapse table-fixed min-w-[740px]">
               <thead className="bg-stone-100/95 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] select-none sticky top-0 z-10 backdrop-blur-xs">
                 <tr>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[70px]">Folio</th>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[75px]">Fecha</th>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[80px]">Sucursal</th>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[90px]">Categoría</th>
-                  <th className="py-2.5 px-2 align-middle min-w-[120px] max-w-[190px]">Concepto</th>
-                  <th className="py-2.5 px-2 align-middle text-right whitespace-nowrap w-[80px]">Monto</th>
-                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[90px]">Pago / Origen</th>
-                  <th className="py-2.5 px-2.5 align-middle whitespace-nowrap min-w-[115px]">Cajero</th>
-                  <th className="py-2.5 px-3 align-middle text-center whitespace-nowrap w-[95px] min-w-[90px]">Acciones</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[68px]">Folio</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[74px]">Fecha</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[74px]">Sucursal</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[88px]">Categoría</th>
+                  <th className="py-2.5 px-2.5 align-middle">Concepto</th>
+                  <th className="py-2.5 px-2 align-middle text-right whitespace-nowrap w-[78px]">Monto</th>
+                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[92px]">Pago / Origen</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[115px]">Cajero</th>
+                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[82px]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
@@ -1651,14 +1651,14 @@ export default function GastosPage() {
                         }`}
                       >
                         {/* 1. Folio */}
-                        <td className="py-2 px-2 align-middle font-mono tabular-nums font-black text-xs text-stone-900 whitespace-nowrap w-[70px]">
-                          <span className="bg-stone-100 border border-stone-200/90 px-1.5 py-0.5 rounded text-[11px]">
+                        <td className="py-2 px-2 align-middle font-mono tabular-nums font-black text-xs text-stone-900 whitespace-nowrap w-[68px]">
+                          <span className="bg-stone-100 border border-stone-200/90 px-1.5 py-0.5 rounded text-[11px] block text-center truncate">
                             #{g.id}
                           </span>
                         </td>
 
                         {/* 2. Fecha */}
-                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[75px]">
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[74px]">
                           {isHoy ? (
                             <div className="flex flex-col leading-tight">
                               <span className={`font-mono font-black text-xs ${isAnulado ? "line-through text-stone-400" : "text-stone-900"}`}>{timeStr || "Hoy"}</span>
@@ -1683,35 +1683,35 @@ export default function GastosPage() {
                         </td>
 
                         {/* 3. Sucursal */}
-                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[80px]">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded-md border border-stone-200/80">
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[74px]">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded-md border border-stone-200/80 truncate max-w-full">
                             <Store className="w-3 h-3 text-brito-orange-600 shrink-0" />
-                            <span>{(g.branchName || "Matriz").replace("Sucursal ", "").replace(" (Centro)", "")}</span>
+                            <span className="truncate">{(g.branchName || "Matriz").replace("Sucursal ", "").replace(" (Centro)", "")}</span>
                           </span>
                         </td>
 
                         {/* 4. Categoría */}
-                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[90px]">
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[88px]">
                           <span
-                            className={`px-1.5 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 border ${
+                            className={`px-1.5 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 border truncate max-w-full ${
                               isAnulado
                                 ? "bg-stone-200 text-stone-600 border-stone-300 line-through"
                                 : `${catInfo.bg} ${catInfo.text} ${catInfo.border}`
                             }`}
                             title={g.categoryLabel || catInfo.label}
                           >
-                            <span className="text-[10px]">{catInfo.icon}</span>
-                            <span>{catInfo.shortLabel || catInfo.label || "Gasto"}</span>
+                            <span className="text-[10px] shrink-0">{catInfo.icon}</span>
+                            <span className="truncate">{catInfo.shortLabel || catInfo.label || "Gasto"}</span>
                           </span>
                         </td>
 
                         {/* 5. Concepto / Motivo */}
-                        <td className="py-2 px-2 align-middle min-w-[120px] max-w-[190px]">
-                          <div className={`truncate max-w-[185px] font-bold text-xs text-stone-900 ${isAnulado ? "line-through text-stone-500" : ""}`} title={g.description}>
+                        <td className="py-2 px-2.5 align-middle">
+                          <div className={`truncate font-bold text-xs text-stone-900 ${isAnulado ? "line-through text-stone-500" : ""}`} title={g.description}>
                             {g.description}
                           </div>
                           {g.supplier && (
-                            <div className="text-[10px] text-stone-500 truncate max-w-[185px]" title={g.supplier}>
+                            <div className="text-[10px] text-stone-500 truncate mt-0.5" title={g.supplier}>
                               Prov: <strong className="text-stone-700 font-semibold">{g.supplier}</strong>
                             </div>
                           )}
@@ -1723,15 +1723,15 @@ export default function GastosPage() {
                         </td>
 
                         {/* 6. Monto */}
-                        <td className="py-2 px-2 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[80px]">
+                        <td className="py-2 px-2 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[78px]">
                           <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700"}>
                             -{formatCurrency(g.amount)}
                           </span>
                         </td>
 
                         {/* 7. Forma de Pago y Origen */}
-                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[90px]">
-                          <div className="inline-flex flex-col items-center leading-tight">
+                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[92px]">
+                          <div className="inline-flex flex-col items-center leading-tight min-w-0">
                             <span
                               className={`px-1.5 py-0.5 rounded-md font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
                                 g.paymentMethod === "efectivo"
@@ -1746,21 +1746,32 @@ export default function GastosPage() {
                               {g.paymentMethod === "transferencia" && <Building className="w-3 h-3 shrink-0" />}
                               <span>{g.paymentMethod === "transferencia" ? "SPEI" : g.paymentMethod}</span>
                             </span>
-                            <span className="text-[10px] text-stone-500 font-medium mt-0.5 truncate max-w-[90px]" title={g.accountOrigin}>
+                            <span className="text-[10px] text-stone-500 font-medium mt-0.5 truncate max-w-[88px]" title={g.accountOrigin}>
                               {g.accountOrigin.replace(/\s*\(.*\)/, "")}
                             </span>
                           </div>
                         </td>
 
-                        {/* 8. Cajero (COMPLETO, sin truncar) */}
-                        <td className="py-2 px-2.5 align-middle text-stone-900 font-bold whitespace-nowrap text-xs min-w-[115px]" title={g.cashier}>
-                          <span className="block font-bold text-xs text-stone-900 whitespace-nowrap">
-                            {g.cashier}
-                          </span>
+                        {/* 8. Cajero (COMPLETO y adaptativo a turno) */}
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[115px]" title={g.cashier}>
+                          {g.cashier && g.cashier.includes(" - ") ? (
+                            <div className="flex flex-col leading-tight min-w-0">
+                              <span className="font-bold text-xs text-stone-900 truncate">
+                                {g.cashier.split(" - ")[0]}
+                              </span>
+                              <span className="text-[10px] text-stone-500 font-medium truncate">
+                                {g.cashier.split(" - ").slice(1).join(" - ")}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="font-bold text-xs text-stone-900 truncate block">
+                              {g.cashier || "Cajero"}
+                            </span>
+                          )}
                         </td>
 
-                        {/* 9. Acciones */}
-                        <td className="py-2.5 px-3 align-middle text-center whitespace-nowrap w-[95px] min-w-[90px]">
+                        {/* 9. Acciones (100% visible sin cortes) */}
+                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[82px]">
                           <div className="relative inline-block text-left">
                             <button
                               type="button"
@@ -1768,10 +1779,10 @@ export default function GastosPage() {
                                 e.stopPropagation();
                                 setActiveDropdown(activeDropdown === g.id ? null : g.id);
                               }}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 active:scale-95 border border-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-2xs"
+                              className="inline-flex items-center justify-center gap-1 px-2.5 py-1 bg-stone-100 hover:bg-stone-200 active:scale-95 border border-stone-200 text-stone-800 font-bold rounded-lg text-xs transition-all cursor-pointer shadow-2xs w-full max-w-[76px]"
                             >
-                              <span>Acciones</span>
-                              <ChevronDown className="w-3 h-3 text-stone-500" />
+                              <span>Acción</span>
+                              <ChevronDown className="w-3 h-3 text-stone-500 shrink-0" />
                             </button>
 
                             {activeDropdown === g.id && (
