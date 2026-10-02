@@ -47,7 +47,10 @@ import {
   Barcode,
   Printer,
   Wifi,
-  WifiOff
+  WifiOff,
+  Zap,
+  ArrowDownRight,
+  ArrowUpRight
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes } from "@/lib/utils";
@@ -404,7 +407,7 @@ function CartPriceInput({
 export default function POSPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
-  const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
+  const { branches, currentBranch, switchBranch, registerRealSale, cashMovements } = useBranch();
   const { addNotification } = useNotifications();
   const { toggleMobile } = useSidebar();
   const { isOnline, isSyncing, isSynced, enqueueOfflineItem, pendingCount } = useSync();
@@ -653,6 +656,53 @@ export default function POSPage() {
   const [showRecentSales, setShowRecentSales] = useState(false);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
+  const [branchPanelTab, setBranchPanelTab] = useState<"sucursales" | "movimientos">("sucursales");
+  const [movementFilterType, setMovementFilterType] = useState<"todos" | "venta" | "pedido" | "gasto" | "entrada" | "corte">("todos");
+  const [movementFilterBranch, setMovementFilterBranch] = useState<string>("todas");
+  const [movementSearchQuery, setMovementSearchQuery] = useState<string>("");
+
+  const filteredCashMovements = useMemo(() => {
+    return (cashMovements || []).filter((m) => {
+      if (movementFilterType !== "todos") {
+        if (m.movementType !== movementFilterType) return false;
+      }
+      if (movementFilterBranch !== "todas") {
+        if (m.branchId !== movementFilterBranch) return false;
+      }
+      if (movementSearchQuery.trim()) {
+        const q = movementSearchQuery.toLowerCase().trim();
+        const matchReason = (m.reason || "").toLowerCase().includes(q);
+        const matchCashier = (m.cashier || m.authorizedBy || "").toLowerCase().includes(q);
+        const matchBranch = (m.branchName || "").toLowerCase().includes(q);
+        const matchAmount = String(m.amount).includes(q);
+        if (!matchReason && !matchCashier && !matchBranch && !matchAmount) return false;
+      }
+      return true;
+    });
+  }, [cashMovements, movementFilterType, movementFilterBranch, movementSearchQuery]);
+
+  const movementTotals = useMemo(() => {
+    let entradas = 0;
+    let salidas = 0;
+    filteredCashMovements.forEach((m) => {
+      if (m.type === "entrada") {
+        entradas += Number(m.amount) || 0;
+      } else {
+        salidas += Number(m.amount) || 0;
+      }
+    });
+    return { entradas, salidas, balance: entradas - salidas };
+  }, [filteredCashMovements]);
+
+  const typeCounts = useMemo(() => {
+    const c: Record<string, number> = { venta: 0, pedido: 0, gasto: 0, entrada: 0, corte: 0 };
+    (cashMovements || []).forEach((m) => {
+      if (m.movementType && c[m.movementType] !== undefined) {
+        c[m.movementType]++;
+      }
+    });
+    return c;
+  }, [cashMovements]);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
   const [showBreadDeliveryModal, setShowBreadDeliveryModal] = useState(false);
@@ -3060,124 +3110,426 @@ export default function POSPage() {
                   {/* Panel Desplegable Flotante (exclusivo para administradores) */}
                   {isAdmin && showBranchDropdown && (
                     <div 
-                      style={{ backgroundColor: "#21120b" }}
-                      className="absolute left-0 mt-2.5 w-[380px] sm:w-[460px] max-w-[calc(100vw-24px)] rounded-2xl shadow-2xl border-2 border-amber-600/80 p-3.5 sm:p-4 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-3.5"
+                      style={{ backgroundColor: "#1e1009" }}
+                      className="absolute left-0 mt-2.5 w-[390px] sm:w-[540px] md:w-[620px] max-w-[calc(100vw-20px)] rounded-3xl shadow-2xl border-2 border-amber-600/80 p-3.5 sm:p-4 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-3.5"
                     >
-                      
                       {/* Cabecera del panel */}
-                      <div className="flex items-center justify-between pb-2 border-b border-amber-900/60">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-950/60">
-                            <Store className="w-4 h-4" />
+                      <div className="flex items-center justify-between pb-2.5 border-b border-amber-900/60">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-950/60 ring-2 ring-amber-400/30">
+                            <Store className="w-5 h-5" />
                           </div>
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-wider text-amber-400 leading-tight">Red Panaderías Brito</p>
-                            <p className="text-sm font-black text-white leading-tight">Red de Sucursales</p>
+                            <p className="text-sm sm:text-base font-black text-white leading-tight">Supervisión y Control Multi-Sucursal</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            EN VIVO
+                          <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/50 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            0ms VIVO
                           </span>
                           <button
                             type="button"
                             onClick={() => setShowBranchDropdown(false)}
                             className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-colors text-xs font-bold cursor-pointer"
-                            title="Cerrar panel de sucursales"
+                            title="Cerrar panel de supervisión"
                           >
                             ✕
                           </button>
                         </div>
                       </div>
 
-                      {/* Lista de Sucursales con diseño de colores corporativos */}
-                      <div className="space-y-1.5">
-                        <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
-                          Seleccionar Tienda Activa:
-                        </p>
-                        <div className="space-y-2 max-h-[290px] overflow-y-auto pr-0.5">
-                          {branches.map((b) => {
-                            const isSelected = activeBranch?.id === b.id;
-                            const isMatriz = b.id.includes("matriz");
-                            const isBenito = b.id.includes("benito");
-                            const badgeColor = isMatriz
-                              ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
-                              : isBenito
-                              ? "bg-rose-500/20 text-rose-300 border-rose-400/40"
-                              : "bg-orange-500/20 text-orange-300 border-orange-400/40";
+                      {/* Selector de Pestañas: 🏬 Sucursales vs ⚡ Movimientos en Vivo */}
+                      <div className="grid grid-cols-2 gap-1.5 p-1 bg-black/40 rounded-xl border border-amber-900/50 text-xs font-black">
+                        <button
+                          type="button"
+                          onClick={() => setBranchPanelTab("sucursales")}
+                          className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg transition-all cursor-pointer ${
+                            branchPanelTab === "sucursales"
+                              ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-900/50"
+                              : "text-amber-200/70 hover:text-white hover:bg-white/5"
+                          }`}
+                        >
+                          <Store className="w-4 h-4 shrink-0" />
+                          <span>Red de Sucursales ({branches.length})</span>
+                        </button>
 
-                            return (
-                              <button
-                                key={b.id}
-                                type="button"
-                                onClick={() => {
-                                  if (isAdmin) {
-                                    switchBranch(b.id);
-                                    // Las opciones no desaparecen al seleccionar, se mantienen abiertas
-                                    playScanBeep(true);
-                                    addNotification({
-                                      senderName: "🏬 Red Brito",
-                                      senderAvatar: "🏬",
-                                      badgeIcon: "dinero",
-                                      title: "Sucursal Activa",
-                                      highlightText: b.name,
-                                      description: "Terminal POS y caja sincronizadas con esta tienda.",
-                                      category: "caja",
-                                    });
-                                  }
-                                }}
-                                disabled={!isAdmin}
-                                style={{ backgroundColor: isSelected ? "#3a1e12" : "#28150d" }}
-                                className={`w-full text-left p-3 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
-                                  isAdmin ? "cursor-pointer active:scale-98" : "cursor-default"
-                                } ${
-                                  isSelected
-                                    ? "border-amber-400 shadow-lg ring-2 ring-amber-400/30"
-                                    : "hover:bg-[#341d11] border-amber-900/50 hover:border-amber-600/70"
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-1.5">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border shrink-0 ${badgeColor}`}>
-                                      {b.code || "TIENDA"}
-                                    </span>
-                                    <span className={`font-black text-sm truncate ${isSelected ? "text-white" : "text-stone-200"}`}>
-                                      {b.name}
-                                    </span>
-                                  </div>
-                                  {isSelected ? (
-                                    <span className="text-[10px] font-black text-emerald-300 bg-emerald-950 border border-emerald-500/50 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                      Activa
-                                    </span>
-                                  ) : (
-                                    <span className="text-[11px] font-bold text-amber-400/80 hover:text-amber-300 shrink-0">
-                                      Cambiar ➔
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center justify-between pt-1.5 border-t border-amber-900/40">
-                                  <span className="text-xs text-amber-200/90 truncate">👤 {b.currentShift?.cashier || b.manager || "En turno"}</span>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <span className="font-mono font-black text-sm sm:text-base text-amber-300 drop-shadow-xs">
-                                      {formatCurrency(b.todaySales)}
-                                    </span>
-                                    <span className="text-xs font-black font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-500/40">
-                                      {b.todayTickets} tkts
-                                    </span>
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setBranchPanelTab("movimientos")}
+                          className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg transition-all cursor-pointer relative ${
+                            branchPanelTab === "movimientos"
+                              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/50"
+                              : "text-emerald-300/80 hover:text-emerald-200 hover:bg-white/5"
+                          }`}
+                        >
+                          <TrendingUp className="w-4 h-4 shrink-0 text-emerald-300" />
+                          <span>Movimientos en Vivo</span>
+                          {cashMovements.length > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black font-mono bg-emerald-400 text-stone-950">
+                              {cashMovements.length}
+                            </span>
+                          )}
+                        </button>
                       </div>
 
-                      {/* Botón inferior para cerrar cuando termine */}
+                      {/* CONTENIDO PESTAÑA 1: RED DE SUCURSALES (CON NÚMEROS GRANDES Y DETALLADOS) */}
+                      {branchPanelTab === "sucursales" && (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-amber-300/90 px-0.5">
+                            <span>Selecciona una sucursal para operar o supervisar:</span>
+                            <span className="text-[10px] text-stone-400">Actualizado al instante</span>
+                          </div>
+
+                          <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-0.5">
+                            {branches.map((b) => {
+                              const isSelected = activeBranch?.id === b.id;
+                              const isMatriz = b.id.includes("matriz");
+                              const isBenito = b.id.includes("benito");
+                              const badgeColor = isMatriz
+                                ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
+                                : isBenito
+                                ? "bg-rose-500/20 text-rose-300 border-rose-400/40"
+                                : "bg-orange-500/20 text-orange-300 border-orange-400/40";
+
+                              return (
+                                <button
+                                  key={b.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isAdmin) {
+                                      switchBranch(b.id);
+                                      playScanBeep(true);
+                                      addNotification({
+                                        senderName: "🏬 Red Brito",
+                                        senderAvatar: "🏬",
+                                        badgeIcon: "dinero",
+                                        title: "Sucursal Activa",
+                                        highlightText: b.name,
+                                        description: "Terminal POS y caja sincronizadas con esta tienda.",
+                                        category: "caja",
+                                      });
+                                    }
+                                  }}
+                                  disabled={!isAdmin}
+                                  style={{ backgroundColor: isSelected ? "#3a1e12" : "#28150d" }}
+                                  className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all flex flex-col gap-2 ${
+                                    isAdmin ? "cursor-pointer active:scale-98" : "cursor-default"
+                                  } ${
+                                    isSelected
+                                      ? "border-amber-400 shadow-xl ring-2 ring-amber-400/40"
+                                      : "hover:bg-[#341d11] border-amber-900/50 hover:border-amber-600/70"
+                                  }`}
+                                >
+                                  {/* Encabezado de la tienda */}
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={`text-[11px] font-black px-2 py-0.5 rounded-lg border shrink-0 ${badgeColor}`}>
+                                        {b.code || "TIENDA"}
+                                      </span>
+                                      <span className={`font-black text-sm sm:text-base truncate ${isSelected ? "text-white" : "text-stone-200"}`}>
+                                        {b.name}
+                                      </span>
+                                    </div>
+                                    {isSelected ? (
+                                      <span className="text-[10px] font-black text-emerald-300 bg-emerald-950 border border-emerald-500/60 px-2.5 py-1 rounded-full shrink-0 flex items-center gap-1.5 shadow-sm">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        Activa ✓
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs font-black text-amber-300/90 hover:text-white shrink-0 flex items-center gap-1 bg-amber-950/80 border border-amber-600/50 px-2.5 py-1 rounded-lg">
+                                        Cambiar ➔
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* MÉTICAS EN GRANDE: VENTAS Y TICKETS */}
+                                  <div className="flex items-center justify-between pt-2 border-t border-amber-900/50">
+                                    <div className="flex items-baseline gap-2">
+                                      <span className="text-[11px] font-black text-amber-400/90 uppercase tracking-wider">Ventas:</span>
+                                      <span className="font-mono font-black text-xl sm:text-2xl text-amber-300 drop-shadow-sm">
+                                        {formatCurrency(b.todaySales)}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs sm:text-sm font-black font-mono text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-500/50 shadow-xs">
+                                      {b.todayTickets} {b.todayTickets === 1 ? "ticket" : "tickets"}
+                                    </span>
+                                  </div>
+
+                                  {/* CAJERO EN TURNO Y EFECTIVO EN GAVETA */}
+                                  <div className="flex items-center justify-between text-xs text-amber-200/90 pt-1">
+                                    <span className="truncate max-w-[200px]">
+                                      👤 {b.currentShift?.cashier || b.manager || "Cajero en turno"}
+                                    </span>
+                                    <div className="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-md border border-amber-900/40 text-[11px]">
+                                      <Coins className="w-3 h-3 text-amber-400 shrink-0" />
+                                      <span className="text-stone-300">Caja:</span>
+                                      <span className="font-mono font-black text-emerald-400">
+                                        {formatCurrency(b.cashInDrawer)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Consolidado total de la red */}
+                          <div className="p-2.5 rounded-xl bg-black/50 border border-amber-800/60 flex items-center justify-between flex-wrap gap-2 text-xs">
+                            <span className="text-amber-300 font-black uppercase text-[10px] tracking-wider">
+                              Consolidado Red Brito:
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono font-black text-sm text-amber-300">
+                                {formatCurrency(branches.reduce((sum, b) => sum + (b.todaySales || 0), 0))}
+                              </span>
+                              <span className="font-mono font-black text-xs text-emerald-300 bg-emerald-950/90 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                                {branches.reduce((sum, b) => sum + (b.todayTickets || 0), 0)} tkts
+                              </span>
+                              <span className="font-mono font-black text-xs text-stone-200">
+                                💵 {formatCurrency(branches.reduce((sum, b) => sum + (b.cashInDrawer || 0), 0))}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CONTENIDO PESTAÑA 2: SUPERVISIÓN DE MOVIMIENTOS EN VIVO */}
+                      {branchPanelTab === "movimientos" && (
+                        <div className="space-y-2.5">
+                          {/* Filtros rápidos por Tipo de Movimiento */}
+                          <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none text-[10px] font-black">
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("todos")}
+                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "todos"
+                                  ? "bg-amber-500 text-stone-950 border-amber-400 shadow-xs"
+                                  : "bg-white/5 text-stone-300 border-white/10 hover:bg-white/10"
+                              }`}
+                            >
+                              ⚡ Todos ({cashMovements.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("venta")}
+                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "venta"
+                                  ? "bg-amber-600 text-white border-amber-400 shadow-xs"
+                                  : "bg-white/5 text-amber-200/80 border-amber-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              🛒 Ventas ({typeCounts.venta || 0})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("pedido")}
+                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "pedido"
+                                  ? "bg-sky-600 text-white border-sky-400 shadow-xs"
+                                  : "bg-white/5 text-sky-200/80 border-sky-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              📋 Pedidos ({typeCounts.pedido || 0})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("gasto")}
+                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "gasto"
+                                  ? "bg-rose-600 text-white border-rose-400 shadow-xs"
+                                  : "bg-white/5 text-rose-200/80 border-rose-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              💸 Gastos ({typeCounts.gasto || 0})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("entrada")}
+                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "entrada"
+                                  ? "bg-emerald-600 text-white border-emerald-400 shadow-xs"
+                                  : "bg-white/5 text-emerald-200/80 border-emerald-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              📥 Entradas ({typeCounts.entrada || 0})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("corte")}
+                              className={`px-2.5 py-1 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "corte"
+                                  ? "bg-purple-600 text-white border-purple-400 shadow-xs"
+                                  : "bg-white/5 text-purple-200/80 border-purple-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              🔒 Cortes ({typeCounts.corte || 0})
+                            </button>
+                          </div>
+
+                          {/* Filtro por Sucursal y Buscador */}
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={movementFilterBranch}
+                              onChange={(e) => setMovementFilterBranch(e.target.value)}
+                              className="bg-[#2a170e] text-amber-200 text-xs font-bold border border-amber-800/60 rounded-xl px-2.5 py-1.5 outline-hidden cursor-pointer"
+                            >
+                              <option value="todas">🏬 Todas las Sucursales</option>
+                              {branches.map((b) => (
+                                <option key={b.id} value={b.id}>
+                                  {b.shortName || b.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            <div className="flex-1 flex items-center bg-[#2a170e] rounded-xl border border-amber-800/60 px-2.5 py-1 gap-1.5 text-xs">
+                              <Search className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <input
+                                type="text"
+                                value={movementSearchQuery}
+                                onChange={(e) => setMovementSearchQuery(e.target.value)}
+                                placeholder="Filtrar por cajero, ticket, concepto..."
+                                className="w-full bg-transparent text-white placeholder-stone-400 text-xs outline-hidden"
+                              />
+                              {movementSearchQuery && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMovementSearchQuery("")}
+                                  className="text-stone-400 hover:text-white"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Barra de Totales Financieros de la Vista */}
+                          <div className="grid grid-cols-3 gap-2 p-2 rounded-xl bg-black/40 border border-amber-900/50 text-center">
+                            <div>
+                              <p className="text-[9px] font-black uppercase text-emerald-400">Total Entradas</p>
+                              <p className="font-mono font-black text-xs sm:text-sm text-emerald-300">
+                                +{formatCurrency(movementTotals.entradas)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-black uppercase text-rose-400">Total Salidas</p>
+                              <p className="font-mono font-black text-xs sm:text-sm text-rose-300">
+                                -{formatCurrency(movementTotals.salidas)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-black uppercase text-amber-400">Flujo Neto</p>
+                              <p className={`font-mono font-black text-xs sm:text-sm ${
+                                movementTotals.balance >= 0 ? "text-emerald-300" : "text-rose-300"
+                              }`}>
+                                {movementTotals.balance >= 0 ? "+" : ""}{formatCurrency(movementTotals.balance)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Lista con scroll de movimientos en tiempo real */}
+                          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-0.5">
+                            {filteredCashMovements.length === 0 ? (
+                              <div className="py-8 text-center text-stone-400 space-y-1">
+                                <p className="text-2xl">⚡</p>
+                                <p className="text-xs font-bold text-stone-300">No hay movimientos registrados para este filtro</p>
+                                <p className="text-[10px] text-stone-500">Cualquier venta, pedido, gasto o entrada se reflejará aquí en 0ms.</p>
+                              </div>
+                            ) : (
+                              filteredCashMovements.map((m) => {
+                                const isEntrada = m.type === "entrada";
+                                const isVenta = m.movementType === "venta";
+                                const isPedido = m.movementType === "pedido";
+                                const isGasto = m.movementType === "gasto";
+                                const isCorte = m.movementType === "corte";
+
+                                const cardBg = isVenta
+                                  ? "bg-[#29160e] border-amber-600/50"
+                                  : isPedido
+                                  ? "bg-[#112338] border-sky-600/50"
+                                  : isGasto
+                                  ? "bg-[#2d1118] border-rose-600/50"
+                                  : isCorte
+                                  ? "bg-[#251233] border-purple-600/50"
+                                  : "bg-[#122b20] border-emerald-600/50";
+
+                                const typeLabel = isVenta
+                                  ? "🛒 VENTA POS"
+                                  : isPedido
+                                  ? "📋 PEDIDO / ANTICIPO"
+                                  : isGasto
+                                  ? "💸 SALIDA / GASTO"
+                                  : isCorte
+                                  ? "🔒 CORTE DE TURNO"
+                                  : "📥 ENTRADA DE CAJA";
+
+                                const badgeColor = isVenta
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
+                                  : isPedido
+                                  ? "bg-sky-500/20 text-sky-300 border-sky-400/40"
+                                  : isGasto
+                                  ? "bg-rose-500/20 text-rose-300 border-rose-400/40"
+                                  : isCorte
+                                  ? "bg-purple-500/20 text-purple-300 border-purple-400/40"
+                                  : "bg-emerald-500/20 text-emerald-300 border-emerald-400/40";
+
+                                return (
+                                  <div
+                                    key={m.id}
+                                    className={`p-2.5 rounded-xl border transition-all space-y-1.5 ${cardBg}`}
+                                  >
+                                    {/* Fila Superior: Tipo, Sucursal, Hora */}
+                                    <div className="flex items-center justify-between gap-1.5">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border ${badgeColor}`}>
+                                          {typeLabel}
+                                        </span>
+                                        <span className="text-[10px] font-black text-amber-200/90 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-700/40">
+                                          🏬 {m.branchName || "Sucursal"}
+                                        </span>
+                                      </div>
+                                      <span className="text-[10px] font-mono text-stone-300 shrink-0">
+                                        🕒 {m.timestamp}
+                                      </span>
+                                    </div>
+
+                                    {/* Fila Media: Detalle / Razón */}
+                                    <p className="text-xs font-semibold text-stone-100 leading-snug">
+                                      {m.reason}
+                                    </p>
+
+                                    {/* Fila Inferior: Cajero / Método y Monto */}
+                                    <div className="flex items-center justify-between pt-1 border-t border-white/10 text-xs">
+                                      <div className="flex items-center gap-2 text-stone-300">
+                                        <span className="text-[11px] truncate max-w-[170px]">
+                                          👤 {m.cashier || m.authorizedBy || "Cajero"}
+                                        </span>
+                                        {m.paymentMethod && (
+                                          <span className="text-[9px] font-black uppercase text-amber-300/80 bg-amber-950/50 px-1.5 py-0.2 rounded border border-amber-800/40">
+                                            {m.paymentMethod}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className={`font-mono font-black text-sm sm:text-base ${
+                                        isEntrada ? "text-emerald-400" : "text-rose-400"
+                                      }`}>
+                                        {isEntrada ? "+" : "-"}{formatCurrency(m.amount)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pie del panel */}
                       <div className="pt-2 border-t border-amber-900/60 flex items-center justify-between">
                         <span className="text-[11px] text-amber-300/80 font-medium">
-                          Sucursal sincronizada para ventas
+                          Supervisión centralizada en tiempo real
                         </span>
                         <button
                           type="button"

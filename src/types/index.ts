@@ -401,6 +401,8 @@ export interface BranchCashMovement {
   movementType?: "venta" | "pedido" | "gasto" | "entrada" | "corte";
   cashier?: string;
   paymentMethod?: string;
+  createdAt?: string;
+  rawTimestamp?: number;
 }
 
 export interface BreadDeliveryItem {

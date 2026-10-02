@@ -1567,16 +1567,16 @@ export default function IngresosPage() {
         {/* ── MODO 1: TABLA FLUIDA CON COLUMNA DE ACCIONES FIJA (STICKY) ── */}
         {viewMode === "tabla" ? (
           <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-stone-300 scrollbar-track-stone-100/60 pb-1">
-            <table className="w-full text-left border-collapse table-auto">
+            <table className="w-full text-left border-collapse">
               <thead className="bg-stone-100/95 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] select-none sticky top-0 z-10 backdrop-blur-xs">
                 <tr>
-                  <th className="py-2.5 px-2.5 align-middle whitespace-nowrap w-[85px]">Folio / Fecha</th>
-                  <th className="py-2.5 px-2.5 align-middle whitespace-nowrap w-[95px]">Sucursal / Cajero</th>
-                  <th className="py-2.5 px-2.5 align-middle min-w-[140px]">Concepto</th>
-                  <th className="py-2.5 px-2.5 align-middle text-right whitespace-nowrap w-[80px]">Monto</th>
-                  <th className="py-2.5 px-2.5 align-middle text-center whitespace-nowrap w-[78px]">Pago</th>
-                  <th className="py-2.5 px-2.5 align-middle whitespace-nowrap w-[130px]">Cuenta / Destino</th>
-                  <th className="py-2.5 px-2.5 align-middle text-center whitespace-nowrap w-[75px]">Acciones</th>
+                  <th className="py-3 px-3 align-middle whitespace-nowrap w-[95px] min-w-[90px]">Folio / Fecha</th>
+                  <th className="py-3 px-3 align-middle whitespace-nowrap w-[115px] min-w-[110px]">Sucursal / Cajero</th>
+                  <th className="py-3 px-3 align-middle min-w-[160px]">Concepto</th>
+                  <th className="py-3 px-3 align-middle text-right whitespace-nowrap w-[95px] min-w-[90px]">Monto</th>
+                  <th className="py-3 px-3 align-middle text-center whitespace-nowrap w-[105px] min-w-[100px]">Pago</th>
+                  <th className="py-3 px-3 align-middle whitespace-nowrap w-[140px] min-w-[135px]">Cuenta / Destino</th>
+                  <th className="py-3 px-3 align-middle text-center whitespace-nowrap w-[120px] min-w-[115px]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
@@ -1603,7 +1603,7 @@ export default function IngresosPage() {
                         }`}
                       >
                         {/* 1. Folio / Fecha */}
-                        <td className="py-2.5 px-2.5 align-middle whitespace-nowrap w-[85px]">
+                        <td className="py-3 px-3 align-middle whitespace-nowrap w-[95px] min-w-[90px]">
                           <div className="flex flex-col leading-tight">
                             <span className="font-mono font-black text-xs text-stone-900 bg-stone-100 border border-stone-200/90 px-1.5 py-0.5 rounded w-fit">
                               #{inc.id}
@@ -1622,13 +1622,13 @@ export default function IngresosPage() {
                         </td>
 
                         {/* 2. Sucursal / Cajero */}
-                        <td className="py-2.5 px-2.5 align-middle whitespace-nowrap w-[95px]">
+                        <td className="py-3 px-3 align-middle whitespace-nowrap w-[115px] min-w-[110px]">
                           <div className="flex flex-col leading-tight">
                             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200/80 w-fit">
                               <Store className="w-3 h-3 text-emerald-600 shrink-0" />
                               <span>{(inc.branchName || "Matriz").replace("Sucursal ", "").replace(" (Centro)", "")}</span>
                             </span>
-                            <span className="text-[10px] text-stone-500 font-semibold mt-1 flex items-center gap-1 truncate max-w-[90px]" title={inc.cashier}>
+                            <span className="text-[10px] text-stone-500 font-semibold mt-1 flex items-center gap-1 truncate max-w-[105px]" title={inc.cashier}>
                               <span className="text-stone-400">👤</span>
                               <span className="truncate">{inc.cashier}</span>
                             </span>
@@ -1636,7 +1636,7 @@ export default function IngresosPage() {
                         </td>
 
                         {/* 3. Concepto y Categoría */}
-                        <td className="py-2.5 px-2.5 align-middle min-w-[140px]">
+                        <td className="py-3 px-3 align-middle min-w-[160px]">
                           <div className="flex items-center gap-1.5 mb-1">
                             <span
                               className={`px-1.5 py-0.2 rounded font-bold text-[10px] inline-flex items-center gap-1 border ${catInfo.bg} ${catInfo.text} ${catInfo.border}`}
@@ -1657,14 +1657,14 @@ export default function IngresosPage() {
                         </td>
 
                         {/* 4. Monto */}
-                        <td className="py-2.5 px-2.5 align-middle text-right font-mono tabular-nums font-black text-sm whitespace-nowrap w-[80px] text-emerald-700">
+                        <td className="py-3 px-3 align-middle text-right font-mono tabular-nums font-black text-sm whitespace-nowrap w-[95px] min-w-[90px] text-emerald-700">
                           +{formatCurrency(inc.amount)}
                         </td>
 
                         {/* 5. Forma de Pago */}
-                        <td className="py-2.5 px-2.5 align-middle text-center whitespace-nowrap w-[78px]">
+                        <td className="py-3 px-3 align-middle text-center whitespace-nowrap w-[105px] min-w-[100px]">
                           <span
-                            className={`px-2 py-0.5 rounded font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
+                            className={`px-2.5 py-1 rounded-md font-black text-[10px] uppercase inline-flex items-center justify-center gap-1.5 border whitespace-nowrap ${
                               inc.paymentMethod === "efectivo"
                                 ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                                 : inc.paymentMethod === "tarjeta"
@@ -1680,7 +1680,7 @@ export default function IngresosPage() {
                         </td>
 
                         {/* 6. Cuenta / Destino (100% VISIBLE Y COMPLETO: CAJA MOSTRADOR / TURNO ACTUAL) */}
-                        <td className="py-2.5 px-2.5 align-middle whitespace-nowrap w-[130px]" title={inc.paymentMethod === "efectivo" ? "Caja Mostrador (Efectivo Turno)" : "Santander / SPEI"}>
+                        <td className="py-3 px-3 align-middle whitespace-nowrap w-[140px] min-w-[135px]" title={inc.paymentMethod === "efectivo" ? "Caja Mostrador (Efectivo Turno)" : "Santander / SPEI"}>
                           <div className="flex flex-col leading-tight">
                             <span className="font-black text-xs text-stone-900 whitespace-nowrap">
                               {inc.paymentMethod === "efectivo" ? "Caja Mostrador" : "Santander"}
@@ -1692,25 +1692,25 @@ export default function IngresosPage() {
                         </td>
 
                         {/* 7. Acciones */}
-                        <td className="py-2.5 px-2.5 align-middle text-center whitespace-nowrap w-[75px]">
-                          <div className="flex items-center justify-center gap-1">
+                        <td className="py-3 px-3 align-middle text-center whitespace-nowrap w-[120px] min-w-[115px]">
+                          <div className="flex items-center justify-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => handlePrintReceipt(inc)}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-[11px] rounded-lg shadow-2xs transition-all cursor-pointer group"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-[11px] rounded-lg shadow-2xs transition-all cursor-pointer group"
                               title="Imprimir Comprobante de Ingreso (80mm)"
                             >
-                              <Printer className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                              <Printer className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                               <span>Ticket</span>
                             </button>
 
-                            <div className="inline-block text-left">
+                            <div className="relative inline-block text-left">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setActiveDropdown(activeDropdown === inc.id ? null : inc.id);
                                 }}
-                                className="p-1 bg-stone-100 hover:bg-stone-200 active:scale-95 border border-stone-200 text-stone-700 rounded-lg text-xs transition-colors cursor-pointer"
+                                className="p-1.5 bg-stone-100 hover:bg-stone-200 active:scale-95 border border-stone-200 text-stone-700 rounded-lg text-xs transition-colors cursor-pointer"
                                 title="Más opciones"
                               >
                                 <ChevronDown className="w-3.5 h-3.5 text-stone-500" />

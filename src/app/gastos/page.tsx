@@ -1620,7 +1620,7 @@ export default function GastosPage() {
                   <th className="py-2.5 px-2 align-middle text-right whitespace-nowrap w-[80px]">Monto</th>
                   <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[90px]">Pago / Origen</th>
                   <th className="py-2.5 px-2.5 align-middle whitespace-nowrap min-w-[115px]">Cajero</th>
-                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[85px] sticky right-0 bg-stone-100 z-20 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">Acciones</th>
+                  <th className="py-2.5 px-3 align-middle text-center whitespace-nowrap w-[95px] min-w-[90px]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
@@ -1759,8 +1759,8 @@ export default function GastosPage() {
                           </span>
                         </td>
 
-                        {/* 9. Acciones (STICKY RIGHT para que NUNCA se oculte o desborde) */}
-                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[85px] sticky right-0 bg-white group-hover:bg-amber-50/50 z-10 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">
+                        {/* 9. Acciones */}
+                        <td className="py-2.5 px-3 align-middle text-center whitespace-nowrap w-[95px] min-w-[90px]">
                           <div className="relative inline-block text-left">
                             <button
                               type="button"
