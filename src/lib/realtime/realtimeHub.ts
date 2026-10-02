@@ -2,11 +2,17 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { FBNotification } from "@/context/NotificationContext";
-import { BranchCashMovement, CustomOrder, Branch } from "@/types";
+import { BranchCashMovement, CustomOrder, Branch, ShiftCutRecord } from "@/types";
 
 export interface RealtimeBranchPayload {
   action: "create" | "update" | "delete";
   branch: Branch;
+  senderDeviceId: string;
+  timestamp: string;
+}
+
+export interface RealtimeShiftCutPayload {
+  cut: ShiftCutRecord;
   senderDeviceId: string;
   timestamp: string;
 }
@@ -66,6 +72,7 @@ type CashMovementListener = (movement: RealtimeCashMovementPayload) => void;
 type OrderListener = (payload: RealtimeOrderPayload) => void;
 type BreadDeliveryListener = (delivery: RealtimeBreadDeliveryPayload) => void;
 type BranchListener = (payload: RealtimeBranchPayload) => void;
+type ShiftCutListener = (cut: ShiftCutRecord) => void;
 type StatusListener = (status: RealtimeStatus) => void;
 
 const CHANNEL_NAME = "panaderia_brito_realtime";
@@ -87,6 +94,7 @@ class RealtimeHub {
   private orderListeners = new Set<OrderListener>();
   private breadDeliveryListeners = new Set<BreadDeliveryListener>();
   private branchListeners = new Set<BranchListener>();
+  private shiftCutListeners = new Set<ShiftCutListener>();
   private statusListeners = new Set<StatusListener>();
 
   constructor() {
@@ -174,6 +182,9 @@ class RealtimeHub {
       this.breadDeliveryListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     } else if (type === "branch") {
       this.branchListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "shift_cut") {
+      const cutData = payload?.cut || payload;
+      this.shiftCutListeners.forEach((fn) => { try { fn(cutData); } catch (err) { console.error(err); } });
     }
   }
 
@@ -215,6 +226,10 @@ class RealtimeHub {
         .on("broadcast", { event: "branch" }, ({ payload }: { payload: any }) => {
           if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
           this.dispatchLocalEvent("branch", payload);
+        })
+        .on("broadcast", { event: "shift_cut" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("shift_cut", payload);
         })
         .subscribe((channelStatus: string) => {
           if (channelStatus === "SUBSCRIBED") {
@@ -350,6 +365,17 @@ class RealtimeHub {
     this.postToSyncEndpoint("branch", payload);
   }
 
+  public async broadcastShiftCut(cut: ShiftCutRecord) {
+    const payload: RealtimeShiftCutPayload = {
+      cut,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+
+    this.sendBroadcast("shift_cut", payload);
+    this.postToSyncEndpoint("shift_cut", payload);
+  }
+
   private sendBroadcast(event: string, payload: any) {
     const payloadWithTab = { ...payload, senderTabId: this.tabId };
 
@@ -470,6 +496,13 @@ class RealtimeHub {
     this.branchListeners.add(listener);
     return () => {
       this.branchListeners.delete(listener);
+    };
+  }
+
+  public onShiftCut(listener: ShiftCutListener) {
+    this.shiftCutListeners.add(listener);
+    return () => {
+      this.shiftCutListeners.delete(listener);
     };
   }
 

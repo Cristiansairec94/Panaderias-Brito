@@ -1568,19 +1568,19 @@ export default function IngresosPage() {
         {/* ── MODO 1: TABLA FLUIDA CON COLUMNA DE ACCIONES FIJA (STICKY) ── */}
         {viewMode === "tabla" ? (
           <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-stone-300 scrollbar-track-stone-100/60 pb-1">
-            <table className="w-full text-left border-collapse min-w-[1220px] table-auto">
-              <thead className="bg-stone-100/95 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] lg:text-xs select-none sticky top-0 z-10 backdrop-blur-xs">
+            <table className="w-full text-left border-collapse table-auto min-w-[880px]">
+              <thead className="bg-stone-100/95 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] select-none sticky top-0 z-10 backdrop-blur-xs">
                 <tr>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[110px] min-w-[100px]">Folio</th>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[130px] min-w-[120px]">Fecha / Hora</th>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[160px] min-w-[150px]">Sucursal</th>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[185px] min-w-[175px]">Categoría</th>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle min-w-[180px] max-w-[280px]">Concepto / Motivo</th>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle text-right whitespace-nowrap w-[125px] min-w-[115px]">Monto</th>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[135px] min-w-[125px]">Forma de Pago</th>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[185px] min-w-[175px]">Cuenta / Destino</th>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[150px] min-w-[140px]">Cajero</th>
-                  <th className="py-3.5 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[120px] min-w-[110px] sticky right-0 bg-stone-100/95 z-20 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">Acciones</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[78px]">Folio</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[85px]">Fecha</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[95px]">Sucursal</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[120px]">Categoría</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle min-w-[110px] max-w-[170px]">Concepto</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle text-right whitespace-nowrap w-[90px]">Monto</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle text-center whitespace-nowrap w-[85px]">Pago</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[105px]">Cuenta / Destino</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[90px]">Cajero</th>
+                  <th className="py-2.5 px-2 sm:px-2.5 align-middle text-center whitespace-nowrap w-[95px]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-sm">
@@ -1607,28 +1607,28 @@ export default function IngresosPage() {
                         }`}
                       >
                         {/* 1. Folio */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle font-mono font-black text-xs sm:text-sm text-stone-900 whitespace-nowrap w-[110px] min-w-[100px]">
-                          <span className="bg-stone-100 border border-stone-200/90 px-2 py-1 rounded-lg">
+                        <td className="py-2 px-2 sm:px-2.5 align-middle font-mono font-black text-xs text-stone-900 whitespace-nowrap w-[78px]">
+                          <span className="bg-stone-100 border border-stone-200/90 px-1.5 py-0.5 rounded-md">
                             #{inc.id}
                           </span>
                         </td>
 
                         {/* 2. Fecha / Hora */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle whitespace-nowrap w-[130px] min-w-[120px]">
+                        <td className="py-2 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[85px]">
                           {isHoy ? (
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="flex flex-col leading-tight">
                               <span className="font-mono font-black text-xs text-stone-900">{timeStr || "Hoy"}</span>
-                              <span className="bg-emerald-500 text-white font-black text-[10px] px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-2xs">
+                              <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
                                 HOY
                               </span>
                             </div>
                           ) : (
-                            <div className="flex flex-col">
-                              <span className="font-bold text-xs text-stone-800">
+                            <div className="flex flex-col leading-tight">
+                              <span className="font-bold text-[11px] text-stone-800">
                                 {cleanDate}
                               </span>
                               {timeStr && (
-                                <span className="text-[11px] font-mono text-stone-400 font-semibold">
+                                <span className="text-[10px] font-mono text-stone-400 font-medium">
                                   {timeStr}
                                 </span>
                               )}
@@ -1637,44 +1637,46 @@ export default function IngresosPage() {
                         </td>
 
                         {/* 3. Sucursal */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle whitespace-nowrap w-[160px] min-w-[150px]">
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-stone-800 bg-stone-100 px-2.5 py-1 rounded-xl border border-stone-200/80">
-                            <Store className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>{(inc.branchName || "Matriz (Centro)").replace("Sucursal ", "")}</span>
+                        <td className="py-2 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[95px]">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded-md border border-stone-200/80">
+                            <Store className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span>{(inc.branchName || "Matriz").replace("Sucursal ", "").replace(" (Centro)", "")}</span>
                           </span>
                         </td>
 
                         {/* 4. Categoría */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle whitespace-nowrap w-[185px] min-w-[175px]">
+                        <td className="py-2 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[120px]">
                           <span
-                            className={`px-2.5 py-1 rounded-xl font-bold text-xs inline-flex items-center gap-1.5 border ${catInfo.bg} ${catInfo.text} ${catInfo.border}`}
+                            className={`px-1.5 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 border ${catInfo.bg} ${catInfo.text} ${catInfo.border}`}
                           >
-                            <span className="text-xs">{catInfo.icon}</span>
-                            <span>{inc.categoryLabel || catInfo.label}</span>
+                            <span className="text-[10px]">{catInfo.icon}</span>
+                            <span className="truncate max-w-[100px]">{inc.categoryLabel || catInfo.label}</span>
                           </span>
                         </td>
 
                         {/* 5. Concepto / Motivo */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle min-w-[180px] max-w-[280px]">
-                          <CompactIncomeConcept
-                            concept={inc.concept}
-                            customerName={inc.customerName}
-                            orderNumber={inc.orderNumber}
-                            saleId={inc.saleId}
-                            referenceNumber={inc.referenceNumber}
-                            category={inc.category}
-                          />
+                        <td className="py-2 px-2 sm:px-2.5 align-middle min-w-[110px] max-w-[170px]">
+                          <div className="max-w-[165px] truncate">
+                            <CompactIncomeConcept
+                              concept={inc.concept}
+                              customerName={inc.customerName}
+                              orderNumber={inc.orderNumber}
+                              saleId={inc.saleId}
+                              referenceNumber={inc.referenceNumber}
+                              category={inc.category}
+                            />
+                          </div>
                         </td>
 
                         {/* 6. Monto */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-right font-mono tabular-nums font-black text-sm sm:text-base whitespace-nowrap w-[125px] min-w-[115px] text-emerald-700">
+                        <td className="py-2 px-2 sm:px-2.5 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[90px] text-emerald-700">
                           +{formatCurrency(inc.amount)}
                         </td>
 
                         {/* 7. Forma de Pago */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[135px] min-w-[125px]">
+                        <td className="py-2 px-2 sm:px-2.5 align-middle text-center whitespace-nowrap w-[85px]">
                           <span
-                            className={`px-2.5 py-1 rounded-lg font-black text-[11px] uppercase inline-flex items-center gap-1.5 border ${
+                            className={`px-1.5 py-0.5 rounded-md font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
                               inc.paymentMethod === "efectivo"
                                 ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                                 : inc.paymentMethod === "tarjeta"
@@ -1682,25 +1684,34 @@ export default function IngresosPage() {
                                 : "bg-purple-100 text-purple-800 border-purple-200"
                             }`}
                           >
-                            {inc.paymentMethod === "efectivo" && <Wallet className="w-3.5 h-3.5 shrink-0" />}
-                            {inc.paymentMethod === "tarjeta" && <CreditCard className="w-3.5 h-3.5 shrink-0" />}
-                            {inc.paymentMethod === "transferencia" && <Building className="w-3.5 h-3.5 shrink-0" />}
+                            {inc.paymentMethod === "efectivo" && <Wallet className="w-3 h-3 shrink-0" />}
+                            {inc.paymentMethod === "tarjeta" && <CreditCard className="w-3 h-3 shrink-0" />}
+                            {inc.paymentMethod === "transferencia" && <Building className="w-3 h-3 shrink-0" />}
                             <span>{inc.paymentMethod}</span>
                           </span>
                         </td>
 
                         {/* 8. Cuenta / Destino */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-stone-800 font-bold text-xs sm:text-sm whitespace-nowrap w-[185px] min-w-[175px]" title={inc.paymentMethod === "efectivo" ? "Caja Mostrador (Efectivo Turno)" : "Santander / SPEI"}>
-                          {inc.paymentMethod === "efectivo" ? "Caja Mostrador" : "Santander / SPEI"}
+                        <td className="py-2 px-2 sm:px-2.5 align-middle text-stone-800 font-bold text-xs whitespace-nowrap w-[105px]" title={inc.paymentMethod === "efectivo" ? "Caja Mostrador (Efectivo Turno)" : "Santander / SPEI"}>
+                          <div className="flex flex-col leading-tight">
+                            <span className="font-bold text-xs text-stone-800 truncate max-w-[100px]">
+                              {inc.paymentMethod === "efectivo" ? "Caja Mostrador" : "Santander"}
+                            </span>
+                            <span className="text-[10px] text-stone-400 font-medium truncate max-w-[100px]">
+                              {inc.paymentMethod === "efectivo" ? "Turno Actual" : "SPEI / Banco"}
+                            </span>
+                          </div>
                         </td>
 
                         {/* 9. Cajero */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-stone-800 font-bold whitespace-nowrap text-xs sm:text-sm w-[150px] min-w-[140px] truncate" title={inc.cashier}>
-                          {inc.cashier}
+                        <td className="py-2 px-2 sm:px-2.5 align-middle text-stone-800 font-bold whitespace-nowrap text-xs w-[90px]" title={inc.cashier}>
+                          <span className="truncate max-w-[85px] block font-bold">
+                            {inc.cashier}
+                          </span>
                         </td>
 
                         {/* 10. Acciones */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[120px] min-w-[110px] sticky right-0 bg-white group-hover:bg-stone-50 z-10 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">
+                        <td className="py-2 px-2 sm:px-2.5 align-middle text-center whitespace-nowrap w-[95px]">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               type="button"

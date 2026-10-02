@@ -246,6 +246,9 @@ export interface CashExpense {
   timestamp?: number | string;
   isOwner?: boolean;
   authorizedBy?: string;
+  branchId?: string;
+  branchName?: string;
+  paymentMethod?: "efectivo" | "tarjeta" | "transferencia";
 }
 
 export type CashIncomeCategory =
