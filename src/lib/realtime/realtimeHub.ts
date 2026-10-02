@@ -38,11 +38,12 @@ export interface RealtimeCashMovementPayload {
   branchId: string;
   branchName: string;
   type: "entrada" | "salida";
-  category: BranchCashMovement["category"];
-  categoryLabel: string;
+  category?: BranchCashMovement["category"];
+  categoryLabel?: string;
   amount: number;
   reason: string;
-  authorizedBy: string;
+  authorizedBy?: string;
+  cashier?: string;
   timestamp: string;
   senderDeviceId: string;
 }

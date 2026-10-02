@@ -21,6 +21,7 @@ import { CashIncome, CashIncomeCategory } from "@/types";
 import { formatCurrency, formatDateTimeSafe } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
 interface IncomesModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ interface IncomesModalProps {
   cashSalesTotal: number;
   totalExpenses: number;
   initialFund?: number;
+  branchId?: string;
   branchName?: string;
   defaultCashier?: string;
   onOpenReceipt?: (income: CashIncome) => void;
@@ -56,6 +58,7 @@ export default function IncomesModal({
   cashSalesTotal,
   totalExpenses,
   initialFund = 1000,
+  branchId,
   branchName = "Matriz Centro",
   defaultCashier = "Don Toño Brito",
   onOpenReceipt,
@@ -91,6 +94,7 @@ export default function IncomesModal({
 
     setIsSubmitting(true);
     const catObj = INCOME_CATEGORIES.find((c) => c.id === category);
+    const effectiveBranchId = branchId || "branch-matriz";
 
     const newIncome: CashIncome = {
       id: `ING-${Date.now().toString().slice(-6)}`,
@@ -102,6 +106,7 @@ export default function IncomesModal({
       concept: description.trim(),
       customerName: customerOrOrder.trim() || undefined,
       cashier: cashier.trim() || defaultCashier,
+      branchId: effectiveBranchId,
       branchName,
       date: formatDateTimeSafe(new Date()),
       timestamp: new Date().toISOString(),
@@ -116,12 +121,25 @@ export default function IncomesModal({
         amount: newIncome.amount,
         reason: `${newIncome.categoryLabel}: ${newIncome.concept} (${newIncome.customerName || "General"}) [${newIncome.paymentMethod}]`,
         authorized_by: newIncome.cashier,
+        branch_id: effectiveBranchId,
       });
     } catch (err) {
       console.log("Offline mode, saved locally", err);
     } finally {
       onAddIncome(newIncome);
       setLastCreatedIncome(newIncome);
+
+      // Emitir en tiempo real para el Administrador y todas las cajas
+      realtimeHub.broadcastCashMovement({
+        id: newIncome.id,
+        type: "entrada",
+        amount: newIncome.amount,
+        reason: `${newIncome.categoryLabel}: ${newIncome.concept}`,
+        branchId: effectiveBranchId,
+        branchName: branchName || "Matriz Centro",
+        cashier: newIncome.cashier,
+        timestamp: new Date().toISOString(),
+      });
 
       // Notificación inmediata para Don Toño
       addNotification({

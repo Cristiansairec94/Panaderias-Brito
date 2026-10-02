@@ -631,11 +631,11 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
           branchId: movement.branchId,
           branchName: movement.branchName,
           type: movement.type,
-          category: movement.category,
-          categoryLabel: movement.categoryLabel,
+          category: movement.category || "otro",
+          categoryLabel: movement.categoryLabel || "Movimiento de Caja",
           amount: movement.amount,
           reason: movement.reason,
-          authorizedBy: movement.authorizedBy,
+          authorizedBy: movement.authorizedBy || movement.cashier || "Don Toño Brito",
           timestamp: movement.timestamp,
         };
         const next = [newMov, ...prev];

@@ -57,6 +57,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
 import { useBranch } from "@/context/BranchContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import { getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
@@ -1589,6 +1590,9 @@ export default function ExpensesModal({
         finalDescription.toLowerCase().includes("dueño") ||
         finalDescription.toLowerCase().includes("toño") ||
         finalDescription.toLowerCase().includes("socio");
+      const targetBranchId = branchId || activeBranch?.id || "branch-matriz";
+      const targetBranchName = branchName || activeBranch?.name || "Sucursal Matriz (Centro)";
+
       const newExpense: CashExpense = {
         id: `EXP-${Date.now().toString().slice(-6)}`,
         amount: parsedAmount,
@@ -1598,6 +1602,9 @@ export default function ExpensesModal({
         date: nowDateTime,
         timestamp: Date.now(),
         createdAt: new Date().toISOString(),
+        branchId: targetBranchId,
+        branchName: targetBranchName,
+        paymentMethod: "efectivo",
       };
 
       let savedToDb = false;
@@ -1611,7 +1618,7 @@ export default function ExpensesModal({
             category: newExpense.category,
             description: newExpense.description,
             cashier: newExpense.cashier,
-            branch_id: branchId || "branch-matriz",
+            branch_id: targetBranchId,
           });
 
         if (!expError) {
@@ -1622,7 +1629,7 @@ export default function ExpensesModal({
             amount: newExpense.amount,
             reason: newExpense.description,
             authorized_by: isOwnerWithdrawal ? (authorizedBy.trim() || "Don Toño Brito") : cashierName,
-            branch_id: branchId || "branch-matriz",
+            branch_id: targetBranchId,
           });
           savedToDb = true;
         }
@@ -1639,6 +1646,7 @@ export default function ExpensesModal({
               category: newExpense.category,
               description: newExpense.description,
               cashier: newExpense.cashier,
+              branch_id: targetBranchId,
             },
           });
         }
@@ -1654,13 +1662,25 @@ export default function ExpensesModal({
           } catch (e) {}
         }
 
+        // Emitir en tiempo real para el Administrador y todas las cajas
+        realtimeHub.broadcastCashMovement({
+          id: `mov-${newExpense.id}`,
+          type: "salida",
+          amount: newExpense.amount,
+          reason: newExpense.description,
+          branchId: targetBranchId,
+          branchName: targetBranchName,
+          cashier: cashierName,
+          timestamp: new Date().toISOString(),
+        });
+
         // Registrar automáticamente en el Historial Detallado de Gastos
         recordCashOutflowAsExpense({
           amount: newExpense.amount,
           description: newExpense.description,
           category: selectedPresetId || newExpense.category,
-          branchId,
-          branchName,
+          branchId: targetBranchId,
+          branchName: targetBranchName,
           cashier: cashierName,
           accountOrigin: "Caja Mostrador (Efectivo Turno)",
           paymentMethod: "efectivo",
@@ -1703,6 +1723,8 @@ export default function ExpensesModal({
       // 2. REGISTRO DE ENTRADA (Dejaron dinero para cambio / abono)
       const isChangeInflow = selectedPresetId === "fondo_cambio";
       const presetObj = ENTRADA_PRESETS.find((p) => p.id === selectedPresetId);
+      const targetBranchId = branchId || activeBranch?.id || "branch-matriz";
+      const targetBranchName = branchName || activeBranch?.name || "Sucursal Matriz (Centro)";
 
       const newIncome: CashIncome = {
         id: `ING-${Date.now().toString().slice(-6)}`,
@@ -1712,6 +1734,8 @@ export default function ExpensesModal({
         paymentMethod: "efectivo",
         concept: finalDescription,
         cashier: cashierName,
+        branchId: targetBranchId,
+        branchName: targetBranchName,
         date: nowDateTime,
         timestamp: new Date().toISOString(),
       };
@@ -1726,7 +1750,7 @@ export default function ExpensesModal({
           amount: newIncome.amount,
           reason: newIncome.concept,
           authorized_by: cashierName,
-          branch_id: branchId || "branch-matriz",
+          branch_id: targetBranchId,
         });
         if (!incError) {
           savedIncomeToDb = true;
@@ -1744,6 +1768,7 @@ export default function ExpensesModal({
               category: newIncome.category,
               concept: newIncome.concept,
               cashier: newIncome.cashier,
+              branch_id: targetBranchId,
             },
           });
         }
@@ -1758,6 +1783,18 @@ export default function ExpensesModal({
             window.dispatchEvent(new Event("brito_shift_cuts_updated"));
           } catch (e) {}
         }
+
+        // Emitir en tiempo real para el Administrador y todas las cajas
+        realtimeHub.broadcastCashMovement({
+          id: newIncome.id,
+          type: "entrada",
+          amount: newIncome.amount,
+          reason: `${newIncome.categoryLabel}: ${newIncome.concept}`,
+          branchId: targetBranchId,
+          branchName: targetBranchName,
+          cashier: cashierName,
+          timestamp: new Date().toISOString(),
+        });
 
         // Notificación para la administración
         if (isChangeInflow) {
@@ -1793,6 +1830,7 @@ export default function ExpensesModal({
         );
       }
     }
+
 
     setIsSubmitting(false);
     setFeedbackSuccess(true);

@@ -36,6 +36,7 @@ import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTime
 import { getStoredOrders } from "@/lib/orders";
 import { useNotifications } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
 interface CashDrawerShiftModalProps {
   isOpen: boolean;
@@ -242,6 +243,14 @@ export default function CashDrawerShiftModal({
   // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta terminal)
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
+    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+      const sBranch = (s as any).branchId || (s as any).branch_id;
+      if (sBranch) {
+        if (sBranch !== currentBranch.id) return false;
+      } else {
+        if (currentBranch.id !== "branch-matriz") return false;
+      }
+    }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
     if (shiftStartBoundary > 0) {
       if (!sTime || sTime < shiftStartBoundary) return false;
@@ -254,6 +263,14 @@ export default function CashDrawerShiftModal({
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
   const shiftOrders = (orders || []).filter((o) => {
     if (!o) return false;
+    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+      const oBranch = (o as any).branchId || (o as any).branch_id;
+      if (oBranch) {
+        if (oBranch !== currentBranch.id) return false;
+      } else {
+        if (currentBranch.id !== "branch-matriz") return false;
+      }
+    }
     const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
     if (shiftStartBoundary > 0) {
       if (!oTime || oTime < shiftStartBoundary) return false;
@@ -280,8 +297,16 @@ export default function CashDrawerShiftModal({
   const effectiveInitialFund = currentBranch?.currentShift?.initialFund !== undefined ? currentBranch.currentShift.initialFund : syncedFund;
 
   // 2. Cálculos de Gastos y Entradas del Turno (incluyendo retiros de dueño tomados del cajón)
-  const shiftExpenses = expenses.filter((e) => {
+  const shiftExpenses = (expenses || []).filter((e) => {
     if (!e) return false;
+    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+      const eBranch = (e as any).branchId || (e as any).branch_id;
+      if (eBranch) {
+        if (eBranch !== currentBranch.id) return false;
+      } else {
+        if (currentBranch.id !== "branch-matriz") return false;
+      }
+    }
     const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, outgoingCashier))) return false;
     const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
@@ -292,6 +317,14 @@ export default function CashDrawerShiftModal({
 
   const shiftIncomes = (incomes || []).filter((inc) => {
     if (!inc) return false;
+    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+      const incBranch = (inc as any).branchId || (inc as any).branch_id;
+      if (incBranch) {
+        if (incBranch !== currentBranch.id) return false;
+      } else {
+        if (currentBranch.id !== "branch-matriz") return false;
+      }
+    }
     const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier))) return false;
     const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
@@ -382,8 +415,8 @@ export default function CashDrawerShiftModal({
       difference: cashDifference,
       nextFund: parsedNextFund,
       notes: shiftNotes.trim() || "Cierre de turno completado conforme y sin anomalías.",
-      expensesList: [...expenses],
-      incomesList: [...incomes],
+      expensesList: [...shiftExpenses],
+      incomesList: [...shiftIncomes],
       stockPieces: totalPiecesInStock,
       stockValue: totalStockValue,
     };
@@ -407,10 +440,61 @@ export default function CashDrawerShiftModal({
       localStorage.setItem("brito_current_shift_cashier", incomingCashier);
       localStorage.setItem("brito_current_shift_name", nextShiftName);
       localStorage.setItem("brito_pos_shift_locked", "true");
-      localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
+      localStorage.setItem(`brito_pos_initial_fund_${targetBranchId}`, parsedNextFund.toString());
+      if (targetBranchId === "branch-matriz") {
+        localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
+      }
+
+      // Preservar ventas, gastos e ingresos de las otras sucursales
+      try {
+        const curSales = JSON.parse(localStorage.getItem("brito_pos_current_sales") || "[]");
+        const remainingSales = Array.isArray(curSales)
+          ? curSales.filter((s: any) => {
+              const bId = s.branchId || s.branch_id;
+              return bId && bId !== targetBranchId;
+            })
+          : [];
+        localStorage.setItem("brito_pos_current_sales", JSON.stringify(remainingSales));
+      } catch {}
+
+      try {
+        const curExp = JSON.parse(localStorage.getItem("brito_pos_current_expenses") || "[]");
+        const remainingExp = Array.isArray(curExp)
+          ? curExp.filter((e: any) => {
+              const bId = e.branchId || e.branch_id;
+              return bId && bId !== targetBranchId;
+            })
+          : [];
+        localStorage.setItem("brito_pos_current_expenses", JSON.stringify(remainingExp));
+      } catch {}
+
+      try {
+        const curInc = JSON.parse(localStorage.getItem("brito_pos_current_incomes") || "[]");
+        const remainingInc = Array.isArray(curInc)
+          ? curInc.filter((i: any) => {
+              const bId = i.branchId || i.branch_id;
+              return bId && bId !== targetBranchId;
+            })
+          : [];
+        localStorage.setItem("brito_pos_current_incomes", JSON.stringify(remainingInc));
+      } catch {}
+
+      // Emitir corte de caja en tiempo real para el Administrador y todas las terminales
+      realtimeHub.broadcastShiftCut(cutRecord);
+
+      // Si se retira efectivo para entregar a Don Toño, emitir movimiento en tiempo real
+      if (cashToWithdraw > 0) {
+        realtimeHub.broadcastCashMovement({
+          id: `mov-corte-${cutRecord.id}`,
+          type: "salida",
+          amount: cashToWithdraw,
+          reason: `Retiro por Cierre de Turno (${outgoingCashier} ➔ Don Toño)`,
+          branchId: targetBranchId,
+          branchName: cutRecord.branchName || "Sucursal Matriz",
+          cashier: outgoingCashier,
+          timestamp: new Date().toISOString(),
+        });
+      }
 
       // Actualizar el estado de la sucursal para que el nuevo turno comience en 0 absoluto
       updateBranch(targetBranchId, {

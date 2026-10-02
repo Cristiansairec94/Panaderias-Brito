@@ -4261,6 +4261,7 @@ export default function POSPage() {
           cashSalesTotal={totalCashSales}
           totalExpenses={totalExpenses}
           initialFund={initialCashFund}
+          branchId={activeBranch?.id || "branch-matriz"}
           branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
           defaultCashier={cashierName}
           onOpenReceipt={handleOpenIncomeReceipt}

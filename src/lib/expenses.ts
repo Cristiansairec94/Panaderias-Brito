@@ -185,7 +185,7 @@ if (typeof window !== "undefined" && realtimeHub?.onCashMovement) {
         return;
       }
 
-      const catDef = GASTO_CATEGORIAS_MAP[payload.category] || {
+      const catDef = (payload.category && GASTO_CATEGORIAS_MAP[payload.category]) || {
         id: "otros",
         label: payload.categoryLabel || "Gastos Menores / Varios",
       };

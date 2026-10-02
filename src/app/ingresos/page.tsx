@@ -247,13 +247,13 @@ export interface IngresoCategoriaDef {
 }
 
 const CATEGORY_OPTIONS: IngresoCategoriaDef[] = [
-  { id: "venta_mostrador", label: "Ventas de Mostrador (Panadería / POS)", shortLabel: "Ventas Mostrador", icon: "🥖", bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-200" },
-  { id: "abono_pedido", label: "Abono a Pedido Especial (Pasteles/Eventos)", shortLabel: "Abono a Pedido", icon: "🎂", bg: "bg-rose-50", text: "text-rose-800", border: "border-rose-200" },
-  { id: "abono_cliente", label: "Cobro a Cliente Mayorista / Tiendita", shortLabel: "Cobro a Cliente", icon: "🏪", bg: "bg-blue-50", text: "text-blue-800", border: "border-blue-200" },
-  { id: "fondo_cambio", label: "Aportación de Cambio / Fondo Adicional", shortLabel: "Fondo de Cambio", icon: "🪙", bg: "bg-yellow-50", text: "text-yellow-800", border: "border-yellow-200" },
-  { id: "venta_costales", label: "Venta de Costales de Harina / Reciclaje", shortLabel: "Venta de Costales", icon: "🌾", bg: "bg-orange-50", text: "text-orange-800", border: "border-orange-200" },
-  { id: "ingreso_extraordinario", label: "Ingreso Extraordinario / Varios", shortLabel: "Ingreso Extra", icon: "✨", bg: "bg-emerald-50", text: "text-emerald-800", border: "border-emerald-200" },
-  { id: "otro", label: "Otro Concepto", shortLabel: "Otro Concepto", icon: "💵", bg: "bg-stone-50", text: "text-stone-700", border: "border-stone-200" },
+  { id: "venta_mostrador", label: "Ventas de Mostrador (Panadería / POS)", shortLabel: "Mostrador", icon: "🥖", bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-200" },
+  { id: "abono_pedido", label: "Abono a Pedido Especial (Pasteles/Eventos)", shortLabel: "Abono Pedido", icon: "🎂", bg: "bg-rose-50", text: "text-rose-800", border: "border-rose-200" },
+  { id: "abono_cliente", label: "Cobro a Cliente Mayorista / Tiendita", shortLabel: "Cobro Cliente", icon: "🏪", bg: "bg-blue-50", text: "text-blue-800", border: "border-blue-200" },
+  { id: "fondo_cambio", label: "Aportación de Cambio / Fondo Adicional", shortLabel: "Fondo Cambio", icon: "🪙", bg: "bg-yellow-50", text: "text-yellow-800", border: "border-yellow-200" },
+  { id: "venta_costales", label: "Venta de Costales de Harina / Reciclaje", shortLabel: "Costales", icon: "🌾", bg: "bg-orange-50", text: "text-orange-800", border: "border-orange-200" },
+  { id: "ingreso_extraordinario", label: "Ingreso Extraordinario / Varios", shortLabel: "Extra", icon: "✨", bg: "bg-emerald-50", text: "text-emerald-800", border: "border-emerald-200" },
+  { id: "otro", label: "Otro Concepto", shortLabel: "Otro", icon: "💵", bg: "bg-stone-50", text: "text-stone-700", border: "border-stone-200" },
 ];
 
 const CUENTAS_DESTINO = [
@@ -354,8 +354,8 @@ function CompactIncomeConcept({
   return (
     <div className="leading-snug py-0.5">
       {/* ── 1. LÍNEA PRINCIPAL: Título del Concepto / Producto ── */}
-      <div className="flex flex-wrap items-center gap-1.5 min-h-[22px]">
-        <span className="font-bold text-stone-900 text-sm leading-tight" title={cleaned}>
+      <div className="flex items-center gap-1.5 min-h-[20px] max-w-full">
+        <span className="font-bold text-stone-900 text-xs sm:text-sm leading-tight truncate max-w-[130px] sm:max-w-[160px]" title={cleaned}>
           {hasMultipleProducts ? mainTitle : (isExpanded ? cleaned : singlePreview)}
         </span>
 
@@ -367,11 +367,11 @@ function CompactIncomeConcept({
               e.stopPropagation();
               setIsExpanded((prev) => !prev);
             }}
-            className="inline-flex items-center gap-1 text-[11px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-full cursor-pointer transition-colors shadow-2xs select-none"
+            className="inline-flex items-center gap-0.5 text-[10px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-1.5 py-0.2 rounded-full cursor-pointer transition-colors shadow-2xs shrink-0 select-none"
             title={isExpanded ? "Ocultar desglose" : "Ver todos los productos"}
           >
-            <span>{isExpanded ? "Ocultar" : `+${productItems.length - 1} más`}</span>
-            <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+            <span>{isExpanded ? "Menos" : `+${productItems.length - 1}`}</span>
+            <ChevronDown className={`w-2.5 h-2.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
           </button>
         )}
 
@@ -383,10 +383,10 @@ function CompactIncomeConcept({
               e.stopPropagation();
               setIsExpanded((prev) => !prev);
             }}
-            className="inline-flex items-center text-[11px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2 py-0.5 rounded-full cursor-pointer transition-colors shadow-2xs select-none"
+            className="inline-flex items-center text-[10px] font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-1.5 py-0.2 rounded-full cursor-pointer transition-colors shadow-2xs shrink-0 select-none"
             title={isExpanded ? "Mostrar menos texto" : "Mostrar texto completo"}
           >
-            {isExpanded ? "ver menos" : "ver más"}
+            {isExpanded ? "menos" : "más"}
           </button>
         )}
       </div>
@@ -407,27 +407,27 @@ function CompactIncomeConcept({
         </div>
       )}
 
-      {/* ── 2. LÍNEA SECUNDARIA: Metadatos y Badges Perfectamente Alineados ── */}
-      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+      {/* ── 2. LÍNEA SECUNDARIA: Metadatos y Badges ── */}
+      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
         {/* Cliente con nombre real */}
         {formattedCustomer && (
-          <span className="text-xs text-stone-700 font-semibold inline-flex items-center gap-1">
+          <span className="text-[10px] sm:text-[11px] text-stone-700 font-semibold inline-flex items-center gap-0.5 truncate max-w-[110px]">
             <span className="text-stone-400">👤</span>
-            <strong className="text-stone-900 font-bold">{formattedCustomer}</strong>
+            <strong className="text-stone-900 font-bold truncate">{formattedCustomer}</strong>
           </span>
         )}
 
         {/* Badge de Pedido Especial */}
         {resolvedOrderNum && (
-          <span className="text-[11px] font-black text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 inline-flex items-center gap-1 shadow-2xs">
+          <span className="text-[10px] font-black text-rose-800 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200 inline-flex items-center gap-0.5 shadow-2xs shrink-0">
             <span>🎂</span>
-            <span>Pedido: #{resolvedOrderNum}</span>
+            <span>Pedido #{resolvedOrderNum}</span>
           </span>
         )}
 
         {/* Badge de Ticket de Venta POS */}
         {resolvedTicketNum && (
-          <span className="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 inline-flex items-center gap-1 shadow-2xs">
+          <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 inline-flex items-center gap-0.5 shadow-2xs shrink-0">
             <span>🧾</span>
             <span>Ticket: #{resolvedTicketNum}</span>
           </span>
@@ -435,23 +435,22 @@ function CompactIncomeConcept({
 
         {/* Folio de Transferencia / SPEI */}
         {referenceNumber && (
-          <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200 inline-flex items-center gap-1">
-            <span>Ref:</span>
-            <span>{referenceNumber}</span>
+          <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 px-1 py-0.2 rounded border border-blue-200 inline-flex items-center gap-0.5 shrink-0">
+            <span>Ref: {referenceNumber}</span>
           </span>
         )}
 
-        {/* Movimientos de caja manuales (ej: "llego la dueña", "escoba", "cambio") */}
+        {/* Movimientos de caja manuales */}
         {!formattedCustomer && !resolvedOrderNum && !resolvedTicketNum && !referenceNumber && (
           <span
-            className={`text-[11px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center gap-1 shadow-2xs ${
+            className={`text-[10px] font-bold px-1.5 py-0.2 rounded border inline-flex items-center gap-0.5 shadow-2xs shrink-0 ${
               isCambio
                 ? "text-teal-800 bg-teal-50 border-teal-200"
                 : "text-stone-600 bg-stone-100 border-stone-200/90"
             }`}
           >
             <span>{isCambio ? "🪙" : "📝"}</span>
-            <span>{isCambio ? "Fondo de Cambio" : "Movimiento en Caja"}</span>
+            <span>{isCambio ? "Fondo Cambio" : "Caja"}</span>
           </span>
         )}
       </div>
@@ -1568,25 +1567,24 @@ export default function IngresosPage() {
         {/* ── MODO 1: TABLA FLUIDA CON COLUMNA DE ACCIONES FIJA (STICKY) ── */}
         {viewMode === "tabla" ? (
           <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-stone-300 scrollbar-track-stone-100/60 pb-1">
-            <table className="w-full text-left border-collapse table-auto min-w-[880px]">
+            <table className="w-full text-left border-collapse table-auto">
               <thead className="bg-stone-100/95 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] select-none sticky top-0 z-10 backdrop-blur-xs">
                 <tr>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[78px]">Folio</th>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[85px]">Fecha</th>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[95px]">Sucursal</th>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[120px]">Categoría</th>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle min-w-[110px] max-w-[170px]">Concepto</th>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle text-right whitespace-nowrap w-[90px]">Monto</th>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle text-center whitespace-nowrap w-[85px]">Pago</th>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[105px]">Cuenta / Destino</th>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[90px]">Cajero</th>
-                  <th className="py-2.5 px-2 sm:px-2.5 align-middle text-center whitespace-nowrap w-[95px]">Acciones</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[75px]">Folio</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[75px]">Fecha</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[80px]">Sucursal</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[95px]">Categoría</th>
+                  <th className="py-2.5 px-2 align-middle min-w-[120px]">Concepto</th>
+                  <th className="py-2.5 px-2 align-middle text-right whitespace-nowrap w-[85px]">Monto</th>
+                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[95px]">Pago / Cuenta</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[85px]">Cajero</th>
+                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[80px]">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-100 text-sm">
+              <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
                 {filteredIncomes.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-16 text-stone-400">
+                    <td colSpan={9} className="text-center py-16 text-stone-400">
                       <Receipt className="w-12 h-12 mx-auto text-stone-300 mb-3" />
                       <p className="font-black text-base sm:text-lg text-stone-700">No se encontraron ingresos con los filtros aplicados</p>
                       <p className="text-sm text-stone-500 mt-1">Prueba cambiando la sucursal o los filtros de búsqueda.</p>
@@ -1607,18 +1605,18 @@ export default function IngresosPage() {
                         }`}
                       >
                         {/* 1. Folio */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle font-mono font-black text-xs text-stone-900 whitespace-nowrap w-[78px]">
-                          <span className="bg-stone-100 border border-stone-200/90 px-1.5 py-0.5 rounded-md">
+                        <td className="py-2 px-2 align-middle font-mono font-black text-xs text-stone-900 whitespace-nowrap w-[75px]">
+                          <span className="bg-stone-100 border border-stone-200/90 px-1.5 py-0.5 rounded-md text-[11px]">
                             #{inc.id}
                           </span>
                         </td>
 
                         {/* 2. Fecha / Hora */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[85px]">
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[75px]">
                           {isHoy ? (
                             <div className="flex flex-col leading-tight">
                               <span className="font-mono font-black text-xs text-stone-900">{timeStr || "Hoy"}</span>
-                              <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
+                              <span className="text-[9px] text-emerald-600 font-black uppercase tracking-wider">
                                 HOY
                               </span>
                             </div>
@@ -1628,7 +1626,7 @@ export default function IngresosPage() {
                                 {cleanDate}
                               </span>
                               {timeStr && (
-                                <span className="text-[10px] font-mono text-stone-400 font-medium">
+                                <span className="text-[9px] font-mono text-stone-400 font-medium">
                                   {timeStr}
                                 </span>
                               )}
@@ -1637,7 +1635,7 @@ export default function IngresosPage() {
                         </td>
 
                         {/* 3. Sucursal */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[95px]">
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[80px]">
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded-md border border-stone-200/80">
                             <Store className="w-3 h-3 text-emerald-600 shrink-0" />
                             <span>{(inc.branchName || "Matriz").replace("Sucursal ", "").replace(" (Centro)", "")}</span>
@@ -1645,18 +1643,19 @@ export default function IngresosPage() {
                         </td>
 
                         {/* 4. Categoría */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle whitespace-nowrap w-[120px]">
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[95px]">
                           <span
                             className={`px-1.5 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 border ${catInfo.bg} ${catInfo.text} ${catInfo.border}`}
+                            title={inc.categoryLabel || catInfo.label}
                           >
                             <span className="text-[10px]">{catInfo.icon}</span>
-                            <span className="truncate max-w-[100px]">{inc.categoryLabel || catInfo.label}</span>
+                            <span>{catInfo.shortLabel || "Mostrador"}</span>
                           </span>
                         </td>
 
                         {/* 5. Concepto / Motivo */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle min-w-[110px] max-w-[170px]">
-                          <div className="max-w-[165px] truncate">
+                        <td className="py-2 px-2 align-middle min-w-[120px]">
+                          <div className="min-w-0">
                             <CompactIncomeConcept
                               concept={inc.concept}
                               customerName={inc.customerName}
@@ -1669,58 +1668,51 @@ export default function IngresosPage() {
                         </td>
 
                         {/* 6. Monto */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[90px] text-emerald-700">
+                        <td className="py-2 px-2 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[85px] text-emerald-700">
                           +{formatCurrency(inc.amount)}
                         </td>
 
-                        {/* 7. Forma de Pago */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle text-center whitespace-nowrap w-[85px]">
-                          <span
-                            className={`px-1.5 py-0.5 rounded-md font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
-                              inc.paymentMethod === "efectivo"
-                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                : inc.paymentMethod === "tarjeta"
-                                ? "bg-blue-100 text-blue-800 border-blue-200"
-                                : "bg-purple-100 text-purple-800 border-purple-200"
-                            }`}
-                          >
-                            {inc.paymentMethod === "efectivo" && <Wallet className="w-3 h-3 shrink-0" />}
-                            {inc.paymentMethod === "tarjeta" && <CreditCard className="w-3 h-3 shrink-0" />}
-                            {inc.paymentMethod === "transferencia" && <Building className="w-3 h-3 shrink-0" />}
-                            <span>{inc.paymentMethod}</span>
-                          </span>
-                        </td>
-
-                        {/* 8. Cuenta / Destino */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle text-stone-800 font-bold text-xs whitespace-nowrap w-[105px]" title={inc.paymentMethod === "efectivo" ? "Caja Mostrador (Efectivo Turno)" : "Santander / SPEI"}>
-                          <div className="flex flex-col leading-tight">
-                            <span className="font-bold text-xs text-stone-800 truncate max-w-[100px]">
-                              {inc.paymentMethod === "efectivo" ? "Caja Mostrador" : "Santander"}
+                        {/* 7. Forma de Pago y Cuenta Destino */}
+                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[95px]">
+                          <div className="inline-flex flex-col items-center leading-tight">
+                            <span
+                              className={`px-1.5 py-0.5 rounded-md font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
+                                inc.paymentMethod === "efectivo"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                  : inc.paymentMethod === "tarjeta"
+                                  ? "bg-blue-100 text-blue-800 border-blue-200"
+                                  : "bg-purple-100 text-purple-800 border-purple-200"
+                              }`}
+                            >
+                              {inc.paymentMethod === "efectivo" && <Wallet className="w-3 h-3 shrink-0" />}
+                              {inc.paymentMethod === "tarjeta" && <CreditCard className="w-3 h-3 shrink-0" />}
+                              {inc.paymentMethod === "transferencia" && <Building className="w-3 h-3 shrink-0" />}
+                              <span>{inc.paymentMethod}</span>
                             </span>
-                            <span className="text-[10px] text-stone-400 font-medium truncate max-w-[100px]">
-                              {inc.paymentMethod === "efectivo" ? "Turno Actual" : "SPEI / Banco"}
+                            <span className="text-[10px] text-stone-500 font-medium mt-0.5">
+                              {inc.paymentMethod === "efectivo" ? "Caja Mostrador" : "Santander / SPEI"}
                             </span>
                           </div>
                         </td>
 
-                        {/* 9. Cajero */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle text-stone-800 font-bold whitespace-nowrap text-xs w-[90px]" title={inc.cashier}>
-                          <span className="truncate max-w-[85px] block font-bold">
+                        {/* 8. Cajero */}
+                        <td className="py-2 px-2 align-middle text-stone-800 font-bold whitespace-nowrap text-xs w-[85px]" title={inc.cashier}>
+                          <span className="truncate max-w-[85px] block font-bold text-[11px]">
                             {inc.cashier}
                           </span>
                         </td>
 
-                        {/* 10. Acciones */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle text-center whitespace-nowrap w-[95px]">
-                          <div className="flex items-center justify-center gap-1.5">
+                        {/* 9. Acciones */}
+                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[80px]">
+                          <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
                               onClick={() => handlePrintReceipt(inc)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer group"
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-[11px] rounded-lg shadow-2xs transition-all cursor-pointer group"
                               title="Imprimir Comprobante de Ingreso (80mm)"
                             >
-                              <Printer className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                              <span className="hidden sm:inline">Ticket</span>
+                              <Printer className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                              <span>Ticket</span>
                             </button>
 
                             <div className="inline-block text-left">
@@ -1729,10 +1721,10 @@ export default function IngresosPage() {
                                   e.stopPropagation();
                                   setActiveDropdown(activeDropdown === inc.id ? null : inc.id);
                                 }}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-stone-50 hover:bg-stone-100 active:scale-95 border border-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                                className="p-1 bg-stone-100 hover:bg-stone-200 active:scale-95 border border-stone-200 text-stone-700 rounded-lg text-xs transition-colors cursor-pointer"
+                                title="Más opciones"
                               >
-                                <span>Acciones</span>
-                                <ChevronDown className="w-3 h-3 text-stone-500" />
+                                <ChevronDown className="w-3.5 h-3.5 text-stone-500" />
                               </button>
 
                               {activeDropdown === inc.id && (

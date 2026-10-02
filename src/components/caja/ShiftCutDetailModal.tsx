@@ -232,7 +232,7 @@ Relevo: ${cut.outgoingCashier} ➔ ${cut.incomingCashier}
 ----------------------------------------
 (+) Fondo Inicial: ${formatCurrency(cut.initialFund)}
 (+) Ventas Efectivo: ${formatCurrency(cut.cashSales)}
-(-) Gastos/Retiros: ${formatCurrency(cut.totalExpenses)}
+${(cut.totalIncomes || 0) > 0 ? `(+) Entradas Efectivo/Cambio: ${formatCurrency(cut.totalIncomes || 0)}\n` : ""}(-) Gastos/Retiros: ${formatCurrency(cut.totalExpenses)}
 (=) Efectivo Esperado: ${formatCurrency(cut.expectedCash)}
 (=) Efectivo Contado: ${formatCurrency(cut.countedCash)}
 Dictamen: ${cut.difference === 0 ? "Cuadrada Exacta ($0.00)" : cut.difference > 0 ? `Sobrante +${formatCurrency(cut.difference)}` : `Faltante ${formatCurrency(cut.difference)}`}
@@ -401,7 +401,7 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
               </div>
               {(cut.totalIncomes || 0) > 0 && (
                 <div className="flex justify-between text-emerald-800 font-bold">
-                  <span>(+) Anticipos / Entradas Pedidos:</span>
+                  <span>(+) Entradas de Efectivo / Cambio:</span>
                   <span>+{formatCurrency(cut.totalIncomes || 0)}</span>
                 </div>
               )}
