@@ -6,7 +6,7 @@ import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { parseDateTimeSafe, getStoredShiftStartBoundary } from "@/lib/utils";
+import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc } from "@/lib/utils";
 
 export interface SimulatedSale {
   id: string;
@@ -295,14 +295,14 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
           const { data: dbSales, error: dbErr } = await supabase
             .from("sales")
-            .select("branch_id, total, payment_method, cashier, date")
+            .select("id, branch_id, total, payment_method, cashier, date, created_at")
             .gte("date", todayIso);
 
           if (!dbErr && dbSales && dbSales.length > 0) {
             const aggMap = new Map<string, { total: number; count: number; cash: number; card: number; transfer: number; lastCashier?: string }>();
             dbSales.forEach((s: any) => {
               const bId = s.branch_id || "branch-matriz";
-              const sTime = parseDateTimeSafe(s.date);
+              const sTime = parseDateTimeSafe(s.created_at || s.date);
               const shiftBoundary = getStoredShiftStartBoundary(bId);
               // Solo considerar ventas que pertenecen al turno actual (posteriores al corte del turno)
               if (shiftBoundary > 0 && sTime < shiftBoundary) {
@@ -326,7 +326,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
                 if (!agg) return b;
                 const dbTotal = agg.total;
                 const dbCount = agg.count;
-                if (dbTotal > (b.todaySales || 0) || dbCount > (b.todayTickets || 0)) {
+                if (dbTotal !== (b.todaySales || 0) || dbCount !== (b.todayTickets || 0)) {
                   changed = true;
                   return {
                     ...b,
@@ -360,6 +360,69 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               }
               return updated;
             });
+
+            // Sincronizar las ventas de Supabase en el POS local (master sales y current sales)
+            try {
+              const rawMaster = localStorage.getItem("brito_pos_master_sales");
+              const masterList: any[] = rawMaster ? JSON.parse(rawMaster) : [];
+              const masterMap = new Map<string, any>(masterList.map((s) => [s.id, s]));
+              let masterChanged = false;
+
+              dbSales.forEach((s: any) => {
+                if (!masterMap.has(s.id)) {
+                  masterChanged = true;
+                  const sTime = parseDateTimeSafe(s.created_at || s.date);
+                  masterMap.set(s.id, {
+                    id: s.id,
+                    date: formatDateTimeSafe(s.created_at || s.date),
+                    total: Number(s.total) || 0,
+                    paymentMethod: s.payment_method || "efectivo",
+                    cashier: s.cashier || "Cajero",
+                    branchId: s.branch_id || "branch-matriz",
+                    timestamp: sTime,
+                    createdAt: s.created_at || s.date,
+                    items: [
+                      {
+                        product: {
+                          id: `prod-${s.id}`,
+                          name: "Venta en mostrador",
+                          price: Number(s.total) || 0,
+                          category: "pan_dulce",
+                          stock: 99,
+                          image: "🥖",
+                        },
+                        quantity: 1,
+                      },
+                    ],
+                  });
+                }
+              });
+
+              if (masterChanged) {
+                const updatedMaster = Array.from(masterMap.values()).sort((a, b) => compareMovementsDesc(a, b));
+                localStorage.setItem("brito_pos_master_sales", JSON.stringify(updatedMaster));
+
+                const rawCurrent = localStorage.getItem("brito_pos_current_sales");
+                const currentList: any[] = rawCurrent ? JSON.parse(rawCurrent) : [];
+                const currentMap = new Map<string, any>(currentList.map((s) => [s.id, s]));
+                let currentChanged = false;
+
+                updatedMaster.forEach((s) => {
+                  if (!currentMap.has(s.id)) {
+                    currentMap.set(s.id, s);
+                    currentChanged = true;
+                  }
+                });
+
+                if (currentChanged) {
+                  const updatedCurrent = Array.from(currentMap.values()).sort((a, b) => compareMovementsDesc(a, b));
+                  localStorage.setItem("brito_pos_current_sales", JSON.stringify(updatedCurrent));
+                }
+
+                window.dispatchEvent(new Event("brito_sales_updated"));
+                window.dispatchEvent(new Event("brito_caja_updated"));
+              }
+            } catch {}
           }
         } catch {}
       } catch (err) {

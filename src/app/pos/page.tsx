@@ -840,13 +840,14 @@ export default function POSPage() {
         console.error("Error al sincronizar ventas en POS:", e);
       }
     };
+    handleSalesUpdated();
     window.addEventListener("brito_sales_updated", handleSalesUpdated);
     window.addEventListener("storage", handleSalesUpdated);
     return () => {
       window.removeEventListener("brito_sales_updated", handleSalesUpdated);
       window.removeEventListener("storage", handleSalesUpdated);
     };
-  }, [isAdmin]);
+  }, [isAdmin, activeBranch?.id]);
 
   // Sanitización de seguridad: eliminar registros corruptos o atípicos de localStorage
   useEffect(() => {
@@ -1065,18 +1066,17 @@ export default function POSPage() {
         setIsShiftLocked(true);
       }
 
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayStartTs = todayStart.getTime();
+
       // Obtener el inicio de turno más reciente y válido (del corte o inicio de turno guardado)
       const lastCutTs = lastCutInfo
         ? parseDateTimeSafe(lastCutInfo.timestamp || lastCutInfo.date || lastCutInfo.createdAt || lastCutInfo.cutTime)
         : 0;
-      let effectiveShiftStart = Number(localStorage.getItem("brito_current_shift_start_timestamp")) || 0;
-      if (lastCutTs > effectiveShiftStart) {
-        effectiveShiftStart = lastCutTs;
-        localStorage.setItem("brito_current_shift_start_timestamp", effectiveShiftStart.toString());
-      } else if (!effectiveShiftStart) {
-        effectiveShiftStart = Date.now();
-        localStorage.setItem("brito_current_shift_start_timestamp", effectiveShiftStart.toString());
-      }
+      // Si hubo corte hoy, el turno inició en ese corte; de lo contrario inicia al inicio del día de hoy
+      const effectiveShiftStart = lastCutTs >= todayStartTs ? lastCutTs : todayStartTs;
+      localStorage.setItem("brito_current_shift_start_timestamp", effectiveShiftStart.toString());
 
       // Sincronizar ventas del turno actual con ventana de tolerancia de 10 segundos
       const rawCurrent = localStorage.getItem("brito_pos_current_sales");
@@ -1274,6 +1274,7 @@ export default function POSPage() {
             payment_method,
             cashier,
             created_at,
+            branch_id,
             sale_items (
               product_id,
               product_name,
@@ -1293,6 +1294,7 @@ export default function POSPage() {
             total: Number(s.total),
             paymentMethod: (s.payment_method as any) || "efectivo",
             cashier: s.cashier || "Don Toño Brito",
+            branchId: s.branch_id || "branch-matriz",
             createdAt: s.created_at,
             timestamp: s.created_at ? new Date(s.created_at).getTime() : undefined,
             items: (s.sale_items || []).map((si: any) => ({
@@ -1309,7 +1311,7 @@ export default function POSPage() {
         }
 
         // Guardar ventas de Supabase y de ingresos en el historial maestro (brito_pos_master_sales)
-        // para reimpresión y consultas históricas SIN contaminar las ventas del turno en vivo (recentSalesList)
+        // y en las ventas activas del turno (brito_pos_current_sales)
         try {
           const rawMaster = localStorage.getItem("brito_pos_master_sales");
           const masterList: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
@@ -1338,6 +1340,7 @@ export default function POSPage() {
                 total: inc.amount,
                 paymentMethod: (inc.paymentMethod as any) || "efectivo",
                 cashier: inc.cashier || "Don Toño Brito",
+                branchId: inc.branchId || "branch-matriz",
                 customerName: inc.customerName,
                 createdAt: inc.timestamp,
                 timestamp: inc.timestamp ? new Date(inc.timestamp).getTime() : undefined,
@@ -1362,6 +1365,27 @@ export default function POSPage() {
             masterList.sort((a, b) => compareMovementsDesc(a, b));
             localStorage.setItem("brito_pos_master_sales", JSON.stringify(masterList));
           }
+
+          // Sincronizar también con las ventas del turno actual (brito_pos_current_sales)
+          const rawCurrent = localStorage.getItem("brito_pos_current_sales");
+          const currentList: Sale[] = rawCurrent ? JSON.parse(rawCurrent) : [];
+          const currentMap = new Map<string, Sale>(currentList.map((s) => [s.id, s]));
+          let currentChanged = false;
+
+          for (const s of masterList) {
+            if (!currentMap.has(s.id)) {
+              currentMap.set(s.id, s);
+              currentChanged = true;
+            }
+          }
+
+          if (currentChanged) {
+            const updatedCurrent = Array.from(currentMap.values()).sort((a, b) => compareMovementsDesc(a, b));
+            localStorage.setItem("brito_pos_current_sales", JSON.stringify(updatedCurrent));
+            setRecentSalesList(updatedCurrent);
+          }
+
+          window.dispatchEvent(new Event("brito_sales_updated"));
         } catch (e) {}
 
         // 3. Load cash expenses from Supabase
@@ -3037,28 +3061,34 @@ export default function POSPage() {
                   {isAdmin && showBranchDropdown && (
                     <div 
                       style={{ backgroundColor: "#21120b" }}
-                      className="absolute left-0 mt-2.5 w-[330px] sm:w-[380px] max-w-[calc(100vw-36px)] rounded-2xl shadow-2xl border-2 border-amber-600/80 p-3 sm:p-3.5 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-3"
+                      className="absolute left-0 mt-2.5 w-[380px] sm:w-[460px] max-w-[calc(100vw-24px)] rounded-2xl shadow-2xl border-2 border-amber-600/80 p-3.5 sm:p-4 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-3.5"
                     >
                       
                       {/* Cabecera del panel */}
                       <div className="flex items-center justify-between pb-2 border-b border-amber-900/60">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-950/60">
-                            <Store className="w-3.5 h-3.5" />
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-950/60">
+                            <Store className="w-4 h-4" />
                           </div>
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-wider text-amber-400 leading-tight">Red Panaderías Brito</p>
-                            <p className="text-xs font-black text-white leading-tight">Red de Sucursales</p>
+                            <p className="text-sm font-black text-white leading-tight">Red de Sucursales</p>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowBranchDropdown(false)}
-                          className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-colors text-xs font-bold cursor-pointer"
-                          title="Cerrar panel de sucursales"
-                        >
-                          ✕
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            EN VIVO
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowBranchDropdown(false)}
+                            className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-colors text-xs font-bold cursor-pointer"
+                            title="Cerrar panel de sucursales"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
 
                       {/* Lista de Sucursales con diseño de colores corporativos */}
@@ -3066,7 +3096,7 @@ export default function POSPage() {
                         <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
                           Seleccionar Tienda Activa:
                         </p>
-                        <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-0.5">
+                        <div className="space-y-2 max-h-[290px] overflow-y-auto pr-0.5">
                           {branches.map((b) => {
                             const isSelected = activeBranch?.id === b.id;
                             const isMatriz = b.id.includes("matriz");
@@ -3099,7 +3129,7 @@ export default function POSPage() {
                                 }}
                                 disabled={!isAdmin}
                                 style={{ backgroundColor: isSelected ? "#3a1e12" : "#28150d" }}
-                                className={`w-full text-left p-2.5 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                                className={`w-full text-left p-3 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
                                   isAdmin ? "cursor-pointer active:scale-98" : "cursor-default"
                                 } ${
                                   isSelected
@@ -3108,11 +3138,11 @@ export default function POSPage() {
                                 }`}
                               >
                                 <div className="flex items-center justify-between gap-1.5">
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border shrink-0 ${badgeColor}`}>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border shrink-0 ${badgeColor}`}>
                                       {b.code || "TIENDA"}
                                     </span>
-                                    <span className={`font-black text-xs truncate ${isSelected ? "text-white" : "text-stone-200"}`}>
+                                    <span className={`font-black text-sm truncate ${isSelected ? "text-white" : "text-stone-200"}`}>
                                       {b.name}
                                     </span>
                                   </div>
@@ -3122,16 +3152,21 @@ export default function POSPage() {
                                       Activa
                                     </span>
                                   ) : (
-                                    <span className="text-[10px] font-bold text-amber-400/80 hover:text-amber-300 shrink-0">
+                                    <span className="text-[11px] font-bold text-amber-400/80 hover:text-amber-300 shrink-0">
                                       Cambiar ➔
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center justify-between text-[10px] text-amber-200/80 pt-1 border-t border-amber-900/40">
-                                  <span className="truncate">👤 {b.currentShift?.cashier || b.manager || "En turno"}</span>
-                                  <span className="font-mono font-black text-amber-300 shrink-0">
-                                    {formatCurrency(b.todaySales)} ({b.todayTickets} tkts)
-                                  </span>
+                                <div className="flex items-center justify-between pt-1.5 border-t border-amber-900/40">
+                                  <span className="text-xs text-amber-200/90 truncate">👤 {b.currentShift?.cashier || b.manager || "En turno"}</span>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="font-mono font-black text-sm sm:text-base text-amber-300 drop-shadow-xs">
+                                      {formatCurrency(b.todaySales)}
+                                    </span>
+                                    <span className="text-xs font-black font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-500/40">
+                                      {b.todayTickets} tkts
+                                    </span>
+                                  </div>
                                 </div>
                               </button>
                             );
@@ -3139,42 +3174,64 @@ export default function POSPage() {
                         </div>
                       </div>
 
-                      {/* Resumen en vivo de la sucursal seleccionada y botón directo a sus ventas */}
+                      {/* Resumen en vivo de la sucursal seleccionada con números grandes y destacados */}
                       {activeBranch && (
-                        <div className="p-2.5 rounded-xl bg-amber-950/70 border border-amber-500/40 space-y-2">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-bold text-amber-300">Ventas hoy en {activeBranch.shortName || activeBranch.name}:</span>
-                            <span className="font-mono font-black text-emerald-400 text-xs">
-                              {formatCurrency(activeBranch.todaySales)}
+                        <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#2c1308] via-[#200d05] to-[#160803] border-2 border-amber-500/60 shadow-xl space-y-3 relative overflow-hidden">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                              Ventas Hoy en {activeBranch.shortName || activeBranch.name}:
+                            </span>
+                            <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/50 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              100% TIEMPO REAL
                             </span>
                           </div>
-                          <div className="flex items-center justify-between text-[10px] text-stone-300">
-                            <span>Tickets emitidos: <strong className="text-white">{activeBranch.todayTickets}</strong></span>
-                            <span>En gaveta: <strong className="text-amber-300">{formatCurrency(activeBranch.cashInDrawer)}</strong></span>
+
+                          {/* Número Principal Gigante */}
+                          <div className="text-3xl sm:text-4xl font-mono font-black text-emerald-400 tracking-tight drop-shadow-md">
+                            {formatCurrency(activeBranch.todaySales)}
                           </div>
+
+                          {/* Cuadrícula de 2 métricas principales con números grandes */}
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <div className="bg-black/40 border border-amber-900/60 rounded-xl p-2.5 flex flex-col">
+                              <span className="text-[11px] font-black uppercase tracking-wider text-amber-200/80">Tickets Emitidos</span>
+                              <span className="text-xl sm:text-2xl font-black font-mono text-white mt-0.5">
+                                {Math.max(currentShiftSales.length, activeBranch.todayTickets)}
+                              </span>
+                            </div>
+                            <div className="bg-black/40 border border-amber-900/60 rounded-xl p-2.5 flex flex-col">
+                              <span className="text-[11px] font-black uppercase tracking-wider text-amber-200/80">Efectivo en Gaveta</span>
+                              <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 mt-0.5">
+                                {formatCurrency(activeBranch.cashInDrawer)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Botón Grande de 1 Toque para Ver y Reimprimir Tickets */}
                           <button
                             type="button"
                             onClick={() => {
                               setShowRecentSales(true);
                               setShowBranchDropdown(false);
                             }}
-                            className="w-full py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-stone-950 font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 hover:brightness-110 active:scale-[0.98] text-stone-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-amber-950/60 transition-all cursor-pointer"
                           >
-                            <Receipt className="w-3.5 h-3.5" />
-                            <span>Ver Historial de Ventas / Tickets ({currentShiftSales.length}) ➔</span>
+                            <Receipt className="w-5 h-5 text-stone-950 shrink-0" />
+                            <span>Ver Historial de Ventas / Tickets ({Math.max(currentShiftSales.length, activeBranch.todayTickets)}) ➔</span>
                           </button>
                         </div>
                       )}
 
                       {/* Botón inferior para cerrar cuando termine */}
                       <div className="pt-2 border-t border-amber-900/60 flex items-center justify-between">
-                        <span className="text-[10px] text-amber-300/70 font-medium">
+                        <span className="text-[11px] text-amber-300/80 font-medium">
                           Sucursal sincronizada para ventas
                         </span>
                         <button
                           type="button"
                           onClick={() => setShowBranchDropdown(false)}
-                          className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-[11px] font-black transition-all shadow-xs active:scale-95 cursor-pointer"
+                          className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-black transition-all shadow-xs active:scale-95 cursor-pointer"
                         >
                           Listo ✓
                         </button>
@@ -3195,13 +3252,13 @@ export default function POSPage() {
                 <button
                   type="button"
                   onClick={() => setShowRecentSales(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/60 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/60 text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer active:scale-95"
                   title="Ver ventas y tickets del turno"
                 >
-                  <Receipt className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="hidden sm:inline">Ventas</span>
-                  <span className="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded-md font-mono text-[11px] font-black">
-                    {currentShiftSales.length}
+                  <Receipt className="w-4 h-4 text-amber-400" />
+                  <span className="hidden sm:inline font-bold">Ventas</span>
+                  <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-mono text-xs sm:text-sm font-black">
+                    {Math.max(currentShiftSales.length, activeBranch?.todayTickets || 0)}
                   </span>
                 </button>
                 <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all ${

@@ -1173,7 +1173,7 @@ export default function GastosPage() {
 
       {/* ── KPI Cards Grid ── */}
       {/* ── KPI Cards Grid ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4">
         {/* Gastos de Hoy */}
         <div
           onClick={() => setFiltroPeriodo(filtroPeriodo === "dia" ? "todos" : "dia")}
@@ -1605,20 +1605,20 @@ export default function GastosPage() {
 
         {/* ── MODO 1: TABLA FLUIDA CON COLUMNA DE ACCIONES FIJA (STICKY) ── */}
         {viewMode === "tabla" ? (
-          <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-stone-200 scrollbar-track-stone-50">
-            <table className="w-full text-left border-collapse min-w-[940px] lg:min-w-full table-auto">
-              <thead className="bg-stone-100/90 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] lg:text-xs select-none sticky top-0 z-10">
+          <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-stone-300 scrollbar-track-stone-100/60 pb-1">
+            <table className="w-full text-left border-collapse min-w-[1220px] table-auto">
+              <thead className="bg-stone-100/95 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] lg:text-xs select-none sticky top-0 z-10 backdrop-blur-xs">
                 <tr>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Folio</th>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Fecha</th>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Sucursal</th>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Categoría</th>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle min-w-[150px] max-w-[260px]">Concepto / Motivo</th>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle text-right whitespace-nowrap">Monto</th>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle text-center whitespace-nowrap">Forma de Pago</th>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle min-w-[130px] max-w-[220px]">Cuenta / Origen</th>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">Cajero</th>
-                  <th className="py-3 px-3 sm:px-3.5 align-middle text-center whitespace-nowrap sticky right-0 bg-stone-100 z-20 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">Acciones</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[110px] min-w-[100px]">Folio</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[130px] min-w-[120px]">Fecha</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[160px] min-w-[150px]">Sucursal</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[185px] min-w-[175px]">Categoría</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle min-w-[180px] max-w-[280px]">Concepto / Motivo</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle text-right whitespace-nowrap w-[125px] min-w-[115px]">Monto</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[135px] min-w-[125px]">Forma de Pago</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[185px] min-w-[175px]">Cuenta / Origen</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle whitespace-nowrap w-[150px] min-w-[140px]">Cajero</th>
+                  <th className="py-3.5 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[115px] min-w-[105px] sticky right-0 bg-stone-100 z-20 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
@@ -1649,12 +1649,12 @@ export default function GastosPage() {
                         }`}
                       >
                         {/* 1. Folio */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle font-mono tabular-nums font-black text-xs sm:text-sm text-stone-900 whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle font-mono tabular-nums font-black text-xs sm:text-sm text-stone-900 whitespace-nowrap w-[110px] min-w-[100px]">
                           #{g.id}
                         </td>
 
                         {/* 2. Fecha */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle whitespace-nowrap w-[130px] min-w-[120px]">
                           {isHoy ? (
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className={`font-mono font-black text-xs ${isAnulado ? "line-through text-stone-400" : "text-stone-900"}`}>{timeStr || "Hoy"}</span>
@@ -1679,7 +1679,7 @@ export default function GastosPage() {
                         </td>
 
                         {/* 3. Sucursal */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle whitespace-nowrap w-[160px] min-w-[150px]">
                           <span className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200/80">
                             <Store className="w-3.5 h-3.5 text-brito-orange-600 shrink-0" />
                             <span>{(g.branchName || "Matriz (Centro)").replace("Sucursal ", "")}</span>
@@ -1687,7 +1687,7 @@ export default function GastosPage() {
                         </td>
 
                         {/* 4. Categoría */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle whitespace-nowrap w-[185px] min-w-[175px]">
                           <span
                             className={`px-2.5 py-1 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 border ${
                               isAnulado
@@ -1701,7 +1701,7 @@ export default function GastosPage() {
                         </td>
 
                         {/* 5. Concepto / Motivo */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle min-w-[150px] max-w-[260px]">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle min-w-[180px] max-w-[280px]">
                           <div className={isAnulado ? "line-through text-stone-500" : ""}>
                             <ExpandableConceptText text={g.description} maxChars={45} />
                           </div>
@@ -1718,14 +1718,14 @@ export default function GastosPage() {
                         </td>
 
                         {/* 6. Monto */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-right font-mono tabular-nums font-black text-sm sm:text-base whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-right font-mono tabular-nums font-black text-sm sm:text-base whitespace-nowrap w-[125px] min-w-[115px]">
                           <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700"}>
                             -{formatCurrency(g.amount)}
                           </span>
                         </td>
 
                         {/* 7. Forma de Pago */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-center whitespace-nowrap">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[135px] min-w-[125px]">
                           <span
                             className={`px-2.5 py-1 rounded-lg font-black text-[11px] uppercase inline-flex items-center gap-1.5 border ${
                               g.paymentMethod === "efectivo"
@@ -1742,18 +1742,18 @@ export default function GastosPage() {
                           </span>
                         </td>
 
-                        {/* 8. Origen / Cuenta (Sin truncamiento forzado; muestra el texto completo) */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-stone-800 font-bold text-xs sm:text-sm whitespace-normal min-w-[130px] max-w-[220px] leading-tight" title={g.accountOrigin}>
+                        {/* 8. Origen / Cuenta */}
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-stone-800 font-bold text-xs sm:text-sm whitespace-nowrap w-[185px] min-w-[175px]" title={g.accountOrigin}>
                           {g.accountOrigin}
                         </td>
 
                         {/* 9. Cajero */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-stone-800 font-black whitespace-nowrap text-xs sm:text-sm">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-stone-800 font-black whitespace-nowrap text-xs sm:text-sm w-[150px] min-w-[140px] truncate" title={g.cashier}>
                           {g.cashier}
                         </td>
 
                         {/* 10. Acciones (Sticky para nunca perderse al hacer scroll horizontal) */}
-                        <td className="py-2.5 sm:py-3 px-3 sm:px-3.5 align-middle text-center whitespace-nowrap sticky right-0 bg-white group-hover:bg-stone-50 z-10 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-100">
+                        <td className="py-2.5 sm:py-3 px-3 sm:px-4 align-middle text-center whitespace-nowrap w-[115px] min-w-[105px] sticky right-0 bg-white group-hover:bg-stone-50 z-10 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-100">
                           <div className="relative inline-block text-left">
                             <button
                               type="button"
