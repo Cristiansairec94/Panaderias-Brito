@@ -4,18 +4,12 @@ import React, { useState, useEffect } from "react";
 import {
   Trash2,
   AlertTriangle,
-  Building2,
   Store,
   MapPin,
-  ShieldCheck,
-  Wallet,
-  Receipt,
   X,
-  CheckCircle2,
   ChevronDown
 } from "lucide-react";
 import { Branch } from "@/types";
-import { formatCurrency } from "@/lib/utils";
 
 interface DeleteBranchModalProps {
   isOpen: boolean;
@@ -151,21 +145,6 @@ export default function DeleteBranchModal({
                       </span>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-stone-200/70 text-xs">
-                <div className="p-2 rounded-xl bg-white border border-stone-200/70">
-                  <span className="text-[10px] font-bold text-stone-400 uppercase block">Encargado</span>
-                  <span className="font-black text-stone-800 block truncate mt-0.5">
-                    {currentBranch.manager}
-                  </span>
-                </div>
-                <div className="p-2 rounded-xl bg-white border border-stone-200/70">
-                  <span className="text-[10px] font-bold text-stone-400 uppercase block">Efectivo en Caja</span>
-                  <span className="font-black text-emerald-600 block mt-0.5">
-                    {formatCurrency(currentBranch.cashInDrawer)}
-                  </span>
                 </div>
               </div>
             </div>
