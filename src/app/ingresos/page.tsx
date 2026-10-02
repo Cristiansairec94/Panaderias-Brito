@@ -1578,8 +1578,8 @@ export default function IngresosPage() {
                   <th className="py-2 px-1.5 sm:px-2 align-middle text-right whitespace-nowrap w-[78px]">Monto</th>
                   <th className="py-2 px-1.5 sm:px-2 align-middle text-center whitespace-nowrap w-[75px]">Pago</th>
                   <th className="py-2 px-1.5 sm:px-2 align-middle whitespace-nowrap w-[110px]">Cuenta / Destino</th>
-                  <th className="py-2 px-1.5 sm:px-2 align-middle whitespace-nowrap w-[80px]">Cajero</th>
-                  <th className="py-2 px-1.5 sm:px-2 align-middle text-center whitespace-nowrap w-[75px]">Acciones</th>
+                  <th className="py-2 px-1.5 sm:px-2 align-middle whitespace-nowrap min-w-[110px]">Cajero</th>
+                  <th className="py-2 px-1.5 sm:px-2 align-middle text-center whitespace-nowrap w-[75px] sticky right-0 bg-stone-100 z-20 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
@@ -1703,15 +1703,15 @@ export default function IngresosPage() {
                           </div>
                         </td>
 
-                        {/* 9. Cajero */}
-                        <td className="py-2 px-1.5 sm:px-2 align-middle text-stone-800 font-bold whitespace-nowrap text-xs w-[80px]" title={inc.cashier}>
-                          <span className="truncate max-w-[78px] block font-bold text-[11px]">
+                        {/* 9. Cajero (COMPLETO) */}
+                        <td className="py-2 px-1.5 sm:px-2 align-middle text-stone-900 font-bold whitespace-nowrap text-xs min-w-[110px]" title={inc.cashier}>
+                          <span className="block font-bold text-xs text-stone-900 whitespace-nowrap">
                             {inc.cashier}
                           </span>
                         </td>
 
-                        {/* 10. Acciones */}
-                        <td className="py-2 px-1.5 sm:px-2 align-middle text-center whitespace-nowrap w-[75px]">
+                        {/* 10. Acciones (STICKY RIGHT) */}
+                        <td className="py-2 px-1.5 sm:px-2 align-middle text-center whitespace-nowrap w-[75px] sticky right-0 bg-white group-hover:bg-emerald-50/50 z-10 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"

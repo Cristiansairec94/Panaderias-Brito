@@ -195,16 +195,16 @@ export interface GastoCategoriaDef {
 }
 
 const GASTO_CATEGORIAS: GastoCategoriaDef[] = [
-  { id: "insumos", label: "Materia Prima & Harinas", icon: "🥖", bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-200" },
-  { id: "gas_lp", label: "Gas LP para Hornos", icon: "🔥", bg: "bg-orange-50", text: "text-orange-800", border: "border-orange-200" },
-  { id: "nomina", label: "Sueldos & Nómina", icon: "💼", bg: "bg-purple-50", text: "text-purple-800", border: "border-purple-200" },
-  { id: "servicios", label: "Luz, Agua e Internet", icon: "⚡", bg: "bg-cyan-50", text: "text-cyan-800", border: "border-cyan-200" },
-  { id: "empaques", label: "Bolsas Kraft & Empaques", icon: "📦", bg: "bg-stone-100", text: "text-stone-800", border: "border-stone-200" },
-  { id: "mantenimiento", label: "Mantenimiento & Refacciones", icon: "🛠️", bg: "bg-blue-50", text: "text-blue-800", border: "border-blue-200" },
-  { id: "gasolina", label: "Gasolina & Repartos", icon: "⛽", bg: "bg-yellow-50", text: "text-yellow-800", border: "border-yellow-200" },
-  { id: "proveedores", label: "Pago a Proveedores", icon: "🤝", bg: "bg-emerald-50", text: "text-emerald-800", border: "border-emerald-200" },
-  { id: "retiro_dueno", label: "Retiro Don Toño / Socios", icon: "🪙", bg: "bg-rose-50", text: "text-rose-800", border: "border-rose-200" },
-  { id: "otros", label: "Gastos Menores / Varios", icon: "🧾", bg: "bg-stone-50", text: "text-stone-700", border: "border-stone-200" },
+  { id: "insumos", label: "Materia Prima & Harinas", shortLabel: "Insumos", icon: "🥖", bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-200" },
+  { id: "gas_lp", label: "Gas LP para Hornos", shortLabel: "Gas LP", icon: "🔥", bg: "bg-orange-50", text: "text-orange-800", border: "border-orange-200" },
+  { id: "nomina", label: "Sueldos & Nómina", shortLabel: "Nómina", icon: "💼", bg: "bg-purple-50", text: "text-purple-800", border: "border-purple-200" },
+  { id: "servicios", label: "Luz, Agua e Internet", shortLabel: "Servicios", icon: "⚡", bg: "bg-cyan-50", text: "text-cyan-800", border: "border-cyan-200" },
+  { id: "empaques", label: "Bolsas Kraft & Empaques", shortLabel: "Empaques", icon: "📦", bg: "bg-stone-100", text: "text-stone-800", border: "border-stone-200" },
+  { id: "mantenimiento", label: "Mantenimiento & Refacciones", shortLabel: "Mantenimiento", icon: "🛠️", bg: "bg-blue-50", text: "text-blue-800", border: "border-blue-200" },
+  { id: "gasolina", label: "Gasolina & Repartos", shortLabel: "Gasolina", icon: "⛽", bg: "bg-yellow-50", text: "text-yellow-800", border: "border-yellow-200" },
+  { id: "proveedores", label: "Pago a Proveedores", shortLabel: "Proveedores", icon: "🤝", bg: "bg-emerald-50", text: "text-emerald-800", border: "border-emerald-200" },
+  { id: "retiro_dueno", label: "Retiro Don Toño / Socios", shortLabel: "Don Toño", icon: "🪙", bg: "bg-rose-50", text: "text-rose-800", border: "border-rose-200" },
+  { id: "otros", label: "Gastos Menores / Varios", shortLabel: "Varios", icon: "🧾", bg: "bg-stone-50", text: "text-stone-700", border: "border-stone-200" },
 ];
 
 const CUENTAS_ORIGEN = [
@@ -588,6 +588,7 @@ export default function GastosPage() {
       return {
         id: "otros",
         label: "Gastos Menores / Varios",
+        shortLabel: "Varios",
         icon: "🧾",
         bg: "bg-stone-50",
         text: "text-stone-700",
@@ -596,12 +597,13 @@ export default function GastosPage() {
     }
     const catLower = String(catIdOrLabel).toLowerCase();
     const found = GASTO_CATEGORIAS.find(
-      (c) => c.id === catIdOrLabel || c.label.toLowerCase() === catLower
+      (c) => c.id === catIdOrLabel || c.label.toLowerCase() === catLower || (c.shortLabel && c.shortLabel.toLowerCase() === catLower)
     );
     return (
       found || {
         id: "otros",
         label: String(catIdOrLabel) || "Otros Gastos",
+        shortLabel: String(catIdOrLabel) || "Gasto",
         icon: "🧾",
         bg: "bg-stone-50",
         text: "text-stone-700",
@@ -1610,15 +1612,15 @@ export default function GastosPage() {
             <table className="w-full text-left border-collapse table-auto">
               <thead className="bg-stone-100/95 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] select-none sticky top-0 z-10 backdrop-blur-xs">
                 <tr>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[75px]">Folio</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[70px]">Folio</th>
                   <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[75px]">Fecha</th>
                   <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[80px]">Sucursal</th>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[95px]">Categoría</th>
-                  <th className="py-2.5 px-2 align-middle min-w-[120px]">Concepto</th>
-                  <th className="py-2.5 px-2 align-middle text-right whitespace-nowrap w-[85px]">Monto</th>
-                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[95px]">Pago / Origen</th>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[85px]">Cajero</th>
-                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[80px]">Acciones</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[90px]">Categoría</th>
+                  <th className="py-2.5 px-2 align-middle min-w-[120px] max-w-[190px]">Concepto</th>
+                  <th className="py-2.5 px-2 align-middle text-right whitespace-nowrap w-[80px]">Monto</th>
+                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[90px]">Pago / Origen</th>
+                  <th className="py-2.5 px-2.5 align-middle whitespace-nowrap min-w-[115px]">Cajero</th>
+                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[85px] sticky right-0 bg-stone-100 z-20 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
@@ -1649,8 +1651,10 @@ export default function GastosPage() {
                         }`}
                       >
                         {/* 1. Folio */}
-                        <td className="py-2 px-2 align-middle font-mono tabular-nums font-black text-xs text-stone-900 whitespace-nowrap w-[75px]">
-                          #{g.id}
+                        <td className="py-2 px-2 align-middle font-mono tabular-nums font-black text-xs text-stone-900 whitespace-nowrap w-[70px]">
+                          <span className="bg-stone-100 border border-stone-200/90 px-1.5 py-0.5 rounded text-[11px]">
+                            #{g.id}
+                          </span>
                         </td>
 
                         {/* 2. Fecha */}
@@ -1687,7 +1691,7 @@ export default function GastosPage() {
                         </td>
 
                         {/* 4. Categoría */}
-                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[95px]">
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[90px]">
                           <span
                             className={`px-1.5 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 border ${
                               isAnulado
@@ -1697,17 +1701,17 @@ export default function GastosPage() {
                             title={g.categoryLabel || catInfo.label}
                           >
                             <span className="text-[10px]">{catInfo.icon}</span>
-                            <span className="truncate max-w-[85px]">{catInfo.label || "Gasto"}</span>
+                            <span>{catInfo.shortLabel || catInfo.label || "Gasto"}</span>
                           </span>
                         </td>
 
                         {/* 5. Concepto / Motivo */}
-                        <td className="py-2 px-2 align-middle min-w-[120px]">
-                          <div className={`truncate max-w-[160px] font-bold text-xs text-stone-900 ${isAnulado ? "line-through text-stone-500" : ""}`} title={g.description}>
+                        <td className="py-2 px-2 align-middle min-w-[120px] max-w-[190px]">
+                          <div className={`truncate max-w-[185px] font-bold text-xs text-stone-900 ${isAnulado ? "line-through text-stone-500" : ""}`} title={g.description}>
                             {g.description}
                           </div>
                           {g.supplier && (
-                            <div className="text-[10px] text-stone-500 truncate max-w-[160px]" title={g.supplier}>
+                            <div className="text-[10px] text-stone-500 truncate max-w-[185px]" title={g.supplier}>
                               Prov: <strong className="text-stone-700 font-semibold">{g.supplier}</strong>
                             </div>
                           )}
@@ -1719,14 +1723,14 @@ export default function GastosPage() {
                         </td>
 
                         {/* 6. Monto */}
-                        <td className="py-2 px-2 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[85px]">
+                        <td className="py-2 px-2 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[80px]">
                           <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700"}>
                             -{formatCurrency(g.amount)}
                           </span>
                         </td>
 
                         {/* 7. Forma de Pago y Origen */}
-                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[95px]">
+                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[90px]">
                           <div className="inline-flex flex-col items-center leading-tight">
                             <span
                               className={`px-1.5 py-0.5 rounded-md font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
@@ -1740,7 +1744,7 @@ export default function GastosPage() {
                               {g.paymentMethod === "efectivo" && <Wallet className="w-3 h-3 shrink-0" />}
                               {g.paymentMethod === "tarjeta" && <CreditCard className="w-3 h-3 shrink-0" />}
                               {g.paymentMethod === "transferencia" && <Building className="w-3 h-3 shrink-0" />}
-                              <span>{g.paymentMethod}</span>
+                              <span>{g.paymentMethod === "transferencia" ? "SPEI" : g.paymentMethod}</span>
                             </span>
                             <span className="text-[10px] text-stone-500 font-medium mt-0.5 truncate max-w-[90px]" title={g.accountOrigin}>
                               {g.accountOrigin.replace(/\s*\(.*\)/, "")}
@@ -1748,15 +1752,15 @@ export default function GastosPage() {
                           </div>
                         </td>
 
-                        {/* 8. Cajero */}
-                        <td className="py-2 px-2 align-middle text-stone-800 font-bold whitespace-nowrap text-xs w-[85px]" title={g.cashier}>
-                          <span className="truncate max-w-[85px] block font-bold text-[11px]">
+                        {/* 8. Cajero (COMPLETO, sin truncar) */}
+                        <td className="py-2 px-2.5 align-middle text-stone-900 font-bold whitespace-nowrap text-xs min-w-[115px]" title={g.cashier}>
+                          <span className="block font-bold text-xs text-stone-900 whitespace-nowrap">
                             {g.cashier}
                           </span>
                         </td>
 
-                        {/* 10. Acciones */}
-                        <td className="py-2 px-2 sm:px-2.5 align-middle text-center whitespace-nowrap w-[80px]">
+                        {/* 9. Acciones (STICKY RIGHT para que NUNCA se oculte o desborde) */}
+                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[85px] sticky right-0 bg-white group-hover:bg-amber-50/50 z-10 shadow-[-6px_0_10px_rgba(0,0,0,0.03)] border-l border-stone-200/80">
                           <div className="relative inline-block text-left">
                             <button
                               type="button"
