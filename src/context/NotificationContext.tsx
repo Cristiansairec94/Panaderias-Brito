@@ -622,6 +622,7 @@ export function findShiftCutForNotification(notif: FBNotification): ShiftCutReco
 
 interface NotificationContextType {
   notifications: FBNotification[];
+  allNotifications?: FBNotification[];
   unreadCount: number;
   soundEnabled: boolean;
   nativePermission: NotificationPermission;
@@ -646,6 +647,24 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 const STORAGE_NOTIFS_KEY = "brito_notifications";
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  // Conectar con el usuario actual y sucursal activa
+  let authContext: any = null;
+  let branchContext: any = null;
+  try {
+    authContext = useAuth();
+  } catch (e) {}
+  try {
+    branchContext = useBranch();
+  } catch (e) {}
+
+  const user: AppUser | null = authContext?.user || null;
+  const currentBranch = branchContext?.currentBranch || null;
+
+  const userRef = useRef(user);
+  userRef.current = user;
+  const currentBranchRef = useRef(currentBranch);
+  currentBranchRef.current = currentBranch;
+
   const [notifications, setNotifications] = useState<FBNotification[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -664,6 +683,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 const enriched = findShiftCutForNotification(item);
                 if (enriched) {
                   return { ...item, shiftCutData: enriched, cutId: enriched.id };
+                }
+              }
+              // Retro-compatibilidad: enriquecer pedidos antiguos con datos de sucursal
+              if (item.category === "pedidos" && (!item.branchId || !item.operatingBranchId)) {
+                const order = findOrderForNotification(item);
+                if (order) {
+                  return {
+                    ...item,
+                    branchId: item.branchId || order.branchId,
+                    branchName: item.branchName || order.branchName,
+                    operatingBranchId: item.operatingBranchId || order.operatingBranchId,
+                    operatingBranchName: item.operatingBranchName || order.operatingBranchName,
+                  };
                 }
               }
               return item;
@@ -737,18 +769,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setNativePermission(perm);
       if (perm === "granted") {
         try {
+          const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
           triggerNativeNotification({
             id: `welcome-${Date.now()}`,
             senderName: "🥖 Panadería Brito",
             senderAvatar: "🥖",
-            badgeIcon: "dinero",
-            title: "Avisos de Turnos y Pedidos",
-            highlightText: "¡Notificaciones activas en tu celular!",
-            description: "Te avisaremos de inmediato cada corte de caja (si cuadró o no) y nuevos pedidos.",
+            badgeIcon: isAdmin ? "dinero" : "pastel",
+            title: isAdmin ? "Avisos de Turnos y Pedidos" : "Avisos de Pedidos en Sucursal",
+            highlightText: "¡Notificaciones activas en tu dispositivo!",
+            description: isAdmin
+              ? "Te avisaremos de inmediato cada corte de caja (si cuadró o no) y pedidos de todas las sucursales."
+              : `Te avisaremos de inmediato cuando se levante o entregue un pedido en tu sucursal (${user?.assignedBranchName || "Mostrador"}).`,
             timeAgo: "Ahora",
             group: "recientes",
             read: false,
-            category: "caja",
+            category: isAdmin ? "caja" : "pedidos",
           });
         } catch (e) {}
       }
@@ -758,7 +793,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // Notificaciones filtradas según el rol y sucursal del usuario
+  const visibleNotifications = useMemo(() => {
+    return notifications.filter((notif) => isNotificationVisibleForUser(notif, user, currentBranch));
+  }, [notifications, user, currentBranch]);
+
+  // Conteo de no leídas calculado exclusivamente sobre las notificaciones visibles para el usuario
+  const unreadCount = useMemo(() => {
+    return visibleNotifications.filter((n) => !n.read).length;
+  }, [visibleNotifications]);
 
   const persistNotifs = (list: FBNotification[]) => {
     if (typeof window !== "undefined") {
@@ -804,10 +847,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         return updated;
       });
 
-      // Efectos inmediatos en el celular
-      playChime();
-      setActiveToast(remoteNotif);
-      triggerNativeNotification(remoteNotif);
+      // Efectos inmediatos en el celular SOLO si la notificación es visible para este usuario
+      const isVisible = isNotificationVisibleForUser(remoteNotif, userRef.current, currentBranchRef.current);
+      if (isVisible) {
+        playChime();
+        setActiveToast(remoteNotif);
+        triggerNativeNotification(remoteNotif);
+      }
     });
 
     const unsubStatus = realtimeHub.onStatusChange((status) => {
@@ -842,14 +888,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       return updated;
     });
 
-    // Reproducir sonido y mostrar banner flotante visible
-    playChime();
-    setActiveToast(fullNotif);
-    triggerNativeNotification(fullNotif);
-
     // Transmitir en vivo por WebSocket a los demás celulares/computadoras del negocio
     if (realtimeHub.broadcastNotification) {
       realtimeHub.broadcastNotification(fullNotif);
+    }
+
+    // Reproducir sonido y mostrar banner flotante visible SOLO si es visible para este usuario
+    const isVisible = isNotificationVisibleForUser(fullNotif, user, currentBranch);
+    if (isVisible) {
+      playChime();
+      setActiveToast(fullNotif);
+      triggerNativeNotification(fullNotif);
     }
   };
 
@@ -881,7 +930,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const markAllAsRead = () => {
     playChime();
     setNotifications((prev) => {
-      const updated = prev.map((n) => ({ ...n, read: true }));
+      const visibleIds = new Set(visibleNotifications.map((n) => n.id));
+      const updated = prev.map((n) => (visibleIds.has(n.id) ? { ...n, read: true } : n));
       persistNotifs(updated);
       return updated;
     });
@@ -896,8 +946,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   };
 
   const clearAll = () => {
-    setNotifications([]);
-    persistNotifs([]);
+    setNotifications((prev) => {
+      // Limpiar únicamente las notificaciones visibles para el usuario actual
+      const visibleIds = new Set(visibleNotifications.map((n) => n.id));
+      const updated = prev.filter((n) => !visibleIds.has(n.id));
+      persistNotifs(updated);
+      return updated;
+    });
   };
 
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<CustomOrder | null>(null);
@@ -956,7 +1011,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   return (
     <NotificationContext.Provider
       value={{
-        notifications,
+        notifications: visibleNotifications,
+        allNotifications: notifications,
         unreadCount,
         soundEnabled,
         nativePermission,

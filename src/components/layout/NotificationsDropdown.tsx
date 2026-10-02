@@ -25,6 +25,7 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { useNotifications, FBNotification, findShiftCutForNotification } from "@/context/NotificationContext";
+import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/lib/utils";
 
 // Graphic illustration for Flour Sack matching user mockup
@@ -107,6 +108,9 @@ export default function NotificationsDropdown() {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
 
+  const { user } = useAuth();
+  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+
   const {
     notifications,
     unreadCount,
@@ -132,6 +136,12 @@ export default function NotificationsDropdown() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin && activeTab === "cortes") {
+      setActiveTab("all");
+    }
+  }, [isAdmin, activeTab]);
 
   const cortesCount = notifications.filter((n) => n.category === "caja").length;
   const pedidosCount = notifications.filter((n) => n.category === "pedidos").length;
@@ -191,9 +201,22 @@ export default function NotificationsDropdown() {
 
             {/* Title & Actions Row */}
             <div className="flex items-center justify-between">
-              <h3 className="text-xl sm:text-[22px] font-bold text-stone-900 tracking-tight">
-                Avisos & Notificaciones
-              </h3>
+              <div>
+                <h3 className="text-xl sm:text-[22px] font-bold text-stone-900 tracking-tight">
+                  Avisos & Notificaciones
+                </h3>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {isAdmin ? (
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                      🛡️ Control Total (Todas las sucursales y cortes)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                      📍 Sucursal {user?.assignedBranchName || "Asignada"}
+                    </span>
+                  )}
+                </div>
+              </div>
 
               <div className="flex items-center gap-1">
                 {/* 3-Dots Settings Menu (Preserving Sound & Options functionality) */}
@@ -274,18 +297,20 @@ export default function NotificationsDropdown() {
                 Todas ({notifications.length})
               </button>
 
-              {/* Cierres de Turno Pill */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("cortes")}
-                className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
-                  activeTab === "cortes"
-                    ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
-                    : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                }`}
-              >
-                🏁 Cierres ({cortesCount})
-              </button>
+              {/* Cierres de Turno Pill - Exclusivo Administrador */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("cortes")}
+                  className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                    activeTab === "cortes"
+                      ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
+                      : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                  }`}
+                >
+                  🏁 Cierres ({cortesCount})
+                </button>
+              )}
 
               {/* Pedidos Pill */}
               <button

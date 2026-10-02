@@ -46,6 +46,14 @@ export default function MobileBottomNav() {
     clearAll,
   } = useNotifications();
 
+  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+
+  useEffect(() => {
+    if (!isAdmin && activeTab === "cortes") {
+      setActiveTab("all");
+    }
+  }, [isAdmin, activeTab]);
+
   // Si no hay usuario logueado, no mostrar la barra
   if (!user) return null;
 
@@ -194,17 +202,19 @@ export default function MobileBottomNav() {
                 >
                   Todas ({notifications.length})
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("cortes")}
-                  className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
-                    activeTab === "cortes"
-                      ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
-                      : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
-                  }`}
-                >
-                  🏁 Cierres ({cortesCount})
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("cortes")}
+                    className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                      activeTab === "cortes"
+                        ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
+                        : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                    }`}
+                  >
+                    🏁 Cierres ({cortesCount})
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setActiveTab("pedidos")}

@@ -824,6 +824,11 @@ export default function PedidosPage() {
       highlightText: order.orderNumber,
       category: "pedidos",
       badgeIcon: "pastel",
+      orderId: order.id,
+      branchId: order.branchId,
+      branchName: order.branchName,
+      operatingBranchId: order.operatingBranchId,
+      operatingBranchName: order.operatingBranchName,
     });
   };
 
@@ -844,6 +849,11 @@ export default function PedidosPage() {
           highlightText: order.orderNumber,
           category: "pedidos",
           badgeIcon: "pastel",
+          orderId: order.id,
+          branchId: order.branchId,
+          branchName: order.branchName,
+          operatingBranchId: order.operatingBranchId,
+          operatingBranchName: order.operatingBranchName,
         });
       }
     } else {
@@ -875,6 +885,11 @@ export default function PedidosPage() {
         highlightText: order.orderNumber,
         category: "pedidos",
         badgeIcon: "pastel",
+        orderId: order.id,
+        branchId: order.branchId,
+        branchName: order.branchName,
+        operatingBranchId: order.operatingBranchId,
+        operatingBranchName: order.operatingBranchName,
       });
     }
   };
