@@ -13,6 +13,8 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     phone: "55 1234 5678",
     branchId: "branch-matriz",
     branchName: "Sucursal Matriz (Centro)",
+    operatingBranchId: "branch-matriz",
+    operatingBranchName: "Sucursal Matriz (Centro)",
     description: "Pastel 3 Leches relleno de durazno, 50 personas, temático de XV años (flores lilas)",
     items: [
       {
@@ -64,6 +66,8 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     phone: "55 8765 4321",
     branchId: "branch-benito",
     branchName: "Sucursal San Benito (Mercado)",
+    operatingBranchId: "branch-benito",
+    operatingBranchName: "Sucursal San Benito (Mercado)",
     description: "100 piezas de mini cuernitos rellenos de jamón y queso para evento escolar matutino",
     items: [
       {
@@ -105,9 +109,11 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     customerId: "cli-1",
     customerName: "Familia Brito (Don Toño)",
     phone: "55 9988 7766",
-    branchId: "branch-flores",
-    branchName: "Sucursal Las Flores (Plaza)",
-    description: "Pastel Mil Hojas de Chocolate y Café con nuez garapiñada para cumpleaños familiar",
+    branchId: "branch-benito",
+    branchName: "Sucursal San Benito (Mercado)",
+    operatingBranchId: "branch-flores",
+    operatingBranchName: "Sucursal Las Flores (Plaza)",
+    description: "Pastel Mil Hojas de Chocolate y Café con nuez garapiñada. Creado en Las Flores, se recoge en San Benito.",
     items: [
       {
         productId: "prod-8",
@@ -128,7 +134,7 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     paymentStatus: "anticipo",
     paymentMethod: "efectivo",
     dedication: "¡Feliz Cumpleaños Don Toño!",
-    notes: "Elaborar con hojaldre recién horneado ese mismo mediodía.",
+    notes: "Elaborar con hojaldre recién horneado ese mismo mediodía. Recoger en San Benito.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
     cashier: "Elena Brito",
     payments: [
