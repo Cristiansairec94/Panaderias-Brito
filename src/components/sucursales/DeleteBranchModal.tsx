@@ -11,7 +11,8 @@ import {
   Wallet,
   Receipt,
   X,
-  CheckCircle2
+  CheckCircle2,
+  ChevronDown
 } from "lucide-react";
 import { Branch } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -96,32 +97,32 @@ export default function DeleteBranchModal({
           </button>
         </div>
 
-        {/* Selector de Sucursal a Eliminar (si hay más de 1) */}
+        {/* Selector Desplegable de Sucursales */}
         {branches.length > 1 && (
-          <div className="px-5 py-3 bg-stone-50 border-b border-stone-200/80 flex items-center gap-2 overflow-x-auto shrink-0">
-            <span className="text-[11px] font-bold text-stone-500 whitespace-nowrap">
-              Seleccionar tienda:
-            </span>
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              {branches.map((b) => {
-                const isSelected = b.id === selectedBranchId;
-                return (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => handleBranchSwitch(b.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 border ${
-                      isSelected
-                        ? "bg-rose-600 text-white border-rose-600 shadow-xs"
-                        : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-                    }`}
-                  >
-                    <Store className={`w-3.5 h-3.5 ${isSelected ? "text-white" : "text-stone-400"}`} />
-                    <span>{b.shortName}</span>
-                    <span className="text-[10px] font-mono opacity-80">({b.code})</span>
-                  </button>
-                );
-              })}
+          <div className="px-5 py-3 bg-stone-50 border-b border-stone-200/80 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 shrink-0">
+            <label 
+              htmlFor="delete-branch-select"
+              className="text-xs font-bold text-stone-700 whitespace-nowrap flex items-center gap-1.5 shrink-0"
+            >
+              <Store className="w-4 h-4 text-rose-600" />
+              <span>Seleccionar tienda:</span>
+            </label>
+            <div className="relative flex-1">
+              <select
+                id="delete-branch-select"
+                value={selectedBranchId}
+                onChange={(e) => handleBranchSwitch(e.target.value)}
+                className="w-full pl-3.5 pr-9 py-2 rounded-xl border border-stone-300 bg-white text-xs sm:text-sm font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-2xs appearance-none cursor-pointer"
+              >
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.code}) — Encargado: {b.manager}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-stone-500">
+                <ChevronDown className="w-4 h-4 text-stone-400" />
+              </div>
             </div>
           </div>
         )}
