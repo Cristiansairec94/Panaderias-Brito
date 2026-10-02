@@ -928,6 +928,11 @@ export default function PedidosPage() {
           highlightText: order.orderNumber,
           category: "pedidos",
           badgeIcon: "pastel",
+          orderId: order.id,
+          branchId: order.branchId,
+          branchName: order.branchName,
+          operatingBranchId: order.operatingBranchId,
+          operatingBranchName: order.operatingBranchName,
         });
       }
     }
@@ -953,6 +958,7 @@ export default function PedidosPage() {
         highlightText: orderNumber || "",
         category: "pedidos",
         badgeIcon: "pastel",
+        orderId: orderId,
       });
     }
   };
@@ -976,6 +982,11 @@ export default function PedidosPage() {
           highlightText: order.orderNumber,
           category: "pedidos",
           badgeIcon: "pastel",
+          orderId: order.id,
+          branchId: order.branchId,
+          branchName: order.branchName,
+          operatingBranchId: order.operatingBranchId,
+          operatingBranchName: order.operatingBranchName,
         });
       } else {
         updateOrderStatus(order.id, "cancelado");
@@ -997,6 +1008,11 @@ export default function PedidosPage() {
           highlightText: order.orderNumber,
           category: "pedidos",
           badgeIcon: "pastel",
+          orderId: order.id,
+          branchId: order.branchId,
+          branchName: order.branchName,
+          operatingBranchId: order.operatingBranchId,
+          operatingBranchName: order.operatingBranchName,
         });
       }
     }
@@ -3486,6 +3502,11 @@ export default function PedidosPage() {
             highlightText: o.orderNumber,
             category: "pedidos",
             badgeIcon: "pastel",
+            orderId: o.id,
+            branchId: o.branchId,
+            branchName: o.branchName,
+            operatingBranchId: o.operatingBranchId,
+            operatingBranchName: o.operatingBranchName,
           });
         }}
         onSendWhatsApp={(o) => {
@@ -3528,6 +3549,11 @@ export default function PedidosPage() {
               highlightText: order.orderNumber,
               category: "pedidos",
               badgeIcon: "pastel",
+              orderId: order.id,
+              branchId: order.branchId,
+              branchName: order.branchName,
+              operatingBranchId: order.operatingBranchId,
+              operatingBranchName: order.operatingBranchName,
             });
           }
         }}
