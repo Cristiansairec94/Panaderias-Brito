@@ -113,7 +113,6 @@ export default function PedidosPage() {
   const [customSelectedMonth, setCustomSelectedMonth] = useState<string>(() => getLocalDateISO(new Date()).slice(0, 7));
   const [customSelectedYear, setCustomSelectedYear] = useState<string>(() => getLocalDateISO(new Date()).slice(0, 4));
   const [isClassificationOpen, setIsClassificationOpen] = useState(true);
-  const [isTimeClassificationOpen, setIsTimeClassificationOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"productos" | "tabla">("productos");
   const [productLayout, setProductLayout] = useState<"lista" | "cuadricula">("lista");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -1609,255 +1608,331 @@ export default function PedidosPage() {
           </div>
       </div>
 
-      {/* 1.5. CLASIFICACIÓN TEMPORAL DE PEDIDOS (Día, Semana, Mes, Año, Todos) */}
-      <div className="bg-white rounded-2xl border border-stone-200 shadow-2xs overflow-hidden transition-all duration-200">
-        {/* Barra superior interactiva para Desplegar / Ocultar */}
-        <div
-          onClick={() => setIsTimeClassificationOpen((prev) => !prev)}
-          className="p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-2 cursor-pointer hover:bg-stone-50 select-none transition-colors"
-          title={isTimeClassificationOpen ? "Ocultar clasificación por tiempo" : "Desplegar clasificación por tiempo (Día, Semana, Mes, Año)"}
-        >
-          <div className="flex items-center gap-2">
-            <span className="p-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
-              <Calendar className="w-3.5 h-3.5 text-amber-700" />
-            </span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-black text-stone-900 uppercase tracking-wide">
-                Clasificación por Tiempo:
-              </span>
-              <span className="text-[11px] font-bold text-stone-500 hidden sm:inline">
-                (Día, Semana, Mes, Año)
-              </span>
-              {timePeriodFilter !== "todos" ? (
-                <span className="text-[10px] font-black uppercase text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
-                  <span>Activo:</span>
-                  <span className="capitalize">{timePeriodFilter}</span>
-                  <span className="bg-amber-200 px-1 rounded text-amber-950 font-mono">
-                    {timePeriodCounts[timePeriodFilter]}
-                  </span>
+      {/* 1.5. CLASIFICACIÓN TEMPORAL DE PEDIDOS (Día, Semana, Mes, Año, Todos) - DISEÑO GRANDE Y DESTACADO */}
+      <div className="bg-gradient-to-b from-white to-amber-50/20 rounded-2xl sm:rounded-3xl border-2 border-stone-200 shadow-sm p-4 sm:p-5 space-y-4 transition-all">
+        {/* Encabezado Principal Grande */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-stone-200">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-500/10 border-2 border-amber-400/40 flex items-center justify-center text-amber-700 shadow-inner">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-black text-stone-900 uppercase tracking-wide">
+                  Clasificación por Tiempo
+                </h3>
+                <span className="text-[11px] font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full">
+                  Filtro de Período
                 </span>
-              ) : (
-                <span className="text-[10px] font-bold text-stone-400 hidden sm:inline">
-                  • Todos ({timePeriodCounts.todos})
-                </span>
-              )}
+              </div>
+              <p className="text-xs font-semibold text-stone-500">
+                Visualiza y filtra tus pedidos por Día, Semana, Mes o Año
+              </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsTimeClassificationOpen((prev) => !prev);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-200 font-bold text-xs transition-colors cursor-pointer shadow-2xs"
-          >
-            <span>{isTimeClassificationOpen ? "Ocultar" : "Desplegar"}</span>
-            <ChevronDown
-              className={`w-3.5 h-3.5 transition-transform duration-200 text-amber-700 ${
-                isTimeClassificationOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-        </div>
-
-        {/* Zona Desplegable */}
-        {isTimeClassificationOpen && (
-          <div className="p-2.5 sm:p-3 pt-2 border-t border-stone-100 space-y-2.5 animate-in fade-in duration-150">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-stone-500">
-                Filtros por período:
-              </span>
-
-          {/* Controles dinámicos según el período seleccionado */}
-          {timePeriodFilter === "dia" && (
-            <div className="flex items-center gap-2 bg-amber-50/90 border border-amber-300 px-2.5 py-1 rounded-xl shadow-2xs">
-              <span className="text-xs font-black text-amber-900">Fecha del Día:</span>
-              <input
-                type="date"
-                value={customSelectedDate}
-                onChange={(e) => setCustomSelectedDate(e.target.value)}
-                className="text-xs font-bold text-stone-900 bg-white border border-amber-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
-              />
-              {customSelectedDate !== todayStr ? (
-                <button
-                  type="button"
-                  onClick={() => setCustomSelectedDate(todayStr)}
-                  className="text-[10px] font-black text-amber-900 bg-amber-200 hover:bg-amber-300 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
-                  title="Volver al día de hoy"
-                >
-                  Ir a Hoy
-                </button>
-              ) : (
-                <span className="text-[10px] font-black uppercase text-amber-800 bg-amber-200/60 px-1.5 py-0.5 rounded">
-                  Hoy
-                </span>
-              )}
-            </div>
-          )}
-
-          {timePeriodFilter === "semana" && (
-            <div className="flex items-center gap-2 bg-blue-50/90 border border-blue-300 px-2.5 py-1 rounded-xl shadow-2xs">
-              <span className="text-xs font-black text-blue-900">Semana Actual:</span>
-              <span className="text-xs font-extrabold text-blue-950 font-mono">
-                {formattedWeekRange}
-              </span>
-            </div>
-          )}
-
-          {timePeriodFilter === "mes" && (
-            <div className="flex items-center gap-2 bg-purple-50/90 border border-purple-300 px-2.5 py-1 rounded-xl shadow-2xs">
-              <span className="text-xs font-black text-purple-900">Mes:</span>
-              <input
-                type="month"
-                value={customSelectedMonth}
-                onChange={(e) => setCustomSelectedMonth(e.target.value)}
-                className="text-xs font-bold text-stone-900 bg-white border border-purple-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
-              />
-              <span className="text-xs font-black text-purple-950 capitalize">
-                {formattedMonthLabel}
-              </span>
-            </div>
-          )}
-
-          {timePeriodFilter === "ano" && (
-            <div className="flex items-center gap-2 bg-emerald-50/90 border border-emerald-300 px-2.5 py-1 rounded-xl shadow-2xs">
-              <span className="text-xs font-black text-emerald-900">Año:</span>
-              <select
-                value={customSelectedYear}
-                onChange={(e) => setCustomSelectedYear(e.target.value)}
-                className="text-xs font-bold text-stone-900 bg-white border border-emerald-300 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+          <div className="flex items-center gap-2 flex-wrap">
+            {timePeriodFilter !== "todos" ? (
+              <button
+                type="button"
+                onClick={() => handleSelectTimePeriod("todos")}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-95 text-white font-black text-xs transition-all cursor-pointer shadow-xs"
+                title="Quitar filtro de tiempo y ver todos los pedidos"
               >
-                {availableYears.map((yr) => (
-                  <option key={yr} value={yr}>
-                    {yr}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {timePeriodFilter !== "todos" && (
-            <button
-              type="button"
-              onClick={() => handleSelectTimePeriod("todos")}
-              className="text-xs font-bold text-stone-500 hover:text-stone-800 underline cursor-pointer"
-            >
-              Ver todo el tiempo
-            </button>
-          )}
+                <span>✕ Ver Todo el Tiempo</span>
+                <span className="bg-stone-700 text-stone-200 px-1.5 py-0.5 rounded-md text-[10px] font-mono">
+                  {timePeriodCounts.todos}
+                </span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 text-stone-600 border border-stone-200 text-xs font-bold">
+                <span>🌐 Viendo todo el tiempo</span>
+                <span className="font-mono font-black text-stone-900 bg-white px-1.5 py-0.5 rounded-md border border-stone-200">
+                  {timePeriodCounts.todos} pedidos
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Botones de Períodos: Todos, Día, Semana, Mes, Año */}
-        <div className="flex items-stretch w-full bg-stone-100 p-0.5 rounded-xl border border-stone-200/90 shadow-2xs divide-x divide-stone-200/80 overflow-x-auto">
+        {/* 5 Botones de Gran Tamaño y Ergonomía */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3">
           {/* 1. Todos */}
           <button
             type="button"
             onClick={() => handleSelectTimePeriod("todos")}
-            className={`flex-1 min-w-[90px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+            className={`col-span-2 sm:col-span-1 p-3.5 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer select-none flex flex-col justify-between text-left gap-2.5 group active:scale-[0.98] ${
               timePeriodFilter === "todos"
-                ? "bg-stone-900 text-white shadow-xs"
-                : "hover:bg-white/80 text-stone-700"
+                ? "bg-stone-900 text-white border-stone-900 shadow-md ring-4 ring-stone-900/20"
+                : "bg-white hover:bg-stone-50 text-stone-800 border-stone-200 hover:border-stone-400 shadow-2xs"
             }`}
             title="Ver todos los pedidos sin restricción de fecha"
           >
-            <span>🌐 Todos</span>
-            <span
-              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
-                timePeriodFilter === "todos" ? "bg-white/20 text-white" : "bg-stone-200 text-stone-800"
-              }`}
-            >
-              {timePeriodCounts.todos}
-            </span>
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-2xl">🌐</span>
+              <span
+                className={`text-xs sm:text-sm font-mono font-black px-2.5 py-1 rounded-xl shadow-xs ${
+                  timePeriodFilter === "todos"
+                    ? "bg-white/20 text-white"
+                    : "bg-stone-100 text-stone-800 border border-stone-200"
+                }`}
+              >
+                {timePeriodCounts.todos}
+              </span>
+            </div>
+            <div>
+              <div className="text-sm sm:text-base font-black tracking-tight">Todo el Tiempo</div>
+              <div className={`text-[11px] font-bold ${timePeriodFilter === "todos" ? "text-stone-300" : "text-stone-400"}`}>
+                Todos los pedidos
+              </div>
+            </div>
           </button>
 
           {/* 2. Día */}
           <button
             type="button"
             onClick={() => handleSelectTimePeriod("dia")}
-            className={`flex-1 min-w-[90px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+            className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer select-none flex flex-col justify-between text-left gap-2.5 group active:scale-[0.98] ${
               timePeriodFilter === "dia"
-                ? "bg-amber-600 text-white shadow-xs"
-                : "hover:bg-white/80 text-stone-700"
+                ? "bg-amber-600 text-white border-amber-600 shadow-md ring-4 ring-amber-500/25"
+                : "bg-white hover:bg-amber-50/60 text-stone-800 border-stone-200 hover:border-amber-400 shadow-2xs"
             }`}
-            title="Ver pedidos programados para un día específico (por defecto hoy)"
+            title="Ver pedidos programados para un día específico"
           >
-            <span>☀️ Día</span>
-            <span
-              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
-                timePeriodFilter === "dia" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-900 border border-amber-200"
-              }`}
-            >
-              {timePeriodCounts.dia}
-            </span>
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-2xl">☀️</span>
+              <span
+                className={`text-xs sm:text-sm font-mono font-black px-2.5 py-1 rounded-xl shadow-xs ${
+                  timePeriodFilter === "dia"
+                    ? "bg-white/20 text-white"
+                    : "bg-amber-100 text-amber-900 border border-amber-300"
+                }`}
+              >
+                {timePeriodCounts.dia}
+              </span>
+            </div>
+            <div>
+              <div className="text-sm sm:text-base font-black tracking-tight">Por Día</div>
+              <div className={`text-[11px] font-bold truncate ${timePeriodFilter === "dia" ? "text-amber-100" : "text-amber-700"}`}>
+                {customSelectedDate === todayStr ? "Hoy" : customSelectedDate}
+              </div>
+            </div>
           </button>
 
           {/* 3. Semana */}
           <button
             type="button"
             onClick={() => handleSelectTimePeriod("semana")}
-            className={`flex-1 min-w-[95px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+            className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer select-none flex flex-col justify-between text-left gap-2.5 group active:scale-[0.98] ${
               timePeriodFilter === "semana"
-                ? "bg-blue-600 text-white shadow-xs"
-                : "hover:bg-white/80 text-stone-700"
+                ? "bg-blue-600 text-white border-blue-600 shadow-md ring-4 ring-blue-500/25"
+                : "bg-white hover:bg-blue-50/60 text-stone-800 border-stone-200 hover:border-blue-400 shadow-2xs"
             }`}
             title="Ver pedidos programados para esta semana (Lunes a Domingo)"
           >
-            <span>🗓️ Semana</span>
-            <span
-              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
-                timePeriodFilter === "semana" ? "bg-white/20 text-white" : "bg-blue-100 text-blue-900 border border-blue-200"
-              }`}
-            >
-              {timePeriodCounts.semana}
-            </span>
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-2xl">🗓️</span>
+              <span
+                className={`text-xs sm:text-sm font-mono font-black px-2.5 py-1 rounded-xl shadow-xs ${
+                  timePeriodFilter === "semana"
+                    ? "bg-white/20 text-white"
+                    : "bg-blue-100 text-blue-900 border border-blue-300"
+                }`}
+              >
+                {timePeriodCounts.semana}
+              </span>
+            </div>
+            <div>
+              <div className="text-sm sm:text-base font-black tracking-tight">Semana</div>
+              <div className={`text-[11px] font-bold ${timePeriodFilter === "semana" ? "text-blue-100" : "text-blue-700"}`}>
+                Lun a Dom
+              </div>
+            </div>
           </button>
 
           {/* 4. Mes */}
           <button
             type="button"
             onClick={() => handleSelectTimePeriod("mes")}
-            className={`flex-1 min-w-[90px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+            className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer select-none flex flex-col justify-between text-left gap-2.5 group active:scale-[0.98] ${
               timePeriodFilter === "mes"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "hover:bg-white/80 text-stone-700"
+                ? "bg-purple-600 text-white border-purple-600 shadow-md ring-4 ring-purple-500/25"
+                : "bg-white hover:bg-purple-50/60 text-stone-800 border-stone-200 hover:border-purple-400 shadow-2xs"
             }`}
-            title="Ver pedidos programados para este mes"
+            title="Ver pedidos programados para un mes específico"
           >
-            <span>📆 Mes</span>
-            <span
-              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
-                timePeriodFilter === "mes" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-900 border border-purple-200"
-              }`}
-            >
-              {timePeriodCounts.mes}
-            </span>
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-2xl">📆</span>
+              <span
+                className={`text-xs sm:text-sm font-mono font-black px-2.5 py-1 rounded-xl shadow-xs ${
+                  timePeriodFilter === "mes"
+                    ? "bg-white/20 text-white"
+                    : "bg-purple-100 text-purple-900 border border-purple-300"
+                }`}
+              >
+                {timePeriodCounts.mes}
+              </span>
+            </div>
+            <div>
+              <div className="text-sm sm:text-base font-black tracking-tight">Por Mes</div>
+              <div className={`text-[11px] font-bold capitalize truncate ${timePeriodFilter === "mes" ? "text-purple-100" : "text-purple-700"}`}>
+                {formattedMonthLabel.split(" ")[0]}
+              </div>
+            </div>
           </button>
 
           {/* 5. Año */}
           <button
             type="button"
             onClick={() => handleSelectTimePeriod("ano")}
-            className={`flex-1 min-w-[90px] py-2 px-3 flex items-center justify-center gap-1.5 text-xs sm:text-sm font-black transition-all cursor-pointer select-none first:rounded-lg last:rounded-lg ${
+            className={`p-3.5 sm:p-4 rounded-2xl border-2 transition-all cursor-pointer select-none flex flex-col justify-between text-left gap-2.5 group active:scale-[0.98] ${
               timePeriodFilter === "ano"
-                ? "bg-emerald-600 text-white shadow-xs"
-                : "hover:bg-white/80 text-stone-700"
+                ? "bg-emerald-600 text-white border-emerald-600 shadow-md ring-4 ring-emerald-500/25"
+                : "bg-white hover:bg-emerald-50/60 text-stone-800 border-stone-200 hover:border-emerald-400 shadow-2xs"
             }`}
-            title="Ver pedidos programados para este año"
+            title="Ver pedidos programados para un año específico"
           >
-            <span>📅 Año</span>
-            <span
-              className={`text-[10px] sm:text-xs font-mono font-black px-1.5 py-0.5 rounded-md ${
-                timePeriodFilter === "ano" ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-900 border border-emerald-200"
-              }`}
-            >
-              {timePeriodCounts.ano}
-            </span>
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-2xl">📅</span>
+              <span
+                className={`text-xs sm:text-sm font-mono font-black px-2.5 py-1 rounded-xl shadow-xs ${
+                  timePeriodFilter === "ano"
+                    ? "bg-white/20 text-white"
+                    : "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                }`}
+              >
+                {timePeriodCounts.ano}
+              </span>
+            </div>
+            <div>
+              <div className="text-sm sm:text-base font-black tracking-tight">Por Año</div>
+              <div className={`text-[11px] font-bold ${timePeriodFilter === "ano" ? "text-emerald-100" : "text-emerald-700"}`}>
+                Año {customSelectedYear}
+              </div>
+            </div>
           </button>
         </div>
+
+        {/* Sub-Barra Contextual Dinámica (Interactiva y Espaciosa según el período seleccionado) */}
+        {timePeriodFilter === "dia" && (
+          <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-xs sm:text-sm font-black text-amber-950 flex items-center gap-1.5">
+                <span>☀️</span> Consultar Fecha del Día:
+              </span>
+              <div className="flex items-center gap-1.5 bg-white border-2 border-amber-300 rounded-xl p-1 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={handlePrevDay}
+                  className="px-2.5 py-1.5 hover:bg-amber-100 text-amber-900 font-black text-xs rounded-lg transition-colors cursor-pointer"
+                  title="Día anterior"
+                >
+                  ◀
+                </button>
+                <input
+                  type="date"
+                  value={customSelectedDate}
+                  onChange={(e) => setCustomSelectedDate(e.target.value)}
+                  className="text-xs sm:text-sm font-black text-stone-900 bg-transparent px-2 py-0.5 focus:outline-none cursor-pointer"
+                />
+                <button
+                  type="button"
+                  onClick={handleNextDay}
+                  className="px-2.5 py-1.5 hover:bg-amber-100 text-amber-900 font-black text-xs rounded-lg transition-colors cursor-pointer"
+                  title="Día siguiente"
+                >
+                  ▶
+                </button>
+              </div>
+
+              {customSelectedDate !== todayStr && (
+                <button
+                  type="button"
+                  onClick={() => setCustomSelectedDate(todayStr)}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <span>☀️ Ir a Hoy</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-amber-950 bg-amber-200/70 border border-amber-300/80 px-3.5 py-2 rounded-xl">
+              <span>📅 {formattedDayLabel}</span>
+              <span className="bg-amber-700 text-white px-2 py-0.5 rounded-md font-mono text-xs">
+                {timePeriodCounts.dia} pedidos
+              </span>
+            </div>
+          </div>
+        )}
+
+        {timePeriodFilter === "semana" && (
+          <div className="bg-blue-50/90 border-2 border-blue-300 rounded-2xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-xs sm:text-sm font-black text-blue-950 flex items-center gap-1.5">
+                <span>🗓️</span> Semana Actual en Consulta:
+              </span>
+              <span className="text-xs sm:text-sm font-black text-blue-900 bg-white border-2 border-blue-300 px-3.5 py-1.5 rounded-xl shadow-2xs font-mono">
+                {formattedWeekRange}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-blue-950 bg-blue-200/70 border border-blue-300/80 px-3.5 py-2 rounded-xl">
+              <span>Lunes a Domingo</span>
+              <span className="bg-blue-700 text-white px-2 py-0.5 rounded-md font-mono text-xs">
+                {timePeriodCounts.semana} pedidos
+              </span>
+            </div>
+          </div>
+        )}
+
+        {timePeriodFilter === "mes" && (
+          <div className="bg-purple-50/90 border-2 border-purple-300 rounded-2xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-xs sm:text-sm font-black text-purple-950 flex items-center gap-1.5">
+                <span>📆</span> Seleccionar Mes a Consultar:
+              </span>
+              <input
+                type="month"
+                value={customSelectedMonth}
+                onChange={(e) => setCustomSelectedMonth(e.target.value)}
+                className="text-xs sm:text-sm font-black text-stone-900 bg-white border-2 border-purple-300 rounded-xl px-3.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer shadow-2xs"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-purple-950 bg-purple-200/70 border border-purple-300/80 px-3.5 py-2 rounded-xl">
+              <span className="capitalize">📅 {formattedMonthLabel}</span>
+              <span className="bg-purple-700 text-white px-2 py-0.5 rounded-md font-mono text-xs">
+                {timePeriodCounts.mes} pedidos
+              </span>
+            </div>
+          </div>
+        )}
+
+        {timePeriodFilter === "ano" && (
+          <div className="bg-emerald-50/90 border-2 border-emerald-300 rounded-2xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-xs sm:text-sm font-black text-emerald-950 flex items-center gap-1.5">
+                <span>📅</span> Seleccionar Año a Consultar:
+              </span>
+              <select
+                value={customSelectedYear}
+                onChange={(e) => setCustomSelectedYear(e.target.value)}
+                className="text-xs sm:text-sm font-black text-stone-900 bg-white border-2 border-emerald-300 rounded-xl px-3.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+              >
+                {availableYears.map((yr) => (
+                  <option key={yr} value={yr}>
+                    Año {yr}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-emerald-950 bg-emerald-200/70 border border-emerald-300/80 px-3.5 py-2 rounded-xl">
+              <span>Año {customSelectedYear} completo</span>
+              <span className="bg-emerald-700 text-white px-2 py-0.5 rounded-md font-mono text-xs">
+                {timePeriodCounts.ano} pedidos
+              </span>
+            </div>
+          </div>
+        )}
       </div>
-    )}
-  </div>
 
       {/* 2. Catálogo de Productos y Pedidos */}
       <div 

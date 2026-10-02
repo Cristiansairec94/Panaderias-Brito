@@ -3926,8 +3926,6 @@ export default function POSPage() {
             setSelectedOrderForReceipt(order);
           }}
           onSelectOrderForPayment={(order) => {
-            setShowExpensesModal(false);
-            setReopenExpensesAfterPayment(true);
             setSelectedOrderForPayment(order);
           }}
           cashSalesTotal={totalCashSales}
@@ -4053,10 +4051,6 @@ export default function POSPage() {
         isOpen={Boolean(selectedOrderForPayment)}
         onClose={() => {
           setSelectedOrderForPayment(null);
-          if (reopenExpensesAfterPayment) {
-            setShowExpensesModal(true);
-            setReopenExpensesAfterPayment(false);
-          }
         }}
         order={selectedOrderForPayment}
         onPaymentSuccess={() => {

@@ -1192,7 +1192,6 @@ export default function ExpensesModal({
   };
 
   const handlePayOrder = (order: CustomOrder) => {
-    handleCloseDetailModal();
     if (onSelectOrderForPayment) {
       onSelectOrderForPayment(order);
     } else if (openOrderPayment) {
@@ -4115,8 +4114,7 @@ export default function ExpensesModal({
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              handleCloseDetailModal();
-                                              onSelectOrderForPayment(order);
+                                              handlePayOrder(order);
                                             }}
                                             className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
                                             title="Cobrar saldo restante"
@@ -4478,10 +4476,7 @@ export default function ExpensesModal({
         }}
         onOpenPayment={(order) => {
           setSelectedOrderDetail(null);
-          if (onSelectOrderForPayment) {
-            handleCloseDetailModal();
-            onSelectOrderForPayment(order);
-          }
+          handlePayOrder(order);
         }}
         onAdvanceStatus={(order) => {
           let nextStatus: CustomOrder["status"] = order.status;
@@ -4490,8 +4485,8 @@ export default function ExpensesModal({
             const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
             if (rem > 0) {
               alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\nDebe estar 100% pagado antes de entregarse.`);
-              handleCloseDetailModal();
-              if (onSelectOrderForPayment) onSelectOrderForPayment(order);
+              setSelectedOrderDetail(null);
+              handlePayOrder(order);
               return;
             }
             nextStatus = "entregado";
@@ -4511,8 +4506,8 @@ export default function ExpensesModal({
           const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
           if (rem > 0) {
             alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\nDebe estar 100% pagado antes de entregarse.`);
-            handleCloseDetailModal();
-            if (onSelectOrderForPayment) onSelectOrderForPayment(order);
+            setSelectedOrderDetail(null);
+            handlePayOrder(order);
             return;
           }
           if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
