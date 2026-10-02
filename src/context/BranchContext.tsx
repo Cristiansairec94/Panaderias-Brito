@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Branch, BranchShift, BranchCashMovement } from "@/types";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
+import { createClient } from "@/lib/supabase/client";
 
 export interface SimulatedSale {
   id: string;
@@ -272,27 +273,45 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
   // Load state from localStorage & Server API
   useEffect(() => {
-    // 1. Sincronización con el servidor para persistencia entre computadoras y teléfonos
+    // 1. Sincronización en tiempo real con el servidor y Supabase para reflejar todas las sucursales de otros perfiles
     const syncBranchesWithServer = async () => {
       try {
+        // A) Sincronizar desde /api/branches (persistencia central del servidor)
         const res = await fetch("/api/branches");
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.branches) && data.branches.length > 0) {
             setBranches((localBranches) => {
               const branchMap = new Map<string, Branch>();
-              // Sembrar defaults
               DEFAULT_BRANCHES.forEach((d) => branchMap.set(d.id, d));
-              // Aplicar lo del servidor (para traer nuevas sucursales creadas en otros dispositivos)
-              data.branches.forEach((b: Branch) => {
-                const existing = branchMap.get(b.id);
-                branchMap.set(b.id, { ...existing, ...b });
+
+              // Sembrar primero con los datos locales
+              localBranches.forEach((b) => branchMap.set(b.id, b));
+
+              // Aplicar lo del servidor: si el servidor reporta ventas/tickets mayores o iguales, el servidor manda
+              data.branches.forEach((serverB: Branch) => {
+                const localB = branchMap.get(serverB.id);
+                if (!localB) {
+                  branchMap.set(serverB.id, serverB);
+                } else {
+                  const serverSales = Number(serverB.todaySales) || 0;
+                  const localSales = Number(localB.todaySales) || 0;
+                  const serverTickets = Number(serverB.todayTickets) || 0;
+                  const localTickets = Number(localB.todayTickets) || 0;
+                  const takeServer = serverSales >= localSales || serverTickets >= localTickets;
+
+                  branchMap.set(serverB.id, {
+                    ...localB,
+                    ...serverB,
+                    todaySales: takeServer ? serverSales : localSales,
+                    todayTickets: takeServer ? serverTickets : localTickets,
+                    cashInDrawer: takeServer ? (Number(serverB.cashInDrawer) || localB.cashInDrawer) : localB.cashInDrawer,
+                    currentShift: serverB.currentShift || localB.currentShift,
+                    status: serverB.status || localB.status,
+                  });
+                }
               });
-              // Preservar ventas en curso locales
-              localBranches.forEach((b: Branch) => {
-                const existing = branchMap.get(b.id);
-                branchMap.set(b.id, { ...existing, ...b });
-              });
+
               const merged = Array.from(branchMap.values());
               try {
                 localStorage.setItem("brito_branches_data", JSON.stringify(merged));
@@ -301,6 +320,77 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             });
           }
         }
+
+        // B) Sincronizar directamente con Supabase las ventas del día de hoy de TODAS las sucursales
+        try {
+          const supabase = createClient();
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          const todayIso = todayStart.toISOString();
+
+          const { data: dbSales, error: dbErr } = await supabase
+            .from("sales")
+            .select("branch_id, total, payment_method, cashier, date")
+            .gte("date", todayIso);
+
+          if (!dbErr && dbSales && dbSales.length > 0) {
+            const aggMap = new Map<string, { total: number; count: number; cash: number; card: number; transfer: number; lastCashier?: string }>();
+            dbSales.forEach((s: any) => {
+              const bId = s.branch_id || "branch-matriz";
+              const ex = aggMap.get(bId) || { total: 0, count: 0, cash: 0, card: 0, transfer: 0 };
+              const amount = Number(s.total) || 0;
+              ex.total += amount;
+              ex.count += 1;
+              if (s.payment_method === "tarjeta") ex.card += amount;
+              else if (s.payment_method === "transferencia") ex.transfer += amount;
+              else ex.cash += amount;
+              if (s.cashier) ex.lastCashier = s.cashier;
+              aggMap.set(bId, ex);
+            });
+
+            setBranches((prev) => {
+              let changed = false;
+              const updated = prev.map((b) => {
+                const agg = aggMap.get(b.id);
+                if (!agg) return b;
+                const dbTotal = agg.total;
+                const dbCount = agg.count;
+                if (dbTotal > (b.todaySales || 0) || dbCount > (b.todayTickets || 0)) {
+                  changed = true;
+                  return {
+                    ...b,
+                    todaySales: Math.max(b.todaySales || 0, dbTotal),
+                    todayTickets: Math.max(b.todayTickets || 0, dbCount),
+                    currentShift: {
+                      ...(b.currentShift || {
+                        id: `shift-${b.id}`,
+                        name: "Turno General",
+                        cashier: agg.lastCashier || "Cajero",
+                        openedAt: "06:00 AM",
+                        initialFund: 1000,
+                        status: "abierto",
+                      }),
+                      totalSales: Math.max(b.currentShift?.totalSales || 0, dbTotal),
+                      ticketCount: Math.max(b.currentShift?.ticketCount || 0, dbCount),
+                      cashSales: Math.max(b.currentShift?.cashSales || 0, agg.cash),
+                      cardSales: Math.max(b.currentShift?.cardSales || 0, agg.card),
+                      transferSales: Math.max(b.currentShift?.transferSales || 0, agg.transfer),
+                      cashier: agg.lastCashier || b.currentShift?.cashier || "Cajero",
+                    },
+                  };
+                }
+                return b;
+              });
+
+              if (changed) {
+                try {
+                  localStorage.setItem("brito_branches_data", JSON.stringify(updated));
+                } catch {}
+              }
+              return updated;
+            });
+          }
+        } catch {}
       } catch (err) {
         console.warn("[BranchContext] No se pudo consultar /api/branches:", err);
       }
@@ -338,6 +428,23 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Ignore localStorage error
     }
+
+    // Intervalo de sincronización en vivo cada 6 segundos para mantener todas las sucursales al día
+    const pollInterval = setInterval(() => {
+      syncBranchesWithServer();
+    }, 6000);
+
+    const handleFocus = () => {
+      syncBranchesWithServer();
+    };
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("online", handleFocus);
+
+    return () => {
+      clearInterval(pollInterval);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("online", handleFocus);
+    };
   }, []);
 
   // Escuchar ventas y movimientos de caja transmitidos en tiempo real desde otros dispositivos

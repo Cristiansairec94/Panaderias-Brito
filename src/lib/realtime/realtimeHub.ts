@@ -250,6 +250,11 @@ class RealtimeHub {
     window.addEventListener("focus", () => {
       this.fetchCatchupEvents();
     });
+
+    // Heartbeat periódico (cada 5s) para recibir ventas y movimientos de otras sucursales de inmediato
+    setInterval(() => {
+      this.fetchCatchupEvents();
+    }, 5000);
   }
 
   public reconnect() {

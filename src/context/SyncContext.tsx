@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { SyncItem, SyncType } from "@/types";
 import {
   getSyncQueue,
@@ -98,19 +98,32 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setConnectionDetail(res.detail);
   }, [refreshQueueAndStats]);
 
-  // 3. Sincronizar inmediatamente todos los movimientos locales a la nube
+  const isSyncingLockRef = useRef(false);
+
+  // 3. Sincronizar inmediatamente todos los movimientos locales a la nube (rápido, sin bloqueo)
   const syncNow = useCallback(async () => {
+    if (isSyncingLockRef.current) {
+      return { total: 0, synced: 0, failed: 0, errors: [] };
+    }
+    isSyncingLockRef.current = true;
     setIsSyncing(true);
     try {
-      await syncAllLocalDataToSupabase();
-      const res = await processSyncQueue();
+      const syncPromise = syncAllLocalDataToSupabase();
+      const timeoutPromise = new Promise<{ total: number; synced: number; failed: number; errors: string[] }>((resolve) =>
+        setTimeout(() => resolve({ total: 0, synced: 0, failed: 0, errors: ["Timeout de seguridad"] }), 5000)
+      );
+      const res: any = await Promise.race([syncPromise, timeoutPromise]);
       refreshQueueAndStats();
       const con = await checkRealOnlineStatus();
       setIsOnline(con.isOnline);
       setLatencyMs(con.latencyMs);
       setConnectionDetail(con.detail);
       return res;
+    } catch (err: any) {
+      console.warn("[SyncContext] Error en syncNow:", err);
+      return { total: 0, synced: 0, failed: 0, errors: [err?.message || "Error"] };
     } finally {
+      isSyncingLockRef.current = false;
       setIsSyncing(false);
     }
   }, [refreshQueueAndStats]);

@@ -68,6 +68,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { useSync } from "@/context/SyncContext";
+import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
@@ -612,12 +613,14 @@ export default function POSPage() {
     };
   }, []);
 
-  // Auto-sync user and branch
+  // Auto-sync user and branch (solo para cajeros/operativos, el administrador puede ver y alternar cualquier sucursal libremente)
   useEffect(() => {
     if (user) {
-      const userBranch = branches.find((b) => b.assignedUserId === user.id);
-      if (userBranch && currentBranch?.id !== userBranch.id) {
-        switchBranch(userBranch.id);
+      if (user.role !== "admin") {
+        const userBranch = branches.find((b) => b.assignedUserId === user.id);
+        if (userBranch && currentBranch?.id !== userBranch.id) {
+          switchBranch(userBranch.id);
+        }
       }
       setCashierName(user.name);
     }
@@ -2030,6 +2033,7 @@ export default function POSPage() {
 
           if (saleData && !saleErr) {
             savedToCloud = true;
+            markRecordIdsAsSynced([createdSaleId]);
             console.log("[POS] Venta guardada con éxito en Supabase:", saleData.id);
 
             const saleItemsToInsert = currentItems.map((item) => ({
@@ -2433,12 +2437,12 @@ export default function POSPage() {
 
         {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
         <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
-          {isSyncing && (
+          {isSyncing && pendingCount > 0 && (
             <div className="bg-amber-500/15 border border-amber-500/30 text-amber-950 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
               <div className="flex items-center gap-2">
                 <RefreshCw className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
                 <span>
-                  <strong>Sincronizando con la nube:</strong> Subiendo ventas acumuladas a la base de datos central...
+                  <strong>Sincronizando con la nube:</strong> Subiendo {pendingCount} {pendingCount === 1 ? "venta pendiente" : "ventas pendientes"} a la base de datos central...
                 </span>
               </div>
             </div>
@@ -2505,8 +2509,31 @@ export default function POSPage() {
               </div>
             </div>
 
-            {/* Grupo Catálogo y Pan: Categorías y Precios + Entrada de Pan directamente a lado */}
+            {/* Grupo Catálogo y Pan: Selector de Sucursal para Admin + Categorías y Precios */}
             <div className="flex items-center gap-2 shrink-0">
+              {/* Selector Rápido de Sucursal para Administrador (En Tiempo Real) */}
+              {user?.role === "admin" && (
+                <div className="hidden sm:flex items-center gap-1.5 bg-white border-2 border-amber-300 rounded-2xl px-3 py-2 text-xs font-black shadow-xs shrink-0">
+                  <Store className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="hidden xl:inline text-amber-900">Sucursal:</span>
+                  <div className="relative">
+                    <select
+                      value={activeBranch?.id || "branch-matriz"}
+                      onChange={(e) => switchBranch(e.target.value)}
+                      className="bg-transparent font-black text-amber-950 focus:outline-none cursor-pointer pr-4 appearance-none text-xs"
+                      title="Alternar entre sucursales en tiempo real (Modo Administrador)"
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id} className="text-stone-900 bg-white">
+                          🏬 {b.name} (${formatCurrency(b.todaySales)})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-amber-700 pointer-events-none absolute right-0 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+              )}
+
               {/* Botón Grande: Categorías y Precios */}
               <button
                 type="button"
@@ -2873,10 +2900,29 @@ export default function POSPage() {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </h3>
               <div className="flex items-center gap-1.5 text-[11px] text-amber-300 font-bold flex-wrap mt-0.5">
-                <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-400/30 text-[10px] font-black tracking-wide shadow-2xs">
-                  <Store className="w-3 h-3 text-amber-300" />
-                  <span>{activeBranch ? activeBranch.name : "Sucursal Matriz"}</span>
-                </span>
+                {user?.role === "admin" ? (
+                  <div className="relative inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-400/30 text-[10px] font-black tracking-wide shadow-2xs">
+                    <Store className="w-3 h-3 text-amber-300 shrink-0" />
+                    <select
+                      value={activeBranch?.id || "branch-matriz"}
+                      onChange={(e) => switchBranch(e.target.value)}
+                      className="bg-transparent font-black text-amber-200 focus:outline-none cursor-pointer appearance-none pr-3"
+                      title="Cambiar sucursal (Modo Administrador)"
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id} className="text-stone-900 bg-white">
+                          🏬 {b.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-2.5 h-2.5 text-amber-300 pointer-events-none absolute right-1 top-1/2 -translate-y-1/2" />
+                  </div>
+                ) : (
+                  <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-400/30 text-[10px] font-black tracking-wide shadow-2xs">
+                    <Store className="w-3 h-3 text-amber-300" />
+                    <span>{activeBranch ? activeBranch.name : "Sucursal Matriz"}</span>
+                  </span>
+                )}
                 <span className="text-amber-400/60">•</span>
                 <span className="text-stone-100 font-semibold">{cashierName}</span>
                 <span className="text-amber-400/60">•</span>
