@@ -300,19 +300,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Check saved session on mount
+  // Check saved session on mount (Aislamiento estricto de sesión por ventana con sessionStorage)
   useEffect(() => {
-    const saved = localStorage.getItem("brito_user");
-    if (saved) {
-      try {
-        const parsedUser = JSON.parse(saved);
-        setUser(parsedUser);
-      } catch (e) {
-        console.error("Error parsing saved session:", e);
+    // Seguridad: limpiar sesiones residuales previas en localStorage para evitar que
+    // nuevas ventanas o navegadores hereden la sesión de otra pestaña
+    try {
+      localStorage.removeItem("brito_user");
+    } catch (e) {
+      // Ignorar errores de almacenamiento
+    }
+
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("brito_user");
+      if (saved) {
+        try {
+          const parsedUser = JSON.parse(saved);
+          setUser(parsedUser);
+        } catch (e) {
+          console.error("Error parsing saved session:", e);
+          setUser(null);
+        }
+      } else {
+        // Bloquear y exigir login en cada ventana o navegador nuevo
         setUser(null);
       }
     } else {
-      // Require login: no auto-login to DEMO_USERS[0]
       setUser(null);
     }
     setIsLoading(false);
@@ -431,10 +443,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (clean === "admin" && cleanPass === "admin") {
       const adminUser = usersList.find((u) => u.role === "admin") || DEMO_USERS[0];
       setUser(adminUser);
-      if (rememberMe) {
-        localStorage.setItem("brito_user", JSON.stringify(adminUser));
-      } else {
+      if (typeof window !== "undefined") {
         sessionStorage.setItem("brito_user", JSON.stringify(adminUser));
+        sessionStorage.setItem("brito_session_active", "true");
+        // Asegurar que no quede sesión compartida en localStorage
+        try {
+          localStorage.removeItem("brito_user");
+          if (rememberMe) {
+            localStorage.setItem("brito_saved_username", "admin");
+          } else {
+            localStorage.removeItem("brito_saved_username");
+          }
+        } catch (e) {}
       }
       return { success: true, user: adminUser };
     }
@@ -471,10 +491,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setUser(found);
-    if (rememberMe) {
-      localStorage.setItem("brito_user", JSON.stringify(found));
-    } else {
+    if (typeof window !== "undefined") {
       sessionStorage.setItem("brito_user", JSON.stringify(found));
+      sessionStorage.setItem("brito_session_active", "true");
+      // Asegurar que no quede sesión compartida en localStorage
+      try {
+        localStorage.removeItem("brito_user");
+        if (rememberMe) {
+          localStorage.setItem("brito_saved_username", found.username || found.email || clean);
+        } else {
+          localStorage.removeItem("brito_saved_username");
+        }
+      } catch (e) {}
     }
 
     return { success: true, user: found };
@@ -530,15 +558,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginAs = (demoUser: User) => {
     setUser(demoUser);
-    localStorage.setItem("brito_user", JSON.stringify(demoUser));
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("brito_user", JSON.stringify(demoUser));
+      sessionStorage.setItem("brito_session_active", "true");
+      try {
+        localStorage.removeItem("brito_user");
+      } catch (e) {}
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("brito_user");
-    sessionStorage.removeItem("brito_user");
     if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brito_user");
       sessionStorage.removeItem("brito_session_active");
+      sessionStorage.removeItem("brito_redirect_url");
+      try {
+        localStorage.removeItem("brito_user");
+      } catch (e) {}
     }
   };
 
@@ -586,7 +623,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (currUser && currUser.id === userId) {
         const updatedCurrentUser = { ...currUser, ...updatedData };
         try {
-          localStorage.setItem("brito_user", JSON.stringify(updatedCurrentUser));
+          sessionStorage.setItem("brito_user", JSON.stringify(updatedCurrentUser));
         } catch (e) {
           console.error("Error updating active session:", e);
         }
@@ -724,7 +761,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           permissions: { ...newPermissions },
         };
         try {
-          localStorage.setItem("brito_user", JSON.stringify(updatedUser));
+          sessionStorage.setItem("brito_user", JSON.stringify(updatedUser));
         } catch (e) {}
         return updatedUser;
       }

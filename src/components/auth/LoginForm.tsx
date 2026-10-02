@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, Heart } from "lucide-react";
+import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, ShieldCheck } from "lucide-react";
 import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
 
 export default function LoginForm() {
@@ -17,6 +17,21 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [welcomeUser, setWelcomeUser] = useState<User | null>(null);
   const [isLogoSpinning, setIsLogoSpinning] = useState(false);
+  const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedUser = localStorage.getItem("brito_saved_username");
+      if (savedUser) {
+        setIdentifier(savedUser);
+        setRememberMe(true);
+      }
+      const pendingUrl = sessionStorage.getItem("brito_redirect_url");
+      if (pendingUrl && pendingUrl !== "/") {
+        setRedirectTarget(pendingUrl);
+      }
+    }
+  }, []);
 
   const handleLogoClick = () => {
     setIsLogoSpinning(true);
@@ -44,14 +59,25 @@ export default function LoginForm() {
       if (res.success && res.user) {
         setWelcomeUser(res.user);
         const destination = getDefaultRouteForUser(res.user);
-        // Mostrar el mensaje de bienvenida 2 segundos antes de ingresar a la app
+
+        // Mostrar el mensaje de bienvenida y luego ingresar a la app
         setTimeout(() => {
           login(identifier, password, rememberMe);
           if (typeof window !== "undefined") {
             sessionStorage.setItem("brito_session_active", "true");
           }
-          router.push(destination);
-        }, 2000);
+
+          // Redirección inteligente: si intentaba entrar a una ruta específica como /pos o /inventario
+          let target = destination;
+          if (typeof window !== "undefined") {
+            const pending = sessionStorage.getItem("brito_redirect_url");
+            if (pending && pending !== "/") {
+              target = pending;
+              sessionStorage.removeItem("brito_redirect_url");
+            }
+          }
+          router.push(target);
+        }, 1600);
       } else {
         setError(res.message || "Usuario o contraseña incorrectos. Intenta de nuevo.");
         setIsLoading(false);
@@ -160,6 +186,15 @@ export default function LoginForm() {
 
             {/* Form */}
             <div className="px-5 sm:px-8 pb-8 sm:pb-10 pt-1 sm:pt-2 space-y-3.5 sm:space-y-4">
+              {redirectTarget && (
+                <div className="p-3.5 bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs rounded-2xl font-medium flex items-center gap-2.5 animate-in fade-in duration-200 shadow-lg">
+                  <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
+                  <p className="leading-snug">
+                    <strong className="text-white">Seguridad de Acceso:</strong> Por protección de la panadería, debes iniciar sesión en esta ventana para acceder a <span className="text-amber-400 font-bold">{redirectTarget}</span>.
+                  </p>
+                </div>
+              )}
+
               {error && (
                 <div className="p-3.5 bg-rose-500/15 border border-rose-500/35 text-rose-200 text-xs rounded-2xl font-semibold flex items-center gap-2.5 animate-in fade-in duration-200">
                   <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
@@ -212,7 +247,7 @@ export default function LoginForm() {
                   </div>
                 </div>
 
-                {/* Remember session checkbox */}
+                {/* Remember username checkbox */}
                 <div className="flex items-center justify-between pt-1">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
@@ -222,7 +257,7 @@ export default function LoginForm() {
                       className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-stone-700 bg-stone-900 cursor-pointer"
                     />
                     <span className="text-xs text-stone-400 font-medium hover:text-stone-300 transition-colors">
-                      Recordar mi sesión
+                      Recordar mi usuario en este equipo
                     </span>
                   </label>
                 </div>

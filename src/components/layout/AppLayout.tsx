@@ -17,19 +17,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, canAccessRoute, getDefaultRouteForUser } = useAuth();
 
   useEffect(() => {
-    if (isLoading || !user) return;
+    if (isLoading) return;
+
+    if (!user) {
+      // Si no hay usuario en esta ventana y se intentó acceder a una ruta protegida (ej: /pos, /inventario)
+      // guardar la URL para redirigir automáticamente una vez que inicie sesión
+      if (typeof window !== "undefined" && pathname && pathname !== "/") {
+        sessionStorage.setItem("brito_redirect_url", pathname);
+      }
+      return;
+    }
 
     const defaultRoute = getDefaultRouteForUser(user);
 
     try {
-      const sessionActive = sessionStorage.getItem("brito_session_active");
-      if (!sessionActive) {
-        sessionStorage.setItem("brito_session_active", "true");
-        if (pathname !== defaultRoute) {
-          router.replace(defaultRoute);
-          return;
-        }
-      }
+      sessionStorage.setItem("brito_session_active", "true");
     } catch (e) {
       console.error("Error accessing sessionStorage:", e);
     }
@@ -40,13 +42,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, pathname, router, canAccessRoute, getDefaultRouteForUser]);
 
-  const targetDefault = user ? getDefaultRouteForUser(user) : "/";
-  const isPendingInitialRedirect =
-    typeof window !== "undefined" &&
-    !sessionStorage.getItem("brito_session_active") &&
-    pathname !== targetDefault;
-
-  if (isLoading || (user && isPendingInitialRedirect)) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0c0d12] flex flex-col items-center justify-center text-white space-y-3">
         <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
