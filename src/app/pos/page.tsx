@@ -2591,23 +2591,6 @@ export default function POSPage() {
 
             {/* Grupo Catálogo y Pan: Selector de Sucursal para Admin + Categorías y Precios */}
             <div className="flex items-center gap-2 shrink-0">
-              {/* Selector Rápido de Sucursal para Administrador (En Tiempo Real) */}
-              {user?.role === "admin" && (
-                <button
-                  type="button"
-                  onClick={() => setShowBranchDropdown((prev) => !prev)}
-                  className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border-2 border-amber-300 hover:border-amber-400 rounded-2xl px-3 py-2 text-xs font-black text-amber-950 shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 group select-none"
-                  title="Ver red de sucursales y cambiar tienda"
-                >
-                  <Store className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="hidden xl:inline text-amber-900">Sucursal:</span>
-                  <span className="text-stone-900">🏬 {activeBranch ? activeBranch.shortName : "Matriz"}</span>
-                  <span className="font-mono text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded-md text-[10px] font-black">
-                    {formatCurrency(activeBranch?.todaySales || 0)}
-                  </span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-amber-700 transition-transform duration-200 ${showBranchDropdown ? "rotate-180 text-amber-900" : ""}`} />
-                </button>
-              )}
 
               {/* Botón Grande: Categorías y Precios */}
               <button
