@@ -150,6 +150,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, permissions, logout, canAccessRoute } = useAuth();
+  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
   const { currentBranch, isAllBranches, branches } = useBranch();
   const { 
     isCollapsed, 
@@ -622,38 +623,72 @@ export default function Sidebar() {
 
           {/* Branch Pill */}
           {!isCollapsed ? (
-            <Link
-              href="/sucursales"
-              onClick={() => setMobileOpen(false)}
-              className="bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] hover:border-orange-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs transition-all group"
-              title="Ver panel de sucursales"
-            >
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                </span>
-                <div>
-                  <p className="font-bold text-stone-200 text-[10px] tracking-wide group-hover:text-orange-300 transition-colors">
-                    {isAllBranches ? "Todas las Sucursales" : currentBranch?.name}
-                  </p>
-                  <p className="text-[9px] text-stone-400">
-                    {isAllBranches ? "Consolidado General" : currentBranch?.manager}
-                  </p>
+            isAdmin ? (
+              <Link
+                href="/sucursales"
+                onClick={() => setMobileOpen(false)}
+                className="bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] hover:border-orange-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs transition-all group"
+                title="Ver panel de sucursales"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  <div>
+                    <p className="font-bold text-stone-200 text-[10px] tracking-wide group-hover:text-orange-300 transition-colors">
+                      {isAllBranches ? "Todas las Sucursales" : currentBranch?.name}
+                    </p>
+                    <p className="text-[9px] text-stone-400">
+                      {isAllBranches ? "Consolidado General" : currentBranch?.manager}
+                    </p>
+                  </div>
                 </div>
+                <span className="text-[9px] font-bold text-orange-300 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full">
+                  {isAllBranches ? "Multi-tienda" : "En Línea"}
+                </span>
+              </Link>
+            ) : (
+              <div
+                className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-2.5 flex items-center justify-between text-xs select-none"
+                title={`Sucursal asignada a tu turno: ${user?.assignedBranchName || currentBranch?.name}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  <div>
+                    <p className="font-bold text-stone-200 text-[10px] tracking-wide truncate max-w-[130px]">
+                      {user?.assignedBranchName || currentBranch?.name}
+                    </p>
+                    <p className="text-[9px] text-stone-400">
+                      {user?.name || currentBranch?.manager}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                  Asignada
+                </span>
               </div>
-              <span className="text-[9px] font-bold text-orange-300 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full">
-                {isAllBranches ? "Multi-tienda" : "En Línea"}
-              </span>
-            </Link>
+            )
           ) : (
-            <Link
-              href="/sucursales"
-              className="flex justify-center p-1"
-              title={isAllBranches ? "Todas las Sucursales" : currentBranch?.name}
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse ring-4 ring-emerald-500/20" />
-            </Link>
+            isAdmin ? (
+              <Link
+                href="/sucursales"
+                className="flex justify-center p-1"
+                title={isAllBranches ? "Todas las Sucursales" : currentBranch?.name}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse ring-4 ring-emerald-500/20" />
+              </Link>
+            ) : (
+              <div
+                className="flex justify-center p-1"
+                title={`Sucursal: ${user?.assignedBranchName || currentBranch?.name}`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse ring-4 ring-emerald-500/20" />
+              </div>
+            )
           )}
         </div>
       </aside>

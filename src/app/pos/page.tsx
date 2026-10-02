@@ -1727,27 +1727,6 @@ export default function POSPage() {
     }
   }, [recentSalesList, cashierName, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
-  // Ventas recientes correspondientes a la sucursal activa para el Breve Historial
-  const branchRecentSales = useMemo(() => {
-    try {
-      if (!recentSalesList || recentSalesList.length === 0) return [];
-      return recentSalesList.filter((s) => {
-        if (!s) return false;
-        if (activeBranch && activeBranch.id !== "all") {
-          const sBranch = (s as any).branchId || (s as any).branch_id;
-          if (sBranch) {
-            if (sBranch !== activeBranch.id) return false;
-          } else {
-            if (activeBranch.id !== "branch-matriz") return false;
-          }
-        }
-        return true;
-      });
-    } catch (e) {
-      console.error("Error filtering branchRecentSales:", e);
-      return [];
-    }
-  }, [recentSalesList, activeBranch]);
 
   const currentShiftExpenses = useMemo(() => {
     try {
@@ -2617,7 +2596,7 @@ export default function POSPage() {
                   type="button"
                   onClick={() => setShowBranchDropdown((prev) => !prev)}
                   className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border-2 border-amber-300 hover:border-amber-400 rounded-2xl px-3 py-2 text-xs font-black text-amber-950 shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 group select-none"
-                  title="Ver red de sucursales y breve historial de ventas"
+                  title="Ver red de sucursales y cambiar tienda"
                 >
                   <Store className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform shrink-0" />
                   <span className="hidden xl:inline text-amber-900">Sucursal:</span>
@@ -2998,13 +2977,13 @@ export default function POSPage() {
               </h3>
               <div className="flex items-center gap-1.5 text-[11px] text-amber-300 font-bold flex-wrap mt-0.5">
 
-                {/* Selector Desplegable de Sucursal con Diseño Artesanal y Breve Historial de Ventas */}
+                {/* Selector Desplegable de Sucursal con Diseño Artesanal */}
                 <div ref={branchDropdownRef} className="relative inline-block">
                   <button
                     type="button"
                     onClick={() => setShowBranchDropdown((prev) => !prev)}
                     className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/25 via-amber-600/20 to-orange-500/25 hover:from-amber-500/40 hover:to-orange-500/40 text-amber-100 hover:text-white px-2.5 py-1 rounded-xl border border-amber-400/40 hover:border-amber-300 text-[11px] font-black tracking-wide shadow-sm transition-all active:scale-95 cursor-pointer group select-none"
-                    title="Ver red de sucursales, cambiar tienda y consultar breve historial de ventas"
+                    title="Ver red de sucursales y cambiar tienda activa"
                   >
                     <Store className="w-3.5 h-3.5 text-amber-300 group-hover:text-amber-200 shrink-0" />
                     <span className="truncate max-w-[130px] sm:max-w-[200px]">
@@ -3033,7 +3012,7 @@ export default function POSPage() {
                           </div>
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-wider text-amber-400 leading-tight">Red Panaderías Brito</p>
-                            <p className="text-xs font-black text-white leading-tight">Sucursales & Historial</p>
+                            <p className="text-xs font-black text-white leading-tight">Red de Sucursales</p>
                           </div>
                         </div>
                         <button
@@ -3066,7 +3045,7 @@ export default function POSPage() {
                         <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
                           {user?.role === "admin" ? "Seleccionar Tienda Activa:" : "Sucursales de la Red:"}
                         </p>
-                        <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-0.5">
+                        <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-0.5">
                           {branches.map((b) => {
                             const isSelected = activeBranch?.id === b.id;
                             const isMatriz = b.id.includes("matriz");
@@ -3136,88 +3115,6 @@ export default function POSPage() {
                             );
                           })}
                         </div>
-                      </div>
-
-                      {/* Breve Historial de Ventas */}
-                      <div className="pt-2 border-t border-amber-900/60 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-xs font-black text-amber-300">
-                            <History className="w-3.5 h-3.5 text-amber-400" />
-                            <span>Breve Historial de Ventas ({branchRecentSales.length})</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowBranchDropdown(false);
-                              setShowRecentSales(true);
-                            }}
-                            className="text-[10px] font-extrabold text-amber-400 hover:text-amber-200 underline cursor-pointer"
-                          >
-                            Ver Todo ➔
-                          </button>
-                        </div>
-
-                        {/* Listado de tickets recientes */}
-                        <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5">
-                          {branchRecentSales.length > 0 ? (
-                            branchRecentSales.slice(0, 3).map((sale) => {
-                              const totalPzas = sale.items?.reduce((acc, i) => acc + (i.quantity || 0), 0) || 0;
-                              const timeStr = sale.date ? (sale.date.includes(" ") ? sale.date.split(" ")[1] : sale.date) : "Reciente";
-                              const methodLabel = sale.paymentMethod === "efectivo" ? "💵 Efec" : sale.paymentMethod === "tarjeta" ? "💳 Tarj" : "📱 Transf";
-
-                              return (
-                                <div
-                                  key={sale.id}
-                                  onClick={() => {
-                                    setShowBranchDropdown(false);
-                                    handleReprintSale(sale);
-                                  }}
-                                  className="p-2 rounded-xl bg-[#28140b]/90 hover:bg-[#341b0f] border border-amber-900/60 hover:border-amber-600 transition-all flex items-center justify-between gap-2 cursor-pointer group shadow-2xs"
-                                  title="Toca para ver y reimprimir este ticket"
-                                >
-                                  <div className="min-w-0 flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0 group-hover:scale-105 transition-transform text-xs">
-                                      <Receipt className="w-3 h-3" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="text-[11px] font-bold text-white truncate">
-                                        {sale.customerName || "Público en General"}
-                                      </p>
-                                      <p className="text-[9px] text-amber-200/70 truncate">
-                                        #{sale.id.slice(-6).toUpperCase()} • {timeStr} • {totalPzas} pzas • {methodLabel}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="text-right shrink-0">
-                                    <span className="text-xs font-black font-mono text-emerald-400 block">
-                                      {formatCurrency(sale.total)}
-                                    </span>
-                                    <span className="text-[9px] text-amber-300 font-bold group-hover:underline">
-                                      🖨️ Ticket
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="p-3 text-center bg-[#231209] rounded-xl border border-amber-900/40 text-[11px] text-amber-200/70">
-                              🥖 Sin ventas registradas en este turno aún. Los tickets cobrados aparecerán aquí.
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Botón grande para abrir historial completo */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowBranchDropdown(false);
-                            setShowRecentSales(true);
-                          }}
-                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-950/40 transition-all active:scale-95 cursor-pointer mt-1"
-                        >
-                          <Receipt className="w-3.5 h-3.5" />
-                          <span>Ver Historial Completo ({branchRecentSales.length} ventas)</span>
-                        </button>
                       </div>
 
                     </div>

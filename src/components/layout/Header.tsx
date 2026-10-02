@@ -40,6 +40,7 @@ export default function Header() {
     consolidatedMetrics
   } = useBranch();
   const { isOnline, isSyncing, isSynced, pendingCount } = useSync();
+  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
 
   const [time, setTime] = useState<string>("");
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -269,12 +270,14 @@ export default function Header() {
           )}
         </Link>
 
-        {/* Branch Selector Dropdown */}
+        {/* Branch Selector Dropdown (Solo administradores pueden alternar o ver Todas) */}
         <div ref={branchMenuRef} className="relative z-[110] shrink-0">
           <button
-            onClick={toggleBranchMenu}
-            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl border border-amber-900/60 bg-[#2c170d] hover:bg-[#3d2012] text-amber-100 text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer"
-            title="Cambiar sucursal activa"
+            onClick={isAdmin ? toggleBranchMenu : undefined}
+            className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl border border-amber-900/60 bg-[#2c170d] text-amber-100 text-xs font-bold transition-all shadow-xs shrink-0 whitespace-nowrap ${
+              isAdmin ? "hover:bg-[#3d2012] cursor-pointer" : "cursor-default opacity-95"
+            }`}
+            title={isAdmin ? "Cambiar sucursal activa" : `Sucursal asignada a tu perfil: ${user?.assignedBranchName || currentBranch?.name}`}
           >
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -282,13 +285,17 @@ export default function Header() {
             </span>
             <Building2 className="w-3.5 h-3.5 text-orange-600 shrink-0" />
             <span className="max-w-[65px] sm:max-w-[110px] md:max-w-[140px] truncate">
-              {isAllBranches ? "Todas" : currentBranch?.shortName}
+              {isAdmin && isAllBranches ? "Todas" : currentBranch?.shortName || currentBranch?.name}
             </span>
-            <ChevronDown className="w-3 h-3 text-amber-400/80 shrink-0 hidden sm:inline" />
+            {isAdmin ? (
+              <ChevronDown className="w-3 h-3 text-amber-400/80 shrink-0 hidden sm:inline" />
+            ) : (
+              <span className="text-[10px] text-amber-400/80 ml-0.5 font-mono hidden sm:inline" title="Sucursal Asignada">🔒</span>
+            )}
           </button>
 
-          {/* Branch Dropdown Menu */}
-          {showBranchMenu && (
+          {/* Branch Dropdown Menu (Exclusivo Administrador) */}
+          {isAdmin && showBranchMenu && (
             <div className="absolute right-0 mt-2 w-84 max-w-[calc(100vw-32px)] bg-[#1c0e08] rounded-2xl shadow-2xl border-2 border-amber-900/70 p-3 z-[150] animate-in fade-in zoom-in-95 text-stone-100">
               <div className="p-2 pb-2.5 border-b border-amber-900/50 flex items-center justify-between">
                 <div>

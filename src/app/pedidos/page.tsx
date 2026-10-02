@@ -38,6 +38,7 @@ import {
   History,
   Archive,
   Building2,
+  Lock,
   X
 } from "lucide-react";
 import { CustomOrder } from "@/types";
@@ -101,10 +102,24 @@ export default function PedidosPage() {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
 
+  // Control de roles y asignación de sucursal:
+  // Administradores: control y visualización total multi-sucursal ("all" y cualquier tienda)
+  // Perfiles operativos (cajeros como Andrés): estrictamente su sucursal asignada
+  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+  const userBranchId = (user?.assignedBranchId || currentBranch?.id || branches[0]?.id || "branch-matriz").trim();
+  const userBranch = branches.find((b) => b.id === userBranchId) || currentBranch || branches[0];
+
   // State: Default view is "productos" en formato "lista" compacta y ordenada
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedBranchFilter, setSelectedBranchFilter] = useState("all");
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState(() => (isAdmin ? "all" : userBranchId));
+
+  // Filtro efectivo de sucursal (para cajeros siempre está forzado a su sucursal asignada)
+  const effectiveBranchFilter = useMemo(() => {
+    if (isAdmin) return selectedBranchFilter;
+    return userBranchId;
+  }, [isAdmin, selectedBranchFilter, userBranchId]);
+
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
   const [historialSubFilter, setHistorialSubFilter] = useState<"todos" | "entregados" | "cancelados">("todos");
   const [pagadosSubFilter, setPagadosSubFilter] = useState<"todos" | "pendientes" | "listos">("todos");
@@ -208,11 +223,15 @@ export default function PedidosPage() {
     };
   }, []);
 
-  // Por requerimiento operativo: al entrar a la página de pedidos el filtro siempre debe permanecer en
-  // "all" (Todas las Sucursales) para visualizar inmediatamente todos los pedidos que van llegando sin exclusión.
+  // Por requerimiento operativo: los administradores entran visualizando "all" (Todas las Sucursales),
+  // mientras que los cajeros y perfiles operativos se limitan estrictamente a su sucursal asignada.
   useEffect(() => {
-    setSelectedBranchFilter("all");
-  }, []);
+    if (isAdmin) {
+      setSelectedBranchFilter("all");
+    } else {
+      setSelectedBranchFilter(userBranchId);
+    }
+  }, [isAdmin, userBranchId]);
 
   // Local minute clock (for checking if delivery time has passed today)
   const [currentMinutes, setCurrentMinutes] = useState<number>(() => {
@@ -367,7 +386,7 @@ export default function PedidosPage() {
 
 // Classification counts for the current branch view
   const classificationCounts = useMemo(() => {
-    const branchFiltered = orders.filter((o) => checkOrderMatchesBranch(o, selectedBranchFilter));
+    const branchFiltered = orders.filter((o) => checkOrderMatchesBranch(o, effectiveBranchFilter));
 
     let activos = 0;
     let hoy = 0;
@@ -421,11 +440,11 @@ export default function PedidosPage() {
       cancelados,
       historial,
     };
-  }, [orders, selectedBranchFilter, todayStr, currentMinutes, checkOrderMatchesBranch]);
+  }, [orders, effectiveBranchFilter, todayStr, currentMinutes, checkOrderMatchesBranch]);
 
   // Time period counts (Día, Semana, Mes, Año, Todos) para la sucursal actual
   const timePeriodCounts = useMemo(() => {
-    const branchFiltered = orders.filter((o) => checkOrderMatchesBranch(o, selectedBranchFilter));
+    const branchFiltered = orders.filter((o) => checkOrderMatchesBranch(o, effectiveBranchFilter));
 
     const baseOrders = branchFiltered.filter((o) => {
       if (classificationFilter === "historial") {
@@ -460,7 +479,7 @@ export default function PedidosPage() {
     };
   }, [
     orders,
-    selectedBranchFilter,
+    effectiveBranchFilter,
     classificationFilter,
     historialSubFilter,
     customSelectedDate,
@@ -475,7 +494,7 @@ export default function PedidosPage() {
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       // Branch filter (revisar sucursal de entrega o sucursal donde se levantó/cobró)
-      if (!checkOrderMatchesBranch(order, selectedBranchFilter)) {
+      if (!checkOrderMatchesBranch(order, effectiveBranchFilter)) {
         return false;
       }
 
@@ -569,7 +588,7 @@ export default function PedidosPage() {
     });
   }, [
     orders,
-    selectedBranchFilter,
+    effectiveBranchFilter,
     classificationFilter,
     historialSubFilter,
     pagadosSubFilter,
@@ -592,9 +611,8 @@ export default function PedidosPage() {
   // Metrics (reactivos a la sucursal seleccionada para coincidir con los pedidos)
   const metrics = useMemo(() => {
     const branchFiltered = orders.filter((o) => {
-      if (selectedBranchFilter !== "all") {
-        const orderOperating = (o as any).operatingBranchId;
-        return !o.branchId || o.branchId === selectedBranchFilter || orderOperating === selectedBranchFilter;
+      if (effectiveBranchFilter !== "all") {
+        return checkOrderMatchesBranch(o, effectiveBranchFilter);
       }
       return true;
     });
@@ -613,7 +631,7 @@ export default function PedidosPage() {
       totalRemainingBalance: totalRemaining,
       readyCount: readyOrders.length,
     };
-  }, [orders, selectedBranchFilter, todayStr]);
+  }, [orders, effectiveBranchFilter, todayStr, checkOrderMatchesBranch]);
 
   // Desglose de sumas por sucursal (para que las sumas de pedidos estén separadas por tienda y no revueltas)
   const branchOrdersBreakdown = useMemo(() => {
@@ -627,8 +645,13 @@ export default function PedidosPage() {
       return o.status !== "entregado" && o.status !== "cancelado";
     });
 
+    // Para perfiles no administradores (cajeros), limitar inmediatamente a su propia sucursal
+    const userScopedOrders = isAdmin 
+      ? baseOrders 
+      : baseOrders.filter((o) => checkOrderMatchesBranch(o, userBranchId));
+
     // Filtro por período de tiempo (Día, Semana, Mes, Año, Todos)
-    const periodOrders = baseOrders.filter((order) => {
+    const periodOrders = userScopedOrders.filter((order) => {
       const orderDate = normalizeDateStr(order.deliveryDate) || (order.createdAt ? normalizeDateStr(order.createdAt) : "");
       if (timePeriodFilter !== "todos") {
         if (!orderDate) return false;
@@ -640,7 +663,7 @@ export default function PedidosPage() {
       return true;
     });
 
-    // Mapear cada sucursal
+    // Mapear cada sucursal visible según rol (Admin ve todas, Cajero solo la suya)
     const branchMap = new Map<string, {
       branchId: string;
       branchName: string;
@@ -655,7 +678,11 @@ export default function PedidosPage() {
       unpaidCount: number;
     }>();
 
-    branches.forEach((b) => {
+    const visibleBranches = isAdmin 
+      ? branches 
+      : branches.filter((b) => b.id === userBranchId);
+
+    visibleBranches.forEach((b) => {
       branchMap.set(b.id, {
         branchId: b.id,
         branchName: b.name,
@@ -671,7 +698,7 @@ export default function PedidosPage() {
       });
     });
 
-    branches.forEach((b) => {
+    visibleBranches.forEach((b) => {
       const bOrders = periodOrders.filter((o) => checkOrderMatchesBranch(o, b.id));
       const totalAmount = bOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
       const totalDeposits = bOrders.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
@@ -717,6 +744,9 @@ export default function PedidosPage() {
   }, [
     orders,
     branches,
+    isAdmin,
+    userBranchId,
+    checkOrderMatchesBranch,
     classificationFilter,
     historialSubFilter,
     timePeriodFilter,
@@ -1206,72 +1236,110 @@ export default function PedidosPage() {
           </div>
         </div>
 
-        {/* Cuadro 2.5: 🏬 Todas las Sucursales (Mucho más grande, interactivo y al lado de '¡Entregas para HOY!') */}
-        <div
-          onClick={() => {
-            if (topBranchSelectRef.current) {
-              topBranchSelectRef.current.focus();
-              if (typeof (topBranchSelectRef.current as any).showPicker === "function") {
-                (topBranchSelectRef.current as any).showPicker();
+        {/* Cuadro 2.5: 🏬 Sucursales (Administradores: Selector interactivo multi-tienda | Cajeros: Exclusivamente su propia sucursal asignada) */}
+        {isAdmin ? (
+          <div
+            onClick={() => {
+              if (topBranchSelectRef.current) {
+                topBranchSelectRef.current.focus();
+                if (typeof (topBranchSelectRef.current as any).showPicker === "function") {
+                  (topBranchSelectRef.current as any).showPicker();
+                }
               }
-            }
-          }}
-          className={`bg-white border-2 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none relative group ${
-            selectedBranchFilter !== "all"
-              ? "border-amber-500 ring-4 ring-amber-400/30 shadow-md bg-amber-50/40"
-              : "border-stone-200/80 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10"
-          }`}
-          title="Toca para seleccionar la sucursal y filtrar los pedidos"
-        >
-          <div className="flex items-start justify-between">
-            <div className="min-w-0 flex-1 pr-2">
-              <span className="text-[11px] font-bold uppercase text-amber-700 tracking-wider block font-extrabold">
-                🏬 Sucursales
-              </span>
-              <span className="text-xl sm:text-2xl font-black text-stone-900 mt-1 block truncate">
-                {selectedBranchFilter === "all"
-                  ? "Todas"
-                  : branches.find((b) => b.id === selectedBranchFilter)?.name.replace("Sucursal ", "") || "Sucursal"}
-              </span>
-              <span className="text-[10px] text-amber-700 font-semibold block truncate">
-                {selectedBranchFilter === "all"
-                  ? `${branchOrdersBreakdown.grandTotalOrders} pedidos en ${branches.length} tiendas`
-                  : `Filtrando pedidos de esta tienda`}
-              </span>
-            </div>
-            <div className={`p-2.5 sm:p-3 rounded-2xl border transition-colors shrink-0 ${
+            }}
+            className={`bg-white border-2 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between transition-all duration-200 cursor-pointer hover:-translate-y-0.5 select-none relative group ${
               selectedBranchFilter !== "all"
-                ? "bg-amber-500 text-white border-amber-600 shadow-xs"
-                : "bg-amber-50 text-amber-600 border-amber-100 group-hover:bg-amber-100"
-            }`}>
-              <Building2 className="w-5 h-5" />
+                ? "border-amber-500 ring-4 ring-amber-400/30 shadow-md bg-amber-50/40"
+                : "border-stone-200/80 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10"
+            }`}
+            title="Toca para seleccionar la sucursal y filtrar los pedidos"
+          >
+            <div className="flex items-start justify-between">
+              <div className="min-w-0 flex-1 pr-2">
+                <span className="text-[11px] font-bold uppercase text-amber-700 tracking-wider block font-extrabold">
+                  🏬 Sucursales
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-stone-900 mt-1 block truncate">
+                  {selectedBranchFilter === "all"
+                    ? "Todas"
+                    : branches.find((b) => b.id === selectedBranchFilter)?.name.replace("Sucursal ", "") || "Sucursal"}
+                </span>
+                <span className="text-[10px] text-amber-700 font-semibold block truncate">
+                  {selectedBranchFilter === "all"
+                    ? `${branchOrdersBreakdown.grandTotalOrders} pedidos en ${branches.length} tiendas`
+                    : `Filtrando pedidos de esta tienda`}
+                </span>
+              </div>
+              <div className={`p-2.5 sm:p-3 rounded-2xl border transition-colors shrink-0 ${
+                selectedBranchFilter !== "all"
+                  ? "bg-amber-500 text-white border-amber-600 shadow-xs"
+                  : "bg-amber-50 text-amber-600 border-amber-100 group-hover:bg-amber-100"
+              }`}>
+                <Building2 className="w-5 h-5" />
+              </div>
             </div>
-          </div>
 
-          <div className="mt-2.5 pt-2 border-t border-stone-100">
-            <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
-              <select
-                ref={topBranchSelectRef}
-                value={selectedBranchFilter}
-                onChange={(e) => {
-                  setSelectedBranchFilter(e.target.value);
-                  scrollToCatalog();
-                }}
-                className="w-full text-xs font-black text-amber-950 bg-amber-50/90 hover:bg-amber-100 border-2 border-amber-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer transition-all appearance-none pr-7 shadow-xs"
-              >
-                <option value="all">
-                  🏬 Todas las Sucursales ({branchOrdersBreakdown.grandTotalOrders} pedidos)
-                </option>
-                {branchOrdersBreakdown.branches.map((b) => (
-                  <option key={b.branchId} value={b.branchId}>
-                    🏬 {b.branchName} ({b.totalOrders} pedidos)
+            <div className="mt-2.5 pt-2 border-t border-stone-100">
+              <div className="relative w-full" onClick={(e) => e.stopPropagation()}>
+                <select
+                  ref={topBranchSelectRef}
+                  value={selectedBranchFilter}
+                  onChange={(e) => {
+                    setSelectedBranchFilter(e.target.value);
+                    scrollToCatalog();
+                  }}
+                  className="w-full text-xs font-black text-amber-950 bg-amber-50/90 hover:bg-amber-100 border-2 border-amber-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer transition-all appearance-none pr-7 shadow-xs"
+                >
+                  <option value="all">
+                    🏬 Todas las Sucursales ({branchOrdersBreakdown.grandTotalOrders} pedidos)
                   </option>
-                ))}
-              </select>
-              <ChevronDown className="w-4 h-4 text-amber-800 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  {branchOrdersBreakdown.branches.map((b) => (
+                    <option key={b.branchId} value={b.branchId}>
+                      🏬 {b.branchName} ({b.totalOrders} pedidos)
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-amber-800 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* Vista exclusiva para Cajero / Perfil No Administrador: estrictamente su propia sucursal asignada */
+          <div
+            className="bg-white border-2 border-amber-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col justify-between select-none relative"
+            title={`Sucursal asignada a tu perfil: ${user?.assignedBranchName || userBranch.name}`}
+          >
+            <div className="flex items-start justify-between">
+              <div className="min-w-0 flex-1 pr-2">
+                <span className="text-[11px] font-bold uppercase text-amber-700 tracking-wider block font-extrabold flex items-center gap-1.5">
+                  <span>🏬 Mi Sucursal</span>
+                  <Lock className="w-3 h-3 text-amber-600 inline" />
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-stone-900 mt-1 block truncate">
+                  {user?.assignedBranchName || userBranch.name.replace("Sucursal ", "")}
+                </span>
+                <span className="text-[10px] text-amber-700 font-semibold block truncate">
+                  {classificationCounts.all} pedidos en tu sucursal
+                </span>
+              </div>
+              <div className="p-2.5 sm:p-3 rounded-2xl border transition-colors shrink-0 bg-amber-50 text-amber-600 border-amber-100">
+                <Building2 className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="mt-2.5 pt-2 border-t border-stone-100">
+              <div className="w-full text-xs font-bold text-amber-950 bg-amber-50/90 border border-amber-200/90 rounded-xl px-2.5 py-1.5 flex items-center justify-between shadow-2xs">
+                <span className="flex items-center gap-1.5 truncate text-[11px]">
+                  <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                  <span className="truncate">Turno: {user?.name || "Cajero"}</span>
+                </span>
+                <span className="text-[10px] bg-amber-200 text-amber-950 px-2 py-0.5 rounded-md font-black shrink-0">
+                  {user?.assignedBranchName || userBranch.shortName || "Asignada"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Cuadro 3: Falta por Cobrar */}
         <div

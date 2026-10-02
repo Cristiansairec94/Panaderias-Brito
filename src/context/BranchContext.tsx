@@ -1,10 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { Branch, BranchShift, BranchCashMovement } from "@/types";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 export interface SimulatedSale {
   id: string;
@@ -252,6 +253,10 @@ interface BranchContextType {
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+  const userAssignedBranchId = (user?.assignedBranchId || "").trim();
+
   const [branches, setBranches] = useState<Branch[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -266,7 +271,25 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     }
     return DEFAULT_BRANCHES;
   });
-  const [currentBranchId, setCurrentBranchId] = useState<string>("branch-matriz");
+
+  const [currentBranchId, setCurrentBranchId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("brito_current_branch_id");
+      if (saved) return saved;
+    }
+    return "branch-matriz";
+  });
+
+  // Los perfiles operativos (cajeros, etc.) quedan estrictamente anclados a su sucursal asignada
+  useEffect(() => {
+    if (!isAdmin && userAssignedBranchId) {
+      setCurrentBranchId(userAssignedBranchId);
+      try {
+        localStorage.setItem("brito_current_branch_id", userAssignedBranchId);
+      } catch {}
+    }
+  }, [isAdmin, userAssignedBranchId]);
+
   const [isLiveSimulating, setIsLiveSimulating] = useState(false);
   const [recentSimulatedSales, setRecentSimulatedSales] = useState<SimulatedSale[]>([]);
   const [cashMovements, setCashMovements] = useState<BranchCashMovement[]>(DEFAULT_CASH_MOVEMENTS);
@@ -415,7 +438,11 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       }
       const savedCurrent = localStorage.getItem("brito_current_branch_id");
       if (savedCurrent) {
-        setCurrentBranchId(savedCurrent);
+        if (!isAdmin && userAssignedBranchId) {
+          setCurrentBranchId(userAssignedBranchId);
+        } else {
+          setCurrentBranchId(savedCurrent);
+        }
       }
       const savedSales = localStorage.getItem("brito_simulated_sales");
       if (savedSales) {
@@ -626,6 +653,13 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchBranch = (branchId: string | "all") => {
+    if (!isAdmin && userAssignedBranchId) {
+      setCurrentBranchId(userAssignedBranchId);
+      try {
+        localStorage.setItem("brito_current_branch_id", userAssignedBranchId);
+      } catch {}
+      return;
+    }
     setCurrentBranchId(branchId);
     try {
       localStorage.setItem("brito_current_branch_id", branchId);
@@ -830,11 +864,17 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     }
   }, [branches]);
 
-  const currentBranch = currentBranchId === "all" 
-    ? null 
-    : branches.find((b) => b.id === currentBranchId) || branches[0];
+  const isAllBranches = isAdmin ? currentBranchId === "all" : false;
 
-  const isAllBranches = currentBranchId === "all";
+  const currentBranch = useMemo(() => {
+    if (!isAdmin && userAssignedBranchId) {
+      return branches.find((b) => b.id === userAssignedBranchId) || branches[0];
+    }
+    if (currentBranchId === "all") {
+      return null;
+    }
+    return branches.find((b) => b.id === currentBranchId) || branches[0];
+  }, [branches, currentBranchId, isAdmin, userAssignedBranchId]);
 
   // Simulate a single sale
   const simulateSale = useCallback((targetBranchId?: string, customAmount?: number): SimulatedSale => {
