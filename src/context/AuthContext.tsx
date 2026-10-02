@@ -133,21 +133,31 @@ export const DEMO_USERS: User[] = [
     password: "admin",
     role: "admin",
     roleLabel: "Dueño / Administrador",
+    jobTitle: "Dueño / Administrador",
     avatar: "👨‍🍳",
     phone: "55 1234 5678",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "01 ene 2024",
   },
   {
     id: "usr-2",
-    name: "Lupita Brito",
-    username: "lupita",
-    email: "caja@panaderiabrito.com",
-    password: "caja",
-    role: "cajero",
-    roleLabel: "Cajera / Auxiliar de Tienda",
+    name: "PAULINA BRITO",
+    username: "paulina",
+    email: "paulina@panaderiabrito.com",
+    password: "1234",
+    role: "auxiliar_admin",
+    roleLabel: "Administrador General",
+    jobTitle: "Auxiliar Administrativo",
     avatar: "👩‍💼",
     phone: "55 8765 4321",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "01 ene 2024",
   },
   {
     id: "usr-3",
@@ -157,9 +167,14 @@ export const DEMO_USERS: User[] = [
     password: "1234",
     role: "auxiliar_admin",
     roleLabel: "Auxiliar Administrativo",
+    jobTitle: "Auxiliar Administrativo",
     avatar: "💼",
     phone: "55 2233 4455",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "15 ene 2024",
   },
   {
     id: "usr-4",
@@ -169,9 +184,14 @@ export const DEMO_USERS: User[] = [
     password: "pan",
     role: "panadero",
     roleLabel: "Jefe de Horno & Producción",
+    jobTitle: "Maestro Panadero",
     avatar: "🥖",
     phone: "55 9988 7766",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "San Benito",
+    createdAt: "01 feb 2024",
   },
   {
     id: "usr-5",
@@ -181,9 +201,82 @@ export const DEMO_USERS: User[] = [
     password: "super",
     role: "supervisor",
     roleLabel: "Supervisor de Turno",
+    jobTitle: "Supervisor de Calidad",
     avatar: "📋",
     phone: "55 3344 5566",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "San Benito",
+    createdAt: "10 feb 2024",
+  },
+  {
+    id: "usr-silvia",
+    name: "silvia puga",
+    username: "silvia",
+    email: "silvia@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Cajero(a) de Mostrador",
+    avatar: "👩‍💼",
+    phone: "2213456778",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "2 oct 2026",
+  },
+  {
+    id: "usr-noe",
+    name: "noe velasquez",
+    username: "noe",
+    email: "noe@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Cajero(a) de Mostrador",
+    avatar: "👨‍🍳",
+    phone: "1122334455",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "San Benito",
+    createdAt: "2 oct 2026",
+  },
+  {
+    id: "usr-carlos-b",
+    name: "carlos bueno",
+    username: "carlos.bueno",
+    email: "carlos.bueno@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Cajero(a) de Mostrador",
+    avatar: "👨‍🍳",
+    phone: "5544332211",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "2 oct 2026",
+  },
+  {
+    id: "usr-andres",
+    name: "andres sanchez",
+    username: "andres",
+    email: "andres@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Ayudante General de Panadería",
+    avatar: "👨‍💼",
+    phone: "7731107898",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "San Benito",
+    createdAt: "1 oct 2026",
   },
 ];
 
@@ -216,59 +309,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [rolePermissionsMap, setRolePermissionsMap] = useState<Record<UserRole, RolePermissions>>(ROLE_PERMISSIONS);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load custom users from localStorage on mount & synchronize with server API
+  // Load custom users from localStorage on mount (Almacenamiento permanente y autoritativo)
   useEffect(() => {
-    // 1. Carga inmediata desde almacenamiento local
     try {
       const savedCustom = localStorage.getItem("brito_custom_users");
       if (savedCustom) {
         const parsed = JSON.parse(savedCustom);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setUsersList(parsed);
+          return;
         }
       }
+      // Inicializar por primera vez con los empleados de la plantilla
+      localStorage.setItem("brito_custom_users", JSON.stringify(DEMO_USERS));
+      setUsersList(DEMO_USERS);
     } catch (e) {
       console.error("Error loading custom users from localStorage:", e);
+      setUsersList(DEMO_USERS);
     }
+  }, []);
 
-    // 2. Sincronización duradera con el servidor (/api/users)
-    const syncUsersWithServer = async () => {
-      try {
-        const res = await fetch("/api/users");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.users) && data.users.length > 0) {
-            setUsersList((localUsers) => {
-              const userMap = new Map<string, User>();
-              // Inicializar con defaults
-              DEMO_USERS.forEach((u) => userMap.set(u.id, u));
-              // Aplicar lo guardado en el servidor (users.json)
-              data.users.forEach((u: User) => {
-                const prev = userMap.get(u.id) || {};
-                userMap.set(u.id, { ...prev, ...u });
-              });
-              // Preservar usuarios locales de la sesión activa
-              localUsers.forEach((u: User) => {
-                const prev = userMap.get(u.id) || {};
-                userMap.set(u.id, { ...prev, ...u });
-              });
-
-              const merged = Array.from(userMap.values());
-              try {
-                localStorage.setItem("brito_custom_users", JSON.stringify(merged));
-              } catch (e) {
-                console.warn("[AuthContext] Almacenamiento local lleno al sincronizar usuarios:", e);
-              }
-              return merged;
-            });
+  // Sincronización en tiempo real entre pestañas abiertas del navegador
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "brito_custom_users" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setUsersList(parsed);
           }
-        }
-      } catch (err) {
-        console.warn("[AuthContext] No se pudo consultar /api/users:", err);
+        } catch {}
       }
     };
-
-    syncUsersWithServer();
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   // Load saved role permissions from localStorage on mount
@@ -470,7 +544,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Friendly alias checks
       if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
-      if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
+      if ((clean === "paulina" || clean === "lupita" || clean === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
       if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
       if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
       if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
@@ -529,7 +603,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Friendly alias checks
       if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
-      if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
+      if ((clean === "paulina" || clean === "lupita" || clean === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
       if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
       if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
       if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
