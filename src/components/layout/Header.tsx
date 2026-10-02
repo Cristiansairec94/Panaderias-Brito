@@ -299,47 +299,68 @@ export default function Header() {
 
           {/* Branch Dropdown Menu */}
           {showBranchMenu && (
-            <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-32px)] bg-[#1c0e08] rounded-2xl shadow-2xl border border-amber-900/60 p-2.5 z-[150] animate-in fade-in zoom-in-95 text-stone-200">
-              <div className="p-2 border-b border-amber-900/40 flex items-center justify-between">
+            <div className="absolute right-0 mt-2 w-84 max-w-[calc(100vw-32px)] bg-[#1c0e08] rounded-2xl shadow-2xl border-2 border-amber-900/70 p-3 z-[150] animate-in fade-in zoom-in-95 text-stone-100">
+              <div className="p-2 pb-2.5 border-b border-amber-900/50 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Red de Sucursales</p>
-                  <p className="text-xs font-black text-white">Seleccionar Tienda</p>
+                  <p className="text-[10px] font-extrabold text-amber-400 uppercase tracking-widest">Red de Sucursales</p>
+                  <p className="text-sm font-black text-white tracking-wide">Seleccionar Tienda</p>
                 </div>
                 <Link
                   href="/sucursales"
                   onClick={() => setShowBranchMenu(false)}
-                  className="text-[10px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 px-2 py-1 rounded-lg border border-orange-200"
+                  className="text-xs font-black text-amber-950 hover:text-black bg-amber-400 hover:bg-amber-300 px-3 py-1.5 rounded-xl border border-amber-300 shadow-sm transition-all cursor-pointer"
                 >
                   Ver Todo
                 </Link>
               </div>
 
               {/* Branch list */}
-              <div className="p-1 space-y-1 mt-1">
+              <div className="p-1 space-y-1.5 mt-2 max-h-[70vh] overflow-y-auto">
                 {/* All Branches option */}
                 <button
+                  type="button"
                   onClick={() => {
                     switchBranch("all");
                     setShowBranchMenu(false);
                   }}
-                  className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-all ${
+                  className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
                     isAllBranches
-                      ? "bg-gradient-to-r from-orange-50 to-rose-50 border border-orange-200 text-stone-900 font-bold"
-                      : "hover:bg-stone-50 text-stone-700"
+                      ? "bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 text-stone-950 font-bold shadow-md ring-2 ring-amber-400/40"
+                      : "bg-[#28150c]/90 hover:bg-[#381e11] border border-amber-900/60 hover:border-amber-700 text-stone-100 shadow-2xs"
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-stone-900 text-white flex items-center justify-center text-xs font-black">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
+                      isAllBranches
+                        ? "bg-gradient-to-br from-amber-600 to-orange-600 text-white shadow-xs"
+                        : "bg-stone-900/90 text-amber-300 border border-amber-900/70"
+                    }`}>
                       Σ
                     </div>
-                    <div>
-                      <p className="font-black text-xs leading-tight">Todas las Sucursales</p>
-                      <p className="text-[10px] text-stone-400">Consolidado general</p>
+                    <div className="min-w-0">
+                      <p className={`font-black text-xs leading-tight truncate ${
+                        isAllBranches ? "text-stone-950" : "text-white"
+                      }`}>
+                        Todas las Sucursales
+                      </p>
+                      <p className={`text-[10px] truncate ${
+                        isAllBranches ? "text-stone-600 font-semibold" : "text-amber-200/80 font-medium"
+                      }`}>
+                        Consolidado general
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs font-black text-emerald-700">{formatCurrency(consolidatedMetrics.totalSales)}</p>
-                    <p className="text-[9px] text-stone-400">{consolidatedMetrics.totalTickets} tickets</p>
+                  <div className="text-right shrink-0 pl-2">
+                    <p className={`text-xs font-black font-mono tracking-tight ${
+                      isAllBranches ? "text-emerald-800" : "text-emerald-400"
+                    }`}>
+                      {formatCurrency(consolidatedMetrics.totalSales)}
+                    </p>
+                    <p className={`text-[10px] font-semibold ${
+                      isAllBranches ? "text-stone-600" : "text-stone-300"
+                    }`}>
+                      {consolidatedMetrics.totalTickets} tickets
+                    </p>
                   </div>
                 </button>
 
@@ -350,28 +371,49 @@ export default function Header() {
                   return (
                     <button
                       key={b.id}
+                      type="button"
                       onClick={() => {
                         switchBranch(b.id);
                         setShowBranchMenu(false);
                       }}
-                      className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-all ${
+                      className={`w-full text-left p-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
                         isSelected
-                          ? "bg-orange-50 border border-orange-200 text-stone-900 font-bold shadow-sm"
-                          : "hover:bg-stone-50 text-stone-700"
+                          ? "bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 text-stone-950 font-bold shadow-md ring-2 ring-amber-400/40"
+                          : "bg-[#28150c]/90 hover:bg-[#381e11] border border-amber-900/60 hover:border-amber-700 text-stone-100 shadow-2xs"
                       }`}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                          isSelected
+                            ? "bg-amber-600 text-white shadow-xs"
+                            : "bg-amber-950/90 text-amber-300 border border-amber-700/60"
+                        }`}>
                           <Store className="w-4 h-4" />
                         </div>
-                        <div>
-                          <p className="font-bold text-xs leading-tight">{b.name}</p>
-                          <p className="text-[10px] text-stone-400">{b.currentShift.cashier}</p>
+                        <div className="min-w-0">
+                          <p className={`font-black text-xs leading-tight truncate ${
+                            isSelected ? "text-stone-950" : "text-white"
+                          }`}>
+                            {b.name}
+                          </p>
+                          <p className={`text-[11px] truncate ${
+                            isSelected ? "text-stone-700 font-semibold" : "text-amber-200/90 font-medium"
+                          }`}>
+                            {b.currentShift?.cashier || b.manager || "En turno"}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs font-black text-stone-900">{formatCurrency(b.todaySales)}</p>
-                        <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      <div className="text-right shrink-0 pl-2">
+                        <p className={`text-xs font-black font-mono tracking-tight ${
+                          isSelected ? "text-amber-950" : "text-amber-300 drop-shadow-2xs"
+                        }`}>
+                          {formatCurrency(b.todaySales)}
+                        </p>
+                        <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-md mt-0.5 ${
+                          isSelected
+                            ? "text-emerald-900 bg-emerald-100 border border-emerald-300"
+                            : "text-emerald-300 bg-emerald-950/80 border border-emerald-500/50"
+                        }`}>
                           {b.todayTickets} tkts
                         </span>
                       </div>
@@ -442,8 +484,8 @@ export default function Header() {
                       onClick={() => handleRoleSwitch(demo)}
                       className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between font-semibold transition-all cursor-pointer ${
                         user?.id === demo.id
-                          ? "bg-amber-50 text-amber-900 font-bold border border-amber-200"
-                          : "text-stone-700 hover:bg-stone-100"
+                          ? "bg-gradient-to-r from-amber-50 to-orange-50 text-stone-950 font-bold border-2 border-amber-400 shadow-sm"
+                          : "text-stone-200 hover:bg-white/[0.08] hover:text-white"
                       }`}
                     >
                       <div className="flex items-center gap-2">
