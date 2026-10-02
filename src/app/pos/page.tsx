@@ -646,6 +646,8 @@ export default function POSPage() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [isReprintMode, setIsReprintMode] = useState(false);
   const [showRecentSales, setShowRecentSales] = useState(false);
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
   const [showBreadDeliveryModal, setShowBreadDeliveryModal] = useState(false);
@@ -1115,6 +1117,28 @@ export default function POSPage() {
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isCustomerPickerOpen]);
+
+  // Cerrar selector de sucursales e historial al hacer clic fuera o presionar Escape
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
+        setShowBranchDropdown(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowBranchDropdown(false);
+      }
+    }
+    if (showBranchDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [showBranchDropdown]);
 
   const handleCreateQuickCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1702,6 +1726,28 @@ export default function POSPage() {
       return [];
     }
   }, [recentSalesList, cashierName, shiftStartBoundary, shiftVersion, activeBranch?.id]);
+
+  // Ventas recientes correspondientes a la sucursal activa para el Breve Historial
+  const branchRecentSales = useMemo(() => {
+    try {
+      if (!recentSalesList || recentSalesList.length === 0) return [];
+      return recentSalesList.filter((s) => {
+        if (!s) return false;
+        if (activeBranch && activeBranch.id !== "all") {
+          const sBranch = (s as any).branchId || (s as any).branch_id;
+          if (sBranch) {
+            if (sBranch !== activeBranch.id) return false;
+          } else {
+            if (activeBranch.id !== "branch-matriz") return false;
+          }
+        }
+        return true;
+      });
+    } catch (e) {
+      console.error("Error filtering branchRecentSales:", e);
+      return [];
+    }
+  }, [recentSalesList, activeBranch]);
 
   const currentShiftExpenses = useMemo(() => {
     try {
@@ -2567,25 +2613,20 @@ export default function POSPage() {
             <div className="flex items-center gap-2 shrink-0">
               {/* Selector Rápido de Sucursal para Administrador (En Tiempo Real) */}
               {user?.role === "admin" && (
-                <div className="hidden sm:flex items-center gap-1.5 bg-white border-2 border-amber-300 rounded-2xl px-3 py-2 text-xs font-black shadow-xs shrink-0">
-                  <Store className="w-4 h-4 text-amber-600 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => setShowBranchDropdown((prev) => !prev)}
+                  className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border-2 border-amber-300 hover:border-amber-400 rounded-2xl px-3 py-2 text-xs font-black text-amber-950 shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 group select-none"
+                  title="Ver red de sucursales y breve historial de ventas"
+                >
+                  <Store className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform shrink-0" />
                   <span className="hidden xl:inline text-amber-900">Sucursal:</span>
-                  <div className="relative">
-                    <select
-                      value={activeBranch?.id || "branch-matriz"}
-                      onChange={(e) => switchBranch(e.target.value)}
-                      className="bg-transparent font-black text-amber-950 focus:outline-none cursor-pointer pr-4 appearance-none text-xs"
-                      title="Alternar entre sucursales en tiempo real (Modo Administrador)"
-                    >
-                      {branches.map((b) => (
-                        <option key={b.id} value={b.id} className="text-stone-900 bg-white">
-                          🏬 {b.name} (${formatCurrency(b.todaySales)})
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-amber-700 pointer-events-none absolute right-0 top-1/2 -translate-y-1/2" />
-                  </div>
-                </div>
+                  <span className="text-stone-900">🏬 {activeBranch ? activeBranch.shortName : "Matriz"}</span>
+                  <span className="font-mono text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded-md text-[10px] font-black">
+                    {formatCurrency(activeBranch?.todaySales || 0)}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-amber-700 transition-transform duration-200 ${showBranchDropdown ? "rotate-180 text-amber-900" : ""}`} />
+                </button>
               )}
 
               {/* Botón Grande: Categorías y Precios */}
@@ -2942,8 +2983,10 @@ export default function POSPage() {
         isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       }`}>
         {/* Header con colores de la marca y micro-animación */}
-        <div className="p-2.5 px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden shrink-0">
-          <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
+        <div className="p-2.5 px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative shrink-0">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl" />
+          </div>
           <div className="flex items-center gap-2.5 relative z-10">
             <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40">
               <ShoppingBag className="w-4 h-4 text-white" />
@@ -2954,29 +2997,233 @@ export default function POSPage() {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </h3>
               <div className="flex items-center gap-1.5 text-[11px] text-amber-300 font-bold flex-wrap mt-0.5">
-                {user?.role === "admin" ? (
-                  <div className="relative inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-400/30 text-[10px] font-black tracking-wide shadow-2xs">
-                    <Store className="w-3 h-3 text-amber-300 shrink-0" />
-                    <select
-                      value={activeBranch?.id || "branch-matriz"}
-                      onChange={(e) => switchBranch(e.target.value)}
-                      className="bg-transparent font-black text-amber-200 focus:outline-none cursor-pointer appearance-none pr-3"
-                      title="Cambiar sucursal (Modo Administrador)"
-                    >
-                      {branches.map((b) => (
-                        <option key={b.id} value={b.id} className="text-stone-900 bg-white">
-                          🏬 {b.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-2.5 h-2.5 text-amber-300 pointer-events-none absolute right-1 top-1/2 -translate-y-1/2" />
-                  </div>
-                ) : (
-                  <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-400/30 text-[10px] font-black tracking-wide shadow-2xs">
-                    <Store className="w-3 h-3 text-amber-300" />
-                    <span>{activeBranch ? activeBranch.name : "Sucursal Matriz"}</span>
-                  </span>
-                )}
+
+                {/* Selector Desplegable de Sucursal con Diseño Artesanal y Breve Historial de Ventas */}
+                <div ref={branchDropdownRef} className="relative inline-block">
+                  <button
+                    type="button"
+                    onClick={() => setShowBranchDropdown((prev) => !prev)}
+                    className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/25 via-amber-600/20 to-orange-500/25 hover:from-amber-500/40 hover:to-orange-500/40 text-amber-100 hover:text-white px-2.5 py-1 rounded-xl border border-amber-400/40 hover:border-amber-300 text-[11px] font-black tracking-wide shadow-sm transition-all active:scale-95 cursor-pointer group select-none"
+                    title="Ver red de sucursales, cambiar tienda y consultar breve historial de ventas"
+                  >
+                    <Store className="w-3.5 h-3.5 text-amber-300 group-hover:text-amber-200 shrink-0" />
+                    <span className="truncate max-w-[130px] sm:max-w-[200px]">
+                      🏬 {activeBranch ? activeBranch.name : "Sucursal Matriz"}
+                    </span>
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                    <ChevronDown
+                      className={`w-3 h-3 text-amber-300 group-hover:text-amber-100 transition-transform duration-200 shrink-0 ${
+                        showBranchDropdown ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* Panel Desplegable Flotante */}
+                  {showBranchDropdown && (
+                    <div className="absolute left-0 mt-2.5 w-[330px] sm:w-[380px] max-w-[calc(100vw-36px)] bg-[#1a0e08]/98 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-amber-700/60 p-3 sm:p-3.5 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-3">
+                      
+                      {/* Cabecera del panel */}
+                      <div className="flex items-center justify-between pb-2 border-b border-amber-900/60">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-900/40">
+                            <Store className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-amber-400 leading-tight">Red Panaderías Brito</p>
+                            <p className="text-xs font-black text-white leading-tight">Sucursales & Historial</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowBranchDropdown(false)}
+                          className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 text-stone-400 hover:text-white flex items-center justify-center transition-colors text-xs font-bold cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Resumen métricas de la sucursal activa */}
+                      <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-[#231209] border border-amber-900/60 text-center">
+                        <div className="p-1.5 bg-[#170c06] rounded-lg border border-amber-900/40">
+                          <span className="text-[9px] font-bold text-amber-400/80 block uppercase leading-none">Venta Hoy</span>
+                          <span className="text-xs font-black text-white font-mono mt-0.5 block">{formatCurrency(activeBranch?.todaySales || 0)}</span>
+                        </div>
+                        <div className="p-1.5 bg-[#170c06] rounded-lg border border-amber-900/40">
+                          <span className="text-[9px] font-bold text-amber-400/80 block uppercase leading-none">Tickets</span>
+                          <span className="text-xs font-black text-amber-300 font-mono mt-0.5 block">{activeBranch?.todayTickets || 0} tkts</span>
+                        </div>
+                        <div className="p-1.5 bg-[#170c06] rounded-lg border border-amber-900/40">
+                          <span className="text-[9px] font-bold text-amber-400/80 block uppercase leading-none">En Caja</span>
+                          <span className="text-xs font-black text-emerald-400 font-mono mt-0.5 block">{formatCurrency(activeBranch?.cashInDrawer || activeBranch?.currentShift?.initialFund || 0)}</span>
+                        </div>
+                      </div>
+
+                      {/* Lista de Sucursales con diseño de colores corporativos */}
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
+                          {user?.role === "admin" ? "Seleccionar Tienda Activa:" : "Sucursales de la Red:"}
+                        </p>
+                        <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-0.5">
+                          {branches.map((b) => {
+                            const isSelected = activeBranch?.id === b.id;
+                            const isMatriz = b.id.includes("matriz");
+                            const isBenito = b.id.includes("benito");
+                            const badgeColor = isMatriz
+                              ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
+                              : isBenito
+                              ? "bg-rose-500/20 text-rose-300 border-rose-400/40"
+                              : "bg-orange-500/20 text-orange-300 border-orange-400/40";
+
+                            return (
+                              <button
+                                key={b.id}
+                                type="button"
+                                onClick={() => {
+                                  if (user?.role === "admin") {
+                                    switchBranch(b.id);
+                                    setShowBranchDropdown(false);
+                                    playScanBeep(true);
+                                    addNotification({
+                                      senderName: "🏬 Red Brito",
+                                      senderAvatar: "🏬",
+                                      badgeIcon: "dinero",
+                                      title: "Sucursal Cambiada",
+                                      highlightText: b.name,
+                                      description: "Terminal POS y caja sincronizadas con esta tienda.",
+                                      category: "caja",
+                                    });
+                                  }
+                                }}
+                                disabled={user?.role !== "admin"}
+                                className={`w-full text-left p-2.5 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
+                                  user?.role === "admin" ? "cursor-pointer active:scale-98" : "cursor-default"
+                                } ${
+                                  isSelected
+                                    ? "bg-gradient-to-r from-amber-950 via-[#361a0e] to-amber-900/80 border-amber-400 shadow-md ring-2 ring-amber-400/30"
+                                    : "bg-[#24130a]/80 hover:bg-[#30190d] border-amber-900/50 hover:border-amber-600/70"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border shrink-0 ${badgeColor}`}>
+                                      {b.code || "TIENDA"}
+                                    </span>
+                                    <span className={`font-black text-xs truncate ${isSelected ? "text-white" : "text-stone-200"}`}>
+                                      {b.name}
+                                    </span>
+                                  </div>
+                                  {isSelected ? (
+                                    <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/80 border border-emerald-500/50 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                      Activa
+                                    </span>
+                                  ) : user?.role === "admin" ? (
+                                    <span className="text-[10px] font-bold text-amber-400/80 hover:text-amber-300 shrink-0">
+                                      Cambiar ➔
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="flex items-center justify-between text-[10px] text-amber-200/80 pt-1 border-t border-amber-900/40">
+                                  <span className="truncate">👤 {b.currentShift?.cashier || b.manager || "En turno"}</span>
+                                  <span className="font-mono font-black text-amber-300 shrink-0">
+                                    {formatCurrency(b.todaySales)} ({b.todayTickets} tkts)
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Breve Historial de Ventas */}
+                      <div className="pt-2 border-t border-amber-900/60 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-amber-300">
+                            <History className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Breve Historial de Ventas ({branchRecentSales.length})</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowBranchDropdown(false);
+                              setShowRecentSales(true);
+                            }}
+                            className="text-[10px] font-extrabold text-amber-400 hover:text-amber-200 underline cursor-pointer"
+                          >
+                            Ver Todo ➔
+                          </button>
+                        </div>
+
+                        {/* Listado de tickets recientes */}
+                        <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5">
+                          {branchRecentSales.length > 0 ? (
+                            branchRecentSales.slice(0, 3).map((sale) => {
+                              const totalPzas = sale.items?.reduce((acc, i) => acc + (i.quantity || 0), 0) || 0;
+                              const timeStr = sale.date ? (sale.date.includes(" ") ? sale.date.split(" ")[1] : sale.date) : "Reciente";
+                              const methodLabel = sale.paymentMethod === "efectivo" ? "💵 Efec" : sale.paymentMethod === "tarjeta" ? "💳 Tarj" : "📱 Transf";
+
+                              return (
+                                <div
+                                  key={sale.id}
+                                  onClick={() => {
+                                    setShowBranchDropdown(false);
+                                    handleReprintSale(sale);
+                                  }}
+                                  className="p-2 rounded-xl bg-[#28140b]/90 hover:bg-[#341b0f] border border-amber-900/60 hover:border-amber-600 transition-all flex items-center justify-between gap-2 cursor-pointer group shadow-2xs"
+                                  title="Toca para ver y reimprimir este ticket"
+                                >
+                                  <div className="min-w-0 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0 group-hover:scale-105 transition-transform text-xs">
+                                      <Receipt className="w-3 h-3" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-[11px] font-bold text-white truncate">
+                                        {sale.customerName || "Público en General"}
+                                      </p>
+                                      <p className="text-[9px] text-amber-200/70 truncate">
+                                        #{sale.id.slice(-6).toUpperCase()} • {timeStr} • {totalPzas} pzas • {methodLabel}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <span className="text-xs font-black font-mono text-emerald-400 block">
+                                      {formatCurrency(sale.total)}
+                                    </span>
+                                    <span className="text-[9px] text-amber-300 font-bold group-hover:underline">
+                                      🖨️ Ticket
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="p-3 text-center bg-[#231209] rounded-xl border border-amber-900/40 text-[11px] text-amber-200/70">
+                              🥖 Sin ventas registradas en este turno aún. Los tickets cobrados aparecerán aquí.
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Botón grande para abrir historial completo */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowBranchDropdown(false);
+                            setShowRecentSales(true);
+                          }}
+                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-950/40 transition-all active:scale-95 cursor-pointer mt-1"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          <span>Ver Historial Completo ({branchRecentSales.length} ventas)</span>
+                        </button>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
                 <span className="text-amber-400/60">•</span>
                 <span className="text-stone-100 font-semibold">{cashierName}</span>
                 <span className="text-amber-400/60">•</span>
