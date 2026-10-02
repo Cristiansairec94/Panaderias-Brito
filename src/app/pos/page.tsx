@@ -632,8 +632,12 @@ export default function POSPage() {
       const storedFund = getStoredShiftFund(activeBranch.currentShift.initialFund);
       setInitialCashFund(storedFund);
       setShiftName(activeBranch.currentShift.name);
-      if (!user) {
-        setCashierName(activeBranch.assignedUserName || activeBranch.currentShift.cashier);
+      if (activeBranch.currentShift?.cashier) {
+        setCashierName(activeBranch.currentShift.cashier);
+      } else if (activeBranch.assignedUserName) {
+        setCashierName(activeBranch.assignedUserName);
+      } else if (user) {
+        setCashierName(user.name);
       }
     }
   }, [activeBranch?.id, user]);
@@ -1678,6 +1682,14 @@ export default function POSPage() {
       }
       return recentSalesList.filter((s) => {
         if (!s) return false;
+        if (activeBranch && activeBranch.id !== "all") {
+          const sBranch = (s as any).branchId || (s as any).branch_id;
+          if (sBranch) {
+            if (sBranch !== activeBranch.id) return false;
+          } else {
+            if (activeBranch.id !== "branch-matriz") return false;
+          }
+        }
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
         if (shiftStartBoundary > 0) {
           if (!t || t < shiftStartBoundary - 60000) return false;
@@ -1689,7 +1701,7 @@ export default function POSPage() {
       console.error("Error filtering currentShiftSales:", e);
       return [];
     }
-  }, [recentSalesList, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [recentSalesList, cashierName, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
   const currentShiftExpenses = useMemo(() => {
     try {
@@ -1739,18 +1751,35 @@ export default function POSPage() {
         if (!o) return false;
         // Los pedidos entregados y cancelados desaparecen por completo de la vista activa y del turno
         if (o.status === "entregado" || o.status === "cancelado") return false;
-        if (activeBranch) {
+        if (activeBranch && activeBranch.id !== "all") {
           const bId = activeBranch.id.toLowerCase().trim();
           const bName = (activeBranch.name || "").toLowerCase().trim();
-          const oPickupId = String(o.branchId || "").toLowerCase().trim();
-          const oPickupName = String(o.branchName || "").toLowerCase().trim();
-          const oOperatingId = String((o as any).operatingBranchId || "").toLowerCase().trim();
-          const oOperatingName = String((o as any).operatingBranchName || "").toLowerCase().trim();
+          const bShort = (activeBranch.shortName || "").toLowerCase().trim();
+          const oPickupId = String(o.branchId || (o as any).branch_id || "").toLowerCase().trim();
+          const oPickupName = String(o.branchName || (o as any).branch_name || "").toLowerCase().trim();
+          const oOperatingId = String((o as any).operatingBranchId || (o as any).operating_branch_id || "").toLowerCase().trim();
+          const oOperatingName = String((o as any).operatingBranchName || (o as any).operating_branch_name || "").toLowerCase().trim();
 
-          const matchesPickup = !oPickupId || oPickupId === bId || (bName && oPickupName === bName) || (bId && oPickupId.includes(bId));
-          const matchesOperating = oOperatingId === bId || (bName && oOperatingName === bName) || (bId && oOperatingId.includes(bId));
+          const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                                (oPickupName && ((bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName))) ||
+                                                (bShort && (oPickupName.includes(bShort) || bShort.includes(oPickupName)))));
+          const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                                   (oOperatingName && ((bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName))) ||
+                                                       (bShort && (oOperatingName.includes(bShort) || bShort.includes(oOperatingName)))));
 
-          if (!matchesPickup && !matchesOperating) return false;
+          if (matchesPickup || matchesOperating) {
+            // Coincide con la sucursal activa
+          } else if (!oPickupId && !oPickupName && !oOperatingId && !oOperatingName) {
+            if (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) {
+              // Coincide cajero
+            } else if (bId === "branch-matriz") {
+              // Asignar por defecto a matriz
+            } else {
+              return false;
+            }
+          } else {
+            return false;
+          }
         }
         const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
         if (shiftStartBoundary > 0) {
@@ -1772,18 +1801,43 @@ export default function POSPage() {
     // Para el conteo de efectivo en cajón, sumar anticipos cobrados en efectivo en este turno y sucursal
     const allShiftOrdersForCash = getStoredOrders().filter((o) => {
       if (!o) return false;
-      if (activeBranch) {
-        const orderOperating = (o as any).operatingBranchId;
-        const orderBranch = orderOperating || o.branchId;
-        if (orderBranch && orderBranch !== activeBranch.id) return false;
+      if (activeBranch && activeBranch.id !== "all") {
+        const bId = activeBranch.id.toLowerCase().trim();
+        const bName = (activeBranch.name || "").toLowerCase().trim();
+        const bShort = (activeBranch.shortName || "").toLowerCase().trim();
+        const oPickupId = String(o.branchId || (o as any).branch_id || "").toLowerCase().trim();
+        const oPickupName = String(o.branchName || (o as any).branch_name || "").toLowerCase().trim();
+        const oOperatingId = String((o as any).operatingBranchId || (o as any).operating_branch_id || "").toLowerCase().trim();
+        const oOperatingName = String((o as any).operatingBranchName || (o as any).operating_branch_name || "").toLowerCase().trim();
+
+        const match = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                      (oPickupName && ((bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName))) ||
+                                      (bShort && (oPickupName.includes(bShort) || bShort.includes(oPickupName))))) ||
+                      (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                      (oOperatingName && ((bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName))) ||
+                                          (bShort && (oOperatingName.includes(bShort) || bShort.includes(oOperatingName)))));
+        if (!match) {
+          if (!oPickupId && !oPickupName && !oOperatingId && !oOperatingName) {
+            if (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) {
+              // match
+            } else if (bId === "branch-matriz") {
+              // match
+            } else {
+              return false;
+            }
+          } else {
+            return false;
+          }
+        }
       }
       const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
       if (shiftStartBoundary > 0 && (!t || t < shiftStartBoundary - 60000)) return false;
       return (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id);
     });
     const ordersCash = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
-    return posCash + ordersCash;
-  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id]);
+    const branchShiftCash = activeBranch?.currentShift?.cashSales ? Number(activeBranch.currentShift.cashSales) : 0;
+    return Math.max(branchShiftCash, posCash) + ordersCash;
+  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id, activeBranch?.currentShift?.cashSales]);
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])

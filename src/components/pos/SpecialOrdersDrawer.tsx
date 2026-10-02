@@ -72,21 +72,19 @@ export default function SpecialOrdersDrawer({
       if (order.status === "entregado" || order.status === "cancelado") return false;
 
       // Branch filter if specified (visible en sucursal que levanta y sucursal que entrega)
-      if (branchId) {
+      if (branchId && branchId !== "all") {
         const bId = branchId.toLowerCase().trim();
         const bName = (branchName || "").toLowerCase().trim();
-        const oPickupId = String(order.branchId || "").toLowerCase().trim();
-        const oPickupName = String(order.branchName || "").toLowerCase().trim();
-        const oOperatingId = String((order as any).operatingBranchId || "").toLowerCase().trim();
-        const oOperatingName = String((order as any).operatingBranchName || "").toLowerCase().trim();
+        const oPickupId = String(order.branchId || (order as any).branch_id || "").toLowerCase().trim();
+        const oPickupName = String(order.branchName || (order as any).branch_name || "").toLowerCase().trim();
+        const oOperatingId = String((order as any).operatingBranchId || (order as any).operating_branch_id || "").toLowerCase().trim();
+        const oOperatingName = String((order as any).operatingBranchName || (order as any).operating_branch_name || "").toLowerCase().trim();
 
-        if (oPickupId || oOperatingId) {
-          const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
-                                (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
-          const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
-                                   (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
-          if (!matchesPickup && !matchesOperating) return false;
-        }
+        const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                              (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
+        const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                                 (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
+        if (!matchesPickup && !matchesOperating) return false;
       }
 
       // Search filter

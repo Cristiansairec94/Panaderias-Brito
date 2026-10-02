@@ -170,6 +170,7 @@ export default function CreateOrderModal({
   const [customerPhone, setCustomerPhone] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const customerSearchContainerRef = useRef<HTMLDivElement>(null);
 
   // Pregunta sobre registrar al cliente en el catálogo (inicialmente "ask" para que el usuario decida)
   const [saveCustomerDecision, setSaveCustomerDecision] = useState<"ask" | "yes" | "no">("ask");
@@ -353,10 +354,12 @@ export default function CreateOrderModal({
     }
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const wasOpenRef = useRef(false);
 
-  // Cargar datos al abrir
+  // Cargar datos al abrir (solo una vez cuando se abre la ventana, no en re-renders o sincronizaciones posteriores)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
+      wasOpenRef.current = true;
       const storedProds = getStoredProducts();
       setProducts(storedProds);
       setCustomers(getStoredCustomers());
@@ -398,8 +401,8 @@ export default function CreateOrderModal({
       setShowProductSuggestions(false);
       setShowCustomerSearch(false);
       setPaymentMethod("efectivo");
-      setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
-      setSelectedCardTerminalId(DEFAULT_CARD_TERMINALS[0].id);
+      setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0]?.id || "");
+      setSelectedCardTerminalId(DEFAULT_CARD_TERMINALS[0]?.id || "");
       setPaymentReference("");
       setCopiedField(null);
       setBarcodeInput("");
@@ -411,6 +414,8 @@ export default function CreateOrderModal({
       setIsEditingDeposit(false);
       userHasCustomDepositRef.current = false;
       previousDepositRef.current = "0";
+    } else if (!isOpen) {
+      wasOpenRef.current = false;
     }
   }, [isOpen, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone, tomorrowStr, initialBranchId, activeBranch, branches]);
 
@@ -576,6 +581,37 @@ export default function CreateOrderModal({
     }
   };
 
+  // Añadir cliente rápidamente al catálogo sin perder el estado del pedido
+  const handleQuickAddCustomer = async (explicitName?: string) => {
+    const targetName = (explicitName || customerName).trim();
+    if (!targetName) return;
+    setIsSavingCustomer(true);
+    try {
+      const created = await createCustomerInDb({
+        name: targetName,
+        phone: customerPhone.trim() || undefined,
+        type: "frecuente",
+        notes: "Cliente registrado desde Pedido Especial",
+      });
+
+      const updatedCusts = getStoredCustomers();
+      setCustomers(updatedCusts);
+
+      setCustomerName(created.name);
+      if (created.phone && created.phone !== "N/A") {
+        setCustomerPhone(created.phone);
+      }
+      setSelectedCustomerId(created.id);
+      setShowCustomerSearch(false);
+      setSaveCustomerDecision("yes");
+      setMustChooseCustomerAlert(false);
+    } catch (err) {
+      console.error("Error creating quick customer", err);
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
   // Buscador y sugerencias rápidas de productos (por nombre, código corto o código de barras)
   const productSuggestions = useMemo(() => {
     const q = barcodeInput.trim().toLowerCase();
@@ -677,7 +713,7 @@ export default function CreateOrderModal({
     }
   };
 
-  // Cierre de sugerencias al hacer clic fuera del buscador de productos
+  // Cierre de sugerencias al hacer clic fuera del buscador de productos o de clientes
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -685,6 +721,12 @@ export default function CreateOrderModal({
         !productSearchContainerRef.current.contains(event.target as Node)
       ) {
         setShowProductSuggestions(false);
+      }
+      if (
+        customerSearchContainerRef.current &&
+        !customerSearchContainerRef.current.contains(event.target as Node)
+      ) {
+        setShowCustomerSearch(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -1075,7 +1117,7 @@ export default function CreateOrderModal({
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="relative">
+              <div ref={customerSearchContainerRef} className="relative">
                 <label className="text-xs font-bold text-stone-700 block mb-1">
                   Nombre del Cliente *
                 </label>
@@ -1093,24 +1135,61 @@ export default function CreateOrderModal({
                       setSaveCustomerDecision("ask");
                     }}
                     onFocus={() => setShowCustomerSearch(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (customerSuggestions.length > 0) {
+                          handleSelectCustomer(customerSuggestions[0]);
+                        } else {
+                          setShowCustomerSearch(false);
+                        }
+                      } else if (e.key === "Escape") {
+                        setShowCustomerSearch(false);
+                      }
+                    }}
                     className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
 
-                {/* Sugerencias rápidas de clientes */}
-                {showCustomerSearch && customerSuggestions.length > 0 && (
-                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden divide-y divide-stone-100">
+                {/* Sugerencias rápidas de clientes y opción directa de añadir a la lista */}
+                {showCustomerSearch && customerName.trim().length > 0 && (
+                  <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden divide-y divide-stone-100 max-h-64 overflow-y-auto">
                     {customerSuggestions.map((c) => (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => handleSelectCustomer(c)}
-                        className="w-full p-2.5 text-left hover:bg-amber-50 flex items-center justify-between text-xs cursor-pointer"
+                        className="w-full p-2.5 text-left hover:bg-amber-50 flex items-center justify-between text-xs cursor-pointer transition-colors"
                       >
-                        <span className="font-bold text-stone-900">{c.name}</span>
-                        <span className="text-[11px] text-stone-500">{c.phone}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                          <span className="font-bold text-stone-900 truncate">{c.name}</span>
+                        </div>
+                        {c.phone && c.phone !== "N/A" && (
+                          <span className="text-[11px] text-stone-500 font-mono shrink-0 ml-2">{c.phone}</span>
+                        )}
                       </button>
                     ))}
+
+                    {/* Botón para añadir directamente a la lista si el cliente no está en catálogo */}
+                    {!isCustomerInCatalog && (
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAddCustomer()}
+                        disabled={isSavingCustomer}
+                        className="w-full p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 flex items-center justify-between text-xs font-bold transition-colors cursor-pointer text-left"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <UserPlus className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="truncate">
+                            {isSavingCustomer ? "Guardando en lista..." : `➕ Añadir "${customerName.trim()}" a mi lista`}
+                          </span>
+                        </div>
+                        <span className="text-[10px] bg-emerald-200 text-emerald-900 font-extrabold px-2 py-0.5 rounded-md shrink-0">
+                          Nuevo
+                        </span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1126,6 +1205,11 @@ export default function CreateOrderModal({
                     placeholder="Ej. 55 1234 5678"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -1145,11 +1229,12 @@ export default function CreateOrderModal({
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setSaveCustomerDecision("yes")}
-                      className="px-3 py-1.5 rounded-lg font-black text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                      onClick={() => handleQuickAddCustomer()}
+                      disabled={isSavingCustomer}
+                      className="px-3 py-1.5 rounded-lg font-black text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1 disabled:opacity-60"
                     >
                       <Check className="w-3.5 h-3.5" />
-                      <span>Sí, añadir</span>
+                      <span>{isSavingCustomer ? "Guardando..." : "Sí, añadir"}</span>
                     </button>
                     <button
                       type="button"

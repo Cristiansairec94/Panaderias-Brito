@@ -62,6 +62,8 @@ export interface Sale {
   timestamp?: number | string;
   isCustomOrder?: boolean;
   orderNumber?: string;
+  branchId?: string;
+  branchName?: string;
 }
 
 export interface InventoryItem {

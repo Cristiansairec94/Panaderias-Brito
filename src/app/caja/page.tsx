@@ -551,6 +551,28 @@ export default function CajaPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Sincronización en vivo del turno con la sucursal activa en la barra superior
+  useEffect(() => {
+    if (currentBranch) {
+      if (currentBranch.currentShift) {
+        if (currentBranch.currentShift.initialFund !== undefined) {
+          setInitialCash(currentBranch.currentShift.initialFund);
+        }
+        if (currentBranch.currentShift.cashSales !== undefined) {
+          setCashSales(currentBranch.currentShift.cashSales);
+        }
+        if (currentBranch.currentShift.cardSales !== undefined) {
+          setCardSales(currentBranch.currentShift.cardSales);
+        }
+        if (currentBranch.currentShift.transferSales !== undefined) {
+          setTransferSales(currentBranch.currentShift.transferSales);
+        }
+      } else if (currentBranch.todaySales !== undefined) {
+        setCashSales(currentBranch.todaySales);
+      }
+    }
+  }, [currentBranch?.id, currentBranch?.currentShift, currentBranch?.todaySales]);
+
   // Live calculations
   const entryMovements = movements.filter((m) => m.type === "entrada");
   const totalEntries = entryMovements.reduce((sum, m) => sum + m.amount, 0);
@@ -561,7 +583,7 @@ export default function CajaPage() {
   const liveDeliveredToOwner = Math.max(0, liveCountedValue - (Number(nextFundAmount) || 0));
 
   // Active shift responsible name
-  const currentShiftResponsible = user?.name || "Lupita Brito (Cajera 1)";
+  const currentShiftResponsible = currentBranch?.currentShift?.cashier || currentBranch?.manager || user?.name || "Lupita Brito (Cajera 1)";
 
   // Cuts filtered primarily by Period (Día, Mes, Año, Todos)
   const periodCuts = useMemo(() => {

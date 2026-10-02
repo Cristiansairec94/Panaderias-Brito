@@ -75,24 +75,22 @@ export default function PosOrdersDrawer({
     const activeList = orders.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
     if (branchScope === "todas") return activeList;
     return activeList.filter((o) => {
-      if (!branchId) return true;
+      if (!branchId || branchId === "all") return true;
       const bId = branchId.toLowerCase().trim();
       const bName = (branchName || "").toLowerCase().trim();
-      const oPickupId = String(o.branchId || "").toLowerCase().trim();
-      const oPickupName = String(o.branchName || "").toLowerCase().trim();
-      const oOperatingId = String((o as any).operatingBranchId || "").toLowerCase().trim();
-      const oOperatingName = String((o as any).operatingBranchName || "").toLowerCase().trim();
-
-      if (!oPickupId && !oOperatingId) return true;
+      const oPickupId = String(o.branchId || (o as any).branch_id || "").toLowerCase().trim();
+      const oPickupName = String(o.branchName || (o as any).branch_name || "").toLowerCase().trim();
+      const oOperatingId = String((o as any).operatingBranchId || (o as any).operating_branch_id || "").toLowerCase().trim();
+      const oOperatingName = String((o as any).operatingBranchName || (o as any).operating_branch_name || "").toLowerCase().trim();
 
       const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
                             (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
       const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
                                (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
 
-      return matchesPickup || matchesOperating;
+      return Boolean(matchesPickup || matchesOperating);
     });
-  }, [orders, branchId, branchScope]);
+  }, [orders, branchId, branchScope, branchName]);
 
   // Filtrado simple
   const filteredOrders = useMemo(() => {

@@ -1,9 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from "react";
 import { realtimeHub, RealtimeStatus } from "@/lib/realtime/realtimeHub";
-import { CustomOrder, ShiftCutRecord } from "@/types";
+import { CustomOrder, ShiftCutRecord, AppUser } from "@/types";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
+import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
 import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
@@ -28,6 +30,10 @@ export interface FBNotification {
   orderId?: string;
   shiftCutData?: ShiftCutRecord;
   cutId?: string;
+  branchId?: string;
+  branchName?: string;
+  operatingBranchId?: string;
+  operatingBranchName?: string;
 }
 
 export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
@@ -76,6 +82,151 @@ export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
     text.includes("ped-");
 
   return Boolean(isCierreTurno || isPedido);
+}
+
+export function checkBranchMatch(
+  info: {
+    pickupBranchId?: string;
+    pickupBranchName?: string;
+    operatingBranchId?: string;
+    operatingBranchName?: string;
+    fullText?: string;
+  },
+  userBranchId?: string,
+  userBranchName?: string
+): boolean {
+  const uId = (userBranchId || "").toLowerCase().trim();
+  const uName = (userBranchName || "").toLowerCase().trim();
+
+  // Helper para identificar palabras clave de sucursal
+  const getBranchKeywords = (str: string): string[] => {
+    const s = str.toLowerCase();
+    const keywords: string[] = [];
+    if (s.includes("benito")) keywords.push("benito");
+    if (s.includes("flores")) keywords.push("flores");
+    if (s.includes("matriz") || s.includes("centro")) keywords.push("matriz");
+    return keywords;
+  };
+
+  const userKeywords = [...getBranchKeywords(uId), ...getBranchKeywords(uName)];
+
+  const checkMatch = (targetId?: string, targetName?: string): boolean => {
+    const tId = (targetId || "").toLowerCase().trim();
+    const tName = (targetName || "").toLowerCase().trim();
+
+    if (uId && tId && (uId === tId || uId.includes(tId) || tId.includes(uId))) {
+      return true;
+    }
+    if (uName && tName && (uName === tName || uName.includes(tName) || tName.includes(uName))) {
+      return true;
+    }
+    const targetKeywords = [...getBranchKeywords(tId), ...getBranchKeywords(tName)];
+    if (userKeywords.some((k) => targetKeywords.includes(k))) {
+      return true;
+    }
+    return false;
+  };
+
+  // 1. Coincidencia con sucursal de entrega / recogida
+  if (checkMatch(info.pickupBranchId, info.pickupBranchName)) {
+    return true;
+  }
+
+  // 2. Coincidencia con sucursal de origen / realización del pedido
+  if (checkMatch(info.operatingBranchId, info.operatingBranchName)) {
+    return true;
+  }
+
+  // 3. Coincidencia por texto libre si hay palabras clave reconocibles
+  if (info.fullText && userKeywords.length > 0) {
+    const textLower = info.fullText.toLowerCase();
+    if (userKeywords.some((k) => textLower.includes(k))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function isNotificationVisibleForUser(
+  notif: Partial<FBNotification>,
+  user: AppUser | null,
+  activeBranch?: { id: string; name?: string; shortName?: string } | null
+): boolean {
+  if (!notif) return false;
+  if (!isAllowedNotification(notif)) return false;
+
+  // 1. Administrador (Dueño o Auxiliar Admin):
+  // Lleva el control y visualización de TODO (cortes de todas las sucursales,
+  // dinero que entra/sale, y todos los pedidos de todas las sucursales)
+  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+  if (isAdmin) {
+    return true;
+  }
+
+  // 2. Roles Operativos (Cajeros, Panaderos, etc.):
+  // REGLA 1: Cortes de caja, dinero que entra, movimientos de efectivo, arqueos y retiros
+  // son EXCLUSIVOS del perfil administrador. Se bloquean estrictamente para cajeros.
+  const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
+  const isCajaCategory =
+    notif.category === "caja" ||
+    notif.badgeIcon === "dinero" ||
+    text.includes("corte") ||
+    text.includes("cierre") ||
+    text.includes("turno") ||
+    text.includes("cuadró") ||
+    text.includes("cuadro") ||
+    text.includes("diferencia") ||
+    text.includes("ingreso registrado") ||
+    text.includes("entrada de caja") ||
+    text.includes("gasto") ||
+    text.includes("retiro") ||
+    text.includes("fondo dejado") ||
+    text.includes("ticket cancelado");
+
+  if (isCajaCategory) {
+    return false;
+  }
+
+  // REGLA 2: Notificaciones de PEDIDOS:
+  // Solo le llegan al cajero si el pedido es de la sucursal donde se hizo el pedido (origen)
+  // o donde se entregará (destino/recogida).
+  const userBranchId = (user.assignedBranchId || activeBranch?.id || "").trim();
+  const userBranchName = (user.assignedBranchName || activeBranch?.name || activeBranch?.shortName || "").trim();
+
+  // Si por alguna razón el usuario no tiene ninguna sucursal asignada
+  if (!userBranchId && !userBranchName) {
+    return true;
+  }
+
+  // Resolver sucursales del pedido
+  let pickupId = notif.branchId;
+  let pickupName = notif.branchName;
+  let operatingId = notif.operatingBranchId;
+  let operatingName = notif.operatingBranchName;
+
+  // Si faltan campos en la notificación, resolverlos desde el pedido almacenado
+  if (!pickupId && !operatingId) {
+    const order = findOrderForNotification(notif as FBNotification);
+    if (order) {
+      pickupId = order.branchId;
+      pickupName = order.branchName;
+      operatingId = order.operatingBranchId;
+      operatingName = order.operatingBranchName;
+    }
+  }
+
+  return checkBranchMatch(
+    {
+      pickupBranchId: pickupId,
+      pickupBranchName: pickupName,
+      operatingBranchId: operatingId,
+      operatingBranchName: operatingName,
+      fullText: text,
+    },
+    userBranchId,
+    userBranchName
+  );
 }
 
 const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
@@ -204,6 +355,10 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
     secondaryActionLink: "/pedidos?order=PED-101",
     category: "pedidos",
     orderId: "PED-101",
+    branchId: "branch-matriz",
+    branchName: "Sucursal Matriz (Centro)",
+    operatingBranchId: "branch-matriz",
+    operatingBranchName: "Sucursal Matriz (Centro)",
   },
   {
     id: "pedido-ped-102",
@@ -220,6 +375,32 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
     actionLink: "/pedidos?order=PED-102",
     category: "pedidos",
     orderId: "PED-102",
+    branchId: "branch-benito",
+    branchName: "Sucursal San Benito (Mercado)",
+    operatingBranchId: "branch-benito",
+    operatingBranchName: "Sucursal San Benito (Mercado)",
+  },
+  {
+    id: "pedido-ped-103",
+    senderName: "🎂 Pedido Inter-Sucursal (Las Flores ➔ San Benito)",
+    senderAvatar: "🎂",
+    badgeIcon: "pastel",
+    title: "Nuevo Pedido PED-103: Total $1,450.00",
+    highlightText: "Lic. Andrea Romero - Anticipo: $700.00",
+    description: "Pastel Gourmet Fondant y 50 Cupcakes. Creado en Sucursal Las Flores. Recoge en Sucursal San Benito a las 15:00 hrs. Saldo restante: $750.00.",
+    timeAgo: "Hace 10 min",
+    group: "recientes",
+    read: false,
+    actionLabel: "Cobrar $750",
+    actionLink: "/caja",
+    secondaryActionLabel: "Ver Detalle",
+    secondaryActionLink: "/pedidos?order=PED-103",
+    category: "pedidos",
+    orderId: "PED-103",
+    branchId: "branch-benito",
+    branchName: "Sucursal San Benito (Mercado)",
+    operatingBranchId: "branch-flores",
+    operatingBranchName: "Sucursal Las Flores (Plaza)",
   },
 ];
 
@@ -272,7 +453,10 @@ export function findOrderForNotification(notif: FBNotification): CustomOrder | n
         orderNumber: folio,
         customerName: notif.highlightText.split("-")[0]?.trim() || "Sra. María González",
         phone: "55 1234 5678",
-        branchName: notif.senderName.replace(/^[^\(]*\(|\)[^\)]*$/g, "") || "Sucursal Matriz (Centro)",
+        branchId: notif.branchId || "branch-matriz",
+        branchName: notif.branchName || notif.senderName.replace(/^[^\(]*\(|\)[^\)]*$/g, "") || "Sucursal Matriz (Centro)",
+        operatingBranchId: notif.operatingBranchId || notif.branchId || "branch-matriz",
+        operatingBranchName: notif.operatingBranchName || notif.branchName || "Sucursal Matriz (Centro)",
         description: notif.description,
         deliveryDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
         deliveryTime: "16:00",

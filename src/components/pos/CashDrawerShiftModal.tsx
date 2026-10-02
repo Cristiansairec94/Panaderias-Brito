@@ -35,6 +35,7 @@ import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } f
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
 import { getStoredOrders } from "@/lib/orders";
 import { useNotifications } from "@/context/NotificationContext";
+import { useBranch } from "@/context/BranchContext";
 
 interface CashDrawerShiftModalProps {
   isOpen: boolean;
@@ -127,9 +128,13 @@ export default function CashDrawerShiftModal({
   cashSalesTotal,
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
+  const { currentBranch } = useBranch();
 
   // Fondo Inicial Sincronizado en tiempo real
   const [syncedFund, setSyncedFund] = useState<number>(() => {
+    if (currentBranch?.currentShift?.initialFund !== undefined) {
+      return currentBranch.currentShift.initialFund;
+    }
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("brito_pos_initial_fund");
       if (saved !== null && !isNaN(Number(saved))) return Number(saved);
@@ -138,6 +143,10 @@ export default function CashDrawerShiftModal({
   });
 
   useEffect(() => {
+    if (currentBranch?.currentShift?.initialFund !== undefined) {
+      setSyncedFund(currentBranch.currentShift.initialFund);
+      return;
+    }
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("brito_pos_initial_fund");
       if (saved !== null && !isNaN(Number(saved))) {
@@ -146,7 +155,7 @@ export default function CashDrawerShiftModal({
       }
     }
     setSyncedFund(initialFund || 0);
-  }, [initialFund, isOpen]);
+  }, [initialFund, isOpen, currentBranch?.id, currentBranch?.currentShift?.initialFund]);
 
   useEffect(() => {
     const handleSync = () => {
@@ -175,7 +184,15 @@ export default function CashDrawerShiftModal({
   const [currentTime, setCurrentTime] = useState("");
 
   // Shift Change & Cash Cut form state
-  const [outgoingCashier, setOutgoingCashier] = useState(cashierName);
+  const [outgoingCashier, setOutgoingCashier] = useState(() => currentBranch?.currentShift?.cashier || cashierName);
+
+  useEffect(() => {
+    if (currentBranch?.currentShift?.cashier) {
+      setOutgoingCashier(currentBranch.currentShift.cashier);
+    } else if (cashierName) {
+      setOutgoingCashier(cashierName);
+    }
+  }, [currentBranch?.id, currentBranch?.currentShift?.cashier, cashierName]);
   const [incomingCashier, setIncomingCashier] = useState("Cajera 2 - Turno Vespertino");
   const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
   const [countedCash, setCountedCash] = useState<string>("");
@@ -300,10 +317,23 @@ export default function CashDrawerShiftModal({
   const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
   const totalOrdersCash = ordersCash + ordersInSalesCash;
   const posCash = purePosCash + totalOrdersCash;
-  const cashSales = posCash;
-  const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
-  const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
-  const totalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0);
+
+  const branchCashSales = currentBranch?.currentShift?.cashSales ? Number(currentBranch.currentShift.cashSales) : 0;
+  const cashSales = Math.max(branchCashSales, posCash);
+
+  const rawCardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const branchCardSales = currentBranch?.currentShift?.cardSales ? Number(currentBranch.currentShift.cardSales) : 0;
+  const cardSales = Math.max(branchCardSales, rawCardSales);
+
+  const rawTransferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
+  const branchTransferSales = currentBranch?.currentShift?.transferSales ? Number(currentBranch.currentShift.transferSales) : 0;
+  const transferSales = Math.max(branchTransferSales, rawTransferSales);
+
+  const rawTotalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0);
+  const branchTotalSales = currentBranch ? (Number(currentBranch.todaySales) || Number(currentBranch.currentShift?.totalSales) || 0) : 0;
+  const totalSalesAll = Math.max(branchTotalSales, rawTotalSalesAll);
+
+  const effectiveInitialFund = currentBranch?.currentShift?.initialFund !== undefined ? currentBranch.currentShift.initialFund : syncedFund;
 
   // 2. Cálculos de Gastos y Entradas del Turno (incluyendo retiros de dueño tomados del cajón)
   const shiftExpenses = expenses.filter((e) => {
@@ -329,7 +359,7 @@ export default function CashDrawerShiftModal({
     .reduce((sum, i) => sum + i.amount, 0);
 
   // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
-  const expectedCashInDrawer = Math.max(0, syncedFund + cashSales + totalIncomesInCash - totalExpenses);
+  const expectedCashInDrawer = Math.max(0, effectiveInitialFund + cashSales + totalIncomesInCash - totalExpenses);
 
   // 4. Conteo y Diferencia (Arqueo)
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;
@@ -391,10 +421,10 @@ export default function CashDrawerShiftModal({
       outgoingCashier,
       incomingCashier,
       responsible: outgoingCashier,
-      branchName: "Sucursal Matriz Centro",
+      branchName: currentBranch?.name || "Sucursal Matriz (Centro)",
       previousShift: shiftName,
       nextShift: nextShiftName,
-      initialFund: syncedFund,
+      initialFund: effectiveInitialFund,
       cashSales,
       cardSales,
       transferSales,

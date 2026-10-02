@@ -225,8 +225,8 @@ function normalizeOrder(order: any): CustomOrder {
     customerId: order.customerId,
     customerName: order.customerName || "Cliente Mostrador",
     phone: order.phone || "N/A",
-    branchId: order.branchId || "branch-matriz",
-    branchName: order.branchName || "Sucursal Matriz (Centro)",
+    branchId: order.branchId || order.branch_id || order.operatingBranchId || order.operating_branch_id || "branch-matriz",
+    branchName: order.branchName || order.branch_name || order.operatingBranchName || order.operating_branch_name || "Sucursal Matriz (Centro)",
     description: order.description || "Pedido de panadería",
     items: Array.isArray(order.items) && order.items.length > 0
       ? order.items
@@ -252,8 +252,8 @@ function normalizeOrder(order: any): CustomOrder {
     notes: order.notes || "",
     createdAt: order.createdAt || new Date().toISOString(),
     timestamp: order.timestamp ? Number(order.timestamp) : parseDateTimeSafe(order.createdAt) || Date.now(),
-    operatingBranchId: order.operatingBranchId || order.branchId,
-    operatingBranchName: order.operatingBranchName || order.branchName,
+    operatingBranchId: order.operatingBranchId || order.operating_branch_id || order.branchId || order.branch_id || "branch-matriz",
+    operatingBranchName: order.operatingBranchName || order.operating_branch_name || order.branchName || order.branch_name || "Sucursal Matriz (Centro)",
     shiftName: order.shiftName,
     cashier: order.cashier || "Don Toño Brito",
     payments: Array.isArray(order.payments) && order.payments.length > 0
