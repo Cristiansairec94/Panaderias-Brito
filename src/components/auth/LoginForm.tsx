@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, ShieldCheck } from "lucide-react";
+import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
 
 export default function LoginForm() {
@@ -19,6 +19,10 @@ export default function LoginForm() {
   const [isLogoSpinning, setIsLogoSpinning] = useState(false);
   const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
 
+  // Seguridad: Control de intentos fallidos y bloqueo temporal anti-fuerza bruta
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutRemaining, setLockoutRemaining] = useState(0);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedUser = localStorage.getItem("brito_saved_username");
@@ -30,8 +34,34 @@ export default function LoginForm() {
       if (pendingUrl && pendingUrl !== "/") {
         setRedirectTarget(pendingUrl);
       }
+
+      // Verificar si existía un bloqueo temporal vigente
+      const lockoutUntil = parseInt(sessionStorage.getItem("brito_lockout_until") || "0", 10);
+      if (lockoutUntil && lockoutUntil > Date.now()) {
+        const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+        setLockoutRemaining(remaining);
+      }
     }
   }, []);
+
+  // Temporizador para cuenta regresiva del bloqueo temporal
+  useEffect(() => {
+    if (lockoutRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setLockoutRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem("brito_lockout_until");
+          }
+          setError("");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutRemaining]);
 
   const handleLogoClick = () => {
     setIsLogoSpinning(true);
@@ -41,6 +71,11 @@ export default function LoginForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (lockoutRemaining > 0) {
+      setError(`Acceso bloqueado por intentos fallidos. Por favor espera ${lockoutRemaining} segundos.`);
+      return;
+    }
 
     if (!identifier.trim()) {
       setError("Por favor escribe tu usuario o correo.");
@@ -57,6 +92,12 @@ export default function LoginForm() {
     setTimeout(() => {
       const res = verifyCredentials(identifier, password);
       if (res.success && res.user) {
+        // Restablecer contador de seguridad al acertar credenciales
+        setFailedAttempts(0);
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("brito_lockout_until");
+        }
+
         setWelcomeUser(res.user);
         const destination = getDefaultRouteForUser(res.user);
 
@@ -79,7 +120,22 @@ export default function LoginForm() {
           router.push(target);
         }, 1600);
       } else {
-        setError(res.message || "Usuario o contraseña incorrectos. Intenta de nuevo.");
+        // Incrementar intentos fallidos y activar bloqueo si llega a 5
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
+
+        if (nextAttempts >= 5) {
+          const lockoutSeconds = 60;
+          const unlockTime = Date.now() + lockoutSeconds * 1000;
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("brito_lockout_until", unlockTime.toString());
+          }
+          setLockoutRemaining(lockoutSeconds);
+          setError("Has superado el límite de 5 intentos fallidos. Por seguridad de la panadería, el acceso se ha bloqueado temporalmente durante 60 segundos.");
+        } else {
+          const left = 5 - nextAttempts;
+          setError(`${res.message || "Usuario o contraseña incorrectos."} (${left} ${left === 1 ? "intento restante" : "intentos restantes"} antes del bloqueo temporal).`);
+        }
         setIsLoading(false);
       }
     }, 350);
@@ -265,10 +321,19 @@ export default function LoginForm() {
                 {/* Big Friendly Submit Button */}
                 <button
                   type="submit"
-                  disabled={isLoading}
-                  className="w-full mt-2 py-3.5 sm:py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-orange-500/30 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] disabled:opacity-70 tracking-wide uppercase cursor-pointer"
+                  disabled={isLoading || lockoutRemaining > 0}
+                  className={`w-full mt-2 py-3.5 sm:py-4 font-black text-xs sm:text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] disabled:opacity-70 tracking-wide uppercase ${
+                    lockoutRemaining > 0
+                      ? "bg-stone-800 text-stone-400 border border-rose-500/30 cursor-not-allowed"
+                      : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/30 cursor-pointer"
+                  }`}
                 >
-                  {isLoading ? (
+                  {lockoutRemaining > 0 ? (
+                    <span className="flex items-center gap-2 text-rose-300">
+                      <ShieldAlert className="w-4 h-4 text-rose-400 animate-pulse" />
+                      <span>Bloqueado temporalmente ({lockoutRemaining}s)</span>
+                    </span>
+                  ) : isLoading ? (
                     <span>Verificando...</span>
                   ) : (
                     <>

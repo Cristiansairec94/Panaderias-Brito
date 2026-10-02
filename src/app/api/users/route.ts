@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { AppUser } from "@/types";
+import { hashPasswordSync, verifyPasswordSync } from "@/lib/security";
 
 const DATA_DIR = path.join(process.cwd(), "src", "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
@@ -52,14 +53,22 @@ function writeStoredUsers(users: AppUser[]): boolean {
   }
 }
 
-// GET: Obtener todos los usuarios y empleados
+// Sanitizar usuario eliminando la contraseña antes de responder al cliente
+function sanitizeUser(u: AppUser): Omit<AppUser, "password"> {
+  const { password, ...safe } = u;
+  return safe;
+}
+
+// GET: Obtener todos los usuarios y empleados (PROTEGIDO: sin contraseñas)
 export async function GET() {
   try {
     const users = readStoredUsers();
+    const sanitizedUsers = users.map(sanitizeUser);
+
     return NextResponse.json({
       success: true,
-      users,
-      count: users.length,
+      users: sanitizedUsers,
+      count: sanitizedUsers.length,
       timestamp: Date.now(),
     });
   } catch (err: any) {
@@ -70,11 +79,77 @@ export async function GET() {
   }
 }
 
-// POST: Registrar un nuevo empleado o sincronizar lista completa
+// POST: Registrar un nuevo empleado, sincronizar o validar credenciales de forma segura en servidor
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     let currentUsers = readStoredUsers();
+
+    // Acción de seguridad: Verificación de credenciales en servidor
+    if (body.action === "verify_credentials") {
+      const { identifier, password } = body;
+      const clean = (identifier || "").trim().toLowerCase();
+      const cleanPass = (password || "").trim();
+
+      if (!clean || !cleanPass) {
+        return NextResponse.json(
+          { success: false, message: "Usuario y contraseña requeridos" },
+          { status: 400 }
+        );
+      }
+
+      const found = currentUsers.find((u) => {
+        const email = u.email ? u.email.toLowerCase() : "";
+        const username = u.username ? u.username.toLowerCase() : "";
+        const name = u.name ? u.name.toLowerCase() : "";
+
+        if (email === clean) return true;
+        if (username === clean) return true;
+        if (name.includes(clean)) return true;
+        if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
+        if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
+        if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
+        if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
+        if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
+
+        return false;
+      });
+
+      if (!found) {
+        return NextResponse.json(
+          { success: false, message: "Usuario no encontrado" },
+          { status: 404 }
+        );
+      }
+
+      if (found.status === "inactivo") {
+        return NextResponse.json(
+          { success: false, message: "Esta cuenta se encuentra temporalmente desactivada" },
+          { status: 403 }
+        );
+      }
+
+      if (found.hasSystemAccess === false) {
+        return NextResponse.json(
+          { success: false, message: "Este trabajador no tiene credenciales de acceso al sistema habilitadas" },
+          { status: 403 }
+        );
+      }
+
+      // Validar contra hash o contraseña legada
+      const isValid = verifyPasswordSync(cleanPass, found.password);
+      if (!isValid) {
+        return NextResponse.json(
+          { success: false, message: "Contraseña incorrecta" },
+          { status: 401 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        user: sanitizeUser(found),
+      });
+    }
 
     // Caso 1: Sincronización de lista completa
     if (Array.isArray(body)) {
@@ -83,14 +158,19 @@ export async function POST(req: NextRequest) {
         currentUsers.forEach((u) => mergedMap.set(u.id, u));
         body.forEach((u) => {
           if (u && u.id) {
-            mergedMap.set(u.id, { ...mergedMap.get(u.id), ...u });
+            const existing = mergedMap.get(u.id);
+            // Hashear contraseña si viene en texto claro nuevo
+            const finalPass = u.password
+              ? (u.password.length === 64 ? u.password : hashPasswordSync(u.password))
+              : existing?.password;
+            mergedMap.set(u.id, { ...existing, ...u, ...(finalPass ? { password: finalPass } : {}) });
           }
         });
         const updated = Array.from(mergedMap.values());
         writeStoredUsers(updated);
-        return NextResponse.json({ success: true, users: updated, count: updated.length });
+        return NextResponse.json({ success: true, users: updated.map(sanitizeUser), count: updated.length });
       }
-      return NextResponse.json({ success: true, users: currentUsers });
+      return NextResponse.json({ success: true, users: currentUsers.map(sanitizeUser) });
     }
 
     // Caso 2: Alta o actualización de un solo empleado
@@ -102,12 +182,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Hashear contraseña si se proporciona una nueva
+    if (newUser.password && newUser.password.length !== 64) {
+      newUser.password = hashPasswordSync(newUser.password);
+    }
+
     const existingIndex = currentUsers.findIndex((u) => u.id === newUser.id);
     let updatedList: AppUser[];
 
     if (existingIndex >= 0) {
+      const prev = currentUsers[existingIndex];
       updatedList = currentUsers.map((u, idx) =>
-        idx === existingIndex ? { ...u, ...newUser } : u
+        idx === existingIndex ? { ...prev, ...newUser, password: newUser.password || prev.password } : u
       );
     } else {
       updatedList = [...currentUsers, newUser];
@@ -117,8 +203,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      user: newUser,
-      users: updatedList,
+      user: sanitizeUser(newUser),
+      users: updatedList.map(sanitizeUser),
       count: updatedList.length,
     });
   } catch (err: any) {
@@ -151,12 +237,17 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const updatedList = currentUsers.map((u) => (u.id === id ? { ...u, ...updates } : u));
+    const sanitizedUpdates = { ...updates };
+    if (sanitizedUpdates.password && sanitizedUpdates.password.length !== 64) {
+      sanitizedUpdates.password = hashPasswordSync(sanitizedUpdates.password);
+    }
+
+    const updatedList = currentUsers.map((u) => (u.id === id ? { ...u, ...sanitizedUpdates } : u));
     writeStoredUsers(updatedList);
 
     return NextResponse.json({
       success: true,
-      users: updatedList,
+      users: updatedList.map(sanitizeUser),
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -192,7 +283,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      users: updatedList,
+      users: updatedList.map(sanitizeUser),
       count: updatedList.length,
     });
   } catch (err: any) {
