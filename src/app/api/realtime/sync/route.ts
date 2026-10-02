@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 
 export interface StoredRealtimeEvent {
   id: string;
@@ -8,9 +10,59 @@ export interface StoredRealtimeEvent {
   timestamp: number;
 }
 
-// Buffer en memoria para los últimos 100 eventos del servidor
-const MAX_EVENTS = 100;
-const eventBuffer: StoredRealtimeEvent[] = [];
+const DATA_DIR = path.join(process.cwd(), "src", "data");
+const EVENTS_FILE = path.join(DATA_DIR, "realtime_events.json");
+
+// Buffer en memoria y persistente para los últimos 500 eventos del servidor
+const MAX_EVENTS = 500;
+let eventBuffer: StoredRealtimeEvent[] = [];
+let isInitialized = false;
+
+function ensureDataDirectory() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+  } catch (err) {
+    console.warn("[API Realtime] No se pudo crear directorio data:", err);
+  }
+}
+
+function loadStoredEvents(): StoredRealtimeEvent[] {
+  if (isInitialized && eventBuffer.length > 0) {
+    return eventBuffer;
+  }
+
+  try {
+    ensureDataDirectory();
+    if (fs.existsSync(EVENTS_FILE)) {
+      const content = fs.readFileSync(EVENTS_FILE, "utf-8");
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        eventBuffer = parsed;
+        isInitialized = true;
+        return eventBuffer;
+      }
+    }
+  } catch (err) {
+    console.warn("[API Realtime] Error al leer realtime_events.json, usando memoria:", err);
+  }
+
+  isInitialized = true;
+  return eventBuffer;
+}
+
+function saveStoredEvents(events: StoredRealtimeEvent[]): boolean {
+  eventBuffer = events;
+  try {
+    ensureDataDirectory();
+    fs.writeFileSync(EVENTS_FILE, JSON.stringify(events, null, 2), "utf-8");
+    return true;
+  } catch (err) {
+    console.warn("[API Realtime] No se pudo escribir en realtime_events.json:", err);
+    return false;
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,13 +70,19 @@ export async function GET(req: NextRequest) {
     const sinceParam = searchParams.get("since");
     const since = sinceParam ? parseInt(sinceParam, 10) : 0;
 
-    const filtered = eventBuffer.filter((e) => e.timestamp > since);
+    const currentEvents = loadStoredEvents();
+    let filtered = currentEvents.filter((e) => e.timestamp > since);
+
+    // Si since es 0, entregar los últimos 100 eventos para arranque inicial
+    if (since === 0 && filtered.length > 100) {
+      filtered = filtered.slice(-100);
+    }
 
     return NextResponse.json({
       success: true,
       events: filtered,
       serverTime: Date.now(),
-      totalBuffered: eventBuffer.length,
+      totalBuffered: currentEvents.length,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -43,6 +101,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Datos incompletos" }, { status: 400 });
     }
 
+    const currentEvents = loadStoredEvents();
+
     const eventRecord: StoredRealtimeEvent = {
       id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       type,
@@ -51,12 +111,14 @@ export async function POST(req: NextRequest) {
       timestamp: Date.now(),
     };
 
-    eventBuffer.push(eventRecord);
+    currentEvents.push(eventRecord);
 
-    // Mantener tamaño máximo de 100 eventos
-    if (eventBuffer.length > MAX_EVENTS) {
-      eventBuffer.splice(0, eventBuffer.length - MAX_EVENTS);
+    // Mantener tamaño máximo de MAX_EVENTS eventos
+    if (currentEvents.length > MAX_EVENTS) {
+      currentEvents.splice(0, currentEvents.length - MAX_EVENTS);
     }
+
+    saveStoredEvents(currentEvents);
 
     return NextResponse.json({
       success: true,

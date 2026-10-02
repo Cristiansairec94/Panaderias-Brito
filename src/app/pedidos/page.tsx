@@ -98,7 +98,7 @@ export type OrderClassificationKey =
   | "historial";
 
 export default function PedidosPage() {
-  const { branches, currentBranch } = useBranch();
+  const { branches, currentBranch, isAllBranches } = useBranch();
   const { user } = useAuth();
   const { addNotification } = useNotifications();
 
@@ -223,17 +223,17 @@ export default function PedidosPage() {
     };
   }, []);
 
-  // Por requerimiento operativo: los administradores entran visualizando "all" (Todas las Sucursales),
-  // pero pueden seleccionar sucursales individuales libremente; los cajeros quedan fijados a su sucursal.
-  const hasInitializedBranchFilterRef = useRef(false);
+  // Sincronización de sucursal: los cajeros quedan fijados a su tienda asignada;
+  // los administradores se sincronizan con la sucursal activa en la cabecera ("all" o tienda individual).
   useEffect(() => {
     if (!isAdmin) {
       setSelectedBranchFilter(userBranchId);
-    } else if (!hasInitializedBranchFilterRef.current && user) {
-      hasInitializedBranchFilterRef.current = true;
+    } else if (isAllBranches) {
       setSelectedBranchFilter("all");
+    } else if (currentBranch && currentBranch.id) {
+      setSelectedBranchFilter(currentBranch.id);
     }
-  }, [isAdmin, userBranchId, user]);
+  }, [isAdmin, userBranchId, isAllBranches, currentBranch?.id]);
 
   // Local minute clock (for checking if delivery time has passed today)
   const [currentMinutes, setCurrentMinutes] = useState<number>(() => {

@@ -311,12 +311,22 @@ export function matchesCashier(itemCashier?: string, targetCashier?: string): bo
 
 /**
  * Obtiene el timestamp de inicio del turno actual a partir del último corte cerrado
- * o de la clave almacenada de inicio de turno.
+ * o de la clave almacenada de inicio de turno (con soporte para aislamiento por sucursal).
  */
-export function getStoredShiftStartBoundary(): number {
+export function getStoredShiftStartBoundary(branchId?: string): number {
   if (typeof window === "undefined") return 0;
   try {
     const now = Date.now();
+    // 1. Clave específica de la sucursal activa
+    if (branchId && branchId !== "all") {
+      const branchStored = localStorage.getItem("brito_shift_start_" + branchId);
+      if (branchStored && !isNaN(Number(branchStored)) && Number(branchStored) > 0) {
+        const num = Number(branchStored);
+        return num > now ? now : num;
+      }
+    }
+
+    // 2. Clave global del turno actual
     const stored = localStorage.getItem("brito_current_shift_start_timestamp");
     if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
       const num = Number(stored);
@@ -330,6 +340,9 @@ export function getStoredShiftStartBoundary(): number {
       const parsed = JSON.parse(rawCuts);
       if (Array.isArray(parsed) && parsed.length > 0) {
         for (const cut of parsed) {
+          if (branchId && branchId !== "all" && cut.branchId && cut.branchId !== branchId) {
+            continue;
+          }
           const cutTs =
             typeof cut.timestamp === "number"
               ? cut.timestamp
@@ -341,9 +354,15 @@ export function getStoredShiftStartBoundary(): number {
       }
     }
     if (startTs === 0) {
-      startTs = now;
+      // Iniciar al comienzo del día de hoy (00:00:00) para no descartar ventas matutinas
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      startTs = todayStart.getTime();
     }
     try {
+      if (branchId && branchId !== "all") {
+        localStorage.setItem("brito_shift_start_" + branchId, startTs.toString());
+      }
       localStorage.setItem("brito_current_shift_start_timestamp", startTs.toString());
     } catch (e) {}
     return startTs;

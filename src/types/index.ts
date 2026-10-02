@@ -212,6 +212,7 @@ export interface ShiftCutRecord {
   outgoingCashier: string;
   incomingCashier: string;
   responsible?: string; // Responsable directo del turno
+  branchId?: string;
   branchName?: string;
   previousShift: string;
   nextShift: string;

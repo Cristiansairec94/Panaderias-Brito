@@ -731,7 +731,7 @@ export default function ExpensesModal({
       if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
       const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
       if (shiftStartBoundary > 0) {
-        if (!expTime || expTime < shiftStartBoundary - 60000) {
+        if (!expTime || expTime < shiftStartBoundary) {
           return false;
         }
       }
@@ -748,7 +748,7 @@ export default function ExpensesModal({
       if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
       const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
       if (shiftStartBoundary > 0) {
-        if (!incTime || incTime < shiftStartBoundary - 60000) {
+        if (!incTime || incTime < shiftStartBoundary) {
           return false;
         }
       }
@@ -771,7 +771,7 @@ export default function ExpensesModal({
       } catch (e) {}
     }
 
-    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
+    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
     const branchFilteredSource = source.filter((s) => {
       if (!s) return false;
       if (activeBranch && activeBranch.id !== "all") {
@@ -784,57 +784,11 @@ export default function ExpensesModal({
       }
       const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
       if (boundary > 0) {
-        if (!sTime || sTime < boundary - 60000) return false;
+        if (!sTime || sTime < boundary) return false;
       }
       if (sTime > Date.now() + 60000) return false;
       return true;
     });
-
-    // Sincronización con la Red de Sucursales: si la sucursal activa reporta ventas y tickets mayores en el turno,
-    // sintetizar los tickets para que el historial contenga la totalidad de los tickets reportados
-    if (activeBranch && activeBranch.todayTickets > 0 && branchFilteredSource.length < activeBranch.todayTickets) {
-      const currentSum = branchFilteredSource.reduce((sum, s) => sum + (Number(s.total) || 0), 0);
-      const targetSales = Math.max(activeBranch.todaySales || 0, activeBranch.currentShift?.totalSales || 0);
-      const remainingAmount = Math.max(0, targetSales - currentSum);
-      const missingCount = activeBranch.todayTickets - branchFilteredSource.length;
-
-      if (missingCount > 0 && remainingAmount > 0) {
-        const avgPerTicket = remainingAmount / missingCount;
-        const synthTickets: Sale[] = [];
-        for (let i = 1; i <= missingCount; i++) {
-          const tAmount = i === missingCount
-            ? Math.round((remainingAmount - (avgPerTicket * (missingCount - 1))) * 100) / 100
-            : Math.round((avgPerTicket + (Math.sin(i * 1.5) * (avgPerTicket * 0.25))) * 100) / 100;
-          const safeAmount = Math.max(8, tAmount);
-          const minutesAgo = Math.min(420, (missingCount - i + 1) * 11);
-          const ticketDate = new Date(Date.now() - minutesAgo * 60000);
-          synthTickets.push({
-            id: `TKT-${activeBranch.code || "BTO"}-${100 + i}`,
-            date: formatDateTimeSafe(ticketDate),
-            timestamp: ticketDate.getTime(),
-            total: safeAmount,
-            paymentMethod: i % 7 === 0 ? "tarjeta" : i % 11 === 0 ? "transferencia" : "efectivo",
-            cashier: activeBranch.currentShift?.cashier || activeBranch.manager || "Carlos Mendoza",
-            branchId: activeBranch.id,
-            branchName: activeBranch.name,
-            items: [
-              {
-                product: {
-                  id: `prod-${i}`,
-                  name: activeBranch.topProduct?.name || "Bolillo de Sal",
-                  price: 3.5,
-                  category: "Pan Salado",
-                  code: "PAN-01",
-                  stock: 100,
-                },
-                quantity: Math.max(2, Math.round(safeAmount / 3.5)),
-              },
-            ],
-          });
-        }
-        return [...branchFilteredSource, ...synthTickets];
-      }
-    }
 
     return branchFilteredSource;
   }, [sales, shiftStartBoundary, shiftVersion, activeBranch]);
@@ -844,7 +798,7 @@ export default function ExpensesModal({
 
   // Pedidos especiales del turno (anticipos y liquidaciones de pedidos creados en el turno activo)
   const relevantOrders = useMemo(() => {
-    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
+    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
     const rawList = Array.isArray(orders) && orders.length > 0 ? orders : (internalOrders || []);
     const stored = getStoredOrders();
     const sourceOrders = rawList.map((o) => {
@@ -857,7 +811,7 @@ export default function ExpensesModal({
       if (!isOrderInBranch(o)) return false;
       const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
       if (boundary > 0) {
-        if (!oTime || oTime < boundary - 60000) {
+        if (!oTime || oTime < boundary) {
           return false;
         }
       }
@@ -935,21 +889,17 @@ export default function ExpensesModal({
   
   // Ventas de mostrador del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
   const shiftPurePosTotal = useMemo(() => {
-    const rawPos = effectiveSales
+    return effectiveSales
       .filter((s) => !s.isCustomOrder)
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const branchSales = activeBranch ? (Number(activeBranch.todaySales) || Number(activeBranch.currentShift?.totalSales) || 0) : 0;
-    return Math.max(branchSales, rawPos);
-  }, [effectiveSales, activeBranch?.todaySales, activeBranch?.currentShift?.totalSales]);
+  }, [effectiveSales]);
 
   // Ventas de mostrador puras en efectivo (excluyendo pedidos) - Para el balance contable del cajón
   const shiftPurePosCash = useMemo(() => {
-    const rawCash = effectiveSales
+    return effectiveSales
       .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder)
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const branchCash = activeBranch?.currentShift?.cashSales ? Number(activeBranch.currentShift.cashSales) : 0;
-    return branchCash > 0 ? Math.max(branchCash, rawCash) : rawCash;
-  }, [effectiveSales, activeBranch?.currentShift?.cashSales]);
+  }, [effectiveSales]);
 
   // Pedidos especiales del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
   const shiftOrdersTotal = useMemo(() => {

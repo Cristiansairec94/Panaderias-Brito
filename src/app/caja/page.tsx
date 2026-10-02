@@ -49,145 +49,9 @@ import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { recordCashIncome } from "@/lib/incomes";
 import ShiftCutDetailModal from "@/components/caja/ShiftCutDetailModal";
 
-const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
-  {
-    id: "CORTE-948210",
-    date: "Hoy, 02:00 PM",
-    timestamp: Date.now() - 2 * 3600000,
-    shiftRange: "06:00 AM — 02:00 PM",
-    outgoingCashier: "Cajera 1 - Turno Matutino",
-    incomingCashier: "Cajera 2 - Turno Vespertino",
-    responsible: "Lupita Brito (Cajera 1)",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Matutino (06:00 - 14:00)",
-    nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 500,
-    cashSales: 4150,
-    cardSales: 700,
-    transferSales: 350,
-    totalSales: 5200,
-    totalSalesAll: 5200,
-    totalExpenses: 570,
-    expectedCash: 4080,
-    countedCash: 4080,
-    difference: 0,
-    nextFund: 0,
-    notes: "Entrega de turno matutino sin ninguna anomalía. Vitrina de conchas y bolillo surtida.",
-    stockPieces: 180,
-    stockValue: 2340,
-  },
-  {
-    id: "CORTE-893120",
-    date: "Ayer, 10:00 PM",
-    timestamp: Date.now() - 18 * 3600000,
-    shiftRange: "02:00 PM — 10:00 PM",
-    outgoingCashier: "Cajera 2 - Turno Vespertino",
-    incomingCashier: "Cajera 1 - Turno Matutino",
-    responsible: "Cajera 2 - Turno Vespertino",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Vespertino (14:00 - 22:00)",
-    nextShift: "Turno Matutino (06:00 - 14:00)",
-    initialFund: 600,
-    cashSales: 3820,
-    cardSales: 680,
-    transferSales: 230,
-    totalSales: 4730,
-    totalSalesAll: 4730,
-    totalExpenses: 200,
-    expectedCash: 4220,
-    countedCash: 4220,
-    difference: 0,
-    nextFund: 500,
-    notes: "Cierre nocturno completado. Pan dulce agotado y efectivo entregado a Don Toño.",
-    stockPieces: 25,
-    stockValue: 325,
-  },
-  {
-    id: "CORTE-892401",
-    date: "Ayer, 02:00 PM",
-    timestamp: Date.now() - 26 * 3600000,
-    shiftRange: "06:00 AM — 02:00 PM",
-    outgoingCashier: "Cajera 1 - Turno Matutino",
-    incomingCashier: "Cajera 2 - Turno Vespertino",
-    responsible: "Lupita Brito (Cajera 1)",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Matutino (06:00 - 14:00)",
-    nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 500,
-    cashSales: 4500,
-    cardSales: 550,
-    transferSales: 120,
-    totalSales: 5170,
-    totalSalesAll: 5170,
-    totalExpenses: 350,
-    expectedCash: 4650,
-    countedCash: 4700,
-    difference: 50,
-    nextFund: 500,
-    notes: "Sobrante de $50 pesos por redondeo voluntario de clientes en mostrador.",
-    stockPieces: 195,
-    stockValue: 2535,
-  },
-  {
-    id: "CORTE-881290",
-    date: "Hace 2 días, 10:00 PM",
-    timestamp: Date.now() - 42 * 3600000,
-    shiftRange: "02:00 PM — 10:00 PM",
-    outgoingCashier: "Cajera 2 - Turno Vespertino",
-    incomingCashier: "Cajera 1 - Turno Matutino",
-    responsible: "Don Toño Brito (Supervisor)",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Vespertino (14:00 - 22:00)",
-    nextShift: "Turno Matutino (06:00 - 14:00)",
-    initialFund: 500,
-    cashSales: 3400,
-    cardSales: 480,
-    transferSales: 200,
-    totalSales: 4080,
-    totalSalesAll: 4080,
-    totalExpenses: 180,
-    expectedCash: 3720,
-    countedCash: 3690,
-    difference: -30,
-    nextFund: 500,
-    notes: "Faltante menor de $30 en monedas de cambio en hora pico. Supervisado por Don Toño.",
-    stockPieces: 30,
-    stockValue: 390,
-  },
-  {
-    id: "CORTE-880912",
-    date: "Hace 2 días, 02:00 PM",
-    timestamp: Date.now() - 50 * 3600000,
-    shiftRange: "06:00 AM — 02:00 PM",
-    outgoingCashier: "Cajera 1 - Turno Matutino",
-    incomingCashier: "Cajera 2 - Turno Vespertino",
-    responsible: "Lupita Brito (Cajera 1)",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Matutino (06:00 - 14:00)",
-    nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 500,
-    cashSales: 4300,
-    cardSales: 620,
-    transferSales: 280,
-    totalSales: 5200,
-    totalSalesAll: 5200,
-    totalExpenses: 400,
-    expectedCash: 4400,
-    countedCash: 4400,
-    difference: 0,
-    nextFund: 500,
-    notes: "Turno entregado conforme con pago de gas LP realizado y comprobante archivado.",
-    stockPieces: 160,
-    stockValue: 2080,
-  }
-];
+const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [];
 
-const INITIAL_MOVEMENTS: CashMovement[] = [
-  { id: "mov-1", shiftId: "shift-101", type: "entrada", category: "abono_cliente", categoryLabel: "Abono de Pedido", amount: 500, reason: "Anticipo Sra. María pastel XV años (PED-101)", authorizedBy: "Lupita Brito", timestamp: "08:45 AM" },
-  { id: "mov-2", shiftId: "shift-101", type: "salida", category: "gasto_gas", categoryLabel: "Pago de Gas LP", amount: 450, reason: "Carga de tanque para hornos principales", authorizedBy: "Don Toño Brito", timestamp: "10:15 AM" },
-  { id: "mov-3", shiftId: "shift-101", type: "salida", category: "compra_insumos", categoryLabel: "Insumo Urgente", amount: 120, reason: "Compra de 5 bolsas de hielo y servilletas en la esquina", authorizedBy: "Lupita Brito", timestamp: "12:30 PM" },
-  { id: "mov-4", shiftId: "shift-101", type: "salida", category: "retiro_dueno", categoryLabel: "Retiro Don Toño", amount: 1000, reason: "Retiro parcial de efectivo por seguridad", authorizedBy: "Don Toño Brito", timestamp: "02:00 PM" },
-];
+const INITIAL_MOVEMENTS: CashMovement[] = [];
 
 function getShiftSuggestionByCurrentTime(date = new Date()) {
   const hours = date.getHours();
@@ -284,7 +148,7 @@ function formatLocalMonth(d = new Date()): string {
 
 export default function CajaPage() {
   const { user, usersList } = useAuth();
-  const { currentBranch } = useBranch();
+  const { currentBranch, updateBranch, cashMovements, addCashMovement, isAllBranches } = useBranch();
   const { addNotification } = useNotifications();
   const { isOnline, isSyncing, pendingCount, enqueueOfflineItem } = useSync();
 
@@ -309,7 +173,12 @@ export default function CajaPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "cuadrado" | "sobrante" | "faltante">("all");
 
   const getStoredCajaInitialFund = (fallback: number = 0): number => {
+    if (currentBranch?.currentShift?.initialFund !== undefined) {
+      return currentBranch.currentShift.initialFund;
+    }
     try {
+      const saved = localStorage.getItem("brito_pos_initial_fund");
+      if (saved && !isNaN(Number(saved))) return Number(saved);
       const raw = localStorage.getItem("brito_shift_cuts_history");
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -317,8 +186,6 @@ export default function CajaPage() {
           return parsed[0].nextFund;
         }
       }
-      const saved = localStorage.getItem("brito_pos_initial_fund");
-      if (saved && !isNaN(Number(saved))) return Number(saved);
     } catch (e) {}
     return fallback;
   };
@@ -338,10 +205,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const shiftStart = getStoredShiftStartBoundary();
+            const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -358,10 +225,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const shiftStart = getStoredShiftStartBoundary();
+            const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -378,10 +245,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const shiftStart = getStoredShiftStartBoundary();
+            const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -428,22 +295,24 @@ export default function CajaPage() {
       const raw = localStorage.getItem("brito_shift_cuts_history");
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
+          const realCuts = parsed.filter(c => c && c.id !== "CORTE-948210" && c.id !== "CORTE-893120" && c.id !== "CORTE-892401");
           // Normalize responsible field if missing
-          const normalized: ShiftCutRecord[] = parsed.map((item: ShiftCutRecord) => ({
+          const normalized: ShiftCutRecord[] = realCuts.map((item: ShiftCutRecord) => ({
             ...item,
             responsible: item.responsible || item.outgoingCashier || "Responsable de Caja",
           }));
           setCutsHistory(normalized);
+          if (realCuts.length !== parsed.length) {
+            localStorage.setItem("brito_shift_cuts_history", JSON.stringify(realCuts));
+          }
           return;
         }
       }
-      // If empty, initialize with rich sample records
-      localStorage.setItem("brito_shift_cuts_history", JSON.stringify(SAMPLE_HISTORICAL_CUTS));
-      setCutsHistory(SAMPLE_HISTORICAL_CUTS);
+      setCutsHistory([]);
     } catch (e) {
       console.error("Error al cargar historial de caja:", e);
-      setCutsHistory(SAMPLE_HISTORICAL_CUTS);
+      setCutsHistory([]);
     }
   };
 
@@ -476,25 +345,46 @@ export default function CajaPage() {
       setInitialCash(getStoredCajaInitialFund(0));
       try {
         const raw = localStorage.getItem("brito_pos_current_sales");
+        let list: any[] = [];
         if (raw) {
-          const list = JSON.parse(raw);
-          if (Array.isArray(list) && list.length > 0) {
-            const shiftStart = getStoredShiftStartBoundary();
-            const filtered = list.filter((s: any) => {
-              const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
-            });
-            const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            const tSum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            setCashSales(cSum);
-            setCardSales(kSum);
-            setTransferSales(tSum);
-          } else {
-            setCashSales(0);
-            setCardSales(0);
-            setTransferSales(0);
-          }
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) list = [...parsed];
+        }
+        const masterRaw = localStorage.getItem("brito_pos_master_sales");
+        if (masterRaw) {
+          try {
+            const masterParsed = JSON.parse(masterRaw);
+            if (Array.isArray(masterParsed)) {
+              for (const ms of masterParsed) {
+                if (ms && !list.some((s) => s.id === ms.id)) {
+                  list.push(ms);
+                }
+              }
+            }
+          } catch {}
+        }
+
+        if (list.length > 0) {
+          const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
+          const filtered = list.filter((s: any) => {
+            if (!s) return false;
+            if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+              const sBranch = s.branchId || s.branch_id;
+              if (sBranch) {
+                if (sBranch !== currentBranch.id) return false;
+              } else {
+                if (currentBranch.id !== "branch-matriz") return false;
+              }
+            }
+            const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+            return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+          });
+          const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+          const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+          const tSum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+          setCashSales(cSum);
+          setCardSales(kSum);
+          setTransferSales(tSum);
         } else {
           setCashSales(0);
           setCardSales(0);
@@ -509,12 +399,16 @@ export default function CajaPage() {
     window.addEventListener("brito_shift_cuts_updated", handleSync);
     window.addEventListener("storage", handleSync);
     window.addEventListener("brito_incomes_updated", handleSync);
+    window.addEventListener("brito_sales_updated", handleSync);
+    window.addEventListener("brito_caja_updated", handleSync);
     return () => {
       window.removeEventListener("brito_shift_cuts_updated", handleSync);
       window.removeEventListener("storage", handleSync);
       window.removeEventListener("brito_incomes_updated", handleSync);
+      window.removeEventListener("brito_sales_updated", handleSync);
+      window.removeEventListener("brito_caja_updated", handleSync);
     };
-  }, []);
+  }, [currentBranch?.id]);
 
   // URL query params handling (?tab=historial, ?tab=turno, ?tab=entradas, ?tab=salidas)
   useEffect(() => {
@@ -574,9 +468,38 @@ export default function CajaPage() {
   }, [currentBranch?.id, currentBranch?.currentShift, currentBranch?.todaySales]);
 
   // Live calculations
-  const entryMovements = movements.filter((m) => m.type === "entrada");
+  const effectiveMovements = useMemo(() => {
+    if (!cashMovements || cashMovements.length === 0) return movements;
+    const filtered = cashMovements.filter((m) => {
+      if (!m) return false;
+      if (!isAllBranches && currentBranch && currentBranch.id) {
+        if (m.branchId && m.branchId !== currentBranch.id) return false;
+      }
+      return true;
+    });
+    const mapped: CashMovement[] = filtered.map((m) => ({
+      id: m.id,
+      shiftId: "shift-live",
+      type: m.type,
+      category: m.category as any,
+      categoryLabel: m.categoryLabel,
+      amount: m.amount,
+      reason: m.reason,
+      authorizedBy: m.authorizedBy,
+      timestamp: m.timestamp,
+    }));
+    const combined = [...movements];
+    for (const m of mapped) {
+      if (!combined.some((c) => c.id === m.id)) {
+        combined.push(m);
+      }
+    }
+    return combined;
+  }, [cashMovements, currentBranch?.id, isAllBranches, movements]);
+
+  const entryMovements = effectiveMovements.filter((m) => m.type === "entrada");
   const totalEntries = entryMovements.reduce((sum, m) => sum + m.amount, 0);
-  const totalExpenses = movements.filter((m) => m.type === "salida").reduce((sum, m) => sum + m.amount, 0);
+  const totalExpenses = effectiveMovements.filter((m) => m.type === "salida").reduce((sum, m) => sum + m.amount, 0);
   const expectedCashInDrawer = initialCash + cashSales + totalEntries - totalExpenses;
   const liveCountedValue = countedCash !== "" && !isNaN(Number(countedCash)) ? Number(countedCash) : expectedCashInDrawer;
   const liveCashDifference = liveCountedValue - expectedCashInDrawer;
@@ -850,6 +773,18 @@ export default function CajaPage() {
 
     setMovements((prev) => [newMov, ...prev]);
 
+    const targetBranchId = currentBranch?.id || "branch-matriz";
+    if (addCashMovement) {
+      addCashMovement(targetBranchId, {
+        type: movementType,
+        category: movCategory as any,
+        categoryLabel: labels[movCategory] || "Movimiento de Caja",
+        amount: Number(movAmount),
+        reason: movReason || "Sin descripción",
+        authorizedBy: user?.name || "Don Toño Brito",
+      });
+    }
+
     // Si es salida, registrar automáticamente en el Historial Detallado de Gastos
     if (movementType === "salida") {
       recordCashOutflowAsExpense({
@@ -925,6 +860,7 @@ export default function CajaPage() {
       outgoingCashier: currentShiftResponsible,
       incomingCashier: recipient,
       responsible: currentShiftResponsible,
+      branchId: currentBranch?.id || "branch-matriz",
       branchName: currentBranch?.name || "Sucursal Matriz Centro",
       previousShift: getShiftSuggestionByCurrentTime().currentShift,
       nextShift: nextShiftName || "Turno Vespertino",
@@ -955,13 +891,36 @@ export default function CajaPage() {
       localStorage.setItem("brito_pos_current_sales", "[]");
       localStorage.setItem("brito_pos_current_expenses", "[]");
       localStorage.setItem("brito_pos_current_incomes", "[]");
+      const targetBranchId = currentBranch?.id || "branch-matriz";
+      const cutTs = newCut.timestamp || Date.now();
+      localStorage.setItem("brito_shift_start_" + targetBranchId, cutTs.toString());
+      updateBranch(targetBranchId, {
+        todaySales: 0,
+        todayTickets: 0,
+        cashInDrawer: parsedNextFund,
+        currentShift: {
+          id: `shift-${targetBranchId}-${cutTs}`,
+          name: nextShiftName || "Turno General",
+          cashier: recipient,
+          openedAt: formatDateTimeSafe(new Date(cutTs)),
+          initialFund: parsedNextFund,
+          cashSales: 0,
+          cardSales: 0,
+          transferSales: 0,
+          totalSales: 0,
+          ticketCount: 0,
+          status: "abierto",
+        },
+      });
       setCutsHistory(updated);
       setCashSales(0);
       setCardSales(0);
       setTransferSales(0);
+      setMovements([]);
       setInitialCash(parsedNextFund);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
+      window.dispatchEvent(new Event("brito_incomes_updated"));
     } catch (err) {
       console.error("Error guardando corte:", err);
     }

@@ -535,28 +535,32 @@ export default function POSPage() {
         if (storedShift && storedShift !== shiftName) setShiftName(storedShift);
 
         const rawSales = localStorage.getItem("brito_pos_current_sales");
-        if (!rawSales || rawSales === "[]") {
-          setRecentSalesList([]);
-        } else {
+        let list: Sale[] = [];
+        if (rawSales && rawSales !== "[]") {
           const parsed = JSON.parse(rawSales);
-          if (Array.isArray(parsed)) {
-            const shiftStart = getStoredShiftStartBoundary();
-            const realSales = parsed.filter((s: any) => {
-              if (!s) return false;
-              const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
-              return true;
-            });
-            setRecentSalesList((prev) => {
-              if (prev.length === realSales.length && prev.every((s, i) => s.id === realSales[i]?.id)) {
-                return prev;
-              }
-              return realSales;
-            });
-          } else {
-            setRecentSalesList((prev) => (prev.length === 0 ? prev : []));
-          }
+          if (Array.isArray(parsed)) list = [...parsed];
         }
+        const masterSaved = localStorage.getItem("brito_pos_master_sales");
+        if (masterSaved) {
+          try {
+            const masterParsed = JSON.parse(masterSaved);
+            if (Array.isArray(masterParsed)) {
+              for (const ms of masterParsed) {
+                if (ms && !list.some((s) => s.id === ms.id)) {
+                  list.push(ms);
+                }
+              }
+            }
+          } catch {}
+        }
+        const shiftStart = getStoredShiftStartBoundary();
+        const realSales = list.filter((s: any) => {
+          if (!s) return false;
+          const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
+          if (!isAdmin && shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
+          return true;
+        });
+        setRecentSalesList(realSales);
 
         const rawExpenses = localStorage.getItem("brito_pos_current_expenses");
         if (!rawExpenses || rawExpenses === "[]") {
@@ -805,28 +809,32 @@ export default function POSPage() {
     const handleSalesUpdated = () => {
       try {
         const saved = localStorage.getItem("brito_pos_current_sales");
+        let list: Sale[] = [];
         if (saved && saved !== "[]") {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            const shiftStart = getStoredShiftStartBoundary();
-            const realSales = parsed.filter((s: any) => {
-              if (!s) return false;
-              const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
-              return true;
-            });
-            setRecentSalesList((prev) => {
-              if (prev.length === realSales.length && prev.every((s, i) => s.id === realSales[i]?.id)) {
-                return prev;
-              }
-              return realSales;
-            });
-          } else {
-            setRecentSalesList((prev) => (prev.length === 0 ? prev : []));
-          }
-        } else {
-          setRecentSalesList((prev) => (prev.length === 0 ? prev : []));
+          if (Array.isArray(parsed)) list = [...parsed];
         }
+        const masterSaved = localStorage.getItem("brito_pos_master_sales");
+        if (masterSaved) {
+          try {
+            const masterParsed = JSON.parse(masterSaved);
+            if (Array.isArray(masterParsed)) {
+              for (const ms of masterParsed) {
+                if (ms && !list.some((s) => s.id === ms.id)) {
+                  list.push(ms);
+                }
+              }
+            }
+          } catch {}
+        }
+        const shiftStart = getStoredShiftStartBoundary();
+        const realSales = list.filter((s: any) => {
+          if (!s) return false;
+          const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
+          if (!isAdmin && shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
+          return true;
+        });
+        setRecentSalesList(realSales);
         setShiftVersion((v) => v + 1);
       } catch (e) {
         console.error("Error al sincronizar ventas en POS:", e);
@@ -838,7 +846,7 @@ export default function POSPage() {
       window.removeEventListener("brito_sales_updated", handleSalesUpdated);
       window.removeEventListener("storage", handleSalesUpdated);
     };
-  }, []);
+  }, [isAdmin]);
 
   // Sanitización de seguridad: eliminar registros corruptos o atípicos de localStorage
   useEffect(() => {
@@ -1003,10 +1011,15 @@ export default function POSPage() {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            let maxCut = parsed[0];
+            const branchCuts = parsed.filter(c => {
+              if (activeBranch?.id && activeBranch.id !== "all" && c.branchId && c.branchId !== activeBranch.id) return false;
+              return true;
+            });
+            if (branchCuts.length === 0) return null;
+            let maxCut = branchCuts[0];
             let maxT = parseDateTimeSafe(maxCut?.timestamp || maxCut?.date || maxCut?.createdAt || maxCut?.cutTime);
-            for (let i = 1; i < parsed.length; i++) {
-              const c = parsed[i];
+            for (let i = 1; i < branchCuts.length; i++) {
+              const c = branchCuts[i];
               const t = parseDateTimeSafe(c?.timestamp || c?.date || c?.createdAt || c?.cutTime);
               if (t > maxT) {
                 maxT = t;
@@ -1019,7 +1032,7 @@ export default function POSPage() {
       } catch (e) {}
     }
     return null;
-  }, [isShiftLocked, shiftVersion]);
+  }, [isShiftLocked, shiftVersion, activeBranch?.id]);
 
   const baseShiftFund = useMemo(() => {
     return initialCashFund;
@@ -1697,8 +1710,8 @@ export default function POSPage() {
       lastCutInfo?.timestamp || lastCutInfo?.date || lastCutInfo?.createdAt || lastCutInfo?.cutTime
     );
     const validCut = lastCutTs > 0 && lastCutTs <= Date.now() ? lastCutTs : 0;
-    return Math.max(getStoredShiftStartBoundary(), validCut);
-  }, [lastCutInfo, shiftVersion]);
+    return Math.max(getStoredShiftStartBoundary(activeBranch?.id), validCut);
+  }, [lastCutInfo, shiftVersion, activeBranch?.id]);
 
   const currentShiftSales = useMemo(() => {
     try {
@@ -1717,7 +1730,7 @@ export default function POSPage() {
         }
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 60000) return false;
+          if (!t || t < shiftStartBoundary) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1734,11 +1747,19 @@ export default function POSPage() {
       if (!expensesList || expensesList.length === 0) return [];
       const filtered = expensesList.filter((e) => {
         if (!e) return false;
+        if (activeBranch && activeBranch.id !== "all") {
+          const eBranch = (e as any).branchId || (e as any).branch_id;
+          if (eBranch) {
+            if (eBranch !== activeBranch.id) return false;
+          } else {
+            if (activeBranch.id !== "branch-matriz") return false;
+          }
+        }
         const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
         if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 60000) return false;
+          if (!t || t < shiftStartBoundary) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1748,18 +1769,26 @@ export default function POSPage() {
       console.error("Error filtering currentShiftExpenses:", e);
       return [];
     }
-  }, [expensesList, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [expensesList, cashierName, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
   const currentShiftIncomes = useMemo(() => {
     try {
       if (!incomesList || incomesList.length === 0) return [];
       const filtered = incomesList.filter((inc) => {
         if (!inc) return false;
+        if (activeBranch && activeBranch.id !== "all") {
+          const incBranch = (inc as any).branchId || (inc as any).branch_id;
+          if (incBranch) {
+            if (incBranch !== activeBranch.id) return false;
+          } else {
+            if (activeBranch.id !== "branch-matriz") return false;
+          }
+        }
         const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
         if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(inc.timestamp || (inc as any).createdAt || inc.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 60000) return false;
+          if (!t || t < shiftStartBoundary) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1769,7 +1798,7 @@ export default function POSPage() {
       console.error("Error filtering currentShiftIncomes:", e);
       return [];
     }
-  }, [incomesList, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [incomesList, cashierName, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
   const currentShiftOrders = useMemo(() => {
     try {
@@ -1807,11 +1836,6 @@ export default function POSPage() {
             return false;
           }
         }
-        const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
-        if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 60000) return false;
-        }
-        if (t > Date.now() + 60000) return false;
         return true;
       });
     } catch (e) {
@@ -1857,13 +1881,12 @@ export default function POSPage() {
         }
       }
       const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
-      if (shiftStartBoundary > 0 && (!t || t < shiftStartBoundary - 60000)) return false;
+      if (shiftStartBoundary > 0 && (!t || t < shiftStartBoundary)) return false;
       return (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id);
     });
     const ordersCash = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
-    const branchShiftCash = activeBranch?.currentShift?.cashSales ? Number(activeBranch.currentShift.cashSales) : 0;
-    return Math.max(branchShiftCash, posCash) + ordersCash;
-  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id, activeBranch?.currentShift?.cashSales]);
+    return posCash + ordersCash;
+  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])
@@ -1985,11 +2008,20 @@ export default function POSPage() {
       customerType: selectedCustomer.type,
       timestamp: Date.now(),
       createdAt: new Date().toISOString(),
+      branchId: activeBranch ? activeBranch.id : "branch-matriz",
+      branchName: activeBranch ? (activeBranch.shortName || activeBranch.name) : "Matriz",
     };
 
     const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");
     if (activeBranch) {
-      registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary);
+      registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary, {
+        id: createdSaleId,
+        items: currentItems,
+        customerName: selectedCustomer.name,
+        customerId: selectedCustomer.id,
+        date: newSaleRecord.date,
+        createdAt: newSaleRecord.createdAt,
+      });
     }
 
     // 3. Registrar automáticamente en el Historial de Ingresos sin límite de dinero
@@ -3105,6 +3137,33 @@ export default function POSPage() {
                         </div>
                       </div>
 
+                      {/* Resumen en vivo de la sucursal seleccionada y botón directo a sus ventas */}
+                      {activeBranch && (
+                        <div className="p-2.5 rounded-xl bg-amber-950/70 border border-amber-500/40 space-y-2">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-bold text-amber-300">Ventas hoy en {activeBranch.shortName || activeBranch.name}:</span>
+                            <span className="font-mono font-black text-emerald-400 text-xs">
+                              {formatCurrency(activeBranch.todaySales)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-stone-300">
+                            <span>Tickets emitidos: <strong className="text-white">{activeBranch.todayTickets}</strong></span>
+                            <span>En gaveta: <strong className="text-amber-300">{formatCurrency(activeBranch.cashInDrawer)}</strong></span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowRecentSales(true);
+                              setShowBranchDropdown(false);
+                            }}
+                            className="w-full py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-stone-950 font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            <span>Ver Historial de Ventas / Tickets ({currentShiftSales.length}) ➔</span>
+                          </button>
+                        </div>
+                      )}
+
                       {/* Botón inferior para cerrar cuando termine */}
                       <div className="pt-2 border-t border-amber-900/60 flex items-center justify-between">
                         <span className="text-[10px] text-amber-300/70 font-medium">
@@ -3131,6 +3190,18 @@ export default function POSPage() {
             </div>
               </div>
               <div className="flex items-center gap-2 relative z-10">
+                <button
+                  type="button"
+                  onClick={() => setShowRecentSales(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/60 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                  title="Ver ventas y tickets del turno"
+                >
+                  <Receipt className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Ventas</span>
+                  <span className="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded-md font-mono text-[11px] font-black">
+                    {currentShiftSales.length}
+                  </span>
+                </button>
                 <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all ${
                   totalPieces > 0
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/60 scale-105 animate-pulse"

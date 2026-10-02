@@ -21,6 +21,10 @@ export interface RealtimeSalePayload {
   itemsSummary: string;
   timestamp: string;
   senderDeviceId: string;
+  items?: any[];
+  customerName?: string;
+  date?: string;
+  createdAt?: string;
 }
 
 export interface RealtimeCashMovementPayload {
@@ -251,10 +255,14 @@ class RealtimeHub {
       this.fetchCatchupEvents();
     });
 
-    // Heartbeat periódico (cada 5s) para recibir ventas y movimientos de otras sucursales de inmediato
+    // Heartbeat periódico (cada 2.5s) para recibir ventas y movimientos de otras sucursales de inmediato
     setInterval(() => {
       this.fetchCatchupEvents();
-    }, 5000);
+    }, 2500);
+  }
+
+  public async triggerSyncNow() {
+    return this.fetchCatchupEvents();
   }
 
   public reconnect() {
@@ -384,9 +392,15 @@ class RealtimeHub {
       if (!res.ok) return;
 
       const data = await res.json();
-      if (!data || !Array.isArray(data.events) || data.events.length === 0) return;
+      if (!data) return;
 
-      localStorage.setItem(LAST_SYNC_TIMESTAMP_KEY, Date.now().toString());
+      if (data.serverTime) {
+        localStorage.setItem(LAST_SYNC_TIMESTAMP_KEY, data.serverTime.toString());
+      } else {
+        localStorage.setItem(LAST_SYNC_TIMESTAMP_KEY, Date.now().toString());
+      }
+
+      if (!Array.isArray(data.events) || data.events.length === 0) return;
 
       for (const item of data.events) {
         if (item.senderDeviceId === this.getDeviceId()) continue;
