@@ -3174,55 +3174,6 @@ export default function POSPage() {
                         </div>
                       </div>
 
-                      {/* Resumen en vivo de la sucursal seleccionada con números grandes y destacados */}
-                      {activeBranch && (
-                        <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-[#2c1308] via-[#200d05] to-[#160803] border-2 border-amber-500/60 shadow-xl space-y-3 relative overflow-hidden">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black uppercase tracking-wider text-amber-300">
-                              Ventas Hoy en {activeBranch.shortName || activeBranch.name}:
-                            </span>
-                            <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/50 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                              100% TIEMPO REAL
-                            </span>
-                          </div>
-
-                          {/* Número Principal Gigante */}
-                          <div className="text-3xl sm:text-4xl font-mono font-black text-emerald-400 tracking-tight drop-shadow-md">
-                            {formatCurrency(activeBranch.todaySales)}
-                          </div>
-
-                          {/* Cuadrícula de 2 métricas principales con números grandes */}
-                          <div className="grid grid-cols-2 gap-2.5">
-                            <div className="bg-black/40 border border-amber-900/60 rounded-xl p-2.5 flex flex-col">
-                              <span className="text-[11px] font-black uppercase tracking-wider text-amber-200/80">Tickets Emitidos</span>
-                              <span className="text-xl sm:text-2xl font-black font-mono text-white mt-0.5">
-                                {Math.max(currentShiftSales.length, activeBranch.todayTickets)}
-                              </span>
-                            </div>
-                            <div className="bg-black/40 border border-amber-900/60 rounded-xl p-2.5 flex flex-col">
-                              <span className="text-[11px] font-black uppercase tracking-wider text-amber-200/80">Efectivo en Gaveta</span>
-                              <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 mt-0.5">
-                                {formatCurrency(activeBranch.cashInDrawer)}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Botón Grande de 1 Toque para Ver y Reimprimir Tickets */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowRecentSales(true);
-                              setShowBranchDropdown(false);
-                            }}
-                            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 hover:brightness-110 active:scale-[0.98] text-stone-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-amber-950/60 transition-all cursor-pointer"
-                          >
-                            <Receipt className="w-5 h-5 text-stone-950 shrink-0" />
-                            <span>Ver Historial de Ventas / Tickets ({Math.max(currentShiftSales.length, activeBranch.todayTickets)}) ➔</span>
-                          </button>
-                        </div>
-                      )}
-
                       {/* Botón inferior para cerrar cuando termine */}
                       <div className="pt-2 border-t border-amber-900/60 flex items-center justify-between">
                         <span className="text-[11px] text-amber-300/80 font-medium">
