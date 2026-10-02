@@ -48,6 +48,7 @@ import GoogleBranchChart, { PeriodType } from "@/components/sucursales/GoogleBra
 import PeriodSelectorButton from "@/components/sucursales/PeriodSelectorButton";
 import CreateBranchModal from "@/components/sucursales/CreateBranchModal";
 import EditBranchModal from "@/components/sucursales/EditBranchModal";
+import DeleteBranchModal from "@/components/sucursales/DeleteBranchModal";
 import EditShiftModal from "@/components/sucursales/EditShiftModal";
 
 export default function SucursalesPage() {
@@ -68,6 +69,8 @@ export default function SucursalesPage() {
   const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
   const [isEditBranchOpen, setIsEditBranchOpen] = useState(false);
   const [editingBranchTarget, setEditingBranchTarget] = useState<Branch | null>(null);
+  const [isDeleteBranchOpen, setIsDeleteBranchOpen] = useState(false);
+  const [deletingBranchTarget, setDeletingBranchTarget] = useState<Branch | null>(null);
   const [editingShiftBranch, setEditingShiftBranch] = useState<Branch | null>(null);
   const [branchSuccessBanner, setBranchSuccessBanner] = useState<string | null>(null);
 
@@ -329,7 +332,7 @@ export default function SucursalesPage() {
             </p>
           </div>
 
-          {/* Action Buttons: Create Branch & Edit or Delete Branch */}
+          {/* Action Buttons: Nueva Sucursal | Editar Sucursal | Eliminar Sucursal */}
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => setIsCreateBranchOpen(true)}
@@ -345,11 +348,23 @@ export default function SucursalesPage() {
                 setEditingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
                 setIsEditBranchOpen(true);
               }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-black text-xs border border-white/20 backdrop-blur-md shadow-lg transition-all active:scale-95"
-              title="Modificar datos o dar de baja una sucursal existente"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 hover:text-white font-black text-xs border border-amber-400/30 backdrop-blur-md shadow-lg transition-all active:scale-95"
+              title="Modificar datos, encargado y turnos de una sucursal"
             >
               <Edit3 className="w-4 h-4 text-amber-300 stroke-[2.5]" />
-              <span>Editar o Eliminar Sucursal</span>
+              <span>Editar Sucursal</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setDeletingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
+                setIsDeleteBranchOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 hover:text-white font-black text-xs border border-rose-400/30 backdrop-blur-md shadow-lg transition-all active:scale-95"
+              title="Retirar o eliminar una sucursal de la red"
+            >
+              <Trash2 className="w-4 h-4 text-rose-400 stroke-[2.5]" />
+              <span>Eliminar Sucursal</span>
             </button>
           </div>
         </div>
@@ -583,11 +598,23 @@ export default function SucursalesPage() {
                     setIsEditBranchOpen(true);
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200 shadow-xs transition-all active:scale-95"
-                  title="Editar o eliminar sucursal de la red"
+                  title="Editar datos de la sucursal"
                 >
                   <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                  <span className="hidden sm:inline">Editar / Eliminar</span>
-                  <span className="sm:hidden">Editar</span>
+                  <span>Editar</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeletingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
+                    setIsDeleteBranchOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 shadow-xs transition-all active:scale-95"
+                  title="Eliminar sucursal de la red"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Eliminar</span>
                 </button>
 
                 <button
@@ -765,10 +792,22 @@ export default function SucursalesPage() {
                               setIsEditBranchOpen(true);
                             }}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-amber-50 text-amber-800 font-bold text-[11px] border border-stone-200 shadow-xs transition-colors"
-                            title={`Editar o eliminar ${b.name}`}
+                            title={`Editar datos de ${b.name}`}
                           >
                             <Edit3 className="w-3 h-3 text-amber-500" />
                             <span>Editar</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeletingBranchTarget(b);
+                              setIsDeleteBranchOpen(true);
+                            }}
+                            className="inline-flex items-center p-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-stone-200 shadow-xs transition-colors"
+                            title={`Eliminar ${b.name}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
                           </button>
 
                           <button
@@ -1182,9 +1221,21 @@ export default function SucursalesPage() {
                                   setIsEditBranchOpen(true);
                                 }}
                                 className="p-2 rounded-xl bg-white hover:bg-amber-50 text-stone-600 hover:text-amber-800 border border-stone-200 shadow-xs transition-colors"
-                                title={`Editar o eliminar ${b.name}`}
+                                title={`Editar datos de ${b.name}`}
                               >
                                 <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeletingBranchTarget(b);
+                                  setIsDeleteBranchOpen(true);
+                                }}
+                                className="p-2 rounded-xl bg-white hover:bg-rose-50 text-stone-600 hover:text-rose-600 border border-stone-200 shadow-xs transition-colors"
+                                title={`Eliminar ${b.name}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                               </button>
 
                               <button
@@ -1486,15 +1537,24 @@ export default function SucursalesPage() {
         existingCount={branches.length}
       />
 
-      {/* Modal para Editar o Eliminar Sucursal */}
+      {/* Modal para Editar Sucursal */}
       <EditBranchModal
         isOpen={isEditBranchOpen}
         onClose={() => setIsEditBranchOpen(false)}
         branchToEdit={editingBranchTarget}
         branches={branches}
         onUpdateBranch={handleUpdateBranch}
-        onDeleteBranch={handleDeleteBranch}
         onSelectBranchToEdit={(branch) => setEditingBranchTarget(branch)}
+      />
+
+      {/* Modal para Eliminar Sucursal */}
+      <DeleteBranchModal
+        isOpen={isDeleteBranchOpen}
+        onClose={() => setIsDeleteBranchOpen(false)}
+        branchToDelete={deletingBranchTarget}
+        branches={branches}
+        onConfirmDelete={handleDeleteBranch}
+        onSelectBranchToDelete={(branch) => setDeletingBranchTarget(branch)}
       />
 
       {/* Modal para Modificar Horario del Turno */}
