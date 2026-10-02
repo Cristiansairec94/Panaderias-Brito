@@ -688,6 +688,8 @@ export function addCustomOrder(data: {
     phone: data.phone.trim(),
     branchId: data.branchId,
     branchName: data.branchName,
+    operatingBranchId: data.operatingBranchId || data.branchId,
+    operatingBranchName: data.operatingBranchName || data.branchName,
     description: data.description.trim() || (data.items.length > 0 ? data.items.map(i => `${i.quantity}x ${i.name}`).join(", ") : "Encargo"),
     items: data.items,
     deliveryDate: data.deliveryDate,
@@ -728,16 +730,21 @@ export function addCustomOrder(data: {
     realtimeHub.broadcastOrder("create", newOrder);
   }
 
-  // Alerta sonora y visual inmediata en celular
+  // Alerta sonora y visual inmediata en celular y turnos de ambas sucursales
   if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
+    const isCross = newOrder.operatingBranchName && newOrder.branchName && newOrder.operatingBranchName !== newOrder.branchName;
+    const branchLabel = isCross
+      ? `${newOrder.operatingBranchName} ➔ Entrega: ${newOrder.branchName}`
+      : newOrder.branchName;
+
     realtimeHub.broadcastNotification({
       id: `order-create-${newOrder.id}-${Date.now()}`,
-      senderName: `🎂 ${newOrder.branchName}`,
+      senderName: `🎂 ${branchLabel}`,
       senderAvatar: "🎂",
       badgeIcon: "pastel",
-      title: "Nuevo Pedido Especial",
+      title: isCross ? `Nuevo Pedido (${newOrder.operatingBranchName} ➔ ${newOrder.branchName})` : "Nuevo Pedido Especial",
       highlightText: `${newOrder.orderNumber}: ${newOrder.customerName}`,
-      description: `Entrega: ${newOrder.deliveryDate} ${newOrder.deliveryTime} • Anticipo: $${newOrder.deposit} MXN (Total: $${newOrder.total} MXN)`,
+      description: `${isCross ? `[Levantado en: ${newOrder.operatingBranchName} • Entrega en: ${newOrder.branchName}] ` : ""}Entrega: ${newOrder.deliveryDate} ${newOrder.deliveryTime} • Anticipo: $${newOrder.deposit} MXN (Total: $${newOrder.total} MXN)`,
       timeAgo: "Hace un momento",
       group: "recientes",
       read: false,
@@ -858,14 +865,21 @@ export function addOrderPayment(
 
   // Notificación al celular
   if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
+    const isCross = (order as any).operatingBranchName && order.branchName && (order as any).operatingBranchName !== order.branchName;
+    const branchLabel = isCross
+      ? `${(order as any).operatingBranchName} ➔ ${order.branchName}`
+      : order.branchName;
+
     realtimeHub.broadcastNotification({
       id: `order-pay-${order.id}-${Date.now()}`,
-      senderName: `💰 ${order.branchName}`,
+      senderName: `💰 ${branchLabel}`,
       senderAvatar: isFullLiquidation ? "🎉" : "💵",
       badgeIcon: "dinero",
-      title: isFullLiquidation ? "Pedido Especial Liquidado" : "Abono a Pedido Especial",
+      title: isFullLiquidation
+        ? `Pedido Especial Liquidado ${isCross ? `(${branchLabel})` : ""}`
+        : `Abono a Pedido Especial ${isCross ? `(${branchLabel})` : ""}`,
       highlightText: `${order.orderNumber}: Cobro de $${paymentAmount} MXN`,
-      description: `Cliente: ${order.customerName} • Saldo restante: $${newRemaining} MXN`,
+      description: `${isCross ? `[Levantado: ${(order as any).operatingBranchName} • Entrega: ${order.branchName}] ` : ""}Cliente: ${order.customerName} • Saldo restante: $${newRemaining} MXN`,
       timeAgo: "Hace un momento",
       group: "recientes",
       read: false,

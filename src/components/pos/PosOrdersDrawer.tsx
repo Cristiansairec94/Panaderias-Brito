@@ -76,8 +76,21 @@ export default function PosOrdersDrawer({
     if (branchScope === "todas") return activeList;
     return activeList.filter((o) => {
       if (!branchId) return true;
-      const orderBranch = (o as any).operatingBranchId || o.branchId;
-      return !o.branchId || o.branchId === branchId || orderBranch === branchId;
+      const bId = branchId.toLowerCase().trim();
+      const bName = (branchName || "").toLowerCase().trim();
+      const oPickupId = String(o.branchId || "").toLowerCase().trim();
+      const oPickupName = String(o.branchName || "").toLowerCase().trim();
+      const oOperatingId = String((o as any).operatingBranchId || "").toLowerCase().trim();
+      const oOperatingName = String((o as any).operatingBranchName || "").toLowerCase().trim();
+
+      if (!oPickupId && !oOperatingId) return true;
+
+      const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                            (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
+      const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                               (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
+
+      return matchesPickup || matchesOperating;
     });
   }, [orders, branchId, branchScope]);
 
@@ -331,7 +344,7 @@ export default function PosOrdersDrawer({
                   {/* Fila 2: Cliente y Fecha */}
                   <div>
                     <h4 className="font-black text-sm text-stone-900">{order.customerName}</h4>
-                    <div className="flex items-center gap-3 text-xs text-stone-600 mt-0.5">
+                    <div className="flex items-center gap-3 text-xs text-stone-600 mt-0.5 flex-wrap">
                       <span className="flex items-center gap-1 font-bold">
                         <Phone className="w-3.5 h-3.5 text-stone-400" /> {order.phone}
                       </span>
@@ -340,6 +353,14 @@ export default function PosOrdersDrawer({
                         {order.deliveryDate} a las {order.deliveryTime || "16:00"} hrs
                       </span>
                     </div>
+
+                    {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName && (
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-900 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-lg mt-1.5 w-fit">
+                        <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                        <span className="text-amber-600">➔</span>
+                        <span className="text-emerald-800">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Fila 3: Descripción del pedido */}

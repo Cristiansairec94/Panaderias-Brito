@@ -1737,8 +1737,17 @@ export default function POSPage() {
         // Los pedidos entregados y cancelados desaparecen por completo de la vista activa y del turno
         if (o.status === "entregado" || o.status === "cancelado") return false;
         if (activeBranch) {
-          const matchBranch = !o.branchId || o.branchId === activeBranch.id || (o as any).operatingBranchId === activeBranch.id;
-          if (!matchBranch) return false;
+          const bId = activeBranch.id.toLowerCase().trim();
+          const bName = (activeBranch.name || "").toLowerCase().trim();
+          const oPickupId = String(o.branchId || "").toLowerCase().trim();
+          const oPickupName = String(o.branchName || "").toLowerCase().trim();
+          const oOperatingId = String((o as any).operatingBranchId || "").toLowerCase().trim();
+          const oOperatingName = String((o as any).operatingBranchName || "").toLowerCase().trim();
+
+          const matchesPickup = !oPickupId || oPickupId === bId || (bName && oPickupName === bName) || (bId && oPickupId.includes(bId));
+          const matchesOperating = oOperatingId === bId || (bName && oOperatingName === bName) || (bId && oOperatingId.includes(bId));
+
+          if (!matchesPickup && !matchesOperating) return false;
         }
         const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
         if (shiftStartBoundary > 0) {

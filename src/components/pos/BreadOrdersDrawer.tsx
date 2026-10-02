@@ -205,6 +205,8 @@ export default function BreadOrdersDrawer({
       phone: customerPhone.trim(),
       branchId,
       branchName,
+      operatingBranchId: branchId,
+      operatingBranchName: branchName,
       description,
       items: orderItems,
       deliveryDate,

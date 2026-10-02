@@ -756,9 +756,21 @@ export default function ExpensesModal({
       if (!o) return false;
       if (o.status === "entregado" || o.status === "cancelado") return false;
       if (branchId) {
-        const orderBranch = (o as any).operatingBranchId || o.branchId;
-        if (orderBranch && orderBranch !== branchId && o.branchId !== branchId) {
-          return false;
+        const bId = branchId.toLowerCase().trim();
+        const bName = (branchName || "").toLowerCase().trim();
+        const oPickupId = String(o.branchId || "").toLowerCase().trim();
+        const oPickupName = String(o.branchName || "").toLowerCase().trim();
+        const oOperatingId = String((o as any).operatingBranchId || "").toLowerCase().trim();
+        const oOperatingName = String((o as any).operatingBranchName || "").toLowerCase().trim();
+
+        if (oPickupId || oOperatingId) {
+          const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                                (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
+          const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                                   (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
+          if (!matchesPickup && !matchesOperating) {
+            return false;
+          }
         }
       }
       const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
@@ -1099,8 +1111,22 @@ export default function ExpensesModal({
         }
 
         if (branchId) {
-          const orderBranch = (o as any).operatingBranchId || o.branchId;
-          if (orderBranch && orderBranch !== branchId && o.branchId !== branchId) return false;
+          const bId = branchId.toLowerCase().trim();
+          const bName = (branchName || "").toLowerCase().trim();
+          const oPickupId = String(o.branchId || "").toLowerCase().trim();
+          const oPickupName = String(o.branchName || "").toLowerCase().trim();
+          const oOperatingId = String((o as any).operatingBranchId || "").toLowerCase().trim();
+          const oOperatingName = String((o as any).operatingBranchName || "").toLowerCase().trim();
+
+          if (oPickupId || oOperatingId) {
+            const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                                  (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
+            const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                                     (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
+            if (!matchesPickup && !matchesOperating) {
+              return false;
+            }
+          }
         }
         return true;
       })
@@ -3695,6 +3721,18 @@ export default function ExpensesModal({
                                         #{order.orderNumber}
                                       </span>
 
+                                      {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName ? (
+                                        <span className="text-[10px] font-bold text-amber-950 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                                          <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                                          <span className="text-amber-600">➔</span>
+                                          <span className="text-emerald-800">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                                        </span>
+                                      ) : order.branchName ? (
+                                        <span className="text-[10px] font-bold text-stone-600 bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-md">
+                                          🏬 {order.branchName.replace("Sucursal ", "")}
+                                        </span>
+                                      ) : null}
+
                                       {isToday && (
                                         <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-md animate-pulse shadow-xs flex items-center gap-1">
                                           🚨 ¡ENTREGA HOY!
@@ -4055,6 +4093,14 @@ export default function ExpensesModal({
                                       <span className="font-mono font-black text-xs bg-stone-900 text-amber-300 px-2 py-0.5 rounded-lg">
                                         #{order.orderNumber}
                                       </span>
+
+                                      {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName ? (
+                                        <span className="text-[10px] font-bold text-amber-950 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                                          <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                                          <span className="text-amber-600">➔</span>
+                                          <span className="text-emerald-800">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                                        </span>
+                                      ) : null}
                                       <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border flex items-center gap-1 ${
                                         (order.paymentMethod === "efectivo" || !order.paymentMethod)
                                           ? "bg-emerald-100 text-emerald-900 border-emerald-300"

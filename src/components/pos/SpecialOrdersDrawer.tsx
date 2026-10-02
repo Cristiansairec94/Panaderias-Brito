@@ -71,9 +71,22 @@ export default function SpecialOrdersDrawer({
       // Excluir 100% pedidos entregados o cancelados
       if (order.status === "entregado" || order.status === "cancelado") return false;
 
-      // Branch filter if specified
-      if (branchId && order.branchId && order.branchId !== branchId) {
-        return false;
+      // Branch filter if specified (visible en sucursal que levanta y sucursal que entrega)
+      if (branchId) {
+        const bId = branchId.toLowerCase().trim();
+        const bName = (branchName || "").toLowerCase().trim();
+        const oPickupId = String(order.branchId || "").toLowerCase().trim();
+        const oPickupName = String(order.branchName || "").toLowerCase().trim();
+        const oOperatingId = String((order as any).operatingBranchId || "").toLowerCase().trim();
+        const oOperatingName = String((order as any).operatingBranchName || "").toLowerCase().trim();
+
+        if (oPickupId || oOperatingId) {
+          const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                                (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
+          const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                                   (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
+          if (!matchesPickup && !matchesOperating) return false;
+        }
       }
 
       // Search filter
@@ -311,6 +324,15 @@ export default function SpecialOrdersDrawer({
                       )}
                     </div>
                   </div>
+
+                  {/* Fila de Sucursales si difiere origen de entrega */}
+                  {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-300 bg-amber-950/70 border border-amber-850 px-2 py-0.5 rounded-lg">
+                      <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                      <span className="text-amber-500">➔</span>
+                      <span className="text-emerald-300">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                    </div>
+                  )}
 
                   {/* Fila 3: Fecha/Hora y Saldo Destacado */}
                   <div className="flex items-center justify-between gap-2 text-xs pt-1">

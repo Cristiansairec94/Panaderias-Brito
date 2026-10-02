@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   CalendarClock,
   Calendar,
@@ -343,15 +343,31 @@ export default function PedidosPage() {
     return order.status === "entregado";
   };
 
-  // Classification counts for the current branch view
+    const checkOrderMatchesBranch = useCallback((order: CustomOrder, filter: string) => {
+    if (!filter || filter === "all") return true;
+    const f = filter.toLowerCase().trim();
+    const targetBranch = branches.find((b) => b.id.toLowerCase() === f || b.name.toLowerCase() === f);
+    const targetId = targetBranch ? targetBranch.id.toLowerCase() : f;
+    const targetName = targetBranch ? targetBranch.name.toLowerCase() : f;
+
+    const pId = String(order.branchId || "").toLowerCase().trim();
+    const pName = String(order.branchName || "").toLowerCase().trim();
+    const opId = String((order as any).operatingBranchId || "").toLowerCase().trim();
+    const opName = String((order as any).operatingBranchName || "").toLowerCase().trim();
+
+    if (!pId && !opId) return true;
+
+    const matchesPickup = (pId && (pId === targetId || pId.includes(targetId) || targetId.includes(pId))) ||
+                          (pName && (pName === targetName || pName.includes(targetName) || targetName.includes(pName)));
+    const matchesOperating = (opId && (opId === targetId || opId.includes(targetId) || targetId.includes(opId))) ||
+                             (opName && (opName === targetName || opName.includes(targetName) || targetName.includes(opName)));
+
+    return matchesPickup || matchesOperating;
+  }, [branches]);
+
+// Classification counts for the current branch view
   const classificationCounts = useMemo(() => {
-    const branchFiltered = orders.filter((o) => {
-      if (selectedBranchFilter !== "all") {
-        const orderOperating = (o as any).operatingBranchId;
-        return !o.branchId || o.branchId === selectedBranchFilter || orderOperating === selectedBranchFilter;
-      }
-      return true;
-    });
+    const branchFiltered = orders.filter((o) => checkOrderMatchesBranch(o, selectedBranchFilter));
 
     let activos = 0;
     let hoy = 0;
@@ -405,17 +421,11 @@ export default function PedidosPage() {
       cancelados,
       historial,
     };
-  }, [orders, selectedBranchFilter, todayStr, currentMinutes]);
+  }, [orders, selectedBranchFilter, todayStr, currentMinutes, checkOrderMatchesBranch]);
 
   // Time period counts (Día, Semana, Mes, Año, Todos) para la sucursal actual
   const timePeriodCounts = useMemo(() => {
-    const branchFiltered = orders.filter((o) => {
-      if (selectedBranchFilter !== "all") {
-        const orderOperating = (o as any).operatingBranchId;
-        return !o.branchId || o.branchId === selectedBranchFilter || orderOperating === selectedBranchFilter;
-      }
-      return true;
-    });
+    const branchFiltered = orders.filter((o) => checkOrderMatchesBranch(o, selectedBranchFilter));
 
     const baseOrders = branchFiltered.filter((o) => {
       if (classificationFilter === "historial") {
@@ -458,16 +468,15 @@ export default function PedidosPage() {
     endOfWeekStr,
     customSelectedMonth,
     customSelectedYear,
+    checkOrderMatchesBranch,
   ]);
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       // Branch filter (revisar sucursal de entrega o sucursal donde se levantó/cobró)
-      if (selectedBranchFilter !== "all") {
-        const orderOperating = (order as any).operatingBranchId;
-        const matchesBranch = !order.branchId || order.branchId === selectedBranchFilter || orderOperating === selectedBranchFilter;
-        if (!matchesBranch) return false;
+      if (!checkOrderMatchesBranch(order, selectedBranchFilter)) {
+        return false;
       }
 
       // Filtrado según vista activa vs historial
@@ -577,6 +586,7 @@ export default function PedidosPage() {
     todayStr,
     tomorrowStr,
     currentMinutes,
+    checkOrderMatchesBranch,
   ]);
 
   // Metrics (reactivos a la sucursal seleccionada para coincidir con los pedidos)
@@ -661,43 +671,38 @@ export default function PedidosPage() {
       });
     });
 
-    periodOrders.forEach((o) => {
-      const bId = o.branchId || (o as any).operatingBranchId || "branch-matriz";
-      let item = branchMap.get(bId);
-      if (!item) {
-        item = {
-          branchId: bId,
-          branchName: o.branchName || "Sucursal",
-          shortName: (o.branchName || "Sucursal").replace("Sucursal ", ""),
-          code: "",
-          totalOrders: 0,
-          totalAmount: 0,
-          totalDeposits: 0,
-          totalRemaining: 0,
-          todayCount: 0,
-          readyCount: 0,
-          unpaidCount: 0,
-        };
-        branchMap.set(bId, item);
-      }
-      const rem = o.remainingBalance !== undefined ? o.remainingBalance : Math.max(0, (o.total || 0) - (o.deposit || 0));
-      item.totalOrders++;
-      item.totalAmount += Number(o.total) || 0;
-      item.totalDeposits += Number(o.deposit) || 0;
-      item.totalRemaining += Number(rem) || 0;
-      if (normalizeDateStr(o.deliveryDate) === todayStr) {
-        item.todayCount++;
-      }
-      if (o.status === "listo") {
-        item.readyCount++;
-      }
-      if (rem > 0) {
-        item.unpaidCount++;
-      }
+    branches.forEach((b) => {
+      const bOrders = periodOrders.filter((o) => checkOrderMatchesBranch(o, b.id));
+      const totalAmount = bOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      const totalDeposits = bOrders.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+      const totalRemaining = bOrders.reduce((sum, o) => {
+        const rem = o.remainingBalance !== undefined ? o.remainingBalance : Math.max(0, (o.total || 0) - (o.deposit || 0));
+        return sum + Number(rem);
+      }, 0);
+      const todayCount = bOrders.filter((o) => normalizeDateStr(o.deliveryDate) === todayStr).length;
+      const readyCount = bOrders.filter((o) => o.status === "listo").length;
+      const unpaidCount = bOrders.filter((o) => {
+        const rem = o.remainingBalance !== undefined ? o.remainingBalance : Math.max(0, (o.total || 0) - (o.deposit || 0));
+        return rem > 0;
+      }).length;
+
+      branchMap.set(b.id, {
+        branchId: b.id,
+        branchName: b.name,
+        shortName: b.shortName || b.name.replace("Sucursal ", ""),
+        code: b.code || "",
+        totalOrders: bOrders.length,
+        totalAmount,
+        totalDeposits,
+        totalRemaining,
+        todayCount,
+        readyCount,
+        unpaidCount,
+      });
     });
 
     const list = Array.from(branchMap.values());
-    const grandTotalOrders = list.reduce((sum, b) => sum + b.totalOrders, 0);
+    const grandTotalOrders = periodOrders.length;
     const grandTotalAmount = list.reduce((sum, b) => sum + b.totalAmount, 0);
     const grandTotalDeposits = list.reduce((sum, b) => sum + b.totalDeposits, 0);
     const grandTotalRemaining = list.reduce((sum, b) => sum + b.totalRemaining, 0);
@@ -2208,9 +2213,17 @@ export default function PedidosPage() {
                             <span className="font-mono tabular-nums font-black text-xs text-amber-950 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs">
                               {order.orderNumber}
                             </span>
-                            <span className="text-[10px] font-bold text-stone-600 bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-md">
-                              🏬 {order.branchName.replace("Sucursal ", "")}
-                            </span>
+                            {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName ? (
+                              <span className="text-[10px] font-bold text-amber-950 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                                <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                                <span className="text-amber-600">➔</span>
+                                <span className="text-emerald-800">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-stone-600 bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-md">
+                                🏬 {order.branchName.replace("Sucursal ", "")}
+                              </span>
+                            )}
                             {getStatusBadge(order.status)}
                           </div>
 
@@ -2585,9 +2598,17 @@ export default function PedidosPage() {
                           <span className="font-mono font-black text-xs text-amber-950 bg-amber-100/90 border border-amber-300 px-2.5 py-1 rounded-xl shadow-2xs">
                             {order.orderNumber}
                           </span>
-                          <span className="text-[11px] font-bold text-stone-600 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                            🏬 {order.branchName.replace("Sucursal ", "")}
-                          </span>
+                          {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName ? (
+                            <span className="text-[10px] font-bold text-amber-950 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                              <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                              <span className="text-amber-600">➔</span>
+                              <span className="text-emerald-800">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-stone-600 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                              🏬 {order.branchName.replace("Sucursal ", "")}
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -3000,9 +3021,20 @@ export default function PedidosPage() {
 
                         {/* 4. Sucursal */}
                         <td className="py-2 px-3">
-                          <span className="text-xs font-bold text-stone-700 bg-stone-100 px-2.5 py-1 rounded-xl">
-                            {order.branchName.replace("Sucursal ", "")}
-                          </span>
+                          {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                Lev: {order.operatingBranchName.replace("Sucursal ", "")}
+                              </span>
+                              <span className="text-[10px] font-bold text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                Ent: {order.branchName.replace("Sucursal ", "")}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-bold text-stone-700 bg-stone-100 px-2.5 py-1 rounded-xl">
+                              {order.branchName.replace("Sucursal ", "")}
+                            </span>
+                          )}
                         </td>
 
                         {/* 5. Productos Encargados & Características */}
@@ -3280,8 +3312,15 @@ export default function PedidosPage() {
                                       <span>{order.deliveryAddress || "Dirección pendiente"}</span>
                                     </div>
                                   ) : (
-                                    <div className="text-[11px] text-stone-700 bg-stone-50 p-2.5 rounded-xl border border-stone-200 hover:bg-amber-50/40 hover:border-amber-300 transition-colors">
-                                      <strong className="text-stone-900">🏬 Recoger en Tienda:</strong> {order.branchName}
+                                    <div className="text-[11px] text-stone-700 bg-stone-50 p-2.5 rounded-xl border border-stone-200 hover:bg-amber-50/40 hover:border-amber-300 transition-colors space-y-1">
+                                      {order.operatingBranchName && order.operatingBranchName !== order.branchName && (
+                                        <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                                          <span>📝 Levantado en:</span> <span className="font-black text-amber-900">{order.operatingBranchName}</span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-1.5 font-bold text-stone-900">
+                                        <strong className="text-stone-900">🏬 Recoger en Tienda:</strong> {order.branchName}
+                                      </div>
                                     </div>
                                   )}
 
