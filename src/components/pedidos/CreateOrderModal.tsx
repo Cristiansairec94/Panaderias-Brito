@@ -32,7 +32,8 @@ import {
   Check,
   Barcode,
   Copy,
-  Sparkles
+  Sparkles,
+  Lock
 } from "lucide-react";
 import { Product, Customer, OrderItem } from "@/types";
 import { getStoredCustomers, createCustomerInDb, normalizeCustomerName } from "@/lib/customers";
@@ -147,6 +148,9 @@ export default function CreateOrderModal({
   const { user } = useAuth();
   const { addNotification } = useNotifications();
 
+  const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
+  const userBranchId = user?.assignedBranchId;
+
   const customerNameInputRef = useRef<HTMLInputElement>(null);
   const customerDecisionRef = useRef<HTMLDivElement>(null);
   const [mustChooseCustomerAlert, setMustChooseCustomerAlert] = useState(false);
@@ -157,13 +161,17 @@ export default function CreateOrderModal({
 
   // Sucursal activa fija donde está el cajero
   const activeBranch = useMemo(() => {
+    if (!isAdmin && userBranchId) {
+      const b = branches.find((br) => br.id === userBranchId);
+      if (b) return b;
+    }
     if (initialBranchId) {
       const b = branches.find((br) => br.id === initialBranchId);
       if (b) return b;
     }
     if (currentBranch && currentBranch.id) return currentBranch;
     return branches[0] || { id: "branch-matriz", name: "Sucursal Matriz (Centro)" };
-  }, [branches, currentBranch, initialBranchId]);
+  }, [branches, currentBranch, initialBranchId, isAdmin, userBranchId]);
 
   // 1. Cliente
   const [customerName, setCustomerName] = useState("");
@@ -395,8 +403,16 @@ export default function CreateOrderModal({
 
       setDeliveryDate(tomorrowStr);
       setDeliveryTime("16:00");
-      setPickupBranchId(initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz");
-      setOperatingBranchId(initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz");
+      setPickupBranchId(
+        !isAdmin && userBranchId
+          ? userBranchId
+          : (initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz")
+      );
+      setOperatingBranchId(
+        !isAdmin && userBranchId
+          ? userBranchId
+          : (initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz")
+      );
       
       setShowProductSuggestions(false);
       setShowCustomerSearch(false);
@@ -1604,17 +1620,28 @@ export default function CreateOrderModal({
                     <Building2 className="w-3.5 h-3.5 text-amber-600" />
                     Levantamiento de pedido
                   </label>
-                  {selectedOperatingBranch?.id === activeBranch?.id && (
+                  {!isAdmin ? (
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1 border border-amber-300">
+                      <Lock className="w-2.5 h-2.5" /> Fija (Asignada)
+                    </span>
+                  ) : selectedOperatingBranch?.id === activeBranch?.id ? (
                     <span className="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.5 rounded">
                       Esta tienda
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 <div className="relative">
                   <select
                     value={operatingBranchId || activeBranch?.id || ""}
-                    onChange={(e) => setOperatingBranchId(e.target.value)}
-                    className="w-full appearance-none bg-white hover:bg-stone-50 text-stone-900 font-bold text-xs py-2.5 px-3 pr-8 rounded-xl border border-stone-300 shadow-2xs cursor-pointer focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all truncate"
+                    onChange={(e) => {
+                      if (isAdmin) setOperatingBranchId(e.target.value);
+                    }}
+                    disabled={!isAdmin}
+                    className={`w-full appearance-none ${
+                      !isAdmin
+                        ? "bg-stone-100 text-stone-700 cursor-not-allowed border-stone-200"
+                        : "bg-white hover:bg-stone-50 text-stone-900 cursor-pointer border-stone-300"
+                    } font-bold text-xs py-2.5 px-3 pr-8 rounded-xl border shadow-2xs focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all truncate`}
                   >
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>
@@ -1622,7 +1649,11 @@ export default function CreateOrderModal({
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-4 h-4 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  {!isAdmin ? (
+                    <Lock className="w-3.5 h-3.5 text-stone-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  )}
                 </div>
                 {selectedOperatingBranch?.address && (
                   <p className="text-[10px] text-stone-500 font-medium truncate flex items-center gap-1 px-1">

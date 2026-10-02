@@ -403,6 +403,7 @@ function CartPriceInput({
 
 export default function POSPage() {
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
   const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
   const { addNotification } = useNotifications();
   const { toggleMobile } = useSidebar();
@@ -2979,29 +2980,44 @@ export default function POSPage() {
 
                 {/* Selector Desplegable de Sucursal con Diseño Artesanal */}
                 <div ref={branchDropdownRef} className="relative inline-block">
-                  <button
-                    type="button"
-                    onClick={() => setShowBranchDropdown((prev) => !prev)}
-                    className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/25 via-amber-600/20 to-orange-500/25 hover:from-amber-500/40 hover:to-orange-500/40 text-amber-100 hover:text-white px-2.5 py-1 rounded-xl border border-amber-400/40 hover:border-amber-300 text-[11px] font-black tracking-wide shadow-sm transition-all active:scale-95 cursor-pointer group select-none"
-                    title="Ver red de sucursales y cambiar tienda activa"
-                  >
-                    <Store className="w-3.5 h-3.5 text-amber-300 group-hover:text-amber-200 shrink-0" />
-                    <span className="truncate max-w-[130px] sm:max-w-[200px]">
-                      🏬 {activeBranch ? activeBranch.name : "Sucursal Matriz"}
-                    </span>
-                    <span className="relative flex h-2 w-2 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                    </span>
-                    <ChevronDown
-                      className={`w-3 h-3 text-amber-300 group-hover:text-amber-100 transition-transform duration-200 shrink-0 ${
-                        showBranchDropdown ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowBranchDropdown((prev) => !prev)}
+                      className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/25 via-amber-600/20 to-orange-500/25 hover:from-amber-500/40 hover:to-orange-500/40 text-amber-100 hover:text-white px-2.5 py-1 rounded-xl border border-amber-400/40 hover:border-amber-300 text-[11px] font-black tracking-wide shadow-sm transition-all active:scale-95 cursor-pointer group select-none"
+                      title="Ver red de sucursales y cambiar tienda activa"
+                    >
+                      <Store className="w-3.5 h-3.5 text-amber-300 group-hover:text-amber-200 shrink-0" />
+                      <span className="truncate max-w-[130px] sm:max-w-[200px]">
+                        🏬 {activeBranch ? activeBranch.name : "Sucursal Matriz"}
+                      </span>
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                      <ChevronDown
+                        className={`w-3 h-3 text-amber-300 group-hover:text-amber-100 transition-transform duration-200 shrink-0 ${
+                          showBranchDropdown ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                  ) : (
+                    <div
+                      className="inline-flex items-center gap-1.5 bg-amber-950/70 text-amber-200 px-2.5 py-1 rounded-xl border border-amber-500/30 text-[11px] font-black tracking-wide select-none"
+                      title="Sucursal fija asignada a tu turno de cajero"
+                    >
+                      <Store className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span className="truncate max-w-[150px] sm:max-w-[220px]">
+                        🏬 {activeBranch ? activeBranch.name : "Sucursal Matriz"}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold border border-amber-500/30">
+                        <Lock className="w-2.5 h-2.5" /> Fija
+                      </span>
+                    </div>
+                  )}
 
-                  {/* Panel Desplegable Flotante */}
-                  {showBranchDropdown && (
+                  {/* Panel Desplegable Flotante (exclusivo para administradores) */}
+                  {isAdmin && showBranchDropdown && (
                     <div className="absolute left-0 mt-2.5 w-[330px] sm:w-[380px] max-w-[calc(100vw-36px)] bg-[#1a0e08]/98 backdrop-blur-md rounded-2xl shadow-2xl border-2 border-amber-700/60 p-3 sm:p-3.5 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-3">
                       
                       {/* Cabecera del panel */}
@@ -3061,7 +3077,7 @@ export default function POSPage() {
                                 key={b.id}
                                 type="button"
                                 onClick={() => {
-                                  if (user?.role === "admin") {
+                                  if (isAdmin) {
                                     switchBranch(b.id);
                                     setShowBranchDropdown(false);
                                     playScanBeep(true);
@@ -3076,9 +3092,9 @@ export default function POSPage() {
                                     });
                                   }
                                 }}
-                                disabled={user?.role !== "admin"}
+                                disabled={!isAdmin}
                                 className={`w-full text-left p-2.5 rounded-xl border-2 transition-all flex flex-col gap-1.5 ${
-                                  user?.role === "admin" ? "cursor-pointer active:scale-98" : "cursor-default"
+                                  isAdmin ? "cursor-pointer active:scale-98" : "cursor-default"
                                 } ${
                                   isSelected
                                     ? "bg-gradient-to-r from-amber-950 via-[#361a0e] to-amber-900/80 border-amber-400 shadow-md ring-2 ring-amber-400/30"

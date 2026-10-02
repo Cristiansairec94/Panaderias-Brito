@@ -22,7 +22,8 @@ import {
   CreditCard, 
   Banknote, 
   Eye,
-  Plus
+  Plus,
+  Lock
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
@@ -59,6 +60,7 @@ const ALL_TOP_BAKERY_PRODUCTS: TopProductItem[] = [
 
 export default function Home() {
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
   const { unreadCount } = useNotifications();
   const { 
     branches, 
@@ -162,6 +164,12 @@ export default function Home() {
     return [...branches].sort((a, b) => b.todaySales - a.todaySales);
   }, [branches]);
 
+  // Si es cajero/operativo, solo visualiza la sucursal asignada
+  const displayedBranches = useMemo(() => {
+    if (isAdmin) return sortedBranches;
+    return sortedBranches.filter((b) => b.id === currentBranch?.id);
+  }, [isAdmin, sortedBranches, currentBranch]);
+
   // Filtrado de productos estrella por categoría
   const displayedTopProducts = useMemo(() => {
     if (productCategoryFilter === "todas") return ALL_TOP_BAKERY_PRODUCTS;
@@ -218,33 +226,45 @@ export default function Home() {
             {/* Branch Selector Pills */}
             <div className="pt-1 flex flex-wrap items-center gap-1.5">
               <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mr-1">Sucursal:</span>
-              <button
-                onClick={() => switchBranch("all")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-                  isAllBranches
-                    ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg shadow-orange-500/30 scale-105"
-                    : "bg-white/[0.06] hover:bg-white/[0.12] text-stone-300 border border-white/10"
-                }`}
-              >
-                <span>🏢 Todas (Consolidado)</span>
-              </button>
-              {branches.map((b) => {
-                const active = !isAllBranches && currentBranch?.id === b.id;
-                return (
+              {isAdmin ? (
+                <>
                   <button
-                    key={b.id}
-                    onClick={() => switchBranch(b.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      active
-                        ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg shadow-orange-500/30 font-black scale-105"
+                    onClick={() => switchBranch("all")}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                      isAllBranches
+                        ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg shadow-orange-500/30 scale-105"
                         : "bg-white/[0.06] hover:bg-white/[0.12] text-stone-300 border border-white/10"
                     }`}
                   >
-                    <Store className="w-3.5 h-3.5 opacity-70" />
-                    <span>{b.shortName}</span>
+                    <span>🏢 Todas (Consolidado)</span>
                   </button>
-                );
-              })}
+                  {branches.map((b) => {
+                    const active = !isAllBranches && currentBranch?.id === b.id;
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={() => switchBranch(b.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          active
+                            ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg shadow-orange-500/30 font-black scale-105"
+                            : "bg-white/[0.06] hover:bg-white/[0.12] text-stone-300 border border-white/10"
+                        }`}
+                      >
+                        <Store className="w-3.5 h-3.5 opacity-70" />
+                        <span>{b.shortName}</span>
+                      </button>
+                    );
+                  })}
+                </>
+              ) : (
+                <div className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-orange-500/30 to-amber-600/30 text-amber-200 border border-amber-500/40 flex items-center gap-2 select-none">
+                  <Store className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{currentBranch?.name || "Mi Sucursal"}</span>
+                  <span className="text-[10px] bg-amber-500/30 text-amber-100 px-1.5 py-0.5 rounded font-extrabold flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> Asignada
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -405,31 +425,35 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
                 <Store className="w-5 h-5 text-orange-600" />
-                Matriz de Desempeño por Sucursal
+                {isAdmin ? "Matriz de Desempeño por Sucursal" : "Desempeño de tu Sucursal Asignada"}
               </h2>
               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800">
-                3 Tiendas Activas
+                {isAdmin ? `${branches.length} Tiendas Activas` : "1 Tienda Asignada"}
               </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Comparativa de ventas en tiempo real, ticket promedio, arqueo y métodos de cobro.
+              {isAdmin
+                ? "Comparativa de ventas en tiempo real, ticket promedio, arqueo y métodos de cobro."
+                : "Ventas en tiempo real, ticket promedio, arqueo y métodos de cobro de tu tienda."}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link
-              href="/sucursales"
-              className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              Panel de Sucursales
-            </Link>
-          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/sucursales"
+                className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Panel de Sucursales
+              </Link>
+            </div>
+          )}
         </div>
 
-        {/* 3 Branch Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {sortedBranches.map((b, idx) => {
+        {/* Branch Cards Grid */}
+        <div className={`grid grid-cols-1 ${isAdmin ? "md:grid-cols-3" : "max-w-md mx-auto"} gap-5`}>
+          {displayedBranches.map((b, idx) => {
             const isSelected = !isAllBranches && currentBranch?.id === b.id;
             const isTopRank = idx === 0;
 
@@ -499,17 +523,23 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => switchBranch(b.id)}
-                      title={isSelected ? "Sucursal activa actualmente" : "Hacer clic para filtrar el dashboard con esta sucursal"}
-                      className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl transition-all shrink-0 active:scale-95 ${
-                        isSelected
-                          ? "bg-orange-600 text-white shadow-sm ring-2 ring-orange-200"
-                          : "bg-stone-100 hover:bg-orange-50 text-stone-600 hover:text-orange-700 border border-stone-200"
-                      }`}
-                    >
-                      {isSelected ? "Activa ✓" : "Filtrar"}
-                    </button>
+                    {isAdmin ? (
+                      <button
+                        onClick={() => switchBranch(b.id)}
+                        title={isSelected ? "Sucursal activa actualmente" : "Hacer clic para filtrar el dashboard con esta sucursal"}
+                        className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl transition-all shrink-0 active:scale-95 ${
+                          isSelected
+                            ? "bg-orange-600 text-white shadow-sm ring-2 ring-orange-200"
+                            : "bg-stone-100 hover:bg-orange-50 text-stone-600 hover:text-orange-700 border border-stone-200"
+                        }`}
+                      >
+                        {isSelected ? "Activa ✓" : "Filtrar"}
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-black px-2.5 py-1 rounded-xl bg-orange-600 text-white shadow-sm flex items-center gap-1 select-none">
+                        <Lock className="w-2.5 h-2.5" /> Tu Tienda
+                      </span>
+                    )}
                   </div>
 
                   {/* Venta Acumulada y Tickets */}

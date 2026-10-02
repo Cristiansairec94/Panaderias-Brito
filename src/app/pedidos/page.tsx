@@ -224,14 +224,16 @@ export default function PedidosPage() {
   }, []);
 
   // Por requerimiento operativo: los administradores entran visualizando "all" (Todas las Sucursales),
-  // mientras que los cajeros y perfiles operativos se limitan estrictamente a su sucursal asignada.
+  // pero pueden seleccionar sucursales individuales libremente; los cajeros quedan fijados a su sucursal.
+  const hasInitializedBranchFilterRef = useRef(false);
   useEffect(() => {
-    if (isAdmin) {
-      setSelectedBranchFilter("all");
-    } else {
+    if (!isAdmin) {
       setSelectedBranchFilter(userBranchId);
+    } else if (!hasInitializedBranchFilterRef.current && user) {
+      hasInitializedBranchFilterRef.current = true;
+      setSelectedBranchFilter("all");
     }
-  }, [isAdmin, userBranchId]);
+  }, [isAdmin, userBranchId, user]);
 
   // Local minute clock (for checking if delivery time has passed today)
   const [currentMinutes, setCurrentMinutes] = useState<number>(() => {
@@ -3483,13 +3485,14 @@ export default function PedidosPage() {
       <CreateOrderModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        initialBranchId={selectedBranchFilter !== "all" ? selectedBranchFilter : currentBranch?.id}
+        initialBranchId={effectiveBranchFilter !== "all" ? effectiveBranchFilter : currentBranch?.id}
         onOrderCreated={(orderId) => {
           loadOrders();
           const created = getStoredOrders().find((o) => o.id === orderId);
           if (created) {
             setSelectedOrderForReceipt(created);
             if (
+              isAdmin &&
               selectedBranchFilter !== "all" &&
               created.branchId !== selectedBranchFilter &&
               (created as any).operatingBranchId !== selectedBranchFilter
