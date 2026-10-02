@@ -208,19 +208,11 @@ export default function PedidosPage() {
     };
   }, []);
 
-  // Auto-sync branch filter with active connected branch (or user assigned branch if not admin)
+  // Por requerimiento operativo: al entrar a la página de pedidos el filtro siempre debe permanecer en
+  // "all" (Todas las Sucursales) para visualizar inmediatamente todos los pedidos que van llegando sin exclusión.
   useEffect(() => {
-    if (user && user.role !== "admin") {
-      const userBranchId = user.assignedBranchId || currentBranch?.id;
-      if (userBranchId) {
-        setSelectedBranchFilter(userBranchId);
-        return;
-      }
-    }
-    if (currentBranch) {
-      setSelectedBranchFilter(currentBranch.id);
-    }
-  }, [currentBranch, user]);
+    setSelectedBranchFilter("all");
+  }, []);
 
   // Local minute clock (for checking if delivery time has passed today)
   const [currentMinutes, setCurrentMinutes] = useState<number>(() => {
@@ -1181,7 +1173,7 @@ export default function PedidosPage() {
         {/* Cuadro 2.5: 🏬 Todas las Sucursales (Mucho más grande, interactivo y al lado de '¡Entregas para HOY!') */}
         <div
           onClick={() => {
-            if (topBranchSelectRef.current && user?.role === "admin") {
+            if (topBranchSelectRef.current) {
               topBranchSelectRef.current.focus();
               if (typeof (topBranchSelectRef.current as any).showPicker === "function") {
                 (topBranchSelectRef.current as any).showPicker();
@@ -1229,14 +1221,11 @@ export default function PedidosPage() {
                   setSelectedBranchFilter(e.target.value);
                   scrollToCatalog();
                 }}
-                disabled={user?.role !== "admin"}
                 className="w-full text-xs font-black text-amber-950 bg-amber-50/90 hover:bg-amber-100 border-2 border-amber-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer transition-all appearance-none pr-7 shadow-xs"
               >
-                {user?.role === "admin" && (
-                  <option value="all">
-                    🏬 Todas las Sucursales ({branchOrdersBreakdown.grandTotalOrders} pedidos)
-                  </option>
-                )}
+                <option value="all">
+                  🏬 Todas las Sucursales ({branchOrdersBreakdown.grandTotalOrders} pedidos)
+                </option>
                 {branchOrdersBreakdown.branches.map((b) => (
                   <option key={b.branchId} value={b.branchId}>
                     🏬 {b.branchName} ({b.totalOrders} pedidos)

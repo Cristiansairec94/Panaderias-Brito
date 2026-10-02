@@ -405,8 +405,7 @@ export default function POSPage() {
   const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
   const { addNotification } = useNotifications();
   const { toggleMobile } = useSidebar();
-  const { isOnline, isSyncing, isSynced, enqueueOfflineItem, pendingCount, syncNow } = useSync();
-  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+  const { isOnline, isSyncing, isSynced, enqueueOfflineItem, pendingCount } = useSync();
   const activeBranch = currentBranch || branches[0];
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -2449,22 +2448,6 @@ export default function POSPage() {
                   {pendingCount} {pendingCount === 1 ? "venta pendiente" : "ventas pendientes"}
                 </span>
               )}
-            </div>
-          )}
-
-          {syncStatusMsg && (
-            <div className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-950 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{syncStatusMsg}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSyncStatusMsg(null)}
-                className="text-stone-400 hover:text-stone-700"
-              >
-                ✕
-              </button>
             </div>
           )}
 
