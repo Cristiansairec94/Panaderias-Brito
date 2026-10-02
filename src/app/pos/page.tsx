@@ -553,11 +553,11 @@ export default function POSPage() {
             }
           } catch {}
         }
-        const shiftStart = getStoredShiftStartBoundary();
+        const shiftStart = getStoredShiftStartBoundary(activeBranch?.id);
         const realSales = list.filter((s: any) => {
           if (!s) return false;
           const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-          if (!isAdmin && shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
+          if (shiftStart > 0 && (!t || t < shiftStart)) return false;
           return true;
         });
         setRecentSalesList(realSales);
@@ -681,7 +681,7 @@ export default function POSPage() {
               (s: any) => {
                 if (!s) return false;
                 const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-                if (shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
+                if (shiftStart > 0 && (!t || t < shiftStart)) return false;
                 return true;
               }
             );
@@ -827,11 +827,11 @@ export default function POSPage() {
             }
           } catch {}
         }
-        const shiftStart = getStoredShiftStartBoundary();
+        const shiftStart = getStoredShiftStartBoundary(activeBranch?.id);
         const realSales = list.filter((s: any) => {
           if (!s) return false;
           const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-          if (!isAdmin && shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
+          if (shiftStart > 0 && (!t || t < shiftStart)) return false;
           return true;
         });
         setRecentSalesList(realSales);
@@ -923,11 +923,11 @@ export default function POSPage() {
       if (savedSales) {
         const parsedSales = JSON.parse(savedSales);
         if (Array.isArray(parsedSales)) {
-          const shiftStart = getStoredShiftStartBoundary();
+          const shiftStart = getStoredShiftStartBoundary(activeBranch?.id);
           const cleanSales = parsedSales.filter((s: any) => {
             if (!s) return false;
             const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-            return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+            return shiftStart <= 0 || (t > 0 && t >= shiftStart);
           });
           setRecentSalesList(cleanSales);
         }
@@ -1087,7 +1087,7 @@ export default function POSPage() {
             (s: any) => {
               if (!s) return false;
               const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (effectiveShiftStart > 0 && (!t || t < effectiveShiftStart - 60000)) return false;
+              if (effectiveShiftStart > 0 && (!t || t < effectiveShiftStart)) return false;
               return true;
             }
           );
@@ -1181,6 +1181,8 @@ export default function POSPage() {
   const handleCompleteShiftCut = () => {
     setShowCashDrawerModal(false);
     setIsShiftLocked(true);
+    setRecentSalesList([]);
+    setExpensesList([]);
     setShiftVersion((v) => v + 1);
   };
 
@@ -2061,7 +2063,7 @@ export default function POSPage() {
     }
 
     // 5. Guardar en disco local la venta del turno sin perder ninguna venta
-    const currentShiftStart = getStoredShiftStartBoundary();
+    const currentShiftStart = getStoredShiftStartBoundary(activeBranch?.id);
     let currentStoredSales: Sale[] = [];
     try {
       const raw = localStorage.getItem("brito_pos_current_sales");
@@ -2078,7 +2080,7 @@ export default function POSPage() {
     const cleanPrevSales = combinedPrev.filter((s) => {
       if (!s || s.id === newSaleRecord.id) return false;
       const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      return currentShiftStart <= 0 || (t > 0 && t >= currentShiftStart - 60000);
+      return currentShiftStart <= 0 || (t > 0 && t >= currentShiftStart);
     });
     const nextList = [newSaleRecord, ...cleanPrevSales];
     try {

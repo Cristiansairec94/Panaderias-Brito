@@ -469,32 +469,38 @@ export default function CajaPage() {
 
   // Live calculations
   const effectiveMovements = useMemo(() => {
-    if (!cashMovements || cashMovements.length === 0) return movements;
-    const filtered = cashMovements.filter((m) => {
-      if (!m) return false;
-      if (!isAllBranches && currentBranch && currentBranch.id) {
-        if (m.branchId && m.branchId !== currentBranch.id) return false;
-      }
-      return true;
-    });
-    const mapped: CashMovement[] = filtered.map((m) => ({
-      id: m.id,
-      shiftId: "shift-live",
-      type: m.type,
-      category: m.category as any,
-      categoryLabel: m.categoryLabel,
-      amount: m.amount,
-      reason: m.reason,
-      authorizedBy: m.authorizedBy,
-      timestamp: m.timestamp,
-    }));
-    const combined = [...movements];
-    for (const m of mapped) {
-      if (!combined.some((c) => c.id === m.id)) {
-        combined.push(m);
+    const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
+    let combined = [...movements];
+    if (cashMovements && cashMovements.length > 0) {
+      const filtered = cashMovements.filter((m) => {
+        if (!m) return false;
+        if (!isAllBranches && currentBranch && currentBranch.id) {
+          if (m.branchId && m.branchId !== currentBranch.id) return false;
+        }
+        return true;
+      });
+      const mapped: CashMovement[] = filtered.map((m) => ({
+        id: m.id,
+        shiftId: "shift-live",
+        type: m.type,
+        category: m.category as any,
+        categoryLabel: m.categoryLabel,
+        amount: m.amount,
+        reason: m.reason,
+        authorizedBy: m.authorizedBy,
+        timestamp: m.timestamp,
+      }));
+      for (const m of mapped) {
+        if (!combined.some((c) => c.id === m.id)) {
+          combined.push(m);
+        }
       }
     }
-    return combined;
+    return combined.filter((m) => {
+      if (!m) return false;
+      const t = parseDateTimeSafe(m.timestamp);
+      return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+    });
   }, [cashMovements, currentBranch?.id, isAllBranches, movements]);
 
   const entryMovements = effectiveMovements.filter((m) => m.type === "entrada");

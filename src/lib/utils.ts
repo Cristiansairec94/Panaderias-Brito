@@ -317,30 +317,29 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
   if (typeof window === "undefined") return 0;
   try {
     const now = Date.now();
+    const effectiveBranchId =
+      branchId ||
+      localStorage.getItem("brito_current_branch_id") ||
+      localStorage.getItem("brito_active_branch_id") ||
+      undefined;
+
     // 1. Clave específica de la sucursal activa
-    if (branchId && branchId !== "all") {
-      const branchStored = localStorage.getItem("brito_shift_start_" + branchId);
+    if (effectiveBranchId && effectiveBranchId !== "all") {
+      const branchStored = localStorage.getItem("brito_shift_start_" + effectiveBranchId);
       if (branchStored && !isNaN(Number(branchStored)) && Number(branchStored) > 0) {
         const num = Number(branchStored);
         return num > now ? now : num;
       }
     }
 
-    // 2. Clave global del turno actual
-    const stored = localStorage.getItem("brito_current_shift_start_timestamp");
-    if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
-      const num = Number(stored);
-      // Evitar timestamps erróneos en el futuro
-      return num > now ? now : num;
-    }
-
+    // 2. Buscar en historial de cortes de esta sucursal
     let startTs = 0;
     const rawCuts = localStorage.getItem("brito_shift_cuts_history");
     if (rawCuts) {
       const parsed = JSON.parse(rawCuts);
       if (Array.isArray(parsed) && parsed.length > 0) {
         for (const cut of parsed) {
-          if (branchId && branchId !== "all" && cut.branchId && cut.branchId !== branchId) {
+          if (effectiveBranchId && effectiveBranchId !== "all" && cut.branchId && cut.branchId !== effectiveBranchId) {
             continue;
           }
           const cutTs =
@@ -353,6 +352,16 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
         }
       }
     }
+
+    // 3. Clave global del turno actual sólo si no hay sucursal específica o no encontró corte
+    if (startTs === 0 && (!effectiveBranchId || effectiveBranchId === "all")) {
+      const stored = localStorage.getItem("brito_current_shift_start_timestamp");
+      if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
+        const num = Number(stored);
+        if (num <= now) startTs = num;
+      }
+    }
+
     if (startTs === 0) {
       // Iniciar al comienzo del día de hoy (00:00:00) para no descartar ventas matutinas
       const todayStart = new Date();
@@ -360,8 +369,8 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
       startTs = todayStart.getTime();
     }
     try {
-      if (branchId && branchId !== "all") {
-        localStorage.setItem("brito_shift_start_" + branchId, startTs.toString());
+      if (effectiveBranchId && effectiveBranchId !== "all") {
+        localStorage.setItem("brito_shift_start_" + effectiveBranchId, startTs.toString());
       }
       localStorage.setItem("brito_current_shift_start_timestamp", startTs.toString());
     } catch (e) {}

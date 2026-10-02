@@ -561,11 +561,12 @@ export function recordOrderAsPosSale(params: {
     (newSale as any).branchId = params.operatingBranchId || params.branchId;
     (newSale as any).operatingBranchId = params.operatingBranchId;
 
-    const shiftStart = getStoredShiftStartBoundary();
+    const branchIdForShift = params.operatingBranchId || params.branchId;
+    const shiftStart = getStoredShiftStartBoundary(branchIdForShift);
     const cleanCurrentSales = currentSales.filter((s) => {
       if (!s) return false;
       const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+      return shiftStart <= 0 || (t > 0 && t >= shiftStart);
     });
 
     const nextSales = [newSale, ...cleanCurrentSales];
