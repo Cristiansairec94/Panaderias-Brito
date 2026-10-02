@@ -8,7 +8,6 @@ import {
   Clock, 
   ChevronDown, 
   LogOut, 
-  UserCheck,
   Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
@@ -21,7 +20,7 @@ import {
   RefreshCw
 } from "lucide-react";
 
-import { useAuth, DEMO_USERS, User } from "@/context/AuthContext";
+import { useAuth, User } from "@/context/AuthContext";
 import { useSidebar } from "@/context/SidebarContext";
 import { useBranch } from "@/context/BranchContext";
 import { useSync } from "@/context/SyncContext";
@@ -31,7 +30,7 @@ import NotificationsDropdown from "./NotificationsDropdown";
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loginAs, logout, getDefaultRouteForUser } = useAuth();
+  const { user, logout, getDefaultRouteForUser } = useAuth();
   const { isCollapsed, toggleCollapse } = useSidebar();
   const { 
     branches, 
@@ -139,15 +138,6 @@ export default function Header() {
       default:
         return { title: "Panadería Brito", subtitle: "Sistema Integral ERP & POS" };
     }
-  };
-
-  const handleRoleSwitch = (demo: User) => {
-    loginAs(demo);
-    setShowUserMenu(false);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("brito_session_active", "true");
-    }
-    router.push("/");
   };
 
   const handleLogout = () => {
@@ -465,48 +455,44 @@ export default function Header() {
                 onClick={() => setShowUserMenu(false)}
               />
 
-              <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-24px)] bg-[#1c0e08] rounded-2xl shadow-2xl border border-amber-900/60 p-2.5 z-[150] animate-in fade-in zoom-in-95 text-stone-200">
-                <div className="p-2.5 border-b border-amber-900/40 bg-[#24130b] rounded-xl mb-1.5">
-                  <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Sesión activa:</p>
-                  <p className="text-xs font-black text-white">{user?.name}</p>
-                  <p className="text-[11px] text-stone-500">{user?.email}</p>
-                </div>
+              <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-24px)] bg-[#1c0e08] rounded-2xl shadow-2xl border border-amber-900/60 p-3 z-[150] animate-in fade-in zoom-in-95 text-stone-200">
+                <div className="p-3 border-b border-amber-900/40 bg-[#24130b] rounded-xl mb-2 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-lg text-white font-bold overflow-hidden shadow-inner shrink-0">
+                      {user?.photoUrl || (user?.avatar && (user.avatar.startsWith("data:image") || user.avatar.startsWith("http"))) ? (
+                        <img src={user.photoUrl || user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                      ) : (
+                        user?.avatar || "👨‍🍳"
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Sesión Activa</p>
+                      <p className="text-sm font-black text-white truncate">{user?.name}</p>
+                      <p className="text-[11px] text-stone-400 font-medium truncate">{user?.roleLabel}</p>
+                    </div>
+                  </div>
 
-                {/* Fast Role Switcher */}
-                <div className="p-1 space-y-0.5">
-                  <p className="text-[9px] font-bold text-stone-400 uppercase tracking-wider px-2 py-1">
-                    Cambiar de Perfil (Demo):
-                  </p>
-                  {DEMO_USERS.map((demo) => (
-                    <button
-                      key={demo.id}
-                      type="button"
-                      onClick={() => handleRoleSwitch(demo)}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between font-semibold transition-all cursor-pointer ${
-                        user?.id === demo.id
-                          ? "bg-gradient-to-r from-amber-50 to-orange-50 text-stone-950 font-bold border-2 border-amber-400 shadow-sm"
-                          : "text-stone-200 hover:bg-white/[0.08] hover:text-white"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{demo.avatar}</span>
-                        <div>
-                          <span className="font-bold">{demo.name}</span>
-                          <p className="text-[10px] text-stone-400 font-medium">{demo.roleLabel}</p>
-                        </div>
-                      </div>
-                      {user?.id === demo.id && <UserCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
-                    </button>
-                  ))}
-                </div>
+                  {user?.email && (
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-stone-400">
+                      <span>Correo:</span>
+                      <span className="text-stone-300 font-medium truncate max-w-[170px]">{user.email}</span>
+                    </div>
+                  )}
 
-                <div className="border-t border-stone-100 pt-1.5 mt-1">
+                  {user?.assignedBranchName && (
+                    <div className="flex items-center justify-between text-[11px] text-stone-400">
+                      <span>Sucursal:</span>
+                      <span className="font-bold text-amber-400">{user.assignedBranchName}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="pt-1">
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors cursor-pointer"
+                    className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 flex items-center gap-2.5 transition-colors cursor-pointer border border-rose-500/20"
                   >
-                    <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
+                    <LogOut className="w-4 h-4 text-rose-400" /> Cerrar Sesión
                   </button>
                 </div>
               </div>
