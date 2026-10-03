@@ -293,14 +293,14 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
           todayStart.setHours(0, 0, 0, 0);
           const todayIso = todayStart.toISOString();
 
-          const [salesRes, ordersRes, movsRes, expsRes] = await Promise.allSettled([
+          const [salesRes, ordersRes, movsRes, expsRes, cutsRes, branchesRes] = await Promise.allSettled([
             supabase
               .from("sales")
               .select("id, branch_id, total, payment_method, cashier, date, created_at")
               .gte("created_at", todayIso),
             supabase
               .from("custom_orders")
-              .select("id, order_number, customer_name, branch_id, branch_name, description, total, deposit, payment_status, payment_method, cashier, created_at")
+              .select("id, order_number, customer_name, branch_id, branch_name, description, total, deposit, remaining_balance, payment_status, payment_method, cashier, created_at, payments")
               .gte("created_at", todayIso),
             supabase
               .from("cash_movements")
@@ -310,67 +310,97 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               .from("cash_expenses")
               .select("id, branch_id, amount, category, description, cashier, created_at")
               .gte("created_at", todayIso),
+            supabase
+              .from("cash_shifts")
+              .select("id, shift_name, cashier_name, branch_id, opened_at, initial_cash, cash_sales, card_sales, transfer_sales, total_cash_in, total_cash_out, expected_cash, actual_cash, difference, status, notes")
+              .gte("opened_at", todayIso),
+            supabase
+              .from("branches")
+              .select("id, name, short_name, address, phone, is_active"),
           ]);
 
           const dbSales = salesRes.status === "fulfilled" && !salesRes.value.error ? salesRes.value.data || [] : [];
           const dbOrders = ordersRes.status === "fulfilled" && !ordersRes.value.error ? ordersRes.value.data || [] : [];
           const dbMovs = movsRes.status === "fulfilled" && !movsRes.value.error ? movsRes.value.data || [] : [];
           const dbExps = expsRes.status === "fulfilled" && !expsRes.value.error ? expsRes.value.data || [] : [];
+          const dbCuts = cutsRes.status === "fulfilled" && !cutsRes.value.error ? cutsRes.value.data || [] : [];
+          const dbBranches = branchesRes.status === "fulfilled" && !branchesRes.value.error ? branchesRes.value.data || [] : [];
 
           const branchAgg = new Map<string, {
-            total: number;
-            count: number;
-            cashSales: number;
-            cardSales: number;
-            transferSales: number;
+            deskSales: number;
+            deskTickets: number;
+            deskCash: number;
+            deskCard: number;
+            deskTransfer: number;
             orderCash: number;
+            orderCard: number;
+            orderTransfer: number;
+            orderTotalCobrado: number;
+            orderTotal: number;
+            orderCount: number;
             movNet: number;
             expCash: number;
             lastCashier?: string;
+            branchName?: string;
           }>();
 
-          DEFAULT_BRANCHES.forEach((b) => {
-            branchAgg.set(b.id, {
-              total: 0,
-              count: 0,
-              cashSales: 0,
-              cardSales: 0,
-              transferSales: 0,
-              orderCash: 0,
-              movNet: 0,
-              expCash: 0,
-            });
+          const initBranchAgg = () => ({
+            deskSales: 0,
+            deskTickets: 0,
+            deskCash: 0,
+            deskCard: 0,
+            deskTransfer: 0,
+            orderCash: 0,
+            orderCard: 0,
+            orderTransfer: 0,
+            orderTotalCobrado: 0,
+            orderTotal: 0,
+            orderCount: 0,
+            movNet: 0,
+            expCash: 0,
           });
 
-          // 1. Agregar ventas
+          DEFAULT_BRANCHES.forEach((b) => {
+            branchAgg.set(b.id, initBranchAgg());
+          });
+
+          // 1. Agregar ventas de mostrador
           dbSales.forEach((s: any) => {
             const bId = s.branch_id || "branch-matriz";
             let cur = branchAgg.get(bId);
             if (!cur) {
-              cur = { total: 0, count: 0, cashSales: 0, cardSales: 0, transferSales: 0, orderCash: 0, movNet: 0, expCash: 0 };
+              cur = initBranchAgg();
               branchAgg.set(bId, cur);
             }
             const amt = Number(s.total) || 0;
-            cur.total += amt;
-            cur.count += 1;
-            if (s.payment_method === "tarjeta") cur.cardSales += amt;
-            else if (s.payment_method === "transferencia") cur.transferSales += amt;
-            else cur.cashSales += amt;
+            cur.deskSales += amt;
+            cur.deskTickets += 1;
+            if (s.payment_method === "tarjeta") cur.deskCard += amt;
+            else if (s.payment_method === "transferencia") cur.deskTransfer += amt;
+            else cur.deskCash += amt;
             if (s.cashier) cur.lastCashier = s.cashier;
           });
 
-          // 2. Agregar abonos/anticipos en efectivo de pedidos
+          // 2. Agregar pedidos especiales (anticipos y liquidaciones de hoy)
           dbOrders.forEach((o: any) => {
             const bId = o.branch_id || "branch-matriz";
             let cur = branchAgg.get(bId);
             if (!cur) {
-              cur = { total: 0, count: 0, cashSales: 0, cardSales: 0, transferSales: 0, orderCash: 0, movNet: 0, expCash: 0 };
+              cur = initBranchAgg();
               branchAgg.set(bId, cur);
             }
+            if (o.branch_name) cur.branchName = o.branch_name;
             const dep = Number(o.deposit) || 0;
-            if (dep > 0 && (o.payment_method === "efectivo" || !o.payment_method)) {
-              cur.orderCash += dep;
+            const tot = Number(o.total) || 0;
+            cur.orderTotal += tot;
+            cur.orderCount += 1;
+            if (dep > 0) {
+              cur.orderTotalCobrado += dep;
+              if (o.payment_method === "tarjeta") cur.orderCard += dep;
+              else if (o.payment_method === "transferencia") cur.orderTransfer += dep;
+              else cur.orderCash += dep;
             }
+            if (o.cashier && !cur.lastCashier) cur.lastCashier = o.cashier;
           });
 
           // 3. Movimientos de caja (aportes / retiros fuera de ventas)
@@ -379,7 +409,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             const bId = m.branch_id || "branch-matriz";
             let cur = branchAgg.get(bId);
             if (!cur) {
-              cur = { total: 0, count: 0, cashSales: 0, cardSales: 0, transferSales: 0, orderCash: 0, movNet: 0, expCash: 0 };
+              cur = initBranchAgg();
               branchAgg.set(bId, cur);
             }
             const amt = Number(m.amount) || 0;
@@ -391,25 +421,130 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             const bId = e.branch_id || "branch-matriz";
             let cur = branchAgg.get(bId);
             if (!cur) {
-              cur = { total: 0, count: 0, cashSales: 0, cardSales: 0, transferSales: 0, orderCash: 0, movNet: 0, expCash: 0 };
+              cur = initBranchAgg();
               branchAgg.set(bId, cur);
             }
             cur.expCash += Number(e.amount) || 0;
           });
 
-          // Actualizar métricas vivas de cada sucursal
+          // Sincronizar pedidos de Supabase hacia el almacenamiento local si hay pedidos nuevos
+          if (dbOrders.length > 0) {
+            try {
+              const rawLocalOrd = localStorage.getItem("brito_custom_orders");
+              const localOrdList = rawLocalOrd ? JSON.parse(rawLocalOrd) : [];
+              const ordMap = new Map<string, any>(localOrdList.map((o: any) => [o.orderNumber || o.id, o]));
+              let anyOrdUpdated = false;
+
+              dbOrders.forEach((dbo: any) => {
+                const key = dbo.order_number || dbo.id;
+                if (!ordMap.has(key)) {
+                  ordMap.set(key, dbo);
+                  anyOrdUpdated = true;
+                }
+              });
+
+              if (anyOrdUpdated) {
+                localStorage.setItem("brito_custom_orders", JSON.stringify(Array.from(ordMap.values())));
+                window.dispatchEvent(new Event("brito_orders_updated"));
+              }
+            } catch {}
+          }
+
+          // Actualizar métricas vivas de cada sucursal e incorporar sucursales dinámicas
           setBranches((prev) => {
-            const updated = prev.map((b) => {
+            const branchMap = new Map<string, Branch>();
+            DEFAULT_BRANCHES.forEach((d) => branchMap.set(d.id, d));
+            prev.forEach((b) => branchMap.set(b.id, { ...(branchMap.get(b.id) || b), ...b }));
+
+            // Incorporar sucursales de la tabla branches de Supabase si existen
+            dbBranches.forEach((dbB: any) => {
+              if (!branchMap.has(dbB.id)) {
+                branchMap.set(dbB.id, {
+                  id: dbB.id,
+                  name: dbB.name || "Sucursal",
+                  shortName: dbB.short_name || dbB.name || "Sucursal",
+                  code: "SUC-" + dbB.id.slice(-3).toUpperCase(),
+                  address: dbB.address || "Dirección sucursal",
+                  phone: dbB.phone || "55 0000 0000",
+                  manager: "Encargado de Sucursal",
+                  status: dbB.is_active === false ? "cerrada" : "abierta",
+                  dailyGoal: 5000,
+                  todaySales: 0,
+                  todayTickets: 0,
+                  cashInDrawer: 1000,
+                  color: "emerald",
+                  currentShift: {
+                    id: `shift-${dbB.id}`,
+                    name: "Turno General",
+                    cashier: "Cajero",
+                    openedAt: "06:00 AM",
+                    initialFund: 1000,
+                    status: "abierto",
+                    totalSales: 0,
+                    ticketCount: 0,
+                    cashSales: 0,
+                    cardSales: 0,
+                    transferSales: 0,
+                  },
+                });
+              }
+            });
+
+            // Incorporar sucursales dinámicas detectadas en ventas o pedidos (ej. san ildefonso hgo)
+            branchAgg.forEach((agg, bId) => {
+              if (!branchMap.has(bId)) {
+                const bName = agg.branchName || `Sucursal ${bId}`;
+                branchMap.set(bId, {
+                  id: bId,
+                  name: bName,
+                  shortName: bName.split(" ")[0] || "Sucursal",
+                  code: "SUC-" + bId.slice(-3).toUpperCase(),
+                  address: "Ubicación Brito",
+                  phone: "55 0000 0000",
+                  manager: agg.lastCashier || "Cajero en turno",
+                  status: "abierta",
+                  dailyGoal: 5000,
+                  todaySales: 0,
+                  todayTickets: 0,
+                  cashInDrawer: 1000,
+                  color: "emerald",
+                  currentShift: {
+                    id: `shift-${bId}`,
+                    name: "Turno General",
+                    cashier: agg.lastCashier || "Cajero",
+                    openedAt: "06:00 AM",
+                    initialFund: 1000,
+                    status: "abierto",
+                    totalSales: 0,
+                    ticketCount: 0,
+                    cashSales: 0,
+                    cardSales: 0,
+                    transferSales: 0,
+                  },
+                });
+              }
+            });
+
+            const updated = Array.from(branchMap.values()).map((b) => {
               const agg = branchAgg.get(b.id);
               if (!agg) return b;
+
+              // TOTAL GENERAL COBRADO: Ventas en mostrador + Dinero cobrado en pedidos (anticipos y liquidaciones)
+              const totalCobrado = agg.deskSales + agg.orderTotalCobrado;
+              const totalTickets = agg.deskTickets + agg.orderCount;
               const initialFund = b.currentShift?.initialFund || 1000;
-              const calculatedCash = Math.max(0, initialFund + agg.cashSales + agg.orderCash + agg.movNet - agg.expCash);
+              const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.movNet - agg.expCash);
 
               return {
                 ...b,
-                todaySales: agg.total,
-                todayTickets: agg.count,
+                todaySales: totalCobrado,
+                todayTickets: totalTickets,
                 cashInDrawer: calculatedCash,
+                todayDeskSales: agg.deskSales,
+                todayDeskTickets: agg.deskTickets,
+                todayOrdersDeposit: agg.orderTotalCobrado,
+                todayOrdersTotal: agg.orderTotal,
+                todayOrdersCount: agg.orderCount,
                 currentShift: {
                   ...(b.currentShift || {
                     id: `shift-${b.id}`,
@@ -419,11 +554,11 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
                     initialFund: 1000,
                     status: "abierto",
                   }),
-                  totalSales: agg.total,
-                  ticketCount: agg.count,
-                  cashSales: agg.cashSales,
-                  cardSales: agg.cardSales,
-                  transferSales: agg.transferSales,
+                  totalSales: totalCobrado,
+                  ticketCount: totalTickets,
+                  cashSales: agg.deskCash + agg.orderCash,
+                  cardSales: agg.deskCard + agg.orderCard,
+                  transferSales: agg.deskTransfer + agg.orderTransfer,
                   cashier: agg.lastCashier || b.currentShift?.cashier || "Cajero",
                 },
               };
@@ -551,13 +686,40 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             });
           });
 
-          // E) Cortes de caja de hoy
+          // E) Cortes de caja de hoy (desde Supabase y almacenamiento local)
+          const seenCutIds = new Set<string>();
+          dbCuts.forEach((c: any) => {
+            const cutId = c.id;
+            seenCutIds.add(cutId);
+            const bId = c.branch_id || "branch-matriz";
+            const bName = branchNameMap.get(bId) || "Sucursal";
+            const timeMs = parseDateTimeSafe(c.opened_at);
+            unified.push({
+              id: `cut-${cutId}`,
+              branchId: bId,
+              branchName: bName,
+              type: "salida",
+              category: "corte_caja",
+              categoryLabel: "Corte de Turno",
+              amount: Number(c.actual_cash || c.expected_cash || c.initial_cash || 0),
+              reason: `Corte de turno (${c.shift_name || "Turno"}). Cajero: ${c.cashier_name}. Fondo nuevo: $${c.initial_cash || 1000}`,
+              authorizedBy: c.cashier_name || "Cajero",
+              timestamp: formatDateTimeSafe(c.opened_at),
+              createdAt: c.opened_at,
+              rawTimestamp: timeMs,
+              movementType: "corte",
+              cashier: c.cashier_name || "Cajero",
+              paymentMethod: "efectivo",
+            });
+          });
+
           try {
             const rawCuts = localStorage.getItem("brito_shift_cuts_history");
             if (rawCuts) {
               const cuts = JSON.parse(rawCuts);
               if (Array.isArray(cuts)) {
                 cuts.forEach((c: any) => {
+                  if (seenCutIds.has(c.id)) return;
                   const timeMs = c.timestamp || parseDateTimeSafe(c.date || c.createdAt);
                   if (timeMs >= todayStart.getTime()) {
                     const bId = c.branchId || "branch-matriz";
@@ -698,10 +860,24 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       // Ignore localStorage error
     }
 
-    // Intervalo de sincronización en vivo cada 6 segundos para mantener todas las sucursales al día
+    // Suscribirse directamente a cambios de Postgres en Supabase para actualización reactiva instantánea (0 segundos)
+    let realtimeChannel: any = null;
+    try {
+      const supabase = createClient();
+      realtimeChannel = supabase
+        .channel("branch_context_supabase_realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, () => syncBranchesWithServer())
+        .on("postgres_changes", { event: "*", schema: "public", table: "custom_orders" }, () => syncBranchesWithServer())
+        .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements" }, () => syncBranchesWithServer())
+        .on("postgres_changes", { event: "*", schema: "public", table: "cash_expenses" }, () => syncBranchesWithServer())
+        .on("postgres_changes", { event: "*", schema: "public", table: "cash_shifts" }, () => syncBranchesWithServer())
+        .subscribe();
+    } catch {}
+
+    // Intervalo de sincronización en vivo cada 2.5 segundos para respaldo continuo
     const pollInterval = setInterval(() => {
       syncBranchesWithServer();
-    }, 6000);
+    }, 2500);
 
     const handleFocus = () => {
       syncBranchesWithServer();
@@ -713,6 +889,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       clearInterval(pollInterval);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("online", handleFocus);
+      if (realtimeChannel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(realtimeChannel);
+        } catch {}
+      }
     };
   }, []);
 

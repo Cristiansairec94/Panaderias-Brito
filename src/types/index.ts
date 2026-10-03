@@ -385,6 +385,11 @@ export interface Branch {
   cashInDrawer: number;
   color: string; // e.g. "orange", "rose", "emerald", "blue", "purple"
   topProduct?: BranchTopProduct;
+  todayDeskSales?: number;
+  todayDeskTickets?: number;
+  todayOrdersDeposit?: number;
+  todayOrdersTotal?: number;
+  todayOrdersCount?: number;
 }
 
 export interface BranchCashMovement {

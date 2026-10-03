@@ -1495,9 +1495,33 @@ export default function POSPage() {
         )
         .on(
           "postgres_changes",
-          { event: "INSERT", schema: "public", table: "sales" },
+          { event: "*", schema: "public", table: "sales" },
           () => {
             window.dispatchEvent(new Event("brito_sales_updated"));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "custom_orders" },
+          () => {
+            window.dispatchEvent(new Event("brito_orders_updated"));
+            window.dispatchEvent(new Event("brito_sales_updated"));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "cash_movements" },
+          () => {
+            window.dispatchEvent(new Event("brito_incomes_updated"));
+            window.dispatchEvent(new Event("brito_caja_updated"));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "cash_expenses" },
+          () => {
+            window.dispatchEvent(new Event("brito_incomes_updated"));
+            window.dispatchEvent(new Event("brito_caja_updated"));
           }
         )
         .subscribe();
@@ -1990,6 +2014,51 @@ export default function POSPage() {
       const updated = deduplicateExpenses([newExpense, ...cleanCur]);
       localStorage.setItem("brito_pos_current_expenses", JSON.stringify(updated));
     } catch (e) {}
+
+    // Persistir directamente a Supabase para supervisión en tiempo real
+    if (typeof window !== "undefined") {
+      try {
+        const supabase = createClient();
+        const expId = newExpense.id || `GST-${Date.now().toString().slice(-6)}`;
+        const bId = activeBranch?.id || "branch-matriz";
+        Promise.allSettled([
+          supabase.from("cash_expenses").upsert({
+            id: expId,
+            amount: newExpense.amount,
+            category: newExpense.category || "gasto",
+            description: newExpense.description,
+            cashier: cashierName || "Cajero",
+            branch_id: bId,
+          }),
+          supabase.from("cash_movements").upsert({
+            id: `mov-${expId}`,
+            type: "salida",
+            category: newExpense.category || "gasto",
+            category_label: "Gasto de Caja",
+            amount: newExpense.amount,
+            reason: newExpense.description,
+            authorized_by: cashierName || "Cajero",
+            branch_id: bId,
+          }),
+        ]).catch(() => {});
+      } catch {}
+
+      if (realtimeHub?.broadcastCashMovement) {
+        realtimeHub.broadcastCashMovement({
+          id: newExpense.id,
+          branchId: activeBranch?.id || "branch-matriz",
+          branchName: activeBranch?.name || "Sucursal Matriz",
+          type: "salida",
+          category: newExpense.category as any,
+          categoryLabel: "Gasto de Caja",
+          amount: newExpense.amount,
+          reason: newExpense.description,
+          authorizedBy: cashierName || "Cajero",
+          cashier: cashierName,
+          timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        });
+      }
+    }
   };
 
   const handleAddIncome = (newIncome: CashIncome) => {
@@ -2009,6 +2078,41 @@ export default function POSPage() {
       const cleanAll = Array.isArray(allIncomes) ? allIncomes.filter((i: any) => i.id !== newIncome.id) : [];
       localStorage.setItem("brito_cash_incomes", JSON.stringify(deduplicateIncomes([newIncome, ...cleanAll])));
     } catch (e) {}
+
+    // Persistir directamente a Supabase para supervisión en tiempo real
+    if (typeof window !== "undefined") {
+      try {
+        const supabase = createClient();
+        const incId = newIncome.id || `ING-${Date.now().toString().slice(-6)}`;
+        const bId = activeBranch?.id || newIncome.branchId || "branch-matriz";
+        supabase.from("cash_movements").upsert({
+          id: incId,
+          type: "entrada",
+          category: newIncome.category || "otro",
+          category_label: newIncome.categoryLabel || "Entrada Dinero",
+          amount: newIncome.amount,
+          reason: newIncome.concept || "Entrada de dinero a caja",
+          authorized_by: cashierName || "Cajero",
+          branch_id: bId,
+        }).then(() => {}, () => {});
+      } catch {}
+
+      if (realtimeHub?.broadcastCashMovement) {
+        realtimeHub.broadcastCashMovement({
+          id: newIncome.id,
+          branchId: activeBranch?.id || "branch-matriz",
+          branchName: activeBranch?.name || "Sucursal Matriz",
+          type: "entrada",
+          category: "otro",
+          categoryLabel: newIncome.categoryLabel || "Entrada Dinero",
+          amount: newIncome.amount,
+          reason: newIncome.concept || "Entrada de dinero a caja",
+          authorizedBy: cashierName || "Cajero",
+          cashier: cashierName,
+          timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        });
+      }
+    }
   };
 
   const handleDeleteIncome = (id: string) => {
@@ -3200,23 +3304,37 @@ export default function POSPage() {
                                   {/* Fila Central: Ventas, Tickets y Caja */}
                                   <div className="flex items-center justify-between pt-1 border-t border-amber-900/50">
                                     <div className="flex items-baseline gap-1.5">
-                                      <span className="text-[9px] font-bold text-amber-400/90 uppercase tracking-wider">Ventas:</span>
-                                      <span className="font-mono font-black text-sm sm:text-base text-amber-300">
+                                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Total Día:</span>
+                                      <span className="font-mono font-black text-base sm:text-lg text-amber-300">
                                         {formatCurrency(b.todaySales)}
                                       </span>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
-                                      <span className="text-[10px] font-black font-mono text-emerald-300 bg-emerald-950/90 px-1.5 py-0.2 rounded-md border border-emerald-500/50 shadow-xs">
-                                        {b.todayTickets} {b.todayTickets === 1 ? "tkt" : "tkts"}
+                                      <span className="text-[11px] font-black font-mono text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded-md border border-emerald-500/50 shadow-xs">
+                                        {b.todayTickets} {b.todayTickets === 1 ? "op" : "ops"}
                                       </span>
-                                      <div className="flex items-center gap-1 bg-black/40 px-1.5 py-0.2 rounded-md border border-amber-900/40 text-[10px]">
-                                        <span className="text-stone-400">Caja:</span>
+                                      <div className="flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded-md border border-amber-900/40 text-[11px]">
+                                        <span className="text-stone-400 text-[10px]">Caja:</span>
                                         <span className="font-mono font-black text-emerald-400">
                                           {formatCurrency(b.cashInDrawer)}
                                         </span>
                                       </div>
                                     </div>
                                   </div>
+
+                                  {/* Desglose: Mostrador vs Pedidos */}
+                                  {((b.todayOrdersDeposit ?? 0) > 0 || (b.todayDeskSales ?? 0) > 0) && (
+                                    <div className="flex items-center gap-2 text-[10px] font-bold pt-0.5 flex-wrap">
+                                      <span className="text-amber-200/90 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/40">
+                                        🥖 Mostrador: <strong className="font-mono text-white">{formatCurrency(b.todayDeskSales ?? b.todaySales)}</strong>
+                                      </span>
+                                      {(b.todayOrdersDeposit ?? 0) > 0 && (
+                                        <span className="text-pink-300 bg-pink-950/70 px-1.5 py-0.5 rounded border border-pink-700/50">
+                                          🎂 Pedidos: <strong className="font-mono text-pink-200">{formatCurrency(b.todayOrdersDeposit ?? 0)}</strong>
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
 
                                   {/* Cajero en turno */}
                                   <div className="flex items-center justify-between text-[10px] text-amber-200/80">
@@ -3230,19 +3348,19 @@ export default function POSPage() {
                           </div>
 
                           {/* Consolidado total compacto */}
-                          <div className="p-2 rounded-xl bg-black/50 border border-amber-800/60 flex items-center justify-between flex-wrap gap-1.5 text-xs">
-                            <span className="text-amber-300 font-black uppercase text-[9px] tracking-wider">
+                          <div className="p-2.5 rounded-xl bg-black/60 border border-amber-600/60 flex items-center justify-between flex-wrap gap-2 text-xs">
+                            <span className="text-amber-300 font-black uppercase text-[10px] tracking-wider">
                               Consolidado Red Brito:
                             </span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-black text-xs sm:text-sm text-amber-300">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <span className="font-mono font-black text-sm sm:text-base text-amber-300">
                                 {formatCurrency(branches.reduce((sum, b) => sum + (b.todaySales || 0), 0))}
                               </span>
-                              <span className="font-mono font-black text-[10px] text-emerald-300 bg-emerald-950/90 px-1.5 py-0.2 rounded border border-emerald-500/40">
-                                {branches.reduce((sum, b) => sum + (b.todayTickets || 0), 0)} tkts
+                              <span className="font-mono font-black text-[11px] text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-500/40">
+                                {branches.reduce((sum, b) => sum + (b.todayTickets || 0), 0)} ops
                               </span>
-                              <span className="font-mono font-black text-[10px] text-stone-200">
-                                💵 {formatCurrency(branches.reduce((sum, b) => sum + (b.cashInDrawer || 0), 0))}
+                              <span className="font-mono font-black text-xs text-emerald-400 bg-black/40 px-2 py-0.5 rounded border border-amber-900/40">
+                                💵 En Caja: {formatCurrency(branches.reduce((sum, b) => sum + (b.cashInDrawer || 0), 0))}
                               </span>
                             </div>
                           </div>

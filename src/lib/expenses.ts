@@ -138,19 +138,33 @@ export function recordCashOutflowAsExpense(options: {
   const updatedExpenses = [newExpense, ...existingExpenses];
   saveStoredExpenses(updatedExpenses);
 
-  // Intentar guardar en Supabase si hay conexión
+  // Guardar en Supabase para sincronización 100% en tiempo real entre todas las computadoras
   if (typeof window !== "undefined") {
     try {
       const supabase = createClient();
-      Promise.resolve(
-        supabase.from("cash_movements").insert({
+      const expId = newExpense.id || `GST-${Date.now().toString().slice(-6)}`;
+      const branchId = newExpense.branchId || "branch-matriz";
+
+      Promise.allSettled([
+        supabase.from("cash_expenses").upsert({
+          id: expId,
+          amount: newExpense.amount,
+          category: catDef.id,
+          description: `[${newExpense.categoryLabel}] ${newExpense.description}`,
+          cashier: newExpense.cashier || "Cajero",
+          branch_id: branchId,
+        }),
+        supabase.from("cash_movements").upsert({
+          id: `mov-${expId}`,
           type: "salida",
           category: catDef.id,
+          category_label: newExpense.categoryLabel,
           amount: newExpense.amount,
-          reason: `[${newExpense.id}] ${newExpense.categoryLabel}: ${newExpense.description} (${newExpense.branchName})`,
-          authorized_by: newExpense.cashier,
-        })
-      ).catch(() => {});
+          reason: `[${expId}] ${newExpense.categoryLabel}: ${newExpense.description} (${newExpense.branchName})`,
+          authorized_by: newExpense.cashier || "Cajero",
+          branch_id: branchId,
+        }),
+      ]).catch(() => {});
     } catch {}
   }
 

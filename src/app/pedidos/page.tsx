@@ -47,6 +47,7 @@ import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { createClient } from "@/lib/supabase/client";
 import {
   getStoredOrders,
   syncOrdersWithServer,
@@ -184,17 +185,41 @@ export default function PedidosPage() {
   useEffect(() => {
     loadOrders();
 
-    // 1. Sincronización bidireccional automática con el servidor (celulares y PC)
-    syncOrdersWithServer()
-      .then((synced) => {
-        setOrders(synced);
-      })
-      .catch((err) => console.error("Error sincronizando pedidos:", err));
+    const doSync = () => {
+      syncOrdersWithServer()
+        .then((synced) => {
+          setOrders(synced);
+        })
+        .catch((err) => console.error("Error sincronizando pedidos:", err));
+    };
 
-    // 2. Escuchar cambios locales
+    // 1. Sincronización inicial bidireccional automática con Supabase y servidor
+    doSync();
+
+    // 2. Suscripción en tiempo real instantánea a Supabase Postgres Changes para pedidos
+    let supabaseChannel: any = null;
+    try {
+      const supabase = createClient();
+      supabaseChannel = supabase
+        .channel("pedidos_page_supabase_realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "custom_orders" }, () => {
+          doSync();
+        })
+        .subscribe();
+    } catch (e) {
+      console.warn("Could not subscribe to custom_orders realtime:", e);
+    }
+
+    // 3. Heartbeat de respaldo cada 3 segundos para sincronización garantizada
+    const pollInterval = setInterval(() => {
+      doSync();
+    }, 3000);
+
+    // 4. Escuchar cambios locales y foco de ventana
     const handleUpdate = () => loadOrders();
     window.addEventListener("brito_orders_updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
+    window.addEventListener("focus", doSync);
 
     // Revisar si viene de URL ?filter=cancelados o ?filter=bajas para mandar directo al historial
     try {
@@ -211,15 +236,24 @@ export default function PedidosPage() {
       }
     } catch (e) {}
 
-    // 3. Escuchar pedidos y actualizaciones transmitidos en tiempo real por WebSocket
+    // 5. Escuchar pedidos y actualizaciones transmitidos en tiempo real por WebSocket
     const unsubOrder = realtimeHub?.onOrder ? realtimeHub.onOrder(() => {
       loadOrders();
+      doSync();
     }) : undefined;
 
     return () => {
+      clearInterval(pollInterval);
       window.removeEventListener("brito_orders_updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("focus", doSync);
       if (unsubOrder) unsubOrder();
+      if (supabaseChannel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(supabaseChannel);
+        } catch {}
+      }
     };
   }, []);
 

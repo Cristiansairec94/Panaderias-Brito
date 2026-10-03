@@ -51,6 +51,7 @@ import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { recordCashIncome } from "@/lib/incomes";
 import ShiftCutDetailModal from "@/components/caja/ShiftCutDetailModal";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { createClient } from "@/lib/supabase/client";
 
 export interface LiveMoneyMovement {
   id: string;
@@ -503,7 +504,7 @@ export default function CajaPage() {
         } catch {}
       }
 
-      // Ordenar cronológicamente descendente
+      // Ordenar cronológicamente descendente los registros locales
       items.sort((a, b) => {
         const tA = parseDateTimeSafe(a.timestamp);
         const tB = parseDateTimeSafe(b.timestamp);
@@ -511,6 +512,157 @@ export default function CajaPage() {
       });
 
       setLiveStreamMovements(items);
+
+      // 5. Consultar movimientos en tiempo real desde Supabase para supervisión en vivo
+      if (typeof window !== "undefined") {
+        try {
+          const supabase = createClient();
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          const todayIso = todayStart.toISOString();
+
+          Promise.allSettled([
+            supabase
+              .from("sales")
+              .select("id, branch_id, total, payment_method, cashier, date, created_at")
+              .gte("created_at", todayIso),
+            supabase
+              .from("custom_orders")
+              .select("id, order_number, customer_name, branch_id, branch_name, description, total, deposit, remaining_balance, payment_status, payment_method, cashier, created_at")
+              .gte("created_at", todayIso),
+            supabase
+              .from("cash_movements")
+              .select("id, branch_id, type, category, category_label, amount, reason, authorized_by, created_at")
+              .gte("created_at", todayIso),
+            supabase
+              .from("cash_expenses")
+              .select("id, branch_id, amount, category, description, cashier, created_at")
+              .gte("created_at", todayIso),
+            supabase
+              .from("cash_shifts")
+              .select("id, shift_name, cashier_name, branch_id, opened_at, initial_cash, actual_cash, expected_cash, difference")
+              .gte("opened_at", todayIso),
+          ]).then(([salesRes, ordersRes, movsRes, expsRes, cutsRes]) => {
+            const dbSales = salesRes.status === "fulfilled" && !salesRes.value.error ? salesRes.value.data || [] : [];
+            const dbOrders = ordersRes.status === "fulfilled" && !ordersRes.value.error ? ordersRes.value.data || [] : [];
+            const dbMovs = movsRes.status === "fulfilled" && !movsRes.value.error ? movsRes.value.data || [] : [];
+            const dbExps = expsRes.status === "fulfilled" && !expsRes.value.error ? expsRes.value.data || [] : [];
+            const dbCuts = cutsRes.status === "fulfilled" && !cutsRes.value.error ? cutsRes.value.data || [] : [];
+
+            const remoteItems: LiveMoneyMovement[] = [];
+
+            // A) Ventas
+            dbSales.forEach((s: any) => {
+              remoteItems.push({
+                id: s.id,
+                timestamp: s.created_at || s.date || Date.now(),
+                branchId: s.branch_id || "branch-matriz",
+                branchName: s.branch_id || "Sucursal Matriz",
+                cashier: s.cashier || "Cajero",
+                type: "venta",
+                category: "venta_mostrador",
+                categoryLabel: "Venta Mostrador",
+                concept: `Venta mostrador ticket #${s.id}`,
+                amount: Number(s.total) || 0,
+                paymentMethod: s.payment_method || "efectivo",
+                source: "pos",
+              });
+            });
+
+            // B) Pedidos con anticipo o pago
+            dbOrders.forEach((o: any) => {
+              const deposit = Number(o.deposit) || 0;
+              if (deposit > 0) {
+                remoteItems.push({
+                  id: `ord-${o.id}`,
+                  timestamp: o.created_at || Date.now(),
+                  branchId: o.branch_id || "branch-matriz",
+                  branchName: o.branch_name || "Sucursal Matriz",
+                  cashier: o.cashier || "Cajero",
+                  type: "entrada",
+                  category: "abono_pedido",
+                  categoryLabel: o.remaining_balance === 0 ? "Liquidación Pedido" : "Anticipo Pedido",
+                  concept: `Pedido #${o.order_number || o.id} (${o.customer_name || "Cliente"}): ${o.description || "Pedido especial"}`,
+                  amount: deposit,
+                  paymentMethod: o.payment_method || "efectivo",
+                  source: "pedidos",
+                });
+              }
+            });
+
+            // C) Gastos
+            dbExps.forEach((e: any) => {
+              remoteItems.push({
+                id: e.id,
+                timestamp: e.created_at || Date.now(),
+                branchId: e.branch_id || "branch-matriz",
+                branchName: e.branch_id || "Sucursal Matriz",
+                cashier: e.cashier || "Cajero",
+                type: "salida",
+                category: e.category || "gasto",
+                categoryLabel: e.category === "retiro_dueno" ? "👑 Retiro Dueño" : "Salida / Gasto",
+                concept: e.description || "Gasto en caja",
+                amount: Number(e.amount) || 0,
+                paymentMethod: "efectivo",
+                source: "caja",
+                isOwner: e.category === "retiro_dueno",
+              });
+            });
+
+            // D) Movimientos manuales
+            dbMovs.forEach((m: any) => {
+              if (m.category === "venta_mostrador") return;
+              remoteItems.push({
+                id: m.id,
+                timestamp: m.created_at || Date.now(),
+                branchId: m.branch_id || "branch-matriz",
+                branchName: m.branch_id || "Sucursal Matriz",
+                cashier: m.authorized_by || "Cajero",
+                type: m.type as any,
+                category: m.category || "otro",
+                categoryLabel: m.category_label || (m.type === "entrada" ? "🪙 Entrada Dinero" : "Salida / Gasto"),
+                concept: m.reason || "Movimiento de caja",
+                amount: Number(m.amount) || 0,
+                paymentMethod: "efectivo",
+                source: "caja",
+              });
+            });
+
+            // E) Cortes
+            dbCuts.forEach((c: any) => {
+              remoteItems.push({
+                id: c.id,
+                timestamp: c.opened_at || Date.now(),
+                branchId: c.branch_id || "branch-matriz",
+                branchName: c.branch_id || "Sucursal Matriz",
+                cashier: c.cashier_name || "Cajero",
+                type: "corte",
+                category: "corte_caja",
+                categoryLabel: "🏁 Corte de Turno",
+                concept: `Corte de turno (${c.shift_name || "Turno"}). Cajero: ${c.cashier_name}. Fondo: ${formatCurrency(c.initial_cash || 1000)}`,
+                amount: Number(c.actual_cash || c.expected_cash || 0),
+                paymentMethod: "efectivo",
+                source: "caja",
+              });
+            });
+
+            if (remoteItems.length > 0) {
+              setLiveStreamMovements((prevLocal) => {
+                const map = new Map<string, LiveMoneyMovement>();
+                prevLocal.forEach((it) => map.set(it.id, it));
+                remoteItems.forEach((it) => map.set(it.id, it));
+
+                const merged = Array.from(map.values()).sort((a, b) => {
+                  const tA = parseDateTimeSafe(a.timestamp);
+                  const tB = parseDateTimeSafe(b.timestamp);
+                  return tB - tA;
+                });
+                return merged;
+              });
+            }
+          });
+        } catch {}
+      }
     } catch (err) {
       console.error("Error loading live movements:", err);
     }
@@ -706,12 +858,32 @@ export default function CajaPage() {
       }
     });
 
+    // Suscripción directa a Supabase Realtime postgres_changes para ver movimientos de todos los cajeros al instante
+    let supabaseChannel: any = null;
+    try {
+      const supabase = createClient();
+      supabaseChannel = supabase
+        .channel("caja_page_supabase_realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, () => handleSync())
+        .on("postgres_changes", { event: "*", schema: "public", table: "custom_orders" }, () => handleSync())
+        .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements" }, () => handleSync())
+        .on("postgres_changes", { event: "*", schema: "public", table: "cash_expenses" }, () => handleSync())
+        .on("postgres_changes", { event: "*", schema: "public", table: "cash_shifts" }, () => handleSync())
+        .subscribe();
+    } catch {}
+
+    const pollInterval = setInterval(() => {
+      handleSync();
+    }, 3000);
+
     window.addEventListener("brito_shift_cuts_updated", handleSync);
     window.addEventListener("storage", handleSync);
     window.addEventListener("brito_incomes_updated", handleSync);
     window.addEventListener("brito_sales_updated", handleSync);
     window.addEventListener("brito_caja_updated", handleSync);
+    window.addEventListener("focus", handleSync);
     return () => {
+      clearInterval(pollInterval);
       unsubSale();
       unsubCash();
       unsubCut();
@@ -721,6 +893,13 @@ export default function CajaPage() {
       window.removeEventListener("brito_incomes_updated", handleSync);
       window.removeEventListener("brito_sales_updated", handleSync);
       window.removeEventListener("brito_caja_updated", handleSync);
+      window.removeEventListener("focus", handleSync);
+      if (supabaseChannel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(supabaseChannel);
+        } catch {}
+      }
     };
   }, [currentBranch?.id, loadCutsHistory, loadLiveMovements]);
 
@@ -1385,6 +1564,42 @@ export default function CajaPage() {
             })
           : [];
         localStorage.setItem("brito_pos_current_incomes", JSON.stringify(remainingInc));
+      } catch {}
+
+      // Persistir corte de turno y movimiento en Supabase para supervisión en vivo
+      try {
+        const supabase = createClient();
+        const shiftId = newCut.id || `cut-${Date.now()}`;
+        Promise.allSettled([
+          supabase.from("cash_shifts").upsert({
+            id: shiftId,
+            shift_name: nextShiftName || "Turno General",
+            cashier_name: currentShiftResponsible,
+            branch_id: targetBranchId,
+            opened_at: new Date(cutTs).toISOString(),
+            initial_cash: parsedNextFund,
+            cash_sales: cashSales,
+            card_sales: cardSales,
+            transfer_sales: transferSales,
+            total_cash_in: totalEntries,
+            total_cash_out: totalExpenses,
+            expected_cash: expectedCashInDrawer,
+            actual_cash: parsedCounted,
+            difference: diff,
+            status: "cerrada",
+            notes: newCut.notes,
+          }),
+          supabase.from("cash_movements").upsert({
+            id: `mov-${shiftId}`,
+            type: "salida",
+            category: "corte_caja",
+            category_label: "Corte de Turno",
+            amount: parsedCounted,
+            reason: `Corte de turno (${newCut.shiftRange || "Turno"}). Saliente: ${currentShiftResponsible} → Entrante: ${recipient}`,
+            authorized_by: currentShiftResponsible,
+            branch_id: targetBranchId,
+          }),
+        ]).catch(() => {});
       } catch {}
 
       // Emitir corte en tiempo real
