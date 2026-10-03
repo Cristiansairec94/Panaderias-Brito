@@ -34,9 +34,10 @@ import {
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
 import { getStoredOrders } from "@/lib/orders";
-import { useNotifications } from "@/context/NotificationContext";
+import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { createClient } from "@/lib/supabase/client";
 
 interface CashDrawerShiftModalProps {
   isOpen: boolean;
@@ -479,6 +480,42 @@ export default function CashDrawerShiftModal({
         localStorage.setItem("brito_pos_current_incomes", JSON.stringify(remainingInc));
       } catch {}
 
+      // Persistir corte de turno y movimiento en Supabase para supervisión en vivo
+      try {
+        const supabase = createClient();
+        const shiftId = cutRecord.id || `cut-${Date.now()}`;
+        Promise.allSettled([
+          supabase.from("cash_shifts").upsert({
+            id: shiftId,
+            shift_name: nextShiftName || "Turno General",
+            cashier_name: outgoingCashier,
+            branch_id: targetBranchId,
+            opened_at: new Date(cutTs).toISOString(),
+            initial_cash: parsedNextFund,
+            cash_sales: cutRecord.cashSales,
+            card_sales: cutRecord.cardSales,
+            transfer_sales: cutRecord.transferSales,
+            total_cash_in: cutRecord.totalIncomes || 0,
+            total_cash_out: cutRecord.totalExpenses,
+            expected_cash: cutRecord.expectedCash,
+            actual_cash: cutRecord.countedCash,
+            difference: cutRecord.difference,
+            status: "cerrada",
+            notes: cutRecord.notes,
+          }),
+          supabase.from("cash_movements").upsert({
+            id: `mov-${shiftId}`,
+            type: "salida",
+            category: "corte_caja",
+            category_label: "Corte de Turno",
+            amount: parsedCountedCash,
+            reason: `Corte de turno (${cutRecord.shiftRange || "Turno"}). Saliente: ${outgoingCashier} → Entrante: ${incomingCashier}`,
+            authorized_by: outgoingCashier,
+            branch_id: targetBranchId,
+          }),
+        ]).catch(() => {});
+      } catch {}
+
       // Emitir corte de caja en tiempo real para el Administrador y todas las terminales
       realtimeHub.broadcastShiftCut(cutRecord);
 
@@ -500,7 +537,14 @@ export default function CashDrawerShiftModal({
       updateBranch(targetBranchId, {
         todaySales: 0,
         todayTickets: 0,
+        todayDeskSales: 0,
+        todayDeskTickets: 0,
+        todayOrdersDeposit: 0,
+        todayOrdersTotal: 0,
+        todayOrdersCount: 0,
         cashInDrawer: parsedNextFund,
+        lastCut: cutRecord,
+        manager: incomingCashier,
         currentShift: {
           id: `shift-${targetBranchId}-${cutTs}`,
           name: nextShiftName,
@@ -536,7 +580,8 @@ export default function CashDrawerShiftModal({
       ? `🚨 NO CUADRÓ LA CAJA (Faltante ${formatCurrency(cashDifference)})`
       : `⚠️ NO CUADRÓ LA CAJA (Sobrante +${formatCurrency(cashDifference)})`;
 
-    addNotification({
+    const shiftNotif: FBNotification = {
+      id: `notif-cut-${cutRecord.id}`,
       senderName: `🏁 Cierre de Turno (${outgoingCashier})`,
       senderAvatar: isSquare ? "💰" : "⚠️",
       badgeIcon: "dinero",
@@ -544,11 +589,22 @@ export default function CashDrawerShiftModal({
       highlightText: `Cambio de Turno: ${outgoingCashier} ➔ ${incomingCashier}`,
       description: `Folio ${newFolio} archivado en historial. Horario de turno: ${shiftStartTime} a ${currentTime} hrs. Efectivo en caja: ${formatCurrency(parsedCountedCash)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(cashDifference)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(cashToWithdraw)}.`,
       category: "caja",
-      actionLabel: "Ver Corte de Caja",
+      actionLabel: "Ver Ticket de Corte",
       actionLink: `/caja?tab=historial&corteId=${cutRecord.id}`,
       shiftCutData: cutRecord,
       cutId: cutRecord.id,
-    });
+      branchId: cutRecord.branchId || currentBranch?.id || "branch-matriz",
+      branchName: cutRecord.branchName || "Sucursal",
+      timeAgo: "Hace un momento",
+      group: "recientes",
+      read: false,
+    };
+
+    addNotification(shiftNotif);
+
+    if (realtimeHub?.broadcastNotification) {
+      realtimeHub.broadcastNotification(shiftNotif);
+    }
 
     // Actualizar al nuevo cajero y turno
     onChangeCashier(incomingCashier);

@@ -509,14 +509,23 @@ Gran Total Vendido: ${formatCurrency(totalSalesCalculated)}`;
 
         {/* Footer Modal */}
         <div className="p-4 px-6 bg-white border-t border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          <Link
-            href="/caja?tab=historial"
-            onClick={onClose}
-            className="text-xs font-bold text-amber-800 hover:text-amber-950 hover:underline flex items-center gap-1.5 order-2 sm:order-1 transition-colors"
-          >
-            <span>Ir a Historial Completo de Cortes de Caja</span>
-            <ArrowRight className="w-3.5 h-3.5 text-amber-600" />
-          </Link>
+          <div className="flex items-center gap-3 order-2 sm:order-1 flex-wrap">
+            <Link
+              href="/caja?tab=historial"
+              onClick={onClose}
+              className="text-xs font-bold text-amber-800 hover:text-amber-950 hover:underline flex items-center gap-1.5 transition-colors"
+            >
+              <span>Ir a Historial de Cortes</span>
+              <ArrowRight className="w-3.5 h-3.5 text-amber-600" />
+            </Link>
+            <Link
+              href="/pos"
+              onClick={onClose}
+              className="text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-colors"
+            >
+              <span>📊 Ver en Análisis de Sucursal</span>
+            </Link>
+          </div>
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end order-1 sm:order-2">
             <button
               onClick={onClose}

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { Branch, BranchShift, BranchCashMovement } from "@/types";
+import { Branch, BranchShift, BranchCashMovement, ShiftCutRecord } from "@/types";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
@@ -326,6 +326,66 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
           const dbCuts = cutsRes.status === "fulfilled" && !cutsRes.value.error ? cutsRes.value.data || [] : [];
           const dbBranches = branchesRes.status === "fulfilled" && !branchesRes.value.error ? branchesRes.value.data || [] : [];
 
+          // Recolectar todos los cortes de turno cerrados (Supabase + LocalStorage)
+          const allCutsMap = new Map<string, ShiftCutRecord>();
+          if (typeof window !== "undefined") {
+            try {
+              const rawLocalCuts = localStorage.getItem("brito_shift_cuts_history");
+              if (rawLocalCuts) {
+                const parsedCuts: ShiftCutRecord[] = JSON.parse(rawLocalCuts);
+                if (Array.isArray(parsedCuts)) {
+                  parsedCuts.forEach((c) => {
+                    if (c && c.id) allCutsMap.set(c.id, c);
+                  });
+                }
+              }
+            } catch {}
+          }
+
+          dbCuts.forEach((dbc: any) => {
+            if (dbc && dbc.id && !allCutsMap.has(dbc.id)) {
+              allCutsMap.set(dbc.id, {
+                id: dbc.id,
+                date: formatDateTimeSafe(dbc.opened_at),
+                timestamp: new Date(dbc.opened_at).getTime(),
+                shiftRange: dbc.shift_name || "Turno",
+                outgoingCashier: dbc.cashier_name || "Cajero",
+                incomingCashier: dbc.cashier_name || "Cajero",
+                responsible: dbc.cashier_name,
+                branchId: dbc.branch_id,
+                previousShift: "",
+                nextShift: dbc.shift_name,
+                initialFund: Number(dbc.initial_cash) || 0,
+                cashSales: Number(dbc.cash_sales) || 0,
+                cardSales: Number(dbc.card_sales) || 0,
+                transferSales: Number(dbc.transfer_sales) || 0,
+                totalSales: (Number(dbc.cash_sales) || 0) + (Number(dbc.card_sales) || 0) + (Number(dbc.transfer_sales) || 0),
+                totalSalesAll: (Number(dbc.cash_sales) || 0) + (Number(dbc.card_sales) || 0) + (Number(dbc.transfer_sales) || 0),
+                totalExpenses: Number(dbc.total_cash_out) || 0,
+                expectedCash: Number(dbc.expected_cash) || 0,
+                countedCash: Number(dbc.actual_cash) || 0,
+                difference: Number(dbc.difference) || 0,
+                nextFund: Number(dbc.initial_cash) || 0,
+                notes: dbc.notes || "",
+              });
+            }
+          });
+
+          const allCutsList = Array.from(allCutsMap.values());
+          allCutsList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+          const latestCutByBranch = new Map<string, ShiftCutRecord>();
+          const cutTimestampByBranch = new Map<string, number>();
+
+          allCutsList.forEach((cut) => {
+            const bId = cut.branchId || "branch-matriz";
+            if (!latestCutByBranch.has(bId)) {
+              latestCutByBranch.set(bId, cut);
+              const ts = cut.timestamp || parseDateTimeSafe(cut.date);
+              cutTimestampByBranch.set(bId, ts);
+            }
+          });
+
           const branchAgg = new Map<string, {
             deskSales: number;
             deskTickets: number;
@@ -340,6 +400,9 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             orderCount: number;
             movNet: number;
             expCash: number;
+            dayAccumulatedDeskSales: number;
+            dayAccumulatedDeskTickets: number;
+            dayAccumulatedOrdersDeposit: number;
             lastCashier?: string;
             branchName?: string;
           }>();
@@ -358,13 +421,16 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             orderCount: 0,
             movNet: 0,
             expCash: 0,
+            dayAccumulatedDeskSales: 0,
+            dayAccumulatedDeskTickets: 0,
+            dayAccumulatedOrdersDeposit: 0,
           });
 
           DEFAULT_BRANCHES.forEach((b) => {
             branchAgg.set(b.id, initBranchAgg());
           });
 
-          // 1. Agregar ventas de mostrador
+          // 1. Agregar ventas de mostrador (filtrando turno activo vs acumulado)
           dbSales.forEach((s: any) => {
             const bId = s.branch_id || "branch-matriz";
             let cur = branchAgg.get(bId);
@@ -373,15 +439,24 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               branchAgg.set(bId, cur);
             }
             const amt = Number(s.total) || 0;
-            cur.deskSales += amt;
-            cur.deskTickets += 1;
-            if (s.payment_method === "tarjeta") cur.deskCard += amt;
-            else if (s.payment_method === "transferencia") cur.deskTransfer += amt;
-            else cur.deskCash += amt;
-            if (s.cashier) cur.lastCashier = s.cashier;
+            const saleTime = parseDateTimeSafe(s.created_at || s.date);
+            const cutLimit = cutTimestampByBranch.get(bId) || 0;
+
+            cur.dayAccumulatedDeskSales += amt;
+            cur.dayAccumulatedDeskTickets += 1;
+
+            // SOLO sumar al turno activo si la venta ocurrió DESPUÉS del corte cerrado
+            if (saleTime > cutLimit) {
+              cur.deskSales += amt;
+              cur.deskTickets += 1;
+              if (s.payment_method === "tarjeta") cur.deskCard += amt;
+              else if (s.payment_method === "transferencia") cur.deskTransfer += amt;
+              else cur.deskCash += amt;
+              if (s.cashier) cur.lastCashier = s.cashier;
+            }
           });
 
-          // 2. Agregar pedidos especiales (anticipos y liquidaciones de hoy)
+          // 2. Agregar pedidos especiales (anticipos y liquidaciones)
           dbOrders.forEach((o: any) => {
             const bId = o.branch_id || "branch-matriz";
             let cur = branchAgg.get(bId);
@@ -392,20 +467,28 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             if (o.branch_name) cur.branchName = o.branch_name;
             const dep = Number(o.deposit) || 0;
             const tot = Number(o.total) || 0;
-            cur.orderTotal += tot;
-            cur.orderCount += 1;
-            if (dep > 0) {
-              cur.orderTotalCobrado += dep;
-              if (o.payment_method === "tarjeta") cur.orderCard += dep;
-              else if (o.payment_method === "transferencia") cur.orderTransfer += dep;
-              else cur.orderCash += dep;
+            const orderTime = parseDateTimeSafe(o.created_at);
+            const cutLimit = cutTimestampByBranch.get(bId) || 0;
+
+            if (dep > 0) cur.dayAccumulatedOrdersDeposit += dep;
+
+            // SOLO sumar al turno activo si el pedido ocurrió DESPUÉS del corte cerrado
+            if (orderTime > cutLimit) {
+              cur.orderTotal += tot;
+              cur.orderCount += 1;
+              if (dep > 0) {
+                cur.orderTotalCobrado += dep;
+                if (o.payment_method === "tarjeta") cur.orderCard += dep;
+                else if (o.payment_method === "transferencia") cur.orderTransfer += dep;
+                else cur.orderCash += dep;
+              }
+              if (o.cashier && !cur.lastCashier) cur.lastCashier = o.cashier;
             }
-            if (o.cashier && !cur.lastCashier) cur.lastCashier = o.cashier;
           });
 
-          // 3. Movimientos de caja (aportes / retiros fuera de ventas)
+          // 3. Movimientos de caja (aportes / retiros fuera de ventas y de cortes)
           dbMovs.forEach((m: any) => {
-            if (m.category === "venta_mostrador") return;
+            if (m.category === "venta_mostrador" || m.category === "corte_caja") return;
             const bId = m.branch_id || "branch-matriz";
             let cur = branchAgg.get(bId);
             if (!cur) {
@@ -413,7 +496,11 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               branchAgg.set(bId, cur);
             }
             const amt = Number(m.amount) || 0;
-            cur.movNet += m.type === "entrada" ? amt : -amt;
+            const movTime = parseDateTimeSafe(m.created_at);
+            const cutLimit = cutTimestampByBranch.get(bId) || 0;
+            if (movTime > cutLimit) {
+              cur.movNet += m.type === "entrada" ? amt : -amt;
+            }
           });
 
           // 4. Gastos en efectivo
@@ -424,7 +511,11 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               cur = initBranchAgg();
               branchAgg.set(bId, cur);
             }
-            cur.expCash += Number(e.amount) || 0;
+            const expTime = parseDateTimeSafe(e.created_at);
+            const cutLimit = cutTimestampByBranch.get(bId) || 0;
+            if (expTime > cutLimit) {
+              cur.expCash += Number(e.amount) || 0;
+            }
           });
 
           // Sincronizar pedidos de Supabase hacia el almacenamiento local si hay pedidos nuevos
@@ -529,11 +620,21 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               const agg = branchAgg.get(b.id);
               if (!agg) return b;
 
-              // TOTAL GENERAL COBRADO: Ventas en mostrador + Dinero cobrado en pedidos (anticipos y liquidaciones)
+              const latestCut = latestCutByBranch.get(b.id);
+
+              // TOTAL GENERAL COBRADO DEL TURNO ACTIVO
               const totalCobrado = agg.deskSales + agg.orderTotalCobrado;
               const totalTickets = agg.deskTickets + agg.orderCount;
-              const initialFund = b.currentShift?.initialFund || 1000;
+
+              // Fondo inicial: si hubo corte, es exactamente el fondo dejado para nuevo turno (puede ser 0)
+              const initialFund = latestCut !== undefined
+                ? ((latestCut.nextFund !== undefined && latestCut.nextFund !== null) ? Number(latestCut.nextFund) : 0)
+                : ((b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null) ? Number(b.currentShift.initialFund) : 1000);
+
               const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.movNet - agg.expCash);
+
+              // Cajero del turno activo: el entrante del último corte o quien haya registrado ventas posteriores
+              const activeCashier = agg.lastCashier || latestCut?.incomingCashier || b.currentShift?.cashier || b.manager || "Cajero";
 
               return {
                 ...b,
@@ -545,21 +646,22 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
                 todayOrdersDeposit: agg.orderTotalCobrado,
                 todayOrdersTotal: agg.orderTotal,
                 todayOrdersCount: agg.orderCount,
+                lastCut: latestCut,
+                dayAccumulatedSales: agg.dayAccumulatedDeskSales + agg.dayAccumulatedOrdersDeposit,
+                dayAccumulatedTickets: agg.dayAccumulatedDeskTickets,
+                manager: activeCashier,
                 currentShift: {
-                  ...(b.currentShift || {
-                    id: `shift-${b.id}`,
-                    name: "Turno General",
-                    cashier: agg.lastCashier || "Cajero",
-                    openedAt: "06:00 AM",
-                    initialFund: 1000,
-                    status: "abierto",
-                  }),
+                  id: b.currentShift?.id || `shift-${b.id}`,
+                  name: latestCut?.nextShift || b.currentShift?.name || "Turno General",
+                  cashier: activeCashier,
+                  openedAt: latestCut?.date || b.currentShift?.openedAt || "06:00 AM",
+                  initialFund: initialFund,
                   totalSales: totalCobrado,
                   ticketCount: totalTickets,
                   cashSales: agg.deskCash + agg.orderCash,
                   cardSales: agg.deskCard + agg.orderCard,
                   transferSales: agg.deskTransfer + agg.orderTransfer,
-                  cashier: agg.lastCashier || b.currentShift?.cashier || "Cajero",
+                  status: "abierto" as const,
                 },
               };
             });
@@ -1209,29 +1311,37 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             return next;
           });
 
-          // Reiniciar caja con el nuevo fondo
+          const newFund = (cut.nextFund !== undefined && cut.nextFund !== null) ? Number(cut.nextFund) : 0;
+          const nextCashier = cut.incomingCashier || "Cajero";
+
+          // Reiniciar sucursal inmediatamente en 0 absoluto para el nuevo turno
           setBranches((prev) => {
             const updated = prev.map((b) => {
               if (b.id !== bId) return b;
               return {
                 ...b,
-                cashInDrawer: Number(cut.nextFund) || 1000,
+                todaySales: 0,
+                todayTickets: 0,
+                todayDeskSales: 0,
+                todayDeskTickets: 0,
+                todayOrdersDeposit: 0,
+                todayOrdersTotal: 0,
+                todayOrdersCount: 0,
+                cashInDrawer: newFund,
+                lastCut: cut,
+                manager: nextCashier,
                 currentShift: {
-                  ...(b.currentShift || {
-                    id: `shift-${b.id}`,
-                    name: cut.nextShift || "Turno General",
-                    cashier: cut.incomingCashier || "Cajero",
-                    openedAt: "06:00 AM",
-                    initialFund: Number(cut.nextFund) || 1000,
-                    status: "abierto",
-                  }),
-                  cashier: cut.incomingCashier || b.currentShift?.cashier || "Cajero",
-                  initialFund: Number(cut.nextFund) || 1000,
+                  id: b.currentShift?.id || `shift-${b.id}`,
+                  name: cut.nextShift || b.currentShift?.name || "Turno General",
+                  cashier: nextCashier,
+                  openedAt: cut.date || b.currentShift?.openedAt || "06:00 AM",
+                  initialFund: newFund,
                   totalSales: 0,
                   ticketCount: 0,
                   cashSales: 0,
                   cardSales: 0,
                   transferSales: 0,
+                  status: "abierto" as const,
                 },
               };
             });
@@ -1244,6 +1354,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
           try {
             window.dispatchEvent(new Event("brito_caja_updated"));
             window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+            window.dispatchEvent(new Event("brito_sales_updated"));
           } catch {}
         })
       : () => {};
@@ -1286,18 +1397,20 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       try {
         const rawCuts = localStorage.getItem("brito_shift_cuts_history");
         if (rawCuts) {
-          const cuts = JSON.parse(rawCuts);
+          const cuts: ShiftCutRecord[] = JSON.parse(rawCuts);
           if (Array.isArray(cuts) && cuts.length > 0) {
             const latest = cuts[0];
+            const bId = latest.branchId || "branch-matriz";
+            const bName = latest.branchName || "Sucursal";
             const cutMov: BranchCashMovement = {
               id: `cut-${latest.id}`,
-              branchId: latest.branchId || "branch-matriz",
-              branchName: latest.branchName || "Sucursal",
+              branchId: bId,
+              branchName: bName,
               type: "salida",
               category: "corte_caja",
               categoryLabel: "Corte de Turno",
               amount: Number(latest.countedCash || latest.totalSales || 0),
-              reason: `Corte de turno (${latest.shiftRange || "Turno"}). Saliente: ${latest.outgoingCashier} → Entrante: ${latest.incomingCashier}. Fondo nuevo: $${latest.nextFund || 1000}`,
+              reason: `Corte de turno (${latest.shiftRange || "Turno"}). Saliente: ${latest.outgoingCashier} → Entrante: ${latest.incomingCashier}. Fondo nuevo: ${latest.nextFund ?? 0}`,
               authorizedBy: latest.outgoingCashier || "Cajero",
               timestamp: latest.date || new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
               createdAt: new Date(latest.timestamp || Date.now()).toISOString(),
@@ -1307,6 +1420,46 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               paymentMethod: "efectivo",
             };
             setCashMovements((prev) => [cutMov, ...prev.filter((m) => m.id !== cutMov.id)].slice(0, 300));
+
+            const newFund = (latest.nextFund !== undefined && latest.nextFund !== null) ? Number(latest.nextFund) : 0;
+            const nextCashier = latest.incomingCashier || "Cajero";
+
+            // Reiniciar sucursal inmediatamente en 0 absoluto para el nuevo turno
+            setBranches((prev) => {
+              const updated = prev.map((b) => {
+                if (b.id !== bId) return b;
+                return {
+                  ...b,
+                  todaySales: 0,
+                  todayTickets: 0,
+                  todayDeskSales: 0,
+                  todayDeskTickets: 0,
+                  todayOrdersDeposit: 0,
+                  todayOrdersTotal: 0,
+                  todayOrdersCount: 0,
+                  cashInDrawer: newFund,
+                  lastCut: latest,
+                  manager: nextCashier,
+                  currentShift: {
+                    id: b.currentShift?.id || `shift-${b.id}`,
+                    name: latest.nextShift || b.currentShift?.name || "Turno General",
+                    cashier: nextCashier,
+                    openedAt: latest.date || b.currentShift?.openedAt || "06:00 AM",
+                    initialFund: newFund,
+                    totalSales: 0,
+                    ticketCount: 0,
+                    cashSales: 0,
+                    cardSales: 0,
+                    transferSales: 0,
+                    status: "abierto" as const,
+                  },
+                };
+              });
+              try {
+                localStorage.setItem("brito_branches_data", JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
           }
         }
       } catch {}
@@ -1761,6 +1914,13 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
         return {
           ...b,
+          todaySales: 0,
+          todayTickets: 0,
+          todayDeskSales: 0,
+          todayDeskTickets: 0,
+          todayOrdersDeposit: 0,
+          todayOrdersTotal: 0,
+          todayOrdersCount: 0,
           cashInDrawer: 1000,
           currentShift: newShift,
         };

@@ -45,7 +45,7 @@ import { CashMovement, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
-import { useNotifications } from "@/context/NotificationContext";
+import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { recordCashIncome } from "@/lib/incomes";
@@ -1607,7 +1607,14 @@ export default function CajaPage() {
       updateBranch(targetBranchId, {
         todaySales: 0,
         todayTickets: 0,
+        todayDeskSales: 0,
+        todayDeskTickets: 0,
+        todayOrdersDeposit: 0,
+        todayOrdersTotal: 0,
+        todayOrdersCount: 0,
         cashInDrawer: parsedNextFund,
+        lastCut: newCut,
+        manager: recipient,
         currentShift: {
           id: `shift-${targetBranchId}-${cutTs}`,
           name: nextShiftName || "Turno General",
@@ -1628,6 +1635,42 @@ export default function CajaPage() {
       setTransferSales(0);
       setMovements([]);
       setInitialCash(parsedNextFund);
+
+      // Notificación vinculada al corte de caja para toda la red
+      const isSquare = diff === 0;
+      const isShort = diff < 0;
+      const squareStatusTitle = isSquare
+        ? "✓ CAJA CUADRADA EXACTA ($0.00)"
+        : isShort
+        ? `🚨 NO CUADRÓ LA CAJA (Faltante ${formatCurrency(diff)})`
+        : `⚠️ NO CUADRÓ LA CAJA (Sobrante +${formatCurrency(diff)})`;
+
+      const shiftNotif: FBNotification = {
+        id: `notif-cut-${newCut.id}`,
+        senderName: `🏁 Cierre de Turno (${currentShiftResponsible})`,
+        senderAvatar: isSquare ? "💰" : "⚠️",
+        badgeIcon: "dinero",
+        title: `Cierre de Turno: ${squareStatusTitle}`,
+        highlightText: `Cambio de Turno: ${currentShiftResponsible} ➔ ${recipient}`,
+        description: `Folio ${newCut.id}. Efectivo contado: ${formatCurrency(parsedCounted)} (Esperado: ${formatCurrency(expectedCashInDrawer)}). Fondo nuevo dejado en caja: ${formatCurrency(parsedNextFund)}. Saliente: ${currentShiftResponsible}.`,
+        category: "caja",
+        actionLabel: "Ver Ticket de Corte",
+        actionLink: `/caja?tab=historial&corteId=${newCut.id}`,
+        shiftCutData: newCut,
+        cutId: newCut.id,
+        branchId: targetBranchId,
+        branchName: currentBranch?.name || "Sucursal",
+        timeAgo: "Hace un momento",
+        group: "recientes",
+        read: false,
+      };
+
+      addNotification(shiftNotif);
+
+      if (realtimeHub?.broadcastNotification) {
+        realtimeHub.broadcastNotification(shiftNotif);
+      }
+
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
       window.dispatchEvent(new Event("brito_incomes_updated"));

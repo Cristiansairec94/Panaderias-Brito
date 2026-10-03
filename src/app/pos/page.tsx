@@ -407,7 +407,7 @@ export default function POSPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
   const { branches, currentBranch, switchBranch, registerRealSale, cashMovements } = useBranch();
-  const { addNotification } = useNotifications();
+  const { addNotification, openShiftCutDetail } = useNotifications();
   const { toggleMobile } = useSidebar();
   const { isOnline, isSyncing, isSynced, enqueueOfflineItem, pendingCount } = useSync();
   const activeBranch = currentBranch || branches[0];
@@ -3304,7 +3304,7 @@ export default function POSPage() {
                                   {/* Fila Central: Ventas, Tickets y Caja */}
                                   <div className="flex items-center justify-between pt-1 border-t border-amber-900/50">
                                     <div className="flex items-baseline gap-1.5">
-                                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Total Día:</span>
+                                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Total Turno:</span>
                                       <span className="font-mono font-black text-base sm:text-lg text-amber-300">
                                         {formatCurrency(b.todaySales)}
                                       </span>
@@ -3341,7 +3341,48 @@ export default function POSPage() {
                                     <span className="truncate max-w-[220px]">
                                       👤 {b.currentShift?.cashier || b.manager || "Cajero en turno"}
                                     </span>
+                                    {b.currentShift?.name && (
+                                      <span className="text-[9px] text-stone-400 truncate max-w-[120px]">
+                                        {b.currentShift.name.split("(")[0]}
+                                      </span>
+                                    )}
                                   </div>
+
+                                  {/* VINCULACIÓN DIRECTA AL TICKET DE CORTE */}
+                                  {b.lastCut && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openShiftCutDetail(b.lastCut!);
+                                      }}
+                                      className="mt-1 flex items-center justify-between text-[10px] bg-stone-950/90 hover:bg-stone-900 border border-amber-600/50 hover:border-amber-400 text-amber-200 px-2 py-1 rounded-lg transition-all cursor-pointer group shadow-2xs"
+                                      title="Ver Comprobante de Corte de Caja Oficial"
+                                    >
+                                      <div className="flex items-center gap-1.5 truncate">
+                                        <span className="text-amber-400 font-mono font-bold">🧾 {b.lastCut.id}</span>
+                                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${
+                                          b.lastCut.difference === 0 
+                                            ? "bg-emerald-950 text-emerald-300 border border-emerald-500/60" 
+                                            : "bg-rose-950 text-rose-300 border border-rose-500/60"
+                                        }`}>
+                                          {b.lastCut.difference === 0 ? "✓ Cuadrada Exacta ($0.00)" : `Dif: ${formatCurrency(b.lastCut.difference)}`}
+                                        </span>
+                                      </div>
+                                      <span className="text-[9px] text-amber-300 group-hover:text-white font-black underline shrink-0 ml-1">
+                                        Ver Ticket ➔
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Acumulado del día si hubo corte previo */}
+                                  {(b.dayAccumulatedSales ?? 0) > (b.todaySales || 0) && (
+                                    <div className="text-[9px] text-stone-400 font-medium pt-0.5 flex items-center justify-between border-t border-white/5">
+                                      <span>Acumulado del Día:</span>
+                                      <span className="font-mono font-bold text-stone-300">
+                                        {formatCurrency(b.dayAccumulatedSales || 0)} ({b.dayAccumulatedTickets || 0} ops)
+                                      </span>
+                                    </div>
+                                  )}
                                 </button>
                               );
                             })}
@@ -3589,6 +3630,57 @@ export default function POSPage() {
                                         {isEntrada ? "+" : "-"}{formatCurrency(m.amount)}
                                       </span>
                                     </div>
+
+                                    {/* Botón directo para abrir el ticket de corte desde la supervisión */}
+                                    {isCorte && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const cutFolio = m.id.replace("cut-", "").replace("mov-", "");
+                                          let foundCut = branches.find((b) => b.lastCut?.id === cutFolio)?.lastCut;
+                                          if (!foundCut) {
+                                            try {
+                                              const raw = localStorage.getItem("brito_shift_cuts_history");
+                                              if (raw) {
+                                                const list = JSON.parse(raw);
+                                                foundCut = list.find((c: any) => c.id === cutFolio || c.id === m.id);
+                                              }
+                                            } catch {}
+                                          }
+                                          if (foundCut) {
+                                            openShiftCutDetail(foundCut);
+                                          } else {
+                                            openShiftCutDetail({
+                                              id: cutFolio,
+                                              date: m.timestamp,
+                                              timestamp: m.rawTimestamp || Date.now(),
+                                              shiftRange: "Turno Oficial",
+                                              outgoingCashier: m.cashier || m.authorizedBy || "Cajero",
+                                              incomingCashier: "Turno Entrante",
+                                              previousShift: "",
+                                              nextShift: "Turno Siguiente",
+                                              initialFund: 0,
+                                              cashSales: 0,
+                                              cardSales: 0,
+                                              transferSales: 0,
+                                              totalSales: m.amount,
+                                              totalSalesAll: m.amount,
+                                              totalExpenses: 0,
+                                              expectedCash: m.amount,
+                                              countedCash: m.amount,
+                                              difference: 0,
+                                              nextFund: 0,
+                                              notes: m.reason,
+                                            });
+                                          }
+                                        }}
+                                        className="mt-1 w-full flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-purple-950/80 hover:bg-purple-900 border border-purple-500/60 text-purple-200 text-[10px] font-bold transition-all cursor-pointer shadow-xs"
+                                      >
+                                        <span>🧾 Ver Ticket Oficial de Corte de Caja</span>
+                                        <ArrowRight className="w-3 h-3 text-purple-300" />
+                                      </button>
+                                    )}
                                   </div>
                                 );
                               })

@@ -390,6 +390,9 @@ export interface Branch {
   todayOrdersDeposit?: number;
   todayOrdersTotal?: number;
   todayOrdersCount?: number;
+  lastCut?: ShiftCutRecord;
+  dayAccumulatedSales?: number;
+  dayAccumulatedTickets?: number;
 }
 
 export interface BranchCashMovement {
