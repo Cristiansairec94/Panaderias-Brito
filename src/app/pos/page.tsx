@@ -7,7 +7,6 @@ import {
   Plus, 
   Minus, 
   CheckCircle, 
-  Receipt, 
   Database,
   History,
   DollarSign,
@@ -3506,18 +3505,6 @@ export default function POSPage() {
             </div>
               </div>
               <div className="flex items-center gap-2 relative z-10">
-                <button
-                  type="button"
-                  onClick={() => setShowRecentSales(true)}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-900/80 hover:bg-amber-800 text-amber-200 border border-amber-700/60 text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-                  title="Ver ventas y tickets del turno"
-                >
-                  <Receipt className="w-4 h-4 text-amber-400" />
-                  <span className="hidden sm:inline font-bold">Ventas</span>
-                  <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-mono text-xs sm:text-sm font-black">
-                    {Math.max(currentShiftSales.length, activeBranch?.todayTickets || 0)}
-                  </span>
-                </button>
                 <span className={`text-xs px-3 py-1 rounded-full font-black tracking-wide transition-all ${
                   totalPieces > 0
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/60 scale-105 animate-pulse"
