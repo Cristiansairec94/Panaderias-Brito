@@ -38,7 +38,7 @@ import {
 import { useAuth, ROLE_PERMISSIONS, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
 import { UserRole, RolePermissions } from "@/types";
-import { onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
+import { onlyNumbersKeyDown, cleanOnlyNumbers, compressImageFile } from "@/lib/utils";
 
 // Role visual configurations matching user's requested 3 groups
 export const SYSTEM_ROLES: {
@@ -172,7 +172,7 @@ export const PERMISSION_DEFINITIONS: {
     key: "canAccessDashboard",
     title: "Dashboard / Resumen General",
     category: "administracion",
-    description: "Estadísticas globales del día, metas de venta y accesos rápidos.",
+    description: "Estadísticas globales del día, ventas en tiempo real y accesos rápidos.",
     icon: Store,
   },
   {
@@ -320,8 +320,8 @@ export default function UserRoleManagement() {
     setIsModalOpen(true);
   };
 
-  // Upload photo handler
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload photo handler con compresión automática
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -329,20 +329,29 @@ export default function UserRoleManagement() {
       alert("Por favor selecciona una imagen válida (JPG, PNG o WebP).");
       return;
     }
-    if (file.size > 3 * 1024 * 1024) {
-      alert("La imagen excede los 3MB recomendados.");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("La imagen excede los 10MB permitidos.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setFormPhotoUrl(result);
-        showToast("Fotografía cargada correctamente. Guarda para confirmar.");
+    try {
+      const compressed = await compressImageFile(file, 200, 200, 0.75);
+      if (compressed) {
+        setFormPhotoUrl(compressed);
+        showToast("Fotografía optimizada y cargada correctamente.");
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Error optimizando imagen:", err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        if (result) {
+          setFormPhotoUrl(result);
+          showToast("Fotografía cargada correctamente. Guarda para confirmar.");
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleRemovePhoto = () => {

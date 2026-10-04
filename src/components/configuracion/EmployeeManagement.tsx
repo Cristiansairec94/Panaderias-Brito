@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { useAuth, User } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
-import { onlyNumbersKeyDown, cleanOnlyNumbers } from "@/lib/utils";
+import { onlyNumbersKeyDown, cleanOnlyNumbers, compressImageFile } from "@/lib/utils";
 import { UserRole } from "@/types";
 
 const PUESTOS_PANADERIA = [
@@ -102,17 +102,6 @@ const SYSTEM_ROLES: SystemRoleOption[] = [
     activeBg: "bg-purple-50",
   },
   {
-    id: "panadero",
-    label: "Jefe de Horno / Panadero",
-    shortLabel: "Producción",
-    badge: "Horno & Recetas",
-    icon: "🥖",
-    description: "Consulta de recetas, catálogo de panes y registro de producción diaria.",
-    badgeBg: "bg-amber-100 text-amber-900 border-amber-300",
-    activeBorder: "border-amber-500 ring-2 ring-amber-400/40",
-    activeBg: "bg-amber-50",
-  },
-  {
     id: "admin",
     label: "Administrador General",
     shortLabel: "Administrador",
@@ -148,7 +137,7 @@ function suggestRoleFromJobTitle(jobTitle: string): UserRole {
   if (lower.includes("caj") || lower.includes("mostrador") || lower.includes("tienda")) return "cajero";
   if (lower.includes("admin") || lower.includes("auxiliar")) return "auxiliar_admin";
   if (lower.includes("superv") || lower.includes("encargad") || lower.includes("gerent")) return "supervisor";
-  if (lower.includes("panader") || lower.includes("horn") || lower.includes("pastel")) return "panadero";
+  if (lower.includes("panader") || lower.includes("horn") || lower.includes("pastel")) return "cajero";
   return "cajero";
 }
 
@@ -228,7 +217,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
     setFormHasAccess(true);
     setFormUsername("");
     setFormPassword("1234");
-    setFormRole("panadero");
+    setFormRole("cajero");
     setShowFormPassword(false);
     setCopiedPass(false);
     setIsModalOpen(true);
@@ -269,8 +258,8 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
     setIsModalOpen(true);
   };
 
-  // Upload Photo
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload Photo con compresión automática para evitar exceder el límite de almacenamiento
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -278,20 +267,29 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
       alert("Por favor selecciona una imagen válida (JPG, PNG o WebP).");
       return;
     }
-    if (file.size > 3 * 1024 * 1024) {
-      alert("La imagen excede los 3MB recomendados.");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("La imagen excede los 10MB permitidos.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setFormPhotoUrl(result);
-        showToast("Fotografía cargada correctamente.");
+    try {
+      const compressed = await compressImageFile(file, 200, 200, 0.75);
+      if (compressed) {
+        setFormPhotoUrl(compressed);
+        showToast("Fotografía optimizada y cargada correctamente.");
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Error optimizando imagen:", err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        if (result) {
+          setFormPhotoUrl(result);
+          showToast("Fotografía cargada correctamente.");
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleRemovePhoto = () => {
@@ -396,13 +394,10 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
   const stats = useMemo(() => {
     const total = usersList.length;
     const activos = usersList.filter((u) => u.status !== "inactivo").length;
-    const horneros = usersList.filter((u) => 
-      (u.jobTitle?.toLowerCase().includes("panader") || u.jobTitle?.toLowerCase().includes("horn") || u.role === "panadero")
-    ).length;
     const atencion = usersList.filter((u) => 
       (u.jobTitle?.toLowerCase().includes("caj") || u.role === "cajero")
     ).length;
-    return { total, activos, horneros, atencion };
+    return { total, activos, atencion };
   }, [usersList]);
 
   // Filtered employees
@@ -461,7 +456,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
         </div>
 
         {/* Quick Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-blue-200/60 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 pt-4 border-t border-blue-200/60 text-xs">
           <div className="bg-white/90 p-3 rounded-2xl border border-blue-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center text-lg font-bold">
               👥
@@ -479,16 +474,6 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
             <div>
               <p className="text-[10px] font-bold text-stone-400 uppercase">Personal Activo</p>
               <p className="text-base font-black text-emerald-900">{stats.activos}</p>
-            </div>
-          </div>
-
-          <div className="bg-white/90 p-3 rounded-2xl border border-amber-100 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-lg font-bold">
-              🥖
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-stone-400 uppercase">Horno & Producción</p>
-              <p className="text-base font-black text-amber-900">{stats.horneros}</p>
             </div>
           </div>
 
@@ -535,14 +520,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
             >
               Todos ({usersList.length})
             </button>
-            <button
-              onClick={() => setPuestoFilter("produccion")}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                puestoFilter === "produccion" ? "bg-amber-500 text-stone-950 font-black shadow-sm" : "text-stone-500 hover:text-stone-800"
-              }`}
-            >
-              Horno / Producción
-            </button>
+
             <button
               onClick={() => setPuestoFilter("mostrador")}
               className={`px-3 py-1.5 rounded-lg transition-all ${
@@ -1148,7 +1126,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                         <span className="text-[10px] font-medium text-stone-500">Define qué módulos podrá ver este usuario</span>
                       </label>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                         {SYSTEM_ROLES.map((role) => {
                           const isSelected = formRole === role.id;
                           return (

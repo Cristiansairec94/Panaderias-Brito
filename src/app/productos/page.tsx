@@ -19,36 +19,42 @@ import {
   Grid, 
   List as ListIcon, 
   Eye, 
+  EyeOff,
+  ChevronDown,
   ArrowUpDown,
   RefreshCw,
   Tag as TagIcon,
   CheckCircle2,
   Scale,
   Barcode,
-  Printer,
-  Receipt,
-  Percent
+  Printer
 } from "lucide-react";
 import { Product } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
 import { BarcodeCard } from "@/components/productos/BarcodeCard";
 import { PrintBarcodesModal } from "@/components/productos/PrintBarcodesModal";
 import { QuickPriceModal } from "@/components/productos/QuickPriceModal";
+import { ManageCategoriesModal } from "@/components/productos/ManageCategoriesModal";
 import { 
   getStoredProducts, 
   createProduct, 
   updateProduct, 
   deleteProduct, 
-  PRODUCT_CATEGORIES,
-  generateProductCode,
+  generateProductCode, 
   generateProductBarcode,
-  calculateProductTaxes
+  getStoredCategories,
+  fetchProductsFromDb,
+  ProductCategory
 } from "@/lib/products";
+import { createClient } from "@/lib/supabase/client";
 
 export default function ProductosPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(true);
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
@@ -68,8 +74,6 @@ export default function ProductosPage() {
   const [quickPriceProduct, setQuickPriceProduct] = useState<Product | null>(null);
   const [isQuickPriceOpen, setIsQuickPriceOpen] = useState(false);
 
-  // Categories visibility (permanent while in use)
-  const [isCategoriesVisible, setIsCategoriesVisible] = useState(true);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -92,20 +96,68 @@ export default function ProductosPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load products on mount & listen to updates
+  // Load products & categories on mount & listen to updates
   useEffect(() => {
     const load = () => {
       setProducts(getStoredProducts());
+      setCategories(getStoredCategories());
     };
     load();
+
+    // Sincronizar catálogo real desde Supabase
+    fetchProductsFromDb().then((prods) => {
+      if (prods && prods.length > 0) {
+        setProducts(prods);
+      }
+    });
 
     const handleUpdate = () => {
       load();
     };
 
     window.addEventListener("brito_products_updated", handleUpdate);
-    return () => window.removeEventListener("brito_products_updated", handleUpdate);
+    window.addEventListener("brito_categories_updated", handleUpdate);
+
+    // Suscripción en tiempo real de Supabase para cambios de productos y precios
+    let channel: any = null;
+    try {
+      const supabase = createClient();
+      channel = supabase
+        .channel("products_realtime_sync")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "products" },
+          () => {
+            fetchProductsFromDb().then((prods) => {
+              if (prods && prods.length > 0) {
+                setProducts(prods);
+              }
+            });
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn("Could not subscribe to products realtime channel:", e);
+    }
+
+    return () => {
+      window.removeEventListener("brito_products_updated", handleUpdate);
+      window.removeEventListener("brito_categories_updated", handleUpdate);
+      if (channel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(channel);
+        } catch {}
+      }
+    };
   }, []);
+
+  // Ensure selectedCategory is valid
+  useEffect(() => {
+    if (selectedCategory !== "all" && categories.length > 0 && !categories.some(c => c.id === selectedCategory)) {
+      setSelectedCategory("all");
+    }
+  }, [categories, selectedCategory]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -143,23 +195,18 @@ export default function ProductosPage() {
     });
   }, [products, searchQuery, selectedCategory]);
 
-  // Tax calculation preview in real-time
-  const calculatedPreview = useMemo(() => {
-    const p = parseFloat(formData.price) || 0;
-    if (p <= 0) return null;
-    const ivaNum = formData.hasIva ? Math.max(0, parseFloat(formData.ivaRate) || 0) : 0;
-    const iepsNum = formData.hasIeps ? Math.max(0, parseFloat(formData.iepsRate) || 0) : 0;
-    return calculateProductTaxes(p, formData.hasIva, ivaNum, formData.hasIeps, iepsNum, formData.taxIncluded);
-  }, [formData.price, formData.hasIva, formData.ivaRate, formData.hasIeps, formData.iepsRate, formData.taxIncluded]);
 
   // Open Create Modal
   const handleOpenCreate = () => {
     setModalMode("create");
     setEditingId(null);
-    const initialCat = (selectedCategory !== "all" ? selectedCategory : "pan_dulce") as Product["category"];
+    const initialCat = (selectedCategory !== "all" 
+      ? selectedCategory 
+      : (categories[0]?.id || "pan_dulce")) as Product["category"];
     const autoBarcode = generateProductBarcode();
     const isPanDulce = initialCat === "pan_dulce" || initialCat === "pasteleria" || initialCat === "temporada";
     const isBebida = initialCat === "bebidas";
+    const defaultCatIcon = categories.find((c) => c.id === initialCat)?.icon || (initialCat === "abarrotes" ? "🥫" : initialCat === "materia_prima" ? "🌾" : "🥖");
 
     setFormData({
       code: autoBarcode,
@@ -170,7 +217,7 @@ export default function ProductosPage() {
       unit: initialCat === "materia_prima" ? "kg" : "pieza",
       description: "",
       image: "",
-      icon: initialCat === "abarrotes" ? "🥫" : initialCat === "materia_prima" ? "🌾" : "🥖",
+      icon: defaultCatIcon,
       hasIva: isBebida,
       ivaRate: isBebida ? "16" : "0",
       hasIeps: isPanDulce,
@@ -387,46 +434,24 @@ export default function ProductosPage() {
         </div>
       </div>
 
-      {/* Filters and Search Bar */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-stone-200 space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          {/* Left Category Toggle & Counter */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsCategoriesVisible(!isCategoriesVisible)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border shadow-sm ${
-                isCategoriesVisible || selectedCategory !== "all"
-                  ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 ring-2 ring-amber-700/30"
-                  : "bg-stone-900 text-amber-400 border-amber-500/40 hover:bg-stone-800"
-              }`}
-              title={isCategoriesVisible ? "Ocultar panel de categorías" : "Mostrar panel de categorías"}
-            >
-              <Layers className="w-3.5 h-3.5 text-amber-400" />
-              <span>
-                {selectedCategory === "all"
-                  ? "Categorías"
-                  : PRODUCT_CATEGORIES.find((c) => c.id === selectedCategory)?.label || "Categorías"}
-              </span>
-            </button>
-            <span className="hidden md:inline text-xs font-bold text-stone-500">
-              {filteredProducts.length} productos
-            </span>
-          </div>
-
-          {/* Centered Search Bar */}
-          <div className="relative w-full max-w-xl mx-auto">
+      {/* Filters, Search Bar and Categories Bar (ARRIBA) */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-stone-200 space-y-3.5">
+        {/* Top Controls: Search Bar, Counter & View Toggle */}
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+          {/* Search Bar */}
+          <div className="relative w-full sm:max-w-xl">
             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nombre, descripción o categoría..."
-              className="w-full pl-11 pr-10 py-3 bg-stone-50 hover:bg-stone-100/70 focus:bg-white rounded-2xl border border-stone-200 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-center sm:text-left sm:pl-11"
+              placeholder="Buscar pan, pastel, bebida o código de barras..."
+              className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-stone-50 hover:bg-stone-100/70 focus:bg-white rounded-2xl border border-stone-200 text-xs font-semibold text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-left"
             />
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs p-1"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs p-1 cursor-pointer"
                 title="Limpiar búsqueda"
               >
                 <X className="w-3.5 h-3.5" />
@@ -434,117 +459,213 @@ export default function ProductosPage() {
             )}
           </div>
 
-          {/* View Toggle */}
-          <div className="flex items-center justify-end gap-2 w-full md:w-44 self-end md:self-auto">
-            <span className="text-xs text-stone-500 font-medium mr-1 md:hidden">
-              {filteredProducts.length} de {products.length}
+          {/* Right Controls: Count & View Switcher */}
+          <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+            <span className="text-xs text-stone-500 font-bold whitespace-nowrap">
+              {filteredProducts.length} de {products.length} productos
             </span>
-            <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200">
+
+            <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200 shrink-0">
               <button
+                type="button"
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                className={`p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
                   viewMode === "grid" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
                 }`}
                 title="Vista de Cuadrícula"
               >
                 <Grid className="w-4 h-4" />
+                <span className="hidden md:inline text-[11px]">Cuadrícula</span>
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                className={`p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
                   viewMode === "table" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-900"
                 }`}
                 title="Vista de Lista"
               >
                 <ListIcon className="w-4 h-4" />
+                <span className="hidden md:inline text-[11px]">Lista</span>
               </button>
             </div>
           </div>
         </div>
 
-      </div>
-
-      {/* Main Catalog Layout: Left Categories List, Right Products Content */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {/* Left Column: Categorías en forma de Lista con Auto-ocultado */}
-        <div className={`transition-all duration-700 ease-in-out shrink-0 overflow-hidden ${
-          isCategoriesVisible
-            ? "w-full lg:w-72 opacity-100 max-h-[900px] mb-4 lg:mb-0"
-            : "w-0 lg:w-0 opacity-0 max-h-0 pointer-events-none p-0 m-0 border-0"
-        }`}>
-          <div className="w-full lg:w-72 bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-              <h3 className="text-xs font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
+        {/* APARTADO DE CATEGORÍAS EN FORMA DE LISTA (OCULTABLE / DESPLEGABLE) */}
+        <div className="pt-2 border-t border-stone-100 space-y-2.5">
+          {/* Barra Superior de Categorías con opción de Ocultar / Mostrar */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase text-stone-700 tracking-wider flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-amber-600" />
-                <span>Categorías</span>
-              </h3>
-              <button
-                onClick={() => setIsCategoriesVisible(false)}
-                className="text-[10px] font-bold text-stone-500 hover:text-stone-800 bg-stone-100 hover:bg-stone-200 px-3 py-1 rounded-full transition-colors"
-              >
-                Ocultar
-              </button>
+                <span>Categorías del Catálogo:</span>
+              </span>
+
+              {/* Indicador de categoría seleccionada actualmente */}
+              {selectedCategory === "all" ? (
+                <span className="text-[11px] font-bold text-stone-500 bg-stone-100 border border-stone-200/80 px-2.5 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1">
+                  <span>🧺</span>
+                  <span>Todas ({products.length})</span>
+                </span>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full text-[11px] font-black">
+                  <span>{categories.find((c) => c.id === selectedCategory)?.icon || "🏷️"}</span>
+                  <span className="truncate max-w-[140px] sm:max-w-none">
+                    {categories.find((c) => c.id === selectedCategory)?.label || selectedCategory}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("all")}
+                    className="ml-1 w-4 h-4 rounded-full bg-amber-200 hover:bg-amber-300 text-amber-900 flex items-center justify-center text-[10px] font-black cursor-pointer"
+                    title="Mostrar todas las categorías"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Lista Vertical de Categorías */}
-            <div className="space-y-1.5">
-              {PRODUCT_CATEGORIES.map((cat) => {
+            {/* Controles de la barra: Gestionar Categorías + Ocultar / Mostrar lista */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setIsManageCategoriesOpen(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-stone-950 transition-all cursor-pointer shadow-xs shrink-0 select-none border border-amber-600/20"
+                title="Añadir, editar o eliminar categorías del catálogo"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span className="hidden xs:inline">Gestionar</span>
+                <span>Categorías</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCategoriesOpen((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 border border-stone-200 transition-all cursor-pointer shadow-2xs shrink-0 select-none"
+                title={isCategoriesOpen ? "Ocultar lista de categorías" : "Mostrar lista de categorías"}
+              >
+                {isCategoriesOpen ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5 text-stone-500" />
+                    <span>Ocultar Lista</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Mostrar Lista</span>
+                  </>
+                )}
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
+                    isCategoriesOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de Categorías Organizada (Sin scroll horizontal) */}
+          {isCategoriesOpen && (
+            <div className="pt-2 border-t border-stone-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 animate-in fade-in duration-150">
+              {/* Botón de 'Todas las Categorías' */}
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("all")}
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border select-none ${
+                  selectedCategory === "all"
+                    ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 shadow-md ring-2 ring-amber-700/25 scale-[1.01]"
+                    : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200 hover:border-stone-300"
+                }`}
+                title="Ver todas las categorías"
+              >
+                <span className="flex items-center gap-2.5 truncate">
+                  <span className="text-base shrink-0">🧺</span>
+                  <span className="truncate">Todas las Categorías</span>
+                </span>
+                <span
+                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md shrink-0 ml-2 ${
+                    selectedCategory === "all"
+                      ? "bg-amber-500 text-stone-950 font-black"
+                      : "bg-stone-200/90 text-stone-700"
+                  }`}
+                >
+                  {products.length}
+                </span>
+              </button>
+
+              {/* Botones dinámicos de cada categoría */}
+              {categories.map((cat) => {
                 const isSelected = selectedCategory === cat.id;
-                const count = cat.id === "all" 
-                  ? products.length 
-                  : products.filter((p) => p.category === cat.id).length;
+                const count = products.filter((p) => p.category === cat.id).length;
 
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => {
-                      setSelectedCategory(cat.id);
-                      if (typeof window !== "undefined" && window.innerWidth < 1024) {
-                        setIsCategoriesVisible(false);
-                      }
-                    }}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2.5 group ${
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border select-none ${
                       isSelected
-                        ? "bg-[#3e2723] text-amber-50 shadow-md shadow-amber-950/25 font-black scale-[1.02] border-2 border-amber-500 ring-2 ring-amber-700/30"
-                        : "text-stone-700 hover:bg-stone-50 hover:text-stone-950 border border-transparent hover:border-stone-200"
+                        ? "bg-[#3e2723] text-amber-50 border-2 border-amber-500 shadow-md ring-2 ring-amber-700/25 scale-[1.01]"
+                        : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200 hover:border-stone-300"
                     }`}
+                    title={`Ver productos de ${cat.label}`}
                   >
-                    <span className="text-base shrink-0">{cat.icon}</span>
-                    <span className="truncate">{cat.label}</span>
+                    <span className="flex items-center gap-2.5 truncate">
+                      <span className="text-base shrink-0">{cat.icon}</span>
+                      <span className="truncate">{cat.label}</span>
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md shrink-0 ml-2 ${
+                        isSelected
+                          ? "bg-amber-500 text-stone-950 font-black"
+                          : "bg-stone-200/90 text-stone-700"
+                      }`}
+                    >
+                      {count}
+                    </span>
                   </button>
                 );
               })}
-            </div>
-          </div>
-        </div>
 
-        {/* Right Column: Products Content Area */}
-        <div className="flex-1 w-full min-w-0">
-          {filteredProducts.length === 0 ? (
-            <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-sm space-y-4">
-              <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 text-4xl flex items-center justify-center mx-auto text-amber-800">
-                🔍
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-stone-900">No se encontraron productos</h3>
-                <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                  No hay productos que coincidan con &ldquo;{searchQuery}&rdquo; en esta categoría. Puedes intentar otra búsqueda o agregar uno nuevo.
-                </p>
-              </div>
+              {/* Botón rápido "+ Añadir Categoría" */}
               <button
-                onClick={handleOpenCreate}
-                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl inline-flex items-center gap-2"
+                type="button"
+                onClick={() => setIsManageCategoriesOpen(true)}
+                className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-2 border-dashed border-amber-300 hover:border-amber-500 bg-amber-50/50 hover:bg-amber-100/70 text-amber-900 active:scale-98 select-none"
+                title="Añadir una nueva categoría al catálogo"
               >
-                <Plus className="w-4 h-4" /> Crear nuevo producto
+                <Plus className="w-3.5 h-3.5 text-amber-700 stroke-[3]" />
+                <span>+ Nueva Categoría</span>
               </button>
             </div>
-          ) : viewMode === "grid" ? (
-            /* Grid View (Expands to 4 cols when categories panel is hidden) */
-            <div className={`grid gap-6 transition-all duration-700 ${
-              isCategoriesVisible
-                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
-                : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-            }`}>
+          )}
+        </div>
+      </div>
+
+      {/* Main Products Content Area (Full Width) */}
+      <div className="w-full min-w-0">
+        {filteredProducts.length === 0 ? (
+          <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 shadow-sm space-y-4">
+            <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 text-4xl flex items-center justify-center mx-auto text-amber-800">
+              🔍
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-stone-900">No se encontraron productos</h3>
+              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                No hay productos que coincidan con &ldquo;{searchQuery}&rdquo; en esta categoría. Puedes intentar otra búsqueda o agregar uno nuevo.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenCreate}
+              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs rounded-xl inline-flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Crear nuevo producto
+            </button>
+          </div>
+        ) : viewMode === "grid" ? (
+          /* Grid View (Full Width) */
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
           {filteredProducts.map((product) => {
             const catBadge = getCategoryBadge(product.category);
             return (
@@ -807,12 +928,11 @@ export default function ProductosPage() {
           </div>
         </div>
       )}
-        </div>
       </div>
 
       {/* Modal: Crear / Editar Producto */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[200] bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl sm:rounded-[32px] max-w-lg w-full p-5 sm:p-8 shadow-2xl border border-stone-200 relative my-auto max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-stone-100">
@@ -938,21 +1058,21 @@ export default function ProductosPage() {
                     value={formData.category}
                     onChange={(e) => {
                       const newCat = e.target.value as any;
+                      const catObj = categories.find((c) => c.id === newCat);
                       setFormData({ 
                         ...formData, 
                         category: newCat,
+                        icon: catObj?.icon || formData.icon,
                         unit: newCat === "materia_prima" ? "kg" : (formData.unit || "pieza")
                       });
                     }}
                     className="w-full px-3 py-2.5 bg-stone-50 rounded-xl border border-stone-200 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
                   >
-                    <option value="pan_dulce">🥖 Pan Dulce Tradicional</option>
-                    <option value="pan_blanco">🍞 Bolillo & Telera</option>
-                    <option value="pasteleria">🍰 Pastelería & Pays</option>
-                    <option value="bebidas">☕ Cafetería & Bebidas</option>
-                    <option value="temporada">✨ Especiales de Temporada</option>
-                    <option value="abarrotes">🥫 Abarrotes</option>
-                    <option value="materia_prima">🌾 Materia Prima</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1021,238 +1141,6 @@ export default function ProductosPage() {
                 </div>
               )}
 
-              {/* Configuración de Impuestos (IVA / IEPS) */}
-              <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3.5 animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-200 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-700 flex items-center justify-center font-black">
-                      <Receipt className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-stone-900 flex items-center gap-1.5">
-                        <span>Configuración de Impuestos (IVA / IEPS)</span>
-                        <span className="text-[10px] text-amber-700 font-semibold bg-amber-100/80 px-1.5 py-0.2 rounded">SAT</span>
-                      </h4>
-                      <p className="text-[10px] text-stone-500">
-                        Indica si el producto grava IVA o IEPS y personaliza su porcentaje o tasa aplicable.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Modalidad de Impuestos */}
-                  <button
-                    type="button"
-                    onClick={() => setFormData((prev) => ({ ...prev, taxIncluded: !prev.taxIncluded }))}
-                    className={`self-start sm:self-auto px-2.5 py-1 rounded-xl text-[10px] font-black transition-all border flex items-center gap-1.5 cursor-pointer ${
-                      formData.taxIncluded
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
-                        : "bg-stone-200/80 text-stone-700 border-stone-300 hover:bg-stone-300"
-                    }`}
-                    title="Alternar si el precio de venta capturado ya incluye los impuestos o si se cobran adicionalmente"
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${formData.taxIncluded ? "bg-emerald-600 animate-pulse" : "bg-stone-400"}`} />
-                    <span>{formData.taxIncluded ? "Precios con impuestos incluidos" : "+ Impuestos al precio base"}</span>
-                  </button>
-                </div>
-
-                {/* Tarjetas de IVA e IEPS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Tarjeta IVA */}
-                  <div className={`p-3.5 rounded-2xl border transition-all ${
-                    formData.hasIva 
-                      ? "bg-white border-blue-400/80 shadow-xs ring-1 ring-blue-400/20" 
-                      : "bg-stone-100/70 border-stone-200"
-                  }`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-black text-stone-900">Grava IVA</span>
-                        <span className="text-[10px] font-medium text-stone-400">(Tasa Valor Agregado)</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormData((prev) => ({ 
-                          ...prev, 
-                          hasIva: !prev.hasIva,
-                          ivaRate: !prev.hasIva && (!prev.ivaRate || prev.ivaRate === "0") ? "16" : prev.ivaRate
-                        }))}
-                        className={`px-3 py-1 rounded-full text-[10px] font-black tracking-wider transition-all cursor-pointer ${
-                          formData.hasIva
-                            ? "bg-blue-600 text-white shadow-sm shadow-blue-500/25"
-                            : "bg-stone-200 text-stone-600 hover:bg-stone-300"
-                        }`}
-                      >
-                        {formData.hasIva ? "SÍ GRAVA" : "NO GRAVA"}
-                      </button>
-                    </div>
-
-                    {formData.hasIva ? (
-                      <div className="space-y-2 pt-1 animate-in fade-in duration-150">
-                        <div className="flex items-center gap-2">
-                          <label className="text-[11px] font-bold text-stone-600 whitespace-nowrap">
-                            Porcentaje (%):
-                          </label>
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={formData.ivaRate}
-                              onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                              onChange={(e) => setFormData((prev) => ({ ...prev, ivaRate: cleanDecimalNumbers(e.target.value) }))}
-                              placeholder="16"
-                              className="w-full pl-3 pr-7 py-1.5 bg-stone-50 rounded-lg border border-blue-200 text-xs font-black text-stone-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            />
-                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">%</span>
-                          </div>
-                        </div>
-
-                        {/* Botones de selección rápida */}
-                        <div className="flex items-center gap-1">
-                          {[
-                            { rate: "16", label: "16% (General)" },
-                            { rate: "8", label: "8% (Frontera)" },
-                            { rate: "0", label: "0% (Tasa Cero)" },
-                          ].map((item) => (
-                            <button
-                              key={item.rate}
-                              type="button"
-                              onClick={() => setFormData((prev) => ({ ...prev, ivaRate: item.rate }))}
-                              className={`flex-1 py-1 px-1 text-[10px] font-bold rounded-lg border transition-all text-center ${
-                                formData.ivaRate === item.rate
-                                  ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                                  : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
-                              }`}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        {calculatedPreview && (
-                          <div className="text-[10px] text-blue-800 font-medium bg-blue-50/80 px-2 py-1 rounded-md flex items-center justify-between">
-                            <span>Monto de IVA:</span>
-                            <span className="font-mono font-black">${calculatedPreview.ivaAmount.toFixed(2)} MXN</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-stone-500 leading-snug">
-                        Exento o Tasa 0% (común en panadería de consumo básico tradicional).
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Tarjeta IEPS */}
-                  <div className={`p-3.5 rounded-2xl border transition-all ${
-                    formData.hasIeps 
-                      ? "bg-white border-amber-400/80 shadow-xs ring-1 ring-amber-400/20" 
-                      : "bg-stone-100/70 border-stone-200"
-                  }`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-black text-stone-900">Grava IEPS</span>
-                        <span className="text-[10px] font-medium text-stone-400">(Alimentos & Bebidas)</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormData((prev) => ({ 
-                          ...prev, 
-                          hasIeps: !prev.hasIeps,
-                          iepsRate: !prev.hasIeps && (!prev.iepsRate || prev.iepsRate === "0") ? "8" : prev.iepsRate
-                        }))}
-                        className={`px-3 py-1 rounded-full text-[10px] font-black tracking-wider transition-all cursor-pointer ${
-                          formData.hasIeps
-                            ? "bg-amber-500 text-stone-950 shadow-sm shadow-amber-500/25"
-                            : "bg-stone-200 text-stone-600 hover:bg-stone-300"
-                        }`}
-                      >
-                        {formData.hasIeps ? "SÍ GRAVA" : "NO GRAVA"}
-                      </button>
-                    </div>
-
-                    {formData.hasIeps ? (
-                      <div className="space-y-2 pt-1 animate-in fade-in duration-150">
-                        <div className="flex items-center gap-2">
-                          <label className="text-[11px] font-bold text-stone-600 whitespace-nowrap">
-                            Porcentaje (%):
-                          </label>
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={formData.iepsRate}
-                              onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                              onChange={(e) => setFormData((prev) => ({ ...prev, iepsRate: cleanDecimalNumbers(e.target.value) }))}
-                              placeholder="8"
-                              className="w-full pl-3 pr-7 py-1.5 bg-stone-50 rounded-lg border border-amber-300 text-xs font-black text-stone-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                            />
-                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">%</span>
-                          </div>
-                        </div>
-
-                        {/* Botones de selección rápida */}
-                        <div className="flex items-center gap-1">
-                          {[
-                            { rate: "8", label: "8% (Pan Dulce/Calórico)" },
-                            { rate: "7", label: "7%" },
-                            { rate: "26.5", label: "26.5%" },
-                          ].map((item) => (
-                            <button
-                              key={item.rate}
-                              type="button"
-                              onClick={() => setFormData((prev) => ({ ...prev, iepsRate: item.rate }))}
-                              className={`flex-1 py-1 px-1 text-[10px] font-bold rounded-lg border transition-all text-center ${
-                                formData.iepsRate === item.rate
-                                  ? "bg-amber-500 text-stone-950 border-amber-600 shadow-xs"
-                                  : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200"
-                              }`}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        {calculatedPreview && (
-                          <div className="text-[10px] text-amber-900 font-medium bg-amber-50 px-2 py-1 rounded-md flex items-center justify-between">
-                            <span>Monto de IEPS:</span>
-                            <span className="font-mono font-black">${calculatedPreview.iepsAmount.toFixed(2)} MXN</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-stone-500 leading-snug">
-                        Sin IEPS (aplica a panes básicos con densidad calórica menor a 275 kcal/100g).
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Desglose Matemático en Tiempo Real */}
-                {calculatedPreview && (formData.hasIva || formData.hasIeps) && (
-                  <div className="p-3 bg-amber-50/90 rounded-xl border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
-                    <div className="flex items-center gap-3 flex-wrap text-[11px]">
-                      <span className="font-bold text-stone-700">
-                        Base: <strong className="text-stone-950 font-black">${calculatedPreview.basePrice.toFixed(2)}</strong>
-                      </span>
-                      {formData.hasIva && (
-                        <span className="inline-flex items-center gap-1 font-semibold text-blue-800 bg-blue-100/90 px-2 py-0.5 rounded-md font-mono text-[10px]">
-                          +IVA ({formData.ivaRate}%): ${calculatedPreview.ivaAmount.toFixed(2)}
-                        </span>
-                      )}
-                      {formData.hasIeps && (
-                        <span className="inline-flex items-center gap-1 font-semibold text-amber-950 bg-amber-200/90 px-2 py-0.5 rounded-md font-mono text-[10px]">
-                          +IEPS ({formData.iepsRate}%): ${calculatedPreview.iepsAmount.toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                      <span className="text-[11px] text-stone-600 font-bold">Total Público:</span>
-                      <span className="px-2.5 py-1 rounded-lg bg-stone-900 text-amber-400 font-mono font-black text-xs shadow-sm">
-                        ${calculatedPreview.totalPrice.toFixed(2)} MXN
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
 
               {/* Descripción */}
               <div className="space-y-1">
@@ -1290,7 +1178,7 @@ export default function ProductosPage() {
 
       {/* Modal: Confirmar Eliminación con "si" o "no" */}
       {deletingProduct && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[200] bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-7 shadow-2xl border border-stone-200 space-y-4 animate-in zoom-in-95 text-center">
             <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-3xl shadow-inner">
               <Trash2 className="w-8 h-8" />
@@ -1399,6 +1287,18 @@ export default function ProductosPage() {
           setQuickPriceProduct(null);
         }}
         onSave={handleSaveQuickPrice}
+      />
+
+      {/* Modal de Administración de Categorías (Añadir, Editar, Eliminar) */}
+      <ManageCategoriesModal
+        isOpen={isManageCategoriesOpen}
+        onClose={() => setIsManageCategoriesOpen(false)}
+        categories={categories}
+        products={products}
+        onCategoriesChanged={() => {
+          setCategories(getStoredCategories());
+          setProducts(getStoredProducts());
+        }}
       />
     </div>
   );

@@ -11,6 +11,7 @@ import {
   User,
   Phone,
   Store,
+  Building2,
   MapPin,
   DollarSign,
   Cake,
@@ -31,7 +32,8 @@ import {
   Check,
   Barcode,
   Copy,
-  Sparkles
+  Sparkles,
+  Lock
 } from "lucide-react";
 import { Product, Customer, OrderItem } from "@/types";
 import { getStoredCustomers, createCustomerInDb, normalizeCustomerName } from "@/lib/customers";
@@ -146,6 +148,9 @@ export default function CreateOrderModal({
   const { user } = useAuth();
   const { addNotification } = useNotifications();
 
+  const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
+  const userBranchId = user?.assignedBranchId;
+
   const customerNameInputRef = useRef<HTMLInputElement>(null);
   const customerDecisionRef = useRef<HTMLDivElement>(null);
   const [mustChooseCustomerAlert, setMustChooseCustomerAlert] = useState(false);
@@ -156,22 +161,27 @@ export default function CreateOrderModal({
 
   // Sucursal activa fija donde está el cajero
   const activeBranch = useMemo(() => {
+    if (!isAdmin && userBranchId) {
+      const b = branches.find((br) => br.id === userBranchId);
+      if (b) return b;
+    }
     if (initialBranchId) {
       const b = branches.find((br) => br.id === initialBranchId);
       if (b) return b;
     }
     if (currentBranch && currentBranch.id) return currentBranch;
     return branches[0] || { id: "branch-matriz", name: "Sucursal Matriz (Centro)" };
-  }, [branches, currentBranch, initialBranchId]);
+  }, [branches, currentBranch, initialBranchId, isAdmin, userBranchId]);
 
   // 1. Cliente
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const customerSearchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Pregunta sobre registrar al cliente en el catálogo (por defecto sí para agilidad)
-  const [saveCustomerDecision, setSaveCustomerDecision] = useState<"ask" | "yes" | "no">("yes");
+  // Pregunta sobre registrar al cliente en el catálogo (inicialmente "ask" para que el usuario decida)
+  const [saveCustomerDecision, setSaveCustomerDecision] = useState<"ask" | "yes" | "no">("ask");
 
   // Modal de Añadir / Seleccionar Cliente
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -217,8 +227,8 @@ export default function CreateOrderModal({
   // 2. Detalle del pedido
   const [description, setDescription] = useState("");
   const [items, setItems] = useState<OrderItem[]>([]);
-  const [showCatalog, setShowCatalog] = useState(false);
-  const [catalogSearch, setCatalogSearch] = useState("");
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+  const productSearchContainerRef = useRef<HTMLDivElement>(null);
 
   // Escáner de código de barras (POS)
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -241,9 +251,9 @@ export default function CreateOrderModal({
   const tomorrowStr = useMemo(() => getLocalDateStr(1), []);
   const [deliveryDate, setDeliveryDate] = useState<string>(tomorrowStr);
   const [deliveryTime, setDeliveryTime] = useState<string>("16:00");
-  const [deliveryType, setDeliveryType] = useState<"sucursal" | "domicilio">("sucursal");
-  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const deliveryType = "sucursal" as const;
   const [pickupBranchId, setPickupBranchId] = useState<string>("");
+  const [operatingBranchId, setOperatingBranchId] = useState<string>("");
 
   // Estado y sincronización para el calendario ampliado desplegable
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
@@ -306,7 +316,16 @@ export default function CreateOrderModal({
     setIsCalendarExpanded(false);
   };
 
-  // Sucursal seleccionada resuelta
+  // Sucursal seleccionada resuelta para Levantamiento de Pedido
+  const selectedOperatingBranch = useMemo(() => {
+    return (
+      branches.find((b) => b.id === (operatingBranchId || activeBranch?.id)) ||
+      activeBranch ||
+      branches[0]
+    );
+  }, [branches, operatingBranchId, activeBranch]);
+
+  // Sucursal seleccionada resuelta para Recolección de Pedido
   const selectedPickupBranch = useMemo(() => {
     return (
       branches.find((b) => b.id === (pickupBranchId || activeBranch?.id)) ||
@@ -315,8 +334,12 @@ export default function CreateOrderModal({
     );
   }, [branches, pickupBranchId, activeBranch]);
 
-  // 4. Cobro del Anticipo (Editable y siempre por defecto en 0)
+  // 4. Cobro del Anticipo (100% Editable y desaparece al dar clic)
   const [deposit, setDeposit] = useState<string>("0");
+  const [isEditingDeposit, setIsEditingDeposit] = useState(false);
+  const userHasCustomDepositRef = useRef(false);
+  const previousDepositRef = useRef<string>("0");
+  const depositInputRef = useRef<HTMLInputElement>(null);
   const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "tarjeta" | "transferencia">("efectivo");
   const [selectedTransferAccountId, setSelectedTransferAccountId] = useState<string>(DEFAULT_TRANSFER_ACCOUNTS[0].id);
   const [selectedCardTerminalId, setSelectedCardTerminalId] = useState<string>(DEFAULT_CARD_TERMINALS[0].id);
@@ -339,10 +362,12 @@ export default function CreateOrderModal({
     }
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const wasOpenRef = useRef(false);
 
-  // Cargar datos al abrir
+  // Cargar datos al abrir (solo una vez cuando se abre la ventana, no en re-renders o sincronizaciones posteriores)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
+      wasOpenRef.current = true;
       const storedProds = getStoredProducts();
       setProducts(storedProds);
       setCustomers(getStoredCustomers());
@@ -378,22 +403,35 @@ export default function CreateOrderModal({
 
       setDeliveryDate(tomorrowStr);
       setDeliveryTime("16:00");
-      setDeliveryType("sucursal");
-      setPickupBranchId(initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz");
-      setDeliveryAddress("");
-      setShowCatalog(false);
+      setPickupBranchId(
+        !isAdmin && userBranchId
+          ? userBranchId
+          : (initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz")
+      );
+      setOperatingBranchId(
+        !isAdmin && userBranchId
+          ? userBranchId
+          : (initialBranchId || activeBranch?.id || branches[0]?.id || "branch-matriz")
+      );
+      
+      setShowProductSuggestions(false);
       setShowCustomerSearch(false);
       setPaymentMethod("efectivo");
-      setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0].id);
-      setSelectedCardTerminalId(DEFAULT_CARD_TERMINALS[0].id);
+      setSelectedTransferAccountId(DEFAULT_TRANSFER_ACCOUNTS[0]?.id || "");
+      setSelectedCardTerminalId(DEFAULT_CARD_TERMINALS[0]?.id || "");
       setPaymentReference("");
       setCopiedField(null);
       setBarcodeInput("");
       setLastScannedAlert(null);
       keyStrokeBufferRef.current = { buffer: "", lastStrokeTime: 0 };
-      setSaveCustomerDecision("yes");
+      setSaveCustomerDecision("ask");
       setMustChooseCustomerAlert(false);
       setDeposit("");
+      setIsEditingDeposit(false);
+      userHasCustomDepositRef.current = false;
+      previousDepositRef.current = "0";
+    } else if (!isOpen) {
+      wasOpenRef.current = false;
     }
   }, [isOpen, initialItems, initialCustomerId, initialCustomerName, initialCustomerPhone, tomorrowStr, initialBranchId, activeBranch, branches]);
 
@@ -412,23 +450,73 @@ export default function CreateOrderModal({
     return total > 0 ? Math.round(total * 0.5 * 100) / 100 : 0;
   }, [total]);
 
-  // Si no se ha ingresado anticipo o cambió el total, pre-asignar el 50%
+  // Si no se ha ingresado anticipo o cambió el total, pre-asignar el 50% (sin sobreescribir si el usuario está editando)
   useEffect(() => {
-    if (total > 0) {
+    if (total > 0 && !isEditingDeposit && !userHasCustomDepositRef.current) {
+      setDeposit(minRequiredDeposit.toString());
+      previousDepositRef.current = minRequiredDeposit.toString();
+    } else if (total > 0 && !isEditingDeposit && userHasCustomDepositRef.current) {
       const num = Number(deposit) || 0;
-      if (deposit === "" || deposit === "0" || num < minRequiredDeposit) {
-        setDeposit(minRequiredDeposit.toString());
-      } else if (num > total) {
+      if (num > total) {
         setDeposit(total.toString());
       }
     }
-  }, [total, minRequiredDeposit]);
+  }, [total, minRequiredDeposit, isEditingDeposit]);
+
+  const handleDepositFocus = () => {
+    setIsEditingDeposit(true);
+    userHasCustomDepositRef.current = true;
+    if (deposit !== "") {
+      previousDepositRef.current = deposit;
+    }
+    setDeposit(""); // Desaparece inmediatamente al dar clic para escribir directamente
+  };
+
+  const handleDepositClick = () => {
+    if (!isEditingDeposit) {
+      setIsEditingDeposit(true);
+      userHasCustomDepositRef.current = true;
+      if (deposit !== "") {
+        previousDepositRef.current = deposit;
+      }
+      setDeposit(""); // Desaparece inmediatamente al dar clic
+    }
+  };
+
+  const handleDepositChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    userHasCustomDepositRef.current = true;
+    const val = cleanDecimalNumbers(e.target.value);
+    if (val !== "" && total > 0 && Number(val) > total) {
+      setDeposit(total.toString());
+    } else {
+      setDeposit(val);
+    }
+  };
+
+  const handleDepositBlur = () => {
+    setIsEditingDeposit(false);
+    if (deposit.trim() === "") {
+      const prevNum = Number(previousDepositRef.current) || 0;
+      if (prevNum > 0 && prevNum <= total) {
+        setDeposit(previousDepositRef.current);
+      } else if (minRequiredDeposit > 0) {
+        setDeposit(minRequiredDeposit.toString());
+      } else {
+        setDeposit("0");
+      }
+    }
+  };
 
   const numericDeposit = deposit === "" ? 0 : Math.max(0, Number(deposit) || 0);
   const isDepositValid = total > 0 && numericDeposit >= minRequiredDeposit && numericDeposit <= total;
   const isDepositSufficient = isDepositValid;
   const remainingBalance = Math.max(0, total - numericDeposit);
-  const isReadyToConfirm = customerName.trim().length > 0 && total > 0 && isDepositValid && !isSubmitting;
+  const isReadyToConfirm =
+    customerName.trim().length > 0 &&
+    total > 0 &&
+    isDepositValid &&
+    !isSubmitting &&
+    (!isCustomerDecisionNeeded || saveCustomerDecision !== "ask");
 
   // Sugerencias de clientes existentes
   const customerSuggestions = useMemo(() => {
@@ -462,9 +550,7 @@ export default function CreateOrderModal({
     setCustomerName(c.name);
     setCustomerPhone(c.phone && c.phone !== "N/A" ? c.phone : "");
     setSelectedCustomerId(c.id);
-    if (c.address && (!deliveryAddress || deliveryAddress.trim() === "")) {
-      setDeliveryAddress(c.address);
-    }
+    
     setIsCustomerModalOpen(false);
     setShowCustomerSearch(false);
     setSaveCustomerDecision("ask");
@@ -511,16 +597,61 @@ export default function CreateOrderModal({
     }
   };
 
-  // Filtro de productos para catálogo opcional
-  const filteredCatalog = useMemo(() => {
-    if (!catalogSearch.trim()) return products.slice(0, 10);
-    const q = catalogSearch.toLowerCase();
-    return products.filter(
-      (p) => p.name.toLowerCase().includes(q) || (p.code && p.code.toLowerCase().includes(q))
-    ).slice(0, 12);
-  }, [products, catalogSearch]);
+  // Añadir cliente rápidamente al catálogo sin perder el estado del pedido
+  const handleQuickAddCustomer = async (explicitName?: string) => {
+    const targetName = (explicitName || customerName).trim();
+    if (!targetName) return;
+    setIsSavingCustomer(true);
+    try {
+      const created = await createCustomerInDb({
+        name: targetName,
+        phone: customerPhone.trim() || undefined,
+        type: "frecuente",
+        notes: "Cliente registrado desde Pedido Especial",
+      });
 
-  // Manejo de productos del catálogo
+      const updatedCusts = getStoredCustomers();
+      setCustomers(updatedCusts);
+
+      setCustomerName(created.name);
+      if (created.phone && created.phone !== "N/A") {
+        setCustomerPhone(created.phone);
+      }
+      setSelectedCustomerId(created.id);
+      setShowCustomerSearch(false);
+      setSaveCustomerDecision("yes");
+      setMustChooseCustomerAlert(false);
+    } catch (err) {
+      console.error("Error creating quick customer", err);
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
+  // Buscador y sugerencias rápidas de productos (por nombre, código corto o código de barras)
+  const productSuggestions = useMemo(() => {
+    const q = barcodeInput.trim().toLowerCase();
+    if (!q) return [];
+    const currentStored = getStoredProducts();
+    const seen = new Set<string>();
+    const list: Product[] = [];
+    for (const p of [...products, ...currentStored]) {
+      if (p && p.id && !seen.has(p.id)) {
+        seen.add(p.id);
+        list.push(p);
+      }
+    }
+    return list
+      .filter((p) => {
+        const matchName = p.name && p.name.toLowerCase().includes(q);
+        const matchCode = p.code && p.code.toLowerCase().includes(q);
+        const matchBarcode = p.barcode && p.barcode.includes(q);
+        return matchName || matchCode || matchBarcode;
+      })
+      .slice(0, 8);
+  }, [products, barcodeInput]);
+
+  // Manejo de productos agregados al pedido
   const handleAddProductFromCatalog = (product: Product) => {
     setItems((prev) => {
       const idx = prev.findIndex((it) => it.productId === product.id);
@@ -543,39 +674,51 @@ export default function CreateOrderModal({
     });
   };
 
-  // Escaneo y verificación de código de barras desde catálogo del POS
+  const handleSelectProduct = (product: Product, keepOpen = true) => {
+    handleAddProductFromCatalog(product);
+    playScanBeep(true);
+    setLastScannedAlert({
+      success: true,
+      message: `¡Producto agregado: ${product.name}!`,
+      productName: product.name,
+      price: product.price,
+      code: product.barcode || product.code || "",
+    });
+    if (!keepOpen) {
+      setBarcodeInput("");
+      setShowProductSuggestions(false);
+    }
+    setTimeout(() => {
+      setLastScannedAlert(null);
+    }, 3500);
+  };
+
+  // Escaneo y verificación de código de barras / buscador directo de producto
   const handleBarcodeScan = (rawCode: string) => {
     const code = rawCode.trim();
     if (!code) return;
 
     const currentStored = getStoredProducts();
-    const matched =
+    const allProducts = [...products, ...currentStored];
+    let matched =
       findProductByBarcodeOrCode(code, products) ||
       findProductByBarcodeOrCode(code, currentStored);
 
-    if (matched) {
-      handleAddProductFromCatalog(matched);
-      playScanBeep(true);
-      setLastScannedAlert({
-        success: true,
-        message: `¡Producto verificado y agregado!`,
-        productName: matched.name,
-        price: matched.price,
-        code: matched.barcode || matched.code || code,
-      });
-      setBarcodeInput("");
+    // Si no coincide con código o código de barras, buscar coincidencia por nombre
+    if (!matched) {
+      const qLower = code.toLowerCase();
+      matched = allProducts.find(
+        (p) => p && p.name && p.name.toLowerCase().includes(qLower)
+      );
+    }
 
-      // Limpiar mensaje de éxito tras 4 segundos
-      setTimeout(() => {
-        setLastScannedAlert((prev) =>
-          prev?.code === (matched.barcode || matched.code || code) ? null : prev
-        );
-      }, 4000);
+    if (matched) {
+      handleSelectProduct(matched, false);
     } else {
       playScanBeep(false);
       setLastScannedAlert({
         success: false,
-        message: `Código "${code}" no encontrado en el catálogo del Punto de Venta.`,
+        message: `No se encontró ningún producto con "${code}".`,
         code,
       });
 
@@ -585,6 +728,28 @@ export default function CreateOrderModal({
       }, 4500);
     }
   };
+
+  // Cierre de sugerencias al hacer clic fuera del buscador de productos o de clientes
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        productSearchContainerRef.current &&
+        !productSearchContainerRef.current.contains(event.target as Node)
+      ) {
+        setShowProductSuggestions(false);
+      }
+      if (
+        customerSearchContainerRef.current &&
+        !customerSearchContainerRef.current.contains(event.target as Node)
+      ) {
+        setShowCustomerSearch(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Listener global de teclado para pistola lectora física USB / Bluetooth (Keyboard Wedge)
   useEffect(() => {
@@ -607,25 +772,6 @@ export default function CreateOrderModal({
           handleBarcodeScan(barcodeInput);
         }
         return;
-      }
-
-      // Si está enfocado en el buscador de catálogo y presiona Enter
-      if (
-        isOtherInput &&
-        activeElem &&
-        (activeElem as HTMLElement).getAttribute("data-catalog-search") === "true"
-      ) {
-        if (e.key === "Enter" && catalogSearch.trim()) {
-          const matched =
-            findProductByBarcodeOrCode(catalogSearch.trim(), products) ||
-            findProductByBarcodeOrCode(catalogSearch.trim(), getStoredProducts());
-          if (matched) {
-            e.preventDefault();
-            handleBarcodeScan(catalogSearch.trim());
-            setCatalogSearch("");
-            return;
-          }
-        }
       }
 
       const now = Date.now();
@@ -668,7 +814,7 @@ export default function CreateOrderModal({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, isCustomerModalOpen, isSubmitting, barcodeInput, catalogSearch, products]);
+  }, [isOpen, isCustomerModalOpen, isSubmitting, barcodeInput, products]);
 
   const handleUpdateItemQty = (index: number, delta: number) => {
     setItems((prev) => {
@@ -694,61 +840,7 @@ export default function CreateOrderModal({
     });
   };
 
-  // Lista de 4 opciones rápidas de fecha consecutivas y únicas: Hoy, Mañana y los 2 días siguientes
-  const upcomingDays = useMemo(() => {
-    const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-    const fullDayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-    return [0, 1, 2, 3].map((offset) => {
-      const d = new Date();
-      d.setDate(d.getDate() + offset);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const dateStr = `${year}-${month}-${day}`;
-
-      let label = fullDayNames[d.getDay()];
-      if (offset === 0) label = "Hoy";
-      else if (offset === 1) label = "Mañana";
-
-      return {
-        dateStr,
-        shortTitle: label,
-        dayOfWeek: fullDayNames[d.getDay()],
-        dayNum: d.getDate(),
-        monthStr: monthNames[d.getMonth()],
-      };
-    });
-  }, []);
-
-  // Formato amigable de la fecha de entrega seleccionada
-  const selectedDeliveryDateLabel = useMemo(() => {
-    if (!deliveryDate) return "";
-    const parts = deliveryDate.split("-");
-    if (parts.length !== 3) return deliveryDate;
-    const year = parseInt(parts[0], 10);
-    const monthIndex = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
-    const d = new Date(year, monthIndex, day);
-    const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-    const monthNames = [
-      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ];
-    return `${dayNames[d.getDay()]}, ${day} de ${monthNames[monthIndex]} de ${year}`;
-  }, [deliveryDate]);
-
-  // Atajos rápidos de fecha (usando fecha local para evitar errores de huso horario)
-  const handleSetQuickDate = (days: number) => {
-    setDeliveryDate(getLocalDateStr(days));
-  };
-
-  const handleSetNextSaturday = () => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = (6 - day + 7) % 7 || 7;
-    setDeliveryDate(getLocalDateStr(diff));
-  };
 
   // Ejecución centralizada de guardado de pedido (con o sin cliente registrado)
   const executeSaveOrder = (targetCustomerId?: string) => {
@@ -775,9 +867,11 @@ export default function CreateOrderModal({
 
       // Determinar la sucursal de recolección elegida
       const finalPickupBranch =
-        deliveryType === "sucursal"
-          ? (branches.find((b) => b.id === pickupBranchId) || activeBranch)
-          : activeBranch;
+        branches.find((b) => b.id === pickupBranchId) || selectedPickupBranch || activeBranch;
+
+      // Determinar la sucursal de levantamiento de pedido elegida
+      const finalOperatingBranch =
+        branches.find((b) => b.id === operatingBranchId) || selectedOperatingBranch || activeBranch;
 
       // 2. CREACIÓN DEL PEDIDO (BASE CENTRAL)
       const newOrder = addCustomOrder({
@@ -786,14 +880,14 @@ export default function CreateOrderModal({
         customerId: finalCustomerId,
         branchId: finalPickupBranch?.id || "branch-matriz",
         branchName: finalPickupBranch?.name || "Sucursal Matriz (Centro)",
-        operatingBranchId: activeBranch?.id || "branch-matriz",
-        operatingBranchName: activeBranch?.name || "Sucursal Matriz (Centro)",
+        operatingBranchId: finalOperatingBranch?.id || activeBranch?.id || "branch-matriz",
+        operatingBranchName: finalOperatingBranch?.name || activeBranch?.name || "Sucursal Matriz (Centro)",
         description: finalDescription,
         items: finalItems,
         deliveryDate: deliveryDate || tomorrowStr,
         deliveryTime: deliveryTime || "16:00",
-        deliveryType: deliveryType,
-        deliveryAddress: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
+        deliveryType: "sucursal",
+        deliveryAddress: undefined,
         total: total,
         deposit: numericDeposit,
         paymentMethod: paymentMethod,
@@ -804,7 +898,7 @@ export default function CreateOrderModal({
           ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})`
           : undefined,
         paymentReference: paymentReference.trim() || undefined,
-        cashier: cashierName || user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
+        cashier: cashierName || user?.name || finalOperatingBranch?.currentShift?.cashier || activeBranch?.currentShift?.cashier || "Cajero en Turno",
         shiftName: shiftName || activeBranch?.currentShift?.name || undefined,
       });
 
@@ -812,11 +906,11 @@ export default function CreateOrderModal({
       if (numericDeposit > 0) {
         try {
           registerRealSale(
-            activeBranch?.id || "branch-matriz",
+            finalOperatingBranch?.id || activeBranch?.id || "branch-matriz",
             numericDeposit,
             paymentMethod,
-            cashierName || user?.name || activeBranch?.currentShift?.cashier || "Cajero en Turno",
-            `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()} (${deliveryType === "sucursal" ? `Recoge en ${finalPickupBranch?.name}` : "A Domicilio"})`
+            cashierName || user?.name || finalOperatingBranch?.currentShift?.cashier || activeBranch?.currentShift?.cashier || "Cajero en Turno",
+            `Anticipo Pedido ${newOrder.orderNumber} - ${customerName.trim()} (Recoge en ${finalPickupBranch?.name})`
           );
         } catch (saleErr) {
           console.warn("Could not record in registerRealSale:", saleErr);
@@ -825,16 +919,24 @@ export default function CreateOrderModal({
 
       // 4. NOTIFICACIÓN AUDITIVA Y VISUAL CON CHIME Y BANNER (CON RESGUARDO)
       try {
+        const remaining = newOrder.remainingBalance || 0;
         addNotification({
           senderName: `🎂 Pedido Apartado (${finalPickupBranch?.name || "Sucursal"})`,
           senderAvatar: "🎂",
           badgeIcon: "pastel",
-          title: `Nuevo Pedido ${newOrder.orderNumber}`,
+          title: `Nuevo Pedido ${newOrder.orderNumber}: Total ${formatCurrency(newOrder.total)}`,
           highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(numericDeposit)}`,
-          description: `${newOrder.description}. ${deliveryType === "sucursal" ? `Recoge en: ${finalPickupBranch?.name}. ` : "Entrega a domicilio. "}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(newOrder.remainingBalance)}.`,
+          description: `${newOrder.description}. ${deliveryType === "sucursal" ? `Recoge en: ${finalPickupBranch?.name}. ` : "Entrega a domicilio. "}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(remaining)}.`,
           category: "pedidos",
-          actionLabel: "Ver Pedidos",
+          orderId: newOrder.id,
+          branchId: newOrder.branchId,
+          branchName: newOrder.branchName,
+          operatingBranchId: newOrder.operatingBranchId,
+          operatingBranchName: newOrder.operatingBranchName,
+          actionLabel: remaining > 0 ? `Cobrar ${formatCurrency(remaining)}` : "Ver Detalle",
           actionLink: "/pedidos",
+          secondaryActionLabel: remaining > 0 ? "Ver Detalle" : undefined,
+          secondaryActionLink: remaining > 0 ? "/pedidos" : undefined,
         });
       } catch (notifErr) {
         console.warn("Could not fire notification:", notifErr);
@@ -877,7 +979,7 @@ export default function CreateOrderModal({
         const created = await createCustomerInDb({
           name: cleanName,
           phone: customerPhone.trim() || undefined,
-          address: deliveryType === "domicilio" ? deliveryAddress.trim() : undefined,
+          address: undefined,
           type: "evento",
           notes: "Cliente registrado desde Pedido Especial",
         });
@@ -937,13 +1039,19 @@ export default function CreateOrderModal({
       return;
     }
 
+    // Si el cliente no está en el catálogo y aún no decide:
+    if (saveCustomerDecision === "ask") {
+      alert("Por favor indica si deseas registrar al cliente nuevo en el catálogo o solo para este pedido.");
+      return;
+    }
+
     // Si el cliente no está en el catálogo y seleccionó explícitamente no registrarlo:
     if (saveCustomerDecision === "no") {
       handleDeclineSaveCustomer();
       return;
     }
 
-    // Por defecto, registrar al cliente en el catálogo de clientes y guardar el pedido
+    // Registrar al cliente en el catálogo de clientes y guardar el pedido
     handleConfirmSaveCustomer();
   };
 
@@ -965,7 +1073,7 @@ export default function CreateOrderModal({
               </h2>
               <p className="text-xs text-amber-300 font-bold flex items-center gap-1.5 mt-0.5">
                 <Store className="w-3.5 h-3.5 text-amber-400" />
-                <span>{activeBranch.name}</span>
+                <span>{selectedOperatingBranch?.name || activeBranch.name}</span>
               </p>
             </div>
           </div>
@@ -1029,7 +1137,7 @@ export default function CreateOrderModal({
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="relative">
+              <div ref={customerSearchContainerRef} className="relative">
                 <label className="text-xs font-bold text-stone-700 block mb-1">
                   Nombre del Cliente *
                 </label>
@@ -1044,26 +1152,64 @@ export default function CreateOrderModal({
                       setCustomerName(e.target.value);
                       setSelectedCustomerId("");
                       setShowCustomerSearch(true);
+                      setSaveCustomerDecision("ask");
                     }}
                     onFocus={() => setShowCustomerSearch(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (customerSuggestions.length > 0) {
+                          handleSelectCustomer(customerSuggestions[0]);
+                        } else {
+                          setShowCustomerSearch(false);
+                        }
+                      } else if (e.key === "Escape") {
+                        setShowCustomerSearch(false);
+                      }
+                    }}
                     className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
 
-                {/* Sugerencias rápidas de clientes */}
-                {showCustomerSearch && customerSuggestions.length > 0 && (
-                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden divide-y divide-stone-100">
+                {/* Sugerencias rápidas de clientes y opción directa de añadir a la lista */}
+                {showCustomerSearch && customerName.trim().length > 0 && (
+                  <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-xl shadow-xl overflow-hidden divide-y divide-stone-100 max-h-64 overflow-y-auto">
                     {customerSuggestions.map((c) => (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => handleSelectCustomer(c)}
-                        className="w-full p-2.5 text-left hover:bg-amber-50 flex items-center justify-between text-xs cursor-pointer"
+                        className="w-full p-2.5 text-left hover:bg-amber-50 flex items-center justify-between text-xs cursor-pointer transition-colors"
                       >
-                        <span className="font-bold text-stone-900">{c.name}</span>
-                        <span className="text-[11px] text-stone-500">{c.phone}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                          <span className="font-bold text-stone-900 truncate">{c.name}</span>
+                        </div>
+                        {c.phone && c.phone !== "N/A" && (
+                          <span className="text-[11px] text-stone-500 font-mono shrink-0 ml-2">{c.phone}</span>
+                        )}
                       </button>
                     ))}
+
+                    {/* Botón para añadir directamente a la lista si el cliente no está en catálogo */}
+                    {!isCustomerInCatalog && (
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAddCustomer()}
+                        disabled={isSavingCustomer}
+                        className="w-full p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 flex items-center justify-between text-xs font-bold transition-colors cursor-pointer text-left"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <UserPlus className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="truncate">
+                            {isSavingCustomer ? "Guardando en lista..." : `➕ Añadir "${customerName.trim()}" a mi lista`}
+                          </span>
+                        </div>
+                        <span className="text-[10px] bg-emerald-200 text-emerald-900 font-extrabold px-2 py-0.5 rounded-md shrink-0">
+                          Nuevo
+                        </span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1079,6 +1225,11 @@ export default function CreateOrderModal({
                     placeholder="Ej. 55 1234 5678"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
@@ -1087,93 +1238,208 @@ export default function CreateOrderModal({
 
             {/* AÑADIR AL CLIENTE SI ES QUE ES NUEVO */}
             {!isCustomerInCatalog && customerName.trim().length > 0 && (
-              <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs">
-                <div className="flex items-center gap-2">
-                  <UserPlus className="w-4 h-4 text-emerald-700 shrink-0" />
-                  <span className="font-bold text-emerald-950">
-                    ¿Añadir cliente nuevo al catálogo?
-                  </span>
+              saveCustomerDecision === "ask" ? (
+                <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span className="font-bold text-emerald-950">
+                      ¿Añadir cliente nuevo al catálogo?
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickAddCustomer()}
+                      disabled={isSavingCustomer}
+                      className="px-3 py-1.5 rounded-lg font-black text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1 disabled:opacity-60"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>{isSavingCustomer ? "Guardando..." : "Sí, añadir"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSaveCustomerDecision("no")}
+                      className="px-3 py-1.5 rounded-lg font-bold text-xs bg-white text-stone-700 border border-stone-300 hover:bg-stone-100 transition-all cursor-pointer"
+                    >
+                      Solo este pedido
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+              ) : saveCustomerDecision === "yes" ? (
+                <div className="flex items-center justify-between p-2.5 px-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2 text-emerald-950 min-w-0">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-bold truncate">
+                      ✓ El cliente ya se registró en el catálogo
+                    </span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setSaveCustomerDecision("yes")}
-                    className={`px-3 py-1.5 rounded-lg font-black text-xs transition-all cursor-pointer ${
-                      saveCustomerDecision === "yes"
-                        ? "bg-emerald-600 text-white shadow-xs"
-                        : "bg-white text-stone-700 border border-stone-200 hover:bg-stone-50"
-                    }`}
+                    onClick={() => setSaveCustomerDecision("ask")}
+                    className="text-[11px] font-bold text-emerald-800 hover:text-emerald-950 underline underline-offset-2 shrink-0 cursor-pointer ml-2"
                   >
-                    ✓ Sí, añadir
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSaveCustomerDecision("no")}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer ${
-                      saveCustomerDecision === "no"
-                        ? "bg-stone-700 text-white shadow-xs"
-                        : "bg-white text-stone-500 border border-stone-200 hover:bg-stone-50"
-                    }`}
-                  >
-                    Solo este pedido
+                    Cambiar
                   </button>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-between p-2.5 px-3 bg-stone-100 border border-stone-300 rounded-xl text-xs animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2 text-stone-800 min-w-0">
+                    <AlertCircle className="w-4 h-4 text-stone-500 shrink-0" />
+                    <span className="font-bold truncate">
+                      El cliente no se registró (solo para este pedido)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSaveCustomerDecision("ask")}
+                    className="text-[11px] font-bold text-stone-600 hover:text-stone-900 underline underline-offset-2 shrink-0 cursor-pointer ml-2"
+                  >
+                    Cambiar
+                  </button>
+                </div>
+              )
             )}
           </div>
 
           {/* PASO 2: ¿DE QUÉ SERÁ EL PEDIDO? */}
           <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-stone-900">
-                <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
-                  2
-                </span>
-                <h3 className="font-black text-sm uppercase tracking-wide text-stone-900">
-                  2. ¿De qué será el pedido?
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCatalog(!showCatalog)}
-                className="text-xs font-bold text-stone-700 bg-white hover:bg-stone-100 border border-stone-200 px-2.5 py-1 rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
-              >
-                <ShoppingBag className="w-3.5 h-3.5 text-stone-500" />
-                <span>{showCatalog ? "Cerrar catálogo" : "Ver catálogo"}</span>
-              </button>
+            <div className="flex items-center gap-2 text-stone-900">
+              <span className="w-6 h-6 rounded-full bg-amber-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
+                2
+              </span>
+              <h3 className="font-black text-sm uppercase tracking-wide text-stone-900">
+                2. ¿De qué será el pedido?
+              </h3>
             </div>
 
-            {/* Barra rápida de escaneo / búsqueda */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Barcode className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  ref={barcodeInputRef}
-                  type="text"
-                  placeholder="Escanear código de barras o escribir producto..."
-                  value={barcodeInput}
-                  onChange={(e) => setBarcodeInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleBarcodeScan(barcodeInput);
-                    }
-                  }}
-                  className="w-full pl-9 pr-3 py-2 bg-white border border-stone-300 rounded-xl text-xs font-mono font-bold text-stone-900 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
+            {/* Buscador de productos y escáner */}
+            <div ref={productSearchContainerRef} className="relative">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    ref={barcodeInputRef}
+                    type="text"
+                    placeholder="Buscar pan, pastel o código de barras..."
+                    value={barcodeInput}
+                    onChange={(e) => {
+                      setBarcodeInput(e.target.value);
+                      setShowProductSuggestions(true);
+                    }}
+                    onFocus={() => setShowProductSuggestions(true)}
+                    onClick={() => {
+                      if (barcodeInput.trim()) {
+                        setShowProductSuggestions(true);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleBarcodeScan(barcodeInput);
+                      }
+                      if (e.key === "Escape") {
+                        setShowProductSuggestions(false);
+                      }
+                    }}
+                    className="w-full pl-9 pr-8 py-2.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 placeholder:text-stone-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-xs"
+                  />
+                  {barcodeInput.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBarcodeInput("");
+                        setShowProductSuggestions(false);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleBarcodeScan(barcodeInput)}
+                  disabled={!barcodeInput.trim()}
+                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-stone-950 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Agregar</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleBarcodeScan(barcodeInput)}
-                disabled={!barcodeInput.trim()}
-                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-stone-950 text-xs font-black rounded-xl transition-all flex items-center gap-1 shrink-0 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Agregar</span>
-              </button>
+
+              {/* Sugerencias flotantes en tiempo real del buscador */}
+              {showProductSuggestions && productSuggestions.length > 0 && (
+                <div className="absolute z-30 top-full left-0 right-0 mt-1.5 bg-white border border-stone-200 rounded-xl shadow-2xl overflow-hidden divide-y divide-stone-100 max-h-64 overflow-y-auto animate-in fade-in-50 duration-150">
+                  <div className="px-3 py-1.5 bg-stone-100 border-b border-stone-200 text-[10px] font-black text-stone-600 uppercase tracking-wider flex items-center justify-between sticky top-0 z-10">
+                    <div className="flex items-center gap-2">
+                      <span className="text-stone-800 font-black">Resultados ({productSuggestions.length})</span>
+                      <span className="text-[9px] text-stone-500 font-normal normal-case hidden sm:inline">
+                        • Clic en cada pan para agregarlo
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-stone-500 font-normal normal-case sm:hidden">
+                        Clic para agregar
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowProductSuggestions(false);
+                        }}
+                        className="p-1 -mr-1 text-stone-500 hover:text-rose-600 hover:bg-rose-100/70 rounded-md transition-colors cursor-pointer flex items-center gap-1 font-bold text-[10px] normal-case"
+                        title="Cerrar lista"
+                        aria-label="Cerrar lista de resultados"
+                      >
+                        <span className="text-stone-600 hover:text-rose-600 font-bold">Cerrar</span>
+                        <X className="w-3.5 h-3.5 text-stone-600 hover:text-rose-600" />
+                      </button>
+                    </div>
+                  </div>
+                  {productSuggestions.map((prod) => {
+                    const itemInOrder = items.find((it) => it.productId === prod.id);
+                    return (
+                      <button
+                        key={prod.id}
+                        type="button"
+                        onClick={() => handleSelectProduct(prod, true)}
+                        className="w-full px-3 py-2 text-left hover:bg-amber-50 active:bg-amber-100 flex items-center justify-between gap-3 text-xs cursor-pointer group transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-base shrink-0">{prod.icon || "🥖"}</span>
+                          <div className="min-w-0 truncate">
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-stone-900 group-hover:text-amber-950 truncate">
+                                {prod.name}
+                              </p>
+                              {itemInOrder && (
+                                <span className="text-[9px] font-black text-amber-950 bg-amber-100 px-1.5 py-0.2 rounded border border-amber-300 shrink-0">
+                                  {itemInOrder.quantity} en pedido
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-stone-400 font-mono truncate">
+                              {prod.code ? `Cód: ${prod.code}` : ""} {prod.barcode ? `• Barcode: ${prod.barcode}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-black text-xs text-amber-950 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">
+                            {formatCurrency(prod.price)}
+                          </span>
+                          <span className="text-[11px] font-bold text-amber-800 bg-amber-50 group-hover:bg-amber-500 group-hover:text-stone-950 px-2 py-1 rounded-lg border border-amber-300 transition-colors flex items-center gap-0.5">
+                            <Plus className="w-3 h-3" /> Agregar
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Alerta de escaneo */}
+            {/* Alerta de confirmación de producto agregado */}
             {lastScannedAlert && (
               <div
                 className={`rounded-xl p-2 border flex items-center justify-between text-xs animate-in fade-in duration-150 ${
@@ -1194,36 +1460,6 @@ export default function CreateOrderModal({
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
-              </div>
-            )}
-
-            {/* Catálogo rápido desplegable */}
-            {showCatalog && (
-              <div className="bg-white p-3 rounded-xl border border-amber-200 space-y-2 animate-in fade-in duration-150">
-                <input
-                  type="text"
-                  placeholder="Buscar pan o pastel por nombre..."
-                  value={catalogSearch}
-                  onChange={(e) => setCatalogSearch(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto pt-1">
-                  {filteredCatalog.map((prod) => (
-                    <button
-                      key={prod.id}
-                      type="button"
-                      onClick={() => handleAddProductFromCatalog(prod)}
-                      className="p-1.5 bg-stone-50 hover:bg-amber-100/70 border border-stone-200 rounded-lg text-left text-xs transition-colors flex items-center justify-between gap-1 group cursor-pointer"
-                    >
-                      <span className="truncate font-bold text-stone-800 group-hover:text-amber-950">
-                        {prod.name}
-                      </span>
-                      <span className="font-black text-amber-900 shrink-0">
-                        {formatCurrency(prod.price)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -1347,28 +1583,6 @@ export default function CreateOrderModal({
               </h3>
             </div>
 
-            {/* Días rápidos */}
-            <div className="grid grid-cols-4 gap-2">
-              {upcomingDays.map((day) => {
-                const isSelected = deliveryDate === day.dateStr;
-                return (
-                  <button
-                    key={`${day.shortTitle}-${day.dateStr}`}
-                    type="button"
-                    onClick={() => setDeliveryDate(day.dateStr)}
-                    className={`py-2 px-1 rounded-xl text-center border-2 transition-all flex flex-col items-center justify-center cursor-pointer ${
-                      isSelected
-                        ? "bg-amber-500 text-stone-950 font-black border-amber-600 shadow-sm"
-                        : "bg-white hover:bg-stone-100 border-stone-200 text-stone-700"
-                    }`}
-                  >
-                    <span className="text-xs font-black">{day.shortTitle}</span>
-                    <span className="text-[10px] font-bold opacity-80">{day.dayNum} {day.monthStr}</span>
-                  </button>
-                );
-              })}
-            </div>
-
             {/* Fecha y Hora */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1397,67 +1611,93 @@ export default function CreateOrderModal({
               </div>
             </div>
 
-            {/* Entrega: Sucursal vs Domicilio */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setDeliveryType("sucursal")}
-                className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  deliveryType === "sucursal"
-                    ? "bg-stone-900 text-white border-stone-900 shadow-sm"
-                    : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-                }`}
-              >
-                <Store className="w-4 h-4" /> Recoge en Tienda
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeliveryType("domicilio")}
-                className={`py-2 px-3 rounded-xl text-xs font-black border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  deliveryType === "domicilio"
-                    ? "bg-stone-900 text-white border-stone-900 shadow-sm"
-                    : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-                }`}
-              >
-                <MapPin className="w-4 h-4" /> A Domicilio
-              </button>
+            {/* Sucursales: Levantamiento y Recolección en lista desplegable limpia (Ahorro de espacio) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {/* 1. Levantamiento de Pedido */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-amber-600" />
+                    Levantamiento de pedido
+                  </label>
+                  {!isAdmin ? (
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1 border border-amber-300">
+                      <Lock className="w-2.5 h-2.5" /> Fija (Asignada)
+                    </span>
+                  ) : selectedOperatingBranch?.id === activeBranch?.id ? (
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.5 rounded">
+                      Esta tienda
+                    </span>
+                  ) : null}
+                </div>
+                <div className="relative">
+                  <select
+                    value={operatingBranchId || activeBranch?.id || ""}
+                    onChange={(e) => {
+                      if (isAdmin) setOperatingBranchId(e.target.value);
+                    }}
+                    disabled={!isAdmin}
+                    className={`w-full appearance-none ${
+                      !isAdmin
+                        ? "bg-stone-100 text-stone-700 cursor-not-allowed border-stone-200"
+                        : "bg-white hover:bg-stone-50 text-stone-900 cursor-pointer border-stone-300"
+                    } font-bold text-xs py-2.5 px-3 pr-8 rounded-xl border shadow-2xs focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all truncate`}
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} {b.id === activeBranch?.id ? "★ (Esta tienda)" : ""} {b.address ? `— ${b.address}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {!isAdmin ? (
+                    <Lock className="w-3.5 h-3.5 text-stone-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  )}
+                </div>
+                {selectedOperatingBranch?.address && (
+                  <p className="text-[10px] text-stone-500 font-medium truncate flex items-center gap-1 px-1">
+                    <MapPin className="w-2.5 h-2.5 text-stone-400 shrink-0" />
+                    <span className="truncate">{selectedOperatingBranch.address}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* 2. Recolección de Pedido */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
+                    <ShoppingBag className="w-3.5 h-3.5 text-amber-600" />
+                    Recolección de pedido
+                  </label>
+                  {selectedPickupBranch?.id === activeBranch?.id && (
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.5 rounded">
+                      Esta tienda
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <select
+                    value={pickupBranchId || activeBranch?.id || ""}
+                    onChange={(e) => setPickupBranchId(e.target.value)}
+                    className="w-full appearance-none bg-white hover:bg-stone-50 text-stone-900 font-bold text-xs py-2.5 px-3 pr-8 rounded-xl border border-stone-300 shadow-2xs cursor-pointer focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all truncate"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} {b.id === activeBranch?.id ? "★ (Esta tienda)" : ""} {b.address ? `— ${b.address}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                {selectedPickupBranch?.address && (
+                  <p className="text-[10px] text-stone-500 font-medium truncate flex items-center gap-1 px-1">
+                    <MapPin className="w-2.5 h-2.5 text-stone-400 shrink-0" />
+                    <span className="truncate">{selectedPickupBranch.address}</span>
+                  </p>
+                )}
+              </div>
             </div>
-
-            {/* Selector de sucursal si recoge en tienda */}
-            {deliveryType === "sucursal" && (
-              <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
-                  Sucursal de recolección:
-                </label>
-                <select
-                  value={pickupBranchId}
-                  onChange={(e) => setPickupBranchId(e.target.value)}
-                  className="w-full py-2 px-3 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
-                >
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} {b.id === activeBranch?.id ? "(Esta tienda)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Dirección si es a domicilio */}
-            {deliveryType === "domicilio" && (
-              <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
-                  Dirección de entrega a domicilio:
-                </label>
-                <input
-                  type="text"
-                  placeholder="Calle, número, colonia y referencias..."
-                  value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
-                  className="w-full py-2 px-3 bg-white border border-stone-300 rounded-xl text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-              </div>
-            )}
           </div>
 
           {/* PASO 4: ¿CUÁNTO DINERO VA A DEJAR? (MÍNIMO 50%) */}
@@ -1486,7 +1726,11 @@ export default function CreateOrderModal({
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <button
                 type="button"
-                onClick={() => setDeposit(minRequiredDeposit.toString())}
+                onClick={() => {
+                  userHasCustomDepositRef.current = true;
+                  previousDepositRef.current = minRequiredDeposit.toString();
+                  setDeposit(minRequiredDeposit.toString());
+                }}
                 className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === minRequiredDeposit && total > 0 && numericDeposit > 0
                     ? "bg-amber-500 text-stone-950 border-amber-300 font-black shadow-lg ring-2 ring-amber-400/50 scale-[1.01]"
@@ -1501,7 +1745,11 @@ export default function CreateOrderModal({
 
               <button
                 type="button"
-                onClick={() => setDeposit(total.toString())}
+                onClick={() => {
+                  userHasCustomDepositRef.current = true;
+                  previousDepositRef.current = total.toString();
+                  setDeposit(total.toString());
+                }}
                 className={`p-3 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
                   numericDeposit === total && total > 0
                     ? "bg-emerald-600 text-white border-emerald-300 font-black shadow-lg ring-2 ring-emerald-400/50 scale-[1.01]"
@@ -1515,7 +1763,7 @@ export default function CreateOrderModal({
               </button>
             </div>
 
-            {/* Cantidad personalizada */}
+            {/* Cantidad personalizada 100% editable */}
             <div className="flex items-center justify-between gap-3 pt-1">
               <div>
                 <label className="text-xs font-bold text-stone-300 block">
@@ -1526,33 +1774,30 @@ export default function CreateOrderModal({
                 </span>
               </div>
               <div className="relative w-36">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 font-black">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 font-black select-none pointer-events-none">$</span>
                 <input
+                  ref={depositInputRef}
                   type="text"
                   inputMode="decimal"
-                  placeholder={minRequiredDeposit > 0 ? minRequiredDeposit.toString() : "0"}
+                  placeholder=""
                   value={deposit}
-                  onFocus={() => {
-                    if (deposit === "0") setDeposit("");
-                  }}
-                  onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                  onChange={(e) => {
-                    const val = cleanDecimalNumbers(e.target.value);
-                    if (val !== "" && total > 0 && Number(val) > total) {
-                      setDeposit(total.toString());
-                    } else {
-                      setDeposit(val);
+                  onFocus={handleDepositFocus}
+                  onClick={handleDepositClick}
+                  onDoubleClick={() => setDeposit("")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                      return;
                     }
+                    onlyNumbersKeyDown(e, true);
                   }}
-                  onBlur={() => {
-                    if (deposit.trim() === "" && minRequiredDeposit > 0) {
-                      setDeposit(minRequiredDeposit.toString());
-                    }
-                  }}
-                  className={`w-full pl-7 pr-3 py-1.5 bg-stone-950 border rounded-xl text-right text-sm font-black focus:outline-none transition-colors ${
+                  onChange={handleDepositChange}
+                  onBlur={handleDepositBlur}
+                  title="Anticipo 100% editable (al dar clic el número desaparece para escribir directamente)"
+                  className={`w-full pl-7 pr-3 py-1.5 bg-stone-950 border rounded-xl text-right text-sm font-black focus:outline-none transition-all cursor-text ${
                     isDepositValid
-                      ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/50"
-                      : "border-stone-700 text-white"
+                      ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/50 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/70"
+                      : "border-stone-700 text-white focus:border-amber-400 focus:ring-2 focus:ring-amber-400/50"
                   }`}
                 />
               </div>
@@ -1593,7 +1838,7 @@ export default function CreateOrderModal({
                 {[
                   { id: "efectivo", label: "💵 Efectivo" },
                   { id: "tarjeta", label: "💳 Tarjeta" },
-                  { id: "transferencia", label: "📱 SPEI" },
+                  { id: "transferencia", label: "📱 Transferencia" },
                 ].map((m) => (
                   <button
                     key={m.id}
@@ -1609,139 +1854,40 @@ export default function CreateOrderModal({
                   </button>
                 ))}
               </div>
-
-              {/* Detalle SPEI */}
-              {paymentMethod === "transferencia" && (
-                <div className="p-3 bg-stone-950 rounded-xl border border-stone-800 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-stone-400">Banco / Cuenta:</span>
-                    <span className="font-bold text-white">{selectedTransferAccount.bank} - {selectedTransferAccount.name}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-stone-400">CLABE:</span>
-                    <span className="font-mono font-bold text-amber-300">{selectedTransferAccount.clabe}</span>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Folio de rastreo SPEI / Referencia (Opcional)"
-                    value={paymentReference}
-                    onChange={(e) => setPaymentReference(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-xs font-mono text-white placeholder:text-stone-500"
-                  />
-                </div>
-              )}
-
-              {/* Detalle Tarjeta */}
-              {paymentMethod === "tarjeta" && (
-                <div className="p-3 bg-stone-950 rounded-xl border border-stone-800 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-stone-400">Terminal:</span>
-                    <span className="font-bold text-white">{selectedCardTerminal.name} ({selectedCardTerminal.bank})</span>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="No. de autorización / voucher (Opcional)"
-                    value={paymentReference}
-                    onChange={(e) => setPaymentReference(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-stone-900 border border-stone-700 rounded-lg text-xs font-mono text-white placeholder:text-stone-500"
-                  />
-                </div>
-              )}
             </div>
           </div>
 
-          {/* PASO 5: DAR ACCESO A LA COMPRA (CONFIRMACIÓN FINAL PARA VALIDAR) */}
-          <div className="bg-stone-900 text-white rounded-2xl p-4 sm:p-5 border-2 border-emerald-500/80 shadow-xl space-y-3.5">
-            <div className="flex items-center justify-between pb-2 border-b border-stone-800">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-emerald-500 text-stone-950 text-xs font-black flex items-center justify-center shrink-0">
-                  5
-                </span>
-                <h3 className="font-black text-sm uppercase tracking-wide text-white">
-                  5. Dar Acceso a la Compra
-                </h3>
-              </div>
-              <span className="text-[11px] font-bold text-emerald-400">Paso Final de Confirmación</span>
-            </div>
-
-            {/* Resumen de validación rápida */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
-                <span className="text-[10px] text-stone-400 block">Cliente:</span>
-                <span className="font-black text-stone-100 truncate block">
-                  {customerName.trim() || "⚠️ Sin cliente"}
-                </span>
-                {!isCustomerInCatalog && customerName.trim() && (
-                  <span className="text-[9px] text-emerald-400 font-bold block truncate">
-                    {saveCustomerDecision === "yes" ? "+ Añadir a catálogo" : "Solo este pedido"}
-                  </span>
-                )}
-              </div>
-
-              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
-                <span className="text-[10px] text-stone-400 block">Entrega:</span>
-                <span className="font-black text-stone-100 truncate block">
-                  {deliveryDate} ({deliveryTime})
-                </span>
-                <span className="text-[9px] text-amber-300 font-bold block truncate">
-                  {deliveryType === "sucursal" ? selectedPickupBranch?.name : "A Domicilio"}
-                </span>
-              </div>
-
-              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
-                <span className="text-[10px] text-stone-400 block">Total:</span>
-                <span className="font-black text-amber-400 text-sm font-mono block">
-                  {formatCurrency(total)}
-                </span>
-              </div>
-
-              <div className="bg-stone-800/80 p-2.5 rounded-xl border border-stone-700">
-                <span className="text-[10px] text-stone-400 block">Anticipo:</span>
-                <span className={`font-black text-sm font-mono block ${isDepositValid ? "text-emerald-400" : "text-amber-400"}`}>
-                  {formatCurrency(numericDeposit)}
-                </span>
-                <span className={`text-[9px] font-bold block truncate ${isDepositValid ? "text-emerald-400" : "text-amber-400"}`}>
-                  {isDepositValid ? `✓ Mínimo 50% cubierto` : `⚠️ Mínimo ${formatCurrency(minRequiredDeposit)}`}
-                </span>
-              </div>
-            </div>
-
-            {/* BOTÓN DEFINITIVO DE VALIDACIÓN */}
+          {/* BOTÓN DEFINITIVO: CONFIRMAR COMPRA */}
+          <div className="flex flex-col-reverse sm:flex-row items-center sm:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-stone-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full sm:w-auto py-2 sm:py-2.5 px-5 rounded-xl text-xs sm:text-sm font-bold text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-stone-300 transition-all cursor-pointer"
+            >
+              Cancelar
+            </button>
             <button
               type="submit"
-              disabled={isSubmitting || !isReadyToConfirm}
-              className={`w-full py-4 rounded-2xl text-base font-black flex items-center justify-center gap-2.5 transition-all ${
+              disabled={isSubmitting}
+              className={`w-full sm:w-auto py-2 sm:py-2.5 px-6 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 isSubmitting
-                  ? "bg-stone-700 text-stone-400 cursor-wait shadow-none"
-                  : !customerName.trim()
-                  ? "bg-stone-800 text-stone-400 border-2 border-stone-700 cursor-not-allowed opacity-75 shadow-none"
-                  : total <= 0
-                  ? "bg-stone-800 text-stone-400 border-2 border-stone-700 cursor-not-allowed opacity-75 shadow-none"
-                  : !isDepositValid
-                  ? "bg-stone-800 text-amber-400 border-2 border-dashed border-amber-500/50 cursor-not-allowed opacity-80 shadow-none"
-                  : "bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:from-emerald-500 hover:to-emerald-600 text-white shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/40 border-2 border-emerald-300 active:scale-98 cursor-pointer animate-in fade-in"
+                  ? "bg-stone-400 text-stone-200 cursor-wait shadow-none"
+                  : !isReadyToConfirm
+                  ? "bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 shadow-sm"
+                  : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-900/30 active:scale-95"
               }`}
             >
-              <span>
-                {isSubmitting ? (
-                  "⏳"
-                ) : !isReadyToConfirm ? (
-                  "🔒"
-                ) : (
-                  <Sparkles className="w-5 h-5 text-amber-200 animate-pulse" />
-                )}
-              </span>
-              <span>
-                {isSubmitting
-                  ? "Validando y Guardando Pedido..."
-                  : !customerName.trim()
-                  ? "Paso 1: Escribe el nombre del cliente"
-                  : total <= 0
-                  ? "Paso 2: Indica el monto total del pedido"
-                  : !isDepositValid
-                  ? `Paso 4: Requiere mínimo el 50% de anticipo (${formatCurrency(minRequiredDeposit)})`
-                  : `DAR ACCESO A LA COMPRA • VALIDAR PEDIDO (${formatCurrency(numericDeposit)})`}
-              </span>
+              {isSubmitting ? (
+                <>
+                  <span className="text-xs">⏳</span>
+                  <span>Confirmando...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 text-emerald-300" />
+                  <span>Confirmar Compra</span>
+                </>
+              )}
             </button>
           </div>
         </form>

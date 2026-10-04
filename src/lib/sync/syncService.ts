@@ -216,16 +216,24 @@ export async function processSyncQueue(): Promise<{
   for (const item of queue) {
     try {
       if (item.type === "sale") {
-        const { total, paymentMethod, cashier, items } = item.data;
+        const { saleId, date, total, paymentMethod, cashier, items, customerId, customerName, customerType, branchId } = item.data;
+        const sId = saleId || `POS-${Date.now().toString().slice(-6)}`;
+        const sDate = date || item.createdAt || new Date().toISOString();
 
         // 1. Intentar insertar encabezado de venta en Supabase
         const { data: saleData, error: saleErr } = await supabase
           .from("sales")
-          .insert({
+          .upsert({
+            id: sId,
+            date: sDate,
             total: Number(total),
             payment_method: paymentMethod || "efectivo",
             cashier: cashier || "Caja Mostrador",
-          })
+            customer_id: customerId && !customerId.startsWith("cli-") ? customerId : null,
+            customer_name: customerName || "Público General",
+            customer_type: customerType || "general",
+            branch_id: branchId || item.branchId || "branch-matriz",
+          }, { onConflict: "id" })
           .select()
           .single();
 
@@ -245,18 +253,19 @@ export async function processSyncQueue(): Promise<{
         if (saleData && Array.isArray(items) && items.length > 0) {
           const itemsPayload = items.map((it: any) => ({
             sale_id: saleData.id,
-            product_id: it.productId && it.productId.includes("-") ? it.productId : null,
+            product_id: it.productId && it.productId !== "temp" ? it.productId : null,
             product_name: it.name || it.productName || "Producto",
             quantity: Number(it.quantity) || 1,
             unit_price: Number(it.price || it.unitPrice) || 0,
             subtotal: Number(it.subtotal) || 0,
           }));
 
+          await supabase.from("sale_items").delete().eq("sale_id", saleData.id);
           await supabase.from("sale_items").insert(itemsPayload);
 
           // 3. Descontar stock en Supabase
           for (const it of items) {
-            if (it.productId && it.productId.includes("-")) {
+            if (it.productId && it.productId !== "temp") {
               try {
                 const { data: currentProd } = await supabase
                   .from("products")
@@ -278,13 +287,15 @@ export async function processSyncQueue(): Promise<{
 
         syncedCount++;
       } else if (item.type === "expense") {
-        const { amount, category, description, cashier } = item.data;
-        const { error: expErr } = await supabase.from("cash_expenses").insert({
+        const { id: expId, amount, category, description, cashier, branchId } = item.data || {};
+        const { error: expErr } = await supabase.from("cash_expenses").upsert({
+          id: expId || item.id || `exp-${Date.now()}`,
           amount: Number(amount),
           category: category || "general",
           description: description || "Gasto de caja",
           cashier: cashier || "Don Toño Brito",
-        });
+          branch_id: branchId || item.branchId || "branch-matriz",
+        }, { onConflict: "id" });
 
         if (expErr && (expErr.code === "PGRST205" || expErr.message?.includes("schema cache"))) {
           archiveOfflineItem(item, "Gasto archivado en disco local");
@@ -295,14 +306,16 @@ export async function processSyncQueue(): Promise<{
         if (expErr) throw new Error(expErr.message);
         syncedCount++;
       } else if (item.type === "income") {
-        const { amount, category, concept, cashier } = item.data;
-        const { error: incErr } = await supabase.from("cash_movements").insert({
+        const { id: incId, amount, category, concept, cashier, branchId } = item.data || {};
+        const { error: incErr } = await supabase.from("cash_movements").upsert({
+          id: incId || item.id || `mov-${Date.now()}`,
           type: "entrada",
           category: category || "general",
           amount: Number(amount),
           reason: concept || "Entrada de caja",
           authorized_by: cashier || "Don Toño Brito",
-        });
+          branch_id: branchId || item.branchId || "branch-matriz",
+        }, { onConflict: "id" });
 
         if (incErr && (incErr.code === "PGRST205" || incErr.message?.includes("schema cache"))) {
           archiveOfflineItem(item, "Entrada archivada en disco local");
@@ -358,6 +371,315 @@ function archiveOfflineItem(item: SyncItem, reason: string) {
     list.unshift({ ...item, archivedAt: new Date().toISOString(), archiveReason: reason });
     localStorage.setItem(STORAGE_OFFLINE_ARCHIVE_KEY, JSON.stringify(list.slice(0, 500)));
   } catch {}
+}
+
+// ─── CACHE DE REGISTROS YA SINCRONIZADOS A SUPABASE ───────────────────────
+const SYNCED_RECORDS_CACHE_KEY = "brito_synced_records_cache";
+
+export function getSyncedRecordIds(): Set<string> {
+  if (typeof window === "undefined") return new Set<string>();
+  try {
+    const raw = localStorage.getItem(SYNCED_RECORDS_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return new Set(parsed);
+    }
+  } catch {}
+  return new Set<string>();
+}
+
+export function markRecordIdsAsSynced(ids: string[]): void {
+  if (typeof window === "undefined" || ids.length === 0) return;
+  try {
+    const set = getSyncedRecordIds();
+    ids.forEach((id) => {
+      if (id && typeof id === "string") set.add(id);
+    });
+    const array = Array.from(set).slice(-3000);
+    localStorage.setItem(SYNCED_RECORDS_CACHE_KEY, JSON.stringify(array));
+  } catch {}
+}
+
+// ─── SINCRONIZACIÓN MASIVA Y RÁPIDA DE MOVIMIENTOS A LA NUBE (EN LOTES) ─────
+export async function syncAllLocalDataToSupabase(): Promise<{
+  success: boolean;
+  salesSynced: number;
+  expensesSynced: number;
+  incomesSynced: number;
+  customersSynced: number;
+  ordersSynced: number;
+  errors: string[];
+}> {
+  if (typeof window === "undefined") {
+    return { success: false, salesSynced: 0, expensesSynced: 0, incomesSynced: 0, customersSynced: 0, ordersSynced: 0, errors: ["No browser window"] };
+  }
+
+  const status = await checkRealOnlineStatus();
+  if (!status.isOnline) {
+    return { success: false, salesSynced: 0, expensesSynced: 0, incomesSynced: 0, customersSynced: 0, ordersSynced: 0, errors: ["Sin conexión a internet"] };
+  }
+
+  const supabase = createClient();
+  const syncedIds = getSyncedRecordIds();
+
+  let salesSynced = 0;
+  let expensesSynced = 0;
+  let incomesSynced = 0;
+  let customersSynced = 0;
+  let ordersSynced = 0;
+  const errors: string[] = [];
+
+  // 1. Sincronizar Clientes Locales (en lote, solo no sincronizados)
+  try {
+    const rawCust = localStorage.getItem("brito_customers");
+    if (rawCust) {
+      const custs = JSON.parse(rawCust);
+      if (Array.isArray(custs)) {
+        const unsyncedCusts = custs.filter((c) => c.id && c.id !== "cli-0" && c.name !== "Público en General" && !syncedIds.has(c.id));
+        if (unsyncedCusts.length > 0) {
+          const custPayloads = unsyncedCusts.map((c) => ({
+            id: c.id,
+            name: c.name,
+            phone: c.phone && c.phone !== "N/A" ? c.phone : null,
+            email: c.email || null,
+            address: c.address || null,
+            type: c.type || "frecuente",
+            credit_limit: Number(c.creditLimit) || 0,
+            current_debt: Number(c.currentDebt) || 0,
+            total_purchases: Number(c.totalPurchases) || 0,
+            notes: c.notes || null,
+          }));
+          const { error: cErr } = await supabase.from("customers").upsert(custPayloads, { onConflict: "id" });
+          if (!cErr) {
+            customersSynced = unsyncedCusts.length;
+            markRecordIdsAsSynced(unsyncedCusts.map((c) => c.id));
+          } else {
+            errors.push("Clientes: " + cErr.message);
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    errors.push("Clientes: " + e.message);
+  }
+
+  // 2. Sincronizar Ventas Locales (en lotes de 40 para ultra-rapidez)
+  try {
+    const salesMap = new Map<string, any>();
+    const rawCur = localStorage.getItem("brito_pos_current_sales");
+    if (rawCur) {
+      const list = JSON.parse(rawCur);
+      if (Array.isArray(list)) list.forEach((s) => s.id && salesMap.set(s.id, s));
+    }
+    const rawMaster = localStorage.getItem("brito_pos_master_sales");
+    if (rawMaster) {
+      const list = JSON.parse(rawMaster);
+      if (Array.isArray(list)) list.forEach((s) => s.id && !salesMap.has(s.id) && salesMap.set(s.id, s));
+    }
+
+    const unsyncedSales = Array.from(salesMap.values()).filter((s) => s.id && !syncedIds.has(s.id));
+
+    if (unsyncedSales.length > 0) {
+      // Procesar en chunks de 40 para no exceder límites de Supabase
+      const CHUNK_SIZE = 40;
+      for (let i = 0; i < unsyncedSales.length; i += CHUNK_SIZE) {
+        const chunk = unsyncedSales.slice(i, i + CHUNK_SIZE);
+        const salesPayload = chunk.map((sale) => {
+          const sDate = sale.date || sale.createdAt || new Date().toISOString();
+          return {
+            id: sale.id,
+            date: sDate,
+            total: Number(sale.total) || 0,
+            payment_method: sale.paymentMethod || "efectivo",
+            cashier: sale.cashier || "Don Toño Brito",
+            customer_id: sale.customerId && !sale.customerId.startsWith("cli-") ? sale.customerId : null,
+            customer_name: sale.customerName || "Público General",
+            customer_type: sale.customerType || "general",
+            branch_id: sale.branchId || "branch-matriz",
+            payment_reference: sale.paymentReference || null,
+            transfer_account: sale.transferAccount || null,
+            card_terminal: sale.cardTerminal || null,
+            cash_given: sale.cashGiven || null,
+            change: sale.change || null,
+          };
+        });
+
+        const { error: sErr } = await supabase.from("sales").upsert(salesPayload, { onConflict: "id" });
+        if (!sErr) {
+          salesSynced += chunk.length;
+
+          // Partidas de las ventas en este lote
+          const itemsPayload: any[] = [];
+          chunk.forEach((sale) => {
+            if (Array.isArray(sale.items) && sale.items.length > 0) {
+              sale.items.forEach((it: any) => {
+                itemsPayload.push({
+                  sale_id: sale.id,
+                  product_id: it.product?.id || it.productId || null,
+                  product_name: it.product?.name || it.name || "Pan",
+                  quantity: Number(it.quantity) || 1,
+                  unit_price: Number(it.product?.price || it.unitPrice || it.price) || 0,
+                  subtotal: Number(it.product?.price || it.unitPrice || it.price || 0) * (Number(it.quantity) || 1),
+                });
+              });
+            }
+          });
+
+          if (itemsPayload.length > 0) {
+            const chunkSaleIds = chunk.map((s) => s.id);
+            await supabase.from("sale_items").delete().in("sale_id", chunkSaleIds);
+            await supabase.from("sale_items").insert(itemsPayload);
+          }
+
+          markRecordIdsAsSynced(chunk.map((s) => s.id));
+        } else {
+          errors.push("Ventas: " + sErr.message);
+        }
+      }
+    }
+  } catch (e: any) {
+    errors.push("Ventas: " + e.message);
+  }
+
+  // 3. Sincronizar Gastos Locales (en lote)
+  try {
+    const expensesMap = new Map<string, any>();
+    const rawExp1 = localStorage.getItem("brito_expenses");
+    if (rawExp1) {
+      const list = JSON.parse(rawExp1);
+      if (Array.isArray(list)) list.forEach((e) => e.id && expensesMap.set(e.id, e));
+    }
+    const rawExp2 = localStorage.getItem("brito_pos_current_expenses");
+    if (rawExp2) {
+      const list = JSON.parse(rawExp2);
+      if (Array.isArray(list)) list.forEach((e) => e.id && !expensesMap.has(e.id) && expensesMap.set(e.id, e));
+    }
+
+    const unsyncedExpenses = Array.from(expensesMap.values()).filter((e) => e.id && !syncedIds.has(e.id));
+    if (unsyncedExpenses.length > 0) {
+      const expPayload = unsyncedExpenses.map((exp) => ({
+        id: exp.id,
+        amount: Number(exp.amount) || 0,
+        category: exp.category || "general",
+        description: exp.description || exp.reason || "Gasto de caja",
+        cashier: exp.cashier || "Don Toño Brito",
+        branch_id: exp.branchId || "branch-matriz",
+      }));
+      const movPayload = unsyncedExpenses.map((exp) => ({
+        id: `mov-${exp.id}`,
+        type: "salida",
+        category: exp.category || "general",
+        amount: Number(exp.amount) || 0,
+        reason: exp.description || exp.reason || "Gasto",
+        authorized_by: exp.cashier || "Don Toño Brito",
+        branch_id: exp.branchId || "branch-matriz",
+      }));
+
+      await supabase.from("cash_expenses").upsert(expPayload, { onConflict: "id" });
+      await supabase.from("cash_movements").upsert(movPayload, { onConflict: "id" });
+      expensesSynced = unsyncedExpenses.length;
+      markRecordIdsAsSynced(unsyncedExpenses.map((e) => e.id));
+    }
+  } catch (e: any) {
+    errors.push("Gastos: " + e.message);
+  }
+
+  // 4. Sincronizar Ingresos Locales (en lote)
+  try {
+    const incomesMap = new Map<string, any>();
+    const rawInc1 = localStorage.getItem("brito_incomes_v2");
+    if (rawInc1) {
+      const list = JSON.parse(rawInc1);
+      if (Array.isArray(list)) list.forEach((i) => i.id && incomesMap.set(i.id, i));
+    }
+    const rawInc2 = localStorage.getItem("brito_cash_incomes");
+    if (rawInc2) {
+      const list = JSON.parse(rawInc2);
+      if (Array.isArray(list)) list.forEach((i) => i.id && !incomesMap.has(i.id) && incomesMap.set(i.id, i));
+    }
+    const rawInc3 = localStorage.getItem("brito_pos_current_incomes");
+    if (rawInc3) {
+      const list = JSON.parse(rawInc3);
+      if (Array.isArray(list)) list.forEach((i) => i.id && !incomesMap.has(i.id) && incomesMap.set(i.id, i));
+    }
+
+    const unsyncedIncomes = Array.from(incomesMap.values()).filter((i) => i.id && !syncedIds.has(i.id));
+    if (unsyncedIncomes.length > 0) {
+      const incPayload = unsyncedIncomes.map((inc) => ({
+        id: inc.id,
+        type: "entrada",
+        category: inc.category || "general",
+        amount: Number(inc.amount) || 0,
+        reason: inc.concept || inc.reason || "Ingreso de caja",
+        authorized_by: inc.cashier || "Don Toño Brito",
+        branch_id: inc.branchId || "branch-matriz",
+      }));
+      await supabase.from("cash_movements").upsert(incPayload, { onConflict: "id" });
+      incomesSynced = unsyncedIncomes.length;
+      markRecordIdsAsSynced(unsyncedIncomes.map((i) => i.id));
+    }
+  } catch (e: any) {
+    errors.push("Ingresos: " + e.message);
+  }
+
+  // 5. Sincronizar Pedidos Especiales (en lote)
+  try {
+    const ordersMap = new Map<string, any>();
+    const rawOrd1 = localStorage.getItem("brito_custom_orders");
+    if (rawOrd1) {
+      const list = JSON.parse(rawOrd1);
+      if (Array.isArray(list)) list.forEach((o) => o.id && ordersMap.set(o.id, o));
+    }
+    const rawOrd2 = localStorage.getItem("brito_orders");
+    if (rawOrd2) {
+      const list = JSON.parse(rawOrd2);
+      if (Array.isArray(list)) list.forEach((o) => o.id && !ordersMap.has(o.id) && ordersMap.set(o.id, o));
+    }
+
+    const unsyncedOrders = Array.from(ordersMap.values()).filter((o) => o.id && !syncedIds.has(o.id));
+    if (unsyncedOrders.length > 0) {
+      const ordPayload = unsyncedOrders.map((ord) => ({
+        id: ord.id,
+        order_number: ord.orderNumber || ord.id,
+        customer_name: ord.customerName || "Cliente",
+        phone: ord.phone || "N/A",
+        branch_id: ord.branchId || "branch-matriz",
+        branch_name: ord.branchName || "Sucursal Matriz",
+        description: ord.description || "Pedido de pastelería",
+        items: Array.isArray(ord.items) ? ord.items : [],
+        delivery_date: ord.deliveryDate || new Date().toISOString().split("T")[0],
+        delivery_time: ord.deliveryTime || "16:00",
+        status: ord.status || "pendiente",
+        total: Number(ord.total) || 0,
+        deposit: Number(ord.deposit) || 0,
+        remaining_balance: Number(ord.remainingBalance) || 0,
+        payment_status: ord.paymentStatus || "anticipo",
+        cashier: ord.cashier || "Don Toño Brito",
+      }));
+      await supabase.from("custom_orders").upsert(ordPayload, { onConflict: "id" });
+      ordersSynced = unsyncedOrders.length;
+      markRecordIdsAsSynced(unsyncedOrders.map((o) => o.id));
+    }
+  } catch (e: any) {
+    errors.push("Pedidos: " + e.message);
+  }
+
+  // 6. Procesar cola de ítems offline pendientes solo si hay registros en cola
+  if (getPendingSyncCount() > 0) {
+    await processSyncQueue();
+  }
+
+  setLastSyncTime(new Date().toISOString());
+
+  return {
+    success: true,
+    salesSynced,
+    expensesSynced,
+    incomesSynced,
+    customersSynced,
+    ordersSynced,
+    errors,
+  };
 }
 
 // ─── DESCARGA Y PRECARGA DE DATOS EN LA COMPUTADORA (OFFLINE COMPLETO) ────────

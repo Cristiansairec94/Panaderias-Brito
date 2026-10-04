@@ -33,6 +33,9 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem("brito_sidebar_collapsed");
       if (saved !== null) {
         setIsCollapsed(JSON.parse(saved));
+      } else if (typeof window !== "undefined" && window.innerWidth < 1280) {
+        // En pantallas compactas (laptops 1366px, monitores POS 1024x768), iniciar colapsado para dar máximo espacio
+        setIsCollapsed(true);
       }
     } catch {
       // Ignore localStorage errors

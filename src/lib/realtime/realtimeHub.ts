@@ -2,7 +2,20 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { FBNotification } from "@/context/NotificationContext";
-import { BranchCashMovement, CustomOrder } from "@/types";
+import { BranchCashMovement, CustomOrder, Branch, ShiftCutRecord } from "@/types";
+
+export interface RealtimeBranchPayload {
+  action: "create" | "update" | "delete";
+  branch: Branch;
+  senderDeviceId: string;
+  timestamp: string;
+}
+
+export interface RealtimeShiftCutPayload {
+  cut: ShiftCutRecord;
+  senderDeviceId: string;
+  timestamp: string;
+}
 
 export interface RealtimeSalePayload {
   id: string;
@@ -14,6 +27,10 @@ export interface RealtimeSalePayload {
   itemsSummary: string;
   timestamp: string;
   senderDeviceId: string;
+  items?: any[];
+  customerName?: string;
+  date?: string;
+  createdAt?: string;
 }
 
 export interface RealtimeCashMovementPayload {
@@ -21,11 +38,12 @@ export interface RealtimeCashMovementPayload {
   branchId: string;
   branchName: string;
   type: "entrada" | "salida";
-  category: BranchCashMovement["category"];
-  categoryLabel: string;
+  category?: BranchCashMovement["category"];
+  categoryLabel?: string;
   amount: number;
   reason: string;
-  authorizedBy: string;
+  authorizedBy?: string;
+  cashier?: string;
   timestamp: string;
   senderDeviceId: string;
 }
@@ -54,6 +72,8 @@ type SaleListener = (sale: RealtimeSalePayload) => void;
 type CashMovementListener = (movement: RealtimeCashMovementPayload) => void;
 type OrderListener = (payload: RealtimeOrderPayload) => void;
 type BreadDeliveryListener = (delivery: RealtimeBreadDeliveryPayload) => void;
+type BranchListener = (payload: RealtimeBranchPayload) => void;
+type ShiftCutListener = (cut: ShiftCutRecord) => void;
 type StatusListener = (status: RealtimeStatus) => void;
 
 const CHANNEL_NAME = "panaderia_brito_realtime";
@@ -62,6 +82,9 @@ const LAST_SYNC_TIMESTAMP_KEY = "brito_last_realtime_sync_ts";
 
 class RealtimeHub {
   private deviceId: string = "";
+  private tabId: string = typeof window !== "undefined" ? `tab_${Date.now()}_${Math.random().toString(36).substring(2, 8)}` : "tab_srv";
+  private localBroadcastChannel: BroadcastChannel | null = null;
+  private seenEventIds = new Set<string>();
   private channel: any = null;
   private status: RealtimeStatus = "disconnected";
   private initialized = false;
@@ -71,11 +94,26 @@ class RealtimeHub {
   private cashMovementListeners = new Set<CashMovementListener>();
   private orderListeners = new Set<OrderListener>();
   private breadDeliveryListeners = new Set<BreadDeliveryListener>();
+  private branchListeners = new Set<BranchListener>();
+  private shiftCutListeners = new Set<ShiftCutListener>();
   private statusListeners = new Set<StatusListener>();
 
   constructor() {
     if (typeof window !== "undefined") {
       this.deviceId = this.getOrCreateDeviceId();
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          this.localBroadcastChannel = new BroadcastChannel("brito_realtime_local_bus");
+          this.localBroadcastChannel.onmessage = (event) => {
+            if (!event || !event.data) return;
+            const { type, payload, senderTabId } = event.data;
+            if (senderTabId && senderTabId === this.tabId) return;
+            this.dispatchLocalEvent(type, payload);
+          };
+        } catch (e) {
+          console.warn("[RealtimeHub] Error inicializando BroadcastChannel:", e);
+        }
+      }
       this.initChannel();
       this.setupVisibilityListeners();
     }
@@ -86,6 +124,10 @@ class RealtimeHub {
       this.deviceId = this.getOrCreateDeviceId();
     }
     return this.deviceId;
+  }
+
+  public getTabId(): string {
+    return this.tabId;
   }
 
   private getOrCreateDeviceId(): string {
@@ -117,6 +159,36 @@ class RealtimeHub {
     }
   }
 
+  public dispatchLocalEvent(type: string, payload: any) {
+    if (!payload) return;
+    const eventId = payload.id || (payload.order && payload.order.id) || null;
+    if (eventId) {
+      if (this.seenEventIds.has(eventId)) return;
+      this.seenEventIds.add(eventId);
+      if (this.seenEventIds.size > 2000) {
+        const first = this.seenEventIds.values().next().value;
+        if (first) this.seenEventIds.delete(first);
+      }
+    }
+
+    if (type === "notification") {
+      this.notificationListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "sale") {
+      this.saleListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "cash_movement") {
+      this.cashMovementListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "order") {
+      this.orderListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "bread_delivery") {
+      this.breadDeliveryListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "branch") {
+      this.branchListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "shift_cut") {
+      const cutData = payload?.cut || payload;
+      this.shiftCutListeners.forEach((fn) => { try { fn(cutData); } catch (err) { console.error(err); } });
+    }
+  }
+
   private initChannel() {
     if (typeof window === "undefined" || this.channel) return;
     this.setStatus("connecting");
@@ -126,72 +198,44 @@ class RealtimeHub {
       this.channel = supabase.channel(CHANNEL_NAME, {
         config: {
           broadcast: {
-            self: false, // No recibir nuestros propios eventos emitidos
+            self: false,
           },
         },
       });
 
       this.channel
         .on("broadcast", { event: "notification" }, ({ payload }: { payload: any }) => {
-          if (!payload) return;
-          if (payload.senderDeviceId && payload.senderDeviceId === this.getDeviceId()) return;
-          this.notificationListeners.forEach((listener) => {
-            try {
-              listener(payload);
-            } catch (err) {
-              console.error("[RealtimeHub] Error in notification listener:", err);
-            }
-          });
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("notification", payload);
         })
         .on("broadcast", { event: "sale" }, ({ payload }: { payload: any }) => {
-          if (!payload) return;
-          if (payload.senderDeviceId && payload.senderDeviceId === this.getDeviceId()) return;
-          this.saleListeners.forEach((listener) => {
-            try {
-              listener(payload);
-            } catch (err) {
-              console.error("[RealtimeHub] Error in sale listener:", err);
-            }
-          });
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("sale", payload);
         })
         .on("broadcast", { event: "cash_movement" }, ({ payload }: { payload: any }) => {
-          if (!payload) return;
-          if (payload.senderDeviceId && payload.senderDeviceId === this.getDeviceId()) return;
-          this.cashMovementListeners.forEach((listener) => {
-            try {
-              listener(payload);
-            } catch (err) {
-              console.error("[RealtimeHub] Error in cash movement listener:", err);
-            }
-          });
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("cash_movement", payload);
         })
         .on("broadcast", { event: "order" }, ({ payload }: { payload: any }) => {
-          if (!payload) return;
-          if (payload.senderDeviceId && payload.senderDeviceId === this.getDeviceId()) return;
-          this.orderListeners.forEach((listener) => {
-            try {
-              listener(payload);
-            } catch (err) {
-              console.error("[RealtimeHub] Error in order listener:", err);
-            }
-          });
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("order", payload);
         })
         .on("broadcast", { event: "bread_delivery" }, ({ payload }: { payload: any }) => {
-          if (!payload) return;
-          if (payload.senderDeviceId && payload.senderDeviceId === this.getDeviceId()) return;
-          this.breadDeliveryListeners.forEach((listener) => {
-            try {
-              listener(payload);
-            } catch (err) {
-              console.error("[RealtimeHub] Error in bread delivery listener:", err);
-            }
-          });
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("bread_delivery", payload);
+        })
+        .on("broadcast", { event: "branch" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("branch", payload);
+        })
+        .on("broadcast", { event: "shift_cut" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("shift_cut", payload);
         })
         .subscribe((channelStatus: string) => {
           if (channelStatus === "SUBSCRIBED") {
             this.setStatus("connected");
             console.log("[RealtimeHub] Conectado al canal en tiempo real:", CHANNEL_NAME);
-            // Al conectar exitosamente, sincronizar eventos perdidos
             this.fetchCatchupEvents();
           } else if (channelStatus === "CLOSED" || channelStatus === "CHANNEL_ERROR") {
             this.setStatus("disconnected");
@@ -219,7 +263,6 @@ class RealtimeHub {
 
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
-        console.log("[RealtimeHub] Pantalla activa. Ejecutando sincronización de catch-up...");
         if (this.status !== "connected") {
           this.reconnect();
         }
@@ -230,6 +273,15 @@ class RealtimeHub {
     window.addEventListener("focus", () => {
       this.fetchCatchupEvents();
     });
+
+    // Heartbeat periódico cada 1 segundo para sincronización instantánea y sin demoras
+    setInterval(() => {
+      this.fetchCatchupEvents();
+    }, 1000);
+  }
+
+  public async triggerSyncNow() {
+    return this.fetchCatchupEvents();
   }
 
   public reconnect() {
@@ -302,7 +354,42 @@ class RealtimeHub {
     this.postToSyncEndpoint("bread_delivery", payload);
   }
 
+  public async broadcastBranch(action: RealtimeBranchPayload["action"], branch: Branch) {
+    const payload: RealtimeBranchPayload = {
+      action,
+      branch,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+
+    this.sendBroadcast("branch", payload);
+    this.postToSyncEndpoint("branch", payload);
+  }
+
+  public async broadcastShiftCut(cut: ShiftCutRecord) {
+    const payload: RealtimeShiftCutPayload = {
+      cut,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+
+    this.sendBroadcast("shift_cut", payload);
+    this.postToSyncEndpoint("shift_cut", payload);
+  }
+
   private sendBroadcast(event: string, payload: any) {
+    const payloadWithTab = { ...payload, senderTabId: this.tabId };
+
+    // 1. Inmediato en la misma máquina entre pestañas y perfiles (0 ms)
+    if (this.localBroadcastChannel) {
+      try {
+        this.localBroadcastChannel.postMessage({ type: event, payload: payloadWithTab, senderTabId: this.tabId });
+      } catch (err) {
+        console.warn("[RealtimeHub] Error local BroadcastChannel:", err);
+      }
+    }
+
+    // 2. Supabase WebSocket Broadcast hacia otros celulares y computadoras
     if (!this.channel) {
       this.initChannel();
     }
@@ -311,7 +398,7 @@ class RealtimeHub {
         this.channel.send({
           type: "broadcast",
           event,
-          payload,
+          payload: payloadWithTab,
         }).catch((err: any) => {
           console.warn(`[RealtimeHub] Error sending ${event} broadcast:`, err);
         });
@@ -329,8 +416,9 @@ class RealtimeHub {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
-          payload,
+          payload: { ...payload, senderTabId: this.tabId },
           senderDeviceId: this.getDeviceId(),
+          senderTabId: this.tabId,
           timestamp: Date.now(),
         }),
       }).catch(() => {});
@@ -347,24 +435,21 @@ class RealtimeHub {
       if (!res.ok) return;
 
       const data = await res.json();
-      if (!data || !Array.isArray(data.events) || data.events.length === 0) return;
+      if (!data) return;
 
-      localStorage.setItem(LAST_SYNC_TIMESTAMP_KEY, Date.now().toString());
+      if (data.serverTime) {
+        localStorage.setItem(LAST_SYNC_TIMESTAMP_KEY, data.serverTime.toString());
+      } else {
+        localStorage.setItem(LAST_SYNC_TIMESTAMP_KEY, Date.now().toString());
+      }
+
+      if (!Array.isArray(data.events) || data.events.length === 0) return;
 
       for (const item of data.events) {
-        if (item.senderDeviceId === this.getDeviceId()) continue;
+        if (item.senderTabId && item.senderTabId === this.tabId) continue;
+        if (item.payload?.senderTabId && item.payload.senderTabId === this.tabId) continue;
 
-        if (item.type === "notification") {
-          this.notificationListeners.forEach((fn) => fn(item.payload));
-        } else if (item.type === "sale") {
-          this.saleListeners.forEach((fn) => fn(item.payload));
-        } else if (item.type === "cash_movement") {
-          this.cashMovementListeners.forEach((fn) => fn(item.payload));
-        } else if (item.type === "order") {
-          this.orderListeners.forEach((fn) => fn(item.payload));
-        } else if (item.type === "bread_delivery") {
-          this.breadDeliveryListeners.forEach((fn) => fn(item.payload));
-        }
+        this.dispatchLocalEvent(item.type, item.payload);
       }
     } catch {
       // Ignorar errores de red en catchup silencioso
@@ -405,6 +490,20 @@ class RealtimeHub {
     this.breadDeliveryListeners.add(listener);
     return () => {
       this.breadDeliveryListeners.delete(listener);
+    };
+  }
+
+  public onBranch(listener: BranchListener) {
+    this.branchListeners.add(listener);
+    return () => {
+      this.branchListeners.delete(listener);
+    };
+  }
+
+  public onShiftCut(listener: ShiftCutListener) {
+    this.shiftCutListeners.add(listener);
+    return () => {
+      this.shiftCutListeners.delete(listener);
     };
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -29,18 +29,15 @@ export default function MobileBottomNav() {
   const { isMobileOpen, toggleMobile, setMobileOpen } = useSidebar();
   
   const [showNotifications, setShowNotifications] = useState(false);
-  const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">("all");
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [activeItemMenu, setActiveItemMenu] = useState<string | null>(null);
-  const [showBanner, setShowBanner] = useState(true);
 
   const {
     notifications,
     unreadCount,
     soundEnabled,
-    nativePermission,
     realtimeStatus,
-    requestNativePermission,
     toggleSound,
     markAsRead,
     markAsUnread,
@@ -48,6 +45,14 @@ export default function MobileBottomNav() {
     deleteNotification,
     clearAll,
   } = useNotifications();
+
+  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+
+  useEffect(() => {
+    if (!isAdmin && activeTab === "cortes") {
+      setActiveTab("all");
+    }
+  }, [isAdmin, activeTab]);
 
   // Si no hay usuario logueado, no mostrar la barra
   if (!user) return null;
@@ -73,8 +78,13 @@ export default function MobileBottomNav() {
     setShowNotifications((prev) => !prev);
   };
 
+  const cortesCount = notifications.filter((n) => n.category === "caja").length;
+  const pedidosCount = notifications.filter((n) => n.category === "pedidos").length;
+
   const filtered = notifications.filter((n) => {
     if (activeTab === "unread") return !n.read;
+    if (activeTab === "cortes") return n.category === "caja";
+    if (activeTab === "pedidos") return n.category === "pedidos";
     return true;
   });
 
@@ -180,24 +190,48 @@ export default function MobileBottomNav() {
               </div>
 
               {/* Botones de filtro y enlace marcar todo como leído */}
-              <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <div className="flex items-center gap-1.5 mt-3 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setActiveTab("all")}
-                  className={`px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
                     activeTab === "all"
-                      ? "bg-[#ebe4dc] text-stone-900 font-semibold shadow-2xs border border-transparent"
+                      ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
                       : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
                   }`}
                 >
                   Todas ({notifications.length})
                 </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("cortes")}
+                    className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                      activeTab === "cortes"
+                        ? "bg-amber-100 text-amber-950 font-bold shadow-2xs border border-amber-300"
+                        : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                    }`}
+                  >
+                    🏁 Cierres ({cortesCount})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("pedidos")}
+                  className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer flex items-center gap-1 ${
+                    activeTab === "pedidos"
+                      ? "bg-purple-100 text-purple-950 font-bold shadow-2xs border border-purple-300"
+                      : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
+                  }`}
+                >
+                  🎂 Pedidos ({pedidosCount})
+                </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab("unread")}
-                  className={`px-3.5 py-1.5 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-full text-xs sm:text-[13px] transition-all cursor-pointer ${
                     activeTab === "unread"
-                      ? "bg-[#ebe4dc] text-stone-900 font-semibold shadow-2xs border border-transparent"
+                      ? "bg-[#ebe4dc] text-stone-900 font-bold shadow-2xs border border-transparent"
                       : "bg-transparent text-stone-700 font-medium border border-[#ded5cb] hover:bg-[#ede5dc]/60"
                   }`}
                 >
@@ -207,39 +241,11 @@ export default function MobileBottomNav() {
                   type="button"
                   onClick={markAllAsRead}
                   disabled={unreadCount === 0}
-                  className="text-[#c25425] hover:text-[#9e3f18] underline underline-offset-2 font-medium text-xs sm:text-[13px] ml-1.5 cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed transition-colors"
+                  className="text-[#c25425] hover:text-[#9e3f18] underline underline-offset-2 font-medium text-xs sm:text-[13px] ml-auto cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed transition-colors"
                 >
-                  Marcar todo como leído
+                  Marcar leídas
                 </button>
               </div>
-
-              {/* Banner de aviso móvil */}
-              {showBanner && (
-                <div className="bg-[#f4ede4] border border-[#ebdcd0] rounded-2xl p-2.5 sm:p-3 px-3.5 flex items-center justify-between gap-3 mt-3.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowBanner(false)}
-                      className="text-stone-400 hover:text-stone-700 transition-colors p-0.5 shrink-0"
-                      title="Descartar aviso"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                    <span className="text-xs sm:text-[13px] font-medium text-stone-800 truncate">
-                      Activar avisos en celular
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      requestNativePermission();
-                    }}
-                    className="bg-[#c25425] hover:bg-[#a8441b] text-white text-xs font-semibold px-4 py-1.5 rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
-                  >
-                    {nativePermission === "granted" ? "Activado" : "Activar"}
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Lista con scroll y tarjetas */}
@@ -247,8 +253,10 @@ export default function MobileBottomNav() {
               {filtered.length === 0 ? (
                 <div className="p-8 my-4 text-center text-stone-400 flex flex-col items-center justify-center space-y-2 bg-white/70 rounded-2xl border border-[#ede5dc]">
                   <Inbox className="w-10 h-10 text-stone-300 stroke-[1.5]" />
-                  <p className="font-bold text-sm text-stone-800">No hay notificaciones pendientes</p>
-                  <p className="text-xs text-stone-400">Te avisaremos con alertas de horno, pedidos o caja.</p>
+                  <p className="font-bold text-sm text-stone-800">No hay notificaciones</p>
+                  <p className="text-xs text-stone-500 max-w-xs text-center">
+                    Te avisaremos al instante sobre cierres de turno (si cuadró o no la caja) y nuevos pedidos realizados.
+                  </p>
                 </div>
               ) : (
                 <>

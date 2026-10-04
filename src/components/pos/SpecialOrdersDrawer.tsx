@@ -12,13 +12,15 @@ import {
   Send,
   CheckCircle2,
   RefreshCw,
-  Trash2
+  Trash2,
+  Eye
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
+import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 
 interface SpecialOrdersDrawerProps {
@@ -43,10 +45,11 @@ export default function SpecialOrdersDrawer({
   // Submodals
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<CustomOrder | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const loadOrders = () => {
-    const all = getStoredOrders();
+    const all = getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
     setOrders(all);
   };
 
@@ -65,9 +68,23 @@ export default function SpecialOrdersDrawer({
   // Filtered orders for this branch
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      // Branch filter if specified
-      if (branchId && order.branchId && order.branchId !== branchId) {
-        return false;
+      // Excluir 100% pedidos entregados o cancelados
+      if (order.status === "entregado" || order.status === "cancelado") return false;
+
+      // Branch filter if specified (visible en sucursal que levanta y sucursal que entrega)
+      if (branchId && branchId !== "all") {
+        const bId = branchId.toLowerCase().trim();
+        const bName = (branchName || "").toLowerCase().trim();
+        const oPickupId = String(order.branchId || (order as any).branch_id || "").toLowerCase().trim();
+        const oPickupName = String(order.branchName || (order as any).branch_name || "").toLowerCase().trim();
+        const oOperatingId = String((order as any).operatingBranchId || (order as any).operating_branch_id || "").toLowerCase().trim();
+        const oOperatingName = String((order as any).operatingBranchName || (order as any).operating_branch_name || "").toLowerCase().trim();
+
+        const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                              (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
+        const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                                 (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
+        if (!matchesPickup && !matchesOperating) return false;
       }
 
       // Search filter
@@ -84,7 +101,7 @@ export default function SpecialOrdersDrawer({
         return order.deliveryDate === todayStr;
       }
       if (filterMode === "saldo") {
-        return order.remainingBalance > 0 && order.status !== "cancelado";
+        return order.remainingBalance > 0;
       }
 
       return true;
@@ -111,8 +128,15 @@ export default function SpecialOrdersDrawer({
   };
 
   const handleQuickDeliver = (order: CustomOrder) => {
-    updateOrderStatus(order.id, "entregado");
-    loadOrders();
+    if (order.remainingBalance > 0) {
+      alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de $${order.remainingBalance.toFixed(2)} MXN.\n\nDebe estar 100% pagado antes de poder entregarse.`);
+      setSelectedOrderForPayment(order);
+      return;
+    }
+    if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
+      updateOrderStatus(order.id, "entregado");
+      loadOrders();
+    }
   };
 
   const handleDeleteOrder = (order: CustomOrder) => {
@@ -299,6 +323,15 @@ export default function SpecialOrdersDrawer({
                     </div>
                   </div>
 
+                  {/* Fila de Sucursales si difiere origen de entrega */}
+                  {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-300 bg-amber-950/70 border border-amber-850 px-2 py-0.5 rounded-lg">
+                      <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                      <span className="text-amber-500">➔</span>
+                      <span className="text-emerald-300">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                    </div>
+                  )}
+
                   {/* Fila 3: Fecha/Hora y Saldo Destacado */}
                   <div className="flex items-center justify-between gap-2 text-xs pt-1">
                     <div className="flex items-center gap-1.5 text-stone-400 text-[11px]">
@@ -344,6 +377,17 @@ export default function SpecialOrdersDrawer({
                       >
                         <Receipt className="w-3 h-3 text-amber-400" />
                         <span>Ticket</span>
+                      </button>
+
+                      {/* Detalles del Pedido */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOrderForDetail(order)}
+                        className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] font-bold border border-amber-500/30 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Ver detalles completos del pedido"
+                      >
+                        <Eye className="w-3 h-3 text-amber-400" />
+                        <span>Detalles</span>
                       </button>
 
                       {/* Eliminar Pedido */}
@@ -411,6 +455,73 @@ export default function SpecialOrdersDrawer({
           isOpen={!!selectedOrderForReceipt}
           onClose={() => setSelectedOrderForReceipt(null)}
           order={selectedOrderForReceipt}
+        />
+      )}
+
+      {/* Submodal: Detalles Completos del Pedido */}
+      {selectedOrderForDetail && (
+        <OrderDetailModal
+          isOpen={!!selectedOrderForDetail}
+          onClose={() => setSelectedOrderForDetail(null)}
+          order={selectedOrderForDetail}
+          onPrintReceipt={(o) => {
+            setSelectedOrderForDetail(null);
+            setSelectedOrderForReceipt(o);
+          }}
+          onOpenPayment={(o) => {
+            setSelectedOrderForDetail(null);
+            setSelectedOrderForPayment(o);
+          }}
+          onAdvanceStatus={(o) => {
+            let nextStatus: CustomOrder["status"] = o.status;
+            if (o.status === "pendiente" || o.status === "en_horno") nextStatus = "listo";
+            else if (o.status === "listo") {
+              if (o.remainingBalance > 0) {
+                alert(`⛔ No se puede entregar:\n\nEl pedido #${o.orderNumber} aún tiene un saldo pendiente de $${o.remainingBalance.toFixed(2)} MXN.\n\nDebe estar 100% pagado antes de entregarse.`);
+                setSelectedOrderForDetail(null);
+                setSelectedOrderForPayment(o);
+                return;
+              }
+              nextStatus = "entregado";
+            }
+            if (nextStatus !== o.status) {
+              updateOrderStatus(o.id, nextStatus);
+              loadOrders();
+              const updated = getStoredOrders().find((item) => item.id === o.id);
+              if (updated) setSelectedOrderForDetail(updated);
+            }
+          }}
+          onDeliverOrder={(o) => {
+            if (o.remainingBalance > 0) {
+              alert(`⛔ No se puede entregar:\n\nEl pedido #${o.orderNumber} aún tiene un saldo pendiente de $${o.remainingBalance.toFixed(2)} MXN.\n\nDebe estar 100% pagado antes de entregarse.`);
+              setSelectedOrderForDetail(null);
+              setSelectedOrderForPayment(o);
+              return;
+            }
+            if (confirm(`¿Confirmas marcar el pedido #${o.orderNumber} de "${o.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
+              updateOrderStatus(o.id, "entregado");
+              setSelectedOrderForDetail(null);
+              loadOrders();
+            }
+          }}
+          onDarDeBaja={(o) => {
+            const isCancelled = o.status === "cancelado";
+            const confirmMsg = isCancelled
+              ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`
+              : `¿Estás seguro de DAR DE BAJA el pedido ${o.orderNumber} de "${o.customerName}"?\n\nEl pedido se marcará como dado de baja y te mandaremos directo al historial de "Productos que se dieron de baja".`;
+            if (confirm(confirmMsg)) {
+              if (isCancelled) {
+                deleteCustomOrder(o.id);
+              } else {
+                updateOrderStatus(o.id, "cancelado");
+              }
+              setSelectedOrderForDetail(null);
+              loadOrders();
+              if (!isCancelled && typeof window !== "undefined") {
+                window.location.href = "/pedidos?filter=cancelados";
+              }
+            }
+          }}
         />
       )}
 

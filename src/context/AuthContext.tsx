@@ -9,93 +9,109 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
     canAccessDashboard: true,
     canAccessPos: true,
-    canAccessCaja: true,
-    canAccessInventario: true,
+    canAccessSucursales: true,
     canAccessPedidos: true,
     canAccessClientes: true,
+    canAccessProductos: true,
+    canEditPrices: true,
+    canAccessIngresos: true,
+    canAccessGastos: true,
     canAccessFinanzas: true,
+    canAccessCaja: true,
+    canViewProfitMargins: true,
     canAccessReportes: true,
     canAccessConfiguracion: true,
-    canAccessProductos: true,
-    canViewProfitMargins: true,
-    canEditPrices: true,
     canManageUsers: true,
+    canAccessInventario: true,
   },
   auxiliar_admin: {
     canAccessDashboard: true,
     canAccessPos: false,
-    canAccessCaja: true,
-    canAccessInventario: true,
+    canAccessSucursales: true,
     canAccessPedidos: true,
     canAccessClientes: true,
+    canAccessProductos: true,
+    canEditPrices: false,
+    canAccessIngresos: true,
+    canAccessGastos: true,
     canAccessFinanzas: true,
+    canAccessCaja: true,
+    canViewProfitMargins: true,
     canAccessReportes: true,
     canAccessConfiguracion: false,
-    canAccessProductos: true,
-    canViewProfitMargins: true,
-    canEditPrices: false,
     canManageUsers: false,
+    canAccessInventario: true,
   },
   supervisor: {
     canAccessDashboard: true,
     canAccessPos: true,
-    canAccessCaja: true,
-    canAccessInventario: true,
+    canAccessSucursales: true,
     canAccessPedidos: true,
     canAccessClientes: true,
+    canAccessProductos: true,
+    canEditPrices: false,
+    canAccessIngresos: true,
+    canAccessGastos: true,
     canAccessFinanzas: false,
+    canAccessCaja: true,
+    canViewProfitMargins: false,
     canAccessReportes: true,
     canAccessConfiguracion: false,
-    canAccessProductos: true,
-    canViewProfitMargins: false,
-    canEditPrices: false,
     canManageUsers: false,
+    canAccessInventario: true,
   },
   cajero: {
     canAccessDashboard: true,
     canAccessPos: true,
-    canAccessCaja: true,
-    canAccessInventario: false,
+    canAccessSucursales: false,
     canAccessPedidos: true,
     canAccessClientes: true,
+    canAccessProductos: true,
+    canEditPrices: false,
+    canAccessIngresos: true,
+    canAccessGastos: false,
     canAccessFinanzas: false,
+    canAccessCaja: true,
+    canViewProfitMargins: false,
     canAccessReportes: false,
     canAccessConfiguracion: false,
-    canAccessProductos: true,
-    canViewProfitMargins: false,
-    canEditPrices: false,
     canManageUsers: false,
+    canAccessInventario: false,
   },
   panadero: {
     canAccessDashboard: true,
     canAccessPos: false,
-    canAccessCaja: false,
-    canAccessInventario: true,
+    canAccessSucursales: false,
     canAccessPedidos: true,
     canAccessClientes: false,
+    canAccessProductos: true,
+    canEditPrices: false,
+    canAccessIngresos: false,
+    canAccessGastos: false,
     canAccessFinanzas: false,
+    canAccessCaja: false,
+    canViewProfitMargins: false,
     canAccessReportes: false,
     canAccessConfiguracion: false,
-    canAccessProductos: false,
-    canViewProfitMargins: false,
-    canEditPrices: false,
     canManageUsers: false,
+    canAccessInventario: true,
   },
 };
 
 export const ROUTE_PERMISSION_MAP: Record<string, keyof RolePermissions> = {
   "/": "canAccessDashboard",
   "/pos": "canAccessPos",
-  "/ingresos": "canAccessCaja",
-  "/gastos": "canAccessCaja",
-  "/caja": "canAccessCaja",
-  "/inventario": "canAccessInventario",
+  "/sucursales": "canAccessSucursales",
   "/pedidos": "canAccessPedidos",
   "/clientes": "canAccessClientes",
+  "/productos": "canAccessProductos",
+  "/ingresos": "canAccessIngresos",
+  "/gastos": "canAccessGastos",
   "/finanzas": "canAccessFinanzas",
+  "/caja": "canAccessCaja",
   "/reportes": "canAccessReportes",
   "/configuracion": "canAccessConfiguracion",
-  "/productos": "canAccessProductos",
+  "/inventario": "canAccessInventario",
 };
 
 export function getFriendlyName(fullName?: string): string {
@@ -117,21 +133,31 @@ export const DEMO_USERS: User[] = [
     password: "admin",
     role: "admin",
     roleLabel: "Dueño / Administrador",
+    jobTitle: "Dueño / Administrador",
     avatar: "👨‍🍳",
     phone: "55 1234 5678",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "01 ene 2024",
   },
   {
     id: "usr-2",
-    name: "Lupita Brito",
-    username: "lupita",
-    email: "caja@panaderiabrito.com",
-    password: "caja",
-    role: "cajero",
-    roleLabel: "Cajera / Auxiliar de Tienda",
+    name: "PAULINA BRITO",
+    username: "paulina",
+    email: "paulina@panaderiabrito.com",
+    password: "1234",
+    role: "auxiliar_admin",
+    roleLabel: "Administrador General",
+    jobTitle: "Auxiliar Administrativo",
     avatar: "👩‍💼",
     phone: "55 8765 4321",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "01 ene 2024",
   },
   {
     id: "usr-3",
@@ -141,9 +167,14 @@ export const DEMO_USERS: User[] = [
     password: "1234",
     role: "auxiliar_admin",
     roleLabel: "Auxiliar Administrativo",
+    jobTitle: "Auxiliar Administrativo",
     avatar: "💼",
     phone: "55 2233 4455",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "15 ene 2024",
   },
   {
     id: "usr-4",
@@ -153,9 +184,14 @@ export const DEMO_USERS: User[] = [
     password: "pan",
     role: "panadero",
     roleLabel: "Jefe de Horno & Producción",
+    jobTitle: "Maestro Panadero",
     avatar: "🥖",
     phone: "55 9988 7766",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "San Benito",
+    createdAt: "01 feb 2024",
   },
   {
     id: "usr-5",
@@ -165,9 +201,82 @@ export const DEMO_USERS: User[] = [
     password: "super",
     role: "supervisor",
     roleLabel: "Supervisor de Turno",
+    jobTitle: "Supervisor de Calidad",
     avatar: "📋",
     phone: "55 3344 5566",
     status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "San Benito",
+    createdAt: "10 feb 2024",
+  },
+  {
+    id: "usr-silvia",
+    name: "silvia puga",
+    username: "silvia",
+    email: "silvia@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Cajero(a) de Mostrador",
+    avatar: "👩‍💼",
+    phone: "2213456778",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "2 oct 2026",
+  },
+  {
+    id: "usr-noe",
+    name: "noe velasquez",
+    username: "noe",
+    email: "noe@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Cajero(a) de Mostrador",
+    avatar: "👨‍🍳",
+    phone: "1122334455",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "San Benito",
+    createdAt: "2 oct 2026",
+  },
+  {
+    id: "usr-carlos-b",
+    name: "carlos bueno",
+    username: "carlos.bueno",
+    email: "carlos.bueno@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Cajero(a) de Mostrador",
+    avatar: "👨‍🍳",
+    phone: "5544332211",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-matriz",
+    assignedBranchName: "Matriz",
+    createdAt: "2 oct 2026",
+  },
+  {
+    id: "usr-andres",
+    name: "andres sanchez",
+    username: "andres",
+    email: "andres@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Ayudante General de Panadería",
+    avatar: "👨‍💼",
+    phone: "7731107898",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "San Benito",
+    createdAt: "1 oct 2026",
   },
 ];
 
@@ -200,19 +309,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [rolePermissionsMap, setRolePermissionsMap] = useState<Record<UserRole, RolePermissions>>(ROLE_PERMISSIONS);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load custom users from localStorage on mount
+  // Load custom users from localStorage on mount (Almacenamiento permanente y autoritativo)
   useEffect(() => {
     try {
       const savedCustom = localStorage.getItem("brito_custom_users");
       if (savedCustom) {
         const parsed = JSON.parse(savedCustom);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           setUsersList(parsed);
+          return;
         }
       }
+      // Inicializar por primera vez con los empleados de la plantilla
+      localStorage.setItem("brito_custom_users", JSON.stringify(DEMO_USERS));
+      setUsersList(DEMO_USERS);
     } catch (e) {
-      console.error("Error loading custom users:", e);
+      console.error("Error loading custom users from localStorage:", e);
+      setUsersList(DEMO_USERS);
     }
+  }, []);
+
+  // Sincronización en tiempo real entre pestañas abiertas del navegador
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "brito_custom_users" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setUsersList(parsed);
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   // Load saved role permissions from localStorage on mount
@@ -222,13 +352,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (savedRolePerms) {
         const parsed = JSON.parse(savedRolePerms);
         // Garantizar que canAccessDashboard siempre permanezca activo para todos los roles
+        // y fusionar con los valores por defecto del rol para que nunca falte ninguna clave de módulo
         const sanitized: Record<string, Partial<RolePermissions>> = {};
         Object.keys(parsed).forEach((key) => {
-          sanitized[key] = { ...parsed[key], canAccessDashboard: true };
+          const defaultRolePerms = (ROLE_PERMISSIONS as any)[key] || ROLE_PERMISSIONS.cajero;
+          sanitized[key] = {
+            ...defaultRolePerms,
+            ...parsed[key],
+          };
+          if (key === "admin") {
+            sanitized[key].canAccessDashboard = true;
+          }
         });
         setRolePermissionsMap((prev) => ({
           ...prev,
-          ...parsed,
           ...sanitized,
         }));
       }
@@ -237,19 +374,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Check saved session on mount
+  // Check saved session on mount (Aislamiento estricto de sesión por ventana con sessionStorage)
   useEffect(() => {
-    const saved = localStorage.getItem("brito_user");
-    if (saved) {
-      try {
-        const parsedUser = JSON.parse(saved);
-        setUser(parsedUser);
-      } catch (e) {
-        console.error("Error parsing saved session:", e);
+    // Seguridad: limpiar sesiones residuales previas en localStorage para evitar que
+    // nuevas ventanas o navegadores hereden la sesión de otra pestaña
+    try {
+      localStorage.removeItem("brito_user");
+    } catch (e) {
+      // Ignorar errores de almacenamiento
+    }
+
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("brito_user");
+      if (saved) {
+        try {
+          const parsedUser = JSON.parse(saved);
+          setUser(parsedUser);
+        } catch (e) {
+          console.error("Error parsing saved session:", e);
+          setUser(null);
+        }
+      } else {
+        // Bloquear y exigir login en cada ventana o navegador nuevo
         setUser(null);
       }
     } else {
-      // Require login: no auto-login to DEMO_USERS[0]
       setUser(null);
     }
     setIsLoading(false);
@@ -257,20 +406,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Compute active permissions combining role defaults (dynamically configured) and user overrides
   const permissions: RolePermissions = user
-    ? { ...(rolePermissionsMap[user.role] || ROLE_PERMISSIONS[user.role]), ...(user.permissions || {}), canAccessDashboard: true }
+    ? {
+        ...(rolePermissionsMap[user.role] || ROLE_PERMISSIONS[user.role] || ROLE_PERMISSIONS.cajero),
+        ...(user.permissions || {}),
+        ...(user.role === "admin" ? { canAccessDashboard: true } : {}),
+      }
     : {
         canAccessDashboard: false,
         canAccessPos: false,
+        canAccessSucursales: false,
         canAccessCaja: false,
         canAccessInventario: false,
         canAccessPedidos: false,
         canAccessClientes: false,
+        canAccessProductos: false,
+        canEditPrices: false,
+        canAccessIngresos: false,
+        canAccessGastos: false,
         canAccessFinanzas: false,
+        canViewProfitMargins: false,
         canAccessReportes: false,
         canAccessConfiguracion: false,
-        canAccessProductos: false,
-        canViewProfitMargins: false,
-        canEditPrices: false,
         canManageUsers: false,
       };
 
@@ -304,10 +460,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const getDefaultRouteForUser = useCallback(
-    (_targetUser?: User | null): string => {
-      return "/";
+    (targetUser?: User | null): string => {
+      const u = targetUser !== undefined ? targetUser : user;
+      if (!u) return "/";
+      if (u.role === "admin") return "/";
+
+      const effective = {
+        ...(rolePermissionsMap[u.role] || ROLE_PERMISSIONS[u.role] || ROLE_PERMISSIONS.cajero),
+        ...(u.permissions || {}),
+      };
+
+      if (effective.canAccessDashboard) {
+        return "/";
+      }
+      if (effective.canAccessPos) {
+        return "/pos";
+      }
+      if (effective.canAccessPedidos) {
+        return "/pedidos";
+      }
+      if (effective.canAccessCaja) {
+        return "/caja";
+      }
+      if (effective.canAccessClientes) {
+        return "/clientes";
+      }
+      if (effective.canAccessProductos) {
+        return "/productos";
+      }
+      if (effective.canAccessIngresos) {
+        return "/ingresos";
+      }
+      if (effective.canAccessGastos) {
+        return "/gastos";
+      }
+      if (effective.canAccessFinanzas) {
+        return "/finanzas";
+      }
+      if (effective.canAccessSucursales) {
+        return "/sucursales";
+      }
+      if (effective.canAccessConfiguracion) {
+        return "/configuracion";
+      }
+
+      return "/pos";
     },
-    []
+    [user, rolePermissionsMap]
   );
 
   const login = (identifier: string, pass: string, rememberMe: boolean = true) => {
@@ -318,10 +517,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (clean === "admin" && cleanPass === "admin") {
       const adminUser = usersList.find((u) => u.role === "admin") || DEMO_USERS[0];
       setUser(adminUser);
-      if (rememberMe) {
-        localStorage.setItem("brito_user", JSON.stringify(adminUser));
-      } else {
+      if (typeof window !== "undefined") {
         sessionStorage.setItem("brito_user", JSON.stringify(adminUser));
+        sessionStorage.setItem("brito_session_active", "true");
+        // Asegurar que no quede sesión compartida en localStorage
+        try {
+          localStorage.removeItem("brito_user");
+          if (rememberMe) {
+            localStorage.setItem("brito_saved_username", "admin");
+          } else {
+            localStorage.removeItem("brito_saved_username");
+          }
+        } catch (e) {}
       }
       return { success: true, user: adminUser };
     }
@@ -337,7 +544,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Friendly alias checks
       if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
-      if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
+      if ((clean === "paulina" || clean === "lupita" || clean === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
       if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
       if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
       if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
@@ -358,10 +565,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setUser(found);
-    if (rememberMe) {
-      localStorage.setItem("brito_user", JSON.stringify(found));
-    } else {
+    if (typeof window !== "undefined") {
       sessionStorage.setItem("brito_user", JSON.stringify(found));
+      sessionStorage.setItem("brito_session_active", "true");
+      // Asegurar que no quede sesión compartida en localStorage
+      try {
+        localStorage.removeItem("brito_user");
+        if (rememberMe) {
+          localStorage.setItem("brito_saved_username", found.username || found.email || clean);
+        } else {
+          localStorage.removeItem("brito_saved_username");
+        }
+      } catch (e) {}
     }
 
     return { success: true, user: found };
@@ -388,7 +603,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Friendly alias checks
       if ((clean === "toño" || clean === "tono" || clean === "admin") && (email.includes("admin") || name.includes("toño") || name.includes("tono"))) return true;
-      if ((clean === "lupita" || clean === "caja") && (email.includes("caja") || name.includes("lupita"))) return true;
+      if ((clean === "paulina" || clean === "lupita" || clean === "caja") && (email.includes("caja") || email.includes("paulina") || name.includes("paulina") || name.includes("lupita"))) return true;
       if ((clean === "roberto" || clean === "auxiliar" || clean === "aux") && (email.includes("auxiliar") || name.includes("roberto"))) return true;
       if ((clean === "juan" || clean === "panadero" || clean === "horno") && (email.includes("panadero") || name.includes("juan"))) return true;
       if ((clean === "carlos" || clean === "supervisor" || clean === "super") && (email.includes("supervisor") || name.includes("carlos"))) return true;
@@ -417,95 +632,153 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginAs = (demoUser: User) => {
     setUser(demoUser);
-    localStorage.setItem("brito_user", JSON.stringify(demoUser));
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("brito_user", JSON.stringify(demoUser));
+      sessionStorage.setItem("brito_session_active", "true");
+      try {
+        localStorage.removeItem("brito_user");
+      } catch (e) {}
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("brito_user");
-    sessionStorage.removeItem("brito_user");
     if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brito_user");
       sessionStorage.removeItem("brito_session_active");
-    }
-  };
-
-  const addUser = (newUser: User) => {
-    const updated = [...usersList, newUser];
-    setUsersList(updated);
-    try {
-      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Error saving custom user:", e);
-    }
-  };
-
-  const updateUser = (userId: string, updatedData: Partial<User>) => {
-    const updated = usersList.map((u) => {
-      if (u.id === userId) {
-        return { ...u, ...updatedData };
-      }
-      return u;
-    });
-    setUsersList(updated);
-    try {
-      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Error updating user:", e);
-    }
-
-    if (user && user.id === userId) {
-      const updatedCurrentUser = { ...user, ...updatedData };
-      setUser(updatedCurrentUser);
+      sessionStorage.removeItem("brito_redirect_url");
       try {
-        localStorage.setItem("brito_user", JSON.stringify(updatedCurrentUser));
-      } catch (e) {
-        console.error("Error updating active session:", e);
-      }
+        localStorage.removeItem("brito_user");
+      } catch (e) {}
     }
   };
 
-  const deleteUser = (userId: string): { success: boolean; message?: string } => {
+  const addUser = useCallback((newUser: User) => {
+    setUsersList((prevUsers) => {
+      const exists = prevUsers.some((u) => u.id === newUser.id);
+      const updated = exists
+        ? prevUsers.map((u) => (u.id === newUser.id ? { ...u, ...newUser } : u))
+        : [...prevUsers, newUser];
+      try {
+        localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Storage quota warning saving user:", e);
+      }
+      return updated;
+    });
+
+    // Persistir de forma duradera en el servidor
+    fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newUser),
+    }).catch((err) => {
+      console.warn("[AuthContext] No se pudo guardar usuario en servidor:", err);
+    });
+  }, []);
+
+  const updateUser = useCallback((userId: string, updatedData: Partial<User>) => {
+    setUsersList((prevUsers) => {
+      const updated = prevUsers.map((u) => {
+        if (u.id === userId) {
+          return { ...u, ...updatedData };
+        }
+        return u;
+      });
+      try {
+        localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Storage quota warning updating user:", e);
+      }
+      return updated;
+    });
+
+    setUser((currUser) => {
+      if (currUser && currUser.id === userId) {
+        const updatedCurrentUser = { ...currUser, ...updatedData };
+        try {
+          sessionStorage.setItem("brito_user", JSON.stringify(updatedCurrentUser));
+        } catch (e) {
+          console.error("Error updating active session:", e);
+        }
+        return updatedCurrentUser;
+      }
+      return currUser;
+    });
+
+    // Persistir en el servidor
+    fetch("/api/users", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: userId, updates: updatedData }),
+    }).catch((err) => {
+      console.warn("[AuthContext] Error actualizando usuario en servidor:", err);
+    });
+  }, []);
+
+  const deleteUser = useCallback((userId: string): { success: boolean; message?: string } => {
     if (user && user.id === userId) {
       return { success: false, message: "No puedes eliminar tu propia cuenta en sesión activa." };
     }
-    const target = usersList.find((u) => u.id === userId);
-    if (target && (target.id === "usr-1" || (target.role === "admin" && target.username === "admin"))) {
+    if (userId === "usr-1") {
       return { success: false, message: "No se permite eliminar la cuenta principal del Administrador Don Toño." };
     }
 
-    const updated = usersList.filter((u) => u.id !== userId);
-    setUsersList(updated);
-    try {
-      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Error deleting user:", e);
-    }
-    return { success: true };
-  };
+    setUsersList((prevUsers) => {
+      const updated = prevUsers.filter((u) => u.id !== userId);
+      try {
+        localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Storage quota warning deleting user:", e);
+      }
+      return updated;
+    });
 
-  const toggleUserStatus = (userId: string) => {
+    // Eliminar en el servidor
+    fetch(`/api/users?id=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }).catch((err) => {
+      console.warn("[AuthContext] Error eliminando usuario en servidor:", err);
+    });
+
+    return { success: true };
+  }, [user]);
+
+  const toggleUserStatus = useCallback((userId: string) => {
     if (user && user.id === userId) {
       return; // Cannot deactivate own account while logged in
     }
-    const target = usersList.find((u) => u.id === userId);
-    if (target && (target.id === "usr-1" || (target.role === "admin" && target.username === "admin"))) {
+    if (userId === "usr-1") {
       return; // Protect primary admin
     }
 
-    const updated = usersList.map((u) => {
-      if (u.id === userId) {
-        const nextStatus: "activo" | "inactivo" = u.status === "inactivo" ? "activo" : "inactivo";
-        return { ...u, status: nextStatus };
+    let nextStatus: "activo" | "inactivo" = "activo";
+
+    setUsersList((prevUsers) => {
+      const updated = prevUsers.map((u) => {
+        if (u.id === userId) {
+          nextStatus = u.status === "inactivo" ? "activo" : "inactivo";
+          return { ...u, status: nextStatus };
+        }
+        return u;
+      });
+      try {
+        localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Storage quota warning toggling user status:", e);
       }
-      return u;
+      return updated;
     });
-    setUsersList(updated);
-    try {
-      localStorage.setItem("brito_custom_users", JSON.stringify(updated));
-    } catch (e) {
-      console.error("Error toggling user status:", e);
-    }
-  };
+
+    // Persistir en servidor
+    fetch("/api/users", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: userId, updates: { status: nextStatus } }),
+    }).catch((err) => {
+      console.warn("[AuthContext] Error toggling user status en servidor:", err);
+    });
+  }, [user]);
 
   // Dynamically update permissions and labels for a role in the system
   const updateRolePermissions = useCallback((role: UserRole, newPermissions: RolePermissions, roleLabel?: string) => {
@@ -545,6 +818,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {
         console.error("Error updating users with new role permissions:", e);
       }
+      fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedList),
+      }).catch(() => {});
       return updatedList;
     });
 
@@ -557,7 +835,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           permissions: { ...newPermissions },
         };
         try {
-          localStorage.setItem("brito_user", JSON.stringify(updatedUser));
+          sessionStorage.setItem("brito_user", JSON.stringify(updatedUser));
         } catch (e) {}
         return updatedUser;
       }

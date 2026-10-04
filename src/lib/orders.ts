@@ -1,8 +1,85 @@
 import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types";
 import { formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { createClient } from "@/lib/supabase/client";
 
 export const STORAGE_ORDERS_KEY = "brito_custom_orders";
+
+export function orderToSupabasePayload(order: CustomOrder): any {
+  return {
+    id: order.id || order.orderNumber,
+    order_number: order.orderNumber || order.id,
+    customer_id: order.customerId || null,
+    customer_name: order.customerName || "Cliente Mostrador",
+    phone: order.phone || "N/A",
+    branch_id: order.operatingBranchId || order.branchId || "branch-matriz",
+    branch_name: order.operatingBranchName || order.branchName || "Sucursal Matriz (Centro)",
+    description: order.description || "Pedido de pastelería",
+    items: Array.isArray(order.items) ? order.items : [],
+    delivery_date: order.deliveryDate ? order.deliveryDate.split("T")[0].split(" ")[0] : new Date().toISOString().split("T")[0],
+    delivery_time: order.deliveryTime || "16:00",
+    delivery_type: order.deliveryType || "sucursal",
+    delivery_address: order.deliveryAddress || null,
+    status: order.status || "pendiente",
+    total: Number(order.total) || 0,
+    deposit: Number(order.deposit) || 0,
+    remaining_balance: Number(order.remainingBalance) || 0,
+    payment_status: order.paymentStatus || "anticipo",
+    payment_method: order.paymentMethod || "efectivo",
+    payments: Array.isArray(order.payments) ? order.payments : [],
+    dedication: order.dedication || null,
+    notes: order.notes || null,
+    cashier: order.cashier || "Don Toño Brito",
+    shift_name: order.shiftName || null,
+  };
+}
+
+export async function persistOrderToSupabase(order: CustomOrder): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const supabase = createClient();
+    const payload = orderToSupabasePayload(order);
+    const { error } = await supabase.from("custom_orders").upsert(payload, { onConflict: "id" });
+    if (error) {
+      console.warn("[OrdersSupabase] Error al guardar pedido en Supabase:", error);
+    } else {
+      console.log("[OrdersSupabase] Pedido guardado exitosamente en Supabase:", payload.order_number);
+    }
+  } catch (err) {
+    console.warn("[OrdersSupabase] Excepción guardando pedido en Supabase:", err);
+  }
+}
+
+export async function persistOrderPaymentMovementToSupabase(params: {
+  amount: number;
+  orderNumber: string;
+  orderId: string;
+  customerName: string;
+  cashier: string;
+  branchId?: string;
+  isLiquidation?: boolean;
+}): Promise<void> {
+  if (typeof window === "undefined" || params.amount <= 0) return;
+  try {
+    const supabase = createClient();
+    const movId = `ING-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const { error } = await supabase.from("cash_movements").insert({
+      id: movId,
+      type: "entrada",
+      category: "abono_pedido",
+      category_label: params.isLiquidation ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
+      amount: params.amount,
+      reason: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName}`,
+      authorized_by: params.cashier || "Cajero",
+      branch_id: params.branchId || "branch-matriz",
+    });
+    if (error) {
+      console.warn("[OrdersSupabase] Error registrando movimiento de dinero en Supabase:", error);
+    }
+  } catch (err) {
+    console.warn("[OrdersSupabase] Excepción registrando movimiento en Supabase:", err);
+  }
+}
 
 export const INITIAL_ORDERS: CustomOrder[] = [
   {
@@ -13,6 +90,8 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     phone: "55 1234 5678",
     branchId: "branch-matriz",
     branchName: "Sucursal Matriz (Centro)",
+    operatingBranchId: "branch-matriz",
+    operatingBranchName: "Sucursal Matriz (Centro)",
     description: "Pastel 3 Leches relleno de durazno, 50 personas, temático de XV años (flores lilas)",
     items: [
       {
@@ -64,6 +143,8 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     phone: "55 8765 4321",
     branchId: "branch-benito",
     branchName: "Sucursal San Benito (Mercado)",
+    operatingBranchId: "branch-benito",
+    operatingBranchName: "Sucursal San Benito (Mercado)",
     description: "100 piezas de mini cuernitos rellenos de jamón y queso para evento escolar matutino",
     items: [
       {
@@ -105,9 +186,11 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     customerId: "cli-1",
     customerName: "Familia Brito (Don Toño)",
     phone: "55 9988 7766",
-    branchId: "branch-flores",
-    branchName: "Sucursal Las Flores (Plaza)",
-    description: "Pastel Mil Hojas de Chocolate y Café con nuez garapiñada para cumpleaños familiar",
+    branchId: "branch-benito",
+    branchName: "Sucursal San Benito (Mercado)",
+    operatingBranchId: "branch-flores",
+    operatingBranchName: "Sucursal Las Flores (Plaza)",
+    description: "Pastel Mil Hojas de Chocolate y Café con nuez garapiñada. Creado en Las Flores, se recoge en San Benito.",
     items: [
       {
         productId: "prod-8",
@@ -128,7 +211,7 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     paymentStatus: "anticipo",
     paymentMethod: "efectivo",
     dedication: "¡Feliz Cumpleaños Don Toño!",
-    notes: "Elaborar con hojaldre recién horneado ese mismo mediodía.",
+    notes: "Elaborar con hojaldre recién horneado ese mismo mediodía. Recoger en San Benito.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
     cashier: "Elena Brito",
     payments: [
@@ -225,8 +308,8 @@ function normalizeOrder(order: any): CustomOrder {
     customerId: order.customerId,
     customerName: order.customerName || "Cliente Mostrador",
     phone: order.phone || "N/A",
-    branchId: order.branchId || "branch-matriz",
-    branchName: order.branchName || "Sucursal Matriz (Centro)",
+    branchId: order.branchId || order.branch_id || order.operatingBranchId || order.operating_branch_id || "branch-matriz",
+    branchName: order.branchName || order.branch_name || order.operatingBranchName || order.operating_branch_name || "Sucursal Matriz (Centro)",
     description: order.description || "Pedido de panadería",
     items: Array.isArray(order.items) && order.items.length > 0
       ? order.items
@@ -252,8 +335,8 @@ function normalizeOrder(order: any): CustomOrder {
     notes: order.notes || "",
     createdAt: order.createdAt || new Date().toISOString(),
     timestamp: order.timestamp ? Number(order.timestamp) : parseDateTimeSafe(order.createdAt) || Date.now(),
-    operatingBranchId: order.operatingBranchId || order.branchId,
-    operatingBranchName: order.operatingBranchName || order.branchName,
+    operatingBranchId: order.operatingBranchId || order.operating_branch_id || order.branchId || order.branch_id || "branch-matriz",
+    operatingBranchName: order.operatingBranchName || order.operating_branch_name || order.branchName || order.branch_name || "Sucursal Matriz (Centro)",
     shiftName: order.shiftName,
     cashier: order.cashier || "Don Toño Brito",
     payments: Array.isArray(order.payments) && order.payments.length > 0
@@ -303,6 +386,115 @@ export function saveStoredOrders(orders: CustomOrder[]): void {
     window.dispatchEvent(new Event("brito_orders_updated"));
   } catch (err) {
     console.error("Error saving stored orders:", err);
+  }
+}
+
+/**
+ * Sincroniza pedidos bidireccionalmente con Supabase y el servidor para que todos los perfiles
+ * (administrador, cajeros como Silvia Puga, tablets) vean el 100% de los pedidos en tiempo real.
+ */
+export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
+  if (typeof window === "undefined") return INITIAL_ORDERS;
+
+  try {
+    const localOrders = getStoredOrders();
+    let serverOrders: CustomOrder[] = [];
+
+    // 1. Consultar directamente pedidos maestros en Supabase
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("custom_orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        serverOrders = data.map(normalizeOrder);
+      }
+    } catch (dbErr) {
+      console.warn("[OrdersSync] Supabase no disponible temporalmente:", dbErr);
+    }
+
+    // 2. Si Supabase no devolvió pedidos, consultar /api/orders como fallback
+    if (serverOrders.length === 0) {
+      try {
+        const res = await fetch("/api/orders", { method: "GET" });
+        if (res.ok) {
+          const json = await res.json();
+          if (Array.isArray(json.orders)) {
+            serverOrders = json.orders.map(normalizeOrder);
+          }
+        }
+      } catch (apiErr) {
+        console.warn("[OrdersSync] API fallback no disponible:", apiErr);
+      }
+    }
+
+    // 3. Reconciliación / Merge inteligente de pedidos locales y de servidor
+    const ordersMap = new Map<string, CustomOrder>();
+
+    // Primero los de servidor
+    for (const ord of serverOrders) {
+      const key = ord.orderNumber || ord.id;
+      if (key) ordersMap.set(key, normalizeOrder(ord));
+    }
+
+    // Reconciliar con locales
+    let hasLocalChangesToPush = false;
+    const pendingPushList: CustomOrder[] = [];
+
+    for (const ord of localOrders) {
+      const key = ord.orderNumber || ord.id;
+      if (!key) continue;
+
+      if (!ordersMap.has(key)) {
+        // Pedido creado localmente que no está en el servidor aún
+        ordersMap.set(key, ord);
+        hasLocalChangesToPush = true;
+        pendingPushList.push(ord);
+      } else {
+        const serverOrd = ordersMap.get(key)!;
+        const localTs = ord.timestamp || (ord.createdAt ? new Date(ord.createdAt).getTime() : 0);
+        const serverTs = serverOrd.timestamp || (serverOrd.createdAt ? new Date(serverOrd.createdAt).getTime() : 0);
+
+        if (localTs > serverTs) {
+          // El local es más reciente (por ejemplo se cobró o editó en el dispositivo)
+          ordersMap.set(key, ord);
+          hasLocalChangesToPush = true;
+          pendingPushList.push(ord);
+        }
+      }
+    }
+
+    const mergedList = Array.from(ordersMap.values()).sort((a, b) => {
+      const timeA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const timeB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+      return timeB - timeA;
+    });
+
+    // Guardar en el almacenamiento local del dispositivo (celular o PC)
+    localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(mergedList));
+    window.dispatchEvent(new Event("brito_orders_updated"));
+
+    // Subir pedidos locales faltantes o actualizados a Supabase y al endpoint de respaldo
+    if (hasLocalChangesToPush && pendingPushList.length > 0) {
+      try {
+        const supabase = createClient();
+        const payloads = pendingPushList.map(orderToSupabasePayload);
+        supabase.from("custom_orders").upsert(payloads, { onConflict: "id" }).then(() => {});
+      } catch {}
+
+      fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orders: pendingPushList }),
+      }).catch((e) => console.warn("[OrdersSync] Error actualizando cambios al servidor:", e));
+    }
+
+    return mergedList;
+  } catch (err) {
+    console.error("[OrdersSync] Error sincronizando pedidos con servidor:", err);
+    return getStoredOrders();
   }
 }
 
@@ -462,11 +654,12 @@ export function recordOrderAsPosSale(params: {
     (newSale as any).branchId = params.operatingBranchId || params.branchId;
     (newSale as any).operatingBranchId = params.operatingBranchId;
 
-    const shiftStart = getStoredShiftStartBoundary();
+    const branchIdForShift = params.operatingBranchId || params.branchId;
+    const shiftStart = getStoredShiftStartBoundary(branchIdForShift);
     const cleanCurrentSales = currentSales.filter((s) => {
       if (!s) return false;
       const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+      return shiftStart <= 0 || (t > 0 && t >= shiftStart);
     });
 
     const nextSales = [newSale, ...cleanCurrentSales];
@@ -595,6 +788,8 @@ export function addCustomOrder(data: {
     phone: data.phone.trim(),
     branchId: data.branchId,
     branchName: data.branchName,
+    operatingBranchId: data.operatingBranchId || data.branchId,
+    operatingBranchName: data.operatingBranchName || data.branchName,
     description: data.description.trim() || (data.items.length > 0 ? data.items.map(i => `${i.quantity}x ${i.name}`).join(", ") : "Encargo"),
     items: data.items,
     deliveryDate: data.deliveryDate,
@@ -621,27 +816,75 @@ export function addCustomOrder(data: {
 
   saveStoredOrders([newOrder, ...current]);
 
+  // Persistir pedido y anticipo directamente en Supabase para sincronización 100% en tiempo real
+  persistOrderToSupabase(newOrder);
+
+  if (deposit > 0) {
+    persistOrderPaymentMovementToSupabase({
+      amount: deposit,
+      orderNumber,
+      orderId,
+      customerName: data.customerName,
+      cashier: data.cashier,
+      branchId: data.operatingBranchId || data.branchId,
+      isLiquidation: remaining === 0,
+    });
+
+    if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
+      realtimeHub.broadcastCashMovement({
+        id: `ING-ord-${orderNumber}`,
+        branchId: data.operatingBranchId || data.branchId,
+        branchName: data.operatingBranchName || data.branchName || "Sucursal Matriz",
+        type: "entrada",
+        category: "abono_pedido" as any,
+        categoryLabel: remaining === 0 ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
+        amount: deposit,
+        reason: `${remaining === 0 ? "Liquidación final" : "Anticipo"} pedido ${orderNumber} - ${data.customerName}`,
+        authorizedBy: data.cashier || "Cajero",
+        cashier: data.cashier,
+        timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+      });
+    }
+  }
+
+  // Respaldar y sincronizar con el servidor para que los celulares lo reciban al 100%
+  if (typeof window !== "undefined") {
+    fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: newOrder }),
+    }).catch(() => {});
+  }
+
   // Transmitir pedido en tiempo real a los celulares y computadoras
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
     realtimeHub.broadcastOrder("create", newOrder);
   }
 
-  // Alerta sonora y visual inmediata en celular
+  // Alerta sonora y visual inmediata en celular y turnos de ambas sucursales
   if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
+    const isCross = newOrder.operatingBranchName && newOrder.branchName && newOrder.operatingBranchName !== newOrder.branchName;
+    const branchLabel = isCross
+      ? `${newOrder.operatingBranchName} ➔ Entrega: ${newOrder.branchName}`
+      : newOrder.branchName;
+
     realtimeHub.broadcastNotification({
       id: `order-create-${newOrder.id}-${Date.now()}`,
-      senderName: `🎂 ${newOrder.branchName}`,
+      senderName: `🎂 ${branchLabel}`,
       senderAvatar: "🎂",
       badgeIcon: "pastel",
-      title: "Nuevo Pedido Especial",
+      title: isCross ? `Nuevo Pedido (${newOrder.operatingBranchName} ➔ ${newOrder.branchName})` : "Nuevo Pedido Especial",
       highlightText: `${newOrder.orderNumber}: ${newOrder.customerName}`,
-      description: `Entrega: ${newOrder.deliveryDate} ${newOrder.deliveryTime} • Anticipo: $${newOrder.deposit} MXN (Total: $${newOrder.total} MXN)`,
+      description: `${isCross ? `[Levantado en: ${newOrder.operatingBranchName} • Entrega en: ${newOrder.branchName}] ` : ""}Entrega: ${newOrder.deliveryDate} ${newOrder.deliveryTime} • Anticipo: $${newOrder.deposit} MXN (Total: $${newOrder.total} MXN)`,
       timeAgo: "Hace un momento",
       group: "recientes",
       read: false,
       category: "pedidos",
-      actionLabel: "Ver Pedido",
+      orderId: newOrder.id,
+      actionLabel: newOrder.remainingBalance > 0 ? `Cobrar $${newOrder.remainingBalance}` : "Ver Detalle",
       actionLink: "/pedidos",
+      secondaryActionLabel: newOrder.remainingBalance > 0 ? "Ver Detalle" : undefined,
+      secondaryActionLink: newOrder.remainingBalance > 0 ? "/pedidos" : undefined,
     });
   }
 
@@ -690,7 +933,8 @@ export function addOrderPayment(
   order.paymentStatus = isFullLiquidation ? "liquidado" : "anticipo";
   order.payments = [...(order.payments || []), newPayment];
 
-  if (params.markAsDelivered || (isFullLiquidation && order.status === "listo")) {
+  // Solo marcar como entregado si se solicitó explícitamente la entrega inmediata
+  if (params.markAsDelivered) {
     order.status = "entregado";
   }
 
@@ -728,6 +972,51 @@ export function addOrderPayment(
   current[idx] = order;
   saveStoredOrders(current);
 
+  // Persistir actualización de saldo y pagos en Supabase
+  persistOrderToSupabase(order);
+  persistOrderPaymentMovementToSupabase({
+    amount: paymentAmount,
+    orderNumber: order.orderNumber,
+    orderId: order.id,
+    customerName: order.customerName,
+    cashier: params.cashier,
+    branchId: params.operatingBranchId || order.branchId,
+    isLiquidation: isFullLiquidation,
+  });
+
+  if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
+    realtimeHub.broadcastCashMovement({
+      id: `ING-pay-${order.orderNumber}-${order.payments?.length || 1}`,
+      branchId: params.operatingBranchId || order.branchId || "branch-matriz",
+      branchName: params.operatingBranchName || (order as any).branchName || "Sucursal Matriz",
+      type: "entrada",
+      category: "abono_pedido" as any,
+      categoryLabel: isFullLiquidation ? "Liquidación de Pedido Especial" : "Abono a Pedido Especial",
+      amount: paymentAmount,
+      reason: `${isFullLiquidation ? "Liquidación final" : "Abono"} pedido ${order.orderNumber} - ${order.customerName}`,
+      authorizedBy: params.cashier || "Cajero",
+      cashier: params.cashier,
+      timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+    });
+  }
+
+  // Sincronizar pago en servidor persistente para reflejo en celulares
+  if (typeof window !== "undefined") {
+    fetch("/api/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderNumber: order.orderNumber,
+        updates: {
+          deposit: order.deposit,
+          remainingBalance: order.remainingBalance,
+          paymentStatus: order.paymentStatus,
+          payments: order.payments,
+        },
+      }),
+    }).catch(() => {});
+  }
+
   // Transmitir abono / liquidación en tiempo real
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
     realtimeHub.broadcastOrder("payment", order);
@@ -735,20 +1024,30 @@ export function addOrderPayment(
 
   // Notificación al celular
   if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
+    const isCross = (order as any).operatingBranchName && order.branchName && (order as any).operatingBranchName !== order.branchName;
+    const branchLabel = isCross
+      ? `${(order as any).operatingBranchName} ➔ ${order.branchName}`
+      : order.branchName;
+
     realtimeHub.broadcastNotification({
       id: `order-pay-${order.id}-${Date.now()}`,
-      senderName: `💰 ${order.branchName}`,
+      senderName: `💰 ${branchLabel}`,
       senderAvatar: isFullLiquidation ? "🎉" : "💵",
       badgeIcon: "dinero",
-      title: isFullLiquidation ? "Pedido Especial Liquidado" : "Abono a Pedido Especial",
+      title: isFullLiquidation
+        ? `Pedido Especial Liquidado ${isCross ? `(${branchLabel})` : ""}`
+        : `Abono a Pedido Especial ${isCross ? `(${branchLabel})` : ""}`,
       highlightText: `${order.orderNumber}: Cobro de $${paymentAmount} MXN`,
-      description: `Cliente: ${order.customerName} • Saldo restante: $${newRemaining} MXN`,
+      description: `${isCross ? `[Levantado: ${(order as any).operatingBranchName} • Entrega: ${order.branchName}] ` : ""}Cliente: ${order.customerName} • Saldo restante: $${newRemaining} MXN`,
       timeAgo: "Hace un momento",
       group: "recientes",
       read: false,
       category: "pedidos",
-      actionLabel: "Ver Pedido",
+      orderId: order.id,
+      actionLabel: newRemaining > 0 ? `Cobrar $${newRemaining}` : "Ver Detalle",
       actionLink: "/pedidos",
+      secondaryActionLabel: newRemaining > 0 ? "Ver Detalle" : undefined,
+      secondaryActionLink: newRemaining > 0 ? "/pedidos" : undefined,
     });
   }
 
@@ -769,6 +1068,18 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
   };
 
   saveStoredOrders(current);
+
+  // Persistir cambio de estado en Supabase
+  persistOrderToSupabase(current[idx]);
+
+  // Sincronizar cambio de estado en servidor para que el celular lo reciba de inmediato
+  if (typeof window !== "undefined") {
+    fetch("/api/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, updates: { status } }),
+    }).catch(() => {});
+  }
 
   // Transmitir cambio de estado operativo
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
@@ -795,7 +1106,8 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       group: "recientes",
       read: false,
       category: "pedidos",
-      actionLabel: "Ver Pedido",
+      orderId: current[idx].id,
+      actionLabel: "Ver Detalle",
       actionLink: "/pedidos",
     });
   }
@@ -829,6 +1141,22 @@ export function updateCustomOrder(orderId: string, updates: Partial<CustomOrder>
 
   current[idx] = updated;
   saveStoredOrders(current);
+
+  // Persistir cambios en Supabase
+  persistOrderToSupabase(updated);
+
+  // Sincronizar actualización con servidor y transmitir a celulares
+  if (typeof window !== "undefined") {
+    fetch("/api/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, updates }),
+    }).catch(() => {});
+    if (realtimeHub?.broadcastOrder) {
+      realtimeHub.broadcastOrder("status", updated);
+    }
+  }
+
   return updated;
 }
 
@@ -840,6 +1168,21 @@ export function deleteCustomOrder(orderId: string): boolean {
   const filtered = current.filter(o => o.id !== orderId && o.orderNumber !== orderId);
   if (filtered.length !== current.length) {
     saveStoredOrders(filtered);
+
+    // Eliminar en Supabase
+    if (typeof window !== "undefined") {
+      try {
+        const supabase = createClient();
+        supabase.from("custom_orders").delete().or(`id.eq.${orderId},order_number.eq.${orderId}`).then(() => {});
+      } catch {}
+      fetch(`/api/orders?id=${encodeURIComponent(orderId)}`, {
+        method: "DELETE",
+      }).catch(() => {});
+      if (realtimeHub?.broadcastOrder) {
+        realtimeHub.broadcastOrder("delete", { id: orderId, orderNumber: orderId } as CustomOrder);
+      }
+    }
+
     return true;
   }
   return false;

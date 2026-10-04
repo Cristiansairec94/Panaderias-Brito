@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { SyncItem, SyncType } from "@/types";
 import {
   getSyncQueue,
@@ -13,6 +13,7 @@ import {
   setSimulatedOffline,
   checkRealOnlineStatus,
   processSyncQueue,
+  syncAllLocalDataToSupabase,
   exportLocalEmergencyBackup,
   downloadAllDataToLocalPc,
   getLocalDataStats,
@@ -97,20 +98,44 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     setConnectionDetail(res.detail);
   }, [refreshQueueAndStats]);
 
-  // 3. Sincronizar inmediatamente
+  const isSyncingLockRef = useRef(false);
+
+  // 3. Sincronizar inmediatamente todos los movimientos locales a la nube (rápido, sin bloqueo)
   const syncNow = useCallback(async () => {
+    if (isSyncingLockRef.current) {
+      return { total: 0, synced: 0, failed: 0, errors: [] };
+    }
+    isSyncingLockRef.current = true;
     setIsSyncing(true);
     try {
-      const res = await processSyncQueue();
+      const syncPromise = syncAllLocalDataToSupabase();
+      const timeoutPromise = new Promise<{ total: number; synced: number; failed: number; errors: string[] }>((resolve) =>
+        setTimeout(() => resolve({ total: 0, synced: 0, failed: 0, errors: ["Timeout de seguridad"] }), 5000)
+      );
+      const res: any = await Promise.race([syncPromise, timeoutPromise]);
       refreshQueueAndStats();
       const con = await checkRealOnlineStatus();
       setIsOnline(con.isOnline);
       setLatencyMs(con.latencyMs);
       setConnectionDetail(con.detail);
       return res;
+    } catch (err: any) {
+      console.warn("[SyncContext] Error en syncNow:", err);
+      return { total: 0, synced: 0, failed: 0, errors: [err?.message || "Error"] };
     } finally {
+      isSyncingLockRef.current = false;
       setIsSyncing(false);
     }
+  }, [refreshQueueAndStats]);
+
+  // Sincronización automática de arranque en segundo plano
+  useEffect(() => {
+    syncAllLocalDataToSupabase().then((res) => {
+      if (res && (res.salesSynced > 0 || res.expensesSynced > 0 || res.incomesSynced > 0 || res.customersSynced > 0)) {
+        console.log("[SyncContext] Movimientos locales sincronizados a Supabase con éxito:", res);
+        refreshQueueAndStats();
+      }
+    }).catch(() => {});
   }, [refreshQueueAndStats]);
 
   // 4. Descargar / actualizar todo el catálogo local en la PC
@@ -251,10 +276,17 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       setConnectionDetail("Sin conexión a internet (Modo Offline Seguro)");
     };
 
+    const handleNetworkStatusChange = async () => {
+      await refreshConnection();
+      if (!checkSimulatedOffline()) {
+        await syncNow();
+      }
+    };
+
     window.addEventListener("online", handleOnlineEvent);
     window.addEventListener("offline", handleOfflineEvent);
     window.addEventListener("brito_sync_queue_updated", refreshQueueAndStats);
-    window.addEventListener("brito_network_status_changed", refreshConnection);
+    window.addEventListener("brito_network_status_changed", handleNetworkStatusChange);
 
     // Heartbeat cada 25 segundos para mantener estado en vivo
     const interval = setInterval(async () => {
@@ -270,7 +302,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("online", handleOnlineEvent);
       window.removeEventListener("offline", handleOfflineEvent);
       window.removeEventListener("brito_sync_queue_updated", refreshQueueAndStats);
-      window.removeEventListener("brito_network_status_changed", refreshConnection);
+      window.removeEventListener("brito_network_status_changed", handleNetworkStatusChange);
       clearInterval(interval);
     };
   }, [downloadLocalData, refreshConnection, refreshQueueAndStats, syncNow]);

@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 };
 
 import { SyncProvider } from "@/context/SyncContext";
-import PwaInstallPrompt from "@/components/ui/PwaInstallPrompt";
+import { BranchProvider } from "@/context/BranchContext";
 
 export default function RootLayout({
   children,
@@ -62,12 +62,13 @@ export default function RootLayout({
       <body className="antialiased font-sans">
         <AuthProvider>
           <SyncProvider>
-            <NotificationProvider>
-              <AppLayout>
-                {children}
-              </AppLayout>
-              <PwaInstallPrompt />
-            </NotificationProvider>
+            <BranchProvider>
+              <NotificationProvider>
+                <AppLayout>
+                  {children}
+                </AppLayout>
+              </NotificationProvider>
+            </BranchProvider>
           </SyncProvider>
         </AuthProvider>
       </body>

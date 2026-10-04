@@ -7,7 +7,6 @@ import {
   DollarSign, 
   Croissant, 
   Receipt, 
-  Target, 
   Calendar, 
   Layers, 
   Sparkles,
@@ -23,7 +22,7 @@ import { formatCurrency } from "@/lib/utils";
 import PeriodSelectorButton from "./PeriodSelectorButton";
 
 export type PeriodType = "hoy" | "semana" | "mes" | "año" | "custom";
-export type MetricType = "dinero" | "piezas" | "tickets" | "meta";
+export type MetricType = "dinero" | "piezas" | "tickets";
 export type ChartViewMode = "consolidado" | "comparativo";
 
 interface GoogleBranchChartProps {
@@ -281,28 +280,14 @@ export default function GoogleBranchChart({
     const totalMoney = dataPoints.reduce((acc, p) => acc + p.totalMoney, 0);
     const totalPieces = dataPoints.reduce((acc, p) => acc + p.totalPieces, 0);
     const totalTickets = dataPoints.reduce((acc, p) => acc + p.totalTickets, 0);
-    
-    // Total goal calculation
-    const dailyChainGoal = branches.reduce((acc, b) => acc + b.dailyGoal, 0);
-    let goalMultiplier = 1;
-    if (selectedPeriod === "hoy") goalMultiplier = 1;
-    else if (selectedPeriod === "semana") goalMultiplier = 7;
-    else if (selectedPeriod === "mes") goalMultiplier = 30;
-    else if (selectedPeriod === "año") goalMultiplier = 365;
-    else goalMultiplier = Math.max(1, dataPoints.length);
-
-    const totalGoal = dailyChainGoal * goalMultiplier;
-    const percentGoal = Math.min(100, Math.round((totalMoney / totalGoal) * 100));
 
     return {
       totalMoney,
       totalPieces,
       totalTickets,
       averageTicket: totalTickets > 0 ? totalMoney / totalTickets : 0,
-      totalGoal,
-      percentGoal,
     };
-  }, [dataPoints, branches, selectedPeriod]);
+  }, [dataPoints]);
 
   // SVG dimensions and coordinate mapping
   const width = 840;
@@ -336,9 +321,6 @@ export default function GoogleBranchChart({
             max = Math.max(max, b.tickets);
           });
         }
-      } else {
-        // Meta
-        max = 100;
       }
     });
     return max > 0 ? max * 1.15 : 100;
@@ -388,10 +370,9 @@ export default function GoogleBranchChart({
       let val = p.totalMoney;
       if (activeMetric === "piezas") val = p.totalPieces;
       if (activeMetric === "tickets") val = p.totalTickets;
-      if (activeMetric === "meta") val = Math.min(100, Math.round((p.totalMoney / ((aggregated.totalGoal / dataPoints.length) || 1)) * 100));
       return { x: getX(idx), y: getY(val), val };
     });
-  }, [dataPoints, activeMetric, aggregated, maxValue]);
+  }, [dataPoints, activeMetric, maxValue]);
 
   // Points for per-branch lines
   const branchLines = useMemo(() => {
@@ -407,7 +388,6 @@ export default function GoogleBranchChart({
         let val = item.money;
         if (activeMetric === "piezas") val = item.pieces;
         if (activeMetric === "tickets") val = item.tickets;
-        if (activeMetric === "meta") val = Math.min(100, Math.round((item.money / (b.dailyGoal || 10000)) * 100));
         return { x: getX(idx), y: getY(val), val };
       });
       return {
@@ -561,7 +541,7 @@ export default function GoogleBranchChart({
       )}
 
       {/* Google Analytics Scorecard Tabs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 border-b border-stone-200">
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-stone-200 border-b border-stone-200">
         {/* Tab 1: Dinero */}
         <button
           onClick={() => setActiveMetric("dinero")}
@@ -650,38 +630,6 @@ export default function GoogleBranchChart({
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-rose-600" />
           )}
         </button>
-
-        {/* Tab 4: Meta de la Cadena */}
-        <button
-          onClick={() => setActiveMetric("meta")}
-          className={`p-5 text-left transition-all relative border-l border-stone-100 ${
-            activeMetric === "meta"
-              ? "bg-emerald-50/50"
-              : "hover:bg-stone-50"
-          }`}
-        >
-          <div className="flex items-center justify-between text-xs text-stone-500 mb-1">
-            <span className="font-bold flex items-center gap-1.5">
-              <Target className="w-4 h-4 text-emerald-600" />
-              Meta Cadena
-            </span>
-            <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-              {aggregated.percentGoal}%
-            </span>
-          </div>
-          <p className="text-2xl lg:text-3xl font-black text-stone-900 tracking-tight">
-            {formatCurrency(aggregated.totalGoal)}
-          </p>
-          <div className="w-full bg-stone-200 rounded-full h-1.5 mt-2 overflow-hidden">
-            <div 
-              className="bg-emerald-500 h-full rounded-full transition-all duration-700"
-              style={{ width: `${aggregated.percentGoal}%` }}
-            />
-          </div>
-          {activeMetric === "meta" && (
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-600" />
-          )}
-        </button>
       </div>
 
       {/* Secondary Controls Bar: Mode Switcher & Legend */}
@@ -708,7 +656,7 @@ export default function GoogleBranchChart({
                   : "text-stone-600 hover:text-stone-900"
               }`}
             >
-              📊 Comparar 3 Sucursales
+              📊 Comparar Sucursales
             </button>
           </div>
         </div>
@@ -721,8 +669,7 @@ export default function GoogleBranchChart({
               <span>
                 {activeMetric === "dinero" ? "Total Facturado ($ MXN)" :
                  activeMetric === "piezas" ? "Total Piezas de Pan (pzas)" :
-                 activeMetric === "tickets" ? "Total Tickets Cobrados" :
-                 "Cumplimiento de Meta (%)"}
+                 "Total Tickets Cobrados"}
               </span>
             </div>
           ) : (

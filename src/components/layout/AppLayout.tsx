@@ -17,28 +17,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, canAccessRoute, getDefaultRouteForUser } = useAuth();
 
   useEffect(() => {
-    if (isLoading || !user) return;
+    if (isLoading) return;
+
+    if (!user) {
+      // Si no hay usuario en esta ventana y se intentó acceder a una ruta protegida (ej: /pos, /inventario)
+      // guardar la URL para redirigir automáticamente una vez que inicie sesión
+      if (typeof window !== "undefined" && pathname && pathname !== "/") {
+        sessionStorage.setItem("brito_redirect_url", pathname);
+      }
+      return;
+    }
+
+    const defaultRoute = getDefaultRouteForUser(user);
 
     try {
-      const sessionActive = sessionStorage.getItem("brito_session_active");
-      if (!sessionActive) {
-        // Al inicio en el sistema: marcar sesión como activa y empezar siempre en el Dashboard (/)
-        sessionStorage.setItem("brito_session_active", "true");
-        if (pathname !== "/") {
-          router.replace("/");
-        }
-      }
+      sessionStorage.setItem("brito_session_active", "true");
     } catch (e) {
       console.error("Error accessing sessionStorage:", e);
     }
-  }, [user, isLoading, pathname, router]);
 
-  const isPendingInitialRedirect =
-    typeof window !== "undefined" &&
-    !sessionStorage.getItem("brito_session_active") &&
-    pathname !== "/";
+    // Si está en "/" pero no tiene permiso para el Dashboard, redirigir a su ruta por defecto (ej. /pos)
+    if (pathname === "/" && canAccessRoute && !canAccessRoute("/")) {
+      router.replace(defaultRoute);
+    }
+  }, [user, isLoading, pathname, router, canAccessRoute, getDefaultRouteForUser]);
 
-  if (isLoading || (user && isPendingInitialRedirect)) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0c0d12] flex flex-col items-center justify-center text-white space-y-3">
         <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
@@ -58,11 +62,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <BranchProvider>
       <SidebarProvider>
-        <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
+        <div className="flex h-screen max-h-screen w-full max-w-full overflow-hidden bg-stone-50/60 text-stone-900 antialiased selection:bg-amber-500 selection:text-stone-950">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 w-full max-w-full max-h-screen overflow-x-hidden overflow-y-hidden">
           <Header />
-          <main className={`flex-1 min-w-0 w-full max-w-full overflow-x-hidden ${pathname === "/pos" ? "overflow-hidden p-0" : "overflow-y-auto bg-stone-50/60 px-3 sm:px-5 lg:px-6 pt-3 sm:pt-5 pb-24 md:pb-6"}`}>
+          <main className={`flex-1 min-w-0 w-full max-w-full overflow-x-hidden ${
+            pathname === "/pos"
+              ? "overflow-hidden p-0"
+              : pathname.startsWith("/pedidos")
+              ? "overflow-y-auto flex flex-col p-0 bg-stone-50/60"
+              : "overflow-y-auto bg-stone-50/60 px-3 sm:px-5 lg:px-6 pt-3 sm:pt-5 pb-24 md:pb-6"
+          }`}>
             {isAllowed ? (
               children
             ) : (

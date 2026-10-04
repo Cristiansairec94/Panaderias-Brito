@@ -174,6 +174,12 @@ function ConfiguracionContent() {
       todayTickets: 0,
       cashInDrawer: fund,
       color: bColor,
+      topProduct: {
+        name: "Bolillo Tradicional",
+        piecesSold: 0,
+        category: "Pan Salado",
+        icon: "🥖",
+      },
       currentShift: {
         id: `shift-${newId}-1`,
         name: "Turno Matutino (06:00 - 14:00)",
@@ -747,7 +753,7 @@ function ConfiguracionContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Estado Operativo</label>
                       <select
@@ -759,18 +765,6 @@ function ConfiguracionContent() {
                         <option value="mantenimiento">En Mantenimiento</option>
                         <option value="cerrada">Cerrada</option>
                       </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="font-bold text-stone-700">Meta Diaria de Venta ($ MXN)</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={bDailyGoal}
-                        onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                        onChange={(e) => setBDailyGoal(cleanDecimalNumbers(e.target.value))}
-                        className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold"
-                      />
                     </div>
 
                     <div className="space-y-1">
@@ -938,7 +932,7 @@ function ConfiguracionContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                     <div className="space-y-1">
                       <label className="font-bold text-stone-700">Fondo Inicial de Caja ($ MXN)</label>
                       <input
@@ -947,18 +941,6 @@ function ConfiguracionContent() {
                         value={bInitialFund}
                         onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                         onChange={(e) => setBInitialFund(cleanDecimalNumbers(e.target.value))}
-                        className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="font-bold text-stone-700">Meta Diaria ($ MXN)</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={bDailyGoal}
-                        onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
-                        onChange={(e) => setBDailyGoal(cleanDecimalNumbers(e.target.value))}
                         className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-200 font-bold"
                       />
                     </div>

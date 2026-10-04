@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { History, X, Receipt, RefreshCw, Printer, DollarSign, CreditCard, Send, Search, Cake, Eye } from "lucide-react";
+import { History, X, Receipt, RefreshCw, Printer, DollarSign, CreditCard, Send, Search, Cake, Eye, CheckCircle2 } from "lucide-react";
 import { Sale, CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-import { getStoredOrders } from "@/lib/orders";
+import { getStoredOrders, updateOrderStatus } from "@/lib/orders";
+import { useNotifications } from "@/context/NotificationContext";
 
 interface RecentSalesDrawerProps {
   isOpen: boolean;
@@ -25,13 +26,16 @@ export default function RecentSalesDrawer({
   onSelectOrderForReceipt,
   onSelectOrderForPayment,
 }: RecentSalesDrawerProps) {
+  const { openOrderDetail } = useNotifications();
   const [filterMethod, setFilterMethod] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "ventas" | "pedidos">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   if (!isOpen) return null;
 
-  const effectiveOrders = Array.isArray(orders) ? orders : [];
+  const effectiveOrders = Array.isArray(orders)
+    ? orders.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado")
+    : [];
 
   const filteredSales = sales.filter((s) => {
     if (typeFilter === "pedidos") return false;
@@ -48,6 +52,7 @@ export default function RecentSalesDrawer({
   });
 
   const filteredOrders = effectiveOrders.filter((o) => {
+    if (o.status === "entregado" || o.status === "cancelado") return false;
     if (typeFilter === "ventas") return false;
     if (filterMethod !== "all" && o.paymentMethod !== filterMethod) return false;
     if (searchQuery.trim()) {
@@ -251,13 +256,42 @@ export default function RecentSalesDrawer({
                           {order.cashier ? `Cajero: ${order.cashier}` : ""}
                         </span>
                         <div className="flex items-center gap-1.5">
-                          {order.remainingBalance > 0 && onSelectOrderForPayment && (
+                          <button
+                            type="button"
+                            onClick={() => openOrderDetail(order)}
+                            className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold rounded-xl text-xs border border-amber-300 shadow-2xs transition-all cursor-pointer"
+                            title="Ver detalles completos del pedido"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-amber-700" /> Detalles
+                          </button>
+                          {order.remainingBalance > 0 ? (
+                            onSelectOrderForPayment && (
+                              <button
+                                type="button"
+                                onClick={() => onSelectOrderForPayment(order)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                              >
+                                <DollarSign className="w-3 h-3" />
+                                <span>Cobrar Saldo</span>
+                              </button>
+                            )
+                          ) : (
                             <button
                               type="button"
-                              onClick={() => onSelectOrderForPayment(order)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-all cursor-pointer"
+                              onClick={() => {
+                                const ok = confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y pasará al historial de pedidos.`);
+                                if (ok) {
+                                  updateOrderStatus(order.id, "entregado");
+                                  if (typeof window !== "undefined") {
+                                    window.dispatchEvent(new Event("brito_orders_updated"));
+                                  }
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-xs"
+                              title="Marcar como entregado (se archivará en el historial)"
                             >
-                              Cobrar Saldo
+                              <CheckCircle2 className="w-3.5 h-3.5 text-blue-200" />
+                              <span>Entregar</span>
                             </button>
                           )}
                           {onSelectOrderForReceipt && (

@@ -62,6 +62,8 @@ export interface Sale {
   timestamp?: number | string;
   isCustomOrder?: boolean;
   orderNumber?: string;
+  branchId?: string;
+  branchName?: string;
 }
 
 export interface InventoryItem {
@@ -210,6 +212,7 @@ export interface ShiftCutRecord {
   outgoingCashier: string;
   incomingCashier: string;
   responsible?: string; // Responsable directo del turno
+  branchId?: string;
   branchName?: string;
   previousShift: string;
   nextShift: string;
@@ -243,6 +246,9 @@ export interface CashExpense {
   timestamp?: number | string;
   isOwner?: boolean;
   authorizedBy?: string;
+  branchId?: string;
+  branchName?: string;
+  paymentMethod?: "efectivo" | "tarjeta" | "transferencia";
 }
 
 export type CashIncomeCategory =
@@ -290,19 +296,33 @@ export interface SimulatedSale {
 export type UserRole = "admin" | "auxiliar_admin" | "cajero" | "panadero" | "supervisor" | (string & {});
 
 export interface RolePermissions {
+  // 1. DashBoard
   canAccessDashboard: boolean;
-  canAccessPos: boolean;
-  canAccessCaja: boolean;
-  canAccessInventario: boolean;
+  // 2. Sucursales
+  canAccessSucursales?: boolean;
+  // 3. Pedidos
   canAccessPedidos: boolean;
+  // 4. Clientes
   canAccessClientes: boolean;
-  canAccessFinanzas: boolean;
-  canAccessReportes: boolean;
-  canAccessConfiguracion: boolean;
+  // 5. Productos
   canAccessProductos: boolean;
-  canViewProfitMargins: boolean;
   canEditPrices: boolean;
+  // 6. Ingresos
+  canAccessIngresos?: boolean;
+  // 7. Gastos
+  canAccessGastos?: boolean;
+  // 8. Finanzas
+  canAccessFinanzas: boolean;
+  canAccessCaja: boolean;
+  canViewProfitMargins: boolean;
+  canAccessReportes?: boolean;
+  // 9. Configuración
+  canAccessConfiguracion: boolean;
   canManageUsers: boolean;
+  // 10. Punto de Venta (POS)
+  canAccessPos: boolean;
+  // Compatibilidad adicional
+  canAccessInventario?: boolean;
 }
 
 export interface AppUser {
@@ -365,6 +385,14 @@ export interface Branch {
   cashInDrawer: number;
   color: string; // e.g. "orange", "rose", "emerald", "blue", "purple"
   topProduct?: BranchTopProduct;
+  todayDeskSales?: number;
+  todayDeskTickets?: number;
+  todayOrdersDeposit?: number;
+  todayOrdersTotal?: number;
+  todayOrdersCount?: number;
+  lastCut?: ShiftCutRecord;
+  dayAccumulatedSales?: number;
+  dayAccumulatedTickets?: number;
 }
 
 export interface BranchCashMovement {
@@ -378,6 +406,11 @@ export interface BranchCashMovement {
   reason: string;
   authorizedBy: string;
   timestamp: string;
+  movementType?: "venta" | "pedido" | "gasto" | "entrada" | "corte";
+  cashier?: string;
+  paymentMethod?: string;
+  createdAt?: string;
+  rawTimestamp?: number;
 }
 
 export interface BreadDeliveryItem {

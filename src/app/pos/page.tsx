@@ -7,7 +7,6 @@ import {
   Plus, 
   Minus, 
   CheckCircle, 
-  Receipt, 
   Database,
   History,
   DollarSign,
@@ -47,12 +46,15 @@ import {
   Barcode,
   Printer,
   Wifi,
-  WifiOff
+  WifiOff,
+  Zap,
+  ArrowDownRight,
+  ArrowUpRight
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode } from "@/lib/products";
+import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb } from "@/lib/products";
 import { 
   DEFAULT_GENERAL_CUSTOMER, 
   getStoredCustomers, 
@@ -68,6 +70,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { useSync } from "@/context/SyncContext";
+import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
 import TicketModal from "@/components/pos/TicketModal";
 import RecentSalesDrawer from "@/components/pos/RecentSalesDrawer";
 import ExpensesModal from "@/components/pos/ExpensesModal";
@@ -232,9 +235,10 @@ const DEFAULT_CARD_TERMINALS: CardTerminalAccount[] = [
 
 /**
  * Input editable directo y fluido para la cantidad de piezas de un producto en la charola.
- * Permite borrar libremente el número 1 (sin trabas ni rebotes instantáneos),
- * auto-selecciona el texto al hacer clic/foco para sobreescribir al instante,
- * y valida con seguridad al desenfocar (blur).
+/**
+ * Control editable de cantidad de piezas para el producto en la charola.
+ * Al dar clic o enfocar, el número actual desaparece inmediatamente, permitiendo que
+ * la primera tecla que presione el cajero sea la nueva cantidad (sin necesidad de borrar con Backspace).
  */
 function CartQuantityInput({
   value,
@@ -244,10 +248,25 @@ function CartQuantityInput({
   onChange: (qty: number) => void;
 }) {
   const [text, setText] = useState<string>(value > 0 ? value.toString() : "");
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    setText(value > 0 ? value.toString() : "");
-  }, [value]);
+    if (!isEditing) {
+      setText(value > 0 ? value.toString() : "");
+    }
+  }, [value, isEditing]);
+
+  const handleFocus = () => {
+    setIsEditing(true);
+    setText(""); // Desaparece inmediatamente al dar clic para escribir directamente cualquier tecla
+  };
+
+  const handleClick = () => {
+    if (!isEditing) {
+      setIsEditing(true);
+      setText("");
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const clean = cleanOnlyNumbers(e.target.value);
@@ -261,9 +280,12 @@ function CartQuantityInput({
   };
 
   const handleBlur = () => {
+    setIsEditing(false);
     if (text === "" || parseInt(text, 10) === 0) {
-      setText("");
-      onChange(0);
+      // Si el usuario no escribió nada o puso 0, restaurar el valor previo (mínimo 1)
+      const restored = value > 0 ? value : 1;
+      setText(restored.toString());
+      onChange(restored);
     } else {
       const num = parseInt(text, 10);
       setText(num.toString());
@@ -277,6 +299,8 @@ function CartQuantityInput({
       inputMode="numeric"
       pattern="[0-9]*"
       value={text}
+      onFocus={handleFocus}
+      onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.currentTarget.blur();
@@ -288,14 +312,15 @@ function CartQuantityInput({
       onBlur={handleBlur}
       placeholder=""
       className="w-11 h-7 text-center font-black text-xs sm:text-sm bg-white border border-amber-400 focus:border-amber-600 rounded-lg focus:outline-none shadow-inner text-stone-900 cursor-text"
-      title="Cantidad de piezas (puedes borrarlo y escribir libremente)"
+      title="Cantidad de piezas (al dar clic el número desaparece para escribir directamente)"
     />
   );
 }
 
 /**
  * Control editable de precio unitario por pieza para el producto en la charola.
- * Permite cambiar el precio c/pieza para esa venta específica de forma completamente editable y fluida.
+ * Permite cambiar el precio c/pieza para esa venta específica de forma 100% editable.
+ * Al dar clic, el precio actual desaparece inmediatamente para escribir el nuevo precio sin borrar manualmente.
  */
 function CartPriceInput({
   value,
@@ -305,10 +330,25 @@ function CartPriceInput({
   onChange: (price: number) => void;
 }) {
   const [text, setText] = useState<string>(value > 0 ? value.toString() : "");
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    setText(value > 0 ? value.toString() : "");
-  }, [value]);
+    if (!isEditing) {
+      setText(value > 0 ? value.toString() : "");
+    }
+  }, [value, isEditing]);
+
+  const handleFocus = () => {
+    setIsEditing(true);
+    setText(""); // Desaparece inmediatamente al dar clic para escribir directamente el nuevo precio
+  };
+
+  const handleClick = () => {
+    if (!isEditing) {
+      setIsEditing(true);
+      setText("");
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const clean = cleanDecimalNumbers(e.target.value);
@@ -322,9 +362,11 @@ function CartPriceInput({
   };
 
   const handleBlur = () => {
+    setIsEditing(false);
     if (text === "" || text === "." || parseFloat(text) === 0) {
-      setText("");
-      onChange(0);
+      // Si quedó vacío o en 0, restaurar el precio original del producto
+      setText(value > 0 ? value.toString() : "");
+      onChange(value);
     } else {
       const num = parseFloat(text);
       setText(num.toString());
@@ -335,13 +377,15 @@ function CartPriceInput({
   return (
     <div
       className="inline-flex items-center gap-0.5 bg-amber-50 hover:bg-amber-100/70 focus-within:bg-white border border-amber-300 focus-within:border-amber-600 rounded-lg px-1.5 py-0.5 transition-all shadow-2xs group"
-      title="Precio por pieza editable (haz clic para cambiar el precio de esta pieza)"
+      title="Precio por pieza editable (al dar clic el número desaparece para escribir directamente)"
     >
       <span className="text-[11px] font-black text-amber-800 select-none">$</span>
       <input
         type="text"
         inputMode="decimal"
         value={text}
+        onFocus={handleFocus}
+        onClick={handleClick}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.currentTarget.blur();
@@ -361,8 +405,9 @@ function CartPriceInput({
 
 export default function POSPage() {
   const { user } = useAuth();
-  const { branches, currentBranch, switchBranch, registerRealSale } = useBranch();
-  const { addNotification } = useNotifications();
+  const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
+  const { branches, currentBranch, switchBranch, registerRealSale, cashMovements } = useBranch();
+  const { addNotification, openShiftCutDetail } = useNotifications();
   const { toggleMobile } = useSidebar();
   const { isOnline, isSyncing, isSynced, enqueueOfflineItem, pendingCount } = useSync();
   const activeBranch = currentBranch || branches[0];
@@ -492,30 +537,32 @@ export default function POSPage() {
         if (storedShift && storedShift !== shiftName) setShiftName(storedShift);
 
         const rawSales = localStorage.getItem("brito_pos_current_sales");
-        if (!rawSales || rawSales === "[]") {
-          setRecentSalesList([]);
-        } else {
+        let list: Sale[] = [];
+        if (rawSales && rawSales !== "[]") {
           const parsed = JSON.parse(rawSales);
-          if (Array.isArray(parsed)) {
-            const activeCashier = storedCashier || cashierName;
-            const shiftStart = getStoredShiftStartBoundary();
-            const realSales = parsed.filter((s: any) => {
-              if (!s) return false;
-              if (activeCashier && s.cashier && !matchesCashier(s.cashier, activeCashier)) return false;
-              const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (shiftStart > 0 && (!t || t < shiftStart - 1000)) return false;
-              return true;
-            });
-            setRecentSalesList((prev) => {
-              if (prev.length === realSales.length && prev.every((s, i) => s.id === realSales[i]?.id)) {
-                return prev;
-              }
-              return realSales;
-            });
-          } else {
-            setRecentSalesList((prev) => (prev.length === 0 ? prev : []));
-          }
+          if (Array.isArray(parsed)) list = [...parsed];
         }
+        const masterSaved = localStorage.getItem("brito_pos_master_sales");
+        if (masterSaved) {
+          try {
+            const masterParsed = JSON.parse(masterSaved);
+            if (Array.isArray(masterParsed)) {
+              for (const ms of masterParsed) {
+                if (ms && !list.some((s) => s.id === ms.id)) {
+                  list.push(ms);
+                }
+              }
+            }
+          } catch {}
+        }
+        const shiftStart = getStoredShiftStartBoundary(activeBranch?.id);
+        const realSales = list.filter((s: any) => {
+          if (!s) return false;
+          const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
+          if (shiftStart > 0 && (!t || t < shiftStart)) return false;
+          return true;
+        });
+        setRecentSalesList(realSales);
 
         const rawExpenses = localStorage.getItem("brito_pos_current_expenses");
         if (!rawExpenses || rawExpenses === "[]") {
@@ -523,14 +570,10 @@ export default function POSPage() {
         } else {
           const parsedExp = JSON.parse(rawExpenses);
           if (Array.isArray(parsedExp)) {
-            const activeCashier = storedCashier || cashierName;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = parsedExp.filter((e: any) => {
-              if (!e) return false;
-              const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno";
-              if (!isOwnerOrAdmin && activeCashier && e.cashier && !matchesCashier(e.cashier, activeCashier)) return false;
               const t = parseDateTimeSafe(e?.timestamp || e?.createdAt || e?.date);
-              return shiftStart <= 0 || (t && t >= shiftStart - 1000);
+              return shiftStart <= 0 || (t && t >= shiftStart);
             });
             const deduped = deduplicateExpenses(filtered);
             setExpensesList(deduped);
@@ -550,13 +593,10 @@ export default function POSPage() {
         } else {
           const parsedInc = JSON.parse(rawIncomes);
           if (Array.isArray(parsedInc)) {
-            const activeCashier = storedCashier || cashierName;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = parsedInc.filter((i: any) => {
-              if (!i) return false;
-              if (activeCashier && i.cashier && !matchesCashier(i.cashier, activeCashier)) return false;
               const t = parseDateTimeSafe(i?.timestamp || i?.date || i?.createdAt);
-              return shiftStart <= 0 || (t && t >= shiftStart - 1000);
+              return shiftStart <= 0 || (t && t >= shiftStart);
             });
             const deduped = deduplicateIncomes(filtered);
             setIncomesList(deduped);
@@ -580,12 +620,14 @@ export default function POSPage() {
     };
   }, []);
 
-  // Auto-sync user and branch
+  // Auto-sync user and branch (solo para cajeros/operativos, el administrador puede ver y alternar cualquier sucursal libremente)
   useEffect(() => {
     if (user) {
-      const userBranch = branches.find((b) => b.assignedUserId === user.id);
-      if (userBranch && currentBranch?.id !== userBranch.id) {
-        switchBranch(userBranch.id);
+      if (user.role !== "admin") {
+        const userBranch = branches.find((b) => b.assignedUserId === user.id);
+        if (userBranch && currentBranch?.id !== userBranch.id) {
+          switchBranch(userBranch.id);
+        }
       }
       setCashierName(user.name);
     }
@@ -597,8 +639,12 @@ export default function POSPage() {
       const storedFund = getStoredShiftFund(activeBranch.currentShift.initialFund);
       setInitialCashFund(storedFund);
       setShiftName(activeBranch.currentShift.name);
-      if (!user) {
-        setCashierName(activeBranch.assignedUserName || activeBranch.currentShift.cashier);
+      if (activeBranch.currentShift?.cashier) {
+        setCashierName(activeBranch.currentShift.cashier);
+      } else if (activeBranch.assignedUserName) {
+        setCashierName(activeBranch.assignedUserName);
+      } else if (user) {
+        setCashierName(user.name);
       }
     }
   }, [activeBranch?.id, user]);
@@ -607,6 +653,55 @@ export default function POSPage() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [isReprintMode, setIsReprintMode] = useState(false);
   const [showRecentSales, setShowRecentSales] = useState(false);
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+  const [branchPanelTab, setBranchPanelTab] = useState<"sucursales" | "movimientos">("sucursales");
+  const [movementFilterType, setMovementFilterType] = useState<"todos" | "venta" | "pedido" | "gasto" | "entrada" | "corte">("todos");
+  const [movementFilterBranch, setMovementFilterBranch] = useState<string>("todas");
+  const [movementSearchQuery, setMovementSearchQuery] = useState<string>("");
+
+  const filteredCashMovements = useMemo(() => {
+    return (cashMovements || []).filter((m) => {
+      if (movementFilterType !== "todos") {
+        if (m.movementType !== movementFilterType) return false;
+      }
+      if (movementFilterBranch !== "todas") {
+        if (m.branchId !== movementFilterBranch) return false;
+      }
+      if (movementSearchQuery.trim()) {
+        const q = movementSearchQuery.toLowerCase().trim();
+        const matchReason = (m.reason || "").toLowerCase().includes(q);
+        const matchCashier = (m.cashier || m.authorizedBy || "").toLowerCase().includes(q);
+        const matchBranch = (m.branchName || "").toLowerCase().includes(q);
+        const matchAmount = String(m.amount).includes(q);
+        if (!matchReason && !matchCashier && !matchBranch && !matchAmount) return false;
+      }
+      return true;
+    });
+  }, [cashMovements, movementFilterType, movementFilterBranch, movementSearchQuery]);
+
+  const movementTotals = useMemo(() => {
+    let entradas = 0;
+    let salidas = 0;
+    filteredCashMovements.forEach((m) => {
+      if (m.type === "entrada") {
+        entradas += Number(m.amount) || 0;
+      } else {
+        salidas += Number(m.amount) || 0;
+      }
+    });
+    return { entradas, salidas, balance: entradas - salidas };
+  }, [filteredCashMovements]);
+
+  const typeCounts = useMemo(() => {
+    const c: Record<string, number> = { venta: 0, pedido: 0, gasto: 0, entrada: 0, corte: 0 };
+    (cashMovements || []).forEach((m) => {
+      if (m.movementType && c[m.movementType] !== undefined) {
+        c[m.movementType]++;
+      }
+    });
+    return c;
+  }, [cashMovements]);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [showCashDrawerModal, setShowCashDrawerModal] = useState(false);
   const [showBreadDeliveryModal, setShowBreadDeliveryModal] = useState(false);
@@ -635,7 +730,7 @@ export default function POSPage() {
               (s: any) => {
                 if (!s) return false;
                 const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-                if (shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
+                if (shiftStart > 0 && (!t || t < shiftStart)) return false;
                 return true;
               }
             );
@@ -719,13 +814,18 @@ export default function POSPage() {
   const [specialOrderInitialItems, setSpecialOrderInitialItems] = useState<OrderItem[]>([]);
   const [selectedOrderForReceipt, setSelectedOrderForReceipt] = useState<CustomOrder | null>(null);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<CustomOrder | null>(null);
+  const [reopenExpensesAfterPayment, setReopenExpensesAfterPayment] = useState(false);
 
   useEffect(() => {
     const handleOrdersUpdated = () => {
       setShiftVersion((v) => v + 1);
     };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
-    return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
+    window.addEventListener("storage", handleOrdersUpdated);
+    return () => {
+      window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
+      window.removeEventListener("storage", handleOrdersUpdated);
+    };
   }, []);
 
   // Sincronizar en tiempo real el dinero ingresado del turno activo
@@ -758,40 +858,45 @@ export default function POSPage() {
     const handleSalesUpdated = () => {
       try {
         const saved = localStorage.getItem("brito_pos_current_sales");
+        let list: Sale[] = [];
         if (saved && saved !== "[]") {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            const shiftStart = getStoredShiftStartBoundary();
-            const realSales = parsed.filter((s: any) => {
-              if (!s) return false;
-              const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
-              return true;
-            });
-            setRecentSalesList((prev) => {
-              if (prev.length === realSales.length && prev.every((s, i) => s.id === realSales[i]?.id)) {
-                return prev;
-              }
-              return realSales;
-            });
-          } else {
-            setRecentSalesList((prev) => (prev.length === 0 ? prev : []));
-          }
-        } else {
-          setRecentSalesList((prev) => (prev.length === 0 ? prev : []));
+          if (Array.isArray(parsed)) list = [...parsed];
         }
+        const masterSaved = localStorage.getItem("brito_pos_master_sales");
+        if (masterSaved) {
+          try {
+            const masterParsed = JSON.parse(masterSaved);
+            if (Array.isArray(masterParsed)) {
+              for (const ms of masterParsed) {
+                if (ms && !list.some((s) => s.id === ms.id)) {
+                  list.push(ms);
+                }
+              }
+            }
+          } catch {}
+        }
+        const shiftStart = getStoredShiftStartBoundary(activeBranch?.id);
+        const realSales = list.filter((s: any) => {
+          if (!s) return false;
+          const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
+          if (shiftStart > 0 && (!t || t < shiftStart)) return false;
+          return true;
+        });
+        setRecentSalesList(realSales);
         setShiftVersion((v) => v + 1);
       } catch (e) {
         console.error("Error al sincronizar ventas en POS:", e);
       }
     };
+    handleSalesUpdated();
     window.addEventListener("brito_sales_updated", handleSalesUpdated);
     window.addEventListener("storage", handleSalesUpdated);
     return () => {
       window.removeEventListener("brito_sales_updated", handleSalesUpdated);
       window.removeEventListener("storage", handleSalesUpdated);
     };
-  }, []);
+  }, [isAdmin, activeBranch?.id]);
 
   // Sanitización de seguridad: eliminar registros corruptos o atípicos de localStorage
   useEffect(() => {
@@ -868,11 +973,11 @@ export default function POSPage() {
       if (savedSales) {
         const parsedSales = JSON.parse(savedSales);
         if (Array.isArray(parsedSales)) {
-          const shiftStart = getStoredShiftStartBoundary();
+          const shiftStart = getStoredShiftStartBoundary(activeBranch?.id);
           const cleanSales = parsedSales.filter((s: any) => {
             if (!s) return false;
             const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-            return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+            return shiftStart <= 0 || (t > 0 && t >= shiftStart);
           });
           setRecentSalesList(cleanSales);
         }
@@ -956,10 +1061,15 @@ export default function POSPage() {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            let maxCut = parsed[0];
+            const branchCuts = parsed.filter(c => {
+              if (activeBranch?.id && activeBranch.id !== "all" && c.branchId && c.branchId !== activeBranch.id) return false;
+              return true;
+            });
+            if (branchCuts.length === 0) return null;
+            let maxCut = branchCuts[0];
             let maxT = parseDateTimeSafe(maxCut?.timestamp || maxCut?.date || maxCut?.createdAt || maxCut?.cutTime);
-            for (let i = 1; i < parsed.length; i++) {
-              const c = parsed[i];
+            for (let i = 1; i < branchCuts.length; i++) {
+              const c = branchCuts[i];
               const t = parseDateTimeSafe(c?.timestamp || c?.date || c?.createdAt || c?.cutTime);
               if (t > maxT) {
                 maxT = t;
@@ -972,32 +1082,28 @@ export default function POSPage() {
       } catch (e) {}
     }
     return null;
-  }, [isShiftLocked, shiftVersion]);
+  }, [isShiftLocked, shiftVersion, activeBranch?.id]);
 
   const baseShiftFund = useMemo(() => {
     return initialCashFund;
   }, [initialCashFund]);
 
   const handleDirectUnlockShift = () => {
-    const now = Date.now();
     setInitialCashFund(baseShiftFund);
     try {
       localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
       localStorage.removeItem("brito_pos_shift_locked");
       localStorage.setItem("brito_current_shift_cashier", cashierName);
       localStorage.setItem("brito_current_shift_name", shiftName);
-      localStorage.setItem("brito_current_shift_start_timestamp", now.toString());
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
+      if (!localStorage.getItem("brito_pos_current_sales")) {
+        localStorage.setItem("brito_pos_current_sales", "[]");
+      }
+      if (!localStorage.getItem("brito_current_shift_start_timestamp")) {
+        localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
+      }
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
-      window.dispatchEvent(new Event("brito_orders_updated"));
     } catch (e) {}
-    setRecentSalesList([]);
-    setExpensesList([]);
-    setIncomesList([]);
-    setCart([]);
     setIsShiftLocked(false);
     setShiftVersion((v) => v + 1);
   };
@@ -1009,18 +1115,17 @@ export default function POSPage() {
         setIsShiftLocked(true);
       }
 
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayStartTs = todayStart.getTime();
+
       // Obtener el inicio de turno más reciente y válido (del corte o inicio de turno guardado)
       const lastCutTs = lastCutInfo
         ? parseDateTimeSafe(lastCutInfo.timestamp || lastCutInfo.date || lastCutInfo.createdAt || lastCutInfo.cutTime)
         : 0;
-      let effectiveShiftStart = Number(localStorage.getItem("brito_current_shift_start_timestamp")) || 0;
-      if (lastCutTs > effectiveShiftStart) {
-        effectiveShiftStart = lastCutTs;
-        localStorage.setItem("brito_current_shift_start_timestamp", effectiveShiftStart.toString());
-      } else if (!effectiveShiftStart) {
-        effectiveShiftStart = Date.now();
-        localStorage.setItem("brito_current_shift_start_timestamp", effectiveShiftStart.toString());
-      }
+      // Si hubo corte hoy, el turno inició en ese corte; de lo contrario inicia al inicio del día de hoy
+      const effectiveShiftStart = lastCutTs >= todayStartTs ? lastCutTs : todayStartTs;
+      localStorage.setItem("brito_current_shift_start_timestamp", effectiveShiftStart.toString());
 
       // Sincronizar ventas del turno actual con ventana de tolerancia de 10 segundos
       const rawCurrent = localStorage.getItem("brito_pos_current_sales");
@@ -1031,7 +1136,7 @@ export default function POSPage() {
             (s: any) => {
               if (!s) return false;
               const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (effectiveShiftStart > 0 && (!t || t < effectiveShiftStart - 60000)) return false;
+              if (effectiveShiftStart > 0 && (!t || t < effectiveShiftStart)) return false;
               return true;
             }
           );
@@ -1076,6 +1181,28 @@ export default function POSPage() {
     }
   }, [isCustomerPickerOpen]);
 
+  // Cerrar selector de sucursales e historial al hacer clic fuera o presionar Escape
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
+        setShowBranchDropdown(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowBranchDropdown(false);
+      }
+    }
+    if (showBranchDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [showBranchDropdown]);
+
   const handleCreateQuickCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustName.trim()) return;
@@ -1103,46 +1230,26 @@ export default function POSPage() {
   const handleCompleteShiftCut = () => {
     setShowCashDrawerModal(false);
     setIsShiftLocked(true);
+    setRecentSalesList([]);
+    setExpensesList([]);
     setShiftVersion((v) => v + 1);
   };
 
   const handleCashierChange = (newCashier: string) => {
-    const now = Date.now();
     setCashierName(newCashier);
     try {
       localStorage.setItem("brito_current_shift_cashier", newCashier);
-      localStorage.setItem("brito_current_shift_start_timestamp", now.toString());
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-      window.dispatchEvent(new Event("brito_sales_updated"));
-      window.dispatchEvent(new Event("brito_orders_updated"));
     } catch (e) {}
-    setRecentSalesList([]);
-    setExpensesList([]);
-    setIncomesList([]);
-    setCart([]);
     setShiftVersion((v) => v + 1);
   };
 
   const handleShiftChange = (newShift: string) => {
-    const now = Date.now();
     setShiftName(newShift);
     try {
       localStorage.setItem("brito_current_shift_name", newShift);
-      localStorage.setItem("brito_current_shift_start_timestamp", now.toString());
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
-      window.dispatchEvent(new Event("brito_sales_updated"));
-      window.dispatchEvent(new Event("brito_orders_updated"));
     } catch (e) {}
-    setRecentSalesList([]);
-    setExpensesList([]);
-    setIncomesList([]);
-    setCart([]);
     setShiftVersion((v) => v + 1);
   };
 
@@ -1216,6 +1323,7 @@ export default function POSPage() {
             payment_method,
             cashier,
             created_at,
+            branch_id,
             sale_items (
               product_id,
               product_name,
@@ -1235,6 +1343,7 @@ export default function POSPage() {
             total: Number(s.total),
             paymentMethod: (s.payment_method as any) || "efectivo",
             cashier: s.cashier || "Don Toño Brito",
+            branchId: s.branch_id || "branch-matriz",
             createdAt: s.created_at,
             timestamp: s.created_at ? new Date(s.created_at).getTime() : undefined,
             items: (s.sale_items || []).map((si: any) => ({
@@ -1251,7 +1360,7 @@ export default function POSPage() {
         }
 
         // Guardar ventas de Supabase y de ingresos en el historial maestro (brito_pos_master_sales)
-        // para reimpresión y consultas históricas SIN contaminar las ventas del turno en vivo (recentSalesList)
+        // y en las ventas activas del turno (brito_pos_current_sales)
         try {
           const rawMaster = localStorage.getItem("brito_pos_master_sales");
           const masterList: Sale[] = rawMaster ? JSON.parse(rawMaster) : [];
@@ -1280,6 +1389,7 @@ export default function POSPage() {
                 total: inc.amount,
                 paymentMethod: (inc.paymentMethod as any) || "efectivo",
                 cashier: inc.cashier || "Don Toño Brito",
+                branchId: inc.branchId || "branch-matriz",
                 customerName: inc.customerName,
                 createdAt: inc.timestamp,
                 timestamp: inc.timestamp ? new Date(inc.timestamp).getTime() : undefined,
@@ -1304,6 +1414,27 @@ export default function POSPage() {
             masterList.sort((a, b) => compareMovementsDesc(a, b));
             localStorage.setItem("brito_pos_master_sales", JSON.stringify(masterList));
           }
+
+          // Sincronizar también con las ventas del turno actual (brito_pos_current_sales)
+          const rawCurrent = localStorage.getItem("brito_pos_current_sales");
+          const currentList: Sale[] = rawCurrent ? JSON.parse(rawCurrent) : [];
+          const currentMap = new Map<string, Sale>(currentList.map((s) => [s.id, s]));
+          let currentChanged = false;
+
+          for (const s of masterList) {
+            if (!currentMap.has(s.id)) {
+              currentMap.set(s.id, s);
+              currentChanged = true;
+            }
+          }
+
+          if (currentChanged) {
+            const updatedCurrent = Array.from(currentMap.values()).sort((a, b) => compareMovementsDesc(a, b));
+            localStorage.setItem("brito_pos_current_sales", JSON.stringify(updatedCurrent));
+            setRecentSalesList(updatedCurrent);
+          }
+
+          window.dispatchEvent(new Event("brito_sales_updated"));
         } catch (e) {}
 
         // 3. Load cash expenses from Supabase
@@ -1347,6 +1478,65 @@ export default function POSPage() {
       }
     }
     loadInitialData();
+
+    let channel: any = null;
+    try {
+      const supabase = createClient();
+      channel = supabase
+        .channel("pos_supabase_realtime")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "products" },
+          () => {
+            fetchProductsFromDb().then((prods) => {
+              if (prods && prods.length > 0) setProducts(prods);
+            });
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "sales" },
+          () => {
+            window.dispatchEvent(new Event("brito_sales_updated"));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "custom_orders" },
+          () => {
+            window.dispatchEvent(new Event("brito_orders_updated"));
+            window.dispatchEvent(new Event("brito_sales_updated"));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "cash_movements" },
+          () => {
+            window.dispatchEvent(new Event("brito_incomes_updated"));
+            window.dispatchEvent(new Event("brito_caja_updated"));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "cash_expenses" },
+          () => {
+            window.dispatchEvent(new Event("brito_incomes_updated"));
+            window.dispatchEvent(new Event("brito_caja_updated"));
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn("Could not subscribe to pos realtime channel:", e);
+    }
+
+    return () => {
+      if (channel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(channel);
+        } catch {}
+      }
+    };
   }, []);
 
   const filteredProducts = products.filter((prod) => {
@@ -1619,22 +1809,27 @@ export default function POSPage() {
       lastCutInfo?.timestamp || lastCutInfo?.date || lastCutInfo?.createdAt || lastCutInfo?.cutTime
     );
     const validCut = lastCutTs > 0 && lastCutTs <= Date.now() ? lastCutTs : 0;
-    return Math.max(getStoredShiftStartBoundary(), validCut);
-  }, [lastCutInfo, shiftVersion]);
+    return Math.max(getStoredShiftStartBoundary(activeBranch?.id), validCut);
+  }, [lastCutInfo, shiftVersion, activeBranch?.id]);
 
   const currentShiftSales = useMemo(() => {
     try {
-      if (!recentSalesList || recentSalesList.length === 0 || !shiftStartBoundary || shiftStartBoundary <= 0) {
+      if (!recentSalesList || recentSalesList.length === 0) {
         return [];
       }
       return recentSalesList.filter((s) => {
         if (!s) return false;
-        if (cashierName && s.cashier && !matchesCashier(s.cashier, cashierName)) {
-          return false;
+        if (activeBranch && activeBranch.id !== "all") {
+          const sBranch = (s as any).branchId || (s as any).branch_id;
+          if (sBranch) {
+            if (sBranch !== activeBranch.id) return false;
+          } else {
+            if (activeBranch.id !== "branch-matriz") return false;
+          }
         }
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 1000) return false;
+          if (!t || t < shiftStartBoundary) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1643,18 +1838,27 @@ export default function POSPage() {
       console.error("Error filtering currentShiftSales:", e);
       return [];
     }
-  }, [recentSalesList, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [recentSalesList, cashierName, shiftStartBoundary, shiftVersion, activeBranch?.id]);
+
 
   const currentShiftExpenses = useMemo(() => {
     try {
-      if (!expensesList || expensesList.length === 0 || !shiftStartBoundary || shiftStartBoundary <= 0) return [];
+      if (!expensesList || expensesList.length === 0) return [];
       const filtered = expensesList.filter((e) => {
         if (!e) return false;
-        const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno";
-        if (!isOwnerOrAdmin && cashierName && e.cashier && !matchesCashier(e.cashier, cashierName)) return false;
+        if (activeBranch && activeBranch.id !== "all") {
+          const eBranch = (e as any).branchId || (e as any).branch_id;
+          if (eBranch) {
+            if (eBranch !== activeBranch.id) return false;
+          } else {
+            if (activeBranch.id !== "branch-matriz") return false;
+          }
+        }
+        const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
+        if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 1000) return false;
+          if (!t || t < shiftStartBoundary) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1664,17 +1868,26 @@ export default function POSPage() {
       console.error("Error filtering currentShiftExpenses:", e);
       return [];
     }
-  }, [expensesList, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [expensesList, cashierName, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
   const currentShiftIncomes = useMemo(() => {
     try {
-      if (!incomesList || incomesList.length === 0 || !shiftStartBoundary || shiftStartBoundary <= 0) return [];
+      if (!incomesList || incomesList.length === 0) return [];
       const filtered = incomesList.filter((inc) => {
         if (!inc) return false;
-        if (cashierName && inc.cashier && !matchesCashier(inc.cashier, cashierName)) return false;
+        if (activeBranch && activeBranch.id !== "all") {
+          const incBranch = (inc as any).branchId || (inc as any).branch_id;
+          if (incBranch) {
+            if (incBranch !== activeBranch.id) return false;
+          } else {
+            if (activeBranch.id !== "branch-matriz") return false;
+          }
+        }
+        const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
+        if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
         const t = parseDateTimeSafe(inc.timestamp || (inc as any).createdAt || inc.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 1000) return false;
+          if (!t || t < shiftStartBoundary) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1684,44 +1897,95 @@ export default function POSPage() {
       console.error("Error filtering currentShiftIncomes:", e);
       return [];
     }
-  }, [incomesList, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [incomesList, cashierName, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
   const currentShiftOrders = useMemo(() => {
     try {
-      if (!shiftStartBoundary || shiftStartBoundary <= 0) {
-        return [];
-      }
       return getStoredOrders().filter((o) => {
         if (!o) return false;
-        if (activeBranch) {
-          const matchBranch = !o.branchId || o.branchId === activeBranch.id || (o as any).operatingBranchId === activeBranch.id;
-          if (!matchBranch) return false;
+        // Los pedidos entregados y cancelados desaparecen por completo de la vista activa y del turno
+        if (o.status === "entregado" || o.status === "cancelado") return false;
+        if (activeBranch && activeBranch.id !== "all") {
+          const bId = activeBranch.id.toLowerCase().trim();
+          const bName = (activeBranch.name || "").toLowerCase().trim();
+          const bShort = (activeBranch.shortName || "").toLowerCase().trim();
+          const oPickupId = String(o.branchId || (o as any).branch_id || "").toLowerCase().trim();
+          const oPickupName = String(o.branchName || (o as any).branch_name || "").toLowerCase().trim();
+          const oOperatingId = String((o as any).operatingBranchId || (o as any).operating_branch_id || "").toLowerCase().trim();
+          const oOperatingName = String((o as any).operatingBranchName || (o as any).operating_branch_name || "").toLowerCase().trim();
+
+          const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                                (oPickupName && ((bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName))) ||
+                                                (bShort && (oPickupName.includes(bShort) || bShort.includes(oPickupName)))));
+          const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                                   (oOperatingName && ((bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName))) ||
+                                                       (bShort && (oOperatingName.includes(bShort) || bShort.includes(oOperatingName)))));
+
+          if (matchesPickup || matchesOperating) {
+            // Coincide con la sucursal activa
+          } else if (!oPickupId && !oPickupName && !oOperatingId && !oOperatingName) {
+            if (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) {
+              // Coincide cajero
+            } else if (bId === "branch-matriz") {
+              // Asignar por defecto a matriz
+            } else {
+              return false;
+            }
+          } else {
+            return false;
+          }
         }
-        if (cashierName && o.cashier && !matchesCashier(o.cashier, cashierName)) {
-          return false;
-        }
-        const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
-        if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 1000) return false;
-        }
-        if (t > Date.now() + 60000) return false;
         return true;
       });
     } catch (e) {
       console.error("Error filtering currentShiftOrders:", e);
       return [];
     }
-  }, [activeBranch?.id, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [activeBranch?.id, shiftStartBoundary, shiftVersion]);
 
   const totalCashSales = useMemo(() => {
     const posCash = (currentShiftSales || [])
       .filter((s) => s && s.paymentMethod === "efectivo")
       .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
-    const ordersCash = (currentShiftOrders || [])
-      .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id))
-      .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+    // Para el conteo de efectivo en cajón, sumar anticipos cobrados en efectivo en este turno y sucursal
+    const allShiftOrdersForCash = getStoredOrders().filter((o) => {
+      if (!o) return false;
+      if (activeBranch && activeBranch.id !== "all") {
+        const bId = activeBranch.id.toLowerCase().trim();
+        const bName = (activeBranch.name || "").toLowerCase().trim();
+        const bShort = (activeBranch.shortName || "").toLowerCase().trim();
+        const oPickupId = String(o.branchId || (o as any).branch_id || "").toLowerCase().trim();
+        const oPickupName = String(o.branchName || (o as any).branch_name || "").toLowerCase().trim();
+        const oOperatingId = String((o as any).operatingBranchId || (o as any).operating_branch_id || "").toLowerCase().trim();
+        const oOperatingName = String((o as any).operatingBranchName || (o as any).operating_branch_name || "").toLowerCase().trim();
+
+        const match = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                      (oPickupName && ((bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName))) ||
+                                      (bShort && (oPickupName.includes(bShort) || bShort.includes(oPickupName))))) ||
+                      (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                      (oOperatingName && ((bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName))) ||
+                                          (bShort && (oOperatingName.includes(bShort) || bShort.includes(oOperatingName)))));
+        if (!match) {
+          if (!oPickupId && !oPickupName && !oOperatingId && !oOperatingName) {
+            if (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) {
+              // match
+            } else if (bId === "branch-matriz") {
+              // match
+            } else {
+              return false;
+            }
+          } else {
+            return false;
+          }
+        }
+      }
+      const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
+      if (shiftStartBoundary > 0 && (!t || t < shiftStartBoundary)) return false;
+      return (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id);
+    });
+    const ordersCash = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
     return posCash + ordersCash;
-  }, [currentShiftSales, currentShiftOrders]);
+  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])
@@ -1750,6 +2014,51 @@ export default function POSPage() {
       const updated = deduplicateExpenses([newExpense, ...cleanCur]);
       localStorage.setItem("brito_pos_current_expenses", JSON.stringify(updated));
     } catch (e) {}
+
+    // Persistir directamente a Supabase para supervisión en tiempo real
+    if (typeof window !== "undefined") {
+      try {
+        const supabase = createClient();
+        const expId = newExpense.id || `GST-${Date.now().toString().slice(-6)}`;
+        const bId = activeBranch?.id || "branch-matriz";
+        Promise.allSettled([
+          supabase.from("cash_expenses").upsert({
+            id: expId,
+            amount: newExpense.amount,
+            category: newExpense.category || "gasto",
+            description: newExpense.description,
+            cashier: cashierName || "Cajero",
+            branch_id: bId,
+          }),
+          supabase.from("cash_movements").upsert({
+            id: `mov-${expId}`,
+            type: "salida",
+            category: newExpense.category || "gasto",
+            category_label: "Gasto de Caja",
+            amount: newExpense.amount,
+            reason: newExpense.description,
+            authorized_by: cashierName || "Cajero",
+            branch_id: bId,
+          }),
+        ]).catch(() => {});
+      } catch {}
+
+      if (realtimeHub?.broadcastCashMovement) {
+        realtimeHub.broadcastCashMovement({
+          id: newExpense.id,
+          branchId: activeBranch?.id || "branch-matriz",
+          branchName: activeBranch?.name || "Sucursal Matriz",
+          type: "salida",
+          category: newExpense.category as any,
+          categoryLabel: "Gasto de Caja",
+          amount: newExpense.amount,
+          reason: newExpense.description,
+          authorizedBy: cashierName || "Cajero",
+          cashier: cashierName,
+          timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        });
+      }
+    }
   };
 
   const handleAddIncome = (newIncome: CashIncome) => {
@@ -1769,6 +2078,41 @@ export default function POSPage() {
       const cleanAll = Array.isArray(allIncomes) ? allIncomes.filter((i: any) => i.id !== newIncome.id) : [];
       localStorage.setItem("brito_cash_incomes", JSON.stringify(deduplicateIncomes([newIncome, ...cleanAll])));
     } catch (e) {}
+
+    // Persistir directamente a Supabase para supervisión en tiempo real
+    if (typeof window !== "undefined") {
+      try {
+        const supabase = createClient();
+        const incId = newIncome.id || `ING-${Date.now().toString().slice(-6)}`;
+        const bId = activeBranch?.id || newIncome.branchId || "branch-matriz";
+        supabase.from("cash_movements").upsert({
+          id: incId,
+          type: "entrada",
+          category: newIncome.category || "otro",
+          category_label: newIncome.categoryLabel || "Entrada Dinero",
+          amount: newIncome.amount,
+          reason: newIncome.concept || "Entrada de dinero a caja",
+          authorized_by: cashierName || "Cajero",
+          branch_id: bId,
+        }).then(() => {}, () => {});
+      } catch {}
+
+      if (realtimeHub?.broadcastCashMovement) {
+        realtimeHub.broadcastCashMovement({
+          id: newIncome.id,
+          branchId: activeBranch?.id || "branch-matriz",
+          branchName: activeBranch?.name || "Sucursal Matriz",
+          type: "entrada",
+          category: "otro",
+          categoryLabel: newIncome.categoryLabel || "Entrada Dinero",
+          amount: newIncome.amount,
+          reason: newIncome.concept || "Entrada de dinero a caja",
+          authorizedBy: cashierName || "Cajero",
+          cashier: cashierName,
+          timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        });
+      }
+    }
   };
 
   const handleDeleteIncome = (id: string) => {
@@ -1843,11 +2187,20 @@ export default function POSPage() {
       customerType: selectedCustomer.type,
       timestamp: Date.now(),
       createdAt: new Date().toISOString(),
+      branchId: activeBranch ? activeBranch.id : "branch-matriz",
+      branchName: activeBranch ? (activeBranch.shortName || activeBranch.name) : "Matriz",
     };
 
     const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");
     if (activeBranch) {
-      registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary);
+      registerRealSale(activeBranch.id, currentTotal, currentPaymentMethod, cashierName, itemsSummary, {
+        id: createdSaleId,
+        items: currentItems,
+        customerName: selectedCustomer.name,
+        customerId: selectedCustomer.id,
+        date: newSaleRecord.date,
+        createdAt: newSaleRecord.createdAt,
+      });
     }
 
     // 3. Registrar automáticamente en el Historial de Ingresos sin límite de dinero
@@ -1887,7 +2240,7 @@ export default function POSPage() {
     }
 
     // 5. Guardar en disco local la venta del turno sin perder ninguna venta
-    const currentShiftStart = getStoredShiftStartBoundary();
+    const currentShiftStart = getStoredShiftStartBoundary(activeBranch?.id);
     let currentStoredSales: Sale[] = [];
     try {
       const raw = localStorage.getItem("brito_pos_current_sales");
@@ -1904,7 +2257,7 @@ export default function POSPage() {
     const cleanPrevSales = combinedPrev.filter((s) => {
       if (!s || s.id === newSaleRecord.id) return false;
       const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-      return currentShiftStart <= 0 || (t > 0 && t >= currentShiftStart - 60000);
+      return currentShiftStart <= 0 || (t > 0 && t >= currentShiftStart);
     });
     const nextList = [newSaleRecord, ...cleanPrevSales];
     try {
@@ -1942,12 +2295,25 @@ export default function POSPage() {
         try {
           const supabase = createClient();
           const saleInsertPayload: any = {
+            id: createdSaleId,
+            date: newSaleRecord.date,
             total: currentTotal,
             payment_method: currentPaymentMethod,
             cashier: cashierName,
+            branch_id: activeBranch?.id || "branch-matriz",
+            payment_reference: paymentReference.trim() || null,
+            transfer_account: currentPaymentMethod === "transferencia" && selectedTransferAccount ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})` : null,
+            card_terminal: currentPaymentMethod === "tarjeta" && selectedCardTerminal ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})` : null,
+            cash_given: currentCashGiven || null,
+            change: currentChange || null,
           };
           if (selectedCustomer.id && !selectedCustomer.id.startsWith("cli-")) {
             saleInsertPayload.customer_id = selectedCustomer.id;
+            saleInsertPayload.customer_name = selectedCustomer.name;
+            saleInsertPayload.customer_type = selectedCustomer.type;
+          } else {
+            saleInsertPayload.customer_name = "Público General";
+            saleInsertPayload.customer_type = "general";
           }
 
           const { data: saleData, error: saleErr } = await supabase
@@ -1958,6 +2324,9 @@ export default function POSPage() {
 
           if (saleData && !saleErr) {
             savedToCloud = true;
+            markRecordIdsAsSynced([createdSaleId]);
+            console.log("[POS] Venta guardada con éxito en Supabase:", saleData.id);
+
             const saleItemsToInsert = currentItems.map((item) => ({
               sale_id: saleData.id,
               product_id: item.product.id.includes("-") ? item.product.id : null,
@@ -1977,9 +2346,11 @@ export default function POSPage() {
                   .eq("id", item.product.id);
               }
             }
+          } else if (saleErr) {
+            console.error("[POS] Error al insertar venta en Supabase:", saleErr);
           }
         } catch (e) {
-          console.log("Offline sale background pending", e);
+          console.error("[POS] Excepción en guardado de venta en Supabase:", e);
         }
       }
 
@@ -1992,9 +2363,14 @@ export default function POSPage() {
           branchId: activeBranch?.id,
           data: {
             saleId: createdSaleId,
+            date: newSaleRecord.date,
             total: currentTotal,
             paymentMethod: currentPaymentMethod,
             cashier: cashierName,
+            customerId: selectedCustomer.id,
+            customerName: selectedCustomer.name,
+            customerType: selectedCustomer.type,
+            branchId: activeBranch?.id || "branch-matriz",
             items: currentItems.map((item) => ({
               productId: item.product.id,
               name: item.product.name,
@@ -2313,7 +2689,7 @@ export default function POSPage() {
       {/* Product Catalog Area (Main) con espacio y scrollbar estilizado */}
       <div 
         ref={catalogScrollRef}
-        className="flex-1 flex flex-col min-w-0 px-4 lg:px-5 pb-6 pt-0 pr-3 sm:pr-4 overflow-y-auto scroll-smooth relative"
+        className="flex-1 flex flex-col min-w-0 px-3 sm:px-4 lg:px-5 pb-6 pt-0 overflow-y-auto overflow-x-hidden scroll-smooth relative"
       >
         {/* Alerta flotante de escaneo de código de barras */}
         {lastScannedItem && (
@@ -2351,13 +2727,13 @@ export default function POSPage() {
         )}
 
         {/* Top Fixed Header Toolbar & Category Panel Container (Anclado y sellado al ras para tapar el espacio) */}
-        <div className={`sticky top-0 z-30 -mx-4 lg:-mx-5 px-4 py-2.5 lg:px-5 lg:py-3 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-3" : "mb-4"}`}>
-          {isSyncing && (
+        <div className={`sticky top-0 z-30 -mx-3 sm:-mx-4 lg:-mx-5 px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-stone-100 border-b border-stone-200/90 shadow-sm transition-all duration-200 ${showCategoryPanel ? "space-y-2 pb-2.5 mb-2.5" : "mb-3"}`}>
+          {isSyncing && pendingCount > 0 && (
             <div className="bg-amber-500/15 border border-amber-500/30 text-amber-950 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs mb-2 animate-in fade-in">
               <div className="flex items-center gap-2">
                 <RefreshCw className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
                 <span>
-                  <strong>Sincronizando con la nube:</strong> Subiendo ventas acumuladas a la base de datos central...
+                  <strong>Sincronizando con la nube:</strong> Subiendo {pendingCount} {pendingCount === 1 ? "venta pendiente" : "ventas pendientes"} a la base de datos central...
                 </span>
               </div>
             </div>
@@ -2379,25 +2755,25 @@ export default function POSPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-3 w-full">
-            {/* Botón Menú Móvil */}
-            <button
-              type="button"
-              onClick={toggleMobile}
-              className="md:hidden p-3 rounded-2xl bg-white hover:bg-stone-50 text-stone-700 transition-colors border-2 border-stone-200 shrink-0 shadow-xs"
-              title="Abrir menú"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+          <div className="flex flex-col 2xl:flex-row items-stretch 2xl:items-center justify-between gap-2 sm:gap-2.5 w-full">
+            {/* Fila 1: Menú móvil (si aplica) + Buscador de Productos & Escáner */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {/* Botón Menú Móvil */}
+              <button
+                type="button"
+                onClick={toggleMobile}
+                className="md:hidden p-2.5 rounded-xl bg-white hover:bg-stone-50 text-stone-700 transition-colors border-2 border-stone-200 shrink-0 shadow-xs"
+                title="Abrir menú"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
 
-            {/* Buscador de Productos & Escáner de Código de Barras */}
-            <div className="flex items-center gap-2 flex-1 max-w-2xl min-w-0">
               {/* Buscador General con Soporte de Enter para Código */}
               <div className="relative flex-1 min-w-0">
-                <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+                <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
                   type="text"
-                  placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel..."
+                  placeholder="Buscar dulce $10, bolillo, telera, pizza, strudel o escanea código..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => {
@@ -2410,31 +2786,52 @@ export default function POSPage() {
                       }
                     }
                   }}
-                  className="w-full pl-12 pr-10 py-3.5 bg-white rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
+                  className="w-full pl-10 sm:pl-11 pr-9 py-2 sm:py-2.5 bg-white rounded-xl sm:rounded-2xl border-2 border-stone-300 focus:border-amber-600 focus:outline-none shadow-xs text-xs sm:text-sm font-bold text-stone-800 placeholder:text-stone-400 transition-all"
                 />
                 {search && (
                   <button
                     type="button"
                     onClick={() => setSearch("")}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
+
+              {/* Botón Móvil para Ver Charola / Carrito (visible solo en pantallas pequeñas) */}
+              <div className="relative shrink-0 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setIsMobileCartOpen(true)}
+                  className="relative flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-md shadow-amber-600/30 active:scale-95 transition-all"
+                  title="Abrir charola de cobro"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span className="hidden sm:inline">Charola</span>
+                  {totalPieces > 0 && (
+                    <span className="w-5 h-5 bg-rose-600 text-white rounded-full text-[10px] font-black flex items-center justify-center border-2 border-white">
+                      {totalPieces}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
 
-            {/* Grupo Catálogo y Pan: Categorías y Precios + Entrada de Pan directamente a lado */}
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Botón Grande: Categorías y Precios */}
+            {/* Fila 2 (o en fila continua en pantallas 2xl): Botones de Acción */}
+            <div className="grid grid-cols-3 2xl:flex items-center gap-1.5 sm:gap-2 shrink-0 w-full 2xl:w-auto">
+              {/* Botón 1: Categorías y Precios */}
               <button
                 type="button"
                 onClick={() => setShowCategoryPanel(!showCategoryPanel)}
-                className="flex items-center gap-2.5 px-4 sm:px-5 py-3.5 rounded-2xl border-2 border-amber-400 bg-white hover:bg-amber-50 text-stone-900 text-sm sm:text-base font-black transition-all active:scale-95 shadow-sm whitespace-nowrap"
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl border-2 border-amber-400 bg-white hover:bg-amber-50 text-stone-900 text-xs sm:text-sm font-black transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                  selectedCategory !== "all" ? "ring-2 ring-amber-400/40 bg-amber-50/60" : ""
+                }`}
                 title="Mostrar u ocultar panel de categorías y precios"
               >
-                <span className="text-xl">🧺</span>
-                <span>Categorías y Precios</span>
+                <span className="text-base sm:text-lg">🧺</span>
+                <span className="truncate">Categorías</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 text-stone-400 shrink-0 ${showCategoryPanel ? "rotate-180" : ""}`} />
                 {selectedCategory !== "all" && (
                   <span
                     onClick={(e) => {
@@ -2442,52 +2839,15 @@ export default function POSPage() {
                       setSelectedCategory("all");
                       setShowCategoryPanel(false);
                     }}
-                    className="w-5 h-5 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center text-xs font-black transition-transform active:scale-90 ml-0.5"
+                    className="w-4 h-4 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center text-[10px] font-black transition-transform active:scale-90 ml-0.5"
                     title="Ver todo el pan y quitar filtro"
                   >
                     ✕
                   </span>
                 )}
-                <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-stone-400 ${showCategoryPanel ? "rotate-180" : ""}`} />
               </button>
 
-              {/* Botón Surtir / Entrada de Pan (Camionetas) - Oculto temporalmente */}
-              {false && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isShiftLocked) {
-                      addNotification({
-                        senderName: "🔒 Terminal Bloqueada",
-                        senderAvatar: "⚠️",
-                        badgeIcon: "alerta",
-                        title: "Terminal Bloqueada",
-                        highlightText: "Turno cerrado por seguridad",
-                        description: "Debes desbloquear la terminal ingresando las credenciales de la encargada antes de registrar entrada de pan.",
-                        category: "inventario",
-                      });
-                      return;
-                    }
-                    setShowBreadDeliveryModal(true);
-                  }}
-                  className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-sm whitespace-nowrap cursor-pointer ${
-                    isShiftLocked
-                      ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                      : "border-emerald-300 hover:border-emerald-500 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-950 text-sm sm:text-base font-black"
-                  }`}
-                  title={isShiftLocked ? "Terminal bloqueada" : "Registrar pan recibido de las camionetas o taller"}
-                >
-                  <span className="text-lg">🚐</span>
-                  <span>Entrada de Pan</span>
-                </button>
-              )}
-
-            </div>
-
-            {/* Grupo Caja y Turno: Movimientos de Caja + Cerrar Turno */}
-            <div className="flex items-center gap-2 shrink-0">
-
-              {/* Botón Movimientos de Caja ($) (Gastos, Retiros y Entradas para Cambio) */}
+              {/* Botón 2: Movimientos de Caja */}
               <button
                 type="button"
                 onClick={() => {
@@ -2505,20 +2865,20 @@ export default function POSPage() {
                   }
                   setShowExpensesModal(true);
                 }}
-                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl border-2 transition-all active:scale-95 shadow-xs whitespace-nowrap ${
                   isShiftLocked
                     ? "border-stone-300 bg-stone-100 text-stone-400 opacity-60 cursor-not-allowed"
-                    : "border-amber-300 hover:border-amber-400 bg-amber-50 hover:bg-amber-100/90 text-stone-900 text-sm sm:text-base font-black"
+                    : "border-amber-300 hover:border-amber-400 bg-amber-50 hover:bg-amber-100/90 text-stone-900 text-xs sm:text-sm font-black"
                 }`}
                 title={isShiftLocked ? "Terminal bloqueada" : "Registrar gastos, retiros de dueños y entradas para cambio de billetes"}
               >
-                <span className="w-6 h-6 rounded-xl bg-amber-500 text-stone-950 font-black flex items-center justify-center text-xs shadow-xs border border-amber-400 shrink-0">
+                <span className="w-5 h-5 rounded-lg bg-amber-500 text-stone-950 font-black flex items-center justify-center text-[11px] shadow-xs border border-amber-400 shrink-0">
                   $
                 </span>
-                <span>Movimientos de Caja</span>
+                <span className="truncate">Movimientos</span>
               </button>
 
-              {/* Botón Destacado: Cerrar Turno & Bloquear Punto de Venta */}
+              {/* Botón 3: Cerrar Turno & Bloquear Punto de Venta */}
               <button
                 type="button"
                 onClick={() => {
@@ -2537,40 +2897,22 @@ export default function POSPage() {
                   setShiftModalTab("cambio");
                   setShowCashDrawerModal(true);
                 }}
-                className={`flex items-center gap-2 px-3.5 sm:px-4 py-3.5 rounded-2xl border-2 transition-all active:scale-95 shadow-md shadow-orange-950/20 whitespace-nowrap ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl border-2 transition-all active:scale-95 shadow-md shadow-orange-950/20 whitespace-nowrap ${
                   isShiftLocked
                     ? "border-amber-900/60 bg-gradient-to-r from-stone-800 to-stone-900 text-amber-300"
-                    : "border-amber-600/80 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white text-sm sm:text-base font-black"
+                    : "border-amber-600/80 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:from-amber-700 hover:to-orange-700 text-white text-xs sm:text-sm font-black"
                 }`}
                 title={isShiftLocked ? "Turno ya cerrado y bloqueado" : "Cerrar turno de la cajera y bloquear la terminal con candado"}
               >
-                <span>🔒</span>
-                <span>{isShiftLocked ? "Turno Cerrado 🔒" : "Cerrar Turno"}</span>
-              </button>
-            </div>
-
-            {/* Botón Móvil para Ver Charola / Carrito */}
-            <div className="relative shrink-0 lg:hidden">
-              <button
-                type="button"
-                onClick={() => setIsMobileCartOpen(true)}
-                className="relative flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-md shadow-amber-600/30 active:scale-95 transition-all"
-                title="Abrir charola de cobro"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                <span className="hidden sm:inline">Charola</span>
-                {totalPieces > 0 && (
-                  <span className="w-5 h-5 bg-rose-600 text-white rounded-full text-[10px] font-black flex items-center justify-center border-2 border-white">
-                    {totalPieces}
-                  </span>
-                )}
+                <span className="shrink-0">🔒</span>
+                <span className="truncate">{isShiftLocked ? "Bloqueado" : "Cerrar Turno"}</span>
               </button>
             </div>
           </div>
 
           {/* Tarjeta CATEGORÍAS Y PRECIOS COMPACTA (Permite ver el pan y productos simultáneamente) */}
           {showCategoryPanel && (
-            <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-2.5 sm:p-3 border-2 border-amber-200/90 shadow-md space-y-2 shrink-0 animate-in fade-in duration-200">
+            <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-2 sm:p-2.5 border-2 border-amber-200/90 shadow-md space-y-2 shrink-0 animate-in fade-in duration-200">
               {/* Cabecera Compacta */}
               <div className="flex items-center justify-between pb-1.5 border-b border-stone-100 text-xs">
                 <div className="flex items-center gap-2 min-w-0">
@@ -2606,7 +2948,7 @@ export default function POSPage() {
               </div>
 
               {/* Cuadrícula de Categorías y Precios Completos (Sin cortes ni puntos suspensivos) */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-7 gap-2 max-h-[190px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-1.5 sm:gap-2 max-h-[150px] sm:max-h-[180px] overflow-y-auto pr-1">
                 {CATEGORIES.map((cat) => {
                   const isSelected = selectedCategory === cat.id;
                   const count = cat.id === "all"
@@ -2666,7 +3008,7 @@ export default function POSPage() {
             </div>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(185px,1fr))] gap-2.5 sm:gap-3 pb-12">
           {filteredProducts.map((product) => {
             const itemInCart = cart.find((i) => i.product.id === product.id);
 
@@ -2678,13 +3020,13 @@ export default function POSPage() {
               >
                 {/* Active in-cart indicator */}
                 {itemInCart && (
-                  <span className="absolute top-2.5 right-2.5 z-20 bg-amber-600 text-white font-black text-xs px-2.5 py-0.5 rounded-full shadow-md border-2 border-white animate-in zoom-in flex items-center gap-1">
+                  <span className="absolute top-2 right-2 z-20 bg-amber-600 text-white font-black text-xs px-2.5 py-0.5 rounded-full shadow-md border-2 border-white animate-in zoom-in flex items-center gap-1">
                     <ShoppingBag className="w-3 h-3" /> {itemInCart.quantity} en charola
                   </span>
                 )}
 
                 {/* Compact Image Container */}
-                <div className="relative h-32 sm:h-36 w-full overflow-hidden bg-stone-100">
+                <div className="relative h-28 sm:h-32 w-full overflow-hidden bg-stone-100 shrink-0">
                   {product.image ? (
                     <img
                       src={product.image}
@@ -2693,7 +3035,7 @@ export default function POSPage() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ease-out"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 text-5xl">
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 text-4xl sm:text-5xl">
                       {product.icon || "🥐"}
                     </div>
                   )}
@@ -2701,7 +3043,7 @@ export default function POSPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10 opacity-60 group-hover:opacity-30 transition-opacity" />
 
                   {/* PROMINENT PRICE BADGE (Top Right) */}
-                  <div className="absolute top-2.5 right-2.5 z-10">
+                  <div className="absolute top-2 right-2 z-10">
                     <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black text-xs px-2.5 py-0.5 rounded-xl shadow-md border border-white/80">
                       <span>{formatCurrency(product.price)}</span>
                       {product.unit && (
@@ -2713,50 +3055,40 @@ export default function POSPage() {
                   </div>
 
                   {/* Tag on Image: Disponible libre sin límites */}
-                  <div className="absolute bottom-2.5 left-2.5 z-10">
+                  <div className="absolute bottom-2 left-2 z-10">
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md shadow-xs bg-black/60 text-stone-100">
-                      {product.stock > 0 ? `${product.stock} piezas` : "Disponible"}
+                      {product.stock > 0 ? `${product.stock} pzs` : "Disponible"}
                     </span>
                   </div>
                 </div>
 
-                {/* Card Content */}
-                <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-1.5">
+                {/* Card Content - Título a ancho completo y pie con precio & código */}
+                <div className="p-2 sm:p-2.5 flex-1 flex flex-col justify-between space-y-1">
                   <div>
-                    <div className="flex items-start justify-between gap-1.5">
-                      <div className="min-w-0">
-                        <h3 className="font-extrabold text-stone-900 text-sm sm:text-base leading-snug group-hover:text-amber-800 transition-colors line-clamp-2 break-words">
-                          {product.name}
-                        </h3>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="font-black text-amber-900 text-base">
-                          {formatCurrency(product.price)}
-                        </span>
-                        {product.unit && (
-                          <span className="text-[11px] font-bold text-amber-700 ml-1">
-                            /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-xs text-stone-500 mt-0.5 line-clamp-1 font-sans">
+                    <h3 className="font-extrabold text-stone-900 text-xs sm:text-sm leading-snug group-hover:text-amber-800 transition-colors line-clamp-2 break-words" title={product.name}>
+                      {product.name}
+                    </h3>
+                    <p className="text-[10px] sm:text-[11px] text-stone-500 mt-0.5 line-clamp-1 font-sans">
                       {product.description || "Panadería artesanal horneada diariamente."}
                     </p>
+                  </div>
 
-                    {/* Código / Código de barras */}
-                    {(product.barcode || product.code) && (
-                      <div className="flex items-center gap-1.5 pt-1">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-50/90 text-amber-900 border border-amber-200/90 shadow-2xs">
-                          <Barcode className="w-3 h-3 text-amber-700 shrink-0" />
-                          <span>{product.barcode || product.code}</span>
+                  {/* Fila Inferior: Precio + Código de barras */}
+                  <div className="flex items-center justify-between pt-1 border-t border-stone-100 gap-1 mt-1">
+                    <span className="font-black text-amber-900 text-xs sm:text-sm">
+                      {formatCurrency(product.price)}
+                      {product.unit && (
+                        <span className="text-[10px] font-bold text-amber-700 ml-0.5">
+                          /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
                         </span>
-                        {product.code && product.barcode && (
-                          <span className="text-[10px] font-bold text-stone-400 font-mono">
-                            [{product.code}]
-                          </span>
-                        )}
-                      </div>
+                      )}
+                    </span>
+
+                    {(product.barcode || product.code) && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 truncate max-w-[95px]" title={product.barcode || product.code}>
+                        <Barcode className="w-2.5 h-2.5 text-amber-700 shrink-0" />
+                        <span className="truncate">{product.barcode || product.code}</span>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -2774,27 +3106,607 @@ export default function POSPage() {
         />
       )}
 
-      {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone - Amplia y Espaciosa) */}
-      <div className={`fixed lg:static inset-y-0 right-0 z-[120] lg:z-10 w-full sm:w-[420px] lg:w-[460px] xl:w-[500px] 2xl:w-[540px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out relative overflow-hidden ${
+      {/* Cart & Cashier Sidebar (Right on desktop, sliding drawer on phone) */}
+      <div className={`fixed lg:static inset-y-0 right-0 z-[120] lg:z-10 w-full sm:w-[380px] lg:w-[370px] xl:w-[395px] 2xl:w-[430px] shrink-0 bg-white border-l-2 border-stone-200 flex flex-col h-full shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out relative overflow-hidden lg:overflow-visible ${
         isMobileCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
       }`}>
         {/* Header con colores de la marca y micro-animación */}
-        <div className="p-2.5 px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative overflow-hidden shrink-0">
-          <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
-          <div className="flex items-center gap-2.5 relative z-10">
-            <div className="p-2 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40">
-              <ShoppingBag className="w-4 h-4 text-white" />
+        <div className="p-2 px-3 sm:px-4 border-b border-amber-900/50 flex items-center justify-between bg-gradient-to-r from-[#24130c] via-[#2d1810] to-[#3d1d11] text-white shadow-md relative shrink-0">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-6 -right-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl" />
+          </div>
+          <div className="flex items-center gap-2 relative z-10">
+            <div className="p-1.5 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-xl shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40">
+              <ShoppingBag className="w-3.5 h-3.5 text-white" />
             </div>
             <div>
-              <h3 className="font-black text-sm sm:text-base leading-tight tracking-wide text-white flex items-center gap-1.5">
+              <h3 className="font-black text-xs sm:text-sm leading-tight tracking-wide text-white flex items-center gap-1.5">
                 Charola de Cobro
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </h3>
-              <div className="flex items-center gap-1.5 text-[11px] text-amber-300 font-bold flex-wrap mt-0.5">
-                <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-400/30 text-[10px] font-black tracking-wide shadow-2xs">
-                  <Store className="w-3 h-3 text-amber-300" />
-                  <span>{activeBranch ? activeBranch.name : "Sucursal Matriz"}</span>
-                </span>
+              <div className="flex items-center gap-1 text-[10px] text-amber-300 font-bold flex-wrap mt-0.5">
+
+                {/* Selector Desplegable de Sucursal con Diseño Artesanal */}
+                <div ref={branchDropdownRef} className="relative inline-block">
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowBranchDropdown((prev) => !prev)}
+                      className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-500/25 via-amber-600/20 to-orange-500/25 hover:from-amber-500/40 hover:to-orange-500/40 text-amber-100 hover:text-white px-2 py-0.5 rounded-lg border border-amber-400/40 hover:border-amber-300 text-[10px] font-black tracking-wide shadow-sm transition-all active:scale-95 cursor-pointer group select-none"
+                      title="Ver red de sucursales y cambiar tienda activa"
+                    >
+                      <Store className="w-3 h-3 text-amber-300 group-hover:text-amber-200 shrink-0" />
+                      <span className="truncate max-w-[105px] sm:max-w-[150px]">
+                        🏬 {activeBranch ? activeBranch.name : "Sucursal Matriz"}
+                      </span>
+                      <span className="relative flex h-1.5 w-1.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                      </span>
+                      <ChevronDown
+                        className={`w-2.5 h-2.5 text-amber-300 group-hover:text-amber-100 transition-transform duration-200 shrink-0 ${
+                          showBranchDropdown ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                  ) : (
+                    <div
+                      className="inline-flex items-center gap-1 bg-amber-950/70 text-amber-200 px-2 py-0.5 rounded-lg border border-amber-500/30 text-[10px] font-black tracking-wide select-none"
+                      title="Sucursal fija asignada a tu turno de cajero"
+                    >
+                      <Store className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span className="truncate max-w-[110px] sm:max-w-[160px]">
+                        🏬 {activeBranch ? activeBranch.name : "Sucursal Matriz"}
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 text-[8px] bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded font-bold border border-amber-500/30">
+                        <Lock className="w-2 h-2" /> Fija
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Panel Desplegable Flotante (exclusivo para administradores) - Especializado y Compacto */}
+                  {isAdmin && showBranchDropdown && (
+                    <div 
+                      style={{ backgroundColor: "#1e1009" }}
+                      className="absolute right-0 top-full mt-2 w-[310px] sm:w-[380px] md:w-[410px] max-w-[calc(100vw-24px)] rounded-2xl shadow-2xl border-2 border-amber-600/80 p-2.5 sm:p-3 z-[250] animate-in fade-in zoom-in-95 duration-150 text-stone-100 space-y-2.5"
+                    >
+                      {/* Cabecera compacta del panel */}
+                      <div className="flex items-center justify-between pb-2 border-b border-amber-900/60">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md shadow-amber-950/60 ring-2 ring-amber-400/30 shrink-0">
+                            <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-black uppercase tracking-wider text-amber-400 leading-none">Red Panaderías Brito</p>
+                            <p className="text-xs sm:text-sm font-black text-white leading-tight truncate">Supervisión Multi-Sucursal</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[9px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/50 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            0ms VIVO
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowBranchDropdown(false)}
+                            className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center transition-colors text-xs font-bold cursor-pointer"
+                            title="Cerrar panel de supervisión"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Selector de Pestañas: 🏬 Sucursales vs ⚡ Movimientos */}
+                      <div className="grid grid-cols-2 gap-1 p-0.5 bg-black/40 rounded-xl border border-amber-900/50 text-[11px] font-black">
+                        <button
+                          type="button"
+                          onClick={() => setBranchPanelTab("sucursales")}
+                          className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
+                            branchPanelTab === "sucursales"
+                              ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-900/50"
+                              : "text-amber-200/70 hover:text-white hover:bg-white/5"
+                          }`}
+                        >
+                          <Store className="w-3.5 h-3.5 shrink-0" />
+                          <span>Sucursales ({branches.length})</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setBranchPanelTab("movimientos")}
+                          className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg transition-all cursor-pointer relative ${
+                            branchPanelTab === "movimientos"
+                              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/50"
+                              : "text-emerald-300/80 hover:text-emerald-200 hover:bg-white/5"
+                          }`}
+                        >
+                          <TrendingUp className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
+                          <span>Movimientos</span>
+                          {cashMovements.length > 0 && (
+                            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-black font-mono bg-emerald-400 text-stone-950">
+                              {cashMovements.length}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* CONTENIDO PESTAÑA 1: RED DE SUCURSALES (ESPECIALIZADA Y COMPACTA) */}
+                      {branchPanelTab === "sucursales" && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-amber-300/80 px-0.5">
+                            <span>Selecciona sucursal activa:</span>
+                            <span className="text-[9px] text-stone-400">Actualizado en vivo</span>
+                          </div>
+
+                          <div className="space-y-1.5 max-h-[220px] sm:max-h-[240px] overflow-y-auto pr-0.5">
+                            {branches.map((b) => {
+                              const isSelected = activeBranch?.id === b.id;
+                              const isMatriz = b.id.includes("matriz");
+                              const isBenito = b.id.includes("benito");
+                              const badgeColor = isMatriz
+                                ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
+                                : isBenito
+                                ? "bg-rose-500/20 text-rose-300 border-rose-400/40"
+                                : "bg-orange-500/20 text-orange-300 border-orange-400/40";
+
+                              return (
+                                <button
+                                  key={b.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isAdmin) {
+                                      switchBranch(b.id);
+                                      playScanBeep(true);
+                                      addNotification({
+                                        senderName: "🏬 Red Brito",
+                                        senderAvatar: "🏬",
+                                        badgeIcon: "dinero",
+                                        title: "Sucursal Activa",
+                                        highlightText: b.name,
+                                        description: "Terminal POS y caja sincronizadas con esta tienda.",
+                                        category: "caja",
+                                      });
+                                    }
+                                  }}
+                                  disabled={!isAdmin}
+                                  style={{ backgroundColor: isSelected ? "#3a1e12" : "#28150d" }}
+                                  className={`w-full text-left p-2.5 rounded-xl border transition-all flex flex-col gap-1.5 ${
+                                    isAdmin ? "cursor-pointer active:scale-98" : "cursor-default"
+                                  } ${
+                                    isSelected
+                                      ? "border-amber-400 shadow-lg ring-1 ring-amber-400/50"
+                                      : "hover:bg-[#341d11] border-amber-900/50 hover:border-amber-600/70"
+                                  }`}
+                                >
+                                  {/* Encabezado: Código, Nombre y Estado */}
+                                  <div className="flex items-center justify-between gap-1.5">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-md border shrink-0 ${badgeColor}`}>
+                                        {b.code || "TIENDA"}
+                                      </span>
+                                      <span className={`font-black text-xs sm:text-sm truncate ${isSelected ? "text-white" : "text-stone-200"}`}>
+                                        {b.name}
+                                      </span>
+                                    </div>
+                                    {isSelected ? (
+                                      <span className="text-[9px] font-black text-emerald-300 bg-emerald-950 border border-emerald-500/60 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 shadow-xs">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        Activa ✓
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] font-bold text-amber-300/90 hover:text-white shrink-0 flex items-center gap-0.5 bg-amber-950/80 border border-amber-600/50 px-2 py-0.5 rounded-md">
+                                        Cambiar ➔
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Fila Central: Ventas, Tickets y Caja */}
+                                  <div className="flex items-center justify-between pt-1 border-t border-amber-900/50">
+                                    <div className="flex items-baseline gap-1.5">
+                                      <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Total Turno:</span>
+                                      <span className="font-mono font-black text-base sm:text-lg text-amber-300">
+                                        {formatCurrency(b.todaySales)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <span className="text-[11px] font-black font-mono text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded-md border border-emerald-500/50 shadow-xs">
+                                        {b.todayTickets} {b.todayTickets === 1 ? "op" : "ops"}
+                                      </span>
+                                      <div className="flex items-center gap-1 bg-black/50 px-2 py-0.5 rounded-md border border-amber-900/40 text-[11px]">
+                                        <span className="text-stone-400 text-[10px]">Caja:</span>
+                                        <span className="font-mono font-black text-emerald-400">
+                                          {formatCurrency(b.cashInDrawer)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Desglose: Mostrador vs Pedidos */}
+                                  {((b.todayOrdersDeposit ?? 0) > 0 || (b.todayDeskSales ?? 0) > 0) && (
+                                    <div className="flex items-center gap-2 text-[10px] font-bold pt-0.5 flex-wrap">
+                                      <span className="text-amber-200/90 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/40">
+                                        🥖 Mostrador: <strong className="font-mono text-white">{formatCurrency(b.todayDeskSales ?? b.todaySales)}</strong>
+                                      </span>
+                                      {(b.todayOrdersDeposit ?? 0) > 0 && (
+                                        <span className="text-pink-300 bg-pink-950/70 px-1.5 py-0.5 rounded border border-pink-700/50">
+                                          🎂 Pedidos: <strong className="font-mono text-pink-200">{formatCurrency(b.todayOrdersDeposit ?? 0)}</strong>
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Cajero en turno */}
+                                  <div className="flex items-center justify-between text-[10px] text-amber-200/80">
+                                    <span className="truncate max-w-[220px]">
+                                      👤 {b.currentShift?.cashier || b.manager || "Cajero en turno"}
+                                    </span>
+                                    {b.currentShift?.name && (
+                                      <span className="text-[9px] text-stone-400 truncate max-w-[120px]">
+                                        {b.currentShift.name.split("(")[0]}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* VINCULACIÓN DIRECTA AL TICKET DE CORTE */}
+                                  {b.lastCut && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openShiftCutDetail(b.lastCut!);
+                                      }}
+                                      className="mt-1 flex items-center justify-between text-[10px] bg-stone-950/90 hover:bg-stone-900 border border-amber-600/50 hover:border-amber-400 text-amber-200 px-2 py-1 rounded-lg transition-all cursor-pointer group shadow-2xs"
+                                      title="Ver Comprobante de Corte de Caja Oficial"
+                                    >
+                                      <div className="flex items-center gap-1.5 truncate">
+                                        <span className="text-amber-400 font-mono font-bold">🧾 {b.lastCut.id}</span>
+                                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${
+                                          b.lastCut.difference === 0 
+                                            ? "bg-emerald-950 text-emerald-300 border border-emerald-500/60" 
+                                            : "bg-rose-950 text-rose-300 border border-rose-500/60"
+                                        }`}>
+                                          {b.lastCut.difference === 0 ? "✓ Cuadrada Exacta ($0.00)" : `Dif: ${formatCurrency(b.lastCut.difference)}`}
+                                        </span>
+                                      </div>
+                                      <span className="text-[9px] text-amber-300 group-hover:text-white font-black underline shrink-0 ml-1">
+                                        Ver Ticket ➔
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Acumulado del día si hubo corte previo */}
+                                  {(b.dayAccumulatedSales ?? 0) > (b.todaySales || 0) && (
+                                    <div className="text-[9px] text-stone-400 font-medium pt-0.5 flex items-center justify-between border-t border-white/5">
+                                      <span>Acumulado del Día:</span>
+                                      <span className="font-mono font-bold text-stone-300">
+                                        {formatCurrency(b.dayAccumulatedSales || 0)} ({b.dayAccumulatedTickets || 0} ops)
+                                      </span>
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Consolidado total compacto */}
+                          <div className="p-2.5 rounded-xl bg-black/60 border border-amber-600/60 flex items-center justify-between flex-wrap gap-2 text-xs">
+                            <span className="text-amber-300 font-black uppercase text-[10px] tracking-wider">
+                              Consolidado Red Brito:
+                            </span>
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <span className="font-mono font-black text-sm sm:text-base text-amber-300">
+                                {formatCurrency(branches.reduce((sum, b) => sum + (b.todaySales || 0), 0))}
+                              </span>
+                              <span className="font-mono font-black text-[11px] text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-500/40">
+                                {branches.reduce((sum, b) => sum + (b.todayTickets || 0), 0)} ops
+                              </span>
+                              <span className="font-mono font-black text-xs text-emerald-400 bg-black/40 px-2 py-0.5 rounded border border-amber-900/40">
+                                💵 En Caja: {formatCurrency(branches.reduce((sum, b) => sum + (b.cashInDrawer || 0), 0))}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CONTENIDO PESTAÑA 2: SUPERVISIÓN DE MOVIMIENTOS EN VIVO */}
+                      {branchPanelTab === "movimientos" && (
+                        <div className="space-y-2">
+                          {/* Filtros rápidos por Tipo de Movimiento */}
+                          <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none text-[9px] font-black">
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("todos")}
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "todos"
+                                  ? "bg-amber-500 text-stone-950 border-amber-400 shadow-xs"
+                                  : "bg-white/5 text-stone-300 border-white/10 hover:bg-white/10"
+                              }`}
+                            >
+                              ⚡ Todos ({cashMovements.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("venta")}
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "venta"
+                                  ? "bg-amber-600 text-white border-amber-400 shadow-xs"
+                                  : "bg-white/5 text-amber-200/80 border-amber-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              🛒 Ventas ({typeCounts.venta || 0})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("pedido")}
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "pedido"
+                                  ? "bg-sky-600 text-white border-sky-400 shadow-xs"
+                                  : "bg-white/5 text-sky-200/80 border-sky-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              📋 Pedidos ({typeCounts.pedido || 0})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("gasto")}
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "gasto"
+                                  ? "bg-rose-600 text-white border-rose-400 shadow-xs"
+                                  : "bg-white/5 text-rose-200/80 border-rose-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              💸 Gastos ({typeCounts.gasto || 0})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("entrada")}
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "entrada"
+                                  ? "bg-emerald-600 text-white border-emerald-400 shadow-xs"
+                                  : "bg-white/5 text-emerald-200/80 border-emerald-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              📥 Entradas ({typeCounts.entrada || 0})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMovementFilterType("corte")}
+                              className={`px-2 py-0.5 rounded-md border transition-all shrink-0 cursor-pointer ${
+                                movementFilterType === "corte"
+                                  ? "bg-purple-600 text-white border-purple-400 shadow-xs"
+                                  : "bg-white/5 text-purple-200/80 border-purple-900/40 hover:bg-white/10"
+                              }`}
+                            >
+                              🔒 Cortes ({typeCounts.corte || 0})
+                            </button>
+                          </div>
+
+                          {/* Filtro por Sucursal y Buscador */}
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={movementFilterBranch}
+                              onChange={(e) => setMovementFilterBranch(e.target.value)}
+                              className="bg-[#2a170e] text-amber-200 text-[11px] font-bold border border-amber-800/60 rounded-lg px-2 py-1 outline-hidden cursor-pointer shrink-0"
+                            >
+                              <option value="todas">🏬 Todas las Tiendas</option>
+                              {branches.map((b) => (
+                                <option key={b.id} value={b.id}>
+                                  {b.shortName || b.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            <div className="flex-1 flex items-center bg-[#2a170e] rounded-lg border border-amber-800/60 px-2 py-0.5 gap-1 text-[11px]">
+                              <Search className="w-3 h-3 text-amber-400 shrink-0" />
+                              <input
+                                type="text"
+                                value={movementSearchQuery}
+                                onChange={(e) => setMovementSearchQuery(e.target.value)}
+                                placeholder="Filtrar por cajero, ticket..."
+                                className="w-full bg-transparent text-white placeholder-stone-400 text-[11px] outline-hidden"
+                              />
+                              {movementSearchQuery && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMovementSearchQuery("")}
+                                  className="text-stone-400 hover:text-white"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Barra de Totales Financieros de la Vista */}
+                          <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-lg bg-black/40 border border-amber-900/50 text-center">
+                            <div>
+                              <p className="text-[8px] font-black uppercase text-emerald-400">Entradas</p>
+                              <p className="font-mono font-black text-xs text-emerald-300">
+                                +{formatCurrency(movementTotals.entradas)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black uppercase text-rose-400">Salidas</p>
+                              <p className="font-mono font-black text-xs text-rose-300">
+                                -{formatCurrency(movementTotals.salidas)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black uppercase text-amber-400">Balance</p>
+                              <p className={`font-mono font-black text-xs ${
+                                movementTotals.balance >= 0 ? "text-emerald-300" : "text-rose-300"
+                              }`}>
+                                {movementTotals.balance >= 0 ? "+" : ""}{formatCurrency(movementTotals.balance)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Lista con scroll de movimientos en tiempo real */}
+                          <div className="space-y-1.5 max-h-[200px] sm:max-h-[220px] overflow-y-auto pr-0.5">
+                            {filteredCashMovements.length === 0 ? (
+                              <div className="py-6 text-center text-stone-400 space-y-1">
+                                <p className="text-xl">⚡</p>
+                                <p className="text-[11px] font-bold text-stone-300">No hay movimientos para este filtro</p>
+                                <p className="text-[9px] text-stone-500">Cualquier transacción se reflejará aquí en 0ms.</p>
+                              </div>
+                            ) : (
+                              filteredCashMovements.map((m) => {
+                                const isEntrada = m.type === "entrada";
+                                const isVenta = m.movementType === "venta";
+                                const isPedido = m.movementType === "pedido";
+                                const isGasto = m.movementType === "gasto";
+                                const isCorte = m.movementType === "corte";
+
+                                const cardBg = isVenta
+                                  ? "bg-[#29160e] border-amber-600/50"
+                                  : isPedido
+                                  ? "bg-[#112338] border-sky-600/50"
+                                  : isGasto
+                                  ? "bg-[#2d1118] border-rose-600/50"
+                                  : isCorte
+                                  ? "bg-[#251233] border-purple-600/50"
+                                  : "bg-[#122b20] border-emerald-600/50";
+
+                                const typeLabel = isVenta
+                                  ? "🛒 VENTA"
+                                  : isPedido
+                                  ? "📋 PEDIDO"
+                                  : isGasto
+                                  ? "💸 SALIDA"
+                                  : isCorte
+                                  ? "🔒 CORTE"
+                                  : "📥 ENTRADA";
+
+                                const badgeColor = isVenta
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-400/40"
+                                  : isPedido
+                                  ? "bg-sky-500/20 text-sky-300 border-sky-400/40"
+                                  : isGasto
+                                  ? "bg-rose-500/20 text-rose-300 border-rose-400/40"
+                                  : isCorte
+                                  ? "bg-purple-500/20 text-purple-300 border-purple-400/40"
+                                  : "bg-emerald-500/20 text-emerald-300 border-emerald-400/40";
+
+                                return (
+                                  <div
+                                    key={m.id}
+                                    className={`p-2 rounded-xl border transition-all space-y-1 ${cardBg}`}
+                                  >
+                                    {/* Fila Superior: Tipo, Sucursal, Hora */}
+                                    <div className="flex items-center justify-between gap-1.5">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={`text-[8px] font-black px-1.5 py-0.2 rounded border ${badgeColor}`}>
+                                          {typeLabel}
+                                        </span>
+                                        <span className="text-[9px] font-black text-amber-200/90 bg-amber-950/80 px-1 py-0.2 rounded border border-amber-700/40">
+                                          🏬 {m.branchName || "Sucursal"}
+                                        </span>
+                                      </div>
+                                      <span className="text-[9px] font-mono text-stone-300 shrink-0">
+                                        🕒 {m.timestamp}
+                                      </span>
+                                    </div>
+
+                                    {/* Fila Media: Detalle / Razón */}
+                                    <p className="text-[11px] font-semibold text-stone-100 leading-snug truncate">
+                                      {m.reason}
+                                    </p>
+
+                                    {/* Fila Inferior: Cajero / Método y Monto */}
+                                    <div className="flex items-center justify-between pt-0.5 border-t border-white/10 text-[11px]">
+                                      <div className="flex items-center gap-1.5 text-stone-300">
+                                        <span className="text-[10px] truncate max-w-[140px]">
+                                          👤 {m.cashier || m.authorizedBy || "Cajero"}
+                                        </span>
+                                        {m.paymentMethod && (
+                                          <span className="text-[8px] font-black uppercase text-amber-300/80 bg-amber-950/50 px-1 py-0.2 rounded border border-amber-800/40">
+                                            {m.paymentMethod}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className={`font-mono font-black text-xs sm:text-sm ${
+                                        isEntrada ? "text-emerald-400" : "text-rose-400"
+                                      }`}>
+                                        {isEntrada ? "+" : "-"}{formatCurrency(m.amount)}
+                                      </span>
+                                    </div>
+
+                                    {/* Botón directo para abrir el ticket de corte desde la supervisión */}
+                                    {isCorte && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const cutFolio = m.id.replace("cut-", "").replace("mov-", "");
+                                          let foundCut = branches.find((b) => b.lastCut?.id === cutFolio)?.lastCut;
+                                          if (!foundCut) {
+                                            try {
+                                              const raw = localStorage.getItem("brito_shift_cuts_history");
+                                              if (raw) {
+                                                const list = JSON.parse(raw);
+                                                foundCut = list.find((c: any) => c.id === cutFolio || c.id === m.id);
+                                              }
+                                            } catch {}
+                                          }
+                                          if (foundCut) {
+                                            openShiftCutDetail(foundCut);
+                                          } else {
+                                            openShiftCutDetail({
+                                              id: cutFolio,
+                                              date: m.timestamp,
+                                              timestamp: m.rawTimestamp || Date.now(),
+                                              shiftRange: "Turno Oficial",
+                                              outgoingCashier: m.cashier || m.authorizedBy || "Cajero",
+                                              incomingCashier: "Turno Entrante",
+                                              previousShift: "",
+                                              nextShift: "Turno Siguiente",
+                                              initialFund: 0,
+                                              cashSales: 0,
+                                              cardSales: 0,
+                                              transferSales: 0,
+                                              totalSales: m.amount,
+                                              totalSalesAll: m.amount,
+                                              totalExpenses: 0,
+                                              expectedCash: m.amount,
+                                              countedCash: m.amount,
+                                              difference: 0,
+                                              nextFund: 0,
+                                              notes: m.reason,
+                                            });
+                                          }
+                                        }}
+                                        className="mt-1 w-full flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-purple-950/80 hover:bg-purple-900 border border-purple-500/60 text-purple-200 text-[10px] font-bold transition-all cursor-pointer shadow-xs"
+                                      >
+                                        <span>🧾 Ver Ticket Oficial de Corte de Caja</span>
+                                        <ArrowRight className="w-3 h-3 text-purple-300" />
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pie del panel */}
+                      <div className="pt-1.5 border-t border-amber-900/60 flex items-center justify-between">
+                        <span className="text-[10px] text-amber-300/80 font-medium">
+                          Supervisión centralizada en tiempo real
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowBranchDropdown(false)}
+                          className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-black transition-all shadow-xs active:scale-95 cursor-pointer"
+                        >
+                          Listo ✓
+                        </button>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
                 <span className="text-amber-400/60">•</span>
                 <span className="text-stone-100 font-semibold">{cashierName}</span>
                 <span className="text-amber-400/60">•</span>
@@ -3117,35 +4029,33 @@ export default function POSPage() {
         )}
 
         {/* Cart Items List - Optimizado para ver al menos 5 productos simultáneamente */}
-        <div ref={cartContainerRef} className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-1.5 scroll-smooth">
+        <div ref={cartContainerRef} className="flex-1 overflow-y-auto p-2 sm:p-2.5 space-y-1.5 scroll-smooth">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-4 space-y-2 animate-in fade-in zoom-in-95 duration-200">
+            <div className="h-full flex flex-col items-center justify-center text-center p-2 sm:p-3 space-y-1 sm:space-y-1.5 animate-in fade-in zoom-in-95 duration-200">
               <div className="relative">
-                <div className="w-14 h-14 bg-gradient-to-br from-amber-100 via-orange-50 to-amber-50 rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-amber-200">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-amber-100 via-orange-50 to-amber-50 rounded-2xl flex items-center justify-center text-xl sm:text-2xl shadow-xs border border-amber-200">
                   🧺
                 </div>
               </div>
               <div className="space-y-0.5">
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black uppercase tracking-wider border border-amber-200">
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[9px] font-black uppercase tracking-wider border border-amber-200">
                   Mostrador Listo
                 </span>
-                <p className="text-sm font-black text-stone-900">Charola vacía</p>
-                <p className="text-[11px] text-stone-500 max-w-[220px] leading-relaxed mx-auto font-medium">
+                <p className="text-xs sm:text-sm font-black text-stone-900">Charola vacía</p>
+                <p className="text-[10px] sm:text-[11px] text-stone-500 max-w-[200px] leading-tight mx-auto font-medium">
                   Escanea el código de barras o toca cualquier pan del mostrador para agregarlo al cobro.
                 </p>
               </div>
-              <div className="pt-3 w-full max-w-xs mx-auto">
+              <div className="pt-1.5 w-full max-w-xs mx-auto">
                 <button
                   type="button"
                   onClick={() => handleOpenCreateOrder(false)}
-                  className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-[#881337] via-[#be123c] to-[#9a3412] hover:from-[#9f1239] hover:via-[#e11d48] hover:to-[#c2410c] text-white font-black text-sm sm:text-base shadow-xl shadow-rose-950/30 hover:shadow-2xl hover:shadow-rose-900/40 transition-all active:scale-95 border-2 border-amber-300/90 hover:border-amber-200 ring-4 ring-amber-400/20 flex items-center justify-center gap-2.5 mx-auto cursor-pointer hover:scale-[1.02] group"
+                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-[#881337] via-[#be123c] to-[#9a3412] hover:from-[#9f1239] hover:via-[#e11d48] hover:to-[#c2410c] text-white font-black text-xs shadow-md shadow-rose-950/20 transition-all active:scale-95 border border-amber-300/80 ring-2 ring-amber-400/20 flex items-center justify-center gap-1.5 mx-auto cursor-pointer group"
                   title="Levantar un pedido especial para otra fecha"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-amber-400/25 border border-amber-300/50 flex items-center justify-center shrink-0 shadow-inner">
-                    <Cake className="w-4 h-4 sm:w-5 sm:h-5 text-amber-200 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <span className="tracking-wide drop-shadow-sm font-black">Hacer Pedido Especial</span>
-                  <Sparkles className="w-4 h-4 text-amber-300 animate-pulse shrink-0 drop-shadow" />
+                  <Cake className="w-3.5 h-3.5 text-amber-200 group-hover:scale-110 transition-transform shrink-0" />
+                  <span className="tracking-wide font-black">Hacer Pedido Especial</span>
+                  <Sparkles className="w-3 h-3 text-amber-300 animate-pulse shrink-0" />
                 </button>
               </div>
             </div>
@@ -3286,26 +4196,26 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* Payment Configuration & Checkout Area (Más grande, números destacados y micro-animaciones) */}
-        <div className="p-3 sm:p-4 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/40 space-y-2.5 shadow-xl shrink-0">
+        {/* Payment Configuration & Checkout Area */}
+        <div className="p-2 sm:p-2.5 border-t-2 border-stone-200/80 bg-gradient-to-b from-stone-50 via-white to-amber-50/40 space-y-1.5 sm:space-y-2 shadow-xl shrink-0">
           {/* Fila Principal: Total a Cobrar + Selector de Forma de Pago */}
-          <div className="bg-gradient-to-br from-[#24130c] via-[#2d1810] to-[#1f100a] text-white p-3 sm:p-3.5 px-4 rounded-2xl shadow-lg border-2 border-amber-900/70 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-gradient-to-br from-[#24130c] via-[#2d1810] to-[#1f100a] text-white p-2 sm:p-2.5 px-3 rounded-xl sm:rounded-2xl shadow-md border border-amber-900/70 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-xs font-black uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5">
+              <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-300/90 flex items-center gap-1">
                 <span>Total a Cobrar</span>
                 <span className="text-amber-200/70 font-bold">({totalPieces} {totalPieces === 1 ? "pz" : "pzs"})</span>
               </div>
-              <div className="text-3xl sm:text-4xl font-black text-amber-400 tracking-tight leading-none mt-1 transition-all duration-300">
+              <div className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight leading-none mt-0.5 transition-all duration-300">
                 {formatCurrency(total)}
               </div>
             </div>
 
             {/* Selector de Método de Pago integrado con texto visible siempre */}
-            <div className="flex items-center bg-black/50 p-1.5 rounded-2xl border border-white/10 gap-1.5 flex-wrap">
+            <div className="flex items-center bg-black/50 p-1 rounded-xl border border-white/10 gap-1 flex-wrap">
               {[
                 { id: "efectivo", label: "Efectivo", icon: DollarSign },
                 { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
-                { id: "transferencia", label: "SPEI", icon: Send },
+                { id: "transferencia", label: "Transferencia", icon: Send },
               ].map((m) => {
                 const Icon = m.icon;
                 const isSelected = paymentMethod === m.id;
@@ -3314,13 +4224,13 @@ export default function POSPage() {
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMethod(m.id as any)}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs sm:text-sm font-black transition-all duration-200 active:scale-95 cursor-pointer ${
+                    className={`flex items-center justify-center gap-1 py-1 px-2 sm:px-2.5 rounded-lg text-xs font-black transition-all duration-200 active:scale-95 cursor-pointer ${
                       isSelected
-                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-md scale-105 ring-2 ring-amber-300/40"
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 shadow-sm ring-1 ring-amber-300/40"
                         : "text-amber-200/80 hover:text-white hover:bg-white/10"
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <Icon className="w-3 h-3 shrink-0" />
                     <span className="font-black whitespace-nowrap">{m.label}</span>
                   </button>
                 );
@@ -3330,26 +4240,26 @@ export default function POSPage() {
 
           {/* Manejo de Efectivo con Números Grandes y Animados */}
           {paymentMethod === "efectivo" && (
-            <div className="p-3 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 rounded-2xl border-2 border-amber-300/90 space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-200 shadow-xs">
+            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-stone-50 rounded-xl border border-amber-300/90 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200 shadow-2xs">
               {/* Billetes rápidos + Cobro Exacto con Números Más Grandes */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={handleExactCash}
                   disabled={cart.length === 0}
-                  className="px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-200 to-amber-300 hover:from-amber-300 hover:to-amber-400 text-stone-950 text-xs sm:text-sm font-black shrink-0 transition-all active:scale-90 hover:scale-105 shadow-sm"
+                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-200 to-amber-300 hover:from-amber-300 hover:to-amber-400 text-stone-950 text-xs font-black shrink-0 transition-all active:scale-90 hover:scale-105 shadow-2xs"
                   title="Cobro Exacto"
                 >
                   ⚡ Exacto
                 </button>
-                <div className="grid grid-cols-5 gap-1.5 flex-1">
+                <div className="grid grid-cols-5 gap-1 flex-1">
                   {QUICK_DENOMINATIONS.map((bill) => (
                     <button
                       key={bill}
                       type="button"
                       onClick={() => handleQuickCash(bill)}
                       disabled={cart.length === 0}
-                      className="py-2 sm:py-2.5 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-sm sm:text-base rounded-xl border-2 border-amber-200 shadow-xs transition-all duration-200 active:scale-90 hover:scale-105 text-center"
+                      className="py-1 sm:py-1.5 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-xs sm:text-sm rounded-lg border border-amber-200 shadow-2xs transition-all duration-200 active:scale-90 hover:scale-105 text-center"
                     >
                       ${bill}
                     </button>
@@ -3358,14 +4268,16 @@ export default function POSPage() {
               </div>
 
               {/* Input de cantidad recibida y badge de cambio con Tipografía Grande */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-black text-sm">💵</span>
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400 font-black text-xs">💵</span>
                   <input
                     type="text"
                     inputMode="decimal"
                     placeholder="Paga con... ($)"
                     value={cashGiven}
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => e.currentTarget.select()}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.currentTarget.blur();
@@ -3374,18 +4286,18 @@ export default function POSPage() {
                       onlyNumbersKeyDown(e, true);
                     }}
                     onChange={(e) => setCashGiven(cleanDecimalNumbers(e.target.value))}
-                    className="w-full pl-9 pr-3 py-2.5 bg-white rounded-xl border-2 border-amber-400 focus:border-amber-600 focus:ring-2 focus:ring-amber-400/30 text-sm sm:text-base font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all"
+                    className="w-full pl-7 pr-2.5 py-1.5 bg-white rounded-lg border border-amber-400 focus:border-amber-600 focus:ring-1 focus:ring-amber-400/30 text-xs sm:text-sm font-black text-stone-900 focus:outline-none shadow-inner placeholder:text-stone-400 placeholder:font-medium transition-all"
                   />
                 </div>
 
                 {parsedCashGiven > 0 && (
-                  <div className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 shrink-0 shadow-md animate-in zoom-in-95 duration-150 ${
+                  <div className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 shrink-0 shadow-sm animate-in zoom-in-95 duration-150 ${
                     parsedCashGiven >= total
                       ? "bg-emerald-600 text-white"
                       : "bg-rose-600 text-white"
                   }`}>
-                    <span className="text-[11px] opacity-90">{parsedCashGiven >= total ? "Cambio:" : "Falta:"}</span>
-                    <span className="font-black text-sm sm:text-base">
+                    <span className="text-[10px] opacity-90">{parsedCashGiven >= total ? "Cambio:" : "Falta:"}</span>
+                    <span className="font-black text-xs sm:text-sm">
                       {parsedCashGiven >= total ? formatCurrency(change) : formatCurrency(total - parsedCashGiven)}
                     </span>
                   </div>
@@ -3582,24 +4494,9 @@ export default function POSPage() {
           )}
 
 
-          {/* Botón para Apartar la charola como Pedido Especial (cualquier pan, incluso 1 sola pieza o el de menor valor) */}
-          {cart.length > 0 && (
-            <div className="pt-0.5">
-              <button
-                type="button"
-                onClick={() => handleOpenCreateOrder(true)}
-                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#881337] via-[#be123c] to-[#9a3412] hover:from-[#9f1239] hover:via-[#e11d48] hover:to-[#c2410c] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-rose-950/20 border-2 border-amber-300/80 hover:border-amber-200 cursor-pointer active:scale-98 transition-all group"
-                title="Apartar estos productos de la charola como Pedido Especial para otra fecha"
-              >
-                <Cake className="w-4 h-4 text-amber-200 group-hover:scale-110 transition-transform" />
-                <span className="truncate">🎂 Apartar como Pedido Especial ({totalPieces} {totalPieces === 1 ? "pz" : "pzs"})</span>
-                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
-              </button>
-            </div>
-          )}
 
           {/* Botones de Acción */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">
+          <div className="grid grid-cols-2 gap-2 pt-0.5">
             <button
               type="button"
               onClick={() => {
@@ -3608,27 +4505,27 @@ export default function POSPage() {
                 selectCustomer(DEFAULT_GENERAL_CUSTOMER);
               }}
               disabled={cart.length === 0}
-              className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
+              className={`py-2.5 sm:py-3 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all duration-200 shadow-md ${
                 cart.length > 0
                   ? "bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-700 hover:to-rose-800 text-white shadow-red-600/30 hover:shadow-red-600/50 hover:scale-[1.01] active:scale-95 border border-red-400/80 ring-2 ring-red-400/30 cursor-pointer"
                   : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
               }`}
               title="Cancelar compra y vaciar charola"
             >
-              <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+              <Trash2 className="w-4 h-4 shrink-0" />
               <span className="truncate">Cancelar Compra</span>
             </button>
             <button
               type="button"
               onClick={handleCheckout}
               disabled={cart.length === 0 || !isPaymentValid || isSubmitting}
-              className={`py-3 sm:py-3.5 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-200 shadow-md ${
+              className={`py-2.5 sm:py-3 px-2 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all duration-200 shadow-md ${
                 cart.length > 0 && isPaymentValid && !isSubmitting
                   ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-2 ring-amber-400/40 cursor-pointer"
                   : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
               }`}
             >
-              <CheckCircle className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
+              <CheckCircle className={`w-4 h-4 shrink-0 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
               <span className="truncate">{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
             </button>
           </div>
@@ -3829,7 +4726,6 @@ export default function POSPage() {
             setSelectedOrderForReceipt(order);
           }}
           onSelectOrderForPayment={(order) => {
-            setShowExpensesModal(false);
             setSelectedOrderForPayment(order);
           }}
           cashSalesTotal={totalCashSales}
@@ -3866,6 +4762,7 @@ export default function POSPage() {
           cashSalesTotal={totalCashSales}
           totalExpenses={totalExpenses}
           initialFund={initialCashFund}
+          branchId={activeBranch?.id || "branch-matriz"}
           branchName={activeBranch ? activeBranch.name : "Sucursal Matriz"}
           defaultCashier={cashierName}
           onOpenReceipt={handleOpenIncomeReceipt}
@@ -3953,7 +4850,9 @@ export default function POSPage() {
       {/* Modal de Liquidación / Cobro de Saldo de Pedido Especial */}
       <OrderPaymentModal
         isOpen={Boolean(selectedOrderForPayment)}
-        onClose={() => setSelectedOrderForPayment(null)}
+        onClose={() => {
+          setSelectedOrderForPayment(null);
+        }}
         order={selectedOrderForPayment}
         onPaymentSuccess={() => {
           try {
@@ -3972,9 +4871,9 @@ export default function POSPage() {
             senderName: "💰 Pedido Liquidado",
             senderAvatar: "🥖",
             badgeIcon: "dinero",
-            title: "Saldo Cobrado & Pedido Entregado",
+            title: "Saldo Cobrado con Éxito",
             highlightText: "Ingreso registrado en caja",
-            description: "El saldo restante ha sido cobrado y sumado al turno actual.",
+            description: "El saldo restante ha sido cobrado. El pedido sigue listo en sucursal para entregarse.",
             category: "caja",
           });
         }}

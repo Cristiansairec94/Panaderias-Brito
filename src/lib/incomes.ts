@@ -1,6 +1,7 @@
 import { CashIncome, CashIncomeCategory, Sale, SimulatedSale } from "@/types";
 import { formatDateTimeSafe, formatCurrency } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { createClient } from "@/lib/supabase/client";
 
 export const STORAGE_INCOMES_KEY = "brito_cash_incomes";
 
@@ -323,6 +324,41 @@ export function recordCashIncome(income: {
       const shiftIncomes: CashIncome[] = shiftIncomesRaw ? JSON.parse(shiftIncomesRaw) : [];
       if (!shiftIncomes.some((si) => si.id === newIncome.id)) {
         localStorage.setItem("brito_pos_current_incomes", JSON.stringify([newIncome, ...shiftIncomes]));
+      }
+
+      // Guardar directamente en Supabase para supervisión en tiempo real
+      if (typeof window !== "undefined") {
+        try {
+          const supabase = createClient();
+          const incId = newIncome.id || `ING-${Date.now().toString().slice(-6)}`;
+          supabase.from("cash_movements").upsert({
+            id: incId,
+            type: "entrada",
+            category: newIncome.category || "otro",
+            category_label: newIncome.categoryLabel || "Entrada de Dinero",
+            amount: newIncome.amount,
+            reason: newIncome.concept || "Entrada de dinero a caja",
+            authorized_by: newIncome.cashier || "Don Toño Brito",
+            branch_id: newIncome.branchId || "branch-matriz",
+          }).then(() => {}, () => {});
+        } catch {}
+      }
+
+      // Transmisión inmediata en tiempo real para supervisión del Administrador
+      if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
+        realtimeHub.broadcastCashMovement({
+          id: newIncome.id,
+          branchId: newIncome.branchId || "branch-matriz",
+          branchName: newIncome.branchName || "Sucursal Matriz",
+          type: "entrada",
+          category: "otro",
+          categoryLabel: newIncome.categoryLabel || "Entrada de Dinero",
+          amount: newIncome.amount,
+          reason: newIncome.concept || "Entrada de dinero a caja",
+          authorizedBy: newIncome.cashier || "Don Toño Brito",
+          cashier: newIncome.cashier,
+          timestamp: newIncome.date || new Date().toLocaleTimeString("es-MX"),
+        });
       }
     }
   } catch (e) {}

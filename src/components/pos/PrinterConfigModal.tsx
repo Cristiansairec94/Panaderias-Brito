@@ -465,6 +465,104 @@ export default function PrinterConfigModal({
               </div>
             </div>
 
+            {/* Calibración Térmica de Tono y Margen Seguro */}
+            <div className="pt-3 border-t border-stone-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-stone-800 flex items-center gap-1.5">
+                  <Sliders className="w-4 h-4 text-amber-600" />
+                  <span>Calibración de Tono y Brillo Térmico:</span>
+                </label>
+                <span className="text-[10px] font-black text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                  Calibrado para POS-58
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {/* Intensidad de Tono (Oscuridad) */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-stone-700">Oscuridad / Tono de Letra</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, ticketTone: "normal" })}
+                      className={`py-2 px-1.5 rounded-xl font-bold text-xs border text-center transition-all cursor-pointer ${
+                        config.ticketTone === "normal"
+                          ? "bg-[#2d1810] text-amber-200 border-amber-700 shadow-xs"
+                          : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                      }`}
+                    >
+                      Normal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, ticketTone: "oscuro" })}
+                      className={`py-2 px-1.5 rounded-xl font-black text-xs border text-center transition-all cursor-pointer ${
+                        (config.ticketTone || "oscuro") === "oscuro"
+                          ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                          : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                      }`}
+                      title="Recomendado: negro reforzado nítido sin zonas tenues"
+                    >
+                      Oscuro ⭐
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, ticketTone: "ultra_oscuro" })}
+                      className={`py-2 px-1.5 rounded-xl font-black text-xs border text-center transition-all cursor-pointer ${
+                        config.ticketTone === "ultra_oscuro"
+                          ? "bg-black text-amber-300 border-black shadow-xs"
+                          : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                      }`}
+                      title="Máximo contraste para cabezales térmicos desgastados"
+                    >
+                      Ultra
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ancho seguro para evitar cortes a la derecha */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-stone-700">Margen / Ancho Seguro de Rollo</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, printableWidth: "44mm" })}
+                      className={`py-2 px-1.5 rounded-xl font-bold text-xs border text-center transition-all cursor-pointer ${
+                        config.printableWidth === "44mm"
+                          ? "bg-[#2d1810] text-amber-200 border-amber-700 shadow-xs"
+                          : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                      }`}
+                    >
+                      44 mm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, printableWidth: "46mm" })}
+                      className={`py-2 px-1.5 rounded-xl font-black text-xs border text-center transition-all cursor-pointer ${
+                        (config.printableWidth || "46mm") === "46mm"
+                          ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                          : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                      }`}
+                      title="Recomendado para rollos de 58mm: evita cortar ceros y letras a la derecha"
+                    >
+                      46 mm ⭐
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, printableWidth: "48mm" })}
+                      className={`py-2 px-1.5 rounded-xl font-bold text-xs border text-center transition-all cursor-pointer ${
+                        config.printableWidth === "48mm"
+                          ? "bg-[#2d1810] text-amber-200 border-amber-700 shadow-xs"
+                          : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                      }`}
+                    >
+                      48 mm
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Checkboxes de Comportamiento */}
             <div className="pt-2 border-t border-stone-100 space-y-2.5 text-xs">
               <label className="flex items-center gap-2.5 cursor-pointer font-bold text-stone-800">

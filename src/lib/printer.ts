@@ -8,6 +8,9 @@ export interface PrinterInfo {
   paperWidth: "58mm" | "80mm";
 }
 
+export type TicketTone = "normal" | "oscuro" | "ultra_oscuro";
+export type TicketPrintableWidth = "44mm" | "46mm" | "48mm" | "72mm";
+
 export interface PrinterConfig {
   selectedPrinterId: string;
   selectedPrinterName: string;
@@ -21,6 +24,9 @@ export interface PrinterConfig {
   status: "connected" | "ready" | "offline";
   lastTestDate?: string;
   customPrinters: PrinterInfo[];
+  // Calibración térmica de color, tono y márgenes seguros
+  ticketTone?: TicketTone;
+  printableWidth?: TicketPrintableWidth;
 }
 
 export const STORAGE_PRINTER_KEY = "brito_pos_printer_config";
@@ -80,6 +86,8 @@ export const DEFAULT_PRINTER_CONFIG: PrinterConfig = {
   copies: 1,
   status: "connected",
   customPrinters: [],
+  ticketTone: "ultra_oscuro", // Ultra oscuro reforzado para letras pequeñas negras y nítidas
+  printableWidth: "46mm", // Ancho seguro para que no se corten ceros ni letras en la orilla derecha
 };
 
 /**
@@ -180,9 +188,16 @@ export function printTestTicket(
             color: #000;
             background: #fff;
             margin: 0;
-            padding: 8px 6px;
-            width: ${is58mm ? "54mm" : "76mm"};
+            padding: 4px 6px;
+            width: ${is58mm ? (config.printableWidth || "46mm") : "72mm"};
             box-sizing: border-box;
+            ${
+              config.ticketTone === "ultra_oscuro"
+                ? "-webkit-text-stroke: 0.35px #000; font-weight: 900;"
+                : config.ticketTone === "oscuro"
+                ? "-webkit-text-stroke: 0.2px #000; font-weight: 800;"
+                : ""
+            }
           }
           .center { text-align: center; }
           .bold { font-weight: 900; }

@@ -28,6 +28,7 @@ import { Product, CustomOrder, OrderItem } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown } from "@/lib/utils";
 import { getStoredProducts } from "@/lib/products";
 import { getStoredOrders, addCustomOrder, addOrderPayment, updateOrderStatus } from "@/lib/orders";
+import { useNotifications } from "@/context/NotificationContext";
 
 interface BreadOrdersDrawerProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export default function BreadOrdersDrawer({
   shiftName,
   onSelectOrderForReceipt,
 }: BreadOrdersDrawerProps) {
+  const { addNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState<"new" | "list">("new");
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<CustomOrder[]>([]);
@@ -86,14 +88,14 @@ export default function BreadOrdersDrawer({
   useEffect(() => {
     if (isOpen) {
       setProducts(getStoredProducts());
-      setOrders(getStoredOrders());
+      setOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
       setDepositInput(0);
     }
   }, [isOpen]);
 
   // Refresh orders from storage
   const refreshOrders = () => {
-    setOrders(getStoredOrders());
+    setOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
   };
 
   // Total calculation
@@ -203,6 +205,8 @@ export default function BreadOrdersDrawer({
       phone: customerPhone.trim(),
       branchId,
       branchName,
+      operatingBranchId: branchId,
+      operatingBranchName: branchName,
       description,
       items: orderItems,
       deliveryDate,
@@ -216,6 +220,31 @@ export default function BreadOrdersDrawer({
       cashier: cashierName,
       shiftName: shiftName || undefined,
     });
+
+    // Notificación en vivo para todos los dispositivos y dueños
+    try {
+      const remaining = newOrder.remainingBalance || 0;
+      addNotification({
+        senderName: `🎂 Pedido Registrado (${branchName || "Mostrador"})`,
+        senderAvatar: "🎂",
+        badgeIcon: "pastel",
+        title: `Nuevo Pedido ${newOrder.orderNumber}: Total ${formatCurrency(newOrder.total)}`,
+        highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(newOrder.deposit)}`,
+        description: `${newOrder.description}. Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs (${newOrder.deliveryType === "domicilio" ? `A domicilio: ${newOrder.deliveryAddress}` : `Recoge en ${newOrder.branchName || branchName || "Sucursal"}`}). Saldo restante: ${formatCurrency(remaining)}.`,
+        category: "pedidos",
+        orderId: newOrder.id,
+        branchId: newOrder.branchId,
+        branchName: newOrder.branchName,
+        operatingBranchId: newOrder.operatingBranchId,
+        operatingBranchName: newOrder.operatingBranchName,
+        actionLabel: remaining > 0 ? `Cobrar ${formatCurrency(remaining)}` : "Ver Detalle",
+        actionLink: "/pedidos",
+        secondaryActionLabel: remaining > 0 ? "Ver Detalle" : undefined,
+        secondaryActionLink: remaining > 0 ? "/pedidos" : undefined,
+      });
+    } catch (e) {
+      console.warn("Could not fire order notification:", e);
+    }
 
     // Reset form
     setCustomerName("");
@@ -253,6 +282,25 @@ export default function BreadOrdersDrawer({
     });
 
     if (updated) {
+      try {
+        addNotification({
+          senderName: `🎂 Pedido Liquidado (${branchName || "Mostrador"})`,
+          senderAvatar: "🎂",
+          badgeIcon: "pastel",
+          title: `Pedido ${order.orderNumber} Liquidado: ${formatCurrency(order.remainingBalance)}`,
+          highlightText: `${order.customerName} - 100% Pagado`,
+          description: `Se liquidó el saldo pendiente de ${formatCurrency(order.remainingBalance)} vía ${liquidationPaymentMethod}. Pedido: ${order.description}. Entregado al cliente.`,
+          category: "pedidos",
+          orderId: order.id,
+          branchId: order.branchId,
+          branchName: order.branchName,
+          operatingBranchId: order.operatingBranchId,
+          operatingBranchName: order.operatingBranchName,
+          actionLabel: "Ver Detalle",
+          actionLink: "/pedidos",
+        });
+      } catch (e) {}
+
       setPayingOrderId(null);
       refreshOrders();
       if (onSelectOrderForReceipt) {
@@ -282,7 +330,7 @@ export default function BreadOrdersDrawer({
 
   if (!isOpen) return null;
 
-  const activeOrders = orders.filter((o) => o.status !== "entregado");
+  const activeOrders = orders.filter((o) => o.status !== "entregado" && o.status !== "cancelado");
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -630,14 +678,29 @@ export default function BreadOrdersDrawer({
                   </div>
 
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-amber-400">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-amber-400 select-none pointer-events-none">$</span>
                     <input
                       type="number"
                       min="0"
                       step="1"
                       required
-                      placeholder="0"
+                      placeholder=""
                       value={depositInput}
+                      onFocus={() => {
+                        if (depositInput !== "" && depositInput !== 0) {
+                          setDepositInput("");
+                        }
+                      }}
+                      onClick={() => {
+                        if (depositInput !== "" && depositInput !== 0) {
+                          setDepositInput("");
+                        }
+                      }}
+                      onBlur={() => {
+                        if (depositInput === "" || depositInput === 0) {
+                          if (minRequiredDeposit > 0) setDepositInput(minRequiredDeposit);
+                        }
+                      }}
                       onKeyDown={(e) => onlyNumbersKeyDown(e, true)}
                       onChange={(e) => setDepositInput(e.target.value === "" ? "" : Number(e.target.value))}
                       className="w-full pl-10 pr-4 py-3 bg-white text-stone-900 rounded-2xl text-lg font-black focus:outline-none focus:ring-4 focus:ring-amber-500 shadow-inner"
@@ -710,7 +773,7 @@ export default function BreadOrdersDrawer({
                     {[
                       { id: "efectivo", label: "Efectivo", icon: Banknote },
                       { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
-                      { id: "transferencia", label: "SPEI / Transf.", icon: Send },
+                      { id: "transferencia", label: "Transferencia", icon: Send },
                     ].map((m) => {
                       const Icon = m.icon;
                       const isSel = paymentMethod === m.id;

@@ -14,6 +14,7 @@ import {
   Receipt, 
   Package, 
   CalendarDays, 
+  CalendarClock,
   Users, 
   Layers, 
   DollarSign, 
@@ -30,7 +31,11 @@ import {
   Palette,
   Lock,
   ArrowRight,
-  Smile
+  Smile,
+  Building2,
+  Croissant,
+  TrendingUp,
+  TrendingDown
 } from "lucide-react";
 import { useAuth, ROLE_PERMISSIONS } from "@/context/AuthContext";
 import { UserRole, RolePermissions } from "@/types";
@@ -267,125 +272,197 @@ interface PermissionGroup {
 
 const PERMISSION_GROUPS: PermissionGroup[] = [
   {
-    categoryTitle: "Punto de Venta y Cobro en Mostrador",
-    categoryBadge: "Operación Caja",
-    icon: "🛒",
+    categoryTitle: "1. Módulo: DashBoard",
+    categoryBadge: "Principal",
+    icon: "🏠",
+    badgeClass: "bg-orange-100 text-orange-900 border-orange-300",
+    borderClass: "border-orange-200/90",
+    headerBg: "bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent",
+    items: [
+      {
+        key: "canAccessDashboard",
+        label: "Acceso al DashBoard (Panel Principal)",
+        description: "Visualizar el balance general diario, ventas en tiempo real y rendimiento general de las tiendas.",
+        icon: BarChart3,
+      },
+    ],
+  },
+  {
+    categoryTitle: "2. Módulo: Sucursales",
+    categoryBadge: "3 Tiendas",
+    icon: "🏢",
+    badgeClass: "bg-blue-100 text-blue-900 border-blue-300",
+    borderClass: "border-blue-200/90",
+    headerBg: "bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent",
+    items: [
+      {
+        key: "canAccessSucursales",
+        label: "Gestión y Vista de Sucursales",
+        description: "Consultar el estado de cada panadería/tienda, metas de venta diarias, fondos iniciales y encargados.",
+        icon: Building2,
+      },
+    ],
+  },
+  {
+    categoryTitle: "3. Módulo: Pedidos",
+    categoryBadge: "Encargos",
+    icon: "📋",
+    badgeClass: "bg-pink-100 text-pink-900 border-pink-300",
+    borderClass: "border-pink-200/90",
+    headerBg: "bg-gradient-to-r from-pink-500/10 via-rose-500/5 to-transparent",
+    items: [
+      {
+        key: "canAccessPedidos",
+        label: "Encargos y Pedidos Especiales",
+        description: "Registrar y dar seguimiento a pedidos por encargo de pasteles, eventos, pan de fiesta y apartados con anticipos.",
+        icon: CalendarClock,
+      },
+    ],
+  },
+  {
+    categoryTitle: "4. Módulo: Clientes",
+    categoryBadge: "Activos",
+    icon: "👥",
     badgeClass: "bg-emerald-100 text-emerald-900 border-emerald-300",
     borderClass: "border-emerald-200/90",
     headerBg: "bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent",
     items: [
       {
-        key: "canAccessPos",
-        label: "Acceso al Punto de Venta (POS)",
-        description: "Permite registrar ventas de pan dulce, bolillo, pasteles y cobrar a clientes.",
-        icon: ShoppingBag,
-      },
-      {
-        key: "canAccessCaja",
-        label: "Gestión de Caja y Turnos de Efectivo",
-        description: "Apertura de turno, arqueo de dinero en efectivo, gastos menores y corte de turno.",
-        icon: Receipt,
-      },
-      {
-        key: "canAccessPedidos",
-        label: "Encargos y Pedidos Especiales",
-        description: "Registrar y dar seguimiento a pedidos de pasteles, eventos y panadería por encargo.",
-        icon: CalendarDays,
-      },
-      {
         key: "canAccessClientes",
         label: "Directorio de Clientes",
-        description: "Consultar lista de clientes, crédito deudores y datos de contacto.",
+        description: "Consultar lista de clientes activos, historial de consumo, teléfonos de contacto y control de saldos a crédito.",
         icon: Users,
       },
     ],
   },
   {
-    categoryTitle: "Almacén, Compras y Materia Prima",
-    categoryBadge: "Inventarios",
-    icon: "📦",
+    categoryTitle: "5. Módulo: Productos",
+    categoryBadge: "Catálogo",
+    icon: "🥐",
     badgeClass: "bg-amber-100 text-amber-900 border-amber-300",
     borderClass: "border-amber-200/90",
-    headerBg: "bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent",
+    headerBg: "bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-transparent",
     items: [
-      {
-        key: "canAccessInventario",
-        label: "Control de Stock & Insumos de Panadería",
-        description: "Recepción de harina, azúcar, levadura, mantequilla y registro de mermas de pan.",
-        icon: Package,
-      },
       {
         key: "canAccessProductos",
         label: "Catálogo de Productos y Recetas",
-        description: "Ver catálogo de piezas de pan, ingredientes requeridos y costos de producción.",
-        icon: Layers,
+        description: "Ver catálogo completo de piezas de pan, repostería, ingredientes e impuestos aplicables (IVA / IEPS).",
+        icon: Croissant,
       },
       {
         key: "canEditPrices",
         label: "Modificación de Precios de Venta",
-        description: "Habilidad de cambiar los precios de lista de las piezas de pan o aplicar promociones.",
+        description: "Habilidad de cambiar los precios de lista de las piezas de pan o aplicar promociones y descuentos.",
         icon: Sliders,
         critical: true,
       },
     ],
   },
   {
-    categoryTitle: "Finanzas, Rentabilidad y Gerencia",
-    categoryBadge: "Finanzas",
-    icon: "💼",
-    badgeClass: "bg-blue-100 text-blue-900 border-blue-300",
-    borderClass: "border-blue-200/90",
-    headerBg: "bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent",
+    categoryTitle: "6. Módulo: Ingresos",
+    categoryBadge: "+Ventas",
+    icon: "📈",
+    badgeClass: "bg-teal-100 text-teal-900 border-teal-300",
+    borderClass: "border-teal-200/90",
+    headerBg: "bg-gradient-to-r from-teal-500/10 via-emerald-500/5 to-transparent",
     items: [
       {
-        key: "canAccessDashboard",
-        label: "Panel Principal y Resumen Gerencial",
-        description: "Visualizar el balance general diario, ventas en tiempo real y metas de la sucursal.",
-        icon: BarChart3,
-      },
-      {
-        key: "canAccessFinanzas",
-        label: "Módulo Financiero y Flujo de Caja",
-        description: "Control de ingresos, pagos a proveedores, gastos operativos y utilidad neta.",
-        icon: DollarSign,
-        critical: true,
-      },
-      {
-        key: "canAccessReportes",
-        label: "Reportes Avanzados y Exportación",
-        description: "Generación y descarga de hojas Excel/PDF de ventas históricas y productividad.",
-        icon: FileSpreadsheet,
-      },
-      {
-        key: "canViewProfitMargins",
-        label: "Visualización de Márgenes de Ganancia",
-        description: "Ver el porcentaje de ganancia neta, costo unitario por pieza y rendimiento de masa.",
-        icon: DollarSign,
-        critical: true,
+        key: "canAccessIngresos",
+        label: "Registro de Ingresos y Abonos",
+        description: "Registrar cobros extraordinarios de ventas, entradas de efectivo por abonos de clientes y pagos directos.",
+        icon: TrendingUp,
       },
     ],
   },
   {
-    categoryTitle: "Seguridad y Control Crítico del Sistema",
-    categoryBadge: "Seguridad",
-    icon: "🔒",
+    categoryTitle: "7. Módulo: Gastos",
+    categoryBadge: "Control",
+    icon: "📉",
+    badgeClass: "bg-rose-100 text-rose-900 border-rose-300",
+    borderClass: "border-rose-200/90",
+    headerBg: "bg-gradient-to-r from-rose-500/10 via-red-500/5 to-transparent",
+    items: [
+      {
+        key: "canAccessGastos",
+        label: "Registro de Gastos Operativos",
+        description: "Registrar gastos menores de tienda, pago a proveedores de harina/gas, compras de mostrador y salidas de efectivo.",
+        icon: TrendingDown,
+      },
+    ],
+  },
+  {
+    categoryTitle: "8. Módulo: Finanzas",
+    categoryBadge: "Balance",
+    icon: "💵",
+    badgeClass: "bg-indigo-100 text-indigo-900 border-indigo-300",
+    borderClass: "border-indigo-200/90",
+    headerBg: "bg-gradient-to-r from-indigo-500/10 via-violet-500/5 to-transparent",
+    items: [
+      {
+        key: "canAccessCaja",
+        label: "Historial de Caja y Arqueo de Turnos",
+        description: "Apertura de turno de efectivo, arqueos a mitad de jornada, corte Z y cuadre de caja por sucursal.",
+        icon: Receipt,
+      },
+      {
+        key: "canAccessFinanzas",
+        label: "Resumen Financiero y Balance General",
+        description: "Visualizar estado de resultados, flujo de efectivo neto acumulado, balance de ingresos vs egresos y utilidades.",
+        icon: DollarSign,
+        critical: true,
+      },
+      {
+        key: "canViewProfitMargins",
+        label: "Visualización de Márgenes de Ganancia",
+        description: "Ver costos unitarios por pieza de pan, rendimiento de masa y porcentaje de ganancia neta.",
+        icon: BarChart3,
+        critical: true,
+      },
+      {
+        key: "canAccessReportes",
+        label: "Reportes Financieros y Exportación",
+        description: "Generación y descarga de hojas Excel/PDF de ventas históricas, productividad y contabilidad.",
+        icon: FileSpreadsheet,
+      },
+    ],
+  },
+  {
+    categoryTitle: "9. Módulo: Configuración",
+    categoryBadge: "Sistema",
+    icon: "⚙️",
     badgeClass: "bg-purple-100 text-purple-900 border-purple-300",
     borderClass: "border-purple-200/90",
-    headerBg: "bg-gradient-to-r from-purple-500/10 via-rose-500/5 to-transparent",
+    headerBg: "bg-gradient-to-r from-purple-500/10 via-fuchsia-500/5 to-transparent",
     items: [
       {
         key: "canAccessConfiguracion",
-        label: "Configuración General de la Panadería",
-        description: "Ajustar datos fiscales, tickets térmicos, sucursales y parámetros del ERP.",
+        label: "Catálogos y Parámetros del Sistema",
+        description: "Ajustar datos fiscales, tickets térmicos, sucursales y parámetros generales del ERP.",
         icon: Sliders,
         critical: true,
       },
       {
         key: "canManageUsers",
         label: "Administración de Roles y Empleados",
-        description: "Crear, editar o remover empleados y asignar accesos del sistema.",
+        description: "Crear, editar o remover empleados, generar usuarios, contraseñas, PINs y configurar esta misma matriz de accesos.",
         icon: Crown,
         critical: true,
+      },
+    ],
+  },
+  {
+    categoryTitle: "10. Módulo: Punto de Venta (POS)",
+    categoryBadge: "Caja Mostrador",
+    icon: "🛍️",
+    badgeClass: "bg-amber-100 text-amber-950 border-amber-400",
+    borderClass: "border-amber-300/90",
+    headerBg: "bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent",
+    items: [
+      {
+        key: "canAccessPos",
+        label: "Acceso al Punto de Venta (POS)",
+        description: "Terminal de venta rápida de pan en mostrador, emisión de tickets térmicos, cobro en efectivo/tarjeta y arqueos.",
+        icon: ShoppingBag,
       },
     ],
   },
@@ -543,17 +620,20 @@ export default function RoleManagement() {
     const allTrue: RolePermissions = {
       canAccessDashboard: true,
       canAccessPos: true,
-      canAccessCaja: true,
-      canAccessInventario: true,
+      canAccessSucursales: true,
       canAccessPedidos: true,
       canAccessClientes: true,
+      canAccessProductos: true,
+      canEditPrices: true,
+      canAccessIngresos: true,
+      canAccessGastos: true,
       canAccessFinanzas: true,
+      canAccessCaja: true,
+      canViewProfitMargins: true,
       canAccessReportes: true,
       canAccessConfiguracion: true,
-      canAccessProductos: true,
-      canViewProfitMargins: true,
-      canEditPrices: true,
       canManageUsers: true,
+      canAccessInventario: true,
     };
     setCurrentPermissions(allTrue);
     setHasChanges(true);
@@ -568,17 +648,20 @@ export default function RoleManagement() {
     const allFalse: RolePermissions = {
       canAccessDashboard: false,
       canAccessPos: false,
-      canAccessCaja: false,
-      canAccessInventario: false,
+      canAccessSucursales: false,
       canAccessPedidos: false,
       canAccessClientes: false,
+      canAccessProductos: false,
+      canEditPrices: false,
+      canAccessIngresos: false,
+      canAccessGastos: false,
       canAccessFinanzas: false,
+      canAccessCaja: false,
+      canViewProfitMargins: false,
       canAccessReportes: false,
       canAccessConfiguracion: false,
-      canAccessProductos: false,
-      canViewProfitMargins: false,
-      canEditPrices: false,
       canManageUsers: false,
+      canAccessInventario: false,
     };
     setCurrentPermissions(allFalse);
     setHasChanges(true);
@@ -702,7 +785,7 @@ export default function RoleManagement() {
     setSelectedRole(roleSlug);
     setIsCreateModalOpen(false);
 
-    showToast(`¡Nuevo rol "${newRoleObj.name}" creado con éxito! Puedes personalizar sus 13 permisos ahora.`);
+    showToast(`¡Nuevo rol "${newRoleObj.name}" creado con éxito! Puedes personalizar sus accesos por módulo ahora.`);
   };
 
   // Trigger Delete Role
@@ -748,9 +831,20 @@ export default function RoleManagement() {
     showToast(`Rol "${deletingName}" eliminado correctamente${reassignMsg}`);
   };
 
+  // Total available permissions across all 10 system modules
+  const totalPermsCount = useMemo(() => {
+    return PERMISSION_GROUPS.reduce((acc, g) => acc + g.items.length, 0);
+  }, []);
+
   // Count active permissions for active role
   const activePermsCount = useMemo(() => {
-    return Object.values(currentPermissions).filter(Boolean).length;
+    let count = 0;
+    PERMISSION_GROUPS.forEach((g) => {
+      g.items.forEach((item) => {
+        if (currentPermissions[item.key]) count++;
+      });
+    });
+    return count;
   }, [currentPermissions]);
 
   return (
@@ -774,7 +868,7 @@ export default function RoleManagement() {
               Roles en Sistema
             </h3>
             <p className="text-xs text-stone-600 max-w-2xl leading-relaxed">
-              Gestiona, crea y personaliza los roles de trabajo en Panaderías Brito. Puedes crear nuevos perfiles de cargo, eliminar roles obsoletos o modificar de forma interactiva sus títulos y sus 13 permisos de acceso.
+              Gestiona, crea y personaliza los roles de trabajo en Panaderías Brito. Puedes crear nuevos perfiles de cargo, eliminar roles obsoletos o modificar de forma interactiva sus títulos y permisos de acceso organizados por los módulos del sistema.
             </p>
           </div>
 
@@ -826,7 +920,9 @@ export default function RoleManagement() {
                 const isSelected = selectedRole === role.id;
                 const countUsers = usersList.filter((u) => u.role === role.id).length;
                 const effectivePerms = rolePermissionsMap?.[role.id] || ROLE_PERMISSIONS[role.id] || ROLE_PERMISSIONS.cajero;
-                const activeCount = Object.values(effectivePerms || {}).filter(Boolean).length;
+                const activeCount = PERMISSION_GROUPS.reduce((acc, g) => {
+                  return acc + g.items.filter((item) => Boolean(effectivePerms[item.key])).length;
+                }, 0);
                 const themeColors = role.colorClass || COLOR_THEMES.amber.colors;
 
                 return (
@@ -901,7 +997,7 @@ export default function RoleManagement() {
                       <span className={`px-2 py-0.5 rounded-md font-mono font-bold text-[10px] ${
                         isSelected ? "bg-stone-900 text-amber-400" : "bg-white border border-stone-200 text-stone-700"
                       }`}>
-                        {activeCount} / 13 accesos
+                        {activeCount} / {totalPermsCount} accesos
                       </span>
                     </div>
                   </div>
@@ -1102,7 +1198,7 @@ export default function RoleManagement() {
               {isAdmin ? (
                 <div className="flex items-center gap-2 px-3.5 py-2 bg-stone-100 border border-stone-200 rounded-xl text-xs font-bold text-stone-500">
                   <Lock className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Accesos Totales Permanentes (13 de 13)</span>
+                  <span>Accesos Totales Permanentes ({totalPermsCount} de {totalPermsCount})</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1134,16 +1230,16 @@ export default function RoleManagement() {
               )}
             </div>
 
-            {/* MATRIZ DE 13 ACCESOS (ELEGANTE, INTUITIVA Y AGRUPADA) */}
+            {/* MATRIZ DE ACCESOS POR MÓDULOS DEL SISTEMA */}
             <div className="p-5 sm:p-6 space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-100">
                 <div className="space-y-0.5">
                   <h5 className="font-black text-sm text-stone-900 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>Matriz de 13 Accesos & Permisos Granulares</span>
+                    <span>Matriz de Permisos por Módulos del Sistema</span>
                   </h5>
                   <p className="text-xs text-stone-500">
-                    Controla y audita qué acciones exactas puede realizar este rol en cada área de la panadería.
+                    Controla y audita qué módulos y acciones de la barra de navegación puede utilizar este rol.
                   </p>
                 </div>
                 
@@ -1152,16 +1248,16 @@ export default function RoleManagement() {
                   <div className="w-32 bg-stone-200 rounded-full h-2.5 overflow-hidden">
                     <div 
                       className="bg-gradient-to-r from-emerald-500 to-teal-500 h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${(activePermsCount / 13) * 100}%` }}
+                      style={{ width: `${(activePermsCount / totalPermsCount) * 100}%` }}
                     />
                   </div>
                   <span className="px-3 py-1 bg-stone-900 text-amber-400 rounded-xl font-mono font-bold text-xs shadow-xs">
-                    {activePermsCount} de 13 Activos
+                    {activePermsCount} de {totalPermsCount} Activos
                   </span>
                 </div>
               </div>
 
-              {/* 4 Category Panels */}
+              {/* 10 Module Category Panels */}
               <div className="space-y-4">
                 {PERMISSION_GROUPS.map((group) => {
                   const categoryTotal = group.items.length;

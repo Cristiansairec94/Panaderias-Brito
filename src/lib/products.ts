@@ -1,5 +1,6 @@
 import { Product, Sale } from "@/types";
 import { formatDateTimeSafe } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 export function calculateEan13CheckDigit(digits12: string): number {
   const d = digits12.replace(/\D/g, "").slice(0, 12);
@@ -269,8 +270,14 @@ export const DEFAULT_PRODUCTS: Product[] = [
   }
 ];
 
-export const PRODUCT_CATEGORIES = [
-  { id: "all", label: "Todas las Categorías", priceTag: "", icon: "🧺" },
+export interface ProductCategory {
+  id: string;
+  label: string;
+  priceTag?: string;
+  icon: string;
+}
+
+export const DEFAULT_PRODUCT_CATEGORIES: ProductCategory[] = [
   { id: "pan_dulce", label: "Pan Dulce Tradicional", priceTag: "", icon: "🥖" },
   { id: "pan_blanco", label: "Bolillo & Telera", priceTag: "", icon: "🍞" },
   { id: "pasteleria", label: "Pastelería & Pays", priceTag: "", icon: "🍰" },
@@ -279,6 +286,116 @@ export const PRODUCT_CATEGORIES = [
   { id: "abarrotes", label: "Abarrotes", priceTag: "", icon: "🥫" },
   { id: "materia_prima", label: "Materia Prima", priceTag: "", icon: "🌾" },
 ];
+
+export const PRODUCT_CATEGORIES = [
+  { id: "all", label: "Todas las Categorías", priceTag: "", icon: "🧺" },
+  ...DEFAULT_PRODUCT_CATEGORIES,
+];
+
+const CATEGORIES_STORAGE_KEY = "brito_categories_v1";
+
+export function getStoredCategories(): ProductCategory[] {
+  if (typeof window === "undefined") {
+    return DEFAULT_PRODUCT_CATEGORIES;
+  }
+  try {
+    const raw = localStorage.getItem(CATEGORIES_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCT_CATEGORIES));
+      return DEFAULT_PRODUCT_CATEGORIES;
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCT_CATEGORIES));
+      return DEFAULT_PRODUCT_CATEGORIES;
+    }
+    return parsed;
+  } catch {
+    return DEFAULT_PRODUCT_CATEGORIES;
+  }
+}
+
+export function saveStoredCategories(categories: ProductCategory[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+    window.dispatchEvent(new Event("brito_categories_updated"));
+  } catch (err) {
+    console.error("Error saving categories:", err);
+  }
+}
+
+export function addCategory(data: { label: string; icon?: string; id?: string }): ProductCategory {
+  const current = getStoredCategories();
+  let cleanId = (data.id || data.label)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  if (!cleanId) cleanId = `cat_${Date.now()}`;
+
+  let candidate = cleanId;
+  let counter = 1;
+  while (current.some((c) => c.id === candidate) || candidate === "all") {
+    candidate = `${cleanId}_${counter}`;
+    counter++;
+  }
+
+  const newCat: ProductCategory = {
+    id: candidate,
+    label: data.label.trim(),
+    icon: data.icon?.trim() || "🏷️",
+    priceTag: "",
+  };
+
+  const updated = [...current, newCat];
+  saveStoredCategories(updated);
+  return newCat;
+}
+
+export function updateCategory(id: string, updates: { label?: string; icon?: string }): ProductCategory | null {
+  const current = getStoredCategories();
+  const index = current.findIndex((c) => c.id === id);
+  if (index === -1) return null;
+
+  const updatedCat: ProductCategory = {
+    ...current[index],
+    label: updates.label !== undefined ? updates.label.trim() : current[index].label,
+    icon: updates.icon !== undefined ? updates.icon.trim() || "🏷️" : current[index].icon,
+  };
+
+  current[index] = updatedCat;
+  saveStoredCategories(current);
+  return updatedCat;
+}
+
+export function deleteCategory(id: string, reassignToCatId?: string): boolean {
+  const current = getStoredCategories();
+  if (!current.some((c) => c.id === id)) return false;
+
+  const filtered = current.filter((c) => c.id !== id);
+  saveStoredCategories(filtered);
+
+  // Reasignar productos de la categoría eliminada
+  const targetCategory = reassignToCatId || (filtered[0]?.id ?? "pan_dulce");
+  const prods = getStoredProducts();
+  let modified = false;
+  const updatedProds = prods.map((p) => {
+    if (p.category === id) {
+      modified = true;
+      return { ...p, category: targetCategory };
+    }
+    return p;
+  });
+  if (modified) {
+    saveStoredProducts(updatedProds);
+  }
+
+  return true;
+}
 
 const STORAGE_KEY = "brito_products_v6";
 
@@ -382,7 +499,8 @@ export function generateProductCode(category?: string): string {
     abarrotes: "AB",
     materia_prima: "MP",
   };
-  const prefix = (category && prefixMap[category]) || "PRD";
+  const customPrefix = category ? category.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() : "";
+  const prefix = (category && prefixMap[category]) || (customPrefix.length >= 2 ? customPrefix : "PRD");
   const existingInCat = current.filter((p) => p.code?.startsWith(prefix) || p.category === category);
   const nextNum = existingInCat.length + 1;
   let codeCandidate = `${prefix}-${String(nextNum).padStart(3, "0")}`;
@@ -509,14 +627,30 @@ export function saveStoredProducts(products: Product[]): void {
 
 export function updateProductStock(id: string, newStock: number): void {
   const current = getStoredProducts();
-  const updated = current.map((p) => (p.id === id ? { ...p, stock: Math.max(0, newStock) } : p));
+  const safeStock = Math.max(0, newStock);
+  const updated = current.map((p) => (p.id === id ? { ...p, stock: safeStock } : p));
   saveStoredProducts(updated);
+
+  if (typeof window !== "undefined") {
+    try {
+      const supabase = createClient();
+      supabase.from("products").update({ stock: safeStock }).eq("id", id).then();
+    } catch {}
+  }
 }
 
 export function updateProductPrice(id: string, newPrice: number): void {
   const current = getStoredProducts();
-  const updated = current.map((p) => (p.id === id ? { ...p, price: Math.max(0, newPrice) } : p));
+  const safePrice = Math.max(0, newPrice);
+  const updated = current.map((p) => (p.id === id ? { ...p, price: safePrice } : p));
   saveStoredProducts(updated);
+
+  if (typeof window !== "undefined") {
+    try {
+      const supabase = createClient();
+      supabase.from("products").update({ price: safePrice }).eq("id", id).then();
+    } catch {}
+  }
 }
 
 export function addProduct(product: Omit<Product, "id">): Product {
@@ -530,6 +664,32 @@ export function addProduct(product: Omit<Product, "id">): Product {
     id: `prod-${Date.now()}`,
   };
   saveStoredProducts([...current, newProduct]);
+
+  if (typeof window !== "undefined") {
+    try {
+      const supabase = createClient();
+      supabase.from("products").upsert({
+        id: newProduct.id,
+        code: newProduct.code,
+        barcode: newProduct.barcode,
+        name: newProduct.name,
+        price: Number(newProduct.price),
+        category: newProduct.category,
+        image: newProduct.image || null,
+        icon: newProduct.icon || "🥖",
+        stock: Number(newProduct.stock) || 0,
+        description: newProduct.description || null,
+        unit: newProduct.unit || "pieza",
+        has_iva: !!newProduct.hasIva,
+        iva_rate: Number(newProduct.ivaRate) || 0,
+        has_ieps: !!newProduct.hasIeps,
+        ieps_rate: Number(newProduct.iepsRate) || 0,
+        tax_included: newProduct.taxIncluded !== undefined ? newProduct.taxIncluded : true,
+        is_active: true,
+      }, { onConflict: "id" }).then();
+    } catch {}
+  }
+
   return newProduct;
 }
 
@@ -548,11 +708,83 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
     return p;
   });
   saveStoredProducts(updated);
+
+  if (typeof window !== "undefined" && updatedItem) {
+    try {
+      const supabase = createClient();
+      const payload: any = {};
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.price !== undefined) payload.price = Number(updates.price);
+      if (updates.category !== undefined) payload.category = updates.category;
+      if (updates.code !== undefined) payload.code = updates.code;
+      if (updates.barcode !== undefined) payload.barcode = updates.barcode;
+      if (updates.stock !== undefined) payload.stock = Number(updates.stock);
+      if (updates.image !== undefined) payload.image = updates.image;
+      if (updates.icon !== undefined) payload.icon = updates.icon;
+      if (updates.description !== undefined) payload.description = updates.description;
+      if (updates.unit !== undefined) payload.unit = updates.unit;
+      if (updates.hasIva !== undefined) payload.has_iva = !!updates.hasIva;
+      if (updates.ivaRate !== undefined) payload.iva_rate = Number(updates.ivaRate);
+      if (updates.hasIeps !== undefined) payload.has_ieps = !!updates.hasIeps;
+      if (updates.iepsRate !== undefined) payload.ieps_rate = Number(updates.iepsRate);
+      if (updates.taxIncluded !== undefined) payload.tax_included = updates.taxIncluded;
+
+      if (Object.keys(payload).length > 0) {
+        supabase.from("products").update(payload).eq("id", id).then();
+      }
+    } catch {}
+  }
+
   return updatedItem;
 }
 
 export function deleteProduct(id: string): void {
   const current = getStoredProducts();
   saveStoredProducts(current.filter((p) => p.id !== id));
+
+  if (typeof window !== "undefined") {
+    try {
+      const supabase = createClient();
+      supabase.from("products").update({ is_active: false }).eq("id", id).then();
+    } catch {}
+  }
+}
+
+export async function fetchProductsFromDb(): Promise<Product[]> {
+  if (typeof window === "undefined") return getStoredProducts();
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("is_active", true)
+      .order("name");
+
+    if (data && data.length > 0 && !error) {
+      const mapped: Product[] = data.map((p: any) => ({
+        id: p.id,
+        code: p.code || `PRD-${p.id}`,
+        barcode: p.barcode,
+        name: p.name,
+        price: Number(p.price),
+        category: p.category,
+        icon: p.icon || "🥖",
+        stock: typeof p.stock === "number" ? p.stock : 0,
+        description: p.description,
+        image: p.image,
+        unit: p.unit || "pieza",
+        hasIva: !!p.has_iva,
+        ivaRate: Number(p.iva_rate) || 0,
+        hasIeps: !!p.has_ieps,
+        iepsRate: Number(p.ieps_rate) || 0,
+        taxIncluded: p.tax_included !== undefined ? p.tax_included : true,
+      }));
+      saveStoredProducts(mapped);
+      return mapped;
+    }
+  } catch (e) {
+    console.warn("fetchProductsFromDb fallback to local:", e);
+  }
+  return getStoredProducts();
 }
 

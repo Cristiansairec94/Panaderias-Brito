@@ -132,6 +132,10 @@ export default function CreateBranchModal({
     };
 
     onAddBranch(newBranch);
+    setName("");
+    setShortName("");
+    setAddress("");
+    setCustomManagerName("");
     onClose();
   };
 

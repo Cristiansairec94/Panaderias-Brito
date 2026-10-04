@@ -311,25 +311,37 @@ export function matchesCashier(itemCashier?: string, targetCashier?: string): bo
 
 /**
  * Obtiene el timestamp de inicio del turno actual a partir del último corte cerrado
- * o de la clave almacenada de inicio de turno.
+ * o de la clave almacenada de inicio de turno (con soporte para aislamiento por sucursal).
  */
-export function getStoredShiftStartBoundary(): number {
+export function getStoredShiftStartBoundary(branchId?: string): number {
   if (typeof window === "undefined") return 0;
   try {
     const now = Date.now();
-    const stored = localStorage.getItem("brito_current_shift_start_timestamp");
-    if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
-      const num = Number(stored);
-      // Evitar timestamps erróneos en el futuro
-      return num > now ? now : num;
+    const effectiveBranchId =
+      branchId ||
+      localStorage.getItem("brito_current_branch_id") ||
+      localStorage.getItem("brito_active_branch_id") ||
+      undefined;
+
+    // 1. Clave específica de la sucursal activa
+    if (effectiveBranchId && effectiveBranchId !== "all") {
+      const branchStored = localStorage.getItem("brito_shift_start_" + effectiveBranchId);
+      if (branchStored && !isNaN(Number(branchStored)) && Number(branchStored) > 0) {
+        const num = Number(branchStored);
+        return num > now ? now : num;
+      }
     }
 
+    // 2. Buscar en historial de cortes de esta sucursal
     let startTs = 0;
     const rawCuts = localStorage.getItem("brito_shift_cuts_history");
     if (rawCuts) {
       const parsed = JSON.parse(rawCuts);
       if (Array.isArray(parsed) && parsed.length > 0) {
         for (const cut of parsed) {
+          if (effectiveBranchId && effectiveBranchId !== "all" && cut.branchId && cut.branchId !== effectiveBranchId) {
+            continue;
+          }
           const cutTs =
             typeof cut.timestamp === "number"
               ? cut.timestamp
@@ -340,10 +352,26 @@ export function getStoredShiftStartBoundary(): number {
         }
       }
     }
+
+    // 3. Clave global del turno actual sólo si no hay sucursal específica o no encontró corte
+    if (startTs === 0 && (!effectiveBranchId || effectiveBranchId === "all")) {
+      const stored = localStorage.getItem("brito_current_shift_start_timestamp");
+      if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
+        const num = Number(stored);
+        if (num <= now) startTs = num;
+      }
+    }
+
     if (startTs === 0) {
-      startTs = now;
+      // Iniciar al comienzo del día de hoy (00:00:00) para no descartar ventas matutinas
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      startTs = todayStart.getTime();
     }
     try {
+      if (effectiveBranchId && effectiveBranchId !== "all") {
+        localStorage.setItem("brito_shift_start_" + effectiveBranchId, startTs.toString());
+      }
       localStorage.setItem("brito_current_shift_start_timestamp", startTs.toString());
     } catch (e) {}
     return startTs;
@@ -428,5 +456,71 @@ export function deduplicateIncomes<T extends { id?: string; amount?: number; con
   }
 
   return result;
+}
+
+/**
+ * Comprime y redimensiona una imagen subida por el usuario utilizando un canvas HTML5.
+ * Reduce el peso de varios MBs a ~10-15KB en formato JPEG para evitar exceder el límite de almacenamiento (localStorage / quota).
+ */
+export function compressImageFile(
+  file: File,
+  maxWidth = 200,
+  maxHeight = 200,
+  quality = 0.75
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") {
+      resolve("");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = (err) => reject(err);
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (!result) {
+        resolve("");
+        return;
+      }
+
+      const img = new Image();
+      img.onerror = (err) => reject(err);
+      img.onload = () => {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(width, 1);
+        canvas.height = Math.max(height, 1);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(result);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        try {
+          const compressed = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressed);
+        } catch {
+          resolve(result);
+        }
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { 
   X, 
   DollarSign, 
@@ -35,7 +35,10 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  Info
+  Info,
+  History,
+  Lock,
+  Store
 } from "lucide-react";
 import { CashExpense, CashIncome, Sale, CustomOrder } from "@/types";
 import { 
@@ -53,11 +56,14 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
+import { useBranch } from "@/context/BranchContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
-import { getStoredOrders } from "@/lib/orders";
+import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import { getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import TicketModal from "@/components/pos/TicketModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
+import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
 import PrinterConfigModal from "@/components/pos/PrinterConfigModal";
 
 interface UnifiedTicketItem {
@@ -413,8 +419,46 @@ export default function ExpensesModal({
   branchPhone,
   onOpenCreateOrder,
 }: ExpensesModalProps) {
-  const { addNotification } = useNotifications();
+  const { addNotification, openOrderDetail, openOrderPayment } = useNotifications();
   const { enqueueOfflineItem, isOnline } = useSync();
+  const { branches, currentBranch } = useBranch();
+  const activeBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch;
+
+  const effectiveCashier = activeBranch?.currentShift?.cashier || cashierName;
+  const effectiveShiftName = activeBranch?.currentShift?.name || shiftName;
+  const effectiveBranchName = activeBranch?.name || branchName || "Sucursal Matriz (Centro)";
+
+  const isOrderInBranch = useCallback((o: any) => {
+    if (!activeBranch?.id || activeBranch.id === "all") return true;
+    const bId = activeBranch.id.toLowerCase().trim();
+    const bName = (activeBranch.name || "").toLowerCase().trim();
+    const bShort = (activeBranch.shortName || "").toLowerCase().trim();
+
+    const pId = String(o.branchId || o.branch_id || "").toLowerCase().trim();
+    const pName = String(o.branchName || o.branch_name || "").toLowerCase().trim();
+    const opId = String(o.operatingBranchId || o.operating_branch_id || "").toLowerCase().trim();
+    const opName = String(o.operatingBranchName || o.operating_branch_name || "").toLowerCase().trim();
+
+    const matchPickup = (pId && (pId === bId || bId.includes(pId) || pId.includes(bId))) ||
+                        (pName && ((bName && (pName === bName || pName.includes(bName) || bName.includes(pName))) ||
+                                   (bShort && (pName.includes(bShort) || bShort.includes(pName)))));
+    const matchOperating = (opId && (opId === bId || bId.includes(opId) || opId.includes(bId))) ||
+                           (opName && ((bName && (opName === bName || opName.includes(bName) || bName.includes(opName))) ||
+                                       (bShort && (opName.includes(bShort) || bShort.includes(opName)))));
+
+    if (matchPickup || matchOperating) return true;
+
+    // Si no tiene campos de sucursal explícitos, asociar solo si coincide el cajero o si es Matriz
+    if (!pId && !pName && !opId && !opName) {
+      if (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) {
+        return true;
+      }
+      if (bId === "branch-matriz") return true;
+    }
+
+    return false;
+  }, [activeBranch]);
+
   const [activeTab, setActiveTab] = useState<"tickets" | "register" | "list">(
     initialTab || "register"
   );
@@ -422,6 +466,7 @@ export default function ExpensesModal({
   // Estados locales para previsualizar/reimprimir tickets directamente sin salir de la pestaña
   const [previewSale, setPreviewSale] = useState<Sale | null>(null);
   const [previewOrder, setPreviewOrder] = useState<CustomOrder | null>(null);
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState<CustomOrder | null>(null);
   const [showPrinterModal, setShowPrinterModal] = useState(false);
 
   useEffect(() => {
@@ -437,13 +482,27 @@ export default function ExpensesModal({
 
   // Modal emergente de información detallada para cada opción de balance
   const [activeDetailModal, setActiveDetailModal] = useState<"fondo" | "ventas" | "entradas" | "gastos" | "balance" | null>(null);
-  const [cashDetailFilter, setCashDetailFilter] = useState<"all" | "ventas" | "pedidos">("all");
-  const [cashMethodFilter, setCashMethodFilter] = useState<"all" | "efectivo" | "tarjeta" | "transferencia">("all");
+  const [cashDetailFilter, setCashDetailFilter] = useState<"all" | "ventas" | "pedidos" | "todos_pedidos">("all");
+  const [cashMethodFilter, setCashMethodFilter] = useState<"all" | "efectivo" | "tarjeta" | "transferencia" | "todos_pedidos">("all");
+
+  // Estados específicos para el historial completo de pedidos (entrega de turno)
+  const [allOrdersSearch, setAllOrdersSearch] = useState<string>("");
+  const [allOrdersStatusFilter, setAllOrdersStatusFilter] = useState<"all" | "hoy" | "listos" | "pendientes" | "por_pagar">("all");
+  const [expandedAllOrdersIds, setExpandedAllOrdersIds] = useState<Record<string, boolean>>({});
+
+  const toggleExpandAllOrder = (orderId: string) => {
+    setExpandedAllOrdersIds((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId],
+    }));
+  };
 
   const handleCloseDetailModal = () => {
     setActiveDetailModal(null);
     setCashDetailFilter("all");
     setCashMethodFilter("all");
+    setAllOrdersSearch("");
+    setAllOrdersStatusFilter("all");
     setActiveTab("register");
   };
 
@@ -476,13 +535,22 @@ export default function ExpensesModal({
   
   // Estado local para el Fondo Inicial de Caja
   const [currentFund, setCurrentFund] = useState<number>(() => {
+    if (activeBranch?.currentShift?.initialFund !== undefined) {
+      return activeBranch.currentShift.initialFund;
+    }
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("brito_pos_initial_fund");
       if (saved !== null && !isNaN(Number(saved))) return Number(saved);
     }
     return initialFund || 0;
   });
+
+  // Fondo inicial sincronizado prioritariamente con el turno de la sucursal activa
+  const effectiveFund = activeBranch?.currentShift?.initialFund !== undefined ? activeBranch.currentShift.initialFund : currentFund;
   const [editFundInput, setEditFundInput] = useState<string>(() => {
+    if (activeBranch?.currentShift?.initialFund !== undefined) {
+      return String(activeBranch.currentShift.initialFund);
+    }
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("brito_pos_initial_fund");
       if (saved !== null && !isNaN(Number(saved))) return saved;
@@ -492,19 +560,16 @@ export default function ExpensesModal({
   const [isEditingFund, setIsEditingFund] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("brito_pos_initial_fund");
-      if (saved !== null && !isNaN(Number(saved))) {
-        setCurrentFund(Number(saved));
-        setEditFundInput(saved);
-        return;
-      }
+    if (activeBranch?.currentShift?.initialFund !== undefined) {
+      setCurrentFund(activeBranch.currentShift.initialFund);
+      setEditFundInput(String(activeBranch.currentShift.initialFund));
+      return;
     }
     if (typeof initialFund === "number") {
       setCurrentFund(initialFund);
       setEditFundInput(String(initialFund));
     }
-  }, [initialFund, isOpen]);
+  }, [initialFund, isOpen, activeBranch?.id, activeBranch?.currentShift?.initialFund]);
 
   useEffect(() => {
     const handleFundSync = () => {
@@ -571,28 +636,31 @@ export default function ExpensesModal({
   const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  // Sincronizar pedidos especiales en memoria y desde almacenamiento
+  // Sincronizar pedidos especiales en memoria y desde almacenamiento (excluyendo 100% entregados y cancelados)
   const [internalOrders, setInternalOrders] = useState<CustomOrder[]>(() => {
-    return Array.isArray(orders) ? orders : getStoredOrders();
+    const raw = Array.isArray(orders) ? orders : getStoredOrders();
+    return raw.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
   });
 
   useEffect(() => {
-    if (Array.isArray(orders)) {
-      setInternalOrders(orders);
-    } else {
-      setInternalOrders(getStoredOrders());
-    }
+    const raw = Array.isArray(orders) ? orders : getStoredOrders();
+    setInternalOrders(raw.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
   }, [orders, isOpen]);
+
+  const [ordersVersion, setOrdersVersion] = useState(0);
 
   useEffect(() => {
     const handleOrdersUpdated = () => {
-      if (!Array.isArray(orders)) {
-        setInternalOrders(getStoredOrders());
-      }
+      setOrdersVersion((v) => v + 1);
+      setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
     };
     window.addEventListener("brito_orders_updated", handleOrdersUpdated);
-    return () => window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
-  }, [orders]);
+    window.addEventListener("storage", handleOrdersUpdated);
+    return () => {
+      window.removeEventListener("brito_orders_updated", handleOrdersUpdated);
+      window.removeEventListener("storage", handleOrdersUpdated);
+    };
+  }, []);
 
   // Sincronizar ventas de mostrador en memoria y desde almacenamiento local
   const [internalSales, setInternalSales] = useState<Sale[]>(() => {
@@ -664,7 +732,7 @@ export default function ExpensesModal({
       if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
       const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
       if (shiftStartBoundary > 0) {
-        if (!expTime || expTime < shiftStartBoundary - 60000) {
+        if (!expTime || expTime < shiftStartBoundary) {
           return false;
         }
       }
@@ -681,7 +749,7 @@ export default function ExpensesModal({
       if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
       const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
       if (shiftStartBoundary > 0) {
-        if (!incTime || incTime < shiftStartBoundary - 60000) {
+        if (!incTime || incTime < shiftStartBoundary) {
           return false;
         }
       }
@@ -703,46 +771,48 @@ export default function ExpensesModal({
         }
       } catch (e) {}
     }
-    if (source.length === 0) {
-      return [];
-    }
 
-    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
-    return source.filter((s) => {
+    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
+    const branchFilteredSource = source.filter((s) => {
       if (!s) return false;
+      if (activeBranch && activeBranch.id !== "all") {
+        const sBranch = (s as any).branchId || (s as any).branch_id;
+        if (sBranch) {
+          if (sBranch !== activeBranch.id) return false;
+        } else {
+          if (activeBranch.id !== "branch-matriz") return false;
+        }
+      }
       const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
       if (boundary > 0) {
-        if (!sTime || sTime < boundary - 60000) return false;
+        if (!sTime || sTime < boundary) return false;
       }
       if (sTime > Date.now() + 60000) return false;
       return true;
     });
-  }, [sales, shiftStartBoundary, shiftVersion]);
+
+    return branchFilteredSource;
+  }, [sales, shiftStartBoundary, shiftVersion, activeBranch]);
 
   // Ventas exclusivas del turno actual (todas las ventas emitidas en la terminal en este turno)
   const effectiveSales = shiftSales;
 
-  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos creados en el turno activo por esta cajera)
+  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos creados en el turno activo)
   const relevantOrders = useMemo(() => {
-    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary();
-    if (!boundary || boundary <= 0) {
-      return [];
-    }
-    const sourceOrders = Array.isArray(orders) ? orders : (internalOrders || []);
+    const boundary = shiftStartBoundary > 0 ? shiftStartBoundary : getStoredShiftStartBoundary(activeBranch?.id);
+    const rawList = Array.isArray(orders) && orders.length > 0 ? orders : (internalOrders || []);
+    const stored = getStoredOrders();
+    const sourceOrders = rawList.map((o) => {
+      const match = stored.find((s) => s.id === o.id || s.orderNumber === o.orderNumber);
+      return match || o;
+    });
     return sourceOrders.filter((o) => {
       if (!o) return false;
-      if (branchId) {
-        const orderBranch = (o as any).operatingBranchId || o.branchId;
-        if (orderBranch && orderBranch !== branchId && o.branchId !== branchId) {
-          return false;
-        }
-      }
-      if (cashierName && o.cashier && !matchesCashier(o.cashier, cashierName)) {
-        return false;
-      }
+      if (o.status === "entregado" || o.status === "cancelado") return false;
+      if (!isOrderInBranch(o)) return false;
       const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
       if (boundary > 0) {
-        if (!oTime || oTime < boundary - 1000) {
+        if (!oTime || oTime < boundary) {
           return false;
         }
       }
@@ -751,7 +821,7 @@ export default function ExpensesModal({
       }
       return true;
     });
-  }, [orders, internalOrders, branchId, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [orders, internalOrders, isOrderInBranch, shiftStartBoundary, shiftVersion, ordersVersion]);
 
   const effectiveOrders = relevantOrders;
 
@@ -760,30 +830,40 @@ export default function ExpensesModal({
   // 3. Todas las ventas históricas de la cajera/operador en turno (historial diario del que opera)
   const operatorAllSales = useMemo(() => {
     return (allAvailableSales || []).filter((s) => {
+      if (activeBranch && activeBranch.id !== "all") {
+        const sBranch = (s as any).branchId || (s as any).branch_id;
+        if (sBranch && sBranch !== activeBranch.id) return false;
+      }
       if (s.cashier && cashierName) {
-        const isMatch = matchesCashier(s.cashier, cashierName);
+        const isMatch = matchesCashier(s.cashier, cashierName) ||
+                        cashierName.toLowerCase().includes("don toño") ||
+                        cashierName.toLowerCase().includes("admin") ||
+                        s.cashier.toLowerCase().includes("don toño") ||
+                        s.cashier.toLowerCase().includes("admin");
         if (!isMatch) return false;
       }
       return true;
     });
-  }, [allAvailableSales, cashierName]);
+  }, [allAvailableSales, cashierName, activeBranch]);
 
   // 4. Todos los pedidos especiales históricos de la cajera/operador en turno
   const operatorAllOrders = useMemo(() => {
     return (internalOrders || []).filter((o) => {
-      if (branchId) {
-        const orderBranch = (o as any).operatingBranchId || o.branchId;
-        if (orderBranch && orderBranch !== branchId && o.branchId !== branchId) {
-          return false;
-        }
-      }
+      if (!o) return false;
+      if (o.status === "entregado" || o.status === "cancelado") return false;
+      if (!isOrderInBranch(o)) return false;
       if (o.cashier && cashierName) {
-        const isMatch = matchesCashier(o.cashier, cashierName);
+        const isMatch =
+          matchesCashier(o.cashier, cashierName) ||
+          cashierName.toLowerCase().includes("don toño") ||
+          cashierName.toLowerCase().includes("admin") ||
+          o.cashier.toLowerCase().includes("don toño") ||
+          o.cashier.toLowerCase().includes("admin");
         if (!isMatch) return false;
       }
       return true;
     });
-  }, [internalOrders, branchId, cashierName]);
+  }, [internalOrders, isOrderInBranch, cashierName]);
 
   // Selección del grupo de ventas según el alcance activo:
   // "turno": estrictamente las de este turno y cajera en vivo.
@@ -797,8 +877,8 @@ export default function ExpensesModal({
   const ordersPool = useMemo(() => {
     if (ticketScopeFilter === "turno") return effectiveOrders;
     if (ticketScopeFilter === "por_dia") return operatorAllOrders.length > 0 ? operatorAllOrders : effectiveOrders;
-    return effectiveOrders;
-  }, [ticketScopeFilter, effectiveOrders, operatorAllOrders]);
+    return getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado" && isOrderInBranch(o));
+  }, [ticketScopeFilter, effectiveOrders, operatorAllOrders, isOrderInBranch]);
 
   // Métricas superiores sincronizadas con el alcance activo (ventas de mostrador sin pedidos)
   const activeSalesForKpi = useMemo(() => {
@@ -891,15 +971,19 @@ export default function ExpensesModal({
     return effectiveSales.filter((s) => !s.isCustomOrder);
   }, [effectiveSales]);
 
-  // Todos los pedidos especiales del turno activo (anticipos y liquidaciones de todos los métodos)
+  // Todos los pedidos especiales del turno activo (anticipos y liquidaciones de todos los métodos, excluyendo entregados/bajas)
   const allShiftOrdersList = useMemo(() => {
     const ordersMap = new Map<string, CustomOrder>();
+    const storedAll = getStoredOrders();
 
     // 1. Pedidos desde effectiveOrders
     effectiveOrders.forEach((o) => {
-      const hasDeposit = (Number(o.deposit) || 0) > 0 || (Number(o.total) || 0) > 0;
+      if (!o) return;
+      const latest = storedAll.find((sto) => sto.id === o.id || sto.orderNumber === o.orderNumber) || o;
+      if (latest.status === "entregado" || latest.status === "cancelado") return;
+      const hasDeposit = (Number(latest.deposit) || 0) > 0 || (Number(latest.total) || 0) > 0;
       if (hasDeposit) {
-        ordersMap.set(o.orderNumber || o.id, o);
+        ordersMap.set(latest.orderNumber || latest.id, latest);
       }
     });
 
@@ -907,6 +991,15 @@ export default function ExpensesModal({
     effectiveSales.forEach((s) => {
       if (s.isCustomOrder) {
         const orderKey = s.orderNumber || s.id;
+        // Si ya está entregado o cancelado en el almacén de pedidos, no agregarlo a la lista de pedidos
+        const storedMatch = storedAll.find((ord) => ord.id === s.id || ord.orderNumber === s.orderNumber);
+        if (storedMatch && (storedMatch.status === "entregado" || storedMatch.status === "cancelado")) {
+          return;
+        }
+        if (storedMatch) {
+          ordersMap.set(orderKey, storedMatch);
+          return;
+        }
         if (!ordersMap.has(orderKey)) {
           const synthOrder: CustomOrder = {
             id: s.id,
@@ -942,7 +1035,7 @@ export default function ExpensesModal({
     });
 
     return Array.from(ordersMap.values());
-  }, [effectiveOrders, effectiveSales]);
+  }, [effectiveOrders, effectiveSales, ordersVersion]);
 
   // Listados específicos en efectivo para compatibilidad
   const cashSalesList = useMemo(() => {
@@ -1023,6 +1116,218 @@ export default function ExpensesModal({
   // Alias para mantener compatibilidad
   const unifiedCashMovements = unifiedShiftMovements;
 
+  const todayDateStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  // Lista de pedidos por entregar de la panadería para la entrega de turno entre cajeras
+  // (Excluye 100% pedidos entregados, cancelados/dados de baja o vencidos, que pertenecen al Historial directo de pedidos)
+  const allHistoricalOrders = useMemo(() => {
+    const list = getStoredOrders();
+    return list
+      .filter((o) => {
+        if (!o) return false;
+        const normStatus = String(o.status || "").toLowerCase().trim();
+
+        // 1. Excluir 100% los pedidos que ya fueron entregados o cancelados/dados de baja
+        if (
+          normStatus === "entregado" ||
+          normStatus === "cancelado" ||
+          normStatus === "baja" ||
+          normStatus.includes("entreg") ||
+          normStatus.includes("cancel") ||
+          Boolean((o as any).isDelivered) ||
+          Boolean((o as any).isCancelled)
+        ) {
+          return false;
+        }
+
+        if (branchId) {
+          const bId = branchId.toLowerCase().trim();
+          const bName = (branchName || "").toLowerCase().trim();
+          const oPickupId = String(o.branchId || "").toLowerCase().trim();
+          const oPickupName = String(o.branchName || "").toLowerCase().trim();
+          const oOperatingId = String((o as any).operatingBranchId || "").toLowerCase().trim();
+          const oOperatingName = String((o as any).operatingBranchName || "").toLowerCase().trim();
+
+          if (oPickupId || oOperatingId) {
+            const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                                  (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
+            const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                                     (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
+            if (!matchesPickup && !matchesOperating) {
+              return false;
+            }
+          }
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const dateA = a.deliveryDate || a.createdAt || "";
+        const dateB = b.deliveryDate || b.createdAt || "";
+        return dateB.localeCompare(dateA);
+      });
+  }, [ordersVersion, internalOrders, branchId, todayDateStr]);
+
+  const todayOrdersList = useMemo(() => {
+    return allHistoricalOrders.filter((o) => {
+      const cleanDate = (o.deliveryDate || "").split("T")[0].split(" ")[0].trim();
+      return cleanDate === todayDateStr || (o.deliveryDate || "").toLowerCase().includes("hoy");
+    });
+  }, [allHistoricalOrders, todayDateStr]);
+
+  const readyOrdersList = useMemo(() => {
+    return allHistoricalOrders.filter((o) => o.status === "listo");
+  }, [allHistoricalOrders]);
+
+  const inPrepOrdersList = useMemo(() => {
+    return allHistoricalOrders.filter((o) => o.status === "pendiente" || o.status === "en_horno");
+  }, [allHistoricalOrders]);
+
+  const unpaidOrdersList = useMemo(() => {
+    return allHistoricalOrders.filter((o) => {
+      const rem = o.remainingBalance !== undefined ? o.remainingBalance : Math.max(0, (o.total || 0) - (o.deposit || 0));
+      return rem > 0;
+    });
+  }, [allHistoricalOrders]);
+
+  const totalUnpaidBalance = useMemo(() => {
+    return unpaidOrdersList.reduce((sum, o) => {
+      const rem = o.remainingBalance !== undefined ? o.remainingBalance : Math.max(0, (o.total || 0) - (o.deposit || 0));
+      return sum + rem;
+    }, 0);
+  }, [unpaidOrdersList]);
+
+  const totalAllOrdersAmount = useMemo(() => {
+    return allHistoricalOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  }, [allHistoricalOrders]);
+
+  const filteredAllOrders = useMemo(() => {
+    let list = allHistoricalOrders;
+
+    if (allOrdersStatusFilter === "hoy") {
+      list = todayOrdersList;
+    } else if (allOrdersStatusFilter === "listos") {
+      list = readyOrdersList;
+    } else if (allOrdersStatusFilter === "pendientes") {
+      list = inPrepOrdersList;
+    } else if (allOrdersStatusFilter === "por_pagar") {
+      list = unpaidOrdersList;
+    }
+
+    if (allOrdersSearch.trim()) {
+      const q = allOrdersSearch.toLowerCase().trim();
+      list = list.filter((o) => {
+        const matchNumber = (o.orderNumber || "").toLowerCase().includes(q);
+        const matchCustomer = (o.customerName || "").toLowerCase().includes(q);
+        const matchPhone = (o.phone || "").toLowerCase().includes(q);
+        const matchDesc = (o.description || "").toLowerCase().includes(q);
+        const matchCashier = (o.cashier || "").toLowerCase().includes(q);
+        const matchItems = (o.items || []).some((item) => (item.name || "").toLowerCase().includes(q));
+        return matchNumber || matchCustomer || matchPhone || matchDesc || matchCashier || matchItems;
+      });
+    }
+
+    return list;
+  }, [allHistoricalOrders, allOrdersStatusFilter, todayOrdersList, readyOrdersList, inPrepOrdersList, unpaidOrdersList, allOrdersSearch]);
+
+  const handleSelectDetailFilter = (filterId: "all" | "ventas" | "pedidos" | "todos_pedidos") => {
+    setCashDetailFilter(filterId);
+    if (filterId === "todos_pedidos") {
+      setCashMethodFilter("todos_pedidos");
+    } else if (cashMethodFilter === "todos_pedidos") {
+      setCashMethodFilter("all");
+    }
+  };
+
+  const handleSelectMethodFilter = (methodId: "all" | "efectivo" | "tarjeta" | "transferencia" | "todos_pedidos") => {
+    setCashMethodFilter(methodId);
+    if (methodId === "todos_pedidos") {
+      setCashDetailFilter("todos_pedidos");
+    } else if (cashDetailFilter === "todos_pedidos") {
+      setCashDetailFilter("all");
+    }
+  };
+
+  const handlePayOrder = (order: CustomOrder) => {
+    if (onSelectOrderForPayment) {
+      onSelectOrderForPayment(order);
+    } else if (openOrderPayment) {
+      openOrderPayment(order);
+    }
+  };
+
+  const handleViewOrderDetail = (order: CustomOrder) => {
+    setSelectedOrderDetail(order);
+    if (openOrderDetail) {
+      openOrderDetail(order);
+    }
+  };
+
+  const handleDeliverOrder = (order: CustomOrder) => {
+    const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
+    if (rem > 0) {
+      alert(
+        `⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\nEl pedido debe estar pagado por completo antes de poder entregarse al cliente. Por favor, presiona "Cobrar Saldo" para registrar el pago.`
+      );
+      handlePayOrder(order);
+      return;
+    }
+
+    const ok = confirm(
+      `¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y se eliminará de esta sección de pedidos por entregar en caja.`
+    );
+    if (!ok) return;
+
+    updateOrderStatus(order.id, "entregado");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_orders_updated"));
+    }
+    setOrdersVersion((v) => v + 1);
+    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+  };
+
+  const handleCancelOrder = (order: CustomOrder) => {
+    const isHistory = order.status === "cancelado" || order.status === "entregado";
+    const ok = confirm(
+      isHistory
+        ? `¿Confirmas ELIMINAR PERMANENTEMENTE el pedido #${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro.`
+        : `¿Confirmas DAR DE BAJA / CANCELAR el pedido #${order.orderNumber} de "${order.customerName}"?\n\nDesaparecerá de la lista de pedidos por entregar.`
+    );
+    if (!ok) return;
+    if (isHistory) {
+      deleteCustomOrder(order.id);
+    } else {
+      updateOrderStatus(order.id, "cancelado");
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_orders_updated"));
+    }
+    setOrdersVersion((v) => v + 1);
+    setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+  };
+
+  const handleSendOrderWhatsApp = (order: CustomOrder) => {
+    const phone = (order.phone || "").replace(/\D/g, "");
+    if (!phone) {
+      alert("Este pedido no tiene número de teléfono registrado.");
+      return;
+    }
+    const cleanDate = (order.deliveryDate || "").split("T")[0].split(" ")[0].trim();
+    const isToday = cleanDate === todayDateStr || (order.deliveryDate || "").toLowerCase().includes("hoy");
+    const fechaTexto = isToday ? "HOY" : `el ${order.deliveryDate}`;
+    const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
+    const saldoTexto = rem > 0 ? ` Resta por liquidar: $${rem}.` : " Su pedido ya está 100% liquidado.";
+    const msg = encodeURIComponent(
+      `Hola ${order.customerName}, le saludamos de Panadería Brito con respecto a su pedido #${order.orderNumber} (${order.description || "Pedido Especial"}). Programado para entrega ${fechaTexto} a las ${order.deliveryTime || "12:00"} hrs.${saldoTexto} ¡Le esperamos en sucursal!`
+    );
+    window.open(`https://wa.me/52${phone}?text=${msg}`, "_blank");
+  };
+
   // Filtrado por Tipo (Todos / Ventas en Caja / Pedidos Especiales)
   const movementsMatchingType = useMemo(() => {
     if (cashDetailFilter === "ventas") return unifiedShiftMovements.filter((m) => m.type === "venta");
@@ -1037,8 +1342,9 @@ export default function ExpensesModal({
       efectivo: movementsMatchingType.filter((m) => m.paymentMethod === "efectivo").length,
       tarjeta: movementsMatchingType.filter((m) => m.paymentMethod === "tarjeta").length,
       transferencia: movementsMatchingType.filter((m) => m.paymentMethod === "transferencia").length,
+      todos_pedidos: allHistoricalOrders.length,
     };
-  }, [movementsMatchingType]);
+  }, [movementsMatchingType, allHistoricalOrders]);
 
   // Movimientos visibles aplicando ambos filtros: tipo y método de pago
   const visibleCashMovements = useMemo(() => {
@@ -1079,6 +1385,7 @@ export default function ExpensesModal({
     if (ticketTypeFilter === "ventas") return [];
     return ordersPool
       .filter((order) => {
+        if (order.status === "entregado" || order.status === "cancelado") return false;
         if (ticketMethodFilter !== "all" && order.paymentMethod !== ticketMethodFilter) return false;
         if (ticketSearch.trim()) {
           const q = ticketSearch.toLowerCase().trim();
@@ -1248,7 +1555,7 @@ export default function ExpensesModal({
     .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && i.category !== "abono_pedido" && !(i as any).orderId)
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const netCashInDrawer = Math.max(0, currentFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);
+  const netCashInDrawer = Math.max(0, effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);
 
   // Cambiar de Salida a Entrada o viceversa
   const handleToggleMovementType = (type: "salida" | "entrada") => {
@@ -1283,6 +1590,9 @@ export default function ExpensesModal({
         finalDescription.toLowerCase().includes("dueño") ||
         finalDescription.toLowerCase().includes("toño") ||
         finalDescription.toLowerCase().includes("socio");
+      const targetBranchId = branchId || activeBranch?.id || "branch-matriz";
+      const targetBranchName = branchName || activeBranch?.name || "Sucursal Matriz (Centro)";
+
       const newExpense: CashExpense = {
         id: `EXP-${Date.now().toString().slice(-6)}`,
         amount: parsedAmount,
@@ -1292,6 +1602,9 @@ export default function ExpensesModal({
         date: nowDateTime,
         timestamp: Date.now(),
         createdAt: new Date().toISOString(),
+        branchId: targetBranchId,
+        branchName: targetBranchName,
+        paymentMethod: "efectivo",
       };
 
       let savedToDb = false;
@@ -1300,19 +1613,23 @@ export default function ExpensesModal({
         const { error: expError } = await supabase
           .from("cash_expenses")
           .insert({
+            id: newExpense.id,
             amount: newExpense.amount,
             category: newExpense.category,
             description: newExpense.description,
             cashier: newExpense.cashier,
+            branch_id: targetBranchId,
           });
 
         if (!expError) {
           await supabase.from("cash_movements").insert({
+            id: `mov-${newExpense.id}`,
             type: "salida",
             category: newExpense.category,
             amount: newExpense.amount,
             reason: newExpense.description,
             authorized_by: isOwnerWithdrawal ? (authorizedBy.trim() || "Don Toño Brito") : cashierName,
+            branch_id: targetBranchId,
           });
           savedToDb = true;
         }
@@ -1329,6 +1646,7 @@ export default function ExpensesModal({
               category: newExpense.category,
               description: newExpense.description,
               cashier: newExpense.cashier,
+              branch_id: targetBranchId,
             },
           });
         }
@@ -1344,13 +1662,25 @@ export default function ExpensesModal({
           } catch (e) {}
         }
 
+        // Emitir en tiempo real para el Administrador y todas las cajas
+        realtimeHub.broadcastCashMovement({
+          id: `mov-${newExpense.id}`,
+          type: "salida",
+          amount: newExpense.amount,
+          reason: newExpense.description,
+          branchId: targetBranchId,
+          branchName: targetBranchName,
+          cashier: cashierName,
+          timestamp: new Date().toISOString(),
+        });
+
         // Registrar automáticamente en el Historial Detallado de Gastos
         recordCashOutflowAsExpense({
           amount: newExpense.amount,
           description: newExpense.description,
           category: selectedPresetId || newExpense.category,
-          branchId,
-          branchName,
+          branchId: targetBranchId,
+          branchName: targetBranchName,
           cashier: cashierName,
           accountOrigin: "Caja Mostrador (Efectivo Turno)",
           paymentMethod: "efectivo",
@@ -1393,6 +1723,8 @@ export default function ExpensesModal({
       // 2. REGISTRO DE ENTRADA (Dejaron dinero para cambio / abono)
       const isChangeInflow = selectedPresetId === "fondo_cambio";
       const presetObj = ENTRADA_PRESETS.find((p) => p.id === selectedPresetId);
+      const targetBranchId = branchId || activeBranch?.id || "branch-matriz";
+      const targetBranchName = branchName || activeBranch?.name || "Sucursal Matriz (Centro)";
 
       const newIncome: CashIncome = {
         id: `ING-${Date.now().toString().slice(-6)}`,
@@ -1402,6 +1734,8 @@ export default function ExpensesModal({
         paymentMethod: "efectivo",
         concept: finalDescription,
         cashier: cashierName,
+        branchId: targetBranchId,
+        branchName: targetBranchName,
         date: nowDateTime,
         timestamp: new Date().toISOString(),
       };
@@ -1410,11 +1744,13 @@ export default function ExpensesModal({
       try {
         const supabase = createClient();
         const { error: incError } = await supabase.from("cash_movements").insert({
+          id: newIncome.id,
           type: "entrada",
           category: newIncome.category,
           amount: newIncome.amount,
           reason: newIncome.concept,
           authorized_by: cashierName,
+          branch_id: targetBranchId,
         });
         if (!incError) {
           savedIncomeToDb = true;
@@ -1432,6 +1768,7 @@ export default function ExpensesModal({
               category: newIncome.category,
               concept: newIncome.concept,
               cashier: newIncome.cashier,
+              branch_id: targetBranchId,
             },
           });
         }
@@ -1446,6 +1783,18 @@ export default function ExpensesModal({
             window.dispatchEvent(new Event("brito_shift_cuts_updated"));
           } catch (e) {}
         }
+
+        // Emitir en tiempo real para el Administrador y todas las cajas
+        realtimeHub.broadcastCashMovement({
+          id: newIncome.id,
+          type: "entrada",
+          amount: newIncome.amount,
+          reason: `${newIncome.categoryLabel}: ${newIncome.concept}`,
+          branchId: targetBranchId,
+          branchName: targetBranchName,
+          cashier: cashierName,
+          timestamp: new Date().toISOString(),
+        });
 
         // Notificación para la administración
         if (isChangeInflow) {
@@ -1481,6 +1830,7 @@ export default function ExpensesModal({
         );
       }
     }
+
 
     setIsSubmitting(false);
     setFeedbackSuccess(true);
@@ -1679,21 +2029,44 @@ export default function ExpensesModal({
                 type="button"
                 onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
                 className="px-2.5 py-1.5 rounded-xl border border-stone-200 hover:bg-stone-100 text-stone-700 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                title={isExpanded ? "Ocultar desglose" : "Ver detalle del pedido"}
+                title={isExpanded ? "Ocultar desglose rápido" : "Ver desglose rápido de panes"}
               >
                 <Eye className="w-3.5 h-3.5 text-stone-500" />
-                <span>{isExpanded ? "Ocultar" : "Detalle"}</span>
+                <span>{isExpanded ? "Ocultar" : "Desglose"}</span>
                 {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
 
-              {order.remainingBalance > 0 && onSelectOrderForPayment && (
+              <button
+                type="button"
+                onClick={() => setSelectedOrderDetail(order)}
+                className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                title="Abrir ventana con el detalle completo del pedido"
+              >
+                <Eye className="w-3.5 h-3.5 text-amber-700" />
+                <span>Detalles</span>
+              </button>
+
+              {order.remainingBalance > 0 ? (
+                onSelectOrderForPayment && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectOrderForPayment(order)}
+                    className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
+                    title="Cobrar saldo restante de este pedido"
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span>Cobrar</span>
+                  </button>
+                )
+              ) : (
                 <button
                   type="button"
-                  onClick={() => onSelectOrderForPayment(order)}
-                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95"
-                  title="Cobrar saldo restante de este pedido"
+                  onClick={() => handleDeliverOrder(order)}
+                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
+                  title="Marcar como entregado (se archivará en el historial directo de pedidos)"
                 >
-                  Cobrar
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Entregar</span>
                 </button>
               )}
 
@@ -1922,11 +2295,20 @@ export default function ExpensesModal({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-black text-lg sm:text-xl leading-tight">
-                  {activeTab === "tickets" ? "Historial Completo de Ventas y Pedidos" : "Movimientos de Dinero en Caja"}
+                  {activeTab === "tickets" ? "Historial Completo de Ventas y Pedidos" : "Movimientos y Arqueo de Caja del Turno"}
                 </h3>
-                <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-xs font-black px-2.5 py-0.5 rounded-full">
-                  👤 {cashierName}
+                <span className="bg-stone-800 text-stone-200 border border-stone-700 text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                  <Store className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span>{effectiveBranchName}</span>
                 </span>
+                <span className="bg-amber-500/20 text-amber-300 border border-amber-400/40 text-xs font-black px-2.5 py-0.5 rounded-full">
+                  👤 {effectiveCashier}
+                </span>
+                {effectiveShiftName && (
+                  <span className="bg-blue-500/20 text-blue-300 border border-blue-400/40 text-xs font-bold px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1">
+                    🕒 {effectiveShiftName}
+                  </span>
+                )}
                 {activeTab === "tickets" && (
                   <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-xs font-black px-2.5 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1">
                     <span>🧾</span> {totalRecordsCount} registros
@@ -1962,7 +2344,7 @@ export default function ExpensesModal({
               🪙 Fondo Inicial
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-blue-800 block my-1 tracking-tight truncate">
-              +{formatCurrency(currentFund)}
+              +{formatCurrency(effectiveFund)}
             </span>
             <span className="text-[10px] text-blue-700 font-bold block">
               Base de caja
@@ -2861,7 +3243,7 @@ export default function ExpensesModal({
               }
             }}
           >
-            <div className="bg-white rounded-3xl shadow-2xl max-w-3xl sm:max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border-2 border-stone-200 animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl sm:max-w-5xl lg:max-w-6xl w-full max-h-[92vh] flex flex-col overflow-hidden border-2 border-stone-200 animate-in zoom-in-95 duration-200">
               {/* Cabecera del Modal Emergente */}
               <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white shrink-0">
                 <div className="flex items-center gap-3">
@@ -3005,7 +3387,9 @@ export default function ExpensesModal({
                 {activeDetailModal === "ventas" && (
                   <div className="space-y-4">
                     <div className={`p-5 sm:p-6 rounded-3xl shadow-lg border-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-white transition-all ${
-                      cashMethodFilter === "tarjeta"
+                      (cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
+                        ? "bg-gradient-to-br from-amber-600 via-amber-700 to-amber-950 border-amber-400"
+                        : cashMethodFilter === "tarjeta"
                         ? "bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 border-blue-400"
                         : cashMethodFilter === "transferencia"
                         ? "bg-gradient-to-br from-purple-600 via-purple-700 to-purple-900 border-purple-400"
@@ -3015,7 +3399,9 @@ export default function ExpensesModal({
                     }`}>
                       <div>
                         <span className={`text-xs uppercase font-black tracking-widest block ${
-                          cashMethodFilter === "tarjeta"
+                          (cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
+                            ? "text-amber-200"
+                            : cashMethodFilter === "tarjeta"
                             ? "text-blue-200"
                             : cashMethodFilter === "transferencia"
                             ? "text-purple-200"
@@ -3023,7 +3409,9 @@ export default function ExpensesModal({
                             ? "text-amber-200"
                             : "text-emerald-200"
                         }`}>
-                          {cashMethodFilter === "tarjeta"
+                          {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
+                            ? "📦 Pedidos por Entregar (Relevo de Turno)"
+                            : cashMethodFilter === "tarjeta"
                             ? (cashDetailFilter === "pedidos" ? "🎂 Pedidos Cobrados con Tarjeta" : cashDetailFilter === "ventas" ? "💳 Ventas Cobradas con Tarjeta" : "💳 Ventas y Pedidos con Tarjeta")
                             : cashMethodFilter === "transferencia"
                             ? (cashDetailFilter === "pedidos" ? "📱 Pedidos por Transferencia" : cashDetailFilter === "ventas" ? "📱 Ventas por Transferencia" : "📱 Ventas y Pedidos por Transferencia")
@@ -3032,10 +3420,14 @@ export default function ExpensesModal({
                             : (cashDetailFilter === "pedidos" ? "🎂 Pedidos Especiales (Todos los Métodos)" : cashDetailFilter === "ventas" ? "🥖 Ventas en Caja (Todos los Métodos)" : "🥖 Ventas y Pedidos del Turno (Todos los Métodos)")}
                         </span>
                         <h2 className="text-3xl sm:text-4xl font-black tracking-tight mt-1 text-white">
-                          +{formatCurrency(currentFilteredTotal)}
+                          {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
+                            ? formatCurrency(totalUnpaidBalance)
+                            : `+${formatCurrency(currentFilteredTotal)}`}
                         </h2>
                         <p className={`text-xs font-medium mt-1 ${
-                          cashMethodFilter === "tarjeta"
+                          (cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
+                            ? "text-amber-100"
+                            : cashMethodFilter === "tarjeta"
                             ? "text-blue-100"
                             : cashMethodFilter === "transferencia"
                             ? "text-purple-100"
@@ -3043,7 +3435,9 @@ export default function ExpensesModal({
                             ? "text-amber-100"
                             : "text-emerald-100"
                         }`}>
-                          {cashDetailFilter === "pedidos"
+                          {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
+                            ? `Saldo total pendiente por cobrar a clientes • ${todayOrdersList.length} entregas programadas para HOY`
+                            : cashDetailFilter === "pedidos"
                             ? `Anticipos y liquidaciones de pedidos ${cashMethodFilter === "all" ? "en todos los métodos" : `por ${cashMethodFilter}`} por ${cashierName}`
                             : cashDetailFilter === "ventas"
                             ? `Tickets cobrados en mostrador ${cashMethodFilter === "all" ? "en todos los métodos" : `por ${cashMethodFilter}`} por ${cashierName}`
@@ -3053,7 +3447,9 @@ export default function ExpensesModal({
                       <div className="flex sm:flex-col gap-2 shrink-0 self-stretch sm:self-auto">
                         <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-white/20 text-center">
                           <span className={`text-[10px] font-bold block uppercase ${
-                            cashMethodFilter === "tarjeta"
+                            (cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
+                              ? "text-amber-200"
+                              : cashMethodFilter === "tarjeta"
                               ? "text-blue-200"
                               : cashMethodFilter === "transferencia"
                               ? "text-purple-200"
@@ -3061,15 +3457,17 @@ export default function ExpensesModal({
                               ? "text-amber-200"
                               : "text-emerald-200"
                           }`}>
-                            {cashDetailFilter === "pedidos" ? "Pedidos" : cashDetailFilter === "ventas" ? "Tickets" : "Registros"}
+                            {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos") ? "Entregas Hoy" : cashDetailFilter === "pedidos" ? "Pedidos" : cashDetailFilter === "ventas" ? "Tickets" : "Registros"}
                           </span>
                           <span className="text-base sm:text-lg font-black text-white">
-                            {visibleCashMovements.length}
+                            {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos") ? todayOrdersList.length : visibleCashMovements.length}
                           </span>
                         </div>
                         <div className="flex-1 bg-white/15 backdrop-blur-xs px-3.5 py-2 rounded-2xl border border-white/20 text-center">
                           <span className={`text-[10px] font-bold block uppercase ${
-                            cashMethodFilter === "tarjeta"
+                            (cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos")
+                              ? "text-amber-200"
+                              : cashMethodFilter === "tarjeta"
                               ? "text-blue-200"
                               : cashMethodFilter === "transferencia"
                               ? "text-purple-200"
@@ -3077,10 +3475,10 @@ export default function ExpensesModal({
                               ? "text-amber-200"
                               : "text-emerald-200"
                           }`}>
-                            Piezas Pan
+                            {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos") ? "Listos Tienda" : "Piezas Pan"}
                           </span>
                           <span className="text-base sm:text-lg font-black text-white">
-                            {currentFilteredPieces}
+                            {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos") ? readyOrdersList.length : currentFilteredPieces}
                           </span>
                         </div>
                       </div>
@@ -3099,7 +3497,7 @@ export default function ExpensesModal({
                               Filtros de Clasificación
                             </span>
                             <span className="text-[11px] text-stone-500 font-bold block">
-                              {cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : "Pedidos Especiales"} • {cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : "Transferencia"} ({visibleCashMovements.length})
+                              {cashDetailFilter === "all" ? "Todos los registros" : cashDetailFilter === "ventas" ? "Ventas en Caja" : cashDetailFilter === "pedidos" ? "Pedidos del Turno" : "Pedidos por Entregar"} • {cashMethodFilter === "all" ? "Todos los métodos" : cashMethodFilter === "efectivo" ? "Efectivo" : cashMethodFilter === "tarjeta" ? "Tarjeta" : cashMethodFilter === "todos_pedidos" ? "Pedidos por Entregar" : "Transferencia"} ({visibleCashMovements.length})
                             </span>
                           </div>
                         </div>
@@ -3110,12 +3508,13 @@ export default function ExpensesModal({
                           <div className="relative flex-1 sm:flex-initial min-w-[140px]">
                             <select
                               value={cashDetailFilter}
-                              onChange={(e) => setCashDetailFilter(e.target.value as any)}
+                              onChange={(e) => handleSelectDetailFilter(e.target.value as any)}
                               className="w-full appearance-none bg-white hover:bg-stone-100 text-stone-800 font-black text-xs px-3 py-2 pr-7 rounded-xl border border-stone-300 shadow-2xs cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                             >
                               <option value="all">📋 Tipo: Todos ({unifiedShiftMovements.length})</option>
                               <option value="ventas">🥖 Tipo: Ventas ({allShiftPureSales.length})</option>
-                              <option value="pedidos">🎂 Tipo: Pedidos ({allShiftOrdersList.length})</option>
+                              <option value="pedidos">🎂 Tipo: Pedidos Turno ({allShiftOrdersList.length})</option>
+                              <option value="todos_pedidos">📦 Tipo: Pedidos por Entregar ({allHistoricalOrders.length})</option>
                             </select>
                             <ChevronDown className="w-3.5 h-3.5 text-stone-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                           </div>
@@ -3124,7 +3523,7 @@ export default function ExpensesModal({
                           <div className="relative flex-1 sm:flex-initial min-w-[145px]">
                             <select
                               value={cashMethodFilter}
-                              onChange={(e) => setCashMethodFilter(e.target.value as any)}
+                              onChange={(e) => handleSelectMethodFilter(e.target.value as any)}
                               className="w-full appearance-none bg-white hover:bg-stone-100 text-stone-800 font-black text-xs px-3 py-2 pr-7 rounded-xl border border-stone-300 shadow-2xs cursor-pointer focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                             >
                               <option value="all">🌐 Pago: Todos ({detailMethodCounts.all})</option>
@@ -3139,45 +3538,60 @@ export default function ExpensesModal({
 
                       {/* 2. Cuadros organizados en cuadrículas limpias (SIN deslizar horizontalmente, SIN barras de desplazamiento) */}
                       <div className="space-y-3 pt-2.5 border-t border-stone-200">
-                          {/* Fila A: Tipo de Registro (3 columnas completas) */}
+                          {/* Fila A: Tipo de Registro (4 columnas limpias) */}
                           <div>
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
                               <span>1. Tipo de Movimiento:</span>
                               <span className="text-[10px] font-bold lowercase text-stone-400">
-                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : "solo pedidos"}
+                                {cashDetailFilter === "all" ? "mostrando todo" : cashDetailFilter === "ventas" ? "solo ventas" : cashDetailFilter === "pedidos" ? "pedidos del turno" : "pedidos por entregar"}
                               </span>
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                               {[
                                 { id: "all", label: "Todos", icon: "📋", count: unifiedShiftMovements.length },
                                 { id: "ventas", label: "Ventas en Caja", icon: "🥖", count: allShiftPureSales.length },
-                                { id: "pedidos", label: "Pedidos Especiales", icon: "🎂", count: allShiftOrdersList.length },
-                              ].map((tab) => (
-                                <button
-                                  key={tab.id}
-                                  type="button"
-                                  onClick={() => setCashDetailFilter(tab.id as any)}
-                                  className={`py-2.5 px-2 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 text-center active:scale-98 ${
-                                    cashDetailFilter === tab.id
-                                      ? "bg-stone-900 text-white border-stone-950 shadow-md ring-2 ring-stone-900/20"
-                                      : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
-                                  }`}
-                                >
-                                  <span className="text-base sm:text-lg">{tab.icon}</span>
-                                  <span className="line-clamp-1">{tab.label}</span>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                                    cashDetailFilter === tab.id
-                                      ? "bg-white/20 text-white"
-                                      : "bg-stone-100 text-stone-600"
-                                  }`}>
-                                    {tab.count}
-                                  </span>
-                                </button>
-                              ))}
+                                { id: "pedidos", label: "Pedidos del Turno", icon: "🎂", count: allShiftOrdersList.length },
+                                { id: "todos_pedidos", label: "Pedidos por Entregar", icon: "📦", count: allHistoricalOrders.length },
+                              ].map((tab) => {
+                                const isSpecial = tab.id === "todos_pedidos";
+                                const isSelected = cashDetailFilter === tab.id;
+                                return (
+                                  <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => handleSelectDetailFilter(tab.id as any)}
+                                    className={`py-2.5 px-3 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
+                                      isSpecial
+                                        ? isSelected
+                                          ? "bg-gradient-to-r from-stone-950 via-amber-950 to-stone-950 text-amber-300 border-amber-400 shadow-xl ring-4 ring-amber-500/50 scale-[1.02]"
+                                          : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white border-orange-600 shadow-md shadow-orange-500/30 ring-2 ring-orange-300/50 hover:brightness-110 hover:shadow-lg"
+                                        : isSelected
+                                        ? "bg-stone-900 text-white border-stone-950 shadow-md ring-2 ring-stone-900/20"
+                                        : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-base sm:text-lg shrink-0">{tab.icon}</span>
+                                      <span className="whitespace-normal leading-tight font-black">{tab.label}</span>
+                                    </div>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
+                                      isSpecial
+                                        ? isSelected
+                                          ? "bg-amber-400 text-stone-950 font-black"
+                                          : "bg-black/25 text-white font-black border border-white/20"
+                                        : isSelected
+                                        ? "bg-white/20 text-white"
+                                        : "bg-stone-100 text-stone-600 font-bold"
+                                    }`}>
+                                      {tab.count}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
 
-                          {/* Fila B: Método de Pago (4 columnas en desktop / 2 en móvil) */}
+                          {/* Fila B: Método de Pago (4 columnas limpias) */}
                           <div>
                             <div className="flex items-center justify-between text-[11px] font-black text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
                               <span>2. Método de Cobro:</span>
@@ -3191,35 +3605,435 @@ export default function ExpensesModal({
                                 { id: "efectivo", label: "Efectivo", icon: "💵", count: detailMethodCounts.efectivo, activeClass: "bg-gradient-to-r from-emerald-700 to-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-600/30" },
                                 { id: "tarjeta", label: "Tarjeta", icon: "💳", count: detailMethodCounts.tarjeta, activeClass: "bg-gradient-to-r from-blue-700 to-blue-800 text-white border-blue-900 ring-2 ring-blue-600/30" },
                                 { id: "transferencia", label: "Transf.", icon: "📱", count: detailMethodCounts.transferencia, activeClass: "bg-gradient-to-r from-purple-700 to-purple-800 text-white border-purple-900 ring-2 ring-purple-600/30" },
-                              ].map((m) => (
-                                <button
-                                  key={m.id}
-                                  type="button"
-                                  onClick={() => setCashMethodFilter(m.id as any)}
-                                  className={`py-2 px-2.5 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
-                                    cashMethodFilter === m.id
-                                      ? `${m.activeClass} shadow-md`
-                                      : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-sm shrink-0">{m.icon}</span>
-                                    <span className="truncate">{m.label}</span>
-                                  </div>
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${
-                                    cashMethodFilter === m.id
-                                      ? "bg-white/20 text-white"
-                                      : "bg-stone-100 text-stone-600"
-                                  }`}>
-                                    {m.count}
-                                  </span>
-                                </button>
-                              ))}
+                              ].map((m) => {
+                                const isSelected = cashMethodFilter === m.id;
+                                return (
+                                  <button
+                                    key={m.id}
+                                    type="button"
+                                    onClick={() => handleSelectMethodFilter(m.id as any)}
+                                    className={`py-2.5 px-3 rounded-2xl font-black text-xs transition-all border-2 cursor-pointer flex items-center justify-between gap-1.5 active:scale-98 ${
+                                      isSelected
+                                        ? `${m.activeClass} shadow-md`
+                                        : "bg-white text-stone-700 hover:bg-stone-100 hover:border-stone-300 border-stone-200 shadow-2xs"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-base shrink-0">{m.icon}</span>
+                                      <span className="whitespace-normal leading-tight font-black">{m.label}</span>
+                                    </div>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
+                                      isSelected
+                                        ? "bg-white/20 text-white"
+                                        : "bg-stone-100 text-stone-600 font-bold"
+                                    }`}>
+                                      {m.count}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
                         </div>
                       </div>
 
+                    {(cashDetailFilter === "todos_pedidos" || cashMethodFilter === "todos_pedidos") ? (
+                      <div className="space-y-3">
+                        {/* 1. Aviso Informativo de Relevo / Entrega de Turno para la Cajera */}
+                        <div className="bg-gradient-to-r from-amber-500/15 via-amber-50 to-stone-50 border-2 border-amber-300 rounded-3xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                          <div className="flex items-start gap-3">
+                            <span className="w-9 h-9 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center text-lg font-black shrink-0 shadow-xs">
+                              📋
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-black text-amber-950 text-sm">
+                                  Pedidos por Entregar para el Turno
+                                </h4>
+                                <span className="text-[10px] font-black uppercase bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md">
+                                  Relevo de Caja
+                                </span>
+                              </div>
+                              <p className="text-xs text-stone-600 font-medium mt-0.5 leading-relaxed">
+                                Informa a la siguiente cajera sobre pedidos pendientes, entregas de <strong>HOY</strong> y saldos por cobrar cuando acuda el cliente a mostrador.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            <a
+                              href="/pedidos"
+                              onClick={() => {
+                                handleCloseDetailModal();
+                              }}
+                              className="px-3.5 py-2 rounded-2xl bg-stone-900 hover:bg-stone-800 text-amber-300 font-black text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+                              title="Ir a la sección de Pedidos para consultar el Historial Completo"
+                            >
+                              <History className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Ver Historial de Pedidos</span>
+                            </a>
+                            {onOpenCreateOrder && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleCloseDetailModal();
+                                  onOpenCreateOrder();
+                                }}
+                                className="px-3.5 py-2 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Apartar Nuevo Pedido</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 2. Mini Tarjetas de Estatus Rápido (KPIs) */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div className="bg-amber-50 border-2 border-amber-300/80 rounded-2xl p-2.5 text-center shadow-2xs">
+                            <span className="text-[10px] font-black uppercase text-amber-900 block">📅 Entrega HOY</span>
+                            <span className="text-xl font-black text-amber-950">{todayOrdersList.length}</span>
+                            <span className="text-[10px] text-amber-800 font-bold block">programados</span>
+                          </div>
+                          <div className="bg-emerald-50 border-2 border-emerald-300/80 rounded-2xl p-2.5 text-center shadow-2xs">
+                            <span className="text-[10px] font-black uppercase text-emerald-900 block">🎂 Listos en Tienda</span>
+                            <span className="text-xl font-black text-emerald-950">{readyOrdersList.length}</span>
+                            <span className="text-[10px] text-emerald-800 font-bold block">listos para entregar</span>
+                          </div>
+                          <div className="bg-rose-50 border-2 border-rose-300/80 rounded-2xl p-2.5 text-center shadow-2xs">
+                            <span className="text-[10px] font-black uppercase text-rose-900 block">⚠️ Con Saldo Pendiente</span>
+                            <span className="text-xl font-black text-rose-950">{unpaidOrdersList.length}</span>
+                            <span className="text-[10px] text-rose-800 font-black block">Resta: {formatCurrency(totalUnpaidBalance)}</span>
+                          </div>
+                          <div className="bg-stone-50 border-2 border-stone-300/80 rounded-2xl p-2.5 text-center shadow-2xs">
+                            <span className="text-[10px] font-black uppercase text-stone-700 block">📦 Por Entregar</span>
+                            <span className="text-xl font-black text-stone-950">{allHistoricalOrders.length}</span>
+                            <span className="text-[10px] text-stone-600 font-bold block">pedidos pendientes</span>
+                          </div>
+                        </div>
+
+                        {/* 3. Buscador y Filtros Rápidos de Estatus */}
+                        <div className="bg-white p-3 rounded-2xl border-2 border-stone-200 shadow-2xs space-y-2.5">
+                          <div className="relative">
+                            <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={allOrdersSearch}
+                              onChange={(e) => setAllOrdersSearch(e.target.value)}
+                              placeholder="Buscar por cliente, teléfono, folio (#PED-101) o tipo de pan/pastel..."
+                              className="w-full pl-9 pr-8 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs font-bold text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                            {allOrdersSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setAllOrdersSearch("")}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs font-black p-0.5 cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-0.5 text-xs">
+                            {[
+                              { id: "all", label: "Todos", count: allHistoricalOrders.length },
+                              { id: "hoy", label: "📅 Para HOY", count: todayOrdersList.length, highlight: "text-amber-800 border-amber-300 bg-amber-50" },
+                              { id: "listos", label: "🎂 Listos en Sucursal", count: readyOrdersList.length, highlight: "text-emerald-800 border-emerald-300 bg-emerald-50" },
+                              { id: "pendientes", label: "⏳ En Horno / Pendientes", count: inPrepOrdersList.length },
+                              { id: "por_pagar", label: "⚠️ Saldo Pendiente", count: unpaidOrdersList.length, highlight: "text-rose-800 border-rose-300 bg-rose-50" },
+                            ].map((f) => (
+                              <button
+                                key={f.id}
+                                type="button"
+                                onClick={() => setAllOrdersStatusFilter(f.id as any)}
+                                className={`px-2.5 sm:px-3 py-1.5 rounded-xl font-bold text-xs border transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-2xs ${
+                                  allOrdersStatusFilter === f.id
+                                    ? "bg-stone-900 text-white border-stone-900 shadow-xs"
+                                    : f.highlight || "bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100"
+                                }`}
+                              >
+                                <span>{f.label}</span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                  allOrdersStatusFilter === f.id ? "bg-white/20 text-white" : "bg-stone-200/80 text-stone-700"
+                                }`}>
+                                  {f.count}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 4. Listado de Pedidos Históricos */}
+                        {filteredAllOrders.length === 0 ? (
+                          <div className="bg-stone-50 border-2 border-dashed border-stone-200 rounded-3xl p-8 text-center space-y-2">
+                            <div className="text-4xl">🎂</div>
+                            <h4 className="font-black text-stone-800 text-sm sm:text-base">
+                              {allOrdersSearch ? "No se encontraron pedidos con ese término de búsqueda" : "No hay pedidos en esta clasificación"}
+                            </h4>
+                            <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                              {allOrdersSearch ? "Prueba buscando por nombre del cliente, número de pedido o teléfono." : "Todos los pedidos que se registren en la panadería aparecerán organizados aquí para el cambio de turno."}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2.5">
+                            {filteredAllOrders.map((order) => {
+                              const cleanDate = (order.deliveryDate || "").split("T")[0].split(" ")[0].trim();
+                              const isToday = cleanDate === todayDateStr || (order.deliveryDate || "").toLowerCase().includes("hoy");
+                              const isExpanded = !!expandedAllOrdersIds[order.id];
+                              const items = order.items || [];
+                              const visibleItems = isExpanded ? items : items.slice(0, 2);
+                              const hasMore = items.length > 2;
+                              const orderPieces = items.reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
+                              const remaining = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
+
+                              return (
+                                <div
+                                  key={order.id}
+                                  className={`bg-white border-2 rounded-2xl p-3.5 shadow-2xs transition-all ${
+                                    isToday
+                                      ? "border-amber-400 bg-amber-50/15 ring-2 ring-amber-400/20"
+                                      : order.status === "listo"
+                                      ? "border-emerald-300"
+                                      : "border-stone-200 hover:border-amber-300"
+                                  }`}
+                                >
+                                  {/* Encabezado del Pedido */}
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-stone-100">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-mono font-black text-xs bg-stone-900 text-amber-300 px-2 py-0.5 rounded-lg shadow-2xs">
+                                        #{order.orderNumber}
+                                      </span>
+
+                                      {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName ? (
+                                        <span className="text-[10px] font-bold text-amber-950 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                                          <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                                          <span className="text-amber-600">➔</span>
+                                          <span className="text-emerald-800">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                                        </span>
+                                      ) : order.branchName ? (
+                                        <span className="text-[10px] font-bold text-stone-600 bg-stone-100 border border-stone-200 px-1.5 py-0.5 rounded-md">
+                                          🏬 {order.branchName.replace("Sucursal ", "")}
+                                        </span>
+                                      ) : null}
+
+                                      {isToday && (
+                                        <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-md animate-pulse shadow-xs flex items-center gap-1">
+                                          🚨 ¡ENTREGA HOY!
+                                        </span>
+                                      )}
+
+                                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                                        order.status === "listo"
+                                          ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                          : order.status === "en_horno"
+                                          ? "bg-amber-100 text-amber-900 border-amber-300"
+                                          : "bg-blue-100 text-blue-900 border-blue-300"
+                                      }`}>
+                                        {order.status === "listo"
+                                          ? "🎂 Listo en Mostrador"
+                                          : order.status === "en_horno"
+                                          ? "🔥 En Horno"
+                                          : "⏳ Pendiente"}
+                                      </span>
+
+                                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                                        remaining <= 0
+                                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                          : "bg-rose-50 text-rose-800 border-rose-300"
+                                      }`}>
+                                        {remaining <= 0 ? "✅ 100% Pagado" : `⚠️ Saldo Pendiente: ${formatCurrency(remaining)}`}
+                                      </span>
+
+                                      <span className="text-[10px] text-stone-500 font-bold ml-auto sm:ml-0">
+                                        Registró: {order.cashier || "Cajero"}
+                                      </span>
+                                    </div>
+
+                                    {/* Monto Total y Saldo */}
+                                    <div className="flex items-center justify-between sm:justify-end gap-3 text-right">
+                                      <div>
+                                        <span className="text-[10px] text-stone-400 font-bold block">Total Pedido</span>
+                                        <span className="text-sm sm:text-base font-black text-stone-900">
+                                          {formatCurrency(order.total)}
+                                        </span>
+                                      </div>
+                                      <div className="border-l pl-3 border-stone-200">
+                                        <span className="text-[10px] text-emerald-600 font-bold block">Cobrado</span>
+                                        <span className="text-sm sm:text-base font-black text-emerald-700">
+                                          +{formatCurrency(order.deposit)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Datos de Cliente y Entrega */}
+                                  <div className="py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-black text-stone-900 text-sm">
+                                          👤 {order.customerName}
+                                        </span>
+                                        {order.phone && order.phone !== "N/A" && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSendOrderWhatsApp(order)}
+                                            className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                            title="Enviar WhatsApp al cliente"
+                                          >
+                                            <Phone className="w-3 h-3" />
+                                            <span>{order.phone}</span>
+                                            <span className="text-[9px] uppercase font-black bg-emerald-600 text-white px-1 rounded">WA</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2 text-stone-600 text-[11px] font-medium flex-wrap">
+                                        <span className={`font-bold ${isToday ? "text-rose-700 font-black" : "text-stone-700"}`}>
+                                          📅 Entrega: {isToday ? "¡HOY!" : order.deliveryDate} a las {order.deliveryTime || "12:00"} hrs
+                                        </span>
+                                        <span>•</span>
+                                        <span>{order.deliveryType === "domicilio" ? "🛵 A Domicilio" : "🏪 En Sucursal"}</span>
+                                        {order.deliveryAddress && (
+                                          <span className="text-stone-500 truncate max-w-xs">({order.deliveryAddress})</span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Acciones Rápidas para la Cajera */}
+                                    <div className="flex items-center gap-1.5 shrink-0 pt-1 sm:pt-0 flex-wrap justify-end">
+                                      {remaining > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handlePayOrder(order)}
+                                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                                          title={`Cobrar saldo restante de ${formatCurrency(remaining)} al cliente`}
+                                        >
+                                          <DollarSign className="w-3.5 h-3.5" />
+                                          <span>Cobrar Saldo ({formatCurrency(remaining)})</span>
+                                        </button>
+                                      )}
+
+                                      {/* Botón Entregar: Activo si 100% Pagado, con bloqueo informativo si tiene saldo pendiente */}
+                                      {remaining <= 0 ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeliverOrder(order)}
+                                          className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-black transition-all shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-blue-400/40"
+                                          title="Marcar como entregado (se eliminará de esta sección de pedidos por entregar)"
+                                        >
+                                          <CheckCircle2 className="w-4 h-4" />
+                                          <span>Entregar</span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            alert(
+                                              `⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(remaining)}.\n\nEl pedido debe estar 100% pagado antes de poder entregarse al cliente. Presiona "Cobrar Saldo" primero.`
+                                            );
+                                            handlePayOrder(order);
+                                          }}
+                                          className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-rose-50 text-stone-500 hover:text-rose-700 border border-stone-300 font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                                          title="No se puede entregar: requiere estar 100% pagado"
+                                        >
+                                          <Lock className="w-3.5 h-3.5 text-stone-400" />
+                                          <span>Entregar (Requiere Pago 100%)</span>
+                                        </button>
+                                      )}
+
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedOrderDetail(order)}
+                                        className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 hover:border-amber-400 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+                                        title="Ver detalles completos del pedido"
+                                      >
+                                        <Eye className="w-3.5 h-3.5 text-amber-800" />
+                                        <span>Detalles</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewOrder(order)}
+                                        className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                                        title="Reimprimir comprobante del pedido"
+                                      >
+                                        <Printer className="w-3.5 h-3.5 text-amber-800" />
+                                        <span className="hidden sm:inline">Ticket</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCancelOrder(order)}
+                                        className="p-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors flex items-center cursor-pointer"
+                                        title="Dar de baja / cancelar pedido"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Resumen de Productos (Máximo 2 visibles por defecto + 'Ver más') */}
+                                  <div className="mt-1 pt-2 border-t border-stone-100">
+                                    <div className="flex items-center justify-between text-[11px] text-stone-500 font-bold mb-1">
+                                      <span>Productos del Pedido ({orderPieces} {orderPieces === 1 ? "pieza" : "piezas"}):</span>
+                                      {hasMore && (
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleExpandAllOrder(order.id)}
+                                          className="text-amber-800 hover:text-amber-950 font-black cursor-pointer flex items-center gap-0.5"
+                                        >
+                                          <span>{isExpanded ? "▲ Ver menos" : `▼ Ver más (+${items.length - 2} productos y detalles)`}</span>
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      {visibleItems.length > 0 ? (
+                                        visibleItems.map((item, idx) => (
+                                          <div
+                                            key={idx}
+                                            className="bg-stone-50 border border-stone-200/70 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-xs"
+                                          >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-900 font-black flex items-center justify-center text-[11px] shrink-0">
+                                                {item.quantity}x
+                                              </span>
+                                              <span className="font-bold text-stone-800 truncate">{item.name}</span>
+                                              {item.notes && <span className="text-[10px] text-stone-400 truncate">({item.notes})</span>}
+                                            </div>
+                                            <span className="font-bold text-stone-700 shrink-0 ml-2">
+                                              ${Number(item.subtotal || item.quantity * item.unitPrice || 0).toFixed(2)}
+                                            </span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <p className="text-xs text-stone-600 italic">
+                                          {order.description || "Pedido Especial"}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {/* Detalles desplegados cuando se expande */}
+                                    {isExpanded && (
+                                      <div className="mt-2 pt-2 border-t border-dashed border-stone-200 space-y-1.5 animate-in slide-in-from-top-1 duration-150">
+                                        {order.dedication && (
+                                          <div className="bg-amber-100/70 border border-amber-300 rounded-xl p-2 px-3 text-xs text-amber-950 font-medium">
+                                            ✍️ <span className="font-bold">Dedicatoria:</span> "{order.dedication}"
+                                          </div>
+                                        )}
+                                        {order.notes && (
+                                          <div className="bg-stone-100 rounded-xl p-2 px-3 text-xs text-stone-700 font-medium">
+                                            📝 <span className="font-bold">Notas de elaboración:</span> {order.notes}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between text-xs px-1 gap-2 flex-wrap">
                         <span className="font-black text-stone-700 uppercase tracking-wide">
@@ -3276,7 +4090,7 @@ export default function ExpensesModal({
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
+                        <div className="space-y-2">
                           {visibleCashMovements.map((item) => {
                             if (item.type === "venta" && item.sale) {
                               const sale = item.sale;
@@ -3350,7 +4164,8 @@ export default function ExpensesModal({
                               return (
                                 <div
                                   key={order.id}
-                                  className="bg-white border-2 border-amber-200 hover:border-amber-400 p-3.5 rounded-2xl shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all"
+                                  onClick={() => setSelectedOrderDetail(order)}
+                                  className="bg-white border-2 border-amber-200 hover:border-amber-400 p-3.5 rounded-2xl shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all cursor-pointer group"
                                 >
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
@@ -3360,6 +4175,14 @@ export default function ExpensesModal({
                                       <span className="font-mono font-black text-xs bg-stone-900 text-amber-300 px-2 py-0.5 rounded-lg">
                                         #{order.orderNumber}
                                       </span>
+
+                                      {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName ? (
+                                        <span className="text-[10px] font-bold text-amber-950 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                                          <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                                          <span className="text-amber-600">➔</span>
+                                          <span className="text-emerald-800">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                                        </span>
+                                      ) : null}
                                       <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border flex items-center gap-1 ${
                                         (order.paymentMethod === "efectivo" || !order.paymentMethod)
                                           ? "bg-emerald-100 text-emerald-900 border-emerald-300"
@@ -3378,12 +4201,12 @@ export default function ExpensesModal({
                                       </span>
                                       <span
                                         className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                                          order.paymentStatus === "liquidado"
+                                          order.paymentStatus === "liquidado" || order.remainingBalance <= 0
                                             ? "bg-emerald-100 text-emerald-900 border-emerald-300"
                                             : "bg-amber-100 text-amber-900 border-amber-300"
                                         }`}
                                       >
-                                        {order.paymentStatus === "liquidado" ? "✅ Liquidado" : "💵 Con Anticipo"}
+                                        {order.paymentStatus === "liquidado" || order.remainingBalance <= 0 ? "✅ Liquidado" : "💵 Con Anticipo"}
                                       </span>
                                       <span className="text-[11px] font-black text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                                         🎂 {orderPieces} {orderPieces === 1 ? "artículo" : "artículos"}
@@ -3406,33 +4229,61 @@ export default function ExpensesModal({
                                       </span>
                                       <span className="text-[10px] text-stone-400 font-bold block">
                                         Total: {formatCurrency(order.total)}
-                                        {order.remainingBalance > 0 && ` • Resta: ${formatCurrency(order.remainingBalance)}`}
+                                        {order.remainingBalance > 0 ? (
+                                          <span className="text-rose-600 font-black"> • Resta: {formatCurrency(order.remainingBalance)}</span>
+                                        ) : (
+                                          <span className="text-emerald-700 font-bold"> • ✅ 100% Pagado</span>
+                                        )}
                                       </span>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
-                                      {onSelectOrderForPayment && order.remainingBalance > 0 && (
+                                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                      {order.remainingBalance > 0 ? (
+                                        onSelectOrderForPayment && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              handlePayOrder(order);
+                                            }}
+                                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1"
+                                            title="Cobrar saldo restante"
+                                          >
+                                            <DollarSign className="w-3.5 h-3.5" />
+                                            <span>Cobrar</span>
+                                          </button>
+                                        )
+                                      ) : (
                                         <button
                                           type="button"
-                                          onClick={() => {
-                                            handleCloseDetailModal();
-                                            onSelectOrderForPayment(order);
-                                          }}
-                                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
-                                          title="Cobrar saldo restante"
+                                          onClick={() => handleDeliverOrder(order)}
+                                          className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xs rounded-xl transition-all shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-blue-400/40"
+                                          title="Marcar como entregado (se archivará en el historial de pedidos)"
                                         >
-                                          Cobrar
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-200" />
+                                          <span>Entregar</span>
                                         </button>
                                       )}
+                                      {/* 1. Botón Detalles Completos */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedOrderDetail(order)}
+                                        className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 hover:border-amber-400 font-black text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+                                        title="Ver detalles completos del pedido"
+                                      >
+                                        <Eye className="w-3.5 h-3.5 text-amber-800" />
+                                        <span>Detalles</span>
+                                      </button>
+
+                                      {/* 2. Reimprimir Ticket */}
                                       {(onSelectOrderForReceipt || true) && (
                                         <button
                                           type="button"
                                           onClick={() => {
                                             setPreviewOrder(order);
                                           }}
-                                          className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                                          className="px-2.5 py-1.5 bg-stone-100 hover:bg-amber-100 text-stone-800 hover:text-amber-950 border border-stone-200 hover:border-amber-300 font-bold text-xs rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
                                           title="Ver comprobante de pedido"
                                         >
-                                          <Printer className="w-3.5 h-3.5 text-amber-800" />
+                                          <Printer className="w-3.5 h-3.5 text-stone-600" />
                                           <span className="hidden sm:inline">Ticket</span>
                                         </button>
                                       )}
@@ -3447,6 +4298,7 @@ export default function ExpensesModal({
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -3494,7 +4346,7 @@ export default function ExpensesModal({
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                        <div className="space-y-2">
                           {shiftIncomes.map((inc) => (
                             <div
                               key={inc.id}
@@ -3576,7 +4428,7 @@ export default function ExpensesModal({
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                        <div className="space-y-2">
                           {shiftExpenses.map((exp) => (
                             <div
                               key={exp.id}
@@ -3623,7 +4475,7 @@ export default function ExpensesModal({
                           {formatCurrency(netCashInDrawer)}
                         </h2>
                         <p className="text-xs text-amber-950/80 font-bold mt-1">
-                          Arqueo contable en vivo correspondiente al turno de {cashierName}
+                          Arqueo contable en vivo correspondiente al turno de {effectiveCashier}
                         </p>
                       </div>
                       <div className="bg-stone-950 text-amber-300 px-4 py-2.5 rounded-2xl shadow-sm text-xs font-black self-stretch sm:self-auto text-center shrink-0">
@@ -3641,7 +4493,7 @@ export default function ExpensesModal({
                           <span className="text-blue-950 flex items-center gap-1.5">
                             <span>🪙</span> Fondo Inicial Base
                           </span>
-                          <span className="font-black text-blue-800">+{formatCurrency(currentFund)}</span>
+                          <span className="font-black text-blue-800">+{formatCurrency(effectiveFund)}</span>
                         </div>
 
                         <div className="flex items-center justify-between p-2.5 bg-emerald-50/70 border border-emerald-200 rounded-xl">
@@ -3737,6 +4589,91 @@ export default function ExpensesModal({
         isOpen={Boolean(previewOrder)}
         onClose={() => setPreviewOrder(null)}
         order={previewOrder}
+      />
+    )}
+
+    {/* Modal de Detalle Completo del Pedido */}
+    {selectedOrderDetail && (
+      <OrderDetailModal
+        isOpen={Boolean(selectedOrderDetail)}
+        onClose={() => setSelectedOrderDetail(null)}
+        order={selectedOrderDetail}
+        onPrintReceipt={(order) => {
+          setSelectedOrderDetail(null);
+          setPreviewOrder(order);
+        }}
+        onOpenPayment={(order) => {
+          setSelectedOrderDetail(null);
+          handlePayOrder(order);
+        }}
+        onAdvanceStatus={(order) => {
+          let nextStatus: CustomOrder["status"] = order.status;
+          if (order.status === "pendiente" || order.status === "en_horno") nextStatus = "listo";
+          else if (order.status === "listo") {
+            const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
+            if (rem > 0) {
+              alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\nDebe estar 100% pagado antes de entregarse.`);
+              setSelectedOrderDetail(null);
+              handlePayOrder(order);
+              return;
+            }
+            nextStatus = "entregado";
+          }
+          if (nextStatus !== order.status) {
+            updateOrderStatus(order.id, nextStatus);
+            const updated = getStoredOrders().find((o) => o.id === order.id);
+            if (updated) setSelectedOrderDetail(updated);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("brito_orders_updated"));
+            }
+            setOrdersVersion((v) => v + 1);
+            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+          }
+        }}
+        onDeliverOrder={(order) => {
+          const rem = order.remainingBalance !== undefined ? order.remainingBalance : Math.max(0, (order.total || 0) - (order.deposit || 0));
+          if (rem > 0) {
+            alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(rem)}.\n\nDebe estar 100% pagado antes de entregarse.`);
+            setSelectedOrderDetail(null);
+            handlePayOrder(order);
+            return;
+          }
+          if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
+            updateOrderStatus(order.id, "entregado");
+            setSelectedOrderDetail(null);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("brito_orders_updated"));
+            }
+            setOrdersVersion((v) => v + 1);
+            setInternalOrders(getStoredOrders().filter((o) => o && o.status !== "entregado" && o.status !== "cancelado"));
+          }
+        }}
+        onSendWhatsApp={(order) => {
+          const cleanPhone = (order.phone || "").replace(/\D/g, "");
+          const formattedPhone = cleanPhone.length === 10 ? `52${cleanPhone}` : cleanPhone;
+          const message = `🥖 *PANADERÍA BRITO*\nHola *${order.customerName}*, te saludamos respecto a tu pedido *${order.orderNumber}*.`;
+          window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`, "_blank");
+        }}
+        onDarDeBaja={(order) => {
+          const isCancelled = order.status === "cancelado";
+          const confirmMsg = isCancelled
+            ? `¿Estás seguro de ELIMINAR PERMANENTEMENTE el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEsta acción borrará el pedido por completo del registro histórico y no se podrá recuperar.`
+            : `¿Estás seguro de DAR DE BAJA el pedido ${order.orderNumber} de "${order.customerName}"?\n\nEl pedido se marcará como dado de baja y te mandaremos directo al historial de "Productos que se dieron de baja".`;
+          if (confirm(confirmMsg)) {
+            if (isCancelled) {
+              deleteCustomOrder(order.id);
+            } else {
+              updateOrderStatus(order.id, "cancelado");
+            }
+            setSelectedOrderDetail(null);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("brito_orders_updated"));
+              if (!isCancelled) {
+                window.location.href = "/pedidos?filter=cancelados";
+              }
+            }
+          }
+        }}
       />
     )}
 

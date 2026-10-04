@@ -17,11 +17,13 @@ import {
   ShieldCheck,
   RefreshCw,
   AlertCircle,
-  Trash2
+  Trash2,
+  Eye
 } from "lucide-react";
 import { CustomOrder } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
+import { useNotifications } from "@/context/NotificationContext";
 
 interface PosOrdersDrawerProps {
   isOpen: boolean;
@@ -44,6 +46,7 @@ export default function PosOrdersDrawer({
   onSelectOrderForReceipt,
   onSelectOrderForPayment,
 }: PosOrdersDrawerProps) {
+  const { openOrderDetail } = useNotifications();
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<"todos" | "hoy" | "saldo">("todos");
@@ -67,19 +70,32 @@ export default function PosOrdersDrawer({
 
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  // Filtrar pedidos de esta sucursal (o todas las sucursales si se selecciona)
+  // Filtrar pedidos de esta sucursal (excluyendo 100% pedidos entregados y dados de baja)
   const branchOrders = useMemo(() => {
-    if (branchScope === "todas") return orders;
-    return orders.filter((o) => {
-      if (!branchId) return true;
-      const orderBranch = (o as any).operatingBranchId || o.branchId;
-      return !o.branchId || o.branchId === branchId || orderBranch === branchId;
+    const activeList = orders.filter((o) => o && o.status !== "entregado" && o.status !== "cancelado");
+    if (branchScope === "todas") return activeList;
+    return activeList.filter((o) => {
+      if (!branchId || branchId === "all") return true;
+      const bId = branchId.toLowerCase().trim();
+      const bName = (branchName || "").toLowerCase().trim();
+      const oPickupId = String(o.branchId || (o as any).branch_id || "").toLowerCase().trim();
+      const oPickupName = String(o.branchName || (o as any).branch_name || "").toLowerCase().trim();
+      const oOperatingId = String((o as any).operatingBranchId || (o as any).operating_branch_id || "").toLowerCase().trim();
+      const oOperatingName = String((o as any).operatingBranchName || (o as any).operating_branch_name || "").toLowerCase().trim();
+
+      const matchesPickup = (oPickupId && (oPickupId === bId || bId.includes(oPickupId) || oPickupId.includes(bId))) ||
+                            (oPickupName && bName && (oPickupName === bName || oPickupName.includes(bName) || bName.includes(oPickupName)));
+      const matchesOperating = (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
+                               (oOperatingName && bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName)));
+
+      return Boolean(matchesPickup || matchesOperating);
     });
-  }, [orders, branchId, branchScope]);
+  }, [orders, branchId, branchScope, branchName]);
 
   // Filtrado simple
   const filteredOrders = useMemo(() => {
     return branchOrders.filter((order) => {
+      if (order.status === "entregado" || order.status === "cancelado") return false;
       if (filterMode === "hoy" && order.deliveryDate !== todayStr) return false;
       if (filterMode === "saldo" && order.remainingBalance <= 0) return false;
 
@@ -118,8 +134,11 @@ export default function PosOrdersDrawer({
 
   const handleMarkDelivered = (order: CustomOrder) => {
     if (order.remainingBalance > 0) {
+      alert(`⛔ No se puede entregar:\n\nEl pedido #${order.orderNumber} aún tiene un saldo pendiente de ${formatCurrency(order.remainingBalance)}.\n\nDebe estar 100% pagado antes de poder entregarse al cliente.`);
       onSelectOrderForPayment(order);
-    } else {
+      return;
+    }
+    if (confirm(`¿Confirmas marcar el pedido #${order.orderNumber} de "${order.customerName}" como ENTREGADO?\n\nEl pedido se marcará como entregado y desaparecerá de la lista de pedidos pendientes.`)) {
       updateOrderStatus(order.id, "entregado");
       refreshOrders();
     }
@@ -323,7 +342,7 @@ export default function PosOrdersDrawer({
                   {/* Fila 2: Cliente y Fecha */}
                   <div>
                     <h4 className="font-black text-sm text-stone-900">{order.customerName}</h4>
-                    <div className="flex items-center gap-3 text-xs text-stone-600 mt-0.5">
+                    <div className="flex items-center gap-3 text-xs text-stone-600 mt-0.5 flex-wrap">
                       <span className="flex items-center gap-1 font-bold">
                         <Phone className="w-3.5 h-3.5 text-stone-400" /> {order.phone}
                       </span>
@@ -332,6 +351,14 @@ export default function PosOrdersDrawer({
                         {order.deliveryDate} a las {order.deliveryTime || "16:00"} hrs
                       </span>
                     </div>
+
+                    {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName && (
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-900 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-lg mt-1.5 w-fit">
+                        <span>🏬 Levantado: {order.operatingBranchName.replace("Sucursal ", "")}</span>
+                        <span className="text-amber-600">➔</span>
+                        <span className="text-emerald-800">Entrega: {order.branchName.replace("Sucursal ", "")}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Fila 3: Descripción del pedido */}
@@ -368,6 +395,14 @@ export default function PosOrdersDrawer({
                   {/* Fila 5: Botones de Acción */}
                   <div className="flex items-center justify-between gap-2 pt-1 border-t border-stone-100">
                     <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openOrderDetail(order)}
+                        className="p-1.5 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                        title="Ver detalles completos del pedido"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-amber-700" /> Detalles
+                      </button>
                       <button
                         type="button"
                         onClick={() => onSelectOrderForReceipt(order)}

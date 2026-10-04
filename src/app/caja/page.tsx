@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { 
   Wallet, 
   ArrowUpRight, 
@@ -37,157 +37,41 @@ import {
   Check,
   Users,
   User,
-  Sparkles
+  Sparkles,
+  Store,
+  Radio
 } from "lucide-react";
 import { CashMovement, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
-import { useNotifications } from "@/context/NotificationContext";
+import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { useSync } from "@/context/SyncContext";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { recordCashIncome } from "@/lib/incomes";
 import ShiftCutDetailModal from "@/components/caja/ShiftCutDetailModal";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { createClient } from "@/lib/supabase/client";
 
-const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [
-  {
-    id: "CORTE-948210",
-    date: "Hoy, 02:00 PM",
-    timestamp: Date.now() - 2 * 3600000,
-    shiftRange: "06:00 AM — 02:00 PM",
-    outgoingCashier: "Cajera 1 - Turno Matutino",
-    incomingCashier: "Cajera 2 - Turno Vespertino",
-    responsible: "Lupita Brito (Cajera 1)",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Matutino (06:00 - 14:00)",
-    nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 500,
-    cashSales: 4150,
-    cardSales: 700,
-    transferSales: 350,
-    totalSales: 5200,
-    totalSalesAll: 5200,
-    totalExpenses: 570,
-    expectedCash: 4080,
-    countedCash: 4080,
-    difference: 0,
-    nextFund: 0,
-    notes: "Entrega de turno matutino sin ninguna anomalía. Vitrina de conchas y bolillo surtida.",
-    stockPieces: 180,
-    stockValue: 2340,
-  },
-  {
-    id: "CORTE-893120",
-    date: "Ayer, 10:00 PM",
-    timestamp: Date.now() - 18 * 3600000,
-    shiftRange: "02:00 PM — 10:00 PM",
-    outgoingCashier: "Cajera 2 - Turno Vespertino",
-    incomingCashier: "Cajera 1 - Turno Matutino",
-    responsible: "Cajera 2 - Turno Vespertino",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Vespertino (14:00 - 22:00)",
-    nextShift: "Turno Matutino (06:00 - 14:00)",
-    initialFund: 600,
-    cashSales: 3820,
-    cardSales: 680,
-    transferSales: 230,
-    totalSales: 4730,
-    totalSalesAll: 4730,
-    totalExpenses: 200,
-    expectedCash: 4220,
-    countedCash: 4220,
-    difference: 0,
-    nextFund: 500,
-    notes: "Cierre nocturno completado. Pan dulce agotado y efectivo entregado a Don Toño.",
-    stockPieces: 25,
-    stockValue: 325,
-  },
-  {
-    id: "CORTE-892401",
-    date: "Ayer, 02:00 PM",
-    timestamp: Date.now() - 26 * 3600000,
-    shiftRange: "06:00 AM — 02:00 PM",
-    outgoingCashier: "Cajera 1 - Turno Matutino",
-    incomingCashier: "Cajera 2 - Turno Vespertino",
-    responsible: "Lupita Brito (Cajera 1)",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Matutino (06:00 - 14:00)",
-    nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 500,
-    cashSales: 4500,
-    cardSales: 550,
-    transferSales: 120,
-    totalSales: 5170,
-    totalSalesAll: 5170,
-    totalExpenses: 350,
-    expectedCash: 4650,
-    countedCash: 4700,
-    difference: 50,
-    nextFund: 500,
-    notes: "Sobrante de $50 pesos por redondeo voluntario de clientes en mostrador.",
-    stockPieces: 195,
-    stockValue: 2535,
-  },
-  {
-    id: "CORTE-881290",
-    date: "Hace 2 días, 10:00 PM",
-    timestamp: Date.now() - 42 * 3600000,
-    shiftRange: "02:00 PM — 10:00 PM",
-    outgoingCashier: "Cajera 2 - Turno Vespertino",
-    incomingCashier: "Cajera 1 - Turno Matutino",
-    responsible: "Don Toño Brito (Supervisor)",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Vespertino (14:00 - 22:00)",
-    nextShift: "Turno Matutino (06:00 - 14:00)",
-    initialFund: 500,
-    cashSales: 3400,
-    cardSales: 480,
-    transferSales: 200,
-    totalSales: 4080,
-    totalSalesAll: 4080,
-    totalExpenses: 180,
-    expectedCash: 3720,
-    countedCash: 3690,
-    difference: -30,
-    nextFund: 500,
-    notes: "Faltante menor de $30 en monedas de cambio en hora pico. Supervisado por Don Toño.",
-    stockPieces: 30,
-    stockValue: 390,
-  },
-  {
-    id: "CORTE-880912",
-    date: "Hace 2 días, 02:00 PM",
-    timestamp: Date.now() - 50 * 3600000,
-    shiftRange: "06:00 AM — 02:00 PM",
-    outgoingCashier: "Cajera 1 - Turno Matutino",
-    incomingCashier: "Cajera 2 - Turno Vespertino",
-    responsible: "Lupita Brito (Cajera 1)",
-    branchName: "Sucursal Matriz Centro",
-    previousShift: "Turno Matutino (06:00 - 14:00)",
-    nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 500,
-    cashSales: 4300,
-    cardSales: 620,
-    transferSales: 280,
-    totalSales: 5200,
-    totalSalesAll: 5200,
-    totalExpenses: 400,
-    expectedCash: 4400,
-    countedCash: 4400,
-    difference: 0,
-    nextFund: 500,
-    notes: "Turno entregado conforme con pago de gas LP realizado y comprobante archivado.",
-    stockPieces: 160,
-    stockValue: 2080,
-  }
-];
+export interface LiveMoneyMovement {
+  id: string;
+  timestamp: number | string;
+  branchId: string;
+  branchName: string;
+  cashier: string;
+  type: "venta" | "entrada" | "salida" | "corte";
+  category?: string;
+  categoryLabel?: string;
+  concept: string;
+  amount: number;
+  paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  source?: "pos" | "caja" | "pedidos";
+  isOwner?: boolean;
+}
 
-const INITIAL_MOVEMENTS: CashMovement[] = [
-  { id: "mov-1", shiftId: "shift-101", type: "entrada", category: "abono_cliente", categoryLabel: "Abono de Pedido", amount: 500, reason: "Anticipo Sra. María pastel XV años (PED-101)", authorizedBy: "Lupita Brito", timestamp: "08:45 AM" },
-  { id: "mov-2", shiftId: "shift-101", type: "salida", category: "gasto_gas", categoryLabel: "Pago de Gas LP", amount: 450, reason: "Carga de tanque para hornos principales", authorizedBy: "Don Toño Brito", timestamp: "10:15 AM" },
-  { id: "mov-3", shiftId: "shift-101", type: "salida", category: "compra_insumos", categoryLabel: "Insumo Urgente", amount: 120, reason: "Compra de 5 bolsas de hielo y servilletas en la esquina", authorizedBy: "Lupita Brito", timestamp: "12:30 PM" },
-  { id: "mov-4", shiftId: "shift-101", type: "salida", category: "retiro_dueno", categoryLabel: "Retiro Don Toño", amount: 1000, reason: "Retiro parcial de efectivo por seguridad", authorizedBy: "Don Toño Brito", timestamp: "02:00 PM" },
-];
+const SAMPLE_HISTORICAL_CUTS: ShiftCutRecord[] = [];
+
+const INITIAL_MOVEMENTS: CashMovement[] = [];
 
 function getShiftSuggestionByCurrentTime(date = new Date()) {
   const hours = date.getHours();
@@ -282,21 +166,50 @@ function formatLocalMonth(d = new Date()): string {
   return `${year}-${month}`;
 }
 
+function getBranchBadgeColor(branchId?: string) {
+  if (!branchId) return "bg-stone-100 text-stone-800 border-stone-200";
+  const id = branchId.toLowerCase();
+  if (id.includes("matriz")) return "bg-amber-100 text-amber-900 border-amber-300";
+  if (id.includes("benito")) return "bg-blue-100 text-blue-900 border-blue-300";
+  if (id.includes("flores")) return "bg-purple-100 text-purple-900 border-purple-300";
+  return "bg-stone-100 text-stone-800 border-stone-200";
+}
+
+function formatLiveTime(timestamp: number | string) {
+  const ts = parseDateTimeSafe(timestamp);
+  if (!ts) return "Reciente";
+  const d = new Date(ts);
+  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
+}
+
+function isRecentlyCreated(timestamp: number | string) {
+  const ts = parseDateTimeSafe(timestamp);
+  if (!ts) return false;
+  return Date.now() - ts < 10 * 60 * 1000;
+}
+
 export default function CajaPage() {
   const { user, usersList } = useAuth();
-  const { currentBranch } = useBranch();
+  const { branches, currentBranch, updateBranch, cashMovements, addCashMovement, isAllBranches } = useBranch();
   const { addNotification } = useNotifications();
   const { isOnline, isSyncing, pendingCount, enqueueOfflineItem } = useSync();
 
-  // Active view tab: "historial" (Principal) or "turno" (Turno en vivo)
-  const [activeTab, setActiveTab] = useState<"historial" | "turno">("historial");
+  // Active view tab: "historial" (Principal), "movimientos" (En tiempo real) or "turno" (Turno en vivo)
+  const [activeTab, setActiveTab] = useState<"historial" | "movimientos" | "turno">("historial");
+
+  // Realtime Live Stream state
+  const [liveStreamMovements, setLiveStreamMovements] = useState<LiveMoneyMovement[]>([]);
+  const [liveBranchFilter, setLiveBranchFilter] = useState<string>("all");
+  const [liveCashierFilter, setLiveCashierFilter] = useState<string>("all");
+  const [liveTypeFilter, setLiveTypeFilter] = useState<"all" | "venta" | "entrada" | "salida" | "corte">("all");
+  const [liveSearchQuery, setLiveSearchQuery] = useState<string>("");
 
   // Historical shift cuts state
   const [cutsHistory, setCutsHistory] = useState<ShiftCutRecord[]>([]);
   const [selectedCutForDetail, setSelectedCutForDetail] = useState<ShiftCutRecord | null>(null);
 
   // Filters for history
-  const [filterPeriod, setFilterPeriod] = useState<"dia" | "mes" | "ano" | "todos">("dia");
+  const [filterPeriod, setFilterPeriod] = useState<"dia" | "mes" | "ano" | "todos">("todos");
   const [selectedDayDate, setSelectedDayDate] = useState<string>(() => formatLocalDate());
   const [selectedMonthStr, setSelectedMonthStr] = useState<string>(() => formatLocalMonth());
   const [selectedYearStr, setSelectedYearStr] = useState<string>(() => new Date().getFullYear().toString());
@@ -309,7 +222,12 @@ export default function CajaPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "cuadrado" | "sobrante" | "faltante">("all");
 
   const getStoredCajaInitialFund = (fallback: number = 0): number => {
+    if (currentBranch?.currentShift?.initialFund !== undefined) {
+      return currentBranch.currentShift.initialFund;
+    }
     try {
+      const saved = localStorage.getItem("brito_pos_initial_fund");
+      if (saved && !isNaN(Number(saved))) return Number(saved);
       const raw = localStorage.getItem("brito_shift_cuts_history");
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -317,8 +235,6 @@ export default function CajaPage() {
           return parsed[0].nextFund;
         }
       }
-      const saved = localStorage.getItem("brito_pos_initial_fund");
-      if (saved && !isNaN(Number(saved))) return Number(saved);
     } catch (e) {}
     return fallback;
   };
@@ -338,10 +254,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const shiftStart = getStoredShiftStartBoundary();
+            const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -358,10 +274,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const shiftStart = getStoredShiftStartBoundary();
+            const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -378,10 +294,10 @@ export default function CajaPage() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            const shiftStart = getStoredShiftStartBoundary();
+            const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
             const filtered = list.filter((s: any) => {
               const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
+              return shiftStart <= 0 || (t > 0 && t >= shiftStart);
             });
             const sum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
             return sum;
@@ -422,57 +338,431 @@ export default function CajaPage() {
     setIsCorteModalOpen(true);
   };
 
-  // Load and sync cuts history from localStorage
-  const loadCutsHistory = () => {
+  // Load and sync cuts history from localStorage with mathematical verification
+  const loadCutsHistory = useCallback(() => {
     try {
       const raw = localStorage.getItem("brito_shift_cuts_history");
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Normalize responsible field if missing
-          const normalized: ShiftCutRecord[] = parsed.map((item: ShiftCutRecord) => ({
-            ...item,
-            responsible: item.responsible || item.outgoingCashier || "Responsable de Caja",
-          }));
+        if (Array.isArray(parsed)) {
+          const realCuts = parsed.filter(c => c && c.id !== "CORTE-948210" && c.id !== "CORTE-893120" && c.id !== "CORTE-892401");
+          // Normalizar y verificar cuadre matemático exacto de todos los cortes
+          const normalized: ShiftCutRecord[] = realCuts.map((item: ShiftCutRecord) => {
+            const initialFund = typeof item.initialFund === "number" && !isNaN(item.initialFund) ? item.initialFund : 0;
+            const cashSales = typeof item.cashSales === "number" && !isNaN(item.cashSales) ? item.cashSales : 0;
+            const totalIncomes = typeof item.totalIncomes === "number" && !isNaN(item.totalIncomes) ? item.totalIncomes : 0;
+            const totalExpenses = typeof item.totalExpenses === "number" && !isNaN(item.totalExpenses) ? item.totalExpenses : 0;
+            const expectedCash = typeof item.expectedCash === "number" && !isNaN(item.expectedCash)
+              ? item.expectedCash
+              : Math.max(0, initialFund + cashSales + totalIncomes - totalExpenses);
+            const countedCash = typeof item.countedCash === "number" && !isNaN(item.countedCash)
+              ? item.countedCash
+              : expectedCash;
+            const difference = typeof item.difference === "number" && !isNaN(item.difference)
+              ? item.difference
+              : (countedCash - expectedCash);
+
+            return {
+              ...item,
+              initialFund,
+              cashSales,
+              totalIncomes,
+              totalExpenses,
+              expectedCash,
+              countedCash,
+              difference,
+              responsible: item.responsible || item.outgoingCashier || "Responsable de Caja",
+              branchId: item.branchId || "branch-matriz",
+              branchName: item.branchName || "Sucursal Matriz (Centro)",
+            };
+          });
           setCutsHistory(normalized);
+          if (realCuts.length !== parsed.length) {
+            localStorage.setItem("brito_shift_cuts_history", JSON.stringify(realCuts));
+          }
           return;
         }
       }
-      // If empty, initialize with rich sample records
-      localStorage.setItem("brito_shift_cuts_history", JSON.stringify(SAMPLE_HISTORICAL_CUTS));
-      setCutsHistory(SAMPLE_HISTORICAL_CUTS);
+      setCutsHistory([]);
     } catch (e) {
       console.error("Error al cargar historial de caja:", e);
-      setCutsHistory(SAMPLE_HISTORICAL_CUTS);
+      setCutsHistory([]);
     }
-  };
+  }, []);
+
+  // Carga inicial y agregación de movimientos en vivo de todas las terminales y sucursales
+  const loadLiveMovements = useCallback(() => {
+    try {
+      const items: LiveMoneyMovement[] = [];
+
+      // 1. Ventas
+      const salesRaw = localStorage.getItem("brito_pos_master_sales") || localStorage.getItem("brito_pos_current_sales");
+      if (salesRaw) {
+        try {
+          const list = JSON.parse(salesRaw);
+          if (Array.isArray(list)) {
+            list.forEach((s: any) => {
+              if (!s) return;
+              items.push({
+                id: s.id,
+                timestamp: s.timestamp || s.createdAt || s.date || Date.now(),
+                branchId: s.branchId || "branch-matriz",
+                branchName: s.branchName || "Sucursal Matriz",
+                cashier: s.cashier || "Cajero",
+                type: "venta",
+                category: "venta_mostrador",
+                categoryLabel: s.isCustomOrder ? "Pedido Especial" : "Venta Mostrador",
+                concept: s.isCustomOrder ? `Liquidación/Anticipo Pedido ${s.id}` : `Venta mostrador (${(s.items || []).length} pzas)`,
+                amount: Number(s.total) || 0,
+                paymentMethod: s.paymentMethod || "efectivo",
+                source: "pos",
+              });
+            });
+          }
+        } catch {}
+      }
+
+      // 2. Gastos y Retiros de Dueño
+      const expRaw = localStorage.getItem("brito_pos_current_expenses") || localStorage.getItem("brito_expenses");
+      if (expRaw) {
+        try {
+          const list = JSON.parse(expRaw);
+          if (Array.isArray(list)) {
+            list.forEach((e: any) => {
+              if (!e) return;
+              items.push({
+                id: e.id,
+                timestamp: e.timestamp || e.createdAt || e.date || Date.now(),
+                branchId: e.branchId || "branch-matriz",
+                branchName: e.branchName || "Sucursal Matriz",
+                cashier: e.cashier || "Cajero",
+                type: "salida",
+                category: e.category || "gasto",
+                categoryLabel: e.category === "retiro_dueno" || e.isOwner ? "👑 Retiro Dueño" : "Salida / Gasto",
+                concept: e.description || "Gasto en caja",
+                amount: Number(e.amount) || 0,
+                paymentMethod: e.paymentMethod || "efectivo",
+                source: "caja",
+                isOwner: e.isOwner || e.category === "retiro_dueno",
+              });
+            });
+          }
+        } catch {}
+      }
+
+      // 3. Entradas de Caja / Aportaciones
+      const incRaw = localStorage.getItem("brito_pos_current_incomes") || localStorage.getItem("brito_incomes");
+      if (incRaw) {
+        try {
+          const list = JSON.parse(incRaw);
+          if (Array.isArray(list)) {
+            list.forEach((i: any) => {
+              if (!i) return;
+              items.push({
+                id: i.id,
+                timestamp: i.timestamp || i.date || Date.now(),
+                branchId: i.branchId || "branch-matriz",
+                branchName: i.branchName || "Sucursal Matriz",
+                cashier: i.cashier || "Cajero",
+                type: "entrada",
+                category: i.category || "ingreso",
+                categoryLabel: i.categoryLabel || "🪙 Entrada Dinero",
+                concept: i.concept || i.description || "Aportación a caja",
+                amount: Number(i.amount) || 0,
+                paymentMethod: i.paymentMethod || "efectivo",
+                source: "caja",
+              });
+            });
+          }
+        } catch {}
+      }
+
+      // 4. Cortes de Caja
+      const cutsRaw = localStorage.getItem("brito_shift_cuts_history");
+      if (cutsRaw) {
+        try {
+          const list = JSON.parse(cutsRaw);
+          if (Array.isArray(list)) {
+            list.forEach((c: any) => {
+              if (!c) return;
+              items.push({
+                id: c.id,
+                timestamp: c.timestamp || parseDateTimeSafe(c.date) || Date.now(),
+                branchId: c.branchId || "branch-matriz",
+                branchName: c.branchName || "Sucursal Matriz",
+                cashier: c.outgoingCashier || c.responsible || "Cajero",
+                type: "corte",
+                category: "corte_caja",
+                categoryLabel: "🏁 Corte de Turno",
+                concept: `Cierre: ${c.difference === 0 ? "Cuadrada Exacta ($0.00)" : `Diferencia ${formatCurrency(c.difference)}`} | Fondo: ${formatCurrency(c.nextFund || 0)}`,
+                amount: Number(c.countedCash) || 0,
+                paymentMethod: "efectivo",
+                source: "caja",
+              });
+            });
+          }
+        } catch {}
+      }
+
+      // Ordenar cronológicamente descendente los registros locales
+      items.sort((a, b) => {
+        const tA = parseDateTimeSafe(a.timestamp);
+        const tB = parseDateTimeSafe(b.timestamp);
+        return tB - tA;
+      });
+
+      setLiveStreamMovements(items);
+
+      // 5. Consultar movimientos en tiempo real desde Supabase para supervisión en vivo
+      if (typeof window !== "undefined") {
+        try {
+          const supabase = createClient();
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          const todayIso = todayStart.toISOString();
+
+          Promise.allSettled([
+            supabase
+              .from("sales")
+              .select("id, branch_id, total, payment_method, cashier, date, created_at")
+              .gte("created_at", todayIso),
+            supabase
+              .from("custom_orders")
+              .select("id, order_number, customer_name, branch_id, branch_name, description, total, deposit, remaining_balance, payment_status, payment_method, cashier, created_at")
+              .gte("created_at", todayIso),
+            supabase
+              .from("cash_movements")
+              .select("id, branch_id, type, category, category_label, amount, reason, authorized_by, created_at")
+              .gte("created_at", todayIso),
+            supabase
+              .from("cash_expenses")
+              .select("id, branch_id, amount, category, description, cashier, created_at")
+              .gte("created_at", todayIso),
+            supabase
+              .from("cash_shifts")
+              .select("id, shift_name, cashier_name, branch_id, opened_at, initial_cash, actual_cash, expected_cash, difference")
+              .gte("opened_at", todayIso),
+          ]).then(([salesRes, ordersRes, movsRes, expsRes, cutsRes]) => {
+            const dbSales = salesRes.status === "fulfilled" && !salesRes.value.error ? salesRes.value.data || [] : [];
+            const dbOrders = ordersRes.status === "fulfilled" && !ordersRes.value.error ? ordersRes.value.data || [] : [];
+            const dbMovs = movsRes.status === "fulfilled" && !movsRes.value.error ? movsRes.value.data || [] : [];
+            const dbExps = expsRes.status === "fulfilled" && !expsRes.value.error ? expsRes.value.data || [] : [];
+            const dbCuts = cutsRes.status === "fulfilled" && !cutsRes.value.error ? cutsRes.value.data || [] : [];
+
+            const remoteItems: LiveMoneyMovement[] = [];
+
+            // A) Ventas
+            dbSales.forEach((s: any) => {
+              remoteItems.push({
+                id: s.id,
+                timestamp: s.created_at || s.date || Date.now(),
+                branchId: s.branch_id || "branch-matriz",
+                branchName: s.branch_id || "Sucursal Matriz",
+                cashier: s.cashier || "Cajero",
+                type: "venta",
+                category: "venta_mostrador",
+                categoryLabel: "Venta Mostrador",
+                concept: `Venta mostrador ticket #${s.id}`,
+                amount: Number(s.total) || 0,
+                paymentMethod: s.payment_method || "efectivo",
+                source: "pos",
+              });
+            });
+
+            // B) Pedidos con anticipo o pago
+            dbOrders.forEach((o: any) => {
+              const deposit = Number(o.deposit) || 0;
+              if (deposit > 0) {
+                remoteItems.push({
+                  id: `ord-${o.id}`,
+                  timestamp: o.created_at || Date.now(),
+                  branchId: o.branch_id || "branch-matriz",
+                  branchName: o.branch_name || "Sucursal Matriz",
+                  cashier: o.cashier || "Cajero",
+                  type: "entrada",
+                  category: "abono_pedido",
+                  categoryLabel: o.remaining_balance === 0 ? "Liquidación Pedido" : "Anticipo Pedido",
+                  concept: `Pedido #${o.order_number || o.id} (${o.customer_name || "Cliente"}): ${o.description || "Pedido especial"}`,
+                  amount: deposit,
+                  paymentMethod: o.payment_method || "efectivo",
+                  source: "pedidos",
+                });
+              }
+            });
+
+            // C) Gastos
+            dbExps.forEach((e: any) => {
+              remoteItems.push({
+                id: e.id,
+                timestamp: e.created_at || Date.now(),
+                branchId: e.branch_id || "branch-matriz",
+                branchName: e.branch_id || "Sucursal Matriz",
+                cashier: e.cashier || "Cajero",
+                type: "salida",
+                category: e.category || "gasto",
+                categoryLabel: e.category === "retiro_dueno" ? "👑 Retiro Dueño" : "Salida / Gasto",
+                concept: e.description || "Gasto en caja",
+                amount: Number(e.amount) || 0,
+                paymentMethod: "efectivo",
+                source: "caja",
+                isOwner: e.category === "retiro_dueno",
+              });
+            });
+
+            // D) Movimientos manuales
+            dbMovs.forEach((m: any) => {
+              if (m.category === "venta_mostrador") return;
+              remoteItems.push({
+                id: m.id,
+                timestamp: m.created_at || Date.now(),
+                branchId: m.branch_id || "branch-matriz",
+                branchName: m.branch_id || "Sucursal Matriz",
+                cashier: m.authorized_by || "Cajero",
+                type: m.type as any,
+                category: m.category || "otro",
+                categoryLabel: m.category_label || (m.type === "entrada" ? "🪙 Entrada Dinero" : "Salida / Gasto"),
+                concept: m.reason || "Movimiento de caja",
+                amount: Number(m.amount) || 0,
+                paymentMethod: "efectivo",
+                source: "caja",
+              });
+            });
+
+            // E) Cortes
+            dbCuts.forEach((c: any) => {
+              remoteItems.push({
+                id: c.id,
+                timestamp: c.opened_at || Date.now(),
+                branchId: c.branch_id || "branch-matriz",
+                branchName: c.branch_id || "Sucursal Matriz",
+                cashier: c.cashier_name || "Cajero",
+                type: "corte",
+                category: "corte_caja",
+                categoryLabel: "🏁 Corte de Turno",
+                concept: `Corte de turno (${c.shift_name || "Turno"}). Cajero: ${c.cashier_name}. Fondo: ${formatCurrency(c.initial_cash || 1000)}`,
+                amount: Number(c.actual_cash || c.expected_cash || 0),
+                paymentMethod: "efectivo",
+                source: "caja",
+              });
+            });
+
+            if (remoteItems.length > 0) {
+              setLiveStreamMovements((prevLocal) => {
+                const map = new Map<string, LiveMoneyMovement>();
+                prevLocal.forEach((it) => map.set(it.id, it));
+                remoteItems.forEach((it) => map.set(it.id, it));
+
+                const merged = Array.from(map.values()).sort((a, b) => {
+                  const tA = parseDateTimeSafe(a.timestamp);
+                  const tB = parseDateTimeSafe(b.timestamp);
+                  return tB - tA;
+                });
+                return merged;
+              });
+            }
+          });
+        } catch {}
+      }
+    } catch (err) {
+      console.error("Error loading live movements:", err);
+    }
+  }, []);
 
   useEffect(() => {
     loadCutsHistory();
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      const corteIdParam = params.get("corteId");
+
+      if (tabParam === "historial" || tabParam === "turno") {
+        setActiveTab(tabParam as "historial" | "turno");
+      }
+
+      if (corteIdParam) {
+        try {
+          const raw = localStorage.getItem("brito_shift_cuts_history");
+          const list = raw ? JSON.parse(raw) : SAMPLE_HISTORICAL_CUTS;
+          const found = list.find((c: ShiftCutRecord) => c.id.toLowerCase() === corteIdParam.toLowerCase());
+          if (found) {
+            setSelectedCutForDetail(found);
+          }
+        } catch {}
+      }
+    }
+
     const handleSync = () => {
       loadCutsHistory();
+      loadLiveMovements();
       setInitialCash(getStoredCajaInitialFund(0));
       try {
         const raw = localStorage.getItem("brito_pos_current_sales");
+        let list: any[] = [];
         if (raw) {
-          const list = JSON.parse(raw);
-          if (Array.isArray(list) && list.length > 0) {
-            const shiftStart = getStoredShiftStartBoundary();
-            const filtered = list.filter((s: any) => {
-              const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
-              return shiftStart <= 0 || (t > 0 && t >= shiftStart - 60000);
-            });
-            const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            const tSum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
-            setCashSales(cSum);
-            setCardSales(kSum);
-            setTransferSales(tSum);
-          } else {
-            setCashSales(0);
-            setCardSales(0);
-            setTransferSales(0);
-          }
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) list = [...parsed];
+        }
+        const masterRaw = localStorage.getItem("brito_pos_master_sales");
+        if (masterRaw) {
+          try {
+            const masterParsed = JSON.parse(masterRaw);
+            if (Array.isArray(masterParsed)) {
+              for (const ms of masterParsed) {
+                if (ms && !list.some((s) => s.id === ms.id)) {
+                  list.push(ms);
+                }
+              }
+            }
+          } catch {}
+        }
+
+        if (list.length > 0) {
+          const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
+          const filtered = list.filter((s: any) => {
+            if (!s) return false;
+            if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+              const sBranch = s.branchId || s.branch_id;
+              if (sBranch) {
+                if (sBranch !== currentBranch.id) return false;
+              } else {
+                if (currentBranch.id !== "branch-matriz") return false;
+              }
+            }
+            const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+            return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+          });
+          const cSum = filtered.filter((s: any) => s.paymentMethod === "efectivo").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+          const kSum = filtered.filter((s: any) => s.paymentMethod === "tarjeta").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+          const tSum = filtered.filter((s: any) => s.paymentMethod === "transferencia").reduce((acc: number, s: any) => acc + (Number(s.total) || 0), 0);
+
+          // Anticipos en efectivo de pedidos especiales para cuadrar exactamente con POS
+          let ordersCash = 0;
+          try {
+            const rawOrders = localStorage.getItem("brito_custom_orders");
+            if (rawOrders) {
+              const ords = JSON.parse(rawOrders);
+              if (Array.isArray(ords)) {
+                ords.forEach((o: any) => {
+                  if (!o || o.status === "cancelado") return;
+                  if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+                    const oBranch = o.branchId || o.branch_id;
+                    if (oBranch && oBranch !== currentBranch.id) return;
+                  }
+                  const ot = parseDateTimeSafe(o.timestamp || o.createdAt || o.date);
+                  if (shiftStart <= 0 || (ot > 0 && ot >= shiftStart)) {
+                    if ((o.paymentMethod === "efectivo" || !o.paymentMethod) && !filtered.some((s) => s.id === o.orderNumber || s.id === o.id)) {
+                      ordersCash += Number(o.deposit) || 0;
+                    }
+                  }
+                });
+              }
+            }
+          } catch {}
+
+          setCashSales(cSum + ordersCash);
+          setCardSales(kSum);
+          setTransferSales(tSum);
         } else {
           setCashSales(0);
           setCardSales(0);
@@ -484,15 +774,134 @@ export default function CajaPage() {
         setTransferSales(0);
       }
     };
+
+    handleSync();
+
+    // Suscripción WebSocket / Broadcast en tiempo real para el Administrador
+    const unsubSale = realtimeHub.onSale((salePayload) => {
+      const newLiveItem: LiveMoneyMovement = {
+        id: salePayload.id,
+        timestamp: Date.now(),
+        branchId: salePayload.branchId,
+        branchName: salePayload.branchName,
+        cashier: salePayload.cashier || "Cajero",
+        type: "venta",
+        category: "venta_mostrador",
+        categoryLabel: "Venta Mostrador",
+        concept: `Venta mostrador por ${formatCurrency(salePayload.total)} [${salePayload.paymentMethod.toUpperCase()}]`,
+        amount: salePayload.total,
+        paymentMethod: salePayload.paymentMethod,
+        source: "pos",
+      };
+      setLiveStreamMovements((prev) => [newLiveItem, ...prev.filter((p) => p.id !== newLiveItem.id)]);
+      handleSync();
+    });
+
+    const unsubCash = realtimeHub.onCashMovement((movPayload) => {
+      const newLiveItem: LiveMoneyMovement = {
+        id: movPayload.id,
+        timestamp: Date.now(),
+        branchId: movPayload.branchId,
+        branchName: movPayload.branchName,
+        cashier: movPayload.cashier || "Cajero",
+        type: movPayload.type,
+        category: movPayload.type === "salida" ? "gasto" : "entrada",
+        categoryLabel: movPayload.type === "salida" ? "💸 Salida / Gasto" : "🪙 Entrada Dinero",
+        concept: movPayload.reason,
+        amount: movPayload.amount,
+        paymentMethod: "efectivo",
+        source: "caja",
+      };
+      setLiveStreamMovements((prev) => [newLiveItem, ...prev.filter((p) => p.id !== newLiveItem.id)]);
+      handleSync();
+    });
+
+    const unsubCut = realtimeHub.onShiftCut((cut) => {
+      const newLiveItem: LiveMoneyMovement = {
+        id: cut.id,
+        timestamp: cut.timestamp || Date.now(),
+        branchId: cut.branchId || "branch-matriz",
+        branchName: cut.branchName || "Matriz (Centro)",
+        cashier: cut.outgoingCashier || "Cajero",
+        type: "corte",
+        category: "corte_caja",
+        categoryLabel: "🏁 Corte de Turno",
+        concept: `Cierre: ${cut.difference === 0 ? "Cuadrada Exacta ($0.00)" : `Diferencia ${formatCurrency(cut.difference)}`} | Fondo: ${formatCurrency(cut.nextFund || 0)}`,
+        amount: cut.countedCash,
+        paymentMethod: "efectivo",
+        source: "caja",
+      };
+      setLiveStreamMovements((prev) => [newLiveItem, ...prev.filter((p) => p.id !== newLiveItem.id)]);
+      loadCutsHistory();
+      handleSync();
+    });
+
+    const unsubOrder = realtimeHub.onOrder((orderPayload) => {
+      if (orderPayload.order && Number(orderPayload.order.deposit) > 0) {
+        const o = orderPayload.order;
+        const newLiveItem: LiveMoneyMovement = {
+          id: `ord-dep-${o.id}-${Date.now().toString().slice(-4)}`,
+          timestamp: Date.now(),
+          branchId: o.branchId || "branch-matriz",
+          branchName: o.branchName || "Sucursal Matriz",
+          cashier: (o as any).cashier || "Cajero",
+          type: "entrada",
+          category: "abono_pedido",
+          categoryLabel: "Abono / Anticipo Pedido",
+          concept: `Anticipo recibido para pedido #${o.orderNumber || o.id} (${o.customerName || "Cliente"})`,
+          amount: Number(o.deposit) || 0,
+          paymentMethod: (o.paymentMethod as any) || "efectivo",
+          source: "pedidos",
+        };
+        setLiveStreamMovements((prev) => [newLiveItem, ...prev.filter((p) => p.id !== newLiveItem.id)]);
+        handleSync();
+      }
+    });
+
+    // Suscripción directa a Supabase Realtime postgres_changes para ver movimientos de todos los cajeros al instante
+    let supabaseChannel: any = null;
+    try {
+      const supabase = createClient();
+      supabaseChannel = supabase
+        .channel("caja_page_supabase_realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, () => handleSync())
+        .on("postgres_changes", { event: "*", schema: "public", table: "custom_orders" }, () => handleSync())
+        .on("postgres_changes", { event: "*", schema: "public", table: "cash_movements" }, () => handleSync())
+        .on("postgres_changes", { event: "*", schema: "public", table: "cash_expenses" }, () => handleSync())
+        .on("postgres_changes", { event: "*", schema: "public", table: "cash_shifts" }, () => handleSync())
+        .subscribe();
+    } catch {}
+
+    const pollInterval = setInterval(() => {
+      handleSync();
+    }, 3000);
+
     window.addEventListener("brito_shift_cuts_updated", handleSync);
     window.addEventListener("storage", handleSync);
     window.addEventListener("brito_incomes_updated", handleSync);
+    window.addEventListener("brito_sales_updated", handleSync);
+    window.addEventListener("brito_caja_updated", handleSync);
+    window.addEventListener("focus", handleSync);
     return () => {
+      clearInterval(pollInterval);
+      unsubSale();
+      unsubCash();
+      unsubCut();
+      unsubOrder();
       window.removeEventListener("brito_shift_cuts_updated", handleSync);
       window.removeEventListener("storage", handleSync);
       window.removeEventListener("brito_incomes_updated", handleSync);
+      window.removeEventListener("brito_sales_updated", handleSync);
+      window.removeEventListener("brito_caja_updated", handleSync);
+      window.removeEventListener("focus", handleSync);
+      if (supabaseChannel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(supabaseChannel);
+        } catch {}
+      }
     };
-  }, []);
+  }, [currentBranch?.id, loadCutsHistory, loadLiveMovements]);
 
   // URL query params handling (?tab=historial, ?tab=turno, ?tab=entradas, ?tab=salidas)
   useEffect(() => {
@@ -529,17 +938,137 @@ export default function CajaPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Sincronización en vivo del turno con la sucursal activa en la barra superior
+  useEffect(() => {
+    if (currentBranch) {
+      if (currentBranch.currentShift) {
+        if (currentBranch.currentShift.initialFund !== undefined) {
+          setInitialCash(currentBranch.currentShift.initialFund);
+        }
+        if (currentBranch.currentShift.cashSales !== undefined) {
+          setCashSales(currentBranch.currentShift.cashSales);
+        }
+        if (currentBranch.currentShift.cardSales !== undefined) {
+          setCardSales(currentBranch.currentShift.cardSales);
+        }
+        if (currentBranch.currentShift.transferSales !== undefined) {
+          setTransferSales(currentBranch.currentShift.transferSales);
+        }
+      } else if (currentBranch.todaySales !== undefined) {
+        setCashSales(currentBranch.todaySales);
+      }
+    }
+  }, [currentBranch?.id, currentBranch?.currentShift, currentBranch?.todaySales]);
+
   // Live calculations
-  const entryMovements = movements.filter((m) => m.type === "entrada");
+  const effectiveMovements = useMemo(() => {
+    const shiftStart = getStoredShiftStartBoundary(currentBranch?.id);
+    let combined = [...movements];
+
+    // 1. Movimientos desde BranchContext
+    if (cashMovements && cashMovements.length > 0) {
+      const filtered = cashMovements.filter((m) => {
+        if (!m) return false;
+        if (!isAllBranches && currentBranch && currentBranch.id && currentBranch.id !== "all") {
+          if (m.branchId && m.branchId !== currentBranch.id) return false;
+        }
+        return true;
+      });
+      const mapped: CashMovement[] = filtered.map((m) => ({
+        id: m.id,
+        shiftId: "shift-live",
+        type: m.type,
+        category: m.category as any,
+        categoryLabel: m.categoryLabel,
+        amount: m.amount,
+        reason: m.reason,
+        authorizedBy: m.authorizedBy,
+        timestamp: m.timestamp,
+      }));
+      for (const m of mapped) {
+        if (!combined.some((c) => c.id === m.id)) {
+          combined.push(m);
+        }
+      }
+    }
+
+    // 2. Gastos activos del turno desde el POS
+    try {
+      const rawExp = localStorage.getItem("brito_pos_current_expenses");
+      if (rawExp) {
+        const parsed = JSON.parse(rawExp);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((e: any) => {
+            if (!e) return;
+            if (!isAllBranches && currentBranch && currentBranch.id && currentBranch.id !== "all") {
+              const bId = e.branchId || e.branch_id;
+              if (bId && bId !== currentBranch.id) return;
+            }
+            if (!combined.some((c) => c.id === e.id || c.id === `mov-${e.id}`)) {
+              combined.push({
+                id: e.id,
+                shiftId: "shift-live",
+                type: "salida",
+                category: (e.category || "gasto") as any,
+                categoryLabel: e.category === "retiro_dueno" || e.isOwner ? "👑 Retiro Dueño" : "Salida / Gasto",
+                amount: Number(e.amount) || 0,
+                reason: e.description || "Gasto en caja",
+                authorizedBy: e.cashier || "Cajero",
+                timestamp: e.timestamp || e.date || e.createdAt || new Date().toISOString(),
+              });
+            }
+          });
+        }
+      }
+    } catch {}
+
+    // 3. Entradas activas del turno desde el POS
+    try {
+      const rawInc = localStorage.getItem("brito_pos_current_incomes");
+      if (rawInc) {
+        const parsed = JSON.parse(rawInc);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((i: any) => {
+            if (!i) return;
+            if (!isAllBranches && currentBranch && currentBranch.id && currentBranch.id !== "all") {
+              const bId = i.branchId || i.branch_id;
+              if (bId && bId !== currentBranch.id) return;
+            }
+            if (!combined.some((c) => c.id === i.id)) {
+              combined.push({
+                id: i.id,
+                shiftId: "shift-live",
+                type: "entrada",
+                category: (i.category || "otro") as any,
+                categoryLabel: i.categoryLabel || "🪙 Entrada Dinero",
+                amount: Number(i.amount) || 0,
+                reason: i.concept || "Entrada a caja",
+                authorizedBy: i.cashier || "Cajero",
+                timestamp: i.timestamp || i.date || new Date().toISOString(),
+              });
+            }
+          });
+        }
+      }
+    } catch {}
+
+    return combined.filter((m) => {
+      if (!m) return false;
+      const t = parseDateTimeSafe(m.timestamp);
+      return shiftStart <= 0 || (t > 0 && t >= shiftStart);
+    });
+  }, [cashMovements, currentBranch?.id, isAllBranches, movements]);
+
+  const entryMovements = effectiveMovements.filter((m) => m.type === "entrada");
   const totalEntries = entryMovements.reduce((sum, m) => sum + m.amount, 0);
-  const totalExpenses = movements.filter((m) => m.type === "salida").reduce((sum, m) => sum + m.amount, 0);
+  const totalExpenses = effectiveMovements.filter((m) => m.type === "salida").reduce((sum, m) => sum + m.amount, 0);
   const expectedCashInDrawer = initialCash + cashSales + totalEntries - totalExpenses;
   const liveCountedValue = countedCash !== "" && !isNaN(Number(countedCash)) ? Number(countedCash) : expectedCashInDrawer;
   const liveCashDifference = liveCountedValue - expectedCashInDrawer;
   const liveDeliveredToOwner = Math.max(0, liveCountedValue - (Number(nextFundAmount) || 0));
 
   // Active shift responsible name
-  const currentShiftResponsible = user?.name || "Lupita Brito (Cajera 1)";
+  const currentShiftResponsible = currentBranch?.currentShift?.cashier || currentBranch?.manager || user?.name || "Lupita Brito (Cajera 1)";
 
   // Cuts filtered primarily by Period (Día, Mes, Año, Todos)
   const periodCuts = useMemo(() => {
@@ -650,9 +1179,19 @@ export default function CajaPage() {
     return Array.from(set).sort((a, b) => Number(b) - Number(a));
   }, [cutsHistory]);
 
-  // Filtered cuts history (Period + Search + Responsible + Status)
+  // Filtered cuts history (Period + Search + Responsible + Status + Branch)
   const filteredCuts = useMemo(() => {
     return periodCuts.filter((cut) => {
+      // 0. Filter by branch
+      if (!isAllBranches && currentBranch && currentBranch.id && currentBranch.id !== "all") {
+        const cutBranch = (cut as any).branchId || (cut as any).branch_id;
+        if (cutBranch) {
+          if (cutBranch !== currentBranch.id) return false;
+        } else {
+          if (currentBranch.id !== "branch-matriz") return false;
+        }
+      }
+
       // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -662,7 +1201,8 @@ export default function CajaPage() {
         const matchIncoming = (cut.incomingCashier || "").toLowerCase().includes(q);
         const matchNotes = (cut.notes || "").toLowerCase().includes(q);
         const matchDate = (cut.date || "").toLowerCase().includes(q);
-        if (!matchId && !matchResp && !matchOutgoing && !matchIncoming && !matchNotes && !matchDate) {
+        const matchBranch = (cut.branchName || "").toLowerCase().includes(q);
+        if (!matchId && !matchResp && !matchOutgoing && !matchIncoming && !matchNotes && !matchDate && !matchBranch) {
           return false;
         }
       }
@@ -685,7 +1225,71 @@ export default function CajaPage() {
 
       return true;
     });
-  }, [periodCuts, searchQuery, selectedResponsibles, uniqueResponsibles, filterStatus]);
+  }, [periodCuts, searchQuery, selectedResponsibles, uniqueResponsibles, filterStatus, isAllBranches, currentBranch?.id]);
+
+  // Realtime Live Stream Movements (Filtered by Branch, Cashier, Type, Search)
+  const filteredLiveMovements = useMemo(() => {
+    return liveStreamMovements.filter((m) => {
+      // 1. Branch filter
+      if (liveBranchFilter !== "all" && m.branchId !== liveBranchFilter) return false;
+
+      // 2. Cashier filter
+      if (liveCashierFilter !== "all" && m.cashier !== liveCashierFilter) return false;
+
+      // 3. Type filter
+      if (liveTypeFilter !== "all") {
+        if (liveTypeFilter === "corte" && m.type !== "corte") return false;
+        if (liveTypeFilter === "venta" && m.type !== "venta") return false;
+        if (liveTypeFilter === "entrada" && m.type !== "entrada") return false;
+        if (liveTypeFilter === "salida" && m.type !== "salida") return false;
+      }
+
+      // 4. Search query
+      if (liveSearchQuery.trim()) {
+        const q = liveSearchQuery.toLowerCase();
+        const matchConcept = (m.concept || "").toLowerCase().includes(q);
+        const matchCashier = (m.cashier || "").toLowerCase().includes(q);
+        const matchBranch = (m.branchName || "").toLowerCase().includes(q);
+        const matchId = (m.id || "").toLowerCase().includes(q);
+        if (!matchConcept && !matchCashier && !matchBranch && !matchId) return false;
+      }
+
+      return true;
+    });
+  }, [liveStreamMovements, liveBranchFilter, liveCashierFilter, liveTypeFilter, liveSearchQuery]);
+
+  // Live Stream KPIs
+  const liveKpis = useMemo(() => {
+    let totalIn = 0;
+    let totalOut = 0;
+    let cashBalance = 0;
+
+    filteredLiveMovements.forEach((m) => {
+      if (m.type === "venta" || m.type === "entrada") {
+        totalIn += m.amount;
+        if (m.paymentMethod === "efectivo") cashBalance += m.amount;
+      } else if (m.type === "salida") {
+        totalOut += m.amount;
+        if (m.paymentMethod === "efectivo") cashBalance -= m.amount;
+      }
+    });
+
+    return {
+      totalIn,
+      totalOut,
+      netCash: cashBalance,
+      count: filteredLiveMovements.length,
+    };
+  }, [filteredLiveMovements]);
+
+  // Unique cashiers for live stream filter
+  const uniqueLiveCashiers = useMemo(() => {
+    const set = new Set<string>();
+    liveStreamMovements.forEach((m) => {
+      if (m.cashier) set.add(m.cashier);
+    });
+    return Array.from(set);
+  }, [liveStreamMovements]);
 
   // Overall Historical Audit Metrics (reflects filtered cuts of active period)
   const auditMetrics = useMemo(() => {
@@ -709,6 +1313,11 @@ export default function CajaPage() {
       diffCutsCount,
     };
   }, [filteredCuts]);
+
+  // Latest Cut for quick preview in empty state
+  const latestCut = useMemo(() => {
+    return cutsHistory.length > 0 ? cutsHistory[0] : null;
+  }, [cutsHistory]);
 
   // Export History to CSV
   const handleExportCSV = () => {
@@ -801,6 +1410,18 @@ export default function CajaPage() {
 
     setMovements((prev) => [newMov, ...prev]);
 
+    const targetBranchId = currentBranch?.id || "branch-matriz";
+    if (addCashMovement) {
+      addCashMovement(targetBranchId, {
+        type: movementType,
+        category: movCategory as any,
+        categoryLabel: labels[movCategory] || "Movimiento de Caja",
+        amount: Number(movAmount),
+        reason: movReason || "Sin descripción",
+        authorizedBy: user?.name || "Don Toño Brito",
+      });
+    }
+
     // Si es salida, registrar automáticamente en el Historial Detallado de Gastos
     if (movementType === "salida") {
       recordCashOutflowAsExpense({
@@ -876,6 +1497,7 @@ export default function CajaPage() {
       outgoingCashier: currentShiftResponsible,
       incomingCashier: recipient,
       responsible: currentShiftResponsible,
+      branchId: currentBranch?.id || "branch-matriz",
       branchName: currentBranch?.name || "Sucursal Matriz Centro",
       previousShift: getShiftSuggestionByCurrentTime().currentShift,
       nextShift: nextShiftName || "Turno Vespertino",
@@ -900,20 +1522,158 @@ export default function CajaPage() {
       );
       const updated = [newCut, ...existing];
       localStorage.setItem("brito_shift_cuts_history", JSON.stringify(updated));
-      localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
-      localStorage.setItem("brito_current_shift_start_timestamp", newCut.timestamp ? newCut.timestamp.toString() : Date.now().toString());
+      const targetBranchId = currentBranch?.id || "branch-matriz";
+      const cutTs = newCut.timestamp || Date.now();
+      localStorage.setItem("brito_shift_start_" + targetBranchId, cutTs.toString());
+      localStorage.setItem("brito_current_shift_start_timestamp", cutTs.toString());
       localStorage.setItem("brito_current_shift_cashier", recipient);
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
+      localStorage.setItem(`brito_pos_initial_fund_${targetBranchId}`, parsedNextFund.toString());
+      if (targetBranchId === "branch-matriz") {
+        localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
+      }
+
+      // Preservar ventas, gastos e ingresos de las otras sucursales
+      try {
+        const curSales = JSON.parse(localStorage.getItem("brito_pos_current_sales") || "[]");
+        const remainingSales = Array.isArray(curSales)
+          ? curSales.filter((s: any) => {
+              const bId = s.branchId || s.branch_id;
+              return bId && bId !== targetBranchId;
+            })
+          : [];
+        localStorage.setItem("brito_pos_current_sales", JSON.stringify(remainingSales));
+      } catch {}
+
+      try {
+        const curExp = JSON.parse(localStorage.getItem("brito_pos_current_expenses") || "[]");
+        const remainingExp = Array.isArray(curExp)
+          ? curExp.filter((e: any) => {
+              const bId = e.branchId || e.branch_id;
+              return bId && bId !== targetBranchId;
+            })
+          : [];
+        localStorage.setItem("brito_pos_current_expenses", JSON.stringify(remainingExp));
+      } catch {}
+
+      try {
+        const curInc = JSON.parse(localStorage.getItem("brito_pos_current_incomes") || "[]");
+        const remainingInc = Array.isArray(curInc)
+          ? curInc.filter((i: any) => {
+              const bId = i.branchId || i.branch_id;
+              return bId && bId !== targetBranchId;
+            })
+          : [];
+        localStorage.setItem("brito_pos_current_incomes", JSON.stringify(remainingInc));
+      } catch {}
+
+      // Persistir corte de turno y movimiento en Supabase para supervisión en vivo
+      try {
+        const supabase = createClient();
+        const shiftId = newCut.id || `cut-${Date.now()}`;
+        Promise.allSettled([
+          supabase.from("cash_shifts").upsert({
+            id: shiftId,
+            shift_name: nextShiftName || "Turno General",
+            cashier_name: currentShiftResponsible,
+            branch_id: targetBranchId,
+            opened_at: new Date(cutTs).toISOString(),
+            initial_cash: parsedNextFund,
+            cash_sales: cashSales,
+            card_sales: cardSales,
+            transfer_sales: transferSales,
+            total_cash_in: totalEntries,
+            total_cash_out: totalExpenses,
+            expected_cash: expectedCashInDrawer,
+            actual_cash: parsedCounted,
+            difference: diff,
+            status: "cerrada",
+            notes: newCut.notes,
+          }),
+          supabase.from("cash_movements").upsert({
+            id: `mov-${shiftId}`,
+            type: "salida",
+            category: "corte_caja",
+            category_label: "Corte de Turno",
+            amount: parsedCounted,
+            reason: `Corte de turno (${newCut.shiftRange || "Turno"}). Saliente: ${currentShiftResponsible} → Entrante: ${recipient}`,
+            authorized_by: currentShiftResponsible,
+            branch_id: targetBranchId,
+          }),
+        ]).catch(() => {});
+      } catch {}
+
+      // Emitir corte en tiempo real
+      realtimeHub.broadcastShiftCut(newCut);
+      updateBranch(targetBranchId, {
+        todaySales: 0,
+        todayTickets: 0,
+        todayDeskSales: 0,
+        todayDeskTickets: 0,
+        todayOrdersDeposit: 0,
+        todayOrdersTotal: 0,
+        todayOrdersCount: 0,
+        cashInDrawer: parsedNextFund,
+        lastCut: newCut,
+        manager: recipient,
+        currentShift: {
+          id: `shift-${targetBranchId}-${cutTs}`,
+          name: nextShiftName || "Turno General",
+          cashier: recipient,
+          openedAt: formatDateTimeSafe(new Date(cutTs)),
+          initialFund: parsedNextFund,
+          cashSales: 0,
+          cardSales: 0,
+          transferSales: 0,
+          totalSales: 0,
+          ticketCount: 0,
+          status: "abierto",
+        },
+      });
       setCutsHistory(updated);
       setCashSales(0);
       setCardSales(0);
       setTransferSales(0);
+      setMovements([]);
       setInitialCash(parsedNextFund);
+
+      // Notificación vinculada al corte de caja para toda la red
+      const isSquare = diff === 0;
+      const isShort = diff < 0;
+      const squareStatusTitle = isSquare
+        ? "✓ CAJA CUADRADA EXACTA ($0.00)"
+        : isShort
+        ? `🚨 NO CUADRÓ LA CAJA (Faltante ${formatCurrency(diff)})`
+        : `⚠️ NO CUADRÓ LA CAJA (Sobrante +${formatCurrency(diff)})`;
+
+      const shiftNotif: FBNotification = {
+        id: `notif-cut-${newCut.id}`,
+        senderName: `🏁 Cierre de Turno (${currentShiftResponsible})`,
+        senderAvatar: isSquare ? "💰" : "⚠️",
+        badgeIcon: "dinero",
+        title: `Cierre de Turno: ${squareStatusTitle}`,
+        highlightText: `Cambio de Turno: ${currentShiftResponsible} ➔ ${recipient}`,
+        description: `Folio ${newCut.id}. Efectivo contado: ${formatCurrency(parsedCounted)} (Esperado: ${formatCurrency(expectedCashInDrawer)}). Fondo nuevo dejado en caja: ${formatCurrency(parsedNextFund)}. Saliente: ${currentShiftResponsible}.`,
+        category: "caja",
+        actionLabel: "Ver Ticket de Corte",
+        actionLink: `/caja?tab=historial&corteId=${newCut.id}`,
+        shiftCutData: newCut,
+        cutId: newCut.id,
+        branchId: targetBranchId,
+        branchName: currentBranch?.name || "Sucursal",
+        timeAgo: "Hace un momento",
+        group: "recientes",
+        read: false,
+      };
+
+      addNotification(shiftNotif);
+
+      if (realtimeHub?.broadcastNotification) {
+        realtimeHub.broadcastNotification(shiftNotif);
+      }
+
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
-      window.dispatchEvent(new Event("brito_orders_updated"));
+      window.dispatchEvent(new Event("brito_incomes_updated"));
     } catch (err) {
       console.error("Error guardando corte:", err);
     }
@@ -930,16 +1690,29 @@ export default function CajaPage() {
     } catch (e) {}
 
     // High priority notification
+    const nowClose = new Date();
+    const closeTimeStr = `${nowClose.getHours().toString().padStart(2, "0")}:${nowClose.getMinutes().toString().padStart(2, "0")}`;
+    const isSquare = diff === 0;
+    const isShort = diff < 0;
+    const squareStatusTitle = isSquare
+      ? "✓ CAJA CUADRADA EXACTA ($0.00)"
+      : isShort
+      ? `🚨 NO CUADRÓ LA CAJA (Faltante ${formatCurrency(diff)})`
+      : `⚠️ NO CUADRÓ LA CAJA (Sobrante +${formatCurrency(diff)})`;
+    const withdrawnCash = Math.max(0, parsedCounted - parsedNextFund);
+
     addNotification({
-      senderName: `🏁 Corte Entregado (${currentShiftResponsible})`,
-      senderAvatar: "💰",
+      senderName: `🏁 Cierre de Turno (${currentShiftResponsible})`,
+      senderAvatar: isSquare ? "💰" : "⚠️",
       badgeIcon: "dinero",
-      title: `Corte de Turno ${newFolio} Registrado`,
-      highlightText: `${currentShiftResponsible} entregó turno a ${recipient} con ${formatCurrency(parsedCounted)}`,
-      description: `Folio ${newFolio} archivado en historial de caja. Efectivo entregado a Don Toño: ${formatCurrency(Math.max(0, parsedCounted - parsedNextFund))}. Diferencia: ${diff === 0 ? "Exacta" : formatCurrency(diff)}.`,
+      title: `Cierre a las ${closeTimeStr} hrs: ${squareStatusTitle}`,
+      highlightText: `Cambio de Turno: ${currentShiftResponsible} ➔ ${recipient}`,
+      description: `Folio ${newFolio} archivado en historial de caja. Horario de cierre: ${closeTimeStr} hrs. Efectivo en caja: ${formatCurrency(parsedCounted)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(diff)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(withdrawnCash)}.`,
       category: "caja",
-      actionLabel: "Ver Comprobante",
-      actionLink: "/caja?tab=historial",
+      actionLabel: "Ver Corte de Caja",
+      actionLink: `/caja?tab=historial&corteId=${newCut.id}`,
+      shiftCutData: newCut,
+      cutId: newCut.id,
     });
 
     setIsCorteModalOpen(false);
@@ -1013,24 +1786,49 @@ export default function CajaPage() {
       </div>
 
       {/* Navigation Header */}
-      <div className="flex items-center justify-between border-b border-stone-200 gap-2 pb-0">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 px-5 py-3 font-black text-xs sm:text-sm border-b-2 border-amber-600 text-amber-950 bg-amber-50/70 rounded-t-2xl shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-stone-200 gap-3 pb-0">
+        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <button
+            onClick={() => setActiveTab("historial")}
+            className={`flex items-center gap-2 px-4 sm:px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "historial"
+                ? "border-b-2 border-amber-600 text-amber-950 bg-amber-50/70 shadow-2xs"
+                : "text-stone-500 hover:text-stone-800 hover:bg-stone-50"
+            }`}
+          >
             <History className="w-4 h-4 text-amber-600" />
             <span>📜 Historial de Cortes de Caja</span>
             <span className="bg-amber-200 text-amber-950 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
               {cutsHistory.length}
             </span>
-          </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("movimientos")}
+            className={`flex items-center gap-2 px-4 sm:px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "movimientos"
+                ? "border-b-2 border-orange-500 text-orange-950 bg-orange-50/70 shadow-2xs"
+                : "text-stone-500 hover:text-stone-800 hover:bg-stone-50"
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-orange-500 animate-pulse" />
+            <span>⚡ Movimientos en Tiempo Real (Todas las Cajas)</span>
+            <span className="bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1 shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+              <span>EN VIVO</span>
+            </span>
+          </button>
         </div>
 
-        <button
-          onClick={handleExportCSV}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-stone-50 text-stone-700 font-bold rounded-xl border border-stone-200 text-xs shadow-2xs transition-colors mb-2 cursor-pointer"
-        >
-          <Download className="w-3.5 h-3.5 text-stone-600" />
-          <span>Exportar Historial (CSV)</span>
-        </button>
+        {activeTab === "historial" && (
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-stone-50 text-stone-700 font-bold rounded-xl border border-stone-200 text-xs shadow-2xs transition-colors mb-2 cursor-pointer self-start sm:self-auto"
+          >
+            <Download className="w-3.5 h-3.5 text-stone-600" />
+            <span>Exportar Historial (CSV)</span>
+          </button>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -1039,7 +1837,7 @@ export default function CajaPage() {
       {activeTab === "historial" && (
         <div className="space-y-6">
           {/* Tarjetas KPI de Auditoría */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white hover:bg-stone-50/50 p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
@@ -1083,23 +1881,6 @@ export default function CajaPage() {
               </div>
               <div className="p-3 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-200/60">
                 <Wallet className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white hover:bg-stone-50/50 p-5 rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
-                  Ventas Totales Auditadas
-                </span>
-                <span className="text-2xl font-black text-amber-950 mt-1 block">
-                  {formatCurrency(auditMetrics.totalSalesAudit)}
-                </span>
-                <span className="text-[11px] text-stone-500 font-medium mt-0.5 block">
-                  Efectivo + Tarjeta + Transf.
-                </span>
-              </div>
-              <div className="p-3 bg-amber-100 text-amber-900 rounded-2xl border border-amber-300">
-                <Coins className="w-6 h-6" />
               </div>
             </div>
 
@@ -1650,11 +2431,11 @@ export default function CajaPage() {
               </div>
 
               {/* 4. Filtro por Estado de Arqueo */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setFilterStatus("all")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                     filterStatus === "all"
                       ? "bg-stone-900 text-white border-stone-900 shadow-xs"
                       : "bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200"
@@ -1665,7 +2446,7 @@ export default function CajaPage() {
                 <button
                   type="button"
                   onClick={() => setFilterStatus("cuadrado")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                     filterStatus === "cuadrado"
                       ? "bg-emerald-900 text-emerald-100 border-emerald-950 shadow-xs ring-2 ring-emerald-500/20"
                       : "bg-stone-50 text-stone-700 hover:bg-emerald-50 border-stone-200"
@@ -1676,7 +2457,7 @@ export default function CajaPage() {
                 <button
                   type="button"
                   onClick={() => setFilterStatus("sobrante")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                     filterStatus === "sobrante"
                       ? "bg-blue-900 text-blue-100 border-blue-950 shadow-xs ring-2 ring-blue-500/20"
                       : "bg-stone-50 text-stone-700 hover:bg-blue-50 border-stone-200"
@@ -1687,7 +2468,7 @@ export default function CajaPage() {
                 <button
                   type="button"
                   onClick={() => setFilterStatus("faltante")}
-                  className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                     filterStatus === "faltante"
                       ? "bg-rose-900 text-rose-100 border-rose-950 shadow-xs ring-2 ring-rose-500/20"
                       : "bg-stone-50 text-stone-700 hover:bg-rose-50 border-stone-200"
@@ -1816,43 +2597,160 @@ export default function CajaPage() {
           </div>
 
           {/* Tabla / Listado de Cortes */}
-          <div className="bg-white rounded-3xl border border-stone-200/80 hover:border-orange-400 hover:ring-2 hover:ring-orange-400/20 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+          <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+            {/* Header del Bloque de Cortes */}
+            <div className="p-4 sm:p-5 border-b border-stone-100 bg-stone-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center font-black shadow-xs shrink-0">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-black text-sm sm:text-base text-stone-900">
+                      Comprobantes y Cortes Registrados
+                    </h3>
+                    <span className="bg-amber-100 text-amber-950 font-black text-[10px] px-2.5 py-0.5 rounded-full border border-amber-300">
+                      {filteredCuts.length} {filteredCuts.length === 1 ? "corte" : "cortes"}
+                    </span>
+                    {filterPeriod !== "todos" && (
+                      <span className="bg-stone-200/80 text-stone-700 font-extrabold text-[10px] px-2 py-0.5 rounded-md">
+                        {filterPeriod === "dia" ? `Día: ${selectedDayDate}` :
+                         filterPeriod === "mes" ? `Mes: ${selectedMonthStr}` : `Año: ${selectedYearStr}`}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-stone-500 font-medium mt-0.5">
+                    {filterPeriod === "dia"
+                      ? `Auditoría del día ${selectedDayDate} • Registros de turno oficial`
+                      : filterPeriod === "mes"
+                      ? `Auditoría acumulada del mes ${selectedMonthStr}`
+                      : filterPeriod === "ano"
+                      ? `Auditoría consolidada del año ${selectedYearStr}`
+                      : `Histórico completo (${cutsHistory.length} cortes archivados)`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Botones de acción rápida en cabecera */}
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                {filterPeriod !== "todos" && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterPeriod("todos")}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs border border-stone-200 shadow-2xs transition-colors cursor-pointer flex items-center gap-1.5"
+                    title="Ver todos los cortes archivados"
+                  >
+                    <span>📂 Ver Todos ({cutsHistory.length})</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleOpenCorteModal}
+                  className="px-3.5 py-1.5 rounded-xl bg-stone-900 hover:bg-black text-amber-400 font-black text-xs shadow-xs transition-transform active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>+ Nuevo Corte</span>
+                </button>
+              </div>
+            </div>
+
             {filteredCuts.length === 0 ? (
-              <div className="p-12 text-center space-y-3">
-                <div className="text-5xl">📜</div>
-                <h4 className="font-black text-base text-stone-800">No se encontraron cortes de caja</h4>
-                <p className="text-xs text-stone-500 max-w-md mx-auto">
-                  {filterPeriod !== "todos" || searchQuery || !isAllResponsiblesSelected || selectedResponsibles.includes("__none__") || filterStatus !== "all"
-                    ? "Ningún corte coincide con el período o filtros seleccionados. Puedes cambiar de fecha, mes o ver todos los registros."
-                    : "No hay registros de cortes de caja archivados aún."}
-                </p>
-                <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+              <div className="py-10 px-4 sm:px-8 text-center space-y-4 max-w-xl mx-auto">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center mx-auto shadow-2xs">
+                  <Receipt className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200">
+                    Sin cortes para este filtro
+                  </span>
+                  <h4 className="font-black text-base text-stone-900 mt-2">
+                    {filterPeriod === "dia" 
+                      ? `No hay cortes registrados para el día ${selectedDayDate}` 
+                      : filterPeriod === "mes" 
+                      ? `No hay cortes registrados para el mes ${selectedMonthStr}`
+                      : "No se encontraron cortes de caja"}
+                  </h4>
+                  <p className="text-xs text-stone-500 max-w-md mx-auto mt-1">
+                    {filterPeriod === "dia"
+                      ? "El turno actual continúa abierto o aún no se ha generado el corte de hoy. Puedes ver los comprobantes anteriores o realizar el corte oficial de tu turno."
+                      : "Ningún corte coincide con los filtros o la búsqueda seleccionada. Puedes restablecer los filtros para ver todos los comprobantes."}
+                  </p>
+                </div>
+
+                {/* Botones de acción rápida */}
+                <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
                   {filterPeriod !== "todos" && (
                     <button
+                      type="button"
                       onClick={() => setFilterPeriod("todos")}
-                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-900 font-black rounded-xl text-xs transition-colors shadow-xs cursor-pointer"
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black rounded-xl text-xs transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                     >
-                      Ver Todos los Cortes ({cutsHistory.length})
+                      <span>📂 Ver Histórico Completo ({cutsHistory.length})</span>
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={handleOpenCorteModal}
+                    className="px-4 py-2 bg-stone-900 hover:bg-black text-white font-bold rounded-xl text-xs transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Realizar Corte de Turno</span>
+                  </button>
                   {(searchQuery || !isAllResponsiblesSelected || selectedResponsibles.includes("__none__") || filterStatus !== "all") && (
                     <button
+                      type="button"
                       onClick={() => {
                         setSearchQuery("");
                         setSelectedResponsibles([]);
                         setFilterStatus("all");
                       }}
-                      className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                      className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
                     >
                       Restablecer Filtros
                     </button>
                   )}
                 </div>
+
+                {/* Tarjeta de Acceso al Último Corte Registrado */}
+                {latestCut && (
+                  <div className="pt-2">
+                    <div 
+                      onClick={() => setSelectedCutForDetail(latestCut)}
+                      className="p-3.5 bg-stone-50 hover:bg-amber-50/80 rounded-2xl border border-stone-200 hover:border-amber-300 transition-all text-left flex items-center justify-between gap-3 cursor-pointer shadow-2xs group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-white border border-stone-200 flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
+                          🧾
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide block">
+                            Último corte archivado en sistema:
+                          </span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <strong className="text-xs font-black text-stone-900">{latestCut.id}</strong>
+                            <span className="text-[11px] text-stone-500 font-medium">({latestCut.date})</span>
+                            <span className="text-[10px] bg-amber-100 text-amber-950 font-black px-1.5 py-0.2 rounded">
+                              {latestCut.responsible || latestCut.outgoingCashier}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-black text-emerald-700 block">
+                          {formatCurrency(latestCut.countedCash)}
+                        </span>
+                        <span className="text-[10px] text-amber-800 font-bold group-hover:underline">
+                          Ver Ticket ➔
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[640px] overflow-y-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-stone-50 text-stone-500 font-black border-b border-stone-200 uppercase tracking-wider text-[10px]">
+                  <thead className="sticky top-0 bg-stone-50/95 backdrop-blur-xs text-stone-500 font-black border-b border-stone-200 uppercase tracking-wider text-[10px] z-10 shadow-2xs">
                     <tr>
                       <th className="p-4">Folio & Fecha</th>
                       <th className="p-4">Responsable del Turno</th>
@@ -1987,11 +2885,391 @@ export default function CajaPage() {
                 </table>
               </div>
             )}
+
+            {/* Footer de Resumen cuando hay registros */}
+            {filteredCuts.length > 0 && (
+              <div className="p-3.5 bg-stone-50 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-stone-500">
+                <div className="flex items-center gap-2">
+                  <span>Mostrando <strong className="text-stone-800">{filteredCuts.length}</strong> de {cutsHistory.length} comprobantes</span>
+                  <span className="text-stone-300">•</span>
+                  <span className="text-[11px] text-stone-400">Total ventas auditadas: <strong className="text-stone-700">{formatCurrency(auditMetrics.totalSalesAudit)}</strong></span>
+                </div>
+                <span className="text-[11px] text-stone-400">
+                  Haz clic sobre cualquier fila o en <strong>"Reimprimir"</strong> para ver el comprobante oficial
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
 
+      {/* ========================================================================= */}
+      {/* PESTAÑA 2: MOVIMIENTOS EN TIEMPO REAL (TODAS LAS CAJAS Y SUCURSALES)       */}
+      {/* ========================================================================= */}
+      {activeTab === "movimientos" && (
+        <div className="space-y-6">
+          {/* Banner de Sincronización y Estado WebSocket en Vivo */}
+          <div className="bg-gradient-to-r from-stone-900 via-stone-800 to-amber-950 p-5 sm:p-6 rounded-3xl text-white shadow-xl border border-stone-700/60 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1.5 z-10">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black tracking-wide uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span>Enlace WebSocket y Hub Local Activo</span>
+                </span>
+                <span className="text-xs text-stone-400 font-mono">0 ms de latencia</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                <span>⚡ Monitor de Flujo de Efectivo en Vivo</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-stone-300 max-w-2xl leading-relaxed">
+                Panel de control para Don Toño Brito: supervisa cada peso que entra, sale o se transfiere en todas las cajas de todas las sucursales al instante.
+              </p>
+            </div>
 
+            <div className="flex items-center gap-2.5 z-10 shrink-0">
+              <button
+                onClick={() => {
+                  realtimeHub.triggerSyncNow();
+                  loadLiveMovements();
+                  loadCutsHistory();
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all border border-white/20 active:scale-95 shadow-sm cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 text-amber-300" />
+                <span>Actualizar Feed Ahora</span>
+              </button>
+            </div>
+            
+            <div className="absolute right-0 bottom-0 translate-x-8 translate-y-8 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          </div>
+
+          {/* Tarjetas KPI de Dinero en Vivo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* KPI 1: Ingresos Totales en Vivo */}
+            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 hover:border-emerald-400 hover:ring-2 hover:ring-emerald-400/20 shadow-sm hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-emerald-800 uppercase tracking-wider block">
+                  (+) Total Ingresos en Vivo
+                </span>
+                <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-200">
+                  <ArrowUpRight className="w-5 h-5" />
+                </div>
+              </div>
+              <span className="text-2xl font-black text-emerald-700 mt-2 block tracking-tight font-mono">
+                +{formatCurrency(liveKpis.totalIn)}
+              </span>
+              <span className="text-[11px] text-stone-500 font-medium mt-1 block">
+                Ventas mostrador + Aportaciones de cambio
+              </span>
+            </div>
+
+            {/* KPI 2: Salidas y Retiros en Vivo */}
+            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 hover:border-rose-400 hover:ring-2 hover:ring-rose-400/20 shadow-sm hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-rose-800 uppercase tracking-wider block">
+                  (-) Salidas & Retiros en Vivo
+                </span>
+                <div className="p-2.5 bg-rose-50 text-rose-700 rounded-2xl border border-rose-200">
+                  <ArrowDownRight className="w-5 h-5" />
+                </div>
+              </div>
+              <span className="text-2xl font-black text-rose-700 mt-2 block tracking-tight font-mono">
+                -{formatCurrency(liveKpis.totalOut)}
+              </span>
+              <span className="text-[11px] text-stone-500 font-medium mt-1 block">
+                Gastos insumos + Retiros Don Toño
+              </span>
+            </div>
+
+            {/* KPI 3: Flujo Neto en Efectivo */}
+            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 hover:border-amber-400 hover:ring-2 hover:ring-amber-400/20 shadow-sm hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-amber-900 uppercase tracking-wider block">
+                  (=) Flujo Neto en Efectivo
+                </span>
+                <div className="p-2.5 bg-amber-50 text-amber-700 rounded-2xl border border-amber-200">
+                  <Wallet className="w-5 h-5" />
+                </div>
+              </div>
+              <span className={`text-2xl font-black mt-2 block tracking-tight font-mono ${liveKpis.netCash >= 0 ? "text-stone-900" : "text-rose-700"}`}>
+                {liveKpis.netCash >= 0 ? "+" : ""}{formatCurrency(liveKpis.netCash)}
+              </span>
+              <span className="text-[11px] text-stone-500 font-medium mt-1 block">
+                Balance disponible en cajones
+              </span>
+            </div>
+
+            {/* KPI 4: Total de Movimientos Transmitidos */}
+            <div className="bg-white p-5 rounded-3xl border border-stone-200/80 hover:border-blue-400 hover:ring-2 hover:ring-blue-400/20 shadow-sm hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-stone-600 uppercase tracking-wider block">
+                  Transacciones en Feed
+                </span>
+                <div className="p-2.5 bg-blue-50 text-blue-700 rounded-2xl border border-blue-200">
+                  <Radio className="w-5 h-5" />
+                </div>
+              </div>
+              <span className="text-2xl font-black text-stone-900 mt-2 block tracking-tight font-mono">
+                {filteredLiveMovements.length} Movimientos
+              </span>
+              <span className="text-[11px] text-stone-500 font-medium mt-1 block">
+                Filtrados según selección
+              </span>
+            </div>
+          </div>
+
+          {/* Barra de Filtros en Tiempo Real */}
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-3.5">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 flex-wrap">
+              {/* Buscador */}
+              <div className="relative flex-1 min-w-[220px]">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por concepto, cajero, sucursal, ID..."
+                  value={liveSearchQuery}
+                  onChange={(e) => setLiveSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-2.5 bg-stone-50 hover:bg-stone-100/80 focus:bg-white rounded-2xl border border-stone-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-xs font-medium transition-all"
+                />
+                {liveSearchQuery && (
+                  <button
+                    onClick={() => setLiveSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 p-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Selector de Sucursal */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-stone-500 shrink-0 flex items-center gap-1">
+                  <Store className="w-3.5 h-3.5 text-stone-400" /> Sucursal:
+                </label>
+                <select
+                  value={liveBranchFilter}
+                  onChange={(e) => setLiveBranchFilter(e.target.value)}
+                  className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-800 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Todas las Sucursales (Global)</option>
+                  {(branches || []).map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Selector de Cajero / Perfil */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-stone-500 shrink-0 flex items-center gap-1">
+                  <User className="w-3.5 h-3.5 text-stone-400" /> Perfil:
+                </label>
+                <select
+                  value={liveCashierFilter}
+                  onChange={(e) => setLiveCashierFilter(e.target.value)}
+                  className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-800 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer max-w-[200px]"
+                >
+                  <option value="all">Todos los Perfiles</option>
+                  {uniqueLiveCashiers.map((cName) => (
+                    <option key={cName} value={cName}>
+                      {cName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Selector de Tipo */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-stone-500 shrink-0 flex items-center gap-1">
+                  <Filter className="w-3.5 h-3.5 text-stone-400" /> Tipo:
+                </label>
+                <select
+                  value={liveTypeFilter}
+                  onChange={(e) => setLiveTypeFilter(e.target.value as any)}
+                  className="px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-800 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Todos los Movimientos</option>
+                  <option value="venta">🟢 Ventas Mostrador</option>
+                  <option value="entrada">🪙 Entradas / Fondos</option>
+                  <option value="salida">💸 Gastos y Salidas</option>
+                  <option value="corte">🏁 Cortes de Turno</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla / Feed de Movimientos en Tiempo Real */}
+          <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden">
+            {filteredLiveMovements.length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <div className="w-14 h-14 bg-stone-100 rounded-full flex items-center justify-center mx-auto text-stone-400">
+                  <Radio className="w-7 h-7 animate-pulse text-amber-500" />
+                </div>
+                <h4 className="text-base font-black text-stone-900">
+                  Sin movimientos registrados con los filtros actuales
+                </h4>
+                <p className="text-xs text-stone-500 max-w-md mx-auto">
+                  El sistema está conectado al Hub en tiempo real y esperando nuevas transacciones de mostrador, entradas o gastos.
+                </p>
+                {(liveBranchFilter !== "all" || liveCashierFilter !== "all" || liveTypeFilter !== "all" || liveSearchQuery) && (
+                  <button
+                    onClick={() => {
+                      setLiveBranchFilter("all");
+                      setLiveCashierFilter("all");
+                      setLiveTypeFilter("all");
+                      setLiveSearchQuery("");
+                    }}
+                    className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3.5 py-1.5 rounded-xl border border-amber-200 transition-colors cursor-pointer"
+                  >
+                    Restablecer todos los filtros
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-stone-200/80 bg-stone-50/70 text-stone-500 font-black uppercase text-[10px] tracking-wider">
+                      <th className="py-3 px-4">Hora / Estado</th>
+                      <th className="py-3 px-4">Sucursal</th>
+                      <th className="py-3 px-4">Cajero / Perfil</th>
+                      <th className="py-3 px-4">Tipo Movimiento</th>
+                      <th className="py-3 px-4">Concepto / Detalle</th>
+                      <th className="py-3 px-4 text-center">Método</th>
+                      <th className="py-3 px-4 text-right">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 font-medium">
+                    {filteredLiveMovements.map((mov) => {
+                      const isRecent = isRecentlyCreated(mov.timestamp);
+                      const isPositive = mov.type === "venta" || mov.type === "entrada";
+                      const isExpense = mov.type === "salida";
+                      const isCut = mov.type === "corte";
+
+                      return (
+                        <tr
+                          key={mov.id}
+                          className={`hover:bg-stone-50/80 transition-colors ${
+                            isRecent ? "bg-amber-50/20" : ""
+                          }`}
+                        >
+                          {/* Hora y Badge en Vivo */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-stone-800">
+                                {formatLiveTime(mov.timestamp)}
+                              </span>
+                              {isRecent && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                  <span>En vivo</span>
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Sucursal */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-black border ${getBranchBadgeColor(mov.branchId)}`}>
+                              <Store className="w-3.5 h-3.5 shrink-0" />
+                              <span>{mov.branchName || "Sucursal Matriz"}</span>
+                            </span>
+                          </td>
+
+                          {/* Cajero / Perfil */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-stone-100 border border-stone-300 flex items-center justify-center font-black text-stone-700 text-xs shrink-0 shadow-2xs">
+                                {mov.isOwner ? "👑" : mov.cashier.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-black text-stone-900 text-xs">
+                                  {mov.cashier}
+                                </span>
+                                {mov.isOwner && (
+                                  <span className="text-[10px] font-bold text-amber-700">
+                                    Propietario / Don Toño
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Tipo de Movimiento */}
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {isPositive && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-black text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>{mov.categoryLabel || "Ingreso / Venta"}</span>
+                              </span>
+                            )}
+                            {isExpense && (
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-black text-[11px] border ${
+                                mov.isOwner
+                                  ? "bg-amber-100 text-amber-950 border-amber-300"
+                                  : "bg-rose-50 text-rose-800 border border-rose-200"
+                              }`}>
+                                <ArrowDownRight className="w-3.5 h-3.5 text-rose-600" />
+                                <span>{mov.categoryLabel || "Salida / Gasto"}</span>
+                              </span>
+                            )}
+                            {isCut && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-black text-[11px] bg-amber-100 text-amber-950 border border-amber-300">
+                                <Lock className="w-3.5 h-3.5 text-amber-700" />
+                                <span>🏁 Corte de Turno</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Concepto / Detalle */}
+                          <td className="py-3 px-4">
+                            <span className="font-semibold text-stone-800 block max-w-sm sm:max-w-md truncate" title={mov.concept}>
+                              {mov.concept}
+                            </span>
+                            <span className="text-[10px] text-stone-400 block font-mono">
+                              ID: {mov.id}
+                            </span>
+                          </td>
+
+                          {/* Forma de Pago */}
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-lg font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
+                              mov.paymentMethod === "efectivo"
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                : mov.paymentMethod === "tarjeta"
+                                ? "bg-blue-100 text-blue-800 border-blue-200"
+                                : "bg-purple-100 text-purple-800 border-purple-200"
+                            }`}>
+                              {mov.paymentMethod === "efectivo" && <Wallet className="w-3 h-3 shrink-0" />}
+                              {mov.paymentMethod === "tarjeta" && <CreditCard className="w-3 h-3 shrink-0" />}
+                              {mov.paymentMethod === "transferencia" && <Building className="w-3 h-3 shrink-0" />}
+                              <span>{mov.paymentMethod}</span>
+                            </span>
+                          </td>
+
+                          {/* Monto */}
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <span className={`font-mono font-black text-sm tracking-tight ${
+                              isPositive
+                                ? "text-emerald-700"
+                                : isExpense
+                                ? "text-rose-700"
+                                : "text-amber-900"
+                            }`}>
+                              {isPositive ? "+" : isExpense ? "-" : ""}{formatCurrency(mov.amount)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* MODAL 1: REGISTRAR ENTRADA / SALIDA                                      */}

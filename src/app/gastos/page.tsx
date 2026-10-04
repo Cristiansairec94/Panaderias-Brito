@@ -31,6 +31,8 @@ import {
   Ban,
   Building2,
   ChevronDown,
+  Table,
+  LayoutGrid,
   BarChart3,
   Flame,
   Wheat,
@@ -70,9 +72,24 @@ const parseExpenseDate = (raw: string | Date | undefined | null): Date | null =>
 
   const text = String(raw).trim();
   if (!text) return null;
+
+  if (text.toLowerCase().includes("hoy")) {
+    return new Date();
+  }
+  if (text.toLowerCase().includes("ayer")) {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d;
+  }
+
   const mISO = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (mISO) {
     const dt = new Date(Number(mISO[1]), Number(mISO[2]) - 1, Number(mISO[3]), 12, 0, 0);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  const mDMY = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (mDMY) {
+    const dt = new Date(Number(mDMY[3]), Number(mDMY[2]) - 1, Number(mDMY[1]), 12, 0, 0);
     return isNaN(dt.getTime()) ? null : dt;
   }
   const parsed = new Date(text);
@@ -116,7 +133,7 @@ const getExpenseTimestamp = (g: Partial<ExpenseRecord> | null | undefined): numb
 };
 
 const getExpenseDateTimeInfo = (g: { date?: string; timestamp?: string; displayDate?: string } | null | undefined) => {
-  if (!g) return { isHoy: false, isAyer: false, formattedDate: "-" };
+  if (!g) return { isHoy: false, isAyer: false, formattedDate: "-", timeStr: "", cleanDate: "-" };
   const todayStr = getLocalDateISO(new Date());
   const yest = new Date();
   yest.setDate(yest.getDate() - 1);
@@ -142,29 +159,35 @@ const getExpenseDateTimeInfo = (g: { date?: string; timestamp?: string; displayD
   }
 
   let formattedDate = "";
+  let cleanDate = "";
   if (isHoy) {
     formattedDate = timeStr ? `Hoy, ${timeStr}` : "Hoy";
+    cleanDate = "Hoy";
   } else if (isAyer) {
     formattedDate = timeStr ? `Ayer, ${timeStr}` : "Ayer";
+    cleanDate = "Ayer";
   } else if (rawDate) {
     const parts = rawDate.split("-");
     if (parts.length === 3) {
-      const ddmmyyyy = `${parts[2]}/${parts[1]}/${parts[0]}`;
-      formattedDate = timeStr ? `${ddmmyyyy}, ${timeStr}` : ddmmyyyy;
+      cleanDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      formattedDate = timeStr ? `${cleanDate}, ${timeStr}` : cleanDate;
     } else {
+      cleanDate = rawDate;
       formattedDate = rawDate;
     }
   } else {
     formattedDate = g.displayDate || "-";
+    cleanDate = g.displayDate || "-";
   }
 
-  return { isHoy, isAyer, formattedDate };
+  return { isHoy, isAyer, formattedDate, timeStr, cleanDate };
 };
 
 // ─── Catálogo de Categorías Especializado en Panadería ──────────────────────
 export interface GastoCategoriaDef {
   id: string;
   label: string;
+  shortLabel?: string;
   icon: string;
   bg: string;
   text: string;
@@ -172,16 +195,16 @@ export interface GastoCategoriaDef {
 }
 
 const GASTO_CATEGORIAS: GastoCategoriaDef[] = [
-  { id: "insumos", label: "Materia Prima & Harinas", icon: "🥖", bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-200" },
-  { id: "gas_lp", label: "Gas LP para Hornos", icon: "🔥", bg: "bg-orange-50", text: "text-orange-800", border: "border-orange-200" },
-  { id: "nomina", label: "Sueldos & Nómina", icon: "💼", bg: "bg-purple-50", text: "text-purple-800", border: "border-purple-200" },
-  { id: "servicios", label: "Luz, Agua e Internet", icon: "⚡", bg: "bg-cyan-50", text: "text-cyan-800", border: "border-cyan-200" },
-  { id: "empaques", label: "Bolsas Kraft & Empaques", icon: "📦", bg: "bg-stone-100", text: "text-stone-800", border: "border-stone-200" },
-  { id: "mantenimiento", label: "Mantenimiento & Refacciones", icon: "🛠️", bg: "bg-blue-50", text: "text-blue-800", border: "border-blue-200" },
-  { id: "gasolina", label: "Gasolina & Repartos", icon: "⛽", bg: "bg-yellow-50", text: "text-yellow-800", border: "border-yellow-200" },
-  { id: "proveedores", label: "Pago a Proveedores", icon: "🤝", bg: "bg-emerald-50", text: "text-emerald-800", border: "border-emerald-200" },
-  { id: "retiro_dueno", label: "Retiro Don Toño / Socios", icon: "🪙", bg: "bg-rose-50", text: "text-rose-800", border: "border-rose-200" },
-  { id: "otros", label: "Gastos Menores / Varios", icon: "🧾", bg: "bg-stone-50", text: "text-stone-700", border: "border-stone-200" },
+  { id: "insumos", label: "Materia Prima & Harinas", shortLabel: "Insumos", icon: "🥖", bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-200" },
+  { id: "gas_lp", label: "Gas LP para Hornos", shortLabel: "Gas LP", icon: "🔥", bg: "bg-orange-50", text: "text-orange-800", border: "border-orange-200" },
+  { id: "nomina", label: "Sueldos & Nómina", shortLabel: "Nómina", icon: "💼", bg: "bg-purple-50", text: "text-purple-800", border: "border-purple-200" },
+  { id: "servicios", label: "Luz, Agua e Internet", shortLabel: "Servicios", icon: "⚡", bg: "bg-cyan-50", text: "text-cyan-800", border: "border-cyan-200" },
+  { id: "empaques", label: "Bolsas Kraft & Empaques", shortLabel: "Empaques", icon: "📦", bg: "bg-stone-100", text: "text-stone-800", border: "border-stone-200" },
+  { id: "mantenimiento", label: "Mantenimiento & Refacciones", shortLabel: "Mantenimiento", icon: "🛠️", bg: "bg-blue-50", text: "text-blue-800", border: "border-blue-200" },
+  { id: "gasolina", label: "Gasolina & Repartos", shortLabel: "Gasolina", icon: "⛽", bg: "bg-yellow-50", text: "text-yellow-800", border: "border-yellow-200" },
+  { id: "proveedores", label: "Pago a Proveedores", shortLabel: "Proveedores", icon: "🤝", bg: "bg-emerald-50", text: "text-emerald-800", border: "border-emerald-200" },
+  { id: "retiro_dueno", label: "Retiro Don Toño / Socios", shortLabel: "Don Toño", icon: "🪙", bg: "bg-rose-50", text: "text-rose-800", border: "border-rose-200" },
+  { id: "otros", label: "Gastos Menores / Varios", shortLabel: "Varios", icon: "🧾", bg: "bg-stone-50", text: "text-stone-700", border: "border-stone-200" },
 ];
 
 const CUENTAS_ORIGEN = [
@@ -379,6 +402,8 @@ function ExpandableConceptText({ text, maxChars = 50 }: { text: string; maxChars
   );
 }
 
+export type PeriodoFiltro = "todos" | "dia" | "semana" | "mes" | "anio";
+
 export default function GastosPage() {
   const { user } = useAuth();
   const { branches, currentBranch } = useBranch();
@@ -388,9 +413,11 @@ export default function GastosPage() {
   const [gastos, setGastos] = useState<ExpenseRecord[]>([]);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [mostrarStats, setMostrarStats] = useState(false);
-  const [periodoStats, setPeriodoStats] = useState<"hoy" | "semana" | "mes">("hoy");
+  const [periodoStats, setPeriodoStats] = useState<"hoy" | "semana" | "mes" | "anio">("hoy");
 
   // ── Filtros ──
+  const [viewMode, setViewMode] = useState<"tabla" | "fichas">("tabla");
+  const [filtroPeriodo, setFiltroPeriodo] = useState<PeriodoFiltro>("todos");
   const [search, setSearch] = useState("");
   const [filtroSucursal, setFiltroSucursal] = useState<string>("all");
   const [filtroTipoPago, setFiltroTipoPago] = useState<string>("all");
@@ -561,6 +588,7 @@ export default function GastosPage() {
       return {
         id: "otros",
         label: "Gastos Menores / Varios",
+        shortLabel: "Varios",
         icon: "🧾",
         bg: "bg-stone-50",
         text: "text-stone-700",
@@ -569,12 +597,13 @@ export default function GastosPage() {
     }
     const catLower = String(catIdOrLabel).toLowerCase();
     const found = GASTO_CATEGORIAS.find(
-      (c) => c.id === catIdOrLabel || c.label.toLowerCase() === catLower
+      (c) => c.id === catIdOrLabel || c.label.toLowerCase() === catLower || (c.shortLabel && c.shortLabel.toLowerCase() === catLower)
     );
     return (
       found || {
         id: "otros",
         label: String(catIdOrLabel) || "Otros Gastos",
+        shortLabel: String(catIdOrLabel) || "Gasto",
         icon: "🧾",
         bg: "bg-stone-50",
         text: "text-stone-700",
@@ -583,20 +612,91 @@ export default function GastosPage() {
     );
   };
 
+  // ─── Rangos de Fecha para Filtros y KPIs ───────────────────────────────────
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentDate = now.getDate();
+
+  // 1. Día (Hoy)
+  const todayStart = useMemo(() => new Date(currentYear, currentMonth, currentDate, 0, 0, 0, 0), [currentYear, currentMonth, currentDate]);
+  const todayEnd = useMemo(() => new Date(currentYear, currentMonth, currentDate, 23, 59, 59, 999), [currentYear, currentMonth, currentDate]);
+
+  // 2. Semana (Esta Semana: Lunes a Domingo)
+  const lunesSemana = useMemo(() => {
+    const d = new Date(now);
+    const day = d.getDay() || 7;
+    d.setDate(d.getDate() - day + 1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [currentYear, currentMonth, currentDate]);
+
+  const domingoSemana = useMemo(() => {
+    const d = new Date(lunesSemana);
+    d.setDate(d.getDate() + 6);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }, [lunesSemana]);
+
+  // 3. Mes (Este Mes)
+  const primerDiaMes = useMemo(() => new Date(currentYear, currentMonth, 1, 0, 0, 0, 0), [currentYear, currentMonth]);
+  const ultimoDiaMes = useMemo(() => new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999), [currentYear, currentMonth]);
+
+  // 4. Año (Este Año)
+  const primerDiaAnio = useMemo(() => new Date(currentYear, 0, 1, 0, 0, 0, 0), [currentYear]);
+  const ultimoDiaAnio = useMemo(() => new Date(currentYear, 11, 31, 23, 59, 59, 999), [currentYear]);
+
+  // ─── Conteo de Gastos por Período de Tiempo (Día, Semana, Mes, Año, Todos) ──
+  const countsByPeriod = useMemo(() => {
+    let dia = 0;
+    let semana = 0;
+    let mes = 0;
+    let anio = 0;
+    let todos = 0;
+
+    (gastos || []).forEach((g) => {
+      if (!g) return;
+      if (filtroSucursal !== "all" && g.branchId !== filtroSucursal) return;
+      if (filtroTipoPago !== "all" && g.paymentMethod !== filtroTipoPago) return;
+
+      todos++;
+      const d = parseExpenseDate(g.date) || (g.timestamp ? new Date(g.timestamp) : null);
+      if (!d) return;
+
+      if (d >= todayStart && d <= todayEnd) dia++;
+      if (d >= lunesSemana && d <= domingoSemana) semana++;
+      if (d >= primerDiaMes && d <= ultimoDiaMes) mes++;
+      if (d >= primerDiaAnio && d <= ultimoDiaAnio) anio++;
+    });
+
+    return { dia, semana, mes, anio, todos };
+  }, [gastos, filtroSucursal, filtroTipoPago, todayStart, todayEnd, lunesSemana, domingoSemana, primerDiaMes, ultimoDiaMes, primerDiaAnio, ultimoDiaAnio]);
+
   // ─── Filtrado Principal y Ordenamiento Cronológico (Más reciente primero) ─
   const filteredGastos = useMemo(() => {
     return (gastos || [])
       .filter((g) => {
         if (!g) return false;
-        // 1. Filtro por Sucursal
+
+        // 1. Filtro por Período (Día / Semana / Mes / Año / Todos)
+        if (filtroPeriodo !== "todos") {
+          const d = parseExpenseDate(g.date) || (g.timestamp ? new Date(g.timestamp) : null);
+          if (!d) return false;
+          if (filtroPeriodo === "dia" && !(d >= todayStart && d <= todayEnd)) return false;
+          if (filtroPeriodo === "semana" && !(d >= lunesSemana && d <= domingoSemana)) return false;
+          if (filtroPeriodo === "mes" && !(d >= primerDiaMes && d <= ultimoDiaMes)) return false;
+          if (filtroPeriodo === "anio" && !(d >= primerDiaAnio && d <= ultimoDiaAnio)) return false;
+        }
+
+        // 2. Filtro por Sucursal
         if (filtroSucursal !== "all" && g.branchId !== filtroSucursal) {
           return false;
         }
-        // 2. Filtro por Tipo de Pago
+        // 3. Filtro por Tipo de Pago
         if (filtroTipoPago !== "all" && g.paymentMethod !== filtroTipoPago) {
           return false;
         }
-        // 3. Búsqueda libre
+        // 4. Búsqueda libre
         if (search.trim()) {
           const query = search.toLowerCase();
           const haystack = `${g.id || ""} ${g.date || ""} ${g.categoryLabel || ""} ${g.branchName || ""} ${g.description || ""} ${g.paymentMethod || ""} ${g.accountOrigin || ""} ${g.cashier || ""} ${g.supplier || ""}`.toLowerCase();
@@ -605,23 +705,9 @@ export default function GastosPage() {
         return true;
       })
       .sort((a, b) => getExpenseTimestamp(b) - getExpenseTimestamp(a));
-  }, [gastos, filtroSucursal, filtroTipoPago, search]);
+  }, [gastos, filtroPeriodo, filtroSucursal, filtroTipoPago, search, todayStart, todayEnd, lunesSemana, domingoSemana, primerDiaMes, ultimoDiaMes, primerDiaAnio, ultimoDiaAnio]);
 
   // ─── Cálculos de KPIs (Reactivos al filtro de sucursal) ─────────────────────
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-
-  const lunesSemana = (() => {
-    const d = new Date(now);
-    const day = d.getDay() || 7;
-    d.setDate(d.getDate() - day + 1);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  })();
-
-  const primerDiaMes = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-
   // Considerar únicamente los gastos de la sucursal activa en el filtro para los KPIs
   const gastosParaKPIs = useMemo(() => {
     if (filtroSucursal === "all") return gastos;
@@ -647,23 +733,34 @@ export default function GastosPage() {
     return gastosParaKPIs.reduce((acc, g) => {
       if (g.status === "anulado") return acc;
       const d = parseExpenseDate(g.date);
-      if (d && d >= lunesSemana && d <= now) {
+      if (d && d >= lunesSemana && d <= domingoSemana) {
         acc += Number(g.amount || 0);
       }
       return acc;
     }, 0);
-  }, [gastosParaKPIs, lunesSemana, now]);
+  }, [gastosParaKPIs, lunesSemana, domingoSemana]);
 
   const totalMes = useMemo(() => {
     return gastosParaKPIs.reduce((acc, g) => {
       if (g.status === "anulado") return acc;
       const d = parseExpenseDate(g.date);
-      if (d && d >= primerDiaMes && d <= now) {
+      if (d && d >= primerDiaMes && d <= ultimoDiaMes) {
         acc += Number(g.amount || 0);
       }
       return acc;
     }, 0);
-  }, [gastosParaKPIs, primerDiaMes, now]);
+  }, [gastosParaKPIs, primerDiaMes, ultimoDiaMes]);
+
+  const totalAnio = useMemo(() => {
+    return gastosParaKPIs.reduce((acc, g) => {
+      if (g.status === "anulado") return acc;
+      const d = parseExpenseDate(g.date);
+      if (d && d >= primerDiaAnio && d <= ultimoDiaAnio) {
+        acc += Number(g.amount || 0);
+      }
+      return acc;
+    }, 0);
+  }, [gastosParaKPIs, primerDiaAnio, ultimoDiaAnio]);
 
   // ─── Estadísticas y Distribución por Categoría ────────────────────────────
   const statsData = useMemo(() => {
@@ -675,9 +772,11 @@ export default function GastosPage() {
       if (periodoStats === "hoy") {
         return d >= todayStart && d <= todayEnd;
       } else if (periodoStats === "semana") {
-        return d >= lunesSemana && d <= now;
+        return d >= lunesSemana && d <= domingoSemana;
       } else if (periodoStats === "mes") {
-        return d >= primerDiaMes && d <= now;
+        return d >= primerDiaMes && d <= ultimoDiaMes;
+      } else if (periodoStats === "anio") {
+        return d >= primerDiaAnio && d <= ultimoDiaAnio;
       }
       return true;
     });
@@ -762,11 +861,13 @@ export default function GastosPage() {
     try {
       const supabase = createClient();
       await supabase.from("cash_movements").insert({
+        id: nuevoGasto.id,
         type: "salida",
         category: form.categoriaId,
         amount: nuevoGasto.amount,
         reason: `[${nuevoGasto.id}] ${nuevoGasto.categoryLabel}: ${nuevoGasto.description} (${nuevoGasto.branchName})`,
         authorized_by: nuevoGasto.cashier,
+        branch_id: nuevoGasto.branchId || "branch-matriz",
       });
     } catch (err) {
       console.log("Offline mode, saved locally", err);
@@ -1074,11 +1175,29 @@ export default function GastosPage() {
       )}
 
       {/* ── KPI Cards Grid ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── KPI Cards Grid ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-4">
         {/* Gastos de Hoy */}
-        <div className="bg-gradient-to-br from-rose-900 via-rose-950 to-stone-950 p-5 rounded-3xl border border-rose-800/60 shadow-xl text-white transition-all duration-200 hover:border-rose-400 hover:shadow-2xl hover:shadow-rose-950/50 hover:ring-2 hover:ring-rose-400/30 hover:-translate-y-0.5 cursor-default relative overflow-hidden">
+        <div
+          onClick={() => setFiltroPeriodo(filtroPeriodo === "dia" ? "todos" : "dia")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para filtrar solo los gastos de hoy"
+          className={`bg-gradient-to-br from-rose-900 via-rose-950 to-stone-950 p-5 rounded-3xl border shadow-xl text-white transition-all duration-200 cursor-pointer relative overflow-hidden select-none hover:scale-[1.01] ${
+            filtroPeriodo === "dia"
+              ? "border-rose-400 ring-4 ring-rose-400/40 shadow-2xl shadow-rose-950/60"
+              : "border-rose-800/60 hover:border-rose-400 hover:shadow-2xl hover:shadow-rose-950/50 hover:ring-2 hover:ring-rose-400/30"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-rose-200 uppercase tracking-wider">Gastos de Hoy</span>
+            <span className="text-xs font-bold text-rose-200 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Gastos de Hoy</span>
+              {filtroPeriodo === "dia" && (
+                <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Activo
+                </span>
+              )}
+            </span>
             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-600/40 text-rose-200 rounded-xl border border-rose-500/30 shadow-sm" title="Símbolo de gastos: Gráfica en caída">
               <TrendingDown className="w-3.5 h-3.5 text-rose-300" />
               <span className="text-[10px] font-black uppercase tracking-wider">En caída</span>
@@ -1109,9 +1228,26 @@ export default function GastosPage() {
         </div>
 
         {/* Gastos de la Semana */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20 hover:-translate-y-0.5 cursor-default">
+        <div
+          onClick={() => setFiltroPeriodo(filtroPeriodo === "semana" ? "todos" : "semana")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para filtrar los gastos de esta semana (Lunes a Domingo)"
+          className={`bg-white p-5 rounded-3xl border shadow-sm transition-all duration-200 cursor-pointer select-none hover:scale-[1.01] ${
+            filtroPeriodo === "semana"
+              ? "border-amber-500 ring-4 ring-amber-400/30 shadow-lg shadow-amber-500/10 bg-amber-50/30"
+              : "border-stone-200/80 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/10 hover:ring-2 hover:ring-amber-400/20"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Gastos de la Semana</span>
+            <span className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+              <span>Gastos de la Semana</span>
+              {filtroPeriodo === "semana" && (
+                <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Activo
+                </span>
+              )}
+            </span>
             <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
               <Calendar className="w-4 h-4" />
             </div>
@@ -1125,9 +1261,26 @@ export default function GastosPage() {
         </div>
 
         {/* Gastos del Mes */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20 hover:-translate-y-0.5 cursor-default">
+        <div
+          onClick={() => setFiltroPeriodo(filtroPeriodo === "mes" ? "todos" : "mes")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para filtrar los gastos del mes en curso"
+          className={`bg-white p-5 rounded-3xl border shadow-sm transition-all duration-200 cursor-pointer select-none hover:scale-[1.01] ${
+            filtroPeriodo === "mes"
+              ? "border-blue-500 ring-4 ring-blue-400/30 shadow-lg shadow-blue-500/10 bg-blue-50/30"
+              : "border-stone-200/80 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:ring-2 hover:ring-blue-400/20"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Gastos del Mes</span>
+            <span className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+              <span>Gastos del Mes</span>
+              {filtroPeriodo === "mes" && (
+                <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider animate-pulse">
+                  Activo
+                </span>
+              )}
+            </span>
             <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
               <DollarSign className="w-4 h-4" />
             </div>
@@ -1140,10 +1293,27 @@ export default function GastosPage() {
           </p>
         </div>
 
-        {/* Total Registros */}
-        <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm transition-all duration-200 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20 hover:-translate-y-0.5 cursor-default">
+        {/* Total Registros / Vista General */}
+        <div
+          onClick={() => setFiltroPeriodo("todos")}
+          role="button"
+          tabIndex={0}
+          title="Haz clic para mostrar todos los gastos sin filtro temporal"
+          className={`bg-white p-5 rounded-3xl border shadow-sm transition-all duration-200 cursor-pointer select-none hover:scale-[1.01] ${
+            filtroPeriodo === "todos"
+              ? "border-rose-500 ring-4 ring-rose-400/20 shadow-lg shadow-rose-500/10 bg-rose-50/20"
+              : "border-stone-200/80 hover:border-rose-400 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20"
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-stone-500">Total Registros</span>
+            <span className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+              <span>Total Registros</span>
+              {filtroPeriodo === "todos" && (
+                <span className="bg-stone-700 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider">
+                  Todos
+                </span>
+              )}
+            </span>
             <div className="p-2 bg-stone-100 text-stone-700 rounded-xl">
               <Receipt className="w-4 h-4" />
             </div>
@@ -1157,8 +1327,133 @@ export default function GastosPage() {
         </div>
       </div>
 
-      {/* ── Filtros y Buscador Dinámico (Con Filtro por Sucursal Clave) ── */}
+      {/* ── Filtros y Buscador Dinámico (Con Filtro Temporal por Día, Semana, Mes, Año y Sucursal) ── */}
       <div className="bg-white p-5 rounded-3xl border border-stone-200/80 shadow-sm space-y-4 transition-all duration-200 hover:border-rose-400/80 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20">
+        
+        {/* ── FILA DE BOTONES DE FILTRO TEMPORAL (DÍA, SEMANA, MES, AÑO, TODOS) ── */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-stone-100">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-rose-100 text-rose-700 rounded-xl">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-black text-stone-700 uppercase tracking-wider block">
+                Filtrar Registros por Período
+              </span>
+              <span className="text-[11px] text-stone-400 font-medium">
+                Selecciona un rango para visualizar los gastos correspondientes
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-stone-100/90 rounded-2xl border border-stone-200">
+            {/* Botón Día */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("dia")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "dia"
+                  ? "bg-rose-900 text-white shadow-sm ring-2 ring-rose-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>📅</span>
+              <span>Día (Hoy)</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "dia" ? "bg-rose-700 text-rose-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.dia}
+              </span>
+            </button>
+
+            {/* Botón Semana */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("semana")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "semana"
+                  ? "bg-rose-900 text-white shadow-sm ring-2 ring-rose-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>🗓️</span>
+              <span>Semana</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "semana" ? "bg-rose-700 text-rose-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.semana}
+              </span>
+            </button>
+
+            {/* Botón Mes */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("mes")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "mes"
+                  ? "bg-rose-900 text-white shadow-sm ring-2 ring-rose-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>📆</span>
+              <span>Mes</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "mes" ? "bg-rose-700 text-rose-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.mes}
+              </span>
+            </button>
+
+            {/* Botón Año */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("anio")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "anio"
+                  ? "bg-rose-900 text-white shadow-sm ring-2 ring-rose-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>📊</span>
+              <span>Año ({currentYear})</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "anio" ? "bg-rose-700 text-rose-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.anio}
+              </span>
+            </button>
+
+            {/* Botón Todos */}
+            <button
+              type="button"
+              onClick={() => setFiltroPeriodo("todos")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all duration-150 ${
+                filtroPeriodo === "todos"
+                  ? "bg-stone-800 text-white shadow-sm ring-2 ring-stone-400/40"
+                  : "text-stone-700 hover:text-stone-900 hover:bg-white/80"
+              }`}
+            >
+              <span>🌐</span>
+              <span>Todos</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                  filtroPeriodo === "todos" ? "bg-stone-600 text-stone-100" : "bg-stone-200 text-stone-700"
+                }`}
+              >
+                {countsByPeriod.todos}
+              </span>
+            </button>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Buscador de Texto Libre */}
           <div className="relative flex-1 w-full">
@@ -1212,12 +1507,13 @@ export default function GastosPage() {
             </select>
 
             {/* Botón para limpiar filtros */}
-            {(search || filtroSucursal !== "all" || filtroTipoPago !== "all") && (
+            {(search || filtroSucursal !== "all" || filtroTipoPago !== "all" || filtroPeriodo !== "todos") && (
               <button
                 onClick={() => {
                   setSearch("");
                   setFiltroSucursal("all");
                   setFiltroTipoPago("all");
+                  setFiltroPeriodo("todos");
                 }}
                 className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border-2 border-rose-200 rounded-2xl text-sm font-black transition-colors shadow-xs"
               >
@@ -1231,6 +1527,11 @@ export default function GastosPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm sm:text-base text-stone-600 font-medium pt-2 border-t border-stone-100">
           <span className="flex items-center gap-1.5 flex-wrap">
             <span>Mostrando <strong className="text-stone-900 font-black">{filteredGastos.length}</strong> de <strong className="text-stone-900 font-bold">{gastos.length}</strong> gastos</span>
+            {filtroPeriodo !== "todos" && (
+              <span className="bg-rose-100 text-rose-900 font-black px-2 py-0.5 rounded-lg text-xs sm:text-sm border border-rose-300">
+                Período: {filtroPeriodo === "dia" ? "Día (Hoy)" : filtroPeriodo === "semana" ? "Semana en curso" : filtroPeriodo === "mes" ? "Mes en curso" : `Año ${currentYear}`}
+              </span>
+            )}
             {filtroSucursal !== "all" && (
               <span className="bg-amber-100 text-amber-900 font-black px-2 py-0.5 rounded-lg text-xs sm:text-sm border border-amber-300">
                 en {branches.find((b) => b.id === filtroSucursal)?.name}
@@ -1246,238 +1547,472 @@ export default function GastosPage() {
         </div>
       </div>
 
-      {/* ── Tabla de Gastos con Diseño Panadería Brito ── */}
+      {/* ── Tabla / Fichas de Gastos Adaptable a Cualquier Resolución ── */}
       <div className="bg-white rounded-3xl border border-stone-200/80 shadow-sm overflow-hidden transition-all duration-200 hover:border-rose-400/80 hover:shadow-lg hover:shadow-rose-500/10 hover:ring-2 hover:ring-rose-400/20">
-        <div className="p-5 sm:p-6 border-b border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Cabecera Responsiva con Selector de Vista */}
+        <div className="p-4 sm:p-5 lg:p-6 border-b border-stone-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-rose-100 text-rose-700 rounded-2xl">
-              <Receipt className="w-6 h-6" />
+            <div className="p-2.5 sm:p-3 bg-rose-100 text-rose-700 rounded-2xl shrink-0">
+              <Receipt className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h3 className="font-black text-xl sm:text-2xl text-stone-900">Historial Detallado de Gastos</h3>
+              <h3 className="font-black text-lg sm:text-xl lg:text-2xl text-stone-900 leading-tight">
+                Historial Detallado de Gastos
+              </h3>
               <p className="text-xs sm:text-sm text-stone-500 font-medium mt-0.5">
                 Todas las salidas de dinero (desde $1.00) de cualquier sucursal registradas en tiempo real • {filteredGastos.length} registros
               </p>
             </div>
           </div>
-          <span className="text-sm sm:text-base font-mono font-bold text-stone-700 bg-stone-100 px-4 py-2 rounded-xl border border-stone-200 self-start sm:self-auto">
-            Total filtrado: <span className="text-rose-700 font-black text-base sm:text-lg">{formatCurrency(filteredGastos.filter(g => g.status !== "anulado").reduce((sum, g) => sum + g.amount, 0))}</span>
-          </span>
+
+          <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+            {/* Selector de Vista: Tabla Completa vs Fichas Adaptables */}
+            <div className="flex items-center bg-stone-100 p-1 rounded-xl border border-stone-200 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("tabla")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  viewMode === "tabla"
+                    ? "bg-white text-stone-900 shadow-xs"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+                }`}
+                title="Ver en formato de tabla (ideal para escritorio y laptops)"
+              >
+                <Table className="w-3.5 h-3.5" />
+                <span>Tabla</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("fichas")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  viewMode === "fichas"
+                    ? "bg-white text-stone-900 shadow-xs"
+                    : "text-stone-600 hover:text-stone-900 hover:bg-white/50"
+                }`}
+                title="Ver en formato de fichas cuadradas (ideal para pantallas compactas, tablets y móviles)"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Fichas</span>
+              </button>
+            </div>
+
+            {/* Total Filtrado */}
+            <span className="text-xs sm:text-sm font-mono font-bold text-stone-700 bg-stone-100 px-3.5 py-1.5 rounded-xl border border-stone-200">
+              Total filtrado:{" "}
+              <span className="text-rose-700 font-black text-sm sm:text-base tabular-nums">
+                {formatCurrency(filteredGastos.filter(g => g.status !== "anulado").reduce((sum, g) => sum + g.amount, 0))}
+              </span>
+            </span>
+          </div>
         </div>
 
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left border-collapse min-w-[1100px]">
-            <thead className="bg-stone-100/90 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-xs sm:text-sm select-none">
-              <tr>
-                <th className="py-4 px-4 align-middle">Folio</th>
-                <th className="py-4 px-4 align-middle">Fecha</th>
-                <th className="py-4 px-4 align-middle">Sucursal</th>
-                <th className="py-4 px-4 align-middle">Categoría</th>
-                <th className="py-4 px-4 align-middle min-w-[280px]">Concepto / Motivo</th>
-                <th className="py-4 px-4 align-middle text-right">Monto</th>
-                <th className="py-4 px-4 align-middle text-center">Forma de Pago</th>
-                <th className="py-4 px-4 align-middle">Cuenta / Origen</th>
-                <th className="py-4 px-4 align-middle">Cajero</th>
-                <th className="py-4 px-4 align-middle text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100 text-sm">
-              {filteredGastos.length === 0 ? (
+        {/* ── MODO 1: TABLA FLUIDA QUE ENCAJA 100% AL ZOOM ESTÁNDAR ── */}
+        {viewMode === "tabla" ? (
+          <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-stone-300 scrollbar-track-stone-100/60 pb-1">
+            <table className="w-full text-left border-collapse table-fixed min-w-[740px]">
+              <thead className="bg-stone-100/95 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] select-none sticky top-0 z-10 backdrop-blur-xs">
                 <tr>
-                  <td colSpan={10} className="text-center py-16 text-stone-400">
-                    <Receipt className="w-12 h-12 mx-auto text-stone-300 mb-3" />
-                    <p className="font-black text-base sm:text-lg text-stone-700">No se encontraron gastos con los filtros aplicados</p>
-                    <p className="text-sm text-stone-500 mt-1">Prueba cambiando la sucursal o los filtros de búsqueda.</p>
-                  </td>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[68px]">Folio</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[74px]">Fecha</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[74px]">Sucursal</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[88px]">Categoría</th>
+                  <th className="py-2.5 px-2.5 align-middle">Concepto</th>
+                  <th className="py-2.5 px-2 align-middle text-right whitespace-nowrap w-[78px]">Monto</th>
+                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[92px]">Pago / Origen</th>
+                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[115px]">Cajero</th>
+                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[82px]">Acciones</th>
                 </tr>
-              ) : (
-                filteredGastos.map((g) => {
-                  const isAnulado = g.status === "anulado";
-                  const catInfo = getCategoryInfo(g.category);
-                  const { isHoy, formattedDate } = getExpenseDateTimeInfo(g);
+              </thead>
+              <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
+                {filteredGastos.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center py-16 text-stone-400">
+                      <Receipt className="w-12 h-12 mx-auto text-stone-300 mb-3" />
+                      <p className="font-black text-base sm:text-lg text-stone-700">No se encontraron gastos con los filtros aplicados</p>
+                      <p className="text-sm text-stone-500 mt-1">Prueba cambiando la sucursal o los filtros de búsqueda.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredGastos.map((g, idx) => {
+                    const isAnulado = g.status === "anulado";
+                    const catInfo = getCategoryInfo(g.category);
+                    const { isHoy, formattedDate, timeStr, cleanDate } = getExpenseDateTimeInfo(g);
+                    const isNearBottom = idx >= filteredGastos.length - 2;
 
-                  return (
-                    <tr
-                      key={g.id}
-                      className={`transition-colors min-h-16 ${
-                        isAnulado
-                          ? "bg-stone-50/80 opacity-60 border-l-4 border-l-stone-300"
-                          : isHoy
-                          ? "border-l-4 border-l-amber-500 bg-amber-50/50 hover:bg-amber-100/60 shadow-xs"
-                          : "border-l-4 border-l-transparent hover:bg-stone-50/70"
-                      }`}
-                    >
-                      {/* 1. Folio */}
-                      <td className="py-3.5 px-4 align-middle font-mono font-black text-sm sm:text-base text-stone-900 whitespace-nowrap">
-                        #{g.id}
-                      </td>
-
-                      {/* 2. Fecha */}
-                      <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                        <span className={`font-bold text-xs sm:text-sm ${isAnulado ? "line-through text-stone-400" : isHoy ? "text-stone-950 font-black" : "text-stone-700"}`}>
-                          {formattedDate}
-                        </span>
-                        {isHoy && !isAnulado && (
-                          <span className="ml-1.5 bg-amber-500 text-white font-black text-xs px-2 py-0.5 rounded-md uppercase tracking-wider shadow-xs inline-flex items-center justify-center">
-                            Hoy
+                    return (
+                      <tr
+                        key={g.id}
+                        className={`transition-colors group ${
+                          isAnulado
+                            ? "bg-stone-50/80 opacity-60 border-l-4 border-l-stone-300"
+                            : isHoy
+                            ? "border-l-4 border-l-amber-500 bg-amber-50/40 hover:bg-amber-100/60 shadow-xs"
+                            : "border-l-4 border-l-transparent hover:bg-stone-50/70"
+                        }`}
+                      >
+                        {/* 1. Folio */}
+                        <td className="py-2 px-2 align-middle font-mono tabular-nums font-black text-xs text-stone-900 whitespace-nowrap w-[68px]">
+                          <span className="bg-stone-100 border border-stone-200/90 px-1.5 py-0.5 rounded text-[11px] block text-center truncate">
+                            #{g.id}
                           </span>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* 3. Sucursal */}
-                      <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-stone-800 bg-stone-100 px-3 py-1.5 rounded-xl border border-stone-200/80">
-                          <Store className="w-4 h-4 text-brito-orange-600" />
-                          <span>{(g.branchName || "Matriz (Centro)").replace("Sucursal ", "")}</span>
-                        </span>
-                      </td>
-
-                      {/* 4. Categoría */}
-                      <td className="py-3.5 px-4 align-middle whitespace-nowrap">
-                        <span
-                          className={`px-3 py-1.5 rounded-xl font-bold text-xs sm:text-sm inline-flex items-center gap-1.5 border ${
-                            isAnulado
-                              ? "bg-stone-200 text-stone-600 border-stone-300 line-through"
-                              : `${catInfo.bg} ${catInfo.text} ${catInfo.border}`
-                          }`}
-                        >
-                          <span className="text-sm">{catInfo.icon}</span>
-                          <span>{g.categoryLabel || catInfo.label}</span>
-                        </span>
-                      </td>
-
-                      {/* 5. Concepto / Motivo */}
-                      <td className="py-3.5 px-4 align-middle max-w-sm">
-                        <div className={isAnulado ? "line-through text-stone-500" : ""}>
-                          <ExpandableConceptText text={g.description} maxChars={50} />
-                        </div>
-                        {g.supplier && (
-                          <div className="text-xs sm:text-sm text-stone-500 truncate mt-1">
-                            Prov: <strong className="text-stone-700 font-semibold">{g.supplier}</strong>
-                          </div>
-                        )}
-                        {isAnulado && g.cancelReason && (
-                          <span className="inline-block mt-1 px-2 py-0.5 bg-red-100 text-red-800 font-bold text-xs rounded-md border border-red-200">
-                            Motivo: {g.cancelReason}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 6. Monto (Directamente al lado de Concepto) */}
-                      <td className="py-3.5 px-4 align-middle text-right font-mono font-black text-base sm:text-lg whitespace-nowrap">
-                        <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700"}>
-                          -{formatCurrency(g.amount)}
-                        </span>
-                      </td>
-
-                      {/* 7. Forma de Pago */}
-                      <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap">
-                        <span
-                          className={`px-3 py-1.5 rounded-xl font-black text-xs sm:text-sm uppercase inline-flex items-center gap-1.5 border ${
-                            g.paymentMethod === "efectivo"
-                              ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                              : g.paymentMethod === "tarjeta"
-                              ? "bg-blue-100 text-blue-800 border-blue-200"
-                              : "bg-purple-100 text-purple-800 border-purple-200"
-                          }`}
-                        >
-                          {g.paymentMethod === "efectivo" && <Wallet className="w-4 h-4" />}
-                          {g.paymentMethod === "tarjeta" && <CreditCard className="w-4 h-4" />}
-                          {g.paymentMethod === "transferencia" && <Building className="w-4 h-4" />}
-                          <span>{g.paymentMethod}</span>
-                        </span>
-                      </td>
-
-                      {/* 8. Origen / Cuenta */}
-                      <td className="py-3.5 px-4 align-middle text-stone-800 font-bold whitespace-nowrap text-xs sm:text-sm max-w-[160px] truncate" title={g.accountOrigin}>
-                        {g.accountOrigin}
-                      </td>
-
-                      {/* 9. Cajero */}
-                      <td className="py-3.5 px-4 align-middle text-stone-800 font-black whitespace-nowrap text-xs sm:text-sm">
-                        {g.cashier}
-                      </td>
-
-                      {/* 10. Acciones */}
-                      <td className="py-3.5 px-4 align-middle text-center whitespace-nowrap relative">
-                        <div className="inline-block text-left">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveDropdown(activeDropdown === g.id ? null : g.id);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 text-stone-800 font-bold rounded-xl text-xs sm:text-sm transition-colors"
-                          >
-                            <span>Acciones</span>
-                            <ChevronDown className="w-3.5 h-3.5 text-stone-500" />
-                          </button>
-
-                          {activeDropdown === g.id && (
-                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-2xl shadow-xl border border-stone-200 py-1.5 z-30 animate-in fade-in zoom-in-95 text-xs sm:text-sm text-left font-bold">
-                              {/* Ver Detalle */}
-                              <button
-                                onClick={() => {
-                                  setGastoSeleccionado(g);
-                                  setModalVerOpen(true);
-                                  setActiveDropdown(null);
-                                }}
-                                className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5"
-                              >
-                                <Eye className="w-4 h-4 text-blue-600" />
-                                <span>Ver Detalle</span>
-                              </button>
-
-                              {/* Imprimir Vale */}
-                              <button
-                                onClick={() => {
-                                  setGastoSeleccionado(g);
-                                  setModalReceiptOpen(true);
-                                  setActiveDropdown(null);
-                                }}
-                                className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5"
-                              >
-                                <Printer className="w-4 h-4 text-stone-600" />
-                                <span>Imprimir Vale (80mm)</span>
-                              </button>
-
+                        {/* 2. Fecha */}
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[74px]">
+                          {isHoy ? (
+                            <div className="flex flex-col leading-tight">
+                              <span className={`font-mono font-black text-xs ${isAnulado ? "line-through text-stone-400" : "text-stone-900"}`}>{timeStr || "Hoy"}</span>
                               {!isAnulado && (
-                                <>
-                                  {/* Editar */}
-                                  <button
-                                    onClick={() => {
-                                      abrirEditarGasto(g);
-                                      setActiveDropdown(null);
-                                    }}
-                                    className="w-full px-3.5 py-2.5 text-stone-700 hover:bg-stone-50 flex items-center gap-2.5"
-                                  >
-                                    <Edit3 className="w-4 h-4 text-amber-600" />
-                                    <span>Editar Gasto</span>
-                                  </button>
-
-                                  {/* Anular */}
-                                  <button
-                                    onClick={() => {
-                                      abrirAnularGasto(g);
-                                      setActiveDropdown(null);
-                                    }}
-                                    className="w-full px-3.5 py-2.5 text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 border-t border-stone-100"
-                                  >
-                                    <Ban className="w-4 h-4 text-rose-600" />
-                                    <span>Anular Gasto</span>
-                                  </button>
-                                </>
+                                <span className="text-[9px] text-amber-600 font-black uppercase tracking-wider">
+                                  HOY
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col leading-tight">
+                              <span className={`font-bold text-[11px] ${isAnulado ? "line-through text-stone-400" : "text-stone-800"}`}>
+                                {cleanDate}
+                              </span>
+                              {timeStr && (
+                                <span className="text-[9px] font-mono text-stone-400 font-medium">
+                                  {timeStr}
+                                </span>
                               )}
                             </div>
                           )}
+                        </td>
+
+                        {/* 3. Sucursal */}
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[74px]">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded-md border border-stone-200/80 truncate max-w-full">
+                            <Store className="w-3 h-3 text-brito-orange-600 shrink-0" />
+                            <span className="truncate">{(g.branchName || "Matriz").replace("Sucursal ", "").replace(" (Centro)", "")}</span>
+                          </span>
+                        </td>
+
+                        {/* 4. Categoría */}
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[88px]">
+                          <span
+                            className={`px-1.5 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 border truncate max-w-full ${
+                              isAnulado
+                                ? "bg-stone-200 text-stone-600 border-stone-300 line-through"
+                                : `${catInfo.bg} ${catInfo.text} ${catInfo.border}`
+                            }`}
+                            title={g.categoryLabel || catInfo.label}
+                          >
+                            <span className="text-[10px] shrink-0">{catInfo.icon}</span>
+                            <span className="truncate">{catInfo.shortLabel || catInfo.label || "Gasto"}</span>
+                          </span>
+                        </td>
+
+                        {/* 5. Concepto / Motivo */}
+                        <td className="py-2 px-2.5 align-middle">
+                          <div className={`truncate font-bold text-xs text-stone-900 ${isAnulado ? "line-through text-stone-500" : ""}`} title={g.description}>
+                            {g.description}
+                          </div>
+                          {g.supplier && (
+                            <div className="text-[10px] text-stone-500 truncate mt-0.5" title={g.supplier}>
+                              Prov: <strong className="text-stone-700 font-semibold">{g.supplier}</strong>
+                            </div>
+                          )}
+                          {isAnulado && g.cancelReason && (
+                            <span className="inline-block mt-0.5 px-1 py-0.2 bg-red-100 text-red-800 font-bold text-[9px] rounded border border-red-200">
+                              {g.cancelReason}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 6. Monto */}
+                        <td className="py-2 px-2 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[78px]">
+                          <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700"}>
+                            -{formatCurrency(g.amount)}
+                          </span>
+                        </td>
+
+                        {/* 7. Forma de Pago y Origen */}
+                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[92px]">
+                          <div className="inline-flex flex-col items-center leading-tight min-w-0">
+                            <span
+                              className={`px-1.5 py-0.5 rounded-md font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
+                                g.paymentMethod === "efectivo"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                  : g.paymentMethod === "tarjeta"
+                                  ? "bg-blue-100 text-blue-800 border-blue-200"
+                                  : "bg-purple-100 text-purple-800 border-purple-200"
+                              }`}
+                            >
+                              {g.paymentMethod === "efectivo" && <Wallet className="w-3 h-3 shrink-0" />}
+                              {g.paymentMethod === "tarjeta" && <CreditCard className="w-3 h-3 shrink-0" />}
+                              {g.paymentMethod === "transferencia" && <Building className="w-3 h-3 shrink-0" />}
+                              <span>{g.paymentMethod === "transferencia" ? "SPEI" : g.paymentMethod}</span>
+                            </span>
+                            <span className="text-[10px] text-stone-500 font-medium mt-0.5 truncate max-w-[88px]" title={g.accountOrigin}>
+                              {g.accountOrigin.replace(/\s*\(.*\)/, "")}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 8. Cajero (COMPLETO y adaptativo a turno) */}
+                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[115px]" title={g.cashier}>
+                          {g.cashier && g.cashier.includes(" - ") ? (
+                            <div className="flex flex-col leading-tight min-w-0">
+                              <span className="font-bold text-xs text-stone-900 truncate">
+                                {g.cashier.split(" - ")[0]}
+                              </span>
+                              <span className="text-[10px] text-stone-500 font-medium truncate">
+                                {g.cashier.split(" - ").slice(1).join(" - ")}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="font-bold text-xs text-stone-900 truncate block">
+                              {g.cashier || "Cajero"}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 9. Acciones (100% visible sin cortes) */}
+                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[82px]">
+                          <div className="relative inline-block text-left">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveDropdown(activeDropdown === g.id ? null : g.id);
+                              }}
+                              className="inline-flex items-center justify-center gap-1 px-2.5 py-1 bg-stone-100 hover:bg-stone-200 active:scale-95 border border-stone-200 text-stone-800 font-bold rounded-lg text-xs transition-all cursor-pointer shadow-2xs w-full max-w-[76px]"
+                            >
+                              <span>Acción</span>
+                              <ChevronDown className="w-3 h-3 text-stone-500 shrink-0" />
+                            </button>
+
+                            {activeDropdown === g.id && (
+                              <div
+                                className={`absolute right-0 w-48 bg-white rounded-2xl shadow-2xl border border-stone-200 py-1.5 z-40 animate-in fade-in zoom-in-95 text-xs text-left font-bold ${
+                                  isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
+                                }`}
+                              >
+                                {/* Ver Detalle */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setGastoSeleccionado(g);
+                                    setModalVerOpen(true);
+                                    setActiveDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-stone-700 hover:bg-stone-50 flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Ver Detalle</span>
+                                </button>
+
+                                {/* Imprimir Vale */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setGastoSeleccionado(g);
+                                    setModalReceiptOpen(true);
+                                    setActiveDropdown(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-stone-700 hover:bg-stone-50 flex items-center gap-2 cursor-pointer"
+                                >
+                                  <Printer className="w-3.5 h-3.5 text-stone-600" />
+                                  <span>Imprimir Vale (80mm)</span>
+                                </button>
+
+                                {!isAnulado && (
+                                  <>
+                                    {/* Editar */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        abrirEditarGasto(g);
+                                        setActiveDropdown(null);
+                                      }}
+                                      className="w-full px-3 py-2 text-stone-700 hover:bg-stone-50 flex items-center gap-2 cursor-pointer"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                                      <span>Editar Gasto</span>
+                                    </button>
+
+                                    {/* Anular */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        abrirAnularGasto(g);
+                                        setActiveDropdown(null);
+                                      }}
+                                      className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 border-t border-stone-100 cursor-pointer"
+                                    >
+                                      <Ban className="w-3.5 h-3.5 text-rose-600" />
+                                      <span>Anular Gasto</span>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* ── MODO 2: FICHAS RESPONSIVAS (MÓVIL, TABLET Y PANTALLAS COMPACTAS) ── */
+          <div className="p-3 sm:p-4 lg:p-5">
+            {filteredGastos.length === 0 ? (
+              <div className="text-center py-16 text-stone-400">
+                <Receipt className="w-12 h-12 mx-auto text-stone-300 mb-3" />
+                <p className="font-black text-base sm:text-lg text-stone-700">No se encontraron gastos con los filtros aplicados</p>
+                <p className="text-sm text-stone-500 mt-1">Prueba cambiando la sucursal o los filtros de búsqueda.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+                {filteredGastos.map((g) => {
+                  const isAnulado = g.status === "anulado";
+                  const catInfo = getCategoryInfo(g.category);
+                  const { isHoy, formattedDate, timeStr, cleanDate } = getExpenseDateTimeInfo(g);
+
+                  return (
+                    <div
+                      key={g.id}
+                      className={`bg-white rounded-2xl border p-3.5 sm:p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between gap-3 border-l-4 ${
+                        isAnulado
+                          ? "border-l-stone-300 opacity-60 bg-stone-50/60"
+                          : isHoy
+                          ? "border-l-amber-500 bg-amber-50/20 hover:bg-amber-50/40"
+                          : "border-l-rose-500 hover:bg-rose-50/20"
+                      }`}
+                    >
+                      {/* Cabecera: Folio, Sucursal, Fecha y Monto */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono tabular-nums font-black text-xs text-stone-900 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-lg shadow-2xs">
+                              #{g.id}
+                            </span>
+                            <span className="text-[10px] font-bold text-stone-600 bg-stone-50 border border-stone-200 px-1.5 py-0.5 rounded-md">
+                              🏬 {(g.branchName || "Matriz").replace("Sucursal ", "")}
+                            </span>
+                            {isHoy && !isAnulado && (
+                              <span className="bg-amber-500 text-white font-black text-[10px] px-1.5 py-0.2 rounded-md uppercase tracking-wider">
+                                Hoy
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-stone-500 font-semibold mt-1">
+                            📅 {formattedDate}
+                          </p>
                         </div>
-                      </td>
-                    </tr>
+
+                        <div className="text-right shrink-0">
+                          <span className={`font-mono tabular-nums font-black text-base sm:text-lg block ${isAnulado ? "line-through text-stone-400" : "text-rose-700"}`}>
+                            -{formatCurrency(g.amount)}
+                          </span>
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md inline-block border mt-0.5 ${
+                            g.paymentMethod === "efectivo"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : g.paymentMethod === "tarjeta"
+                              ? "bg-blue-50 text-blue-800 border-blue-200"
+                              : "bg-purple-50 text-purple-800 border-purple-200"
+                          }`}>
+                            {g.paymentMethod}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Concepto y Categoría */}
+                      <div className="bg-stone-50/80 rounded-xl p-2.5 border border-stone-200/70 text-xs">
+                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                          <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 border ${catInfo.bg} ${catInfo.text} ${catInfo.border}`}>
+                            <span>{catInfo.icon}</span>
+                            <span>{g.categoryLabel || catInfo.label}</span>
+                          </span>
+                        </div>
+                        <p className="font-bold text-stone-900 text-xs sm:text-sm leading-snug">
+                          {g.description}
+                        </p>
+                        {g.supplier && (
+                          <p className="text-[11px] text-stone-500 mt-1">
+                            Prov: <strong className="text-stone-700">{g.supplier}</strong>
+                          </p>
+                        )}
+                        {isAnulado && g.cancelReason && (
+                          <span className="inline-block mt-1 px-1.5 py-0.2 bg-red-100 text-red-800 font-bold text-[10px] rounded border border-red-200">
+                            Motivo: {g.cancelReason}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Cuenta / Origen & Cajero */}
+                      <div className="space-y-0.5 text-xs">
+                        <p className="text-[11px] text-stone-700 font-bold leading-tight" title={g.accountOrigin}>
+                          🏦 {g.accountOrigin}
+                        </p>
+                        <p className="text-[11px] text-stone-500 font-medium">
+                          👤 Cajero: <strong className="text-stone-800 font-bold">{g.cashier}</strong>
+                        </p>
+                      </div>
+
+                      {/* Botonera Directa de Acciones */}
+                      <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-stone-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGastoSeleccionado(g);
+                            setModalVerOpen(true);
+                          }}
+                          className="flex-1 py-1.5 px-2 bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                          title="Ver Detalle Completo"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span>Detalle</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGastoSeleccionado(g);
+                            setModalReceiptOpen(true);
+                          }}
+                          className="flex-1 py-1.5 px-2 bg-stone-100 hover:bg-amber-100 active:scale-95 text-stone-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                          title="Imprimir Vale de Caja"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                          <span>Vale</span>
+                        </button>
+
+                        {!isAnulado && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => abrirEditarGasto(g)}
+                              className="py-1.5 px-2.5 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                              title="Editar Gasto"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => abrirAnularGasto(g)}
+                              className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 border border-rose-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                              title="Anular Gasto"
+                            >
+                              <Ban className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Modal: Registrar Nuevo Gasto ── */}

@@ -12,8 +12,6 @@ import {
   Store, 
   Clock, 
   Receipt, 
-  Flame, 
-  CheckCircle2, 
   ArrowUpRight, 
   Sparkles, 
   RefreshCw, 
@@ -24,7 +22,8 @@ import {
   CreditCard, 
   Banknote, 
   Eye,
-  Plus
+  Plus,
+  Lock
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth, getFriendlyName } from "@/context/AuthContext";
@@ -61,6 +60,7 @@ const ALL_TOP_BAKERY_PRODUCTS: TopProductItem[] = [
 
 export default function Home() {
   const { user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
   const { unreadCount } = useNotifications();
   const { 
     branches, 
@@ -126,13 +126,7 @@ export default function Home() {
     ? consolidatedMetrics.totalCashInDrawer 
     : currentBranch?.cashInDrawer || 5120;
 
-  const activeGoal = Math.round(
-    (isAllBranches ? consolidatedMetrics.totalDailyGoal : currentBranch?.dailyGoal || 10000) * periodMultiplier
-  );
-
-  const percentGoal = Math.min(100, Math.round((activeSales / Math.max(1, activeGoal)) * 100));
   const avgTicket = Math.round(activeSales / Math.max(1, activeTickets));
-  const estimatedPieces = Math.round(activeTickets * 8.6);
 
   // Filtered orders for active branch
   const filteredOrders = useMemo(() => {
@@ -169,6 +163,12 @@ export default function Home() {
   const sortedBranches = useMemo(() => {
     return [...branches].sort((a, b) => b.todaySales - a.todaySales);
   }, [branches]);
+
+  // Si es cajero/operativo, solo visualiza la sucursal asignada
+  const displayedBranches = useMemo(() => {
+    if (isAdmin) return sortedBranches;
+    return sortedBranches.filter((b) => b.id === currentBranch?.id);
+  }, [isAdmin, sortedBranches, currentBranch]);
 
   // Filtrado de productos estrella por categoría
   const displayedTopProducts = useMemo(() => {
@@ -226,33 +226,45 @@ export default function Home() {
             {/* Branch Selector Pills */}
             <div className="pt-1 flex flex-wrap items-center gap-1.5">
               <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mr-1">Sucursal:</span>
-              <button
-                onClick={() => switchBranch("all")}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-                  isAllBranches
-                    ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg shadow-orange-500/30 scale-105"
-                    : "bg-white/[0.06] hover:bg-white/[0.12] text-stone-300 border border-white/10"
-                }`}
-              >
-                <span>🏢 Todas (Consolidado)</span>
-              </button>
-              {branches.map((b) => {
-                const active = !isAllBranches && currentBranch?.id === b.id;
-                return (
+              {isAdmin ? (
+                <>
                   <button
-                    key={b.id}
-                    onClick={() => switchBranch(b.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      active
-                        ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg shadow-orange-500/30 font-black scale-105"
+                    onClick={() => switchBranch("all")}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                      isAllBranches
+                        ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg shadow-orange-500/30 scale-105"
                         : "bg-white/[0.06] hover:bg-white/[0.12] text-stone-300 border border-white/10"
                     }`}
                   >
-                    <Store className="w-3.5 h-3.5 opacity-70" />
-                    <span>{b.shortName}</span>
+                    <span>🏢 Todas (Consolidado)</span>
                   </button>
-                );
-              })}
+                  {branches.map((b) => {
+                    const active = !isAllBranches && currentBranch?.id === b.id;
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={() => switchBranch(b.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          active
+                            ? "bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg shadow-orange-500/30 font-black scale-105"
+                            : "bg-white/[0.06] hover:bg-white/[0.12] text-stone-300 border border-white/10"
+                        }`}
+                      >
+                        <Store className="w-3.5 h-3.5 opacity-70" />
+                        <span>{b.shortName}</span>
+                      </button>
+                    );
+                  })}
+                </>
+              ) : (
+                <div className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-orange-500/30 to-amber-600/30 text-amber-200 border border-amber-500/40 flex items-center gap-2 select-none">
+                  <Store className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{currentBranch?.name || "Mi Sucursal"}</span>
+                  <span className="text-[10px] bg-amber-500/30 text-amber-100 px-1.5 py-0.5 rounded font-extrabold flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> Asignada
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -313,8 +325,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 4 Hero KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {/* 3 Hero KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
           {/* Card 1: Ventas Totales */}
           <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
             <div className="flex items-center justify-between">
@@ -330,17 +342,11 @@ export default function Home() {
               <div className="flex items-center justify-between text-xs text-stone-500 mt-1 font-semibold">
                 <span className="flex items-center gap-1 text-emerald-700 font-bold">
                   <ArrowUpRight className="w-3.5 h-3.5" />
-                  {activeTickets} tickets
+                  {activeTickets} tickets cobrados
                 </span>
-                <span className="text-stone-700 font-bold">{percentGoal}% de meta</span>
-              </div>
-
-              {/* Goal Progress bar */}
-              <div className="w-full bg-stone-200/70 rounded-full h-2 mt-2 overflow-hidden border border-stone-200/60">
-                <div
-                  className="bg-gradient-to-r from-orange-500 via-rose-500 to-emerald-500 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${percentGoal}%` }}
-                />
+                <span className="text-stone-700 font-bold">
+                  Prom: {formatCurrency(avgTicket)}
+                </span>
               </div>
 
               {/* Payment method pills */}
@@ -405,30 +411,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Card 4: Piezas Horneadas & Vendidas */}
-          <div className="bg-stone-50/70 hover:bg-white p-5 sm:p-6 rounded-3xl border border-stone-200/90 hover:border-orange-400 shadow-sm hover:shadow-md transition-all space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-stone-500 uppercase tracking-wider">Piezas de Pan Salidas</span>
-              <div className="p-2.5 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200">
-                <Flame className="w-5 h-5" />
-              </div>
-            </div>
-            <div>
-              <p className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-                {estimatedPieces.toLocaleString("es-MX")} pzas
-              </p>
-              <p className="text-xs text-stone-600 mt-1 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                4 tandas de horneado hoy
-              </p>
-              <div className="pt-2 mt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-                <span>Hornos Leña & Gas</span>
-                <Link href="/inventario" className="text-rose-600 font-black hover:underline flex items-center gap-0.5">
-                  Almacén <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-            </div>
-          </div>
         </div>
 
       </div>
@@ -443,36 +425,35 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <h2 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
                 <Store className="w-5 h-5 text-orange-600" />
-                Matriz de Desempeño por Sucursal
+                {isAdmin ? "Matriz de Desempeño por Sucursal" : "Desempeño de tu Sucursal Asignada"}
               </h2>
               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800">
-                3 Tiendas Activas
+                {isAdmin ? `${branches.length} Tiendas Activas` : "1 Tienda Asignada"}
               </span>
             </div>
             <p className="text-xs text-stone-500 mt-0.5">
-              Comparativa de ventas en tiempo real, cumplimiento de metas, ticket promedio, arqueo y métodos de cobro.
+              {isAdmin
+                ? "Comparativa de ventas en tiempo real, ticket promedio, arqueo y métodos de cobro."
+                : "Ventas en tiempo real, ticket promedio, arqueo y métodos de cobro de tu tienda."}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link
-              href="/sucursales"
-              className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              Panel de Sucursales
-            </Link>
-          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/sucursales"
+                className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Panel de Sucursales
+              </Link>
+            </div>
+          )}
         </div>
 
-        {/* 3 Branch Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {sortedBranches.map((b, idx) => {
-            // Cálculos precisos y sin truncar
-            const isGoalAchieved = b.todaySales >= b.dailyGoal;
-            const realPct = Math.round((b.todaySales / Math.max(1, b.dailyGoal)) * 100);
-            const barPct = Math.min(100, realPct);
-            const diffGoal = Math.abs(b.todaySales - b.dailyGoal);
+        {/* Branch Cards Grid */}
+        <div className={`grid grid-cols-1 ${isAdmin ? "md:grid-cols-3" : "max-w-md mx-auto"} gap-5`}>
+          {displayedBranches.map((b, idx) => {
             const isSelected = !isAllBranches && currentBranch?.id === b.id;
             const isTopRank = idx === 0;
 
@@ -542,56 +523,36 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => switchBranch(b.id)}
-                      title={isSelected ? "Sucursal activa actualmente" : "Hacer clic para filtrar el dashboard con esta sucursal"}
-                      className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl transition-all shrink-0 active:scale-95 ${
-                        isSelected
-                          ? "bg-orange-600 text-white shadow-sm ring-2 ring-orange-200"
-                          : "bg-stone-100 hover:bg-orange-50 text-stone-600 hover:text-orange-700 border border-stone-200"
-                      }`}
-                    >
-                      {isSelected ? "Activa ✓" : "Filtrar"}
-                    </button>
+                    {isAdmin ? (
+                      <button
+                        onClick={() => switchBranch(b.id)}
+                        title={isSelected ? "Sucursal activa actualmente" : "Hacer clic para filtrar el dashboard con esta sucursal"}
+                        className={`text-[10px] font-black px-2.5 py-1.5 rounded-xl transition-all shrink-0 active:scale-95 ${
+                          isSelected
+                            ? "bg-orange-600 text-white shadow-sm ring-2 ring-orange-200"
+                            : "bg-stone-100 hover:bg-orange-50 text-stone-600 hover:text-orange-700 border border-stone-200"
+                        }`}
+                      >
+                        {isSelected ? "Activa ✓" : "Filtrar"}
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-black px-2.5 py-1 rounded-xl bg-orange-600 text-white shadow-sm flex items-center gap-1 select-none">
+                        <Lock className="w-2.5 h-2.5" /> Tu Tienda
+                      </span>
+                    )}
                   </div>
 
-                  {/* Venta Acumulada y Meta Exacta */}
-                  <div className="bg-stone-50/80 rounded-2xl p-3.5 border border-stone-100 space-y-2">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <div>
-                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Venta de hoy</span>
-                        <span className="text-2xl font-black text-stone-900 tracking-tight">{formatCurrency(b.todaySales)}</span>
-                      </div>
-                      <div className="text-right">
-                        {isGoalAchieved ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            {realPct}% (+{formatCurrency(diffGoal)})
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-200">
-                            {realPct}% (Faltan {formatCurrency(diffGoal)})
-                          </span>
-                        )}
-                      </div>
+                  {/* Venta Acumulada y Tickets */}
+                  <div className="bg-stone-50/80 rounded-2xl p-3.5 border border-stone-100 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Venta de hoy</span>
+                      <span className="text-2xl font-black text-stone-900 tracking-tight">{formatCurrency(b.todaySales)}</span>
                     </div>
-
-                    {/* Barra de progreso visual */}
-                    <div className="space-y-1">
-                      <div className="w-full bg-stone-200 rounded-full h-2 overflow-hidden shadow-inner">
-                        <div
-                          className={`h-full rounded-full transition-all duration-700 ${
-                            isGoalAchieved
-                              ? "bg-gradient-to-r from-emerald-500 to-teal-500"
-                              : "bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500"
-                          }`}
-                          style={{ width: `${barPct}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] text-stone-500 font-semibold">
-                        <span>{b.todayTickets} tickets cobrados</span>
-                        <span>Meta: <strong className="text-stone-700">{formatCurrency(b.dailyGoal)}</strong></span>
-                      </div>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-stone-400 block">Transacciones</span>
+                      <span className="text-xs font-black text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200 inline-block">
+                        {b.todayTickets} tickets
+                      </span>
                     </div>
                   </div>
 

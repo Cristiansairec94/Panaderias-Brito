@@ -34,7 +34,10 @@ import {
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
 import { getStoredOrders } from "@/lib/orders";
-import { useNotifications } from "@/context/NotificationContext";
+import { useNotifications, FBNotification } from "@/context/NotificationContext";
+import { useBranch } from "@/context/BranchContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
+import { createClient } from "@/lib/supabase/client";
 
 interface CashDrawerShiftModalProps {
   isOpen: boolean;
@@ -56,56 +59,7 @@ interface CashDrawerShiftModalProps {
   cashSalesTotal?: number;
 }
 
-const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [
-  {
-    id: "CORTE-948210",
-    date: formatDateTimeSafe(new Date(Date.now() - 6 * 3600000)),
-    timestamp: Date.now() - 6 * 3600000,
-    shiftRange: "06:00 AM — 02:00 PM",
-    outgoingCashier: "Cajera 1 - Turno Matutino",
-    incomingCashier: "Cajera 2 - Turno Vespertino",
-    previousShift: "Turno Matutino (06:00 - 14:00)",
-    nextShift: "Turno Vespertino (14:00 - 22:00)",
-    initialFund: 0,
-    cashSales: 1850,
-    cardSales: 420,
-    transferSales: 150,
-    totalSales: 2420,
-    totalSalesAll: 2420,
-    totalExpenses: 200,
-    expectedCash: 2150,
-    countedCash: 2150,
-    difference: 0,
-    nextFund: 0,
-    notes: "Entrega de turno matutino sin ninguna incidencia. Todo cuadrado al 100%.",
-    stockPieces: 140,
-    stockValue: 1820,
-  },
-  {
-    id: "CORTE-893120",
-    date: formatDateTimeSafe(new Date(Date.now() - 26 * 3600000)),
-    timestamp: Date.now() - 26 * 3600000,
-    shiftRange: "02:00 PM — 10:00 PM",
-    outgoingCashier: "Cajera 2 - Turno Vespertino",
-    incomingCashier: "Cajera 1 - Turno Matutino",
-    previousShift: "Turno Vespertino (14:00 - 22:00)",
-    nextShift: "Turno Matutino (06:00 - 14:00)",
-    initialFund: 0,
-    cashSales: 2450,
-    cardSales: 680,
-    transferSales: 230,
-    totalSales: 3360,
-    totalSalesAll: 3360,
-    totalExpenses: 150,
-    expectedCash: 2800,
-    countedCash: 2800,
-    difference: 0,
-    nextFund: 0,
-    notes: "Cierre vespertino completado, pan dulce agotado en vitrina principal.",
-    stockPieces: 15,
-    stockValue: 195,
-  },
-];
+const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [];
 
 export default function CashDrawerShiftModal({
   isOpen,
@@ -127,9 +81,13 @@ export default function CashDrawerShiftModal({
   cashSalesTotal,
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
+  const { currentBranch, updateBranch } = useBranch();
 
   // Fondo Inicial Sincronizado en tiempo real
   const [syncedFund, setSyncedFund] = useState<number>(() => {
+    if (currentBranch?.currentShift?.initialFund !== undefined) {
+      return currentBranch.currentShift.initialFund;
+    }
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("brito_pos_initial_fund");
       if (saved !== null && !isNaN(Number(saved))) return Number(saved);
@@ -138,6 +96,10 @@ export default function CashDrawerShiftModal({
   });
 
   useEffect(() => {
+    if (currentBranch?.currentShift?.initialFund !== undefined) {
+      setSyncedFund(currentBranch.currentShift.initialFund);
+      return;
+    }
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("brito_pos_initial_fund");
       if (saved !== null && !isNaN(Number(saved))) {
@@ -146,7 +108,7 @@ export default function CashDrawerShiftModal({
       }
     }
     setSyncedFund(initialFund || 0);
-  }, [initialFund, isOpen]);
+  }, [initialFund, isOpen, currentBranch?.id, currentBranch?.currentShift?.initialFund]);
 
   useEffect(() => {
     const handleSync = () => {
@@ -175,7 +137,15 @@ export default function CashDrawerShiftModal({
   const [currentTime, setCurrentTime] = useState("");
 
   // Shift Change & Cash Cut form state
-  const [outgoingCashier, setOutgoingCashier] = useState(cashierName);
+  const [outgoingCashier, setOutgoingCashier] = useState(() => currentBranch?.currentShift?.cashier || cashierName);
+
+  useEffect(() => {
+    if (currentBranch?.currentShift?.cashier) {
+      setOutgoingCashier(currentBranch.currentShift.cashier);
+    } else if (cashierName) {
+      setOutgoingCashier(cashierName);
+    }
+  }, [currentBranch?.id, currentBranch?.currentShift?.cashier, cashierName]);
   const [incomingCashier, setIncomingCashier] = useState("Cajera 2 - Turno Vespertino");
   const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
   const [countedCash, setCountedCash] = useState<string>("");
@@ -198,17 +168,19 @@ export default function CashDrawerShiftModal({
       const raw = localStorage.getItem("brito_shift_cuts_history");
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCutsHistory(parsed);
+        if (Array.isArray(parsed)) {
+          const realCuts = parsed.filter(c => c && c.id !== "CORTE-948210" && c.id !== "CORTE-893120" && c.id !== "CORTE-892401");
+          setCutsHistory(realCuts);
+          if (realCuts.length !== parsed.length) {
+            localStorage.setItem("brito_shift_cuts_history", JSON.stringify(realCuts));
+          }
           return;
         }
       }
-      // If empty, save default sample cuts
-      localStorage.setItem("brito_shift_cuts_history", JSON.stringify(DEFAULT_SAMPLE_CUTS));
-      setCutsHistory(DEFAULT_SAMPLE_CUTS);
+      setCutsHistory([]);
     } catch (e) {
       console.error("Error loading shift cuts history:", e);
-      setCutsHistory(DEFAULT_SAMPLE_CUTS);
+      setCutsHistory([]);
     }
   };
 
@@ -265,34 +237,44 @@ export default function CashDrawerShiftModal({
 
   if (!isOpen) return null;
 
-  // Límite temporal estricto del turno actual (timestamp en ms)
+  // Límite temporal estricto del turno actual (timestamp en ms con soporte por sucursal)
   const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) ? lastCutTimestamp : 0;
-  const shiftStartBoundary = Math.max(validLastCut, getStoredShiftStartBoundary());
+  const shiftStartBoundary = Math.max(validLastCut, getStoredShiftStartBoundary(currentBranch?.id));
 
   // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta terminal)
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
-    if (outgoingCashier && s.cashier && !matchesCashier(s.cashier, outgoingCashier)) {
-      return false;
+    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+      const sBranch = (s as any).branchId || (s as any).branch_id;
+      if (sBranch) {
+        if (sBranch !== currentBranch.id) return false;
+      } else {
+        if (currentBranch.id !== "branch-matriz") return false;
+      }
     }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
     if (shiftStartBoundary > 0) {
-      if (!sTime || sTime < shiftStartBoundary - 1000) return false;
+      if (!sTime || sTime < shiftStartBoundary) return false;
     }
     if (sTime > Date.now() + 60000) return false;
     return true;
   });
   const effectiveSales = shiftSales;
 
-  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo por este cajero)
+  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
   const shiftOrders = (orders || []).filter((o) => {
     if (!o) return false;
-    if (outgoingCashier && o.cashier && !matchesCashier(o.cashier, outgoingCashier)) {
-      return false;
+    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+      const oBranch = (o as any).branchId || (o as any).branch_id;
+      if (oBranch) {
+        if (oBranch !== currentBranch.id) return false;
+      } else {
+        if (currentBranch.id !== "branch-matriz") return false;
+      }
     }
     const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
     if (shiftStartBoundary > 0) {
-      if (!oTime || oTime < shiftStartBoundary - 1000) return false;
+      if (!oTime || oTime < shiftStartBoundary) return false;
     }
     if (oTime > Date.now() + 60000) return false;
     return true;
@@ -306,28 +288,48 @@ export default function CashDrawerShiftModal({
   const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
   const totalOrdersCash = ordersCash + ordersInSalesCash;
   const posCash = purePosCash + totalOrdersCash;
+
   const cashSales = posCash;
   const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
   const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
-  const totalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0);
+  const rawTotalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0);
+  const totalSalesAll = rawTotalSalesAll + ordersCash;
+
+  const effectiveInitialFund = currentBranch?.currentShift?.initialFund !== undefined ? currentBranch.currentShift.initialFund : syncedFund;
 
   // 2. Cálculos de Gastos y Entradas del Turno (incluyendo retiros de dueño tomados del cajón)
-  const shiftExpenses = expenses.filter((e) => {
+  const shiftExpenses = (expenses || []).filter((e) => {
     if (!e) return false;
+    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+      const eBranch = (e as any).branchId || (e as any).branch_id;
+      if (eBranch) {
+        if (eBranch !== currentBranch.id) return false;
+      } else {
+        if (currentBranch.id !== "branch-matriz") return false;
+      }
+    }
     const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, outgoingCashier))) return false;
     const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
-    if (shiftStartBoundary > 0 && expTime && expTime < (shiftStartBoundary - 60000)) return false;
+    if (shiftStartBoundary > 0 && expTime && expTime < shiftStartBoundary) return false;
     return true;
   });
   const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   const shiftIncomes = (incomes || []).filter((inc) => {
     if (!inc) return false;
+    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+      const incBranch = (inc as any).branchId || (inc as any).branch_id;
+      if (incBranch) {
+        if (incBranch !== currentBranch.id) return false;
+      } else {
+        if (currentBranch.id !== "branch-matriz") return false;
+      }
+    }
     const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier))) return false;
     const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
-    if (shiftStartBoundary > 0 && incTime && incTime < (shiftStartBoundary - 60000)) return false;
+    if (shiftStartBoundary > 0 && incTime && incTime < shiftStartBoundary) return false;
     return true;
   });
   const totalIncomesInCash = shiftIncomes
@@ -335,7 +337,7 @@ export default function CashDrawerShiftModal({
     .reduce((sum, i) => sum + i.amount, 0);
 
   // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
-  const expectedCashInDrawer = Math.max(0, syncedFund + cashSales + totalIncomesInCash - totalExpenses);
+  const expectedCashInDrawer = Math.max(0, effectiveInitialFund + posCash + totalIncomesInCash - totalExpenses);
 
   // 4. Conteo y Diferencia (Arqueo)
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;
@@ -397,10 +399,11 @@ export default function CashDrawerShiftModal({
       outgoingCashier,
       incomingCashier,
       responsible: outgoingCashier,
-      branchName: "Sucursal Matriz Centro",
+      branchId: currentBranch?.id || "branch-matriz",
+      branchName: currentBranch?.name || "Sucursal Matriz (Centro)",
       previousShift: shiftName,
       nextShift: nextShiftName,
-      initialFund: syncedFund,
+      initialFund: effectiveInitialFund,
       cashSales,
       cardSales,
       transferSales,
@@ -413,8 +416,8 @@ export default function CashDrawerShiftModal({
       difference: cashDifference,
       nextFund: parsedNextFund,
       notes: shiftNotes.trim() || "Cierre de turno completado conforme y sin anomalías.",
-      expensesList: [...expenses],
-      incomesList: [...incomes],
+      expensesList: [...shiftExpenses],
+      incomesList: [...shiftIncomes],
       stockPieces: totalPiecesInStock,
       stockValue: totalStockValue,
     };
@@ -432,17 +435,134 @@ export default function CashDrawerShiftModal({
 
       // Reiniciar inicio de turno y cajero entrante para que ventas/gastos inicien estrictamente en 0
       const cutTs = cutRecord.timestamp || Date.now();
+      const targetBranchId = currentBranch?.id || "branch-matriz";
+      localStorage.setItem("brito_shift_start_" + targetBranchId, cutTs.toString());
       localStorage.setItem("brito_current_shift_start_timestamp", cutTs.toString());
       localStorage.setItem("brito_current_shift_cashier", incomingCashier);
       localStorage.setItem("brito_current_shift_name", nextShiftName);
       localStorage.setItem("brito_pos_shift_locked", "true");
-      localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
-      localStorage.setItem("brito_pos_current_sales", "[]");
-      localStorage.setItem("brito_pos_current_expenses", "[]");
-      localStorage.setItem("brito_pos_current_incomes", "[]");
+      localStorage.setItem(`brito_pos_initial_fund_${targetBranchId}`, parsedNextFund.toString());
+      if (targetBranchId === "branch-matriz") {
+        localStorage.setItem("brito_pos_initial_fund", parsedNextFund.toString());
+      }
+
+      // Preservar ventas, gastos e ingresos de las otras sucursales
+      try {
+        const curSales = JSON.parse(localStorage.getItem("brito_pos_current_sales") || "[]");
+        const remainingSales = Array.isArray(curSales)
+          ? curSales.filter((s: any) => {
+              const bId = s.branchId || s.branch_id;
+              return bId && bId !== targetBranchId;
+            })
+          : [];
+        localStorage.setItem("brito_pos_current_sales", JSON.stringify(remainingSales));
+      } catch {}
+
+      try {
+        const curExp = JSON.parse(localStorage.getItem("brito_pos_current_expenses") || "[]");
+        const remainingExp = Array.isArray(curExp)
+          ? curExp.filter((e: any) => {
+              const bId = e.branchId || e.branch_id;
+              return bId && bId !== targetBranchId;
+            })
+          : [];
+        localStorage.setItem("brito_pos_current_expenses", JSON.stringify(remainingExp));
+      } catch {}
+
+      try {
+        const curInc = JSON.parse(localStorage.getItem("brito_pos_current_incomes") || "[]");
+        const remainingInc = Array.isArray(curInc)
+          ? curInc.filter((i: any) => {
+              const bId = i.branchId || i.branch_id;
+              return bId && bId !== targetBranchId;
+            })
+          : [];
+        localStorage.setItem("brito_pos_current_incomes", JSON.stringify(remainingInc));
+      } catch {}
+
+      // Persistir corte de turno y movimiento en Supabase para supervisión en vivo
+      try {
+        const supabase = createClient();
+        const shiftId = cutRecord.id || `cut-${Date.now()}`;
+        Promise.allSettled([
+          supabase.from("cash_shifts").upsert({
+            id: shiftId,
+            shift_name: nextShiftName || "Turno General",
+            cashier_name: outgoingCashier,
+            branch_id: targetBranchId,
+            opened_at: new Date(cutTs).toISOString(),
+            initial_cash: parsedNextFund,
+            cash_sales: cutRecord.cashSales,
+            card_sales: cutRecord.cardSales,
+            transfer_sales: cutRecord.transferSales,
+            total_cash_in: cutRecord.totalIncomes || 0,
+            total_cash_out: cutRecord.totalExpenses,
+            expected_cash: cutRecord.expectedCash,
+            actual_cash: cutRecord.countedCash,
+            difference: cutRecord.difference,
+            status: "cerrada",
+            notes: cutRecord.notes,
+          }),
+          supabase.from("cash_movements").upsert({
+            id: `mov-${shiftId}`,
+            type: "salida",
+            category: "corte_caja",
+            category_label: "Corte de Turno",
+            amount: parsedCountedCash,
+            reason: `Corte de turno (${cutRecord.shiftRange || "Turno"}). Saliente: ${outgoingCashier} → Entrante: ${incomingCashier}`,
+            authorized_by: outgoingCashier,
+            branch_id: targetBranchId,
+          }),
+        ]).catch(() => {});
+      } catch {}
+
+      // Emitir corte de caja en tiempo real para el Administrador y todas las terminales
+      realtimeHub.broadcastShiftCut(cutRecord);
+
+      // Si se retira efectivo para entregar a Don Toño, emitir movimiento en tiempo real
+      if (cashToWithdraw > 0) {
+        realtimeHub.broadcastCashMovement({
+          id: `mov-corte-${cutRecord.id}`,
+          type: "salida",
+          amount: cashToWithdraw,
+          reason: `Retiro por Cierre de Turno (${outgoingCashier} ➔ Don Toño)`,
+          branchId: targetBranchId,
+          branchName: cutRecord.branchName || "Sucursal Matriz",
+          cashier: outgoingCashier,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Actualizar el estado de la sucursal para que el nuevo turno comience en 0 absoluto
+      updateBranch(targetBranchId, {
+        todaySales: 0,
+        todayTickets: 0,
+        todayDeskSales: 0,
+        todayDeskTickets: 0,
+        todayOrdersDeposit: 0,
+        todayOrdersTotal: 0,
+        todayOrdersCount: 0,
+        cashInDrawer: parsedNextFund,
+        lastCut: cutRecord,
+        manager: incomingCashier,
+        currentShift: {
+          id: `shift-${targetBranchId}-${cutTs}`,
+          name: nextShiftName,
+          cashier: incomingCashier,
+          openedAt: formatDateTimeSafe(new Date(cutTs)),
+          initialFund: parsedNextFund,
+          cashSales: 0,
+          cardSales: 0,
+          transferSales: 0,
+          totalSales: 0,
+          ticketCount: 0,
+          status: "abierto",
+        },
+      });
+
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
-      window.dispatchEvent(new Event("brito_orders_updated"));
+      window.dispatchEvent(new Event("brito_incomes_updated"));
 
       if (onCompleteShiftCut) {
         onCompleteShiftCut();
@@ -452,17 +572,39 @@ export default function CashDrawerShiftModal({
     }
 
     // NOTIFICACIÓN DIRECTA AL ADMINISTRADOR / SISTEMA CON ALTA PRIORIDAD
-    addNotification({
-      senderName: `🏁 Corte Guardado (${outgoingCashier})`,
-      senderAvatar: "💰",
+    const isSquare = cashDifference === 0;
+    const isShort = cashDifference < 0;
+    const squareStatusTitle = isSquare
+      ? "✓ CAJA CUADRADA EXACTA ($0.00)"
+      : isShort
+      ? `🚨 NO CUADRÓ LA CAJA (Faltante ${formatCurrency(cashDifference)})`
+      : `⚠️ NO CUADRÓ LA CAJA (Sobrante +${formatCurrency(cashDifference)})`;
+
+    const shiftNotif: FBNotification = {
+      id: `notif-cut-${cutRecord.id}`,
+      senderName: `🏁 Cierre de Turno (${outgoingCashier})`,
+      senderAvatar: isSquare ? "💰" : "⚠️",
       badgeIcon: "dinero",
-      title: `Corte de Turno ${newFolio}: ${formatCurrency(parsedCountedCash)} en Caja`,
-      highlightText: `${outgoingCashier} entregó a ${incomingCashier}`,
-      description: `Folio ${newFolio} archivado en historial. Horario: ${shiftStartTime} a ${currentTime}. Efectivo contado: ${formatCurrency(parsedCountedCash)} (${cashDifference === 0 ? "Cuadrada Exacta" : cashDifference > 0 ? `Sobrante +${formatCurrency(cashDifference)}` : `Faltante ${formatCurrency(cashDifference)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}, Efectivo entregado/retirado: ${formatCurrency(cashToWithdraw)}.`,
+      title: `Cierre a las ${currentTime} hrs: ${squareStatusTitle}`,
+      highlightText: `Cambio de Turno: ${outgoingCashier} ➔ ${incomingCashier}`,
+      description: `Folio ${newFolio} archivado en historial. Horario de turno: ${shiftStartTime} a ${currentTime} hrs. Efectivo en caja: ${formatCurrency(parsedCountedCash)} (${isSquare ? "Cuadró exacta sin faltantes" : `Diferencia: ${formatCurrency(cashDifference)}`}). Fondo para nuevo turno: ${formatCurrency(parsedNextFund)}. Efectivo retirado/entregado: ${formatCurrency(cashToWithdraw)}.`,
       category: "caja",
-      actionLabel: "Consultar Historial",
-      actionLink: "/caja",
-    });
+      actionLabel: "Ver Ticket de Corte",
+      actionLink: `/caja?tab=historial&corteId=${cutRecord.id}`,
+      shiftCutData: cutRecord,
+      cutId: cutRecord.id,
+      branchId: cutRecord.branchId || currentBranch?.id || "branch-matriz",
+      branchName: cutRecord.branchName || "Sucursal",
+      timeAgo: "Hace un momento",
+      group: "recientes",
+      read: false,
+    };
+
+    addNotification(shiftNotif);
+
+    if (realtimeHub?.broadcastNotification) {
+      realtimeHub.broadcastNotification(shiftNotif);
+    }
 
     // Actualizar al nuevo cajero y turno
     onChangeCashier(incomingCashier);
@@ -479,17 +621,20 @@ export default function CashDrawerShiftModal({
   };
 
 
-  // Filtrado exclusivo para la cajera del turno actual
+  // Filtrado exclusivo para la cajera del turno actual y sucursal
   const currentCashierKey = cashierName;
 
   const currentCashierCuts = useMemo(() => {
     return cutsHistory.filter((cut) => {
+      if (currentBranch?.id && currentBranch.id !== "all" && cut.branchId && cut.branchId !== currentBranch.id) {
+        return false;
+      }
       return (
         matchesCashier(cut.outgoingCashier, cashierName) ||
         matchesCashier(cut.incomingCashier, cashierName)
       );
     });
-  }, [cutsHistory, cashierName]);
+  }, [cutsHistory, cashierName, currentBranch?.id]);
 
   const filteredHistory = useMemo(() => {
     return currentCashierCuts.filter((cut) => {
@@ -1207,11 +1352,11 @@ export default function CashDrawerShiftModal({
                       </div>
 
                       {/* Filtros Rápidos */}
-                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <button
                           type="button"
                           onClick={() => setHistoryFilterType("all")}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                             historyFilterType === "all"
                               ? "bg-amber-950 text-amber-100 border-amber-950 shadow-xs"
                               : "bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200"
@@ -1222,7 +1367,7 @@ export default function CashDrawerShiftModal({
                         <button
                           type="button"
                           onClick={() => setHistoryFilterType("cuadrado")}
-                          className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                          className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                             historyFilterType === "cuadrado"
                               ? "bg-emerald-850 bg-emerald-900 text-emerald-100 border-emerald-950 shadow-xs ring-2 ring-emerald-500/30"
                               : "bg-stone-50 text-stone-700 hover:bg-emerald-50/60 border-stone-200"
@@ -1233,7 +1378,7 @@ export default function CashDrawerShiftModal({
                         <button
                           type="button"
                           onClick={() => setHistoryFilterType("diferencia")}
-                          className={`px-3 py-2 rounded-xl text-xs font-black shrink-0 transition-all border ${
+                          className={`px-3 py-2 rounded-xl text-xs font-black transition-all border cursor-pointer active:scale-95 shadow-2xs ${
                             historyFilterType === "diferencia"
                               ? "bg-rose-900 text-rose-100 border-rose-950 shadow-xs ring-2 ring-rose-500/30"
                               : "bg-stone-50 text-stone-700 hover:bg-rose-50/60 border-stone-200"

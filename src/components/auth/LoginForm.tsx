@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, Heart } from "lucide-react";
+import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, AlertCircle, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
 
 export default function LoginForm() {
   const router = useRouter();
-  const { login, verifyCredentials } = useAuth();
+  const { login, verifyCredentials, getDefaultRouteForUser } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -17,6 +17,51 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [welcomeUser, setWelcomeUser] = useState<User | null>(null);
   const [isLogoSpinning, setIsLogoSpinning] = useState(false);
+  const [redirectTarget, setRedirectTarget] = useState<string | null>(null);
+
+  // Seguridad: Control de intentos fallidos y bloqueo temporal anti-fuerza bruta
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutRemaining, setLockoutRemaining] = useState(0);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedUser = localStorage.getItem("brito_saved_username");
+      if (savedUser) {
+        setIdentifier(savedUser);
+        setRememberMe(true);
+      }
+      const pendingUrl = sessionStorage.getItem("brito_redirect_url");
+      if (pendingUrl && pendingUrl !== "/") {
+        setRedirectTarget(pendingUrl);
+      }
+
+      // Verificar si existía un bloqueo temporal vigente
+      const lockoutUntil = parseInt(sessionStorage.getItem("brito_lockout_until") || "0", 10);
+      if (lockoutUntil && lockoutUntil > Date.now()) {
+        const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+        setLockoutRemaining(remaining);
+      }
+    }
+  }, []);
+
+  // Temporizador para cuenta regresiva del bloqueo temporal
+  useEffect(() => {
+    if (lockoutRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setLockoutRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          if (typeof window !== "undefined") {
+            sessionStorage.removeItem("brito_lockout_until");
+          }
+          setError("");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lockoutRemaining]);
 
   const handleLogoClick = () => {
     setIsLogoSpinning(true);
@@ -26,6 +71,11 @@ export default function LoginForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (lockoutRemaining > 0) {
+      setError(`Acceso bloqueado por intentos fallidos. Por favor espera ${lockoutRemaining} segundos.`);
+      return;
+    }
 
     if (!identifier.trim()) {
       setError("Por favor escribe tu usuario o correo.");
@@ -42,17 +92,50 @@ export default function LoginForm() {
     setTimeout(() => {
       const res = verifyCredentials(identifier, password);
       if (res.success && res.user) {
+        // Restablecer contador de seguridad al acertar credenciales
+        setFailedAttempts(0);
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("brito_lockout_until");
+        }
+
         setWelcomeUser(res.user);
-        // Mostrar el mensaje de bienvenida 2 segundos antes de ingresar a la app
+        const destination = getDefaultRouteForUser(res.user);
+
+        // Mostrar el mensaje de bienvenida y luego ingresar a la app
         setTimeout(() => {
           login(identifier, password, rememberMe);
           if (typeof window !== "undefined") {
             sessionStorage.setItem("brito_session_active", "true");
           }
-          router.push("/");
-        }, 2000);
+
+          // Redirección inteligente: si intentaba entrar a una ruta específica como /pos o /inventario
+          let target = destination;
+          if (typeof window !== "undefined") {
+            const pending = sessionStorage.getItem("brito_redirect_url");
+            if (pending && pending !== "/") {
+              target = pending;
+              sessionStorage.removeItem("brito_redirect_url");
+            }
+          }
+          router.push(target);
+        }, 1600);
       } else {
-        setError(res.message || "Usuario o contraseña incorrectos. Intenta de nuevo.");
+        // Incrementar intentos fallidos y activar bloqueo si llega a 5
+        const nextAttempts = failedAttempts + 1;
+        setFailedAttempts(nextAttempts);
+
+        if (nextAttempts >= 5) {
+          const lockoutSeconds = 60;
+          const unlockTime = Date.now() + lockoutSeconds * 1000;
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("brito_lockout_until", unlockTime.toString());
+          }
+          setLockoutRemaining(lockoutSeconds);
+          setError("Has superado el límite de 5 intentos fallidos. Por seguridad de la panadería, el acceso se ha bloqueado temporalmente durante 60 segundos.");
+        } else {
+          const left = 5 - nextAttempts;
+          setError(`${res.message || "Usuario o contraseña incorrectos."} (${left} ${left === 1 ? "intento restante" : "intentos restantes"} antes del bloqueo temporal).`);
+        }
         setIsLoading(false);
       }
     }, 350);
@@ -159,6 +242,15 @@ export default function LoginForm() {
 
             {/* Form */}
             <div className="px-5 sm:px-8 pb-8 sm:pb-10 pt-1 sm:pt-2 space-y-3.5 sm:space-y-4">
+              {redirectTarget && (
+                <div className="p-3.5 bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs rounded-2xl font-medium flex items-center gap-2.5 animate-in fade-in duration-200 shadow-lg">
+                  <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
+                  <p className="leading-snug">
+                    <strong className="text-white">Seguridad de Acceso:</strong> Por protección de la panadería, debes iniciar sesión en esta ventana para acceder a <span className="text-amber-400 font-bold">{redirectTarget}</span>.
+                  </p>
+                </div>
+              )}
+
               {error && (
                 <div className="p-3.5 bg-rose-500/15 border border-rose-500/35 text-rose-200 text-xs rounded-2xl font-semibold flex items-center gap-2.5 animate-in fade-in duration-200">
                   <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
@@ -211,7 +303,7 @@ export default function LoginForm() {
                   </div>
                 </div>
 
-                {/* Remember session checkbox */}
+                {/* Remember username checkbox */}
                 <div className="flex items-center justify-between pt-1">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
@@ -221,7 +313,7 @@ export default function LoginForm() {
                       className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 border-stone-700 bg-stone-900 cursor-pointer"
                     />
                     <span className="text-xs text-stone-400 font-medium hover:text-stone-300 transition-colors">
-                      Recordar mi sesión
+                      Recordar mi usuario en este equipo
                     </span>
                   </label>
                 </div>
@@ -229,10 +321,19 @@ export default function LoginForm() {
                 {/* Big Friendly Submit Button */}
                 <button
                   type="submit"
-                  disabled={isLoading}
-                  className="w-full mt-2 py-3.5 sm:py-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-orange-500/30 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] disabled:opacity-70 tracking-wide uppercase cursor-pointer"
+                  disabled={isLoading || lockoutRemaining > 0}
+                  className={`w-full mt-2 py-3.5 sm:py-4 font-black text-xs sm:text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] disabled:opacity-70 tracking-wide uppercase ${
+                    lockoutRemaining > 0
+                      ? "bg-stone-800 text-stone-400 border border-rose-500/30 cursor-not-allowed"
+                      : "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 shadow-orange-500/30 cursor-pointer"
+                  }`}
                 >
-                  {isLoading ? (
+                  {lockoutRemaining > 0 ? (
+                    <span className="flex items-center gap-2 text-rose-300">
+                      <ShieldAlert className="w-4 h-4 text-rose-400 animate-pulse" />
+                      <span>Bloqueado temporalmente ({lockoutRemaining}s)</span>
+                    </span>
+                  ) : isLoading ? (
                     <span>Verificando...</span>
                   ) : (
                     <>
