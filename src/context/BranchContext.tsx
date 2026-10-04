@@ -248,42 +248,17 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     const syncBranchesWithServer = async () => {
       try {
         // A) Sincronizar desde /api/branches (persistencia central del servidor)
-        const res = await fetch("/api/branches");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.branches) && data.branches.length > 0) {
-            setBranches((localBranches) => {
-              const branchMap = new Map<string, Branch>();
-              DEFAULT_BRANCHES.forEach((d) => branchMap.set(d.id, d));
-
-              // Sembrar primero con los datos locales
-              localBranches.forEach((b) => branchMap.set(b.id, b));
-
-              // Aplicar lo del servidor sin sobreescribir ventas mayores con cero
-              data.branches.forEach((serverB: Branch) => {
-                const localB = branchMap.get(serverB.id);
-                if (!localB) {
-                  branchMap.set(serverB.id, serverB);
-                } else {
-                  branchMap.set(serverB.id, {
-                    ...localB,
-                    ...serverB,
-                    todaySales: Math.max(Number(serverB.todaySales) || 0, localB.todaySales || 0),
-                    todayTickets: Math.max(Number(serverB.todayTickets) || 0, localB.todayTickets || 0),
-                    cashInDrawer: serverB.cashInDrawer !== undefined ? Number(serverB.cashInDrawer) : localB.cashInDrawer,
-                    currentShift: serverB.currentShift || localB.currentShift,
-                    status: serverB.status || localB.status,
-                  });
-                }
-              });
-
-              const merged = Array.from(branchMap.values());
-              try {
-                localStorage.setItem("brito_branches_data", JSON.stringify(merged));
-              } catch {}
-              return merged;
-            });
+        let serverBranches: Branch[] = [];
+        try {
+          const res = await fetch("/api/branches");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && Array.isArray(data.branches) && data.branches.length > 0) {
+              serverBranches = data.branches;
+            }
           }
+        } catch (err) {
+          console.warn("[BranchContext] No se pudo consultar /api/branches:", err);
         }
 
         // B) Sincronizar directamente con Supabase las ventas, pedidos, gastos y movimientos de TODAS las sucursales
@@ -547,6 +522,32 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             DEFAULT_BRANCHES.forEach((d) => branchMap.set(d.id, d));
             prev.forEach((b) => branchMap.set(b.id, { ...(branchMap.get(b.id) || b), ...b }));
 
+            // Incorporar datos de configuración de /api/branches sin sobreescribir ventas/cajas vivas con 0
+            if (serverBranches.length > 0) {
+              serverBranches.forEach((serverB: Branch) => {
+                const existing = branchMap.get(serverB.id);
+                if (!existing) {
+                  branchMap.set(serverB.id, serverB);
+                } else {
+                  branchMap.set(serverB.id, {
+                    ...existing,
+                    name: serverB.name || existing.name,
+                    shortName: serverB.shortName || existing.shortName,
+                    code: serverB.code || existing.code,
+                    address: serverB.address || existing.address,
+                    phone: serverB.phone || existing.phone,
+                    manager: serverB.manager || existing.manager,
+                    assignedUserId: serverB.assignedUserId || existing.assignedUserId,
+                    assignedUserName: serverB.assignedUserName || existing.assignedUserName,
+                    assignedUserEmail: serverB.assignedUserEmail || existing.assignedUserEmail,
+                    dailyGoal: serverB.dailyGoal || existing.dailyGoal,
+                    color: serverB.color || existing.color,
+                    status: serverB.status || existing.status,
+                  });
+                }
+              });
+            }
+
             // Incorporar sucursales de la tabla branches de Supabase si existen
             dbBranches.forEach((dbB: any) => {
               if (!branchMap.has(dbB.id)) {
@@ -665,6 +666,30 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
                 },
               };
             });
+
+            // Comprobar si realmente hubo cambios operativos o numéricos para evitar re-renderizados continuos
+            const isIdentical =
+              prev.length === updated.length &&
+              prev.every((b, i) => {
+                const u = updated[i];
+                if (!u || b.id !== u.id) return false;
+                return (
+                  b.todaySales === u.todaySales &&
+                  b.todayTickets === u.todayTickets &&
+                  b.cashInDrawer === u.cashInDrawer &&
+                  b.name === u.name &&
+                  b.status === u.status &&
+                  b.manager === u.manager &&
+                  b.currentShift?.totalSales === u.currentShift?.totalSales &&
+                  b.currentShift?.cashier === u.currentShift?.cashier &&
+                  b.currentShift?.name === u.currentShift?.name &&
+                  b.currentShift?.initialFund === u.currentShift?.initialFund
+                );
+              });
+
+            if (isIdentical) {
+              return prev; // Mismo objeto en memoria, cero re-renderizado
+            }
 
             try {
               localStorage.setItem("brito_branches_data", JSON.stringify(updated));
@@ -976,10 +1001,10 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         .subscribe();
     } catch {}
 
-    // Intervalo de sincronización en vivo cada 2.5 segundos para respaldo continuo
+    // Intervalo de respaldo suave cada 30 segundos (los cambios se sincronizan en vivo al instante vía Supabase Realtime)
     const pollInterval = setInterval(() => {
       syncBranchesWithServer();
-    }, 2500);
+    }, 30000);
 
     const handleFocus = () => {
       syncBranchesWithServer();
