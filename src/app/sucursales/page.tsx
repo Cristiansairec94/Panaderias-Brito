@@ -96,20 +96,7 @@ export default function SucursalesPage() {
   };
 
   // Fecha del día actual formateada
-  const [todayDateFormatted, setTodayDateFormatted] = useState<string>(() => {
-    try {
-      const now = new Date();
-      const dayName = now.toLocaleDateString("es-MX", { weekday: "long" });
-      const dayNum = now.getDate();
-      const monthName = now.toLocaleDateString("es-MX", { month: "long" });
-      const year = now.getFullYear();
-      const capDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-      const capMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-      return `${capDay}, ${dayNum} de ${capMonth} de ${year}`;
-    } catch {
-      return "Lunes, 7 de Septiembre de 2026";
-    }
-  });
+  const [todayDateFormatted, setTodayDateFormatted] = useState<string>("Cargando fecha...");
 
   useEffect(() => {
     try {
@@ -122,7 +109,7 @@ export default function SucursalesPage() {
       const capMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
       setTodayDateFormatted(`${capDay}, ${dayNum} de ${capMonth} de ${year}`);
     } catch {
-      // ignore
+      setTodayDateFormatted("Lunes, 7 de Septiembre de 2026");
     }
   }, []);
 
@@ -315,8 +302,8 @@ export default function SucursalesPage() {
     <div className="w-full space-y-5 sm:space-y-6 pb-12">
       {/* Top Header Banner */}
       <div className="relative overflow-hidden bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-3xl p-6 sm:p-8 text-white shadow-2xl border border-stone-800">
-        <div className="absolute -right-12 -top-12 w-80 h-80 bg-orange-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -left-12 -bottom-12 w-80 h-80 bg-rose-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -right-12 -top-12 w-80 h-80 bg-[radial-gradient(circle,rgba(249,115,22,0.18)_0%,transparent_70%)] pointer-events-none" />
+        <div className="absolute -left-12 -bottom-12 w-80 h-80 bg-[radial-gradient(circle,rgba(244,63,94,0.18)_0%,transparent_70%)] pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
@@ -336,7 +323,7 @@ export default function SucursalesPage() {
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => setIsCreateBranchOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-105 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-colors active:opacity-85"
               title="Registrar una nueva sucursal en la red"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
@@ -348,7 +335,7 @@ export default function SucursalesPage() {
                 setEditingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
                 setIsEditBranchOpen(true);
               }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 hover:text-white font-black text-xs border border-amber-400/30 backdrop-blur-md shadow-lg transition-all active:scale-95"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 hover:text-white font-black text-xs border border-amber-400/30 backdrop-blur-md shadow-lg transition-colors active:opacity-85"
               title="Modificar datos, encargado y turnos de una sucursal"
             >
               <Edit3 className="w-4 h-4 text-amber-300 stroke-[2.5]" />
@@ -360,7 +347,7 @@ export default function SucursalesPage() {
                 setDeletingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
                 setIsDeleteBranchOpen(true);
               }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 hover:text-white font-black text-xs border border-rose-400/30 backdrop-blur-md shadow-lg transition-all active:scale-95"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 hover:text-white font-black text-xs border border-rose-400/30 backdrop-blur-md shadow-lg transition-colors active:opacity-85"
               title="Retirar o eliminar una sucursal de la red"
             >
               <Trash2 className="w-4 h-4 text-rose-400 stroke-[2.5]" />
@@ -482,10 +469,10 @@ export default function SucursalesPage() {
 
                 <button
                   onClick={() => setShowStatisticsChart((prev) => !prev)}
-                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs transition-all shadow-md active:scale-95 ${
+                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs transition-colors shadow-md active:opacity-85 ${
                     showStatisticsChart
                       ? "bg-stone-900 text-white hover:bg-black"
-                      : "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-orange-500/20 hover:brightness-110"
+                      : "bg-gradient-to-r from-orange-500 to-rose-500 text-white shadow-orange-500/20 hover:brightness-105"
                   }`}
                 >
                   <BarChart3 className="w-4 h-4" />
@@ -501,7 +488,7 @@ export default function SucursalesPage() {
 
             {/* Gráfica desplegada únicamente cuando showStatisticsChart es true */}
             {showStatisticsChart && (
-              <div className="animate-in fade-in zoom-in-95 duration-300">
+              <div className="animate-in fade-in duration-200">
                 <GoogleBranchChart
                   branches={branches}
                   selectedPeriod={selectedPeriod}
@@ -544,7 +531,7 @@ export default function SucursalesPage() {
                   <button
                     type="button"
                     onClick={() => setDisplayMode("auto")}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-colors ${
                       displayMode === "auto"
                         ? "bg-white text-stone-900 shadow-xs"
                         : "text-stone-500 hover:text-stone-800"
@@ -556,7 +543,7 @@ export default function SucursalesPage() {
                   <button
                     type="button"
                     onClick={() => setDisplayMode("cards")}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition-all ${
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition-colors ${
                       displayMode === "cards"
                         ? "bg-white text-stone-900 shadow-xs"
                         : "text-stone-500 hover:text-stone-800"
@@ -569,7 +556,7 @@ export default function SucursalesPage() {
                   <button
                     type="button"
                     onClick={() => setDisplayMode("table")}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition-all ${
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition-colors ${
                       displayMode === "table"
                         ? "bg-white text-stone-900 shadow-xs"
                         : "text-stone-500 hover:text-stone-800"
@@ -584,7 +571,7 @@ export default function SucursalesPage() {
                 <button
                   type="button"
                   onClick={() => setIsCreateBranchOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-black text-xs shadow-sm active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-105 text-white font-black text-xs shadow-sm active:opacity-85 transition-colors"
                   title="Registrar nueva sucursal"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[3]" />
@@ -597,7 +584,7 @@ export default function SucursalesPage() {
                     setEditingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
                     setIsEditBranchOpen(true);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200 shadow-xs transition-all active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200 shadow-xs transition-colors active:opacity-85"
                   title="Editar datos de la sucursal"
                 >
                   <Edit3 className="w-3.5 h-3.5 text-amber-600" />
@@ -610,7 +597,7 @@ export default function SucursalesPage() {
                     setDeletingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
                     setIsDeleteBranchOpen(true);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 shadow-xs transition-all active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 shadow-xs transition-colors active:opacity-85"
                   title="Eliminar sucursal de la red"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-rose-600" />
@@ -620,7 +607,7 @@ export default function SucursalesPage() {
                 <button
                   type="button"
                   onClick={toggleAllExpanded}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs border border-stone-200 shadow-sm transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs border border-stone-200 shadow-sm transition-colors active:opacity-85"
                 >
                   <BarChart3 className="w-3.5 h-3.5 text-orange-600" />
                   <span>
@@ -843,7 +830,7 @@ export default function SucursalesPage() {
 
                     {/* Cajón Desplegable con Analítica Operativa para Móvil */}
                     {isExpanded && (
-                      <div className="p-4 bg-orange-50/20 border-t border-orange-200/80 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="p-4 bg-orange-50/20 border-t border-orange-200/80 space-y-3.5 animate-in fade-in duration-150">
                         <div className="flex items-center justify-between">
                           <h5 className="font-black text-stone-900 text-xs flex items-center gap-1.5">
                             <BarChart3 className="w-4 h-4 text-orange-600" />
@@ -1071,22 +1058,31 @@ export default function SucursalesPage() {
             <div
               className={
                 displayMode === "table"
-                  ? "block overflow-x-auto"
+                  ? "block overflow-x-auto overscroll-x-contain"
                   : displayMode === "cards"
                   ? "hidden"
-                  : "hidden md:block overflow-x-auto"
+                  : "hidden md:block overflow-x-auto overscroll-x-contain"
               }
             >
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs table-fixed min-w-[1020px]">
+                <colgroup>
+                  <col style={{ width: "22%" }} />
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "12%" }} />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-stone-200 bg-stone-100/70 text-stone-700 uppercase tracking-wider font-extrabold text-[11px]">
-                    <th className="py-4 px-4 min-w-[200px]">Sucursal & Código</th>
-                    <th className="py-4 px-4 min-w-[170px]">Encargado & Contacto</th>
-                    <th className="py-4 px-4 min-w-[130px]">Piezas Vendidas</th>
-                    <th className="py-4 px-4 min-w-[140px]">Ventas Totales</th>
-                    <th className="py-4 px-4 min-w-[120px]">Ticket Prom.</th>
-                    <th className="py-4 px-4 min-w-[170px]">Caja & Turno Actual</th>
-                    <th className="py-4 px-4 min-w-[150px] text-right">Estadísticas</th>
+                    <th className="py-4 px-4">Sucursal & Código</th>
+                    <th className="py-4 px-4">Encargado & Contacto</th>
+                    <th className="py-4 px-4">Piezas Vendidas</th>
+                    <th className="py-4 px-4">Ventas Totales</th>
+                    <th className="py-4 px-4">Ticket Prom.</th>
+                    <th className="py-4 px-4">Caja & Turno Actual</th>
+                    <th className="py-4 px-4 text-right">Estadísticas</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100 font-medium">
@@ -1098,7 +1094,7 @@ export default function SucursalesPage() {
                       <React.Fragment key={b.id}>
                         <tr
                           className={`transition-colors duration-150 ${
-                            isSelected ? "bg-orange-50/40 font-semibold" : isExpanded ? "bg-stone-50/50" : "hover:bg-stone-50/80"
+                            isSelected ? "bg-orange-50/40" : isExpanded ? "bg-stone-50/50" : "hover:bg-stone-50/80"
                           }`}
                         >
                           {/* 1. Sucursal & Codigo */}
@@ -1240,10 +1236,10 @@ export default function SucursalesPage() {
 
                               <button
                                 onClick={() => toggleExpand(b.id)}
-                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all border shadow-sm ${
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-colors border shadow-xs ${
                                   isExpanded
-                                    ? "bg-stone-900 text-white border-stone-900 shadow-md"
-                                    : "bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200 active:scale-95"
+                                    ? "bg-stone-900 text-white border-stone-900 shadow-sm"
+                                    : "bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200 active:opacity-80"
                                 }`}
                                 title="Desplegar panel con estadísticas detalladas de esta sucursal"
                               >
@@ -1258,7 +1254,7 @@ export default function SucursalesPage() {
                         {/* PANEL DESPLEGABLE: Estadísticas Detalladas de la Sucursal */}
                         {isExpanded && (
                           <tr className="bg-orange-50/20 border-b-2 border-orange-200/70">
-                            <td colSpan={7} className="p-4 sm:p-6 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <td colSpan={7} className="p-4 sm:p-6 animate-in fade-in duration-150">
                               <div className="bg-white rounded-3xl border border-orange-200/90 shadow-xl p-5 sm:p-6 space-y-6">
                                 {/* Header del Panel Desplegable */}
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-100 pb-4">
