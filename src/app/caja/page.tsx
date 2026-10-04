@@ -797,6 +797,13 @@ export default function CajaPage() {
       handleSync();
     });
 
+    const unsubSaleCancelled = realtimeHub.onSaleCancelled ? realtimeHub.onSaleCancelled((cancelled) => {
+      setLiveStreamMovements((prev) =>
+        prev.filter((p) => p.id !== cancelled.id && p.id !== `sale-${cancelled.id}` && !p.concept?.includes(cancelled.id.replace(/^(pos-|POS-)/i, "")))
+      );
+      handleSync();
+    }) : () => {};
+
     const unsubCash = realtimeHub.onCashMovement((movPayload) => {
       const newLiveItem: LiveMoneyMovement = {
         id: movPayload.id,
@@ -885,6 +892,7 @@ export default function CajaPage() {
     return () => {
       clearInterval(pollInterval);
       unsubSale();
+      unsubSaleCancelled();
       unsubCash();
       unsubCut();
       unsubOrder();

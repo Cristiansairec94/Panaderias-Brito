@@ -420,6 +420,32 @@ export function recordPosSaleIncome(params: {
 }
 
 /**
+ * Elimina una venta del Historial de Ingresos cuando un ticket es cancelado/anulado en el POS.
+ */
+export function removePosSaleIncome(saleId: string): void {
+  if (typeof window === "undefined" || !saleId) return;
+  try {
+    const cleanId = saleId.toLowerCase().replace(/^(pos-|ing-)/i, "");
+    const current = getStoredIncomes();
+    const filtered = current.filter((i) => {
+      const iSaleId = (i.saleId || "").toLowerCase().replace(/^(pos-|ing-)/i, "");
+      const iId = (i.id || "").toLowerCase().replace(/^(pos-|ing-)/i, "");
+      if (iSaleId && (iSaleId === cleanId || iSaleId === saleId.toLowerCase())) return false;
+      if (iId && (iId === cleanId || iId === `ing-${cleanId}`)) return false;
+      if (i.concept && i.concept.toLowerCase().includes(cleanId)) return false;
+      return true;
+    });
+
+    if (filtered.length !== current.length) {
+      saveStoredIncomes(filtered);
+      window.dispatchEvent(new Event("brito_incomes_updated"));
+    }
+  } catch (e) {
+    console.error("Error removing pos sale income:", e);
+  }
+}
+
+/**
  * Sincroniza y recupera de forma estricta y sin duplicados las ventas de brito_pos_current_sales
  */
 export function syncMissingSalesToIncomes(): void {
@@ -526,4 +552,17 @@ if (typeof window !== "undefined") {
       console.error("[IncomesRealtime] Error registrando movimiento de caja remoto como ingreso:", err);
     }
   });
+
+  // 3. Escuchar cancelaciones de venta en tiempo real para remover del historial de ingresos
+  if (realtimeHub?.onSaleCancelled) {
+    realtimeHub.onSaleCancelled((cancelled) => {
+      try {
+        if (cancelled && cancelled.id) {
+          removePosSaleIncome(cancelled.id);
+        }
+      } catch (err) {
+        console.error("[IncomesRealtime] Error removiendo venta cancelada:", err);
+      }
+    });
+  }
 }

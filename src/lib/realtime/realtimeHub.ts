@@ -33,6 +33,16 @@ export interface RealtimeSalePayload {
   createdAt?: string;
 }
 
+export interface RealtimeSaleCancelledPayload {
+  id: string;
+  branchId: string;
+  amount: number;
+  paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+  cashier?: string;
+  timestamp: string;
+  senderDeviceId: string;
+}
+
 export interface RealtimeCashMovementPayload {
   id: string;
   branchId: string;
@@ -69,6 +79,7 @@ export type RealtimeStatus = "connected" | "connecting" | "disconnected";
 
 type NotificationListener = (notif: FBNotification) => void;
 type SaleListener = (sale: RealtimeSalePayload) => void;
+type SaleCancelledListener = (payload: RealtimeSaleCancelledPayload) => void;
 type CashMovementListener = (movement: RealtimeCashMovementPayload) => void;
 type OrderListener = (payload: RealtimeOrderPayload) => void;
 type BreadDeliveryListener = (delivery: RealtimeBreadDeliveryPayload) => void;
@@ -91,6 +102,7 @@ class RealtimeHub {
 
   private notificationListeners = new Set<NotificationListener>();
   private saleListeners = new Set<SaleListener>();
+  private saleCancelledListeners = new Set<SaleCancelledListener>();
   private cashMovementListeners = new Set<CashMovementListener>();
   private orderListeners = new Set<OrderListener>();
   private breadDeliveryListeners = new Set<BreadDeliveryListener>();
@@ -161,7 +173,8 @@ class RealtimeHub {
 
   public dispatchLocalEvent(type: string, payload: any) {
     if (!payload) return;
-    const eventId = payload.id || (payload.order && payload.order.id) || null;
+    const rawId = payload.id || (payload.order && payload.order.id) || null;
+    const eventId = rawId ? `${type}_${rawId}` : null;
     if (eventId) {
       if (this.seenEventIds.has(eventId)) return;
       this.seenEventIds.add(eventId);
@@ -175,6 +188,8 @@ class RealtimeHub {
       this.notificationListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     } else if (type === "sale") {
       this.saleListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "sale_cancelled") {
+      this.saleCancelledListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     } else if (type === "cash_movement") {
       this.cashMovementListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     } else if (type === "order") {
@@ -211,6 +226,10 @@ class RealtimeHub {
         .on("broadcast", { event: "sale" }, ({ payload }: { payload: any }) => {
           if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
           this.dispatchLocalEvent("sale", payload);
+        })
+        .on("broadcast", { event: "sale_cancelled" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("sale_cancelled", payload);
         })
         .on("broadcast", { event: "cash_movement" }, ({ payload }: { payload: any }) => {
           if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
@@ -320,6 +339,23 @@ class RealtimeHub {
 
     this.sendBroadcast("sale", payload);
     this.postToSyncEndpoint("sale", payload);
+  }
+
+  public async broadcastSaleCancelled(params: {
+    id: string;
+    branchId: string;
+    amount: number;
+    paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+    cashier?: string;
+  }) {
+    const payload: RealtimeSaleCancelledPayload = {
+      ...params,
+      timestamp: new Date().toISOString(),
+      senderDeviceId: this.getDeviceId(),
+    };
+
+    this.sendBroadcast("sale_cancelled", payload);
+    this.postToSyncEndpoint("sale_cancelled", payload);
   }
 
   public async broadcastCashMovement(movement: Omit<RealtimeCashMovementPayload, "senderDeviceId">) {
@@ -469,6 +505,13 @@ class RealtimeHub {
     this.saleListeners.add(listener);
     return () => {
       this.saleListeners.delete(listener);
+    };
+  }
+
+  public onSaleCancelled(listener: SaleCancelledListener) {
+    this.saleCancelledListeners.add(listener);
+    return () => {
+      this.saleCancelledListeners.delete(listener);
     };
   }
 

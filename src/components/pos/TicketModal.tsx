@@ -472,7 +472,7 @@ export default function TicketModal({
           </div>
 
           {/* Botón de Cancelar Ticket */}
-          {!isReprint && onCancelTicket && (
+          {onCancelTicket && (
             <button
               type="button"
               onClick={onCancelTicket}
@@ -480,7 +480,7 @@ export default function TicketModal({
               title="Cancelar compra y regresar panes al inventario"
             >
               <X className="w-4 h-4 text-rose-500 shrink-0" />
-              <span>Cancelar Ticket (Anular compra y reponer panes)</span>
+              <span>{isReprint ? "Anular Ticket (Cancelar venta y devolver panes)" : "Cancelar Ticket (Anular compra y reponer panes)"}</span>
             </button>
           )}
         </div>

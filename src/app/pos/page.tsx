@@ -62,6 +62,7 @@ import {
   addQuickCustomer,
   createCustomerInDb,
   recordCustomerSale,
+  revertCustomerSale,
   fetchCustomersFromDb
 } from "@/lib/customers";
 import { useAuth } from "@/context/AuthContext";
@@ -83,7 +84,7 @@ import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import { getStoredOrders } from "@/lib/orders";
-import { recordPosSaleIncome, getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
+import { recordPosSaleIncome, removePosSaleIncome, getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
 import { getStoredPrinterConfig, PrinterConfig } from "@/lib/printer";
 
 const INITIAL_EXPENSES: CashExpense[] = [];
@@ -406,11 +407,12 @@ function CartPriceInput({
 export default function POSPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
-  const { branches, currentBranch, switchBranch, registerRealSale, cashMovements } = useBranch();
+  const { branches, currentBranch, switchBranch, registerRealSale, cancelRealSale, cashMovements } = useBranch();
   const { addNotification, openShiftCutDetail } = useNotifications();
   const { toggleMobile } = useSidebar();
-  const { isOnline, isSyncing, isSynced, enqueueOfflineItem, pendingCount } = useSync();
+  const { isOnline, isSyncing, isSynced, enqueueOfflineItem, removeQueueItem, pendingCount } = useSync();
   const activeBranch = currentBranch || branches[0];
+  const cancelledSaleIdsRef = useRef<Set<string>>(new Set());
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -2296,6 +2298,10 @@ export default function POSPage() {
     // 7. Sincronización en segundo plano con Supabase y cola offline (asíncrona y no bloqueante)
     (async () => {
       let savedToCloud = false;
+      if (cancelledSaleIdsRef.current.has(createdSaleId)) {
+        return;
+      }
+
       if (isOnline) {
         try {
           const supabase = createClient();
@@ -2321,11 +2327,24 @@ export default function POSPage() {
             saleInsertPayload.customer_type = "general";
           }
 
+          if (cancelledSaleIdsRef.current.has(createdSaleId)) {
+            return;
+          }
+
           const { data: saleData, error: saleErr } = await supabase
             .from("sales")
             .insert(saleInsertPayload)
             .select()
             .single();
+
+          if (cancelledSaleIdsRef.current.has(createdSaleId)) {
+            // Fue cancelado mientras se enviaba la petición
+            try {
+              await supabase.from("sale_items").delete().eq("sale_id", createdSaleId);
+              await supabase.from("sales").delete().eq("id", createdSaleId);
+            } catch {}
+            return;
+          }
 
           if (saleData && !saleErr) {
             savedToCloud = true;
@@ -2359,8 +2378,8 @@ export default function POSPage() {
         }
       }
 
-      // Si no se guardó en la nube (offline o falla de red), encolar de forma segura en la cola offline local
-      if (!savedToCloud) {
+      // Si no se guardó en la nube (offline o falla de red), encolar de forma segura si no ha sido cancelada
+      if (!savedToCloud && !cancelledSaleIdsRef.current.has(createdSaleId)) {
         enqueueOfflineItem({
           type: "sale",
           title: `Venta POS #${createdSaleId} (${formatCurrency(currentTotal)})`,
@@ -2477,13 +2496,21 @@ export default function POSPage() {
     }
   };
 
-  const handleCancelTicket = () => {
+  const handleCancelTicket = async () => {
     if (!completedSale) {
       setShowReceiptModal(false);
       return;
     }
 
+    if (isReprintMode && typeof window !== "undefined") {
+      const confirmCancel = window.confirm(
+        `¿Deseas anular la venta #${completedSale.id} por ${formatCurrency(completedSale.total)} MXN? Se regresarán los panes al inventario y se descontará del corte de caja y estadísticas.`
+      );
+      if (!confirmCancel) return;
+    }
+
     const sale = completedSale;
+    cancelledSaleIdsRef.current.add(sale.id);
 
     // 1. Devolver los panes al inventario local
     setProducts((prev) => {
@@ -2498,7 +2525,7 @@ export default function POSPage() {
       return updated;
     });
 
-    // 2. Reintegrar stock en Supabase si aplica
+    // 2. Reintegrar stock y eliminar la venta en Supabase (ambas tablas: sale_items y sales)
     try {
       const supabase = createClient();
       for (const item of sale.items) {
@@ -2512,25 +2539,57 @@ export default function POSPage() {
             .then();
         }
       }
+
+      await supabase.from("sale_items").delete().eq("sale_id", sale.id);
+      await supabase.from("sales").delete().eq("id", sale.id);
     } catch (e) {
-      console.log("Offline mode, stock restored locally", e);
+      console.error("Error al anular venta en Supabase:", e);
     }
 
-    // 3. Eliminar la venta de recentSalesList (no se cobrará el dinero ni afectará el corte)
-    const nextList = recentSalesList.filter((s) => s.id !== sale.id);
+    // 3. Revertir métricas de sucursal, caja y turnos en BranchContext (multi-tienda y tiempo real)
+    const effectiveBranchId = sale.branchId || activeBranch?.id || "branch-matriz";
+    if (cancelRealSale) {
+      cancelRealSale({
+        saleId: sale.id,
+        branchId: effectiveBranchId,
+        amount: sale.total,
+        paymentMethod: sale.paymentMethod,
+        cashier: sale.cashier,
+      });
+    }
+
+    // 4. Eliminar del Historial de Ingresos para que no se sume al arqueo ni a las ventas
+    removePosSaleIncome(sale.id);
+
+    // 5. Revertir compra acumulada y conteos de moda en el cliente
+    if (sale.customerId && sale.customerId !== "cli-0") {
+      revertCustomerSale(
+        sale.customerId,
+        sale.items.map((i) => ({ name: i.product.name, quantity: i.quantity })),
+        sale.total
+      );
+    }
+
+    // 6. Eliminar la venta de las listas locales del turno y maestro
+    setRecentSalesList((prev) => prev.filter((s) => s.id !== sale.id));
     try {
-      localStorage.setItem("brito_pos_current_sales", JSON.stringify(nextList));
+      const rawCurrent = localStorage.getItem("brito_pos_current_sales");
+      if (rawCurrent) {
+        const parsed: Sale[] = JSON.parse(rawCurrent);
+        const next = parsed.filter((s) => s.id !== sale.id);
+        localStorage.setItem("brito_pos_current_sales", JSON.stringify(next));
+      }
       const rawMaster = localStorage.getItem("brito_pos_master_sales");
       if (rawMaster) {
-        const prevMaster: Sale[] = JSON.parse(rawMaster);
-        const nextMaster = prevMaster.filter((s) => s.id !== sale.id);
-        localStorage.setItem("brito_pos_master_sales", JSON.stringify(nextMaster));
+        const parsed: Sale[] = JSON.parse(rawMaster);
+        const next = parsed.filter((s) => s.id !== sale.id);
+        localStorage.setItem("brito_pos_master_sales", JSON.stringify(next));
       }
       window.dispatchEvent(new Event("brito_sales_updated"));
+      window.dispatchEvent(new Event("brito_shift_cuts_updated"));
     } catch (e) {}
-    setRecentSalesList(nextList);
 
-    // 4. Notificación en el sistema de Panaderías Brito
+    // 7. Notificación en el sistema de Panaderías Brito
     addNotification({
       senderName: "🥖 Panaderías Brito",
       senderAvatar: "🥐",
@@ -2541,8 +2600,10 @@ export default function POSPage() {
       category: "caja",
     });
 
-    // 5. Cerrar ticket directamente y reiniciar estado de venta
+    // 8. Cerrar ticket directamente y reiniciar estado de venta
     setShowReceiptModal(false);
+    setCompletedSale(null);
+    setIsReprintMode(false);
     resetSale();
   };
 
@@ -4569,7 +4630,7 @@ export default function POSPage() {
         <TicketModal
           isOpen={showReceiptModal}
           onClose={handleCloseReceiptModal}
-          onCancelTicket={isReprintMode ? undefined : handleCancelTicket}
+          onCancelTicket={handleCancelTicket}
           isReprint={isReprintMode}
           saleId={completedSale.id}
           items={completedSale.items}

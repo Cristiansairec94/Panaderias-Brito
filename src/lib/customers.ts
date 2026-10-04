@@ -672,6 +672,69 @@ export function recordCustomerSale(
 }
 
 /**
+ * Revierte una compra del cliente cuando se cancela/anula un ticket en el POS.
+ */
+export function revertCustomerSale(
+  customerId: string,
+  items: { name: string; quantity: number }[],
+  saleAmount: number
+): void {
+  if (typeof window === "undefined" || !customerId || customerId === "cli-0") return;
+  try {
+    const customers = getStoredCustomers();
+    const idx = customers.findIndex((c) => c.id === customerId);
+    if (idx === -1) return;
+
+    const customer = { ...customers[idx] };
+    customer.totalPurchases = Math.max(0, (customer.totalPurchases || 0) - saleAmount);
+
+    const counts: Record<string, number> = { ...(customer.purchaseCounts || {}) };
+    for (const it of items) {
+      if (it.name && counts[it.name]) {
+        counts[it.name] = Math.max(0, counts[it.name] - (it.quantity || 1));
+      }
+    }
+    customer.purchaseCounts = counts;
+
+    // Recalcular la moda estadística
+    let maxCount = 0;
+    let modeItem = "";
+    for (const [prodName, count] of Object.entries(counts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        modeItem = prodName;
+      }
+    }
+    customer.favoriteProduct = modeItem || undefined;
+
+    // Quitar del historial de compras del cliente
+    if (Array.isArray(customer.purchaseHistory)) {
+      customer.purchaseHistory = customer.purchaseHistory.filter(
+        (p) => Math.abs(p.total - saleAmount) > 0.001
+      );
+    }
+
+    customers[idx] = customer;
+    saveStoredCustomers(customers);
+
+    if (!customerId.startsWith("cli-")) {
+      try {
+        const supabase = createClient();
+        supabase
+          .from("customers")
+          .update({ total_purchases: customer.totalPurchases })
+          .eq("id", customerId)
+          .then();
+      } catch (err) {
+        console.warn("Error updating customer total_purchases on server:", err);
+      }
+    }
+  } catch (e) {
+    console.error("Error reverting customer sale", e);
+  }
+}
+
+/**
  * Consulta clientes en tiempo real desde la base de datos de Supabase.
  * Si la consulta es exitosa, fusiona y sincroniza con localStorage.
  */

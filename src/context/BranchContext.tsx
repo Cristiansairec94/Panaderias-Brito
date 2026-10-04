@@ -171,6 +171,13 @@ interface BranchContextType {
       createdAt?: string;
     }
   ) => void;
+  cancelRealSale: (params: {
+    saleId: string;
+    branchId: string;
+    amount: number;
+    paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+    cashier?: string;
+  }) => void;
   simulateSale: (targetBranchId?: string, customAmount?: number) => SimulatedSale;
   simulateBulkSales: (targetBranchId?: string, count?: number) => void;
   advanceShift: (branchId: string) => void;
@@ -1164,6 +1171,80 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         })
       : () => {};
 
+    // 1.1 Escuchar CANCELACIÓN DE VENTAS en tiempo real
+    const unsubSaleCancelled = realtimeHub.onSaleCancelled
+      ? realtimeHub.onSaleCancelled((payload) => {
+          setBranches((prev) => {
+            const isCash = payload.paymentMethod === "efectivo";
+            const isCard = payload.paymentMethod === "tarjeta";
+            const isTransfer = payload.paymentMethod === "transferencia";
+
+            const updated = prev.map((b) => {
+              if (b.id !== payload.branchId) return b;
+              const curShift = b.currentShift;
+              const updatedShift: BranchShift | undefined = curShift
+                ? {
+                    ...curShift,
+                    totalSales: Math.max(0, (Number(curShift.totalSales) || 0) - payload.amount),
+                    ticketCount: Math.max(0, (Number(curShift.ticketCount) || 0) - 1),
+                    cashSales: Math.max(0, (Number(curShift.cashSales) || 0) - (isCash ? payload.amount : 0)),
+                    cardSales: Math.max(0, (Number(curShift.cardSales) || 0) - (isCard ? payload.amount : 0)),
+                    transferSales: Math.max(0, (Number(curShift.transferSales) || 0) - (isTransfer ? payload.amount : 0)),
+                  }
+                : undefined;
+
+              return {
+                ...b,
+                todaySales: Math.max(0, (Number(b.todaySales) || 0) - payload.amount),
+                todayTickets: Math.max(0, (Number(b.todayTickets) || 0) - 1),
+                cashInDrawer: Math.max(0, (Number(b.cashInDrawer) || 0) - (isCash ? payload.amount : 0)),
+                currentShift: updatedShift || b.currentShift,
+              };
+            });
+
+            try {
+              localStorage.setItem("brito_branches_data", JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
+
+          const cleanId = payload.id.replace(/^(pos-|POS-)/i, "");
+          setCashMovements((prev) => {
+            const filtered = prev.filter(
+              (m) =>
+                m.id !== `sale-${payload.id}` &&
+                m.id !== payload.id &&
+                !(m.reason && m.reason.includes(cleanId))
+            );
+            try {
+              localStorage.setItem("brito_branch_cash_movements", JSON.stringify(filtered));
+            } catch {}
+            return filtered;
+          });
+
+          setRecentSimulatedSales((prev) => {
+            const filtered = prev.filter(
+              (s) => s.id !== payload.id && !String(s.id).includes(cleanId)
+            );
+            try {
+              localStorage.setItem("brito_simulated_sales", JSON.stringify(filtered));
+            } catch {}
+            return filtered;
+          });
+
+          try {
+            const masterRaw = localStorage.getItem("brito_pos_master_sales");
+            if (masterRaw) {
+              const list: any[] = JSON.parse(masterRaw);
+              const next = list.filter((s) => s.id !== payload.id && !String(s.id).includes(cleanId));
+              localStorage.setItem("brito_pos_master_sales", JSON.stringify(next));
+            }
+            window.dispatchEvent(new Event("brito_sales_updated"));
+            window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+          } catch {}
+        })
+      : () => {};
+
     // 2. Escuchar PEDIDOS y abonos en tiempo real
     const unsubOrder = realtimeHub.onOrder
       ? realtimeHub.onOrder((payload) => {
@@ -1465,6 +1546,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       unsubSale();
+      unsubSaleCancelled();
       unsubOrder();
       unsubCashMovement();
       unsubShiftCut();
@@ -1746,6 +1828,87 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error("Error inside registerRealSale:", err);
+    }
+  }, [branches]);
+
+  const cancelRealSale = useCallback((params: {
+    saleId: string;
+    branchId: string;
+    amount: number;
+    paymentMethod: "efectivo" | "tarjeta" | "transferencia";
+    cashier?: string;
+  }) => {
+    try {
+      const isCash = params.paymentMethod === "efectivo";
+      const isCard = params.paymentMethod === "tarjeta";
+      const isTransfer = params.paymentMethod === "transferencia";
+      const cleanId = params.saleId.replace(/^(pos-|POS-)/i, "");
+
+      setBranches((prev) => {
+        const updated = prev.map((b) => {
+          if (b.id !== params.branchId) return b;
+          const curShift = b.currentShift;
+          const updatedShift: BranchShift | undefined = curShift
+            ? {
+                ...curShift,
+                totalSales: Math.max(0, (Number(curShift.totalSales) || 0) - params.amount),
+                ticketCount: Math.max(0, (Number(curShift.ticketCount) || 0) - 1),
+                cashSales: Math.max(0, (Number(curShift.cashSales) || 0) - (isCash ? params.amount : 0)),
+                cardSales: Math.max(0, (Number(curShift.cardSales) || 0) - (isCard ? params.amount : 0)),
+                transferSales: Math.max(0, (Number(curShift.transferSales) || 0) - (isTransfer ? params.amount : 0)),
+              }
+            : undefined;
+
+          return {
+            ...b,
+            todaySales: Math.max(0, (Number(b.todaySales) || 0) - params.amount),
+            todayTickets: Math.max(0, (Number(b.todayTickets) || 0) - 1),
+            cashInDrawer: Math.max(0, (Number(b.cashInDrawer) || 0) - (isCash ? params.amount : 0)),
+            currentShift: updatedShift || b.currentShift,
+          };
+        });
+
+        persistBranches(updated);
+        return updated;
+      });
+
+      // Eliminar del historial de movimientos de caja de la sucursal
+      setCashMovements((prev) => {
+        const filtered = prev.filter(
+          (m) =>
+            m.id !== `sale-${params.saleId}` &&
+            m.id !== params.saleId &&
+            !(m.reason && m.reason.includes(cleanId))
+        );
+        try {
+          localStorage.setItem("brito_branch_cash_movements", JSON.stringify(filtered));
+        } catch {}
+        return filtered;
+      });
+
+      // Eliminar de ventas simuladas
+      setRecentSimulatedSales((prev) => {
+        const filtered = prev.filter(
+          (s) => s.id !== params.saleId && !String(s.id).includes(cleanId)
+        );
+        try {
+          localStorage.setItem("brito_simulated_sales", JSON.stringify(filtered));
+        } catch {}
+        return filtered;
+      });
+
+      // Transmitir cancelación en tiempo real por WebSocket
+      if (realtimeHub?.broadcastSaleCancelled) {
+        realtimeHub.broadcastSaleCancelled({
+          id: params.saleId,
+          branchId: params.branchId,
+          amount: params.amount,
+          paymentMethod: params.paymentMethod,
+          cashier: params.cashier,
+        });
+      }
+    } catch (err) {
+      console.error("Error inside cancelRealSale:", err);
     }
   }, [branches]);
 
@@ -2055,6 +2218,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         updateBranch,
         deleteBranch,
         registerRealSale,
+        cancelRealSale,
         simulateSale,
         simulateBulkSales,
         advanceShift,
