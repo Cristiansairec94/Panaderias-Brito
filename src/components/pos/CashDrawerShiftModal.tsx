@@ -252,6 +252,9 @@ export default function CashDrawerShiftModal({
         if (currentBranch.id !== "branch-matriz") return false;
       }
     }
+    if (outgoingCashier && s.cashier && !matchesCashier(s.cashier, outgoingCashier)) {
+      return false;
+    }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
     if (shiftStartBoundary > 0) {
       if (!sTime || sTime < shiftStartBoundary) return false;
@@ -271,6 +274,9 @@ export default function CashDrawerShiftModal({
       } else {
         if (currentBranch.id !== "branch-matriz") return false;
       }
+    }
+    if (outgoingCashier && o.cashier && !matchesCashier(o.cashier, outgoingCashier)) {
+      return false;
     }
     const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
     if (shiftStartBoundary > 0) {

@@ -627,15 +627,17 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               const totalCobrado = agg.deskSales + agg.orderTotalCobrado;
               const totalTickets = agg.deskTickets + agg.orderCount;
 
-              // Fondo inicial: si hubo corte, es exactamente el fondo dejado para nuevo turno (puede ser 0)
-              const initialFund = latestCut !== undefined
-                ? ((latestCut.nextFund !== undefined && latestCut.nextFund !== null) ? Number(latestCut.nextFund) : 0)
-                : ((b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null) ? Number(b.currentShift.initialFund) : 1000);
+              // Fondo inicial: preservar prioritariamente el fondo del turno activo de esta sucursal
+              const initialFund = b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null
+                ? Number(b.currentShift.initialFund)
+                : (latestCut !== undefined && latestCut.nextFund !== undefined && latestCut.nextFund !== null
+                    ? Number(latestCut.nextFund)
+                    : 1000);
 
               const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.movNet - agg.expCash);
 
-              // Cajero del turno activo: el entrante del último corte o quien haya registrado ventas posteriores
-              const activeCashier = agg.lastCashier || latestCut?.incomingCashier || b.currentShift?.cashier || b.manager || "Cajero";
+              // Cajero del turno activo: preservar el cajero actualmente en turno en la sucursal para estabilidad
+              const activeCashier = b.currentShift?.cashier || agg.lastCashier || latestCut?.incomingCashier || b.manager || "Cajero";
 
               return {
                 ...b,
@@ -922,26 +924,8 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             if (masterChanged) {
               const updatedMaster = Array.from(masterMap.values()).sort((a, b) => compareMovementsDesc(a, b));
               localStorage.setItem("brito_pos_master_sales", JSON.stringify(updatedMaster));
-
-              const rawCurrent = localStorage.getItem("brito_pos_current_sales");
-              const currentList: any[] = rawCurrent ? JSON.parse(rawCurrent) : [];
-              const currentMap = new Map<string, any>(currentList.map((s) => [s.id, s]));
-              let currentChanged = false;
-
-              updatedMaster.forEach((s) => {
-                if (!currentMap.has(s.id)) {
-                  currentMap.set(s.id, s);
-                  currentChanged = true;
-                }
-              });
-
-              if (currentChanged) {
-                const updatedCurrent = Array.from(currentMap.values()).sort((a, b) => compareMovementsDesc(a, b));
-                localStorage.setItem("brito_pos_current_sales", JSON.stringify(updatedCurrent));
-              }
-
-              window.dispatchEvent(new Event("brito_sales_updated"));
-              window.dispatchEvent(new Event("brito_caja_updated"));
+              // NOTA: brito_pos_current_sales pertenece exclusivamente al turno de la terminal local
+              // y no debe sobreescribirse ni contaminarse con el historial completo de todas las sucursales.
             }
           } catch {}
         } catch {}
@@ -1168,24 +1152,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               branchName: sale.branchName,
             };
 
-            let updatedAny = false;
             if (!masterList.some((s) => s.id === remoteSale.id)) {
               masterList = [remoteSale, ...masterList].slice(0, 1000);
               localStorage.setItem("brito_pos_master_sales", JSON.stringify(masterList));
-              updatedAny = true;
             }
-
-            if (!currentList.some((s) => s.id === remoteSale.id)) {
-              currentList = [remoteSale, ...currentList].slice(0, 500);
-              localStorage.setItem("brito_pos_current_sales", JSON.stringify(currentList));
-              updatedAny = true;
-            }
-
-            if (updatedAny) {
-              window.dispatchEvent(new Event("brito_sales_updated"));
-              window.dispatchEvent(new Event("brito_caja_updated"));
-              window.dispatchEvent(new Event("storage"));
-            }
+            // NOTA: No inyectar en brito_pos_current_sales para que los movimientos de otras sucursales
+            // no alteren el turno activo de la terminal local ni desestabilicen sus números.
           } catch (err) {
             console.warn("[BranchContext] Error persisting realtime sale:", err);
           }

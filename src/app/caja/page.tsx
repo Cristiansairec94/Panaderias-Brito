@@ -1068,7 +1068,7 @@ export default function CajaPage() {
   const liveDeliveredToOwner = Math.max(0, liveCountedValue - (Number(nextFundAmount) || 0));
 
   // Active shift responsible name
-  const currentShiftResponsible = currentBranch?.currentShift?.cashier || currentBranch?.manager || user?.name || "Lupita Brito (Cajera 1)";
+  const currentShiftResponsible = (user && user.role !== "admin" ? user.name : null) || currentBranch?.currentShift?.cashier || currentBranch?.manager || user?.name || "Cajero";
 
   // Cuts filtered primarily by Period (Día, Mes, Año, Todos)
   const periodCuts = useMemo(() => {

@@ -424,8 +424,8 @@ export default function ExpensesModal({
   const { branches, currentBranch } = useBranch();
   const activeBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch;
 
-  const effectiveCashier = activeBranch?.currentShift?.cashier || cashierName;
-  const effectiveShiftName = activeBranch?.currentShift?.name || shiftName;
+  const effectiveCashier = cashierName || activeBranch?.currentShift?.cashier || "Cajero";
+  const effectiveShiftName = shiftName || activeBranch?.currentShift?.name || "Turno Activo";
   const effectiveBranchName = activeBranch?.name || branchName || "Sucursal Matriz (Centro)";
 
   const isOrderInBranch = useCallback((o: any) => {
@@ -535,39 +535,37 @@ export default function ExpensesModal({
   
   // Estado local para el Fondo Inicial de Caja
   const [currentFund, setCurrentFund] = useState<number>(() => {
-    if (activeBranch?.currentShift?.initialFund !== undefined) {
-      return activeBranch.currentShift.initialFund;
+    if (typeof initialFund === "number" && initialFund >= 0) {
+      return initialFund;
     }
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("brito_pos_initial_fund");
       if (saved !== null && !isNaN(Number(saved))) return Number(saved);
     }
-    return initialFund || 0;
+    if (activeBranch?.currentShift?.initialFund !== undefined) {
+      return activeBranch.currentShift.initialFund;
+    }
+    return 0;
   });
 
-  // Fondo inicial sincronizado prioritariamente con el turno de la sucursal activa
-  const effectiveFund = activeBranch?.currentShift?.initialFund !== undefined ? activeBranch.currentShift.initialFund : currentFund;
+  // Fondo inicial sincronizado prioritariamente con la terminal y cajera activa
+  const effectiveFund = (typeof initialFund === "number" && initialFund >= 0)
+    ? initialFund
+    : (currentFund !== undefined ? currentFund : (activeBranch?.currentShift?.initialFund || 0));
   const [editFundInput, setEditFundInput] = useState<string>(() => {
-    if (activeBranch?.currentShift?.initialFund !== undefined) {
-      return String(activeBranch.currentShift.initialFund);
-    }
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("brito_pos_initial_fund");
-      if (saved !== null && !isNaN(Number(saved))) return saved;
-    }
-    return String(initialFund || 0);
+    return String(effectiveFund);
   });
   const [isEditingFund, setIsEditingFund] = useState(false);
 
   useEffect(() => {
+    if (typeof initialFund === "number" && initialFund >= 0) {
+      setCurrentFund(initialFund);
+      setEditFundInput(String(initialFund));
+      return;
+    }
     if (activeBranch?.currentShift?.initialFund !== undefined) {
       setCurrentFund(activeBranch.currentShift.initialFund);
       setEditFundInput(String(activeBranch.currentShift.initialFund));
-      return;
-    }
-    if (typeof initialFund === "number") {
-      setCurrentFund(initialFund);
-      setEditFundInput(String(initialFund));
     }
   }, [initialFund, isOpen, activeBranch?.id, activeBranch?.currentShift?.initialFund]);
 
@@ -721,15 +719,23 @@ export default function ExpensesModal({
   // Límite temporal estricto del turno actual (timestamp en ms)
   const shiftStartBoundary = useMemo(() => {
     const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) ? lastCutTimestamp : 0;
-    return Math.max(validLastCut, getStoredShiftStartBoundary());
-  }, [lastCutTimestamp, shiftVersion]);
+    return Math.max(validLastCut, getStoredShiftStartBoundary(activeBranch?.id));
+  }, [lastCutTimestamp, shiftVersion, activeBranch?.id]);
 
-  // Filtrar exclusivamente las salidas correspondientes a la cajera y turno en operación (incluyendo retiros de dueño del cajón)
+  // Filtrar exclusivamente las salidas correspondientes a la sucursal, cajera y turno en operación
   const shiftExpenses = useMemo(() => {
     const filtered = (expenses || []).filter((e) => {
       if (!e) return false;
+      if (activeBranch && activeBranch.id !== "all") {
+        const eBranch = (e as any).branchId || (e as any).branch_id;
+        if (eBranch) {
+          if (eBranch !== activeBranch.id) return false;
+        } else {
+          if (activeBranch.id !== "branch-matriz") return false;
+        }
+      }
       const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
-      if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
+      if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, effectiveCashier))) return false;
       const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
       if (shiftStartBoundary > 0) {
         if (!expTime || expTime < shiftStartBoundary) {
@@ -740,13 +746,21 @@ export default function ExpensesModal({
       return true;
     });
     return deduplicateExpenses(filtered);
-  }, [expenses, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [expenses, effectiveCashier, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
   const shiftIncomes = useMemo(() => {
     const rawFiltered = (incomes || []).filter((inc) => {
       if (!inc) return false;
+      if (activeBranch && activeBranch.id !== "all") {
+        const incBranch = (inc as any).branchId || (inc as any).branch_id;
+        if (incBranch) {
+          if (incBranch !== activeBranch.id) return false;
+        } else {
+          if (activeBranch.id !== "branch-matriz") return false;
+        }
+      }
       const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
-      if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
+      if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, effectiveCashier))) return false;
       const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
       if (shiftStartBoundary > 0) {
         if (!incTime || incTime < shiftStartBoundary) {
@@ -757,9 +771,9 @@ export default function ExpensesModal({
       return true;
     });
     return deduplicateIncomes(rawFiltered);
-  }, [incomes, cashierName, shiftStartBoundary, shiftVersion]);
+  }, [incomes, effectiveCashier, shiftStartBoundary, shiftVersion, activeBranch?.id]);
 
-  // Filtrar exclusivamente las ventas correspondientes al turno en operación
+  // Filtrar exclusivamente las ventas correspondientes a esta sucursal y a la cajera en su turno
   const shiftSales = useMemo(() => {
     let source = Array.isArray(sales) && sales.length > 0 ? sales : [];
     if (source.length === 0 && typeof window !== "undefined") {
@@ -783,6 +797,9 @@ export default function ExpensesModal({
           if (activeBranch.id !== "branch-matriz") return false;
         }
       }
+      if (effectiveCashier && s.cashier && !matchesCashier(s.cashier, effectiveCashier)) {
+        return false;
+      }
       const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
       if (boundary > 0) {
         if (!sTime || sTime < boundary) return false;
@@ -792,7 +809,7 @@ export default function ExpensesModal({
     });
 
     return branchFilteredSource;
-  }, [sales, shiftStartBoundary, shiftVersion, activeBranch]);
+  }, [sales, shiftStartBoundary, shiftVersion, activeBranch, effectiveCashier]);
 
   // Ventas exclusivas del turno actual (todas las ventas emitidas en la terminal en este turno)
   const effectiveSales = shiftSales;
@@ -2366,8 +2383,13 @@ export default function ExpensesModal({
               Ventas
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-emerald-700 block my-1 tracking-tight truncate">
-              +{formatCurrency(shiftPurePosTotal)}
+              +{formatCurrency(shiftPurePosCash)}
             </span>
+            {shiftPurePosTotal > shiftPurePosCash && (
+              <span className="text-[10px] text-emerald-700 font-bold block truncate">
+                Total cobrado: {formatCurrency(shiftPurePosTotal)}
+              </span>
+            )}
             <span className="text-[11px] sm:text-xs font-black text-emerald-800 bg-emerald-100/90 group-hover:bg-emerald-200 border border-emerald-200/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
               👁️ Ver historial
             </span>
@@ -2388,8 +2410,13 @@ export default function ExpensesModal({
               Pedidos
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-amber-800 block my-1 tracking-tight truncate">
-              +{formatCurrency(shiftOrdersTotal)}
+              +{formatCurrency(shiftOrdersCash)}
             </span>
+            {shiftOrdersTotal > shiftOrdersCash && (
+              <span className="text-[10px] text-amber-700 font-bold block truncate">
+                Total cobrado: {formatCurrency(shiftOrdersTotal)}
+              </span>
+            )}
             <span className="text-[11px] sm:text-xs font-black text-amber-900 bg-amber-200/90 group-hover:bg-amber-300 border border-amber-300/80 px-2.5 py-0.5 rounded-full mt-1 inline-flex items-center justify-center gap-1 shadow-2xs">
               👁️ Ver historial
             </span>

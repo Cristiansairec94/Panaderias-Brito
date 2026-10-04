@@ -480,7 +480,7 @@ export default function POSPage() {
       const stored = localStorage.getItem("brito_current_shift_cashier");
       if (stored) return stored;
     }
-    return activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino";
+    return user?.name || (activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino");
   });
   const [shiftName, setShiftName] = useState(() => {
     if (typeof window !== "undefined") {
@@ -624,12 +624,14 @@ export default function POSPage() {
   useEffect(() => {
     if (user) {
       if (user.role !== "admin") {
-        const userBranch = branches.find((b) => b.assignedUserId === user.id);
+        const userBranch = branches.find((b) => b.assignedUserId === user.id || b.id === user.assignedBranchId);
         if (userBranch && currentBranch?.id !== userBranch.id) {
           switchBranch(userBranch.id);
         }
       }
-      setCashierName(user.name);
+      if (user.name) {
+        setCashierName(user.name);
+      }
     }
   }, [user, branches]);
 
@@ -639,12 +641,12 @@ export default function POSPage() {
       const storedFund = getStoredShiftFund(activeBranch.currentShift.initialFund);
       setInitialCashFund(storedFund);
       setShiftName(activeBranch.currentShift.name);
-      if (activeBranch.currentShift?.cashier) {
+      if (user && user.name) {
+        setCashierName(user.name);
+      } else if (activeBranch.currentShift?.cashier) {
         setCashierName(activeBranch.currentShift.cashier);
       } else if (activeBranch.assignedUserName) {
         setCashierName(activeBranch.assignedUserName);
-      } else if (user) {
-        setCashierName(user.name);
       }
     }
   }, [activeBranch?.id, user]);
@@ -1826,6 +1828,9 @@ export default function POSPage() {
           } else {
             if (activeBranch.id !== "branch-matriz") return false;
           }
+        }
+        if (cashierName && s.cashier && !matchesCashier(s.cashier, cashierName)) {
+          return false;
         }
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
         if (shiftStartBoundary > 0) {

@@ -113,18 +113,18 @@ export default function Home() {
 
   const baseSales = isAllBranches 
     ? consolidatedMetrics.totalSales 
-    : currentBranch?.todaySales || 5480;
+    : (currentBranch?.todaySales ?? 0);
 
   const baseTickets = isAllBranches
     ? consolidatedMetrics.totalTickets 
-    : currentBranch?.todayTickets || 46;
+    : (currentBranch?.todayTickets ?? 0);
 
   const activeSales = Math.round(baseSales * periodMultiplier);
   const activeTickets = Math.round(baseTickets * periodMultiplier);
   
   const activeCash = isAllBranches 
     ? consolidatedMetrics.totalCashInDrawer 
-    : currentBranch?.cashInDrawer || 5120;
+    : (currentBranch?.cashInDrawer ?? 0);
 
   const avgTicket = Math.round(activeSales / Math.max(1, activeTickets));
 
