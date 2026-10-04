@@ -39,6 +39,7 @@ import {
   purgeDuplicateCustomers,
   normalizeCustomerName
 } from "@/lib/customers";
+import CustomerReportsView from "@/components/clientes/CustomerReportsView";
 
 // Ícono SVG oficial y ordenado de WhatsApp
 function WhatsAppIcon({ className = "w-4 h-4" }: { className?: string }) {
@@ -97,6 +98,7 @@ function getPageNumbers(current: number, total: number): (number | "...")[] {
 
 export default function ClientesPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [activeTab, setActiveTab] = useState<"directorio" | "reportes">("directorio");
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"recent" | "alpha">("recent");
 
@@ -422,8 +424,62 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      {/* BANNER DE DETECCIÓN Y ELIMINACIÓN DE CONTACTOS REPETIDOS */}
-      {duplicateGroups.length > 0 && (
+      {/* SELECTOR DE PESTAÑAS PRINCIPALES: DIRECTORIO VS REPORTES Y MÉTRICAS */}
+      <div className="flex items-center gap-2 bg-white p-2 rounded-3xl border-2 border-stone-200 shadow-sm w-full overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab("directorio")}
+          className={`flex items-center justify-center gap-2.5 px-6 py-3 rounded-2xl font-black text-sm sm:text-base transition-all cursor-pointer ${
+            activeTab === "directorio"
+              ? "bg-stone-900 text-white shadow-md shadow-stone-900/20"
+              : "text-stone-600 hover:text-stone-900 hover:bg-stone-100"
+          }`}
+        >
+          <Users className="w-5 h-5 text-amber-500" />
+          <span>Directorio de Clientes</span>
+          <span className={`text-xs px-2.5 py-0.5 rounded-full font-black ${
+            activeTab === "directorio"
+              ? "bg-white/20 text-white"
+              : "bg-stone-200 text-stone-700"
+          }`}>
+            {customers.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("reportes")}
+          className={`flex items-center justify-center gap-2.5 px-6 py-3 rounded-2xl font-black text-sm sm:text-base transition-all cursor-pointer ${
+            activeTab === "reportes"
+              ? "bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md shadow-amber-600/30"
+              : "text-stone-600 hover:text-amber-900 hover:bg-amber-50"
+          }`}
+        >
+          <BarChart3 className="w-5 h-5 text-amber-200" />
+          <span>Reportes y Métricas</span>
+          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+            activeTab === "reportes"
+              ? "bg-amber-400 text-stone-950 font-black"
+              : "bg-amber-100 text-amber-900 font-bold"
+          }`}>
+            VIP & Hábitos
+          </span>
+        </button>
+      </div>
+
+      {activeTab === "reportes" ? (
+        <CustomerReportsView
+          customers={customers}
+          onViewCustomerHistory={(c) => setHistoryModalCustomer(c)}
+          onSelectCustomerInDirectory={(customerName) => {
+            setActiveTab("directorio");
+            setSearch(customerName);
+          }}
+        />
+      ) : (
+        <>
+          {/* BANNER DE DETECCIÓN Y ELIMINACIÓN DE CONTACTOS REPETIDOS */}
+          {duplicateGroups.length > 0 && (
         <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/15 border-2 border-amber-500/50 rounded-3xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-in slide-in-from-top-2 duration-200">
           <div className="flex items-start gap-3">
             <div className="w-11 h-11 rounded-2xl bg-amber-500 text-stone-950 flex items-center justify-center text-xl shrink-0 font-black shadow-md shadow-amber-500/20">
@@ -808,6 +864,8 @@ export default function ClientesPage() {
         </>
       )}
     </div>
+        </>
+      )}
 
       {/* MODAL 1: REGISTRAR NUEVO CLIENTE (SIMPLE: NÚMERO, NOMBRE Y DESCRIPCIÓN) */}
       {isModalOpen && (

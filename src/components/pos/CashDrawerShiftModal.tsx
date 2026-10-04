@@ -272,21 +272,27 @@ export default function CashDrawerShiftModal({
   // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta terminal)
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
+    if (outgoingCashier && s.cashier && !matchesCashier(s.cashier, outgoingCashier)) {
+      return false;
+    }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
     if (shiftStartBoundary > 0) {
-      if (!sTime || sTime < shiftStartBoundary - 60000) return false;
+      if (!sTime || sTime < shiftStartBoundary - 1000) return false;
     }
     if (sTime > Date.now() + 60000) return false;
     return true;
   });
   const effectiveSales = shiftSales;
 
-  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo)
+  // Pedidos especiales del turno (anticipos y liquidaciones de pedidos en efectivo por este cajero)
   const shiftOrders = (orders || []).filter((o) => {
     if (!o) return false;
+    if (outgoingCashier && o.cashier && !matchesCashier(o.cashier, outgoingCashier)) {
+      return false;
+    }
     const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
     if (shiftStartBoundary > 0) {
-      if (!oTime || oTime < shiftStartBoundary - 60000) return false;
+      if (!oTime || oTime < shiftStartBoundary - 1000) return false;
     }
     if (oTime > Date.now() + 60000) return false;
     return true;
@@ -436,6 +442,7 @@ export default function CashDrawerShiftModal({
       localStorage.setItem("brito_pos_current_incomes", "[]");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
+      window.dispatchEvent(new Event("brito_orders_updated"));
 
       if (onCompleteShiftCut) {
         onCompleteShiftCut();

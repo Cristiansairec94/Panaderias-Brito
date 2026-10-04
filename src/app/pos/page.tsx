@@ -497,11 +497,13 @@ export default function POSPage() {
         } else {
           const parsed = JSON.parse(rawSales);
           if (Array.isArray(parsed)) {
+            const activeCashier = storedCashier || cashierName;
             const shiftStart = getStoredShiftStartBoundary();
             const realSales = parsed.filter((s: any) => {
               if (!s) return false;
+              if (activeCashier && s.cashier && !matchesCashier(s.cashier, activeCashier)) return false;
               const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (shiftStart > 0 && (!t || t < shiftStart - 60000)) return false;
+              if (shiftStart > 0 && (!t || t < shiftStart - 1000)) return false;
               return true;
             });
             setRecentSalesList((prev) => {
@@ -521,10 +523,14 @@ export default function POSPage() {
         } else {
           const parsedExp = JSON.parse(rawExpenses);
           if (Array.isArray(parsedExp)) {
+            const activeCashier = storedCashier || cashierName;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = parsedExp.filter((e: any) => {
+              if (!e) return false;
+              const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno";
+              if (!isOwnerOrAdmin && activeCashier && e.cashier && !matchesCashier(e.cashier, activeCashier)) return false;
               const t = parseDateTimeSafe(e?.timestamp || e?.createdAt || e?.date);
-              return shiftStart <= 0 || (t && t >= shiftStart);
+              return shiftStart <= 0 || (t && t >= shiftStart - 1000);
             });
             const deduped = deduplicateExpenses(filtered);
             setExpensesList(deduped);
@@ -544,10 +550,13 @@ export default function POSPage() {
         } else {
           const parsedInc = JSON.parse(rawIncomes);
           if (Array.isArray(parsedInc)) {
+            const activeCashier = storedCashier || cashierName;
             const shiftStart = getStoredShiftStartBoundary();
             const filtered = parsedInc.filter((i: any) => {
+              if (!i) return false;
+              if (activeCashier && i.cashier && !matchesCashier(i.cashier, activeCashier)) return false;
               const t = parseDateTimeSafe(i?.timestamp || i?.date || i?.createdAt);
-              return shiftStart <= 0 || (t && t >= shiftStart);
+              return shiftStart <= 0 || (t && t >= shiftStart - 1000);
             });
             const deduped = deduplicateIncomes(filtered);
             setIncomesList(deduped);
@@ -970,21 +979,25 @@ export default function POSPage() {
   }, [initialCashFund]);
 
   const handleDirectUnlockShift = () => {
+    const now = Date.now();
     setInitialCashFund(baseShiftFund);
     try {
       localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
       localStorage.removeItem("brito_pos_shift_locked");
       localStorage.setItem("brito_current_shift_cashier", cashierName);
       localStorage.setItem("brito_current_shift_name", shiftName);
-      if (!localStorage.getItem("brito_pos_current_sales")) {
-        localStorage.setItem("brito_pos_current_sales", "[]");
-      }
-      if (!localStorage.getItem("brito_current_shift_start_timestamp")) {
-        localStorage.setItem("brito_current_shift_start_timestamp", Date.now().toString());
-      }
+      localStorage.setItem("brito_current_shift_start_timestamp", now.toString());
+      localStorage.setItem("brito_pos_current_sales", "[]");
+      localStorage.setItem("brito_pos_current_expenses", "[]");
+      localStorage.setItem("brito_pos_current_incomes", "[]");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
+      window.dispatchEvent(new Event("brito_orders_updated"));
     } catch (e) {}
+    setRecentSalesList([]);
+    setExpensesList([]);
+    setIncomesList([]);
+    setCart([]);
     setIsShiftLocked(false);
     setShiftVersion((v) => v + 1);
   };
@@ -1094,20 +1107,42 @@ export default function POSPage() {
   };
 
   const handleCashierChange = (newCashier: string) => {
+    const now = Date.now();
     setCashierName(newCashier);
     try {
       localStorage.setItem("brito_current_shift_cashier", newCashier);
+      localStorage.setItem("brito_current_shift_start_timestamp", now.toString());
+      localStorage.setItem("brito_pos_current_sales", "[]");
+      localStorage.setItem("brito_pos_current_expenses", "[]");
+      localStorage.setItem("brito_pos_current_incomes", "[]");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      window.dispatchEvent(new Event("brito_sales_updated"));
+      window.dispatchEvent(new Event("brito_orders_updated"));
     } catch (e) {}
+    setRecentSalesList([]);
+    setExpensesList([]);
+    setIncomesList([]);
+    setCart([]);
     setShiftVersion((v) => v + 1);
   };
 
   const handleShiftChange = (newShift: string) => {
+    const now = Date.now();
     setShiftName(newShift);
     try {
       localStorage.setItem("brito_current_shift_name", newShift);
+      localStorage.setItem("brito_current_shift_start_timestamp", now.toString());
+      localStorage.setItem("brito_pos_current_sales", "[]");
+      localStorage.setItem("brito_pos_current_expenses", "[]");
+      localStorage.setItem("brito_pos_current_incomes", "[]");
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+      window.dispatchEvent(new Event("brito_sales_updated"));
+      window.dispatchEvent(new Event("brito_orders_updated"));
     } catch (e) {}
+    setRecentSalesList([]);
+    setExpensesList([]);
+    setIncomesList([]);
+    setCart([]);
     setShiftVersion((v) => v + 1);
   };
 
@@ -1589,14 +1624,17 @@ export default function POSPage() {
 
   const currentShiftSales = useMemo(() => {
     try {
-      if (!recentSalesList || recentSalesList.length === 0) {
+      if (!recentSalesList || recentSalesList.length === 0 || !shiftStartBoundary || shiftStartBoundary <= 0) {
         return [];
       }
       return recentSalesList.filter((s) => {
         if (!s) return false;
+        if (cashierName && s.cashier && !matchesCashier(s.cashier, cashierName)) {
+          return false;
+        }
         const t = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 60000) return false;
+          if (!t || t < shiftStartBoundary - 1000) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1609,14 +1647,14 @@ export default function POSPage() {
 
   const currentShiftExpenses = useMemo(() => {
     try {
-      if (!expensesList || expensesList.length === 0) return [];
+      if (!expensesList || expensesList.length === 0 || !shiftStartBoundary || shiftStartBoundary <= 0) return [];
       const filtered = expensesList.filter((e) => {
         if (!e) return false;
-        const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
-        if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, cashierName))) return false;
+        const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno";
+        if (!isOwnerOrAdmin && cashierName && e.cashier && !matchesCashier(e.cashier, cashierName)) return false;
         const t = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 60000) return false;
+          if (!t || t < shiftStartBoundary - 1000) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1630,14 +1668,13 @@ export default function POSPage() {
 
   const currentShiftIncomes = useMemo(() => {
     try {
-      if (!incomesList || incomesList.length === 0) return [];
+      if (!incomesList || incomesList.length === 0 || !shiftStartBoundary || shiftStartBoundary <= 0) return [];
       const filtered = incomesList.filter((inc) => {
         if (!inc) return false;
-        const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
-        if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, cashierName))) return false;
+        if (cashierName && inc.cashier && !matchesCashier(inc.cashier, cashierName)) return false;
         const t = parseDateTimeSafe(inc.timestamp || (inc as any).createdAt || inc.date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 60000) return false;
+          if (!t || t < shiftStartBoundary - 1000) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1651,15 +1688,21 @@ export default function POSPage() {
 
   const currentShiftOrders = useMemo(() => {
     try {
+      if (!shiftStartBoundary || shiftStartBoundary <= 0) {
+        return [];
+      }
       return getStoredOrders().filter((o) => {
         if (!o) return false;
         if (activeBranch) {
           const matchBranch = !o.branchId || o.branchId === activeBranch.id || (o as any).operatingBranchId === activeBranch.id;
           if (!matchBranch) return false;
         }
+        if (cashierName && o.cashier && !matchesCashier(o.cashier, cashierName)) {
+          return false;
+        }
         const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
         if (shiftStartBoundary > 0) {
-          if (!t || t < shiftStartBoundary - 60000) return false;
+          if (!t || t < shiftStartBoundary - 1000) return false;
         }
         if (t > Date.now() + 60000) return false;
         return true;
@@ -1668,7 +1711,7 @@ export default function POSPage() {
       console.error("Error filtering currentShiftOrders:", e);
       return [];
     }
-  }, [activeBranch?.id, shiftStartBoundary, shiftVersion]);
+  }, [activeBranch?.id, cashierName, shiftStartBoundary, shiftVersion]);
 
   const totalCashSales = useMemo(() => {
     const posCash = (currentShiftSales || [])

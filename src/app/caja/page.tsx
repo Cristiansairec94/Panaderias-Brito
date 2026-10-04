@@ -913,6 +913,7 @@ export default function CajaPage() {
       setInitialCash(parsedNextFund);
       window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       window.dispatchEvent(new Event("brito_sales_updated"));
+      window.dispatchEvent(new Event("brito_orders_updated"));
     } catch (err) {
       console.error("Error guardando corte:", err);
     }
