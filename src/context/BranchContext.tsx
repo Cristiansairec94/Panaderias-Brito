@@ -58,6 +58,43 @@ const DEFAULT_BRANCHES: Branch[] = [
     },
   },
   {
+    id: "branch-benito",
+    name: "Sucursal San Benito (Mercado)",
+    shortName: "San Benito",
+    code: "BEN-02",
+    address: "Calle Hidalgo #120, Col. San Benito",
+    phone: "55 8765 4321",
+    manager: "Silvia Puga",
+    assignedUserId: "usr-silvia",
+    assignedUserName: "silvia puga",
+    assignedUserEmail: "silvia@panaderiabrito.com",
+    status: "abierta",
+    dailyGoal: 8000,
+    todaySales: 0,
+    todayTickets: 0,
+    cashInDrawer: 800,
+    color: "rose",
+    topProduct: {
+      name: "Bolillo de Sal",
+      piecesSold: 0,
+      category: "Pan Salado",
+      icon: "🥖",
+    },
+    currentShift: {
+      id: "shift-ben-201",
+      name: "Turno Matutino (06:30 - 14:30)",
+      cashier: "silvia puga",
+      openedAt: "06:30 AM",
+      initialFund: 800,
+      cashSales: 0,
+      cardSales: 0,
+      transferSales: 0,
+      totalSales: 0,
+      ticketCount: 0,
+      status: "abierto",
+    },
+  },
+  {
     id: "branch-sanjuan",
     name: "Sucursal San Juan",
     shortName: "San Juan",
@@ -220,41 +257,27 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
           const parsed = JSON.parse(savedBranches);
           if (Array.isArray(parsed) && parsed.length > 0) {
             let modified = false;
-            const migrated = parsed.map((b: Branch) => {
-              if (b.id === "branch-benito") {
+            let list = parsed;
+            if (!list.some((b: Branch) => b.id === "branch-benito")) {
+              const benito = DEFAULT_BRANCHES.find((b) => b.id === "branch-benito");
+              if (benito) {
+                list = [...list, benito];
                 modified = true;
-                return {
-                  ...b,
-                  id: "branch-sanjuan",
-                  name: "Sucursal San Juan",
-                  shortName: "San Juan",
-                  code: "SJU-02",
-                  address: "Calle Morelos #45, Col. San Juan",
-                  phone: "55 8765 4321",
-                  manager: "Cajero San Juan",
-                  assignedUserId: "usr-sanjuan",
-                  assignedUserName: "Cajero San Juan",
-                  assignedUserEmail: "sanjuan@panaderiabrito.com",
-                  dailyGoal: 8500,
-                  cashInDrawer: 1000,
-                  currentShift: {
-                    ...(b.currentShift || {}),
-                    id: "shift-sju-201",
-                    name: "Turno Vespertino (14:00 - 22:00)",
-                    cashier: "Cajero San Juan",
-                    openedAt: "14:00 hrs",
-                    initialFund: 1000,
-                  },
-                };
               }
-              return b;
-            });
+            }
+            if (!list.some((b: Branch) => b.id === "branch-sanjuan")) {
+              const sj = DEFAULT_BRANCHES.find((b) => b.id === "branch-sanjuan");
+              if (sj) {
+                list = [...list, sj];
+                modified = true;
+              }
+            }
             if (modified) {
               try {
-                localStorage.setItem("brito_branches_data", JSON.stringify(migrated));
+                localStorage.setItem("brito_branches_data", JSON.stringify(list));
               } catch {}
             }
-            return migrated;
+            return list;
           }
         }
       } catch {}
@@ -266,7 +289,8 @@ function resolveBranchParam(param: string | null): string | null {
   if (!param) return null;
   const lower = param.toLowerCase().trim();
   if (lower.includes("flores")) return "branch-flores";
-  if (lower.includes("sanjuan") || lower.includes("san-juan") || lower.includes("benito")) return "branch-sanjuan";
+  if (lower.includes("benito")) return "branch-benito";
+  if (lower.includes("sanjuan") || lower.includes("san-juan")) return "branch-sanjuan";
   if (lower.includes("matriz") || lower.includes("centro")) return "branch-matriz";
   if (lower === "all" || lower === "todas") return "all";
   return param;
@@ -287,7 +311,6 @@ function resolveBranchParam(param: string | null): string | null {
       } catch {}
       const saved = localStorage.getItem("brito_current_branch_id");
       if (saved) {
-        if (saved === "branch-benito") return "branch-sanjuan";
         return saved;
       }
     }
@@ -675,9 +698,7 @@ function resolveBranchParam(param: string | null): string | null {
             const branchMap = new Map<string, Branch>();
             DEFAULT_BRANCHES.forEach((d) => branchMap.set(d.id, d));
             prev.forEach((b) => {
-              if (b.id !== "branch-benito") {
-                branchMap.set(b.id, { ...(branchMap.get(b.id) || b), ...b });
-              }
+              branchMap.set(b.id, { ...(branchMap.get(b.id) || b), ...b });
             });
 
             // Incorporar datos de configuración de /api/branches sin sobreescribir ventas/cajas vivas con 0
@@ -708,22 +729,22 @@ function resolveBranchParam(param: string | null): string | null {
 
             // Incorporar sucursales de la tabla branches de Supabase si existen
             dbBranches.forEach((dbB: any) => {
-              if (dbB.id === "branch-benito") return;
+              const isBenito = dbB.id === "branch-benito";
               const isSj = dbB.id === "branch-sanjuan";
               if (!branchMap.has(dbB.id)) {
                 branchMap.set(dbB.id, {
                   id: dbB.id,
-                  name: dbB.name || (isSj ? "Sucursal San Juan" : "Sucursal"),
-                  shortName: dbB.short_name || (isSj ? "San Juan" : (dbB.name || "Sucursal")),
-                  code: isSj ? "SJU-02" : ("SUC-" + dbB.id.slice(-3).toUpperCase()),
-                  address: dbB.address || (isSj ? "Calle Morelos #45, Col. San Juan" : "Dirección sucursal"),
-                  phone: dbB.phone || (isSj ? "55 8765 4321" : "55 0000 0000"),
-                  manager: isSj ? "Cajero San Juan" : "Encargado de Sucursal",
-                  assignedUserId: isSj ? "usr-sanjuan" : undefined,
-                  assignedUserName: isSj ? "Cajero San Juan" : undefined,
-                  assignedUserEmail: isSj ? "sanjuan@panaderiabrito.com" : undefined,
+                  name: dbB.name || (isBenito ? "Sucursal San Benito (Mercado)" : isSj ? "Sucursal San Juan" : "Sucursal"),
+                  shortName: dbB.short_name || (isBenito ? "San Benito" : isSj ? "San Juan" : (dbB.name || "Sucursal")),
+                  code: isBenito ? "BEN-02" : isSj ? "SJU-02" : ("SUC-" + dbB.id.slice(-3).toUpperCase()),
+                  address: dbB.address || (isBenito ? "Calle Hidalgo #120, Col. San Benito" : isSj ? "Calle Morelos #45, Col. San Juan" : "Dirección sucursal"),
+                  phone: dbB.phone || "55 8765 4321",
+                  manager: isBenito ? "Silvia Puga" : isSj ? "Cajero San Juan" : "Encargado de Sucursal",
+                  assignedUserId: isBenito ? "usr-silvia" : isSj ? "usr-sanjuan" : undefined,
+                  assignedUserName: isBenito ? "silvia puga" : isSj ? "Cajero San Juan" : undefined,
+                  assignedUserEmail: isBenito ? "silvia@panaderiabrito.com" : isSj ? "sanjuan@panaderiabrito.com" : undefined,
                   status: dbB.is_active === false ? "cerrada" : "abierta",
-                  dailyGoal: isSj ? 8500 : 5000,
+                  dailyGoal: isBenito ? 8000 : isSj ? 8500 : 5000,
                   todaySales: 0,
                   todayTickets: 0,
                   cashInDrawer: 1000,

@@ -223,8 +223,8 @@ export const DEMO_USERS: User[] = [
     phone: "2213456778",
     status: "activo",
     hasSystemAccess: true,
-    assignedBranchId: "branch-matriz",
-    assignedBranchName: "Matriz",
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "San Benito",
     createdAt: "2 oct 2026",
   },
   {
@@ -369,9 +369,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (Array.isArray(parsed) && parsed.length > 0) {
           let modified = false;
           parsed = parsed.map((u: any) => {
-            if (u.assignedBranchId === "branch-benito") {
+            if (u.id === "usr-silvia" || u.username === "silvia") {
               modified = true;
-              return { ...u, assignedBranchId: "branch-sanjuan", assignedBranchName: "San Juan" };
+              return { ...u, assignedBranchId: "branch-benito", assignedBranchName: "San Benito" };
             }
             return u;
           });
@@ -458,6 +458,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (saved) {
         try {
           const parsedUser = JSON.parse(saved);
+          if (parsedUser && (parsedUser.id === "usr-silvia" || parsedUser.username === "silvia")) {
+            parsedUser.assignedBranchId = "branch-benito";
+            parsedUser.assignedBranchName = "San Benito";
+            sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
+          }
           setUser(parsedUser);
         } catch (e) {
           console.error("Error parsing saved session:", e);

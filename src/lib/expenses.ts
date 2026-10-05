@@ -28,8 +28,8 @@ export const GASTO_CATEGORIAS_MAP: Record<string, { id: string; label: string }>
 export const DEFAULT_BRANCHES_NAMES: Record<string, string> = {
   "branch-matriz": "Matriz (Centro)",
   "branch-sanjuan": "San Juan",
-  "branch-san-benito": "San Juan",
-  "branch-benito": "San Juan",
+  "branch-san-benito": "San Benito (Mercado)",
+  "branch-benito": "San Benito (Mercado)",
   "branch-las-flores": "Las Flores (Plaza)",
   "branch-flores": "Las Flores (Plaza)",
 };
