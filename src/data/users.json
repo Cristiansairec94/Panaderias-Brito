@@ -63,8 +63,8 @@
     "phone": "55 9988 7766",
     "status": "activo",
     "hasSystemAccess": true,
-    "assignedBranchId": "branch-benito",
-    "assignedBranchName": "San Benito",
+    "assignedBranchId": "branch-sanjuan",
+    "assignedBranchName": "San Juan",
     "createdAt": "01 feb 2024"
   },
   {
@@ -80,8 +80,8 @@
     "phone": "55 3344 5566",
     "status": "activo",
     "hasSystemAccess": true,
-    "assignedBranchId": "branch-benito",
-    "assignedBranchName": "San Benito",
+    "assignedBranchId": "branch-sanjuan",
+    "assignedBranchName": "San Juan",
     "createdAt": "10 feb 2024"
   },
   {
@@ -114,8 +114,8 @@
     "phone": "1122334455",
     "status": "activo",
     "hasSystemAccess": true,
-    "assignedBranchId": "branch-benito",
-    "assignedBranchName": "San Benito",
+    "assignedBranchId": "branch-sanjuan",
+    "assignedBranchName": "San Juan",
     "createdAt": "2 oct 2026"
   },
   {
@@ -148,8 +148,25 @@
     "phone": "7731107898",
     "status": "activo",
     "hasSystemAccess": true,
-    "assignedBranchId": "branch-benito",
-    "assignedBranchName": "San Benito",
+    "assignedBranchId": "branch-sanjuan",
+    "assignedBranchName": "San Juan",
     "createdAt": "1 oct 2026"
+  },
+  {
+    "id": "usr-sanjuan",
+    "name": "Cajero San Juan",
+    "username": "sanjuan",
+    "email": "sanjuan@panaderiabrito.com",
+    "password": "1234",
+    "role": "cajero",
+    "roleLabel": "Cajero(a) de Mostrador",
+    "jobTitle": "Cajero(a) de Mostrador",
+    "avatar": "👩‍💼",
+    "phone": "55 8765 4321",
+    "status": "activo",
+    "hasSystemAccess": true,
+    "assignedBranchId": "branch-sanjuan",
+    "assignedBranchName": "San Juan",
+    "createdAt": "05 oct 2026"
   }
 ]

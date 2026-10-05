@@ -189,8 +189,8 @@ export const DEMO_USERS: User[] = [
     phone: "55 9988 7766",
     status: "activo",
     hasSystemAccess: true,
-    assignedBranchId: "branch-benito",
-    assignedBranchName: "San Benito",
+    assignedBranchId: "branch-sanjuan",
+    assignedBranchName: "San Juan",
     createdAt: "01 feb 2024",
   },
   {
@@ -206,8 +206,8 @@ export const DEMO_USERS: User[] = [
     phone: "55 3344 5566",
     status: "activo",
     hasSystemAccess: true,
-    assignedBranchId: "branch-benito",
-    assignedBranchName: "San Benito",
+    assignedBranchId: "branch-sanjuan",
+    assignedBranchName: "San Juan",
     createdAt: "10 feb 2024",
   },
   {
@@ -240,8 +240,8 @@ export const DEMO_USERS: User[] = [
     phone: "1122334455",
     status: "activo",
     hasSystemAccess: true,
-    assignedBranchId: "branch-benito",
-    assignedBranchName: "San Benito",
+    assignedBranchId: "branch-sanjuan",
+    assignedBranchName: "San Juan",
     createdAt: "2 oct 2026",
   },
   {
@@ -274,9 +274,60 @@ export const DEMO_USERS: User[] = [
     phone: "7731107898",
     status: "activo",
     hasSystemAccess: true,
-    assignedBranchId: "branch-benito",
-    assignedBranchName: "San Benito",
+    assignedBranchId: "branch-sanjuan",
+    assignedBranchName: "San Juan",
     createdAt: "1 oct 2026",
+  },
+  {
+    id: "usr-sanjuan",
+    name: "Cajero San Juan",
+    username: "sanjuan",
+    email: "sanjuan@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Cajero(a) de Mostrador",
+    avatar: "👩‍💼",
+    phone: "55 8765 4321",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-sanjuan",
+    assignedBranchName: "San Juan",
+    createdAt: "05 oct 2026",
+  },
+  {
+    id: "usr-sofia",
+    name: "Sofía Morales",
+    username: "sofia",
+    email: "sofia@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Cajera Las Flores",
+    avatar: "👩‍💼",
+    phone: "55 9988 7766",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-flores",
+    assignedBranchName: "Sucursal Las Flores (Plaza)",
+    createdAt: "01 feb 2024",
+  },
+  {
+    id: "usr-elena",
+    name: "Elena Brito",
+    username: "elena",
+    email: "elena@panaderiabrito.com",
+    password: "1234",
+    role: "supervisor",
+    roleLabel: "Encargada de Sucursal",
+    jobTitle: "Encargada Las Flores",
+    avatar: "👩‍🍳",
+    phone: "55 9988 7766",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-flores",
+    assignedBranchName: "Sucursal Las Flores (Plaza)",
+    createdAt: "01 feb 2024",
   },
 ];
 
@@ -314,8 +365,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const savedCustom = localStorage.getItem("brito_custom_users");
       if (savedCustom) {
-        const parsed = JSON.parse(savedCustom);
+        let parsed = JSON.parse(savedCustom);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          let modified = false;
+          parsed = parsed.map((u: any) => {
+            if (u.assignedBranchId === "branch-benito") {
+              modified = true;
+              return { ...u, assignedBranchId: "branch-sanjuan", assignedBranchName: "San Juan" };
+            }
+            return u;
+          });
+          if (!parsed.some((u: any) => u.id === "usr-sanjuan" || u.username === "sanjuan")) {
+            const sj = DEMO_USERS.find((u) => u.id === "usr-sanjuan");
+            if (sj) {
+              parsed.push(sj);
+              modified = true;
+            }
+          }
+          if (modified) {
+            localStorage.setItem("brito_custom_users", JSON.stringify(parsed));
+          }
           setUsersList(parsed);
           return;
         }

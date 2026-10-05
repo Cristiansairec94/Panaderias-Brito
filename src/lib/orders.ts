@@ -141,10 +141,10 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     customerId: "cli-2",
     customerName: "Ing. Carlos Mendoza",
     phone: "55 8765 4321",
-    branchId: "branch-benito",
-    branchName: "Sucursal San Benito (Mercado)",
-    operatingBranchId: "branch-benito",
-    operatingBranchName: "Sucursal San Benito (Mercado)",
+    branchId: "branch-sanjuan",
+    branchName: "Sucursal San Juan",
+    operatingBranchId: "branch-sanjuan",
+    operatingBranchName: "Sucursal San Juan",
     description: "100 piezas de mini cuernitos rellenos de jamón y queso para evento escolar matutino",
     items: [
       {
@@ -165,7 +165,7 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     remainingBalance: 0,
     paymentStatus: "liquidado",
     paymentMethod: "transferencia",
-    dedication: "Evento Colegio San Benito",
+    dedication: "Evento Colegio San Juan",
     notes: "Cliente pasa en camioneta blanca a recoger en rampa.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
     cashier: "Don Toño Brito",
@@ -186,11 +186,11 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     customerId: "cli-1",
     customerName: "Familia Brito (Don Toño)",
     phone: "55 9988 7766",
-    branchId: "branch-benito",
-    branchName: "Sucursal San Benito (Mercado)",
+    branchId: "branch-sanjuan",
+    branchName: "Sucursal San Juan",
     operatingBranchId: "branch-flores",
     operatingBranchName: "Sucursal Las Flores (Plaza)",
-    description: "Pastel Mil Hojas de Chocolate y Café con nuez garapiñada. Creado en Las Flores, se recoge en San Benito.",
+    description: "Pastel Mil Hojas de Chocolate y Café con nuez garapiñada. Creado en Las Flores, se recoge en San Juan.",
     items: [
       {
         productId: "prod-8",
@@ -211,7 +211,7 @@ export const INITIAL_ORDERS: CustomOrder[] = [
     paymentStatus: "anticipo",
     paymentMethod: "efectivo",
     dedication: "¡Feliz Cumpleaños Don Toño!",
-    notes: "Elaborar con hojaldre recién horneado ese mismo mediodía. Recoger en San Benito.",
+    notes: "Elaborar con hojaldre recién horneado ese mismo mediodía. Recoger en San Juan.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
     cashier: "Elena Brito",
     payments: [

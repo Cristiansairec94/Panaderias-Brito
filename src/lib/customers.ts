@@ -94,8 +94,8 @@ export const INITIAL_CUSTOMERS: Customer[] = [
         id: "comp-201",
         date: "04/09/2026, 11:30 AM",
         total: 420,
-        branchName: "Sucursal San Benito (Mercado)",
-        cashier: "Maestro Juan",
+        branchName: "Sucursal San Juan",
+        cashier: "Cajero San Juan",
         paymentMethod: "efectivo",
         items: [
           { name: "Telera Tradicional", quantity: 120, unitPrice: 3.5, subtotal: 420 },
@@ -105,8 +105,8 @@ export const INITIAL_CUSTOMERS: Customer[] = [
         id: "comp-202",
         date: "02/09/2026, 11:00 AM",
         total: 420,
-        branchName: "Sucursal San Benito (Mercado)",
-        cashier: "Maestro Juan",
+        branchName: "Sucursal San Juan",
+        cashier: "Cajero San Juan",
         paymentMethod: "efectivo",
         items: [
           { name: "Telera Tradicional", quantity: 120, unitPrice: 3.5, subtotal: 420 },
@@ -116,7 +116,7 @@ export const INITIAL_CUSTOMERS: Customer[] = [
         id: "comp-203",
         date: "31/08/2026, 10:45 AM",
         total: 510,
-        branchName: "Sucursal San Benito (Mercado)",
+        branchName: "Sucursal San Juan",
         cashier: "Carlos Mendoza",
         paymentMethod: "efectivo",
         items: [

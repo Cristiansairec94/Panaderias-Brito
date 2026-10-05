@@ -76,9 +76,9 @@ export default function GoogleBranchChart({
   // Generate data points based on period and real-time branch sales
   const dataPoints: DataPoint[] = useMemo(() => {
     // Current live totals to ground the synthetic historical points
-    const liveMatriz = branches.find((b) => b.code.includes("MAT"))?.todaySales || 5480;
-    const liveBenito = branches.find((b) => b.code.includes("BEN"))?.todaySales || 4120;
-    const liveFlores = branches.find((b) => b.code.includes("FLO"))?.todaySales || 4890;
+    const liveMatriz = branches.find((b) => b.code.includes("MAT") || b.id === "branch-matriz")?.todaySales || 5480;
+    const liveBenito = branches.find((b) => b.code.includes("SJU") || b.code.includes("BEN") || b.id === "branch-sanjuan" || b.id === "branch-benito")?.todaySales || 4120;
+    const liveFlores = branches.find((b) => b.code.includes("FLO") || b.id === "branch-flores")?.todaySales || 4890;
 
     // Average price per piece of bakery bread ~ $16.5 MXN
     const calcPieces = (amount: number) => Math.round(amount / 16.5);
@@ -111,6 +111,7 @@ export default function GoogleBranchChart({
           totalTickets,
           branchesData: {
             "branch-matriz": { money: mMoney, pieces: calcPieces(mMoney), tickets: calcTickets(mMoney) },
+            "branch-sanjuan": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
             "branch-benito": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
             "branch-flores": { money: fMoney, pieces: calcPieces(fMoney), tickets: calcTickets(fMoney) },
           },
@@ -148,6 +149,7 @@ export default function GoogleBranchChart({
           totalTickets,
           branchesData: {
             "branch-matriz": { money: mMoney, pieces: calcPieces(mMoney), tickets: calcTickets(mMoney) },
+            "branch-sanjuan": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
             "branch-benito": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
             "branch-flores": { money: fMoney, pieces: calcPieces(fMoney), tickets: calcTickets(fMoney) },
           },
@@ -187,6 +189,7 @@ export default function GoogleBranchChart({
           totalTickets,
           branchesData: {
             "branch-matriz": { money: mMoney, pieces: calcPieces(mMoney), tickets: calcTickets(mMoney) },
+            "branch-sanjuan": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
             "branch-benito": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
             "branch-flores": { money: fMoney, pieces: calcPieces(fMoney), tickets: calcTickets(fMoney) },
           },
@@ -229,6 +232,7 @@ export default function GoogleBranchChart({
           totalTickets,
           branchesData: {
             "branch-matriz": { money: mMoney, pieces: calcPieces(mMoney), tickets: calcTickets(mMoney) },
+            "branch-sanjuan": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
             "branch-benito": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
             "branch-flores": { money: fMoney, pieces: calcPieces(fMoney), tickets: calcTickets(fMoney) },
           },
@@ -267,6 +271,7 @@ export default function GoogleBranchChart({
         totalTickets,
         branchesData: {
           "branch-matriz": { money: mMoney, pieces: calcPieces(mMoney), tickets: calcTickets(mMoney) },
+          "branch-sanjuan": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
           "branch-benito": { money: bMoney, pieces: calcPieces(bMoney), tickets: calcTickets(bMoney) },
           "branch-flores": { money: fMoney, pieces: calcPieces(fMoney), tickets: calcTickets(fMoney) },
         },

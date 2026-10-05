@@ -189,7 +189,7 @@ export default function RealTimeSalesMonitor({
           // Badge colors according to store
           const theme = 
             b.id === "branch-matriz" ? { border: "border-orange-200", bg: "bg-orange-50/40", text: "text-orange-700", ring: "ring-orange-500" } :
-            b.id === "branch-benito" ? { border: "border-rose-200", bg: "bg-rose-50/40", text: "text-rose-700", ring: "ring-rose-500" } :
+            (b.id === "branch-sanjuan" || b.id === "branch-benito") ? { border: "border-rose-200", bg: "bg-rose-50/40", text: "text-rose-700", ring: "ring-rose-500" } :
             { border: "border-amber-200", bg: "bg-amber-50/40", text: "text-amber-700", ring: "ring-amber-500" };
 
           return (
@@ -205,7 +205,7 @@ export default function RealTimeSalesMonitor({
                   <div className="flex items-center gap-2.5">
                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-sm ${
                       b.id === "branch-matriz" ? "bg-gradient-to-br from-orange-500 to-orange-600" :
-                      b.id === "branch-benito" ? "bg-gradient-to-br from-rose-500 to-rose-600" :
+                      (b.id === "branch-sanjuan" || b.id === "branch-benito") ? "bg-gradient-to-br from-rose-500 to-rose-600" :
                       "bg-gradient-to-br from-amber-500 to-amber-600"
                     }`}>
                       <Store className="w-5 h-5" />

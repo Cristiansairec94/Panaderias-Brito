@@ -27,8 +27,11 @@ export const GASTO_CATEGORIAS_MAP: Record<string, { id: string; label: string }>
 
 export const DEFAULT_BRANCHES_NAMES: Record<string, string> = {
   "branch-matriz": "Matriz (Centro)",
-  "branch-san-benito": "San Benito (Mercado)",
+  "branch-sanjuan": "San Juan",
+  "branch-san-benito": "San Juan",
+  "branch-benito": "San Juan",
   "branch-las-flores": "Las Flores (Plaza)",
+  "branch-flores": "Las Flores (Plaza)",
 };
 
 const getLocalDateISO = (d: Date = new Date()): string => {
@@ -91,7 +94,7 @@ export function recordCashOutflowAsExpense(options: {
   const branchName =
     options.branchName ||
     DEFAULT_BRANCHES_NAMES[branchId] ||
-    (branchId.includes("matriz") ? "Matriz (Centro)" : branchId.includes("benito") ? "San Benito (Mercado)" : "Las Flores (Plaza)");
+    (branchId.includes("matriz") ? "Matriz (Centro)" : (branchId.includes("sanjuan") || branchId.includes("benito")) ? "San Juan" : "Las Flores (Plaza)");
 
   const categoryKey = options.category ? options.category.toLowerCase().trim() : "otros";
   const catDef = GASTO_CATEGORIAS_MAP[categoryKey] || {

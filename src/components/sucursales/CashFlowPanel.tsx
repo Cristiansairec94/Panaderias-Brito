@@ -302,7 +302,7 @@ export default function CashFlowPanel({
                 <div className="flex items-center gap-2.5">
                   <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-sm ${
                     b.id === "branch-matriz" ? "bg-orange-600" :
-                    b.id === "branch-benito" ? "bg-rose-600" : "bg-amber-600"
+                    (b.id === "branch-sanjuan" || b.id === "branch-benito") ? "bg-rose-600" : "bg-amber-600"
                   }`}>
                     <Store className="w-4 h-4" />
                   </div>

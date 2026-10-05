@@ -659,7 +659,7 @@ export default function SucursalesPage() {
                             className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-sm ${
                               b.id === "branch-matriz"
                                 ? "bg-gradient-to-br from-orange-500 to-orange-600"
-                                : b.id === "branch-benito"
+                                : b.id === "branch-sanjuan" || b.id === "branch-benito"
                                 ? "bg-gradient-to-br from-rose-500 to-rose-600"
                                 : "bg-gradient-to-br from-amber-500 to-amber-600"
                             }`}
@@ -1102,7 +1102,7 @@ export default function SucursalesPage() {
                             <div className="flex items-center gap-3">
                               <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-sm ${
                                 b.id === "branch-matriz" ? "bg-gradient-to-br from-orange-500 to-orange-600" :
-                                b.id === "branch-benito" ? "bg-gradient-to-br from-rose-500 to-rose-600" :
+                                (b.id === "branch-sanjuan" || b.id === "branch-benito") ? "bg-gradient-to-br from-rose-500 to-rose-600" :
                                 "bg-gradient-to-br from-amber-500 to-amber-600"
                               }`}>
                                 <Store className="w-5 h-5" />
@@ -1261,7 +1261,7 @@ export default function SucursalesPage() {
                                   <div className="flex items-center gap-3">
                                     <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-white shrink-0 shadow-md ${
                                       b.id === "branch-matriz" ? "bg-gradient-to-br from-orange-500 to-orange-600" :
-                                      b.id === "branch-benito" ? "bg-gradient-to-br from-rose-500 to-rose-600" :
+                                      (b.id === "branch-sanjuan" || b.id === "branch-benito") ? "bg-gradient-to-br from-rose-500 to-rose-600" :
                                       "bg-gradient-to-br from-amber-500 to-amber-600"
                                     }`}>
                                       <BarChart3 className="w-6 h-6" />

@@ -56,8 +56,8 @@
     "customerId": "cli-2",
     "customerName": "Ing. Carlos Mendoza",
     "phone": "55 8765 4321",
-    "branchId": "branch-benito",
-    "branchName": "Sucursal San Benito (Mercado)",
+    "branchId": "branch-sanjuan",
+    "branchName": "Sucursal San Juan",
     "description": "100 piezas de mini cuernitos rellenos de jamón y queso para evento escolar matutino",
     "items": [
       {
@@ -78,7 +78,7 @@
     "remainingBalance": 0,
     "paymentStatus": "liquidado",
     "paymentMethod": "transferencia",
-    "dedication": "Evento Colegio San Benito",
+    "dedication": "Evento Colegio San Juan",
     "notes": "Cliente pasa en camioneta blanca a recoger en rampa.",
     "createdAt": "2026-09-23T14:58:58.480Z",
     "cashier": "Don Toño Brito",

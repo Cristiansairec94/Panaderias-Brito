@@ -270,7 +270,7 @@ export default function EditBranchModal({
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Ej. Sucursal San Benito (Mercado)"
+                    placeholder="Ej. Sucursal San Juan"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-orange-500 font-bold text-stone-900 text-sm bg-white shadow-2xs placeholder:text-stone-400"
                   />
                 </div>
@@ -288,7 +288,7 @@ export default function EditBranchModal({
                     required
                     value={shortName}
                     onChange={(e) => setShortName(e.target.value)}
-                    placeholder="Ej. San Benito"
+                    placeholder="Ej. San Juan"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-orange-500 font-bold text-stone-900 text-sm bg-white shadow-2xs placeholder:text-stone-400"
                   />
                 </div>
@@ -302,7 +302,7 @@ export default function EditBranchModal({
                     required
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    placeholder="Ej. BEN-02"
+                    placeholder="Ej. SJU-02"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono font-black text-stone-900 text-sm uppercase bg-white shadow-2xs tracking-wider"
                   />
                 </div>
@@ -318,7 +318,7 @@ export default function EditBranchModal({
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Ej. Calle Hidalgo #120, Col. San Benito"
+                  placeholder="Ej. Calle Morelos #45, Col. San Juan"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 focus:outline-none focus:ring-2 focus:ring-orange-500 text-stone-900 font-medium text-sm bg-white shadow-2xs placeholder:text-stone-400"
                 />
               </div>
