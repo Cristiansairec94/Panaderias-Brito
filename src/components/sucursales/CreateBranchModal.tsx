@@ -132,6 +132,25 @@ export default function CreateBranchModal({
     };
 
     onAddBranch(newBranch);
+
+    if (assignmentMode === "existing" && finalUserId) {
+      try {
+        const rawUsers = localStorage.getItem("brito_custom_users");
+        if (rawUsers) {
+          const uList = JSON.parse(rawUsers);
+          if (Array.isArray(uList)) {
+            const updatedUsers = uList.map((u: any) =>
+              u.id === finalUserId
+                ? { ...u, assignedBranchId: newBranch.id, assignedBranchName: newBranch.shortName || newBranch.name }
+                : u
+            );
+            localStorage.setItem("brito_custom_users", JSON.stringify(updatedUsers));
+            window.dispatchEvent(new Event("brito_users_updated"));
+          }
+        }
+      } catch {}
+    }
+
     setName("");
     setShortName("");
     setAddress("");

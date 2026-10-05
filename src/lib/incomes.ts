@@ -228,7 +228,7 @@ export function recordCashIncome(income: {
   referenceNumber?: string;
   id?: string;
   date?: string;
-}): CashIncome {
+}, isRemoteSync = false): CashIncome {
   const current = getStoredIncomes();
 
   // 1. Si es venta de mostrador pero el concepto dice que es Anticipo/Liquidación de un PED-XXX:
@@ -326,8 +326,8 @@ export function recordCashIncome(income: {
         localStorage.setItem("brito_pos_current_incomes", JSON.stringify([newIncome, ...shiftIncomes]));
       }
 
-      // Guardar directamente en Supabase para supervisión en tiempo real
-      if (typeof window !== "undefined") {
+      // Guardar directamente en Supabase para supervisión en tiempo real SOLO SI NO ES SYNC REMOTO
+      if (!isRemoteSync && typeof window !== "undefined") {
         try {
           const supabase = createClient();
           const incId = newIncome.id || `ING-${Date.now().toString().slice(-6)}`;
@@ -344,8 +344,8 @@ export function recordCashIncome(income: {
         } catch {}
       }
 
-      // Transmisión inmediata en tiempo real para supervisión del Administrador
-      if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
+      // Transmisión inmediata en tiempo real para supervisión del Administrador SOLO SI NO ES SYNC REMOTO
+      if (!isRemoteSync && typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
         realtimeHub.broadcastCashMovement({
           id: newIncome.id,
           branchId: newIncome.branchId || "branch-matriz",
@@ -535,19 +535,41 @@ if (typeof window !== "undefined") {
   // 2. Escuchar entradas de dinero a caja de cualquier sucursal
   realtimeHub.onCashMovement((mov) => {
     try {
-      if (!mov || mov.type !== "entrada" || mov.amount <= 0) return;
-      recordCashIncome({
-        id: `ING-${mov.id.replace(/^bmov-/, "")}`,
-        amount: mov.amount,
-        category: (mov.category as CashIncomeCategory) || "ingreso_extraordinario",
-        categoryLabel: mov.categoryLabel || "Entrada de Caja",
-        paymentMethod: "efectivo",
-        concept: `${mov.categoryLabel}: ${mov.reason}`,
-        cashier: mov.authorizedBy || "Encargado de Caja",
-        branchId: mov.branchId,
-        branchName: mov.branchName,
-        date: `Hoy, ${mov.timestamp}`,
-      });
+      if (!mov || mov.type !== "entrada" || Number(mov.amount) <= 0) return;
+
+      // Limpiar ID para evitar que se anide ING-ING-ING-...
+      const rawId = (mov.id || "").replace(/^(mov-|bmov-|ING-)+/gi, "");
+      const cleanIncomeId = `ING-${rawId || Date.now().toString().slice(-6)}`;
+
+      // Evitar registrar dos veces si ya existe
+      const current = getStoredIncomes();
+      if (current.some((i) => i.id === cleanIncomeId || (rawId && i.id.includes(rawId)))) {
+        return;
+      }
+
+      // Limpiar prefijo repetitivo en el motivo (ej. "Cambio / Feria: Cambio / Feria:...")
+      const categoryLabel = mov.categoryLabel || "Entrada de Caja";
+      let cleanReason = (mov.reason || "").trim();
+      while (cleanReason.toLowerCase().startsWith(categoryLabel.toLowerCase() + ":")) {
+        cleanReason = cleanReason.slice(categoryLabel.length + 1).trim();
+      }
+      const finalConcept = cleanReason ? `${categoryLabel}: ${cleanReason}` : categoryLabel;
+
+      recordCashIncome(
+        {
+          id: cleanIncomeId,
+          amount: Number(mov.amount),
+          category: (mov.category as CashIncomeCategory) || "ingreso_extraordinario",
+          categoryLabel,
+          paymentMethod: "efectivo",
+          concept: finalConcept,
+          cashier: mov.authorizedBy || mov.cashier || "Encargado de Caja",
+          branchId: mov.branchId,
+          branchName: mov.branchName,
+          date: `Hoy, ${mov.timestamp}`,
+        },
+        true // isRemoteSync = true (evita re-insertar en DB y re-transmitir en loop)
+      );
     } catch (err) {
       console.error("[IncomesRealtime] Error registrando movimiento de caja remoto como ingreso:", err);
     }

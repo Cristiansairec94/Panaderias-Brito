@@ -164,6 +164,25 @@ export default function EditBranchModal({
     }
 
     onUpdateBranch(currentBranch.id, updates);
+
+    if (finalUserId) {
+      try {
+        const rawUsers = localStorage.getItem("brito_custom_users");
+        if (rawUsers) {
+          const uList = JSON.parse(rawUsers);
+          if (Array.isArray(uList)) {
+            const updatedUsers = uList.map((u: any) =>
+              u.id === finalUserId
+                ? { ...u, assignedBranchId: currentBranch.id, assignedBranchName: updates.shortName || updates.name || currentBranch.name }
+                : u
+            );
+            localStorage.setItem("brito_custom_users", JSON.stringify(updatedUsers));
+            window.dispatchEvent(new Event("brito_users_updated"));
+          }
+        }
+      } catch {}
+    }
+
     onClose();
   };
 

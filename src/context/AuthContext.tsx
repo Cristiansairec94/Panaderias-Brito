@@ -223,8 +223,8 @@ export const DEMO_USERS: User[] = [
     phone: "2213456778",
     status: "activo",
     hasSystemAccess: true,
-    assignedBranchId: "branch-benito",
-    assignedBranchName: "San Benito",
+    assignedBranchId: "branch-1790889237862",
+    assignedBranchName: "San Ildefonso",
     createdAt: "2 oct 2026",
   },
   {
@@ -371,7 +371,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           parsed = parsed.map((u: any) => {
             if (u.id === "usr-silvia" || u.username === "silvia") {
               modified = true;
-              return { ...u, assignedBranchId: "branch-benito", assignedBranchName: "San Benito" };
+              return { ...u, assignedBranchId: "branch-1790889237862", assignedBranchName: "San Ildefonso" };
             }
             return u;
           });
@@ -459,8 +459,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsedUser = JSON.parse(saved);
           if (parsedUser && (parsedUser.id === "usr-silvia" || parsedUser.username === "silvia")) {
-            parsedUser.assignedBranchId = "branch-benito";
-            parsedUser.assignedBranchName = "San Benito";
+            parsedUser.assignedBranchId = "branch-1790889237862";
+            parsedUser.assignedBranchName = "San Ildefonso";
             sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
           }
           setUser(parsedUser);
