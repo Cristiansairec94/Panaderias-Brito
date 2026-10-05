@@ -368,6 +368,77 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             }
           });
 
+          // Sincronizar historial de cortes y límites de turno en localStorage para todas las pantallas del navegador
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem("brito_shift_cuts_history", JSON.stringify(allCutsList));
+
+              latestCutByBranch.forEach((cut, bId) => {
+                const cutTs = cut.timestamp || parseDateTimeSafe(cut.date);
+                const cutFund = Number(cut.nextFund ?? cut.initialFund ?? 0);
+                if (cutTs > 0) {
+                  localStorage.setItem(`brito_shift_start_${bId}`, cutTs.toString());
+                  localStorage.setItem(`brito_pos_initial_fund_${bId}`, cutFund.toString());
+                  if (bId === "branch-matriz") {
+                    localStorage.setItem("brito_current_shift_start_timestamp", cutTs.toString());
+                    localStorage.setItem("brito_pos_initial_fund", cutFund.toString());
+                  }
+                }
+              });
+
+              // Limpiar ventas locales que ya pertenecen a un turno cortado/cerrado
+              const curSalesRaw = localStorage.getItem("brito_pos_current_sales");
+              if (curSalesRaw) {
+                const curSales = JSON.parse(curSalesRaw);
+                if (Array.isArray(curSales)) {
+                  const filtered = curSales.filter((s: any) => {
+                    const sBranch = s.branchId || s.branch_id || "branch-matriz";
+                    const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+                    const bCutLimit = cutTimestampByBranch.get(sBranch) || 0;
+                    return sTime > bCutLimit;
+                  });
+                  localStorage.setItem("brito_pos_current_sales", JSON.stringify(filtered));
+                }
+              }
+
+              // Limpiar gastos locales que ya pertenecen a un turno cortado/cerrado
+              const curExpRaw = localStorage.getItem("brito_pos_current_expenses");
+              if (curExpRaw) {
+                const curExp = JSON.parse(curExpRaw);
+                if (Array.isArray(curExp)) {
+                  const filtered = curExp.filter((e: any) => {
+                    const eBranch = e.branchId || e.branch_id || "branch-matriz";
+                    const eTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
+                    const bCutLimit = cutTimestampByBranch.get(eBranch) || 0;
+                    return eTime > bCutLimit;
+                  });
+                  localStorage.setItem("brito_pos_current_expenses", JSON.stringify(filtered));
+                }
+              }
+
+              // Limpiar ingresos locales que ya pertenecen a un turno cortado/cerrado
+              const curIncRaw = localStorage.getItem("brito_pos_current_incomes");
+              if (curIncRaw) {
+                const curInc = JSON.parse(curIncRaw);
+                if (Array.isArray(curInc)) {
+                  const filtered = curInc.filter((i: any) => {
+                    const iBranch = i.branchId || i.branch_id || "branch-matriz";
+                    const iTime = parseDateTimeSafe(i.timestamp || i.date || i.createdAt);
+                    const bCutLimit = cutTimestampByBranch.get(iBranch) || 0;
+                    return iTime > bCutLimit;
+                  });
+                  localStorage.setItem("brito_pos_current_incomes", JSON.stringify(filtered));
+                }
+              }
+
+              window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+              window.dispatchEvent(new Event("brito_sales_updated"));
+              window.dispatchEvent(new Event("brito_caja_updated"));
+            } catch (e) {
+              console.warn("[BranchContext] Error sincronizando localStorage de cortes:", e);
+            }
+          }
+
           const branchAgg = new Map<string, {
             deskSales: number;
             deskTickets: number;
@@ -634,17 +705,31 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
               const totalCobrado = agg.deskSales + agg.orderTotalCobrado;
               const totalTickets = agg.deskTickets + agg.orderCount;
 
-              // Fondo inicial: preservar prioritariamente el fondo del turno activo de esta sucursal
-              const initialFund = b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null
-                ? Number(b.currentShift.initialFund)
-                : (latestCut !== undefined && latestCut.nextFund !== undefined && latestCut.nextFund !== null
-                    ? Number(latestCut.nextFund)
-                    : 1000);
+              // Fondo inicial: Si hay un corte registrado para esta sucursal, el fondo del nuevo turno SIEMPRE es el nextFund del corte.
+              let initialFund = 1000;
+              if (latestCut && latestCut.nextFund !== undefined && latestCut.nextFund !== null) {
+                initialFund = Number(latestCut.nextFund);
+              } else if (b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null) {
+                initialFund = Number(b.currentShift.initialFund);
+              }
 
               const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.movNet - agg.expCash);
 
-              // Cajero del turno activo: preservar el cajero actualmente en turno en la sucursal para estabilidad
-              const activeCashier = b.currentShift?.cashier || agg.lastCashier || latestCut?.incomingCashier || b.manager || "Cajero";
+              // Cajero del turno activo:
+              // Si el usuario logueado es cajero asignado a esta sucursal (ej. Silvia Puga), ella es la cajera activa.
+              // Si no, usar incomingCashier del último corte o el cajero de la sucursal (evitando el placeholder 'Cajera 2')
+              let activeCashier = b.currentShift?.cashier || b.manager || "Cajero";
+              if (user && (user.role === "cajero" || user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name) {
+                activeCashier = user.name;
+              } else if (latestCut?.incomingCashier && !latestCut.incomingCashier.includes("Cajera 2")) {
+                activeCashier = latestCut.incomingCashier;
+              } else if (b.currentShift?.cashier && !b.currentShift.cashier.includes("Cajera 2")) {
+                activeCashier = b.currentShift.cashier;
+              } else if (user?.name) {
+                activeCashier = user.name;
+              } else {
+                activeCashier = b.manager || "Cajero";
+              }
 
               return {
                 ...b,
@@ -1430,6 +1515,46 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
           });
 
           try {
+            const raw = localStorage.getItem("brito_shift_cuts_history");
+            const existingHistory: ShiftCutRecord[] = raw ? JSON.parse(raw) : [];
+            const nextHistory = [cut, ...existingHistory.filter((c) => c && c.id !== cut.id)];
+            localStorage.setItem("brito_shift_cuts_history", JSON.stringify(nextHistory));
+
+            const cutTs = cut.timestamp || parseDateTimeSafe(cut.date) || Date.now();
+            localStorage.setItem(`brito_shift_start_${bId}`, cutTs.toString());
+            localStorage.setItem(`brito_pos_initial_fund_${bId}`, newFund.toString());
+            if (bId === "branch-matriz") {
+              localStorage.setItem("brito_current_shift_start_timestamp", cutTs.toString());
+              localStorage.setItem("brito_pos_initial_fund", newFund.toString());
+            }
+
+            // Filtrar ventas y gastos locales de esta sucursal que ya quedaron cortados
+            const curSalesRaw = localStorage.getItem("brito_pos_current_sales");
+            if (curSalesRaw) {
+              const curSales = JSON.parse(curSalesRaw);
+              if (Array.isArray(curSales)) {
+                const filtered = curSales.filter((s: any) => {
+                  const sBranch = s.branchId || s.branch_id || "branch-matriz";
+                  const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+                  return sBranch !== bId || sTime > cutTs;
+                });
+                localStorage.setItem("brito_pos_current_sales", JSON.stringify(filtered));
+              }
+            }
+
+            const curExpRaw = localStorage.getItem("brito_pos_current_expenses");
+            if (curExpRaw) {
+              const curExp = JSON.parse(curExpRaw);
+              if (Array.isArray(curExp)) {
+                const filtered = curExp.filter((e: any) => {
+                  const eBranch = e.branchId || e.branch_id || "branch-matriz";
+                  const eTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
+                  return eBranch !== bId || eTime > cutTs;
+                });
+                localStorage.setItem("brito_pos_current_expenses", JSON.stringify(filtered));
+              }
+            }
+
             window.dispatchEvent(new Event("brito_caja_updated"));
             window.dispatchEvent(new Event("brito_shift_cuts_updated"));
             window.dispatchEvent(new Event("brito_sales_updated"));

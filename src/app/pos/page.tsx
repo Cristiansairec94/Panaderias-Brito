@@ -51,7 +51,7 @@ import {
   ArrowDownRight,
   ArrowUpRight
 } from "lucide-react";
-import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem } from "@/types";
+import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb } from "@/lib/products";
@@ -478,11 +478,12 @@ export default function POSPage() {
   
   // Shift & Cashier state
   const [cashierName, setCashierName] = useState(() => {
+    if (user?.name) return user.name;
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("brito_current_shift_cashier");
-      if (stored) return stored;
+      if (stored && !stored.includes("Cajera 2")) return stored;
     }
-    return user?.name || (activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino");
+    return activeBranch ? activeBranch.currentShift.cashier : "Cajera 1 - Turno Matutino";
   });
   const [shiftName, setShiftName] = useState(() => {
     if (typeof window !== "undefined") {
@@ -492,6 +493,12 @@ export default function POSPage() {
     return activeBranch ? activeBranch.currentShift.name : "Turno Matutino (06:00 - 14:00)";
   });
   const getStoredShiftFund = (fallback: number = 0): number => {
+    if (activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null) {
+      return Number(activeBranch.lastCut.nextFund);
+    }
+    if (activeBranch?.currentShift?.initialFund !== undefined && activeBranch?.currentShift?.initialFund !== null) {
+      return Number(activeBranch.currentShift.initialFund);
+    }
     if (typeof window === "undefined") return fallback;
     try {
       const saved = localStorage.getItem("brito_pos_initial_fund");
@@ -508,7 +515,7 @@ export default function POSPage() {
   };
 
   const [initialCashFund, setInitialCashFund] = useState<number>(() => {
-    return getStoredShiftFund(0);
+    return getStoredShiftFund(activeBranch?.currentShift?.initialFund || 0);
   });
 
   // Configuración de Impresora Directa para Tickets
@@ -534,7 +541,11 @@ export default function POSPage() {
       setInitialCashFund(fund);
       try {
         const storedCashier = localStorage.getItem("brito_current_shift_cashier");
-        if (storedCashier && storedCashier !== cashierName) setCashierName(storedCashier);
+        if (user?.name) {
+          setCashierName(user.name);
+        } else if (storedCashier && storedCashier !== cashierName && !storedCashier.includes("Cajera 2")) {
+          setCashierName(storedCashier);
+        }
         const storedShift = localStorage.getItem("brito_current_shift_name");
         if (storedShift && storedShift !== shiftName) setShiftName(storedShift);
 
@@ -633,6 +644,9 @@ export default function POSPage() {
       }
       if (user.name) {
         setCashierName(user.name);
+        try {
+          localStorage.setItem("brito_current_shift_cashier", user.name);
+        } catch {}
       }
     }
   }, [user, branches]);
@@ -640,18 +654,18 @@ export default function POSPage() {
   // Sync shift info when branch changes (respetando el fondo del último corte cerrado)
   useEffect(() => {
     if (activeBranch) {
-      const storedFund = getStoredShiftFund(activeBranch.currentShift.initialFund);
+      const storedFund = getStoredShiftFund(activeBranch.currentShift?.initialFund || 0);
       setInitialCashFund(storedFund);
       setShiftName(activeBranch.currentShift.name);
       if (user && user.name) {
         setCashierName(user.name);
-      } else if (activeBranch.currentShift?.cashier) {
+      } else if (activeBranch.currentShift?.cashier && !activeBranch.currentShift.cashier.includes("Cajera 2")) {
         setCashierName(activeBranch.currentShift.cashier);
       } else if (activeBranch.assignedUserName) {
         setCashierName(activeBranch.assignedUserName);
       }
     }
-  }, [activeBranch?.id, user]);
+  }, [activeBranch?.id, activeBranch?.lastCut, activeBranch?.currentShift?.initialFund, user]);
 
   // Modals & Drawers state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -1059,6 +1073,14 @@ export default function POSPage() {
   }, []);
 
   const lastCutInfo = useMemo(() => {
+    let bestCut: ShiftCutRecord | null = null;
+    let bestT = 0;
+
+    if (activeBranch?.lastCut) {
+      bestCut = activeBranch.lastCut;
+      bestT = parseDateTimeSafe(bestCut.timestamp || bestCut.date);
+    }
+
     if (typeof window !== "undefined") {
       try {
         const raw = localStorage.getItem("brito_shift_cuts_history");
@@ -1069,24 +1091,19 @@ export default function POSPage() {
               if (activeBranch?.id && activeBranch.id !== "all" && c.branchId && c.branchId !== activeBranch.id) return false;
               return true;
             });
-            if (branchCuts.length === 0) return null;
-            let maxCut = branchCuts[0];
-            let maxT = parseDateTimeSafe(maxCut?.timestamp || maxCut?.date || maxCut?.createdAt || maxCut?.cutTime);
-            for (let i = 1; i < branchCuts.length; i++) {
-              const c = branchCuts[i];
+            for (const c of branchCuts) {
               const t = parseDateTimeSafe(c?.timestamp || c?.date || c?.createdAt || c?.cutTime);
-              if (t > maxT) {
-                maxT = t;
-                maxCut = c;
+              if (t > bestT) {
+                bestT = t;
+                bestCut = c;
               }
             }
-            return maxCut;
           }
         }
       } catch (e) {}
     }
-    return null;
-  }, [isShiftLocked, shiftVersion, activeBranch?.id]);
+    return bestCut;
+  }, [isShiftLocked, shiftVersion, activeBranch?.id, activeBranch?.lastCut]);
 
   const baseShiftFund = useMemo(() => {
     return initialCashFund;
@@ -1125,7 +1142,7 @@ export default function POSPage() {
 
       // Obtener el inicio de turno más reciente y válido (del corte o inicio de turno guardado)
       const lastCutTs = lastCutInfo
-        ? parseDateTimeSafe(lastCutInfo.timestamp || lastCutInfo.date || lastCutInfo.createdAt || lastCutInfo.cutTime)
+        ? parseDateTimeSafe(lastCutInfo.timestamp || lastCutInfo.date || (lastCutInfo as any).createdAt || (lastCutInfo as any).cutTime)
         : 0;
       // Si hubo corte hoy, el turno inició en ese corte; de lo contrario inicia al inicio del día de hoy
       const effectiveShiftStart = lastCutTs >= todayStartTs ? lastCutTs : todayStartTs;
@@ -1809,12 +1826,18 @@ export default function POSPage() {
 
   // Financial calculations strictly for the current operating cashier's shift
   const shiftStartBoundary = useMemo(() => {
-    const lastCutTs = parseDateTimeSafe(
-      lastCutInfo?.timestamp || lastCutInfo?.date || lastCutInfo?.createdAt || lastCutInfo?.cutTime
+    const activeCutTs = parseDateTimeSafe(
+      activeBranch?.lastCut?.timestamp || activeBranch?.lastCut?.date
     );
-    const validCut = lastCutTs > 0 && lastCutTs <= Date.now() ? lastCutTs : 0;
+    const lastCutTs = parseDateTimeSafe(
+      lastCutInfo?.timestamp || lastCutInfo?.date || (lastCutInfo as any)?.createdAt || (lastCutInfo as any)?.cutTime
+    );
+    const validCut = Math.max(
+      activeCutTs > 0 && activeCutTs <= Date.now() ? activeCutTs : 0,
+      lastCutTs > 0 && lastCutTs <= Date.now() ? lastCutTs : 0
+    );
     return Math.max(getStoredShiftStartBoundary(activeBranch?.id), validCut);
-  }, [lastCutInfo, shiftVersion, activeBranch?.id]);
+  }, [lastCutInfo, activeBranch?.lastCut, shiftVersion, activeBranch?.id]);
 
   const currentShiftSales = useMemo(() => {
     try {

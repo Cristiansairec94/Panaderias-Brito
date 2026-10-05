@@ -535,6 +535,12 @@ export default function ExpensesModal({
   
   // Estado local para el Fondo Inicial de Caja
   const [currentFund, setCurrentFund] = useState<number>(() => {
+    if (activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null) {
+      return Number(activeBranch.lastCut.nextFund);
+    }
+    if (activeBranch?.currentShift?.initialFund !== undefined && activeBranch?.currentShift?.initialFund !== null) {
+      return activeBranch.currentShift.initialFund;
+    }
     if (typeof initialFund === "number" && initialFund >= 0) {
       return initialFund;
     }
@@ -542,32 +548,36 @@ export default function ExpensesModal({
       const saved = localStorage.getItem("brito_pos_initial_fund");
       if (saved !== null && !isNaN(Number(saved))) return Number(saved);
     }
-    if (activeBranch?.currentShift?.initialFund !== undefined) {
-      return activeBranch.currentShift.initialFund;
-    }
     return 0;
   });
 
   // Fondo inicial sincronizado prioritariamente con la terminal y cajera activa
-  const effectiveFund = (typeof initialFund === "number" && initialFund >= 0)
-    ? initialFund
-    : (currentFund !== undefined ? currentFund : (activeBranch?.currentShift?.initialFund || 0));
+  const effectiveFund = (activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null)
+    ? Number(activeBranch.lastCut.nextFund)
+    : ((typeof initialFund === "number" && initialFund >= 0)
+        ? initialFund
+        : (currentFund !== undefined ? currentFund : (activeBranch?.currentShift?.initialFund || 0)));
   const [editFundInput, setEditFundInput] = useState<string>(() => {
     return String(effectiveFund);
   });
   const [isEditingFund, setIsEditingFund] = useState(false);
 
   useEffect(() => {
-    if (typeof initialFund === "number" && initialFund >= 0) {
-      setCurrentFund(initialFund);
-      setEditFundInput(String(initialFund));
+    if (activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null) {
+      setCurrentFund(Number(activeBranch.lastCut.nextFund));
+      setEditFundInput(String(activeBranch.lastCut.nextFund));
       return;
     }
     if (activeBranch?.currentShift?.initialFund !== undefined) {
       setCurrentFund(activeBranch.currentShift.initialFund);
       setEditFundInput(String(activeBranch.currentShift.initialFund));
+      return;
     }
-  }, [initialFund, isOpen, activeBranch?.id, activeBranch?.currentShift?.initialFund]);
+    if (typeof initialFund === "number" && initialFund >= 0) {
+      setCurrentFund(initialFund);
+      setEditFundInput(String(initialFund));
+    }
+  }, [initialFund, isOpen, activeBranch?.id, activeBranch?.lastCut, activeBranch?.currentShift?.initialFund]);
 
   useEffect(() => {
     const handleFundSync = () => {
@@ -718,9 +728,12 @@ export default function ExpensesModal({
 
   // Límite temporal estricto del turno actual (timestamp en ms)
   const shiftStartBoundary = useMemo(() => {
-    const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) ? lastCutTimestamp : 0;
+    const activeCutTs = parseDateTimeSafe(activeBranch?.lastCut?.timestamp || activeBranch?.lastCut?.date);
+    const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) 
+      ? lastCutTimestamp 
+      : (activeCutTs > 0 && activeCutTs <= Date.now() ? activeCutTs : 0);
     return Math.max(validLastCut, getStoredShiftStartBoundary(activeBranch?.id));
-  }, [lastCutTimestamp, shiftVersion, activeBranch?.id]);
+  }, [lastCutTimestamp, activeBranch?.lastCut, shiftVersion, activeBranch?.id]);
 
   // Filtrar exclusivamente las salidas correspondientes a la sucursal, cajera y turno en operación
   const shiftExpenses = useMemo(() => {

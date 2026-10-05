@@ -89,7 +89,7 @@ function getShiftSuggestionByCurrentTime(date = new Date()) {
     return {
       currentShift: "Turno Matutino (06:00 - 14:00)",
       nextShift: "Turno Vespertino (14:00 - 22:00)",
-      suggestedRecipient: "Cajera 2 - Turno Vespertino",
+      suggestedRecipient: "Turno Vespertino",
       cutTimeStr,
     };
   } else if (decimal >= 14.5 && decimal < 22) {
@@ -97,7 +97,7 @@ function getShiftSuggestionByCurrentTime(date = new Date()) {
     return {
       currentShift: "Turno Vespertino (14:00 - 22:00)",
       nextShift: "Turno Matutino (06:00 - 14:00)",
-      suggestedRecipient: "Cajera 1 - Turno Matutino",
+      suggestedRecipient: "Turno Matutino",
       cutTimeStr,
     };
   } else {
@@ -105,7 +105,7 @@ function getShiftSuggestionByCurrentTime(date = new Date()) {
     return {
       currentShift: "Turno Nocturno (22:00 - 06:00)",
       nextShift: "Turno Matutino (06:00 - 14:00)",
-      suggestedRecipient: "Cajera 1 - Turno Matutino",
+      suggestedRecipient: "Turno Matutino",
       cutTimeStr,
     };
   }
@@ -1495,7 +1495,7 @@ export default function CajaPage() {
     const newFolio = `CORTE-${Date.now().toString().slice(-6)}`;
     const nowStr = formatDateTimeSafe();
 
-    const recipient = incomingCashier.trim() || "Cajera 2 - Turno Vespertino";
+    const recipient = incomingCashier.trim() || "Siguiente Cajero(a)";
 
     const newCut: ShiftCutRecord = {
       id: newFolio,

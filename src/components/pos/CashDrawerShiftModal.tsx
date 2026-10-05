@@ -85,7 +85,10 @@ export default function CashDrawerShiftModal({
 
   // Fondo Inicial Sincronizado en tiempo real
   const [syncedFund, setSyncedFund] = useState<number>(() => {
-    if (currentBranch?.currentShift?.initialFund !== undefined) {
+    if (currentBranch?.lastCut?.nextFund !== undefined && currentBranch?.lastCut?.nextFund !== null) {
+      return Number(currentBranch.lastCut.nextFund);
+    }
+    if (currentBranch?.currentShift?.initialFund !== undefined && currentBranch?.currentShift?.initialFund !== null) {
       return currentBranch.currentShift.initialFund;
     }
     if (typeof window !== "undefined") {
@@ -96,6 +99,10 @@ export default function CashDrawerShiftModal({
   });
 
   useEffect(() => {
+    if (currentBranch?.lastCut?.nextFund !== undefined && currentBranch?.lastCut?.nextFund !== null) {
+      setSyncedFund(Number(currentBranch.lastCut.nextFund));
+      return;
+    }
     if (currentBranch?.currentShift?.initialFund !== undefined) {
       setSyncedFund(currentBranch.currentShift.initialFund);
       return;
@@ -108,7 +115,7 @@ export default function CashDrawerShiftModal({
       }
     }
     setSyncedFund(initialFund || 0);
-  }, [initialFund, isOpen, currentBranch?.id, currentBranch?.currentShift?.initialFund]);
+  }, [initialFund, isOpen, currentBranch?.id, currentBranch?.lastCut, currentBranch?.currentShift?.initialFund]);
 
   useEffect(() => {
     const handleSync = () => {
@@ -137,16 +144,16 @@ export default function CashDrawerShiftModal({
   const [currentTime, setCurrentTime] = useState("");
 
   // Shift Change & Cash Cut form state
-  const [outgoingCashier, setOutgoingCashier] = useState(() => currentBranch?.currentShift?.cashier || cashierName);
+  const [outgoingCashier, setOutgoingCashier] = useState(() => cashierName || currentBranch?.currentShift?.cashier || "Cajero");
 
   useEffect(() => {
-    if (currentBranch?.currentShift?.cashier) {
-      setOutgoingCashier(currentBranch.currentShift.cashier);
-    } else if (cashierName) {
+    if (cashierName) {
       setOutgoingCashier(cashierName);
+    } else if (currentBranch?.currentShift?.cashier && !currentBranch.currentShift.cashier.includes("Cajera 2")) {
+      setOutgoingCashier(currentBranch.currentShift.cashier);
     }
   }, [currentBranch?.id, currentBranch?.currentShift?.cashier, cashierName]);
-  const [incomingCashier, setIncomingCashier] = useState("Cajera 2 - Turno Vespertino");
+  const [incomingCashier, setIncomingCashier] = useState("Siguiente Cajero(a)");
   const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
   const [countedCash, setCountedCash] = useState<string>("");
   const [nextInitialFund, setNextInitialFund] = useState("");
@@ -238,7 +245,10 @@ export default function CashDrawerShiftModal({
   if (!isOpen) return null;
 
   // Límite temporal estricto del turno actual (timestamp en ms con soporte por sucursal)
-  const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) ? lastCutTimestamp : 0;
+  const activeCutTs = parseDateTimeSafe(currentBranch?.lastCut?.timestamp || currentBranch?.lastCut?.date);
+  const validLastCut = (lastCutTimestamp && lastCutTimestamp > 0 && lastCutTimestamp <= Date.now()) 
+    ? lastCutTimestamp 
+    : (activeCutTs > 0 && activeCutTs <= Date.now() ? activeCutTs : 0);
   const shiftStartBoundary = Math.max(validLastCut, getStoredShiftStartBoundary(currentBranch?.id));
 
   // 1. Cálculos de Ventas del Turno (todas las ventas de mostrador del turno en esta terminal)
