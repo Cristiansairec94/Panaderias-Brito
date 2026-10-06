@@ -82,6 +82,7 @@ export function recordCashOutflowAsExpense(options: {
   supplier?: string;
   notes?: string;
   folio?: string;
+  id?: string;
   date?: string;
 }): ExpenseRecord | null {
   const parsedAmount = Number(options.amount);
@@ -109,7 +110,7 @@ export function recordCashOutflowAsExpense(options: {
   const existingExpenses = getStoredExpenses();
 
   // Generar folio único tipo GST-XXXX
-  let folio = options.folio;
+  let folio = options.folio || options.id;
   if (!folio) {
     let attempts = 0;
     while (!folio || (existingExpenses.some((g) => g.id === folio) && attempts < 20)) {
