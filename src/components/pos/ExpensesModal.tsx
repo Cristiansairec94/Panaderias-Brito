@@ -1706,6 +1706,7 @@ export default function ExpensesModal({
 
         // Registrar automáticamente en el Historial Detallado de Gastos
         recordCashOutflowAsExpense({
+          id: newExpense.id,
           amount: newExpense.amount,
           description: newExpense.description,
           category: selectedPresetId || newExpense.category,
