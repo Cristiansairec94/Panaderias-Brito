@@ -740,8 +740,9 @@ function resolveBranchParam(param: string | null): string | null {
 
               dbOrders.forEach((dbo: any) => {
                 const key = dbo.order_number || dbo.id;
-                if (!ordMap.has(key)) {
-                  ordMap.set(key, dbo);
+                const existing = ordMap.get(key);
+                if (!existing || (!existing.deposit && dbo.deposit) || existing.deposit !== dbo.deposit || existing.status !== dbo.status) {
+                  ordMap.set(key, { ...existing, ...dbo });
                   anyOrdUpdated = true;
                 }
               });
@@ -1185,6 +1186,7 @@ function resolveBranchParam(param: string | null): string | null {
             if (masterChanged) {
               const updatedMaster = Array.from(masterMap.values()).sort((a, b) => compareMovementsDesc(a, b));
               localStorage.setItem("brito_pos_master_sales", JSON.stringify(updatedMaster));
+              window.dispatchEvent(new Event("brito_sales_updated"));
               // NOTA: brito_pos_current_sales pertenece exclusivamente al turno de la terminal local
               // y no debe sobreescribirse ni contaminarse con el historial completo de todas las sucursales.
             }

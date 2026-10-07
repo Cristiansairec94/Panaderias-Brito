@@ -1862,62 +1862,12 @@ export default function POSPage() {
         } catch {}
       }
 
-      if (activeBranch?.id === "branch-sanjuan") {
-        const sjSales: Sale[] = [
-          {
-            id: "POS-245478",
-            total: 72,
-            cashier: "noe velasquez",
-            paymentMethod: "efectivo",
-            date: "Hoy 12:20",
-            timestamp: 1791397248000,
-            createdAt: "2026-10-07T18:20:48.085Z",
-            branchId: "branch-sanjuan",
-            items: [
-              { product: { id: "p1", name: "Chocolate Caliente con Leche", price: 30, category: "bebidas", stock: 50, image: "☕" }, quantity: 2 },
-              { product: { id: "p2", name: "Concha de Chocolate", price: 12, category: "pan_dulce", stock: 50, image: "🥖" }, quantity: 1 }
-            ]
-          },
-          {
-            id: "POS-255686",
-            total: 42,
-            cashier: "noe velasquez",
-            paymentMethod: "efectivo",
-            date: "Hoy 12:20",
-            timestamp: 1791397258000,
-            createdAt: "2026-10-07T18:20:58.217Z",
-            branchId: "branch-sanjuan",
-            items: [
-              { product: { id: "p1", name: "Chocolate Caliente con Leche", price: 30, category: "bebidas", stock: 50, image: "☕" }, quantity: 1 },
-              { product: { id: "p2", name: "Concha de Chocolate", price: 12, category: "pan_dulce", stock: 50, image: "🥖" }, quantity: 1 }
-            ]
-          },
-          {
-            id: "POS-265237",
-            total: 67,
-            cashier: "noe velasquez",
-            paymentMethod: "efectivo",
-            date: "Hoy 12:21",
-            timestamp: 1791397268000,
-            createdAt: "2026-10-07T18:21:08.096Z",
-            branchId: "branch-sanjuan",
-            items: [
-              { product: { id: "p1", name: "Chocolate Caliente con Leche", price: 30, category: "bebidas", stock: 50, image: "☕" }, quantity: 1 },
-              { product: { id: "p2", name: "Concha de Chocolate", price: 12, category: "pan_dulce", stock: 50, image: "🥖" }, quantity: 1 },
-              { product: { id: "p3", name: "Café de Olla Caliente", price: 25, category: "bebidas", stock: 50, image: "☕" }, quantity: 1 }
-            ]
-          }
-        ];
-        sjSales.forEach((s) => {
-          if (!pool.some((x) => x.id === s.id)) pool.push(s);
-        });
-      }
-
       if (pool.length === 0) return [];
 
       const targetCashier = activeBranch?.currentShift?.cashier || cashierName;
       return pool.filter((s) => {
         if (!s) return false;
+        if (s.id && (s.id.includes("354644") || s.id.includes("299599") || s.id.includes("331037") || s.total > 500000)) return false;
         if (activeBranch && activeBranch.id !== "all") {
           const sBranch = (s as any).branchId || (s as any).branch_id;
           if (sBranch) {
@@ -1949,6 +1899,7 @@ export default function POSPage() {
       if (cashMovements && cashMovements.length > 0) {
         cashMovements.forEach((m) => {
           if (m.type === "salida" && m.category !== "corte" && m.category !== "corte_caja") {
+            if (m.id && (m.id.includes("354644") || m.id.includes("299599") || m.id.includes("334972") || m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.amount > 500000)) return;
             const bMatch = !activeBranch || activeBranch.id === "all" || m.branchId === activeBranch.id;
             if (bMatch && !expPool.some((e) => e.id === m.id || e.id === m.id.replace("mov-", ""))) {
               expPool.push({
@@ -1968,41 +1919,10 @@ export default function POSPage() {
         });
       }
 
-      if (activeBranch?.id === "branch-sanjuan") {
-        const sjExp: CashExpense[] = [
-          {
-            id: "mov-EXP-354644",
-            amount: 789778,
-            category: "gasto",
-            description: "trsdet",
-            cashier: "noe velasquez",
-            date: "Hoy 12:22",
-            timestamp: 1791397354000,
-            branchId: "branch-sanjuan",
-            paymentMethod: "efectivo"
-          },
-          {
-            id: "mov-EXP-299599",
-            amount: 700,
-            category: "gasto",
-            description: "yujgyu",
-            cashier: "noe velasquez",
-            date: "Hoy 12:21",
-            timestamp: 1791397299000,
-            branchId: "branch-sanjuan",
-            paymentMethod: "efectivo"
-          }
-        ];
-        sjExp.forEach((ke) => {
-          if (!expPool.some((e) => e.id === ke.id || e.id === ke.id.replace("mov-", ""))) {
-            expPool.push(ke);
-          }
-        });
-      }
-
       const targetCashier = activeBranch?.currentShift?.cashier || cashierName;
       const filtered = expPool.filter((e) => {
         if (!e) return false;
+        if (e.id && (e.id.includes("354644") || e.id.includes("299599") || e.id.includes("334972") || e.amount > 500000)) return false;
         if (activeBranch && activeBranch.id !== "all") {
           const eBranch = (e as any).branchId || (e as any).branch_id;
           if (eBranch) {
@@ -2033,6 +1953,7 @@ export default function POSPage() {
       if (cashMovements && cashMovements.length > 0) {
         cashMovements.forEach((m) => {
           if (m.type === "entrada" && m.category !== "venta_mostrador" && m.category !== "corte" && m.category !== "corte_caja") {
+            if (m.id && (m.id.includes("331037") || m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.amount > 500000)) return;
             const bMatch = !activeBranch || activeBranch.id === "all" || m.branchId === activeBranch.id;
             if (bMatch && !incPool.some((i) => i.id === m.id)) {
               incPool.push({
@@ -2053,25 +1974,10 @@ export default function POSPage() {
         });
       }
 
-      if (activeBranch?.id === "branch-sanjuan") {
-        const sjInc: CashIncome = {
-          id: "ING-331037",
-          amount: 795564,
-          category: "fondo_cambio",
-          categoryLabel: "Fondo de Cambio",
-          concept: "tdtr",
-          cashier: "noe velasquez",
-          date: "Hoy 12:22",
-          timestamp: "1791397331000",
-          branchId: "branch-sanjuan",
-          paymentMethod: "efectivo"
-        };
-        if (!incPool.some((i) => i.id === sjInc.id)) incPool.push(sjInc);
-      }
-
       const targetCashier = activeBranch?.currentShift?.cashier || cashierName;
       const filtered = incPool.filter((inc) => {
         if (!inc) return false;
+        if (inc.id && (inc.id.includes("331037") || inc.amount > 500000)) return false;
         if (activeBranch && activeBranch.id !== "all") {
           const incBranch = (inc as any).branchId || (inc as any).branch_id;
           if (incBranch) {
