@@ -4430,7 +4430,7 @@ export default function POSPage() {
                   />
                 </div>
 
-                {hasCashGiven && parsedCashGiven > 0 ? (
+                {hasCashGiven && parsedCashGiven > 0 && (
                   <div className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 shrink-0 shadow-sm animate-in zoom-in-95 duration-150 ${
                     parsedCashGiven >= total
                       ? "bg-emerald-600 text-white"
@@ -4441,13 +4441,6 @@ export default function POSPage() {
                       {parsedCashGiven >= total ? formatCurrency(change) : formatCurrency(total - parsedCashGiven)}
                     </span>
                   </div>
-                ) : (
-                  cart.length > 0 && (
-                    <div className="px-2 py-1 rounded-lg bg-amber-100/90 border border-amber-300/80 text-[10px] font-bold text-amber-900 flex items-center gap-1 shrink-0 shadow-2xs">
-                      <span>👆</span>
-                      <span>Elige opción</span>
-                    </div>
-                  )
                 )}
               </div>
             </div>
@@ -4641,14 +4634,6 @@ export default function POSPage() {
           )}
 
 
-
-          {/* Aviso visual cuando aún no se ha seleccionado con cuánto pagan en efectivo */}
-          {cart.length > 0 && paymentMethod === "efectivo" && !hasCashGiven && (
-            <div className="bg-amber-100/90 border border-amber-300 text-amber-950 rounded-xl px-2.5 py-1.5 text-center text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs animate-in fade-in duration-150">
-              <span className="text-amber-700">💡</span>
-              <span>Elige <strong>⚡ Exacto</strong>, un billete o ingresa con cuánto pagan para cobrar</span>
-            </div>
-          )}
 
           {/* Botones de Acción */}
           <div className="grid grid-cols-2 gap-2 pt-0.5">
