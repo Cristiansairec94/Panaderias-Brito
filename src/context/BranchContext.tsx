@@ -741,6 +741,35 @@ function resolveBranchParam(param: string | null): string | null {
             }
           });
 
+          // Incorporar ingresos en efectivo locales que aún no estén en dbMovs para sincronización instantánea
+          if (typeof window !== "undefined") {
+            try {
+              const rawLocalInc = localStorage.getItem("brito_pos_current_incomes");
+              if (rawLocalInc) {
+                const localIncs = JSON.parse(rawLocalInc);
+                if (Array.isArray(localIncs)) {
+                  localIncs.forEach((inc: any) => {
+                    if (!inc || !inc.id) return;
+                    if (dbMovs.some((m: any) => m.id === inc.id)) return;
+                    const bId = inc.branchId || inc.branch_id || "branch-matriz";
+                    let cur = branchAgg.get(bId);
+                    if (!cur) {
+                      cur = initBranchAgg();
+                      branchAgg.set(bId, cur);
+                    }
+                    const amt = Number(inc.amount) || 0;
+                    const t = parseDateTimeSafe(inc.timestamp || inc.date || inc.createdAt);
+                    const cutLimit = cutTimestampByBranch.get(bId) || 0;
+                    if (t > cutLimit && (inc.paymentMethod === "efectivo" || !inc.paymentMethod)) {
+                      cur.cashInflow += amt;
+                      cur.movNet += amt;
+                    }
+                  });
+                }
+              }
+            } catch {}
+          }
+
           // 4. Gastos en efectivo
           dbExps.forEach((e: any) => {
             const bId = e.branch_id || "branch-matriz";

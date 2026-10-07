@@ -1807,9 +1807,7 @@ export default function ExpensesModal({
     .reduce((sum, i) => sum + i.amount, 0);
 
   const calculatedCashInDrawer = Math.max(0, effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);
-  const netCashInDrawer = (activeBranch && typeof activeBranch.cashInDrawer === "number" && activeBranch.cashInDrawer > 0)
-    ? activeBranch.cashInDrawer
-    : calculatedCashInDrawer;
+  const netCashInDrawer = calculatedCashInDrawer;
 
   // Cambiar de Salida a Entrada o viceversa
   const handleToggleMovementType = (type: "salida" | "entrada") => {
