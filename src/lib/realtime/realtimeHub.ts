@@ -174,6 +174,9 @@ class RealtimeHub {
   public dispatchLocalEvent(type: string, payload: any) {
     if (!payload) return;
     const rawId = payload.id || (payload.order && payload.order.id) || null;
+    if (rawId && typeof rawId === "string" && (rawId.includes("ING-ING") || rawId.includes("mov-mov-"))) {
+      return;
+    }
     const eventId = rawId ? `${type}_${rawId}` : null;
     if (eventId) {
       if (this.seenEventIds.has(eventId)) return;
@@ -359,6 +362,15 @@ class RealtimeHub {
   }
 
   public async broadcastCashMovement(movement: Omit<RealtimeCashMovementPayload, "senderDeviceId">) {
+    if (!movement || !movement.id) return;
+    // Guard against recursive / looping IDs
+    if (movement.id.includes("ING-ING") || movement.id.includes("mov-mov-")) return;
+    if (movement.reason && movement.reason.includes("Cambio / Feria: Cambio / Feria")) return;
+
+    const eventKey = `cash_movement_${movement.id}`;
+    if (this.seenEventIds.has(eventKey)) return;
+    this.seenEventIds.add(eventKey);
+
     const payload: RealtimeCashMovementPayload = {
       ...movement,
       senderDeviceId: this.getDeviceId(),

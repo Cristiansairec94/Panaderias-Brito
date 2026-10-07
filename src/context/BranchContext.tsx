@@ -46,7 +46,7 @@ const DEFAULT_BRANCHES: Branch[] = [
     currentShift: {
       id: "shift-mat-101",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "Lupita Brito",
+      cashier: "silvia puga",
       openedAt: "06:00 AM",
       initialFund: 1000,
       cashSales: 0,
@@ -175,10 +175,10 @@ const DEFAULT_BRANCHES: Branch[] = [
     code: "ILF-04",
     address: "Av. San Benito #123, Col. Centro Histórico",
     phone: "55 8361 7480",
-    manager: "silvia puga",
-    assignedUserId: "usr-silvia",
-    assignedUserName: "silvia puga",
-    assignedUserEmail: "silvia@panaderiabrito.com",
+    manager: "Cajero San Ildefonso",
+    assignedUserId: "usr-ildefonso",
+    assignedUserName: "Cajero San Ildefonso",
+    assignedUserEmail: "ildefonso@panaderiabrito.com",
     status: "abierta",
     dailyGoal: 6000,
     todaySales: 0,
@@ -194,7 +194,7 @@ const DEFAULT_BRANCHES: Branch[] = [
     currentShift: {
       id: "shift-ilf-401",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "silvia puga",
+      cashier: "Cajero San Ildefonso",
       openedAt: "06:00 AM",
       initialFund: 1000,
       cashSales: 0,
@@ -596,6 +596,8 @@ function resolveBranchParam(param: string | null): string | null {
             orderTotalCobrado: number;
             orderTotal: number;
             orderCount: number;
+            cashInflow: number;
+            cashOutflow: number;
             movNet: number;
             expCash: number;
             dayAccumulatedDeskSales: number;
@@ -617,6 +619,8 @@ function resolveBranchParam(param: string | null): string | null {
             orderTotalCobrado: 0,
             orderTotal: 0,
             orderCount: 0,
+            cashInflow: 0,
+            cashOutflow: 0,
             movNet: 0,
             expCash: 0,
             dayAccumulatedDeskSales: 0,
@@ -687,6 +691,7 @@ function resolveBranchParam(param: string | null): string | null {
           // 3. Movimientos de caja (aportes / retiros fuera de ventas y de cortes)
           dbMovs.forEach((m: any) => {
             if (m.category === "venta_mostrador" || m.category === "corte_caja") return;
+            if (m.id && (m.id.includes("ING-ING") || m.id.includes("mov-mov-"))) return;
             const bId = m.branch_id || "branch-matriz";
             let cur = branchAgg.get(bId);
             if (!cur) {
@@ -697,7 +702,14 @@ function resolveBranchParam(param: string | null): string | null {
             const movTime = parseDateTimeSafe(m.created_at);
             const cutLimit = cutTimestampByBranch.get(bId) || 0;
             if (movTime > cutLimit) {
-              cur.movNet += m.type === "entrada" ? amt : -amt;
+              if (m.type === "entrada") {
+                cur.cashInflow += amt;
+                cur.movNet += amt;
+              } else {
+                cur.cashOutflow += amt;
+                cur.movNet -= amt;
+              }
+              if (m.authorized_by && !cur.lastCashier) cur.lastCashier = m.authorized_by;
             }
           });
 
@@ -713,6 +725,7 @@ function resolveBranchParam(param: string | null): string | null {
             const cutLimit = cutTimestampByBranch.get(bId) || 0;
             if (expTime > cutLimit) {
               cur.expCash += Number(e.amount) || 0;
+              if (e.cashier && !cur.lastCashier) cur.lastCashier = e.cashier;
             }
           });
 
@@ -786,10 +799,10 @@ function resolveBranchParam(param: string | null): string | null {
                   code: isIldefonso ? "ILF-04" : isBenito ? "BEN-02" : isSj ? "SJU-02" : ("SUC-" + dbB.id.slice(-3).toUpperCase()),
                   address: dbB.address || (isIldefonso ? "Av. San Benito #123, Col. Centro Histórico" : isBenito ? "Calle Hidalgo #120, Col. San Benito" : isSj ? "Calle Morelos #45, Col. San Juan" : "Dirección sucursal"),
                   phone: dbB.phone || (isIldefonso ? "55 8361 7480" : "55 8765 4321"),
-                  manager: isIldefonso ? "silvia puga" : isBenito ? "Carlos Mendoza" : isSj ? "Cajero San Juan" : "Encargado de Sucursal",
-                  assignedUserId: isIldefonso ? "usr-silvia" : isBenito ? "usr-5" : isSj ? "usr-sanjuan" : undefined,
-                  assignedUserName: isIldefonso ? "silvia puga" : isBenito ? "Carlos Mendoza" : isSj ? "Cajero San Juan" : undefined,
-                  assignedUserEmail: isIldefonso ? "silvia@panaderiabrito.com" : isBenito ? "supervisor@panaderiabrito.com" : isSj ? "sanjuan@panaderiabrito.com" : undefined,
+                  manager: isIldefonso ? "Cajero San Ildefonso" : isBenito ? "Carlos Mendoza" : isSj ? "Cajero San Juan" : "Encargado de Sucursal",
+                  assignedUserId: isIldefonso ? "usr-ildefonso" : isBenito ? "usr-5" : isSj ? "usr-sanjuan" : undefined,
+                  assignedUserName: isIldefonso ? "Cajero San Ildefonso" : isBenito ? "Carlos Mendoza" : isSj ? "Cajero San Juan" : undefined,
+                  assignedUserEmail: isIldefonso ? "ildefonso@panaderiabrito.com" : isBenito ? "supervisor@panaderiabrito.com" : isSj ? "sanjuan@panaderiabrito.com" : undefined,
                   status: dbB.is_active === false ? "cerrada" : "abierta",
                   dailyGoal: isIldefonso ? 6000 : isBenito ? 8000 : isSj ? 8500 : 5000,
                   todaySales: 0,
@@ -799,7 +812,7 @@ function resolveBranchParam(param: string | null): string | null {
                   currentShift: {
                     id: isIldefonso ? "shift-ilf-401" : isSj ? "shift-sju-201" : `shift-${dbB.id}`,
                     name: isSj ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)",
-                    cashier: isIldefonso ? "silvia puga" : isBenito ? "Carlos Mendoza" : isSj ? "Cajero San Juan" : "Cajero",
+                    cashier: isIldefonso ? "Cajero San Ildefonso" : isBenito ? "Carlos Mendoza" : isSj ? "Cajero San Juan" : "Cajero",
                     openedAt: isSj ? "14:00 hrs" : "06:00 AM",
                     initialFund: 1000,
                     status: "abierto",
@@ -866,20 +879,22 @@ function resolveBranchParam(param: string | null): string | null {
                 initialFund = Number(b.currentShift.initialFund);
               }
 
-              const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.movNet - agg.expCash);
+              // Flujo de salidas: evitar doble deducción entre cash_movements y cash_expenses
+              const totalOutflows = Math.max(agg.cashOutflow, agg.expCash);
+              const calculatedCash = Math.max(0, initialFund + agg.deskCash + agg.orderCash + agg.cashInflow - totalOutflows);
 
               // Cajero del turno activo:
-              // Si el usuario logueado es cajero asignado a esta sucursal (ej. Silvia Puga), ella es la cajera activa.
-              // Si no, usar incomingCashier del último corte o el cajero de la sucursal (evitando el placeholder 'Cajera 2')
               let activeCashier = b.currentShift?.cashier || b.manager || "Cajero";
-              if (user && (user.role === "cajero" || user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name) {
+              if (user && user.role === "cajero" && (user.id === b.assignedUserId || user.assignedBranchId === b.id) && user.name) {
                 activeCashier = user.name;
+              } else if (agg.lastCashier && agg.lastCashier.trim().length > 0) {
+                activeCashier = agg.lastCashier;
               } else if (latestCut?.incomingCashier && !latestCut.incomingCashier.includes("Cajera 2")) {
                 activeCashier = latestCut.incomingCashier;
+              } else if (b.id === "branch-matriz") {
+                activeCashier = "silvia puga";
               } else if (b.currentShift?.cashier && !b.currentShift.cashier.includes("Cajera 2")) {
                 activeCashier = b.currentShift.cashier;
-              } else if (user?.name) {
-                activeCashier = user.name;
               } else {
                 activeCashier = b.manager || "Cajero";
               }
@@ -2450,6 +2465,7 @@ function resolveBranchParam(param: string | null): string | null {
           cashier: movement.authorizedBy,
           accountOrigin: "Caja Mostrador (Efectivo Turno)",
           paymentMethod: "efectivo",
+          skipSupabaseAndBroadcast: true,
         });
       }
 

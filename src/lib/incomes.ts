@@ -2,6 +2,7 @@ import { CashIncome, CashIncomeCategory, Sale, SimulatedSale } from "@/types";
 import { formatDateTimeSafe, formatCurrency } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
+import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
 
 export const STORAGE_INCOMES_KEY = "brito_cash_incomes";
 
@@ -555,21 +556,22 @@ if (typeof window !== "undefined") {
       }
       const finalConcept = cleanReason ? `${categoryLabel}: ${cleanReason}` : categoryLabel;
 
-      recordCashIncome(
-        {
-          id: cleanIncomeId,
-          amount: Number(mov.amount),
-          category: (mov.category as CashIncomeCategory) || "ingreso_extraordinario",
-          categoryLabel,
-          paymentMethod: "efectivo",
-          concept: finalConcept,
-          cashier: mov.authorizedBy || mov.cashier || "Encargado de Caja",
-          branchId: mov.branchId,
-          branchName: mov.branchName,
-          date: `Hoy, ${mov.timestamp}`,
-        },
-        true // isRemoteSync = true (evita re-insertar en DB y re-transmitir en loop)
-      );
+      const remoteIncome: CashIncome = {
+        id: cleanIncomeId,
+        amount: Number(mov.amount),
+        category: (mov.category as CashIncomeCategory) || "ingreso_extraordinario",
+        categoryLabel,
+        paymentMethod: "efectivo",
+        concept: finalConcept,
+        cashier: mov.authorizedBy || mov.cashier || "Encargado de Caja",
+        branchId: mov.branchId || "branch-matriz",
+        branchName: mov.branchName || "Sucursal Matriz Centro",
+        date: `Hoy, ${mov.timestamp}`,
+        timestamp: new Date().toISOString(),
+      };
+      // Marcar como ya sincronizado en la nube para evitar re-subidas por syncService
+      markRecordIdsAsSynced([cleanIncomeId, rawId, mov.id].filter(Boolean) as string[]);
+      saveStoredIncomes(cleanDuplicateIncomes([remoteIncome, ...current]));
     } catch (err) {
       console.error("[IncomesRealtime] Error registrando movimiento de caja remoto como ingreso:", err);
     }

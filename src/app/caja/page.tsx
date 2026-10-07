@@ -612,6 +612,7 @@ export default function CajaPage() {
             // D) Movimientos manuales
             dbMovs.forEach((m: any) => {
               if (m.category === "venta_mostrador") return;
+              if (m.id && (m.id.includes("ING-ING") || m.id.includes("mov-mov-"))) return;
               remoteItems.push({
                 id: m.id,
                 timestamp: m.created_at || Date.now(),
@@ -1430,19 +1431,7 @@ export default function CajaPage() {
       });
     }
 
-    // Si es salida, registrar automáticamente en el Historial Detallado de Gastos
-    if (movementType === "salida") {
-      recordCashOutflowAsExpense({
-        amount: Number(movAmount),
-        description: movReason || "Salida de caja",
-        category: movCategory,
-        branchId: currentBranch?.id,
-        branchName: currentBranch?.name,
-        cashier: user?.name || "Don Toño Brito",
-        accountOrigin: "Caja Mostrador (Efectivo Turno)",
-        paymentMethod: "efectivo",
-      });
-    } else if (movementType === "entrada") {
+    if (movementType === "entrada") {
       // Registrar automáticamente en el Historial de Ingresos sin límite de dinero
       recordCashIncome({
         amount: Number(movAmount),

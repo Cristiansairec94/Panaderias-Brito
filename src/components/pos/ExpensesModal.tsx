@@ -61,6 +61,7 @@ import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import { getStoredIncomes, cleanDuplicateIncomes } from "@/lib/incomes";
+import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
 import TicketModal from "@/components/pos/TicketModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
 import OrderDetailModal from "@/components/pedidos/OrderDetailModal";
@@ -1662,6 +1663,7 @@ export default function ExpensesModal({
             branch_id: targetBranchId,
           });
           savedToDb = true;
+          markRecordIdsAsSynced([newExpense.id, `mov-${newExpense.id}`]);
         }
       } catch (err) {
         console.log("Offline mode, saved locally", err);
@@ -1704,7 +1706,7 @@ export default function ExpensesModal({
           timestamp: new Date().toISOString(),
         });
 
-        // Registrar automáticamente en el Historial Detallado de Gastos
+        // Registrar automáticamente en el Historial Detallado de Gastos (sin duplicar Supabase ni broadcast)
         recordCashOutflowAsExpense({
           id: newExpense.id,
           amount: newExpense.amount,
@@ -1715,6 +1717,7 @@ export default function ExpensesModal({
           cashier: cashierName,
           accountOrigin: "Caja Mostrador (Efectivo Turno)",
           paymentMethod: "efectivo",
+          skipSupabaseAndBroadcast: true,
         });
 
         // Notificación para la administración y Don Toño
@@ -1785,6 +1788,7 @@ export default function ExpensesModal({
         });
         if (!incError) {
           savedIncomeToDb = true;
+          markRecordIdsAsSynced([newIncome.id]);
         }
       } catch (err) {
         console.log("Offline mode, saved locally", err);

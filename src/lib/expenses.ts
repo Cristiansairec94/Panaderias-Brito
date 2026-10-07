@@ -84,6 +84,7 @@ export function recordCashOutflowAsExpense(options: {
   folio?: string;
   id?: string;
   date?: string;
+  skipSupabaseAndBroadcast?: boolean;
 }): ExpenseRecord | null {
   const parsedAmount = Number(options.amount);
   if (isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -109,8 +110,8 @@ export function recordCashOutflowAsExpense(options: {
 
   const existingExpenses = getStoredExpenses();
 
-  // Generar folio único tipo GST-XXXX
-  let folio = options.folio || options.id;
+  // Preservar ID original si fue provisto (ej. EXP-xxxx), o generar folio único tipo GST-XXXX
+  let folio = options.id || options.folio;
   if (!folio) {
     let attempts = 0;
     while (!folio || (existingExpenses.some((g) => g.id === folio) && attempts < 20)) {
@@ -138,16 +139,16 @@ export function recordCashOutflowAsExpense(options: {
     timestamp: now.toISOString(),
   };
 
-  // Guardar en la base de datos local
-  const updatedExpenses = [newExpense, ...existingExpenses];
+  // Guardar en la base de datos local deduplicando por ID
+  const cleanExisting = existingExpenses.filter((g) => g.id !== folio);
+  const updatedExpenses = [newExpense, ...cleanExisting];
   saveStoredExpenses(updatedExpenses);
 
-  // Guardar en Supabase para sincronización 100% en tiempo real entre todas las computadoras
-  if (typeof window !== "undefined") {
+  // Guardar en Supabase para supervisión si no fue persistido previamente por la pantalla de origen
+  if (!options.skipSupabaseAndBroadcast && typeof window !== "undefined") {
     try {
       const supabase = createClient();
-      const expId = newExpense.id || `GST-${Date.now().toString().slice(-6)}`;
-      const branchId = newExpense.branchId || "branch-matriz";
+      const expId = newExpense.id;
 
       Promise.allSettled([
         supabase.from("cash_expenses").upsert({
@@ -172,10 +173,10 @@ export function recordCashOutflowAsExpense(options: {
     } catch {}
   }
 
-  // Transmitir en tiempo real a los demás dispositivos / sucursales
-  if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
+  // Transmitir en tiempo real a los demás dispositivos / sucursales si no fue emitido previamente
+  if (!options.skipSupabaseAndBroadcast && typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
     realtimeHub.broadcastCashMovement({
-      id: newExpense.id,
+      id: `mov-${newExpense.id}`,
       branchId: newExpense.branchId,
       branchName: newExpense.branchName,
       type: "salida",
@@ -198,8 +199,19 @@ if (typeof window !== "undefined" && realtimeHub?.onCashMovement) {
     try {
       if (!payload || payload.type !== "salida") return;
       const current = getStoredExpenses();
-      // Evitar duplicados por id o coincidencia exacta de tiempo/monto
-      if (current.some((g) => g.id === payload.id || (g.amount === payload.amount && g.description === payload.reason && g.branchId === payload.branchId))) {
+      const rawId = payload.id || "";
+      const baseId = rawId.replace(/^mov-/, "");
+
+      // Evitar duplicados por id (con o sin prefijo mov-), o coincidencia exacta de monto/motivo/sucursal
+      if (
+        current.some(
+          (g) =>
+            g.id === payload.id ||
+            g.id === baseId ||
+            `mov-${g.id}` === payload.id ||
+            (g.amount === payload.amount && g.description === payload.reason && g.branchId === payload.branchId)
+        )
+      ) {
         return;
       }
 
@@ -208,8 +220,10 @@ if (typeof window !== "undefined" && realtimeHub?.onCashMovement) {
         label: payload.categoryLabel || "Gastos Menores / Varios",
       };
 
+      const finalId = baseId.length > 0 ? baseId : `GST-${Date.now().toString().slice(-4)}`;
+
       const remoteExpense: ExpenseRecord = {
-        id: payload.id.startsWith("GST-") ? payload.id : `GST-${Date.now().toString().slice(-4)}`,
+        id: finalId,
         date: getLocalDateISO(new Date(payload.timestamp || Date.now())),
         displayDate: `Hoy, ${payload.timestamp || new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
         category: catDef.id,

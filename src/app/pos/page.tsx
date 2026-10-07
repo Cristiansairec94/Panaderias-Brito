@@ -2044,51 +2044,6 @@ export default function POSPage() {
       const updated = deduplicateExpenses([newExpense, ...cleanCur]);
       localStorage.setItem("brito_pos_current_expenses", JSON.stringify(updated));
     } catch (e) {}
-
-    // Persistir directamente a Supabase para supervisión en tiempo real
-    if (typeof window !== "undefined") {
-      try {
-        const supabase = createClient();
-        const expId = newExpense.id || `GST-${Date.now().toString().slice(-6)}`;
-        const bId = activeBranch?.id || "branch-matriz";
-        Promise.allSettled([
-          supabase.from("cash_expenses").upsert({
-            id: expId,
-            amount: newExpense.amount,
-            category: newExpense.category || "gasto",
-            description: newExpense.description,
-            cashier: cashierName || "Cajero",
-            branch_id: bId,
-          }),
-          supabase.from("cash_movements").upsert({
-            id: `mov-${expId}`,
-            type: "salida",
-            category: newExpense.category || "gasto",
-            category_label: "Gasto de Caja",
-            amount: newExpense.amount,
-            reason: newExpense.description,
-            authorized_by: cashierName || "Cajero",
-            branch_id: bId,
-          }),
-        ]).catch(() => {});
-      } catch {}
-
-      if (realtimeHub?.broadcastCashMovement) {
-        realtimeHub.broadcastCashMovement({
-          id: newExpense.id,
-          branchId: activeBranch?.id || "branch-matriz",
-          branchName: activeBranch?.name || "Sucursal Matriz",
-          type: "salida",
-          category: newExpense.category as any,
-          categoryLabel: "Gasto de Caja",
-          amount: newExpense.amount,
-          reason: newExpense.description,
-          authorizedBy: cashierName || "Cajero",
-          cashier: cashierName,
-          timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
-        });
-      }
-    }
   };
 
   const handleAddIncome = (newIncome: CashIncome) => {
@@ -2108,41 +2063,6 @@ export default function POSPage() {
       const cleanAll = Array.isArray(allIncomes) ? allIncomes.filter((i: any) => i.id !== newIncome.id) : [];
       localStorage.setItem("brito_cash_incomes", JSON.stringify(deduplicateIncomes([newIncome, ...cleanAll])));
     } catch (e) {}
-
-    // Persistir directamente a Supabase para supervisión en tiempo real
-    if (typeof window !== "undefined") {
-      try {
-        const supabase = createClient();
-        const incId = newIncome.id || `ING-${Date.now().toString().slice(-6)}`;
-        const bId = activeBranch?.id || newIncome.branchId || "branch-matriz";
-        supabase.from("cash_movements").upsert({
-          id: incId,
-          type: "entrada",
-          category: newIncome.category || "otro",
-          category_label: newIncome.categoryLabel || "Entrada Dinero",
-          amount: newIncome.amount,
-          reason: newIncome.concept || "Entrada de dinero a caja",
-          authorized_by: cashierName || "Cajero",
-          branch_id: bId,
-        }).then(() => {}, () => {});
-      } catch {}
-
-      if (realtimeHub?.broadcastCashMovement) {
-        realtimeHub.broadcastCashMovement({
-          id: newIncome.id,
-          branchId: activeBranch?.id || "branch-matriz",
-          branchName: activeBranch?.name || "Sucursal Matriz",
-          type: "entrada",
-          category: "otro",
-          categoryLabel: newIncome.categoryLabel || "Entrada Dinero",
-          amount: newIncome.amount,
-          reason: newIncome.concept || "Entrada de dinero a caja",
-          authorizedBy: cashierName || "Cajero",
-          cashier: cashierName,
-          timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
-        });
-      }
-    }
   };
 
   const handleDeleteIncome = (id: string) => {

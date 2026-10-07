@@ -555,7 +555,9 @@ export async function syncAllLocalDataToSupabase(): Promise<{
       if (Array.isArray(list)) list.forEach((e) => e.id && !expensesMap.has(e.id) && expensesMap.set(e.id, e));
     }
 
-    const unsyncedExpenses = Array.from(expensesMap.values()).filter((e) => e.id && !syncedIds.has(e.id));
+    const unsyncedExpenses = Array.from(expensesMap.values()).filter(
+      (e) => e.id && !e.id.includes("mov-mov-") && !syncedIds.has(e.id)
+    );
     if (unsyncedExpenses.length > 0) {
       const expPayload = unsyncedExpenses.map((exp) => ({
         id: exp.id,
@@ -566,7 +568,7 @@ export async function syncAllLocalDataToSupabase(): Promise<{
         branch_id: exp.branchId || "branch-matriz",
       }));
       const movPayload = unsyncedExpenses.map((exp) => ({
-        id: `mov-${exp.id}`,
+        id: exp.id.startsWith("mov-") ? exp.id : `mov-${exp.id}`,
         type: "salida",
         category: exp.category || "general",
         amount: Number(exp.amount) || 0,
@@ -603,7 +605,9 @@ export async function syncAllLocalDataToSupabase(): Promise<{
       if (Array.isArray(list)) list.forEach((i) => i.id && !incomesMap.has(i.id) && incomesMap.set(i.id, i));
     }
 
-    const unsyncedIncomes = Array.from(incomesMap.values()).filter((i) => i.id && !syncedIds.has(i.id));
+    const unsyncedIncomes = Array.from(incomesMap.values()).filter(
+      (i) => i.id && !i.id.includes("ING-ING") && !syncedIds.has(i.id)
+    );
     if (unsyncedIncomes.length > 0) {
       const incPayload = unsyncedIncomes.map((inc) => ({
         id: inc.id,
