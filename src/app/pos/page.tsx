@@ -496,30 +496,69 @@ export default function POSPage() {
     }
     return activeBranch ? activeBranch.currentShift.name : "Turno Matutino (06:00 - 14:00)";
   });
-  const getStoredShiftFund = (fallback: number = 0): number => {
-    if (activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null) {
-      return Number(activeBranch.lastCut.nextFund);
+  const getStoredShiftFund = (targetBranchId?: string, fallback?: number): number => {
+    const bId = targetBranchId || activeBranch?.id || "branch-matriz";
+    const standardFund = bId === "branch-benito" ? 800 : bId === "branch-flores" ? 1200 : 1000;
+    const finalFallback = fallback !== undefined && fallback > 0 ? fallback : standardFund;
+
+    // Auto-sanitizar clave local si Matriz tiene 800 por contaminación
+    if (typeof window !== "undefined" && bId === "branch-matriz") {
+      try {
+        if (localStorage.getItem("brito_pos_initial_fund") === "800") {
+          localStorage.setItem("brito_pos_initial_fund", "1000");
+        }
+        if (localStorage.getItem("brito_pos_initial_fund_branch-matriz") === "800") {
+          localStorage.setItem("brito_pos_initial_fund_branch-matriz", "1000");
+        }
+      } catch {}
     }
-    if (activeBranch?.currentShift?.initialFund !== undefined && activeBranch?.currentShift?.initialFund !== null) {
-      return Number(activeBranch.currentShift.initialFund);
+
+    if (activeBranch?.id === bId && activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null) {
+      const cutFund = Number(activeBranch.lastCut.nextFund);
+      if (cutFund > 0 && !(bId === "branch-matriz" && cutFund === 800)) {
+        return cutFund;
+      }
     }
-    if (typeof window === "undefined") return fallback;
+    if (activeBranch?.id === bId && activeBranch?.currentShift?.initialFund !== undefined && activeBranch?.currentShift?.initialFund !== null) {
+      const shiftFund = Number(activeBranch.currentShift.initialFund);
+      if (shiftFund > 0 && !(bId === "branch-matriz" && shiftFund === 800)) {
+        return shiftFund;
+      }
+    }
+    if (typeof window === "undefined") return finalFallback;
     try {
-      const saved = localStorage.getItem("brito_pos_initial_fund");
-      if (saved !== null && saved !== "" && !isNaN(Number(saved))) return Number(saved);
+      const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
+      if (branchSaved !== null && branchSaved !== "" && !isNaN(Number(branchSaved))) {
+        const num = Number(branchSaved);
+        if (num > 0 && !(bId === "branch-matriz" && num === 800)) return num;
+      }
+
+      if (bId === "branch-matriz") {
+        const saved = localStorage.getItem("brito_pos_initial_fund");
+        if (saved !== null && saved !== "" && !isNaN(Number(saved))) {
+          const num = Number(saved);
+          if (num > 0 && num !== 800) return num;
+        }
+      }
+
       const raw = localStorage.getItem("brito_shift_cuts_history");
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0].nextFund === "number") {
-          return parsed[0].nextFund;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const branchCut = parsed.find((c: any) => c && (c.branchId === bId || (!c.branchId && bId === "branch-matriz")));
+          if (branchCut && typeof branchCut.nextFund === "number" && branchCut.nextFund > 0) {
+            if (!(bId === "branch-matriz" && branchCut.nextFund === 800)) {
+              return branchCut.nextFund;
+            }
+          }
         }
       }
     } catch (e) {}
-    return fallback;
+    return finalFallback;
   };
 
   const [initialCashFund, setInitialCashFund] = useState<number>(() => {
-    return getStoredShiftFund(activeBranch?.currentShift?.initialFund || 0);
+    return getStoredShiftFund(activeBranch?.id, activeBranch?.currentShift?.initialFund);
   });
 
   // Configuración de Impresora Directa para Tickets
@@ -541,7 +580,7 @@ export default function POSPage() {
   // Sincronización automática de cortes de turno y fondos de caja
   useEffect(() => {
     const handleShiftSync = () => {
-      const fund = getStoredShiftFund();
+      const fund = getStoredShiftFund(activeBranch?.id);
       setInitialCashFund(fund);
       try {
         const storedCashier = localStorage.getItem("brito_current_shift_cashier");
@@ -658,7 +697,7 @@ export default function POSPage() {
   // Sync shift info when branch changes (respetando el fondo del último corte cerrado)
   useEffect(() => {
     if (activeBranch) {
-      const storedFund = getStoredShiftFund(activeBranch.currentShift?.initialFund || 0);
+      const storedFund = getStoredShiftFund(activeBranch.id, activeBranch.currentShift?.initialFund);
       setInitialCashFund(storedFund);
       if (activeBranch.currentShift?.name) {
         setShiftName(activeBranch.currentShift.name);
@@ -1116,9 +1155,13 @@ export default function POSPage() {
   }, [initialCashFund]);
 
   const handleDirectUnlockShift = () => {
+    const bId = activeBranch?.id || "branch-matriz";
     setInitialCashFund(baseShiftFund);
     try {
-      localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
+      localStorage.setItem(`brito_pos_initial_fund_${bId}`, baseShiftFund.toString());
+      if (bId === "branch-matriz") {
+        localStorage.setItem("brito_pos_initial_fund", baseShiftFund.toString());
+      }
       localStorage.removeItem("brito_pos_shift_locked");
       localStorage.setItem("brito_current_shift_cashier", cashierName);
       localStorage.setItem("brito_current_shift_name", shiftName);
@@ -4816,9 +4859,13 @@ export default function POSPage() {
           cashSalesTotal={totalCashSales}
           initialFund={initialCashFund}
           onUpdateInitialFund={(val) => {
+            const bId = activeBranch?.id || "branch-matriz";
             setInitialCashFund(val);
             try {
-              localStorage.setItem("brito_pos_initial_fund", val.toString());
+              localStorage.setItem(`brito_pos_initial_fund_${bId}`, val.toString());
+              if (bId === "branch-matriz") {
+                localStorage.setItem("brito_pos_initial_fund", val.toString());
+              }
               window.dispatchEvent(new Event("brito_shift_cuts_updated"));
             } catch (e) {}
           }}
@@ -4876,9 +4923,13 @@ export default function POSPage() {
           onChangeShift={handleShiftChange}
           initialFund={initialCashFund}
           onChangeInitialFund={(val) => {
+            const bId = activeBranch?.id || "branch-matriz";
             setInitialCashFund(val);
             try {
-              localStorage.setItem("brito_pos_initial_fund", val.toString());
+              localStorage.setItem(`brito_pos_initial_fund_${bId}`, val.toString());
+              if (bId === "branch-matriz") {
+                localStorage.setItem("brito_pos_initial_fund", val.toString());
+              }
             } catch (e) {}
           }}
           sales={currentShiftSales}

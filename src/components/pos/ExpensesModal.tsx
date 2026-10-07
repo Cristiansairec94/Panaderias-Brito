@@ -563,30 +563,47 @@ export default function ExpensesModal({
     } catch {}
   }, []);
 
+  // Determinar fondo inicial canónico por sucursal
+  const targetBranchId = branchId || activeBranch?.id || "branch-matriz";
+  const standardBranchFund = targetBranchId === "branch-benito" ? 800 : targetBranchId === "branch-flores" ? 1200 : 1000;
+
   // Estado local para el Fondo Inicial de Caja
   const [currentFund, setCurrentFund] = useState<number>(() => {
     if (activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null) {
-      return Number(activeBranch.lastCut.nextFund);
+      const f = Number(activeBranch.lastCut.nextFund);
+      if (f > 0 && !(targetBranchId === "branch-matriz" && f === 800)) return f;
     }
     if (activeBranch?.currentShift?.initialFund !== undefined && activeBranch?.currentShift?.initialFund !== null) {
-      return activeBranch.currentShift.initialFund;
+      const f = Number(activeBranch.currentShift.initialFund);
+      if (f > 0 && !(targetBranchId === "branch-matriz" && f === 800)) return f;
     }
-    if (typeof initialFund === "number" && initialFund >= 0) {
+    if (typeof initialFund === "number" && initialFund > 0 && !(targetBranchId === "branch-matriz" && initialFund === 800)) {
       return initialFund;
     }
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("brito_pos_initial_fund");
-      if (saved !== null && !isNaN(Number(saved))) return Number(saved);
+      const savedBranch = localStorage.getItem(`brito_pos_initial_fund_${targetBranchId}`);
+      if (savedBranch !== null && !isNaN(Number(savedBranch)) && Number(savedBranch) > 0) {
+        const num = Number(savedBranch);
+        if (!(targetBranchId === "branch-matriz" && num === 800)) return num;
+      }
+      if (targetBranchId === "branch-matriz") {
+        const saved = localStorage.getItem("brito_pos_initial_fund");
+        if (saved !== null && !isNaN(Number(saved)) && Number(saved) > 0 && Number(saved) !== 800) return Number(saved);
+      }
     }
-    return 0;
+    return standardBranchFund;
   });
 
   // Fondo inicial sincronizado prioritariamente con la terminal y cajera activa
-  const effectiveFund = (activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null)
+  const effectiveFund = (activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null && Number(activeBranch.lastCut.nextFund) > 0 && !(targetBranchId === "branch-matriz" && Number(activeBranch.lastCut.nextFund) === 800))
     ? Number(activeBranch.lastCut.nextFund)
-    : ((typeof initialFund === "number" && initialFund >= 0)
+    : ((typeof initialFund === "number" && initialFund > 0 && !(targetBranchId === "branch-matriz" && initialFund === 800))
         ? initialFund
-        : (currentFund !== undefined ? currentFund : (activeBranch?.currentShift?.initialFund || 0)));
+        : (currentFund > 0 && !(targetBranchId === "branch-matriz" && currentFund === 800)
+            ? currentFund
+            : (activeBranch?.currentShift?.initialFund && Number(activeBranch.currentShift.initialFund) > 0 && !(targetBranchId === "branch-matriz" && Number(activeBranch.currentShift.initialFund) === 800)
+                ? Number(activeBranch.currentShift.initialFund)
+                : standardBranchFund)));
   const [editFundInput, setEditFundInput] = useState<string>(() => {
     return String(effectiveFund);
   });
@@ -594,28 +611,48 @@ export default function ExpensesModal({
 
   useEffect(() => {
     if (activeBranch?.lastCut?.nextFund !== undefined && activeBranch?.lastCut?.nextFund !== null) {
-      setCurrentFund(Number(activeBranch.lastCut.nextFund));
-      setEditFundInput(String(activeBranch.lastCut.nextFund));
-      return;
+      const f = Number(activeBranch.lastCut.nextFund);
+      if (f > 0 && !(targetBranchId === "branch-matriz" && f === 800)) {
+        setCurrentFund(f);
+        setEditFundInput(String(f));
+        return;
+      }
     }
     if (activeBranch?.currentShift?.initialFund !== undefined) {
-      setCurrentFund(activeBranch.currentShift.initialFund);
-      setEditFundInput(String(activeBranch.currentShift.initialFund));
-      return;
+      const f = Number(activeBranch.currentShift.initialFund);
+      if (f > 0 && !(targetBranchId === "branch-matriz" && f === 800)) {
+        setCurrentFund(f);
+        setEditFundInput(String(f));
+        return;
+      }
     }
-    if (typeof initialFund === "number" && initialFund >= 0) {
+    if (typeof initialFund === "number" && initialFund > 0 && !(targetBranchId === "branch-matriz" && initialFund === 800)) {
       setCurrentFund(initialFund);
       setEditFundInput(String(initialFund));
+      return;
     }
-  }, [initialFund, isOpen, activeBranch?.id, activeBranch?.lastCut, activeBranch?.currentShift?.initialFund]);
+    setCurrentFund(standardBranchFund);
+    setEditFundInput(String(standardBranchFund));
+  }, [initialFund, isOpen, activeBranch?.id, activeBranch?.lastCut, activeBranch?.currentShift?.initialFund, targetBranchId, standardBranchFund]);
 
   useEffect(() => {
     const handleFundSync = () => {
       if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("brito_pos_initial_fund");
-        if (saved !== null && !isNaN(Number(saved))) {
-          setCurrentFund(Number(saved));
-          setEditFundInput(saved);
+        const savedBranch = localStorage.getItem(`brito_pos_initial_fund_${targetBranchId}`);
+        if (savedBranch !== null && !isNaN(Number(savedBranch)) && Number(savedBranch) > 0) {
+          const num = Number(savedBranch);
+          if (!(targetBranchId === "branch-matriz" && num === 800)) {
+            setCurrentFund(num);
+            setEditFundInput(String(num));
+            return;
+          }
+        }
+        if (targetBranchId === "branch-matriz") {
+          const saved = localStorage.getItem("brito_pos_initial_fund");
+          if (saved !== null && !isNaN(Number(saved)) && Number(saved) > 0 && Number(saved) !== 800) {
+            setCurrentFund(Number(saved));
+            setEditFundInput(saved);
+          }
         }
       }
     };
@@ -625,7 +662,7 @@ export default function ExpensesModal({
       window.removeEventListener("brito_shift_cuts_updated", handleFundSync);
       window.removeEventListener("storage", handleFundSync);
     };
-  }, []);
+  }, [targetBranchId]);
 
   const [shiftVersion, setShiftVersion] = useState(0);
 
@@ -647,7 +684,10 @@ export default function ExpensesModal({
     setCurrentFund(validAmount);
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem("brito_pos_initial_fund", validAmount.toString());
+        localStorage.setItem(`brito_pos_initial_fund_${targetBranchId}`, validAmount.toString());
+        if (targetBranchId === "branch-matriz") {
+          localStorage.setItem("brito_pos_initial_fund", validAmount.toString());
+        }
         window.dispatchEvent(new Event("brito_shift_cuts_updated"));
       } catch (e) {}
     }

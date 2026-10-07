@@ -222,21 +222,40 @@ export default function CajaPage() {
   const [filterStatus, setFilterStatus] = useState<"all" | "cuadrado" | "sobrante" | "faltante">("all");
 
   const getStoredCajaInitialFund = (fallback: number = 0): number => {
-    if (currentBranch?.currentShift?.initialFund !== undefined) {
-      return currentBranch.currentShift.initialFund;
+    const bId = currentBranch?.id || "branch-matriz";
+    const standardFund = bId === "branch-benito" ? 800 : bId === "branch-flores" ? 1200 : 1000;
+    const finalFallback = fallback > 0 ? fallback : standardFund;
+
+    if (currentBranch?.lastCut?.nextFund !== undefined && currentBranch?.lastCut?.nextFund !== null) {
+      const f = Number(currentBranch.lastCut.nextFund);
+      if (f > 0 && !(bId === "branch-matriz" && f === 800)) return f;
+    }
+    if (currentBranch?.currentShift?.initialFund !== undefined && currentBranch?.currentShift?.initialFund !== null) {
+      const f = Number(currentBranch.currentShift.initialFund);
+      if (f > 0 && !(bId === "branch-matriz" && f === 800)) return f;
     }
     try {
-      const saved = localStorage.getItem("brito_pos_initial_fund");
-      if (saved && !isNaN(Number(saved))) return Number(saved);
+      const branchSaved = localStorage.getItem(`brito_pos_initial_fund_${bId}`);
+      if (branchSaved && !isNaN(Number(branchSaved)) && Number(branchSaved) > 0) {
+        const num = Number(branchSaved);
+        if (!(bId === "branch-matriz" && num === 800)) return num;
+      }
+      if (bId === "branch-matriz") {
+        const saved = localStorage.getItem("brito_pos_initial_fund");
+        if (saved && !isNaN(Number(saved)) && Number(saved) > 0 && Number(saved) !== 800) return Number(saved);
+      }
       const raw = localStorage.getItem("brito_shift_cuts_history");
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0].nextFund === "number") {
-          return parsed[0].nextFund;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const bCut = parsed.find((c: any) => c && (c.branchId === bId || (!c.branchId && bId === "branch-matriz")));
+          if (bCut && typeof bCut.nextFund === "number" && bCut.nextFund > 0) {
+            if (!(bId === "branch-matriz" && bCut.nextFund === 800)) return bCut.nextFund;
+          }
         }
       }
     } catch (e) {}
-    return fallback;
+    return finalFallback;
   };
 
   // Live Shift state

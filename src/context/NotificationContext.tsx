@@ -232,12 +232,12 @@ export function isNotificationVisibleForUser(
 const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
   {
     id: "corte-turno-matutino-cuadro",
-    senderName: "🏁 Cierre de Turno (Lupita Brito)",
+    senderName: "🏁 Cierre de Turno (silvia puga)",
     senderAvatar: "💰",
     badgeIcon: "dinero",
     title: "Cierre a las 14:00 hrs: ✓ CAJA CUADRADA EXACTA ($0.00)",
-    highlightText: "Lupita Brito entregó turno a Don Toño Brito",
-    description: "Horario de turno: 06:30 a 14:00 hrs. Efectivo en caja: $4,850.00. Cuadró exacto sin faltante ($0.00 de diferencia). Fondo dejado para nuevo turno: $800.00. Efectivo retirado: $4,050.00.",
+    highlightText: "silvia puga entregó turno a Don Toño Brito",
+    description: "Horario de turno: 06:00 a 14:00 hrs. Efectivo en caja: $47,569.00. Cuadró exacto sin faltante ($0.00 de diferencia). Fondo dejado para nuevo turno: $1,000.00. Efectivo retirado: $46,569.00.",
     timeAgo: "Hace 15 min",
     group: "recientes",
     read: false,
@@ -249,25 +249,26 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
       id: "CORTE-MAT-001",
       date: new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
       timestamp: Date.now() - 15 * 60 * 1000,
-      shiftRange: "06:30 a 14:00 hrs",
-      outgoingCashier: "Lupita Brito",
+      shiftRange: "06:00 a 14:00 hrs",
+      outgoingCashier: "silvia puga",
       incomingCashier: "Don Toño Brito",
-      responsible: "Lupita Brito",
+      responsible: "silvia puga",
       branchName: "Sucursal Matriz (Centro)",
+      branchId: "branch-matriz",
       previousShift: "Matutino",
       nextShift: "Vespertino",
-      initialFund: 800,
-      cashSales: 4550,
-      cardSales: 1200,
-      transferSales: 600,
-      totalSales: 6350,
-      totalSalesAll: 6350,
-      totalExpenses: 500,
-      totalIncomes: 0,
-      expectedCash: 4850,
-      countedCash: 4850,
+      initialFund: 1000,
+      cashSales: 18979,
+      cardSales: 0,
+      transferSales: 0,
+      totalSales: 18979,
+      totalSalesAll: 18979,
+      totalExpenses: 6000,
+      totalIncomes: 33590,
+      expectedCash: 47569,
+      countedCash: 47569,
       difference: 0,
-      nextFund: 800,
+      nextFund: 1000,
       notes: "Cierre de turno matutino completado conforme y sin faltantes. Don Toño recibió el efectivo físico en mostrador.",
       expensesList: [
         {
@@ -310,7 +311,7 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
       branchName: "Sucursal Matriz (Centro)",
       previousShift: "Vespertino",
       nextShift: "Nocturno / Cierre",
-      initialFund: 800,
+      initialFund: 1000,
       cashSales: 3320,
       cardSales: 850,
       transferSales: 400,
@@ -321,7 +322,7 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
       expectedCash: 3920,
       countedCash: 3870,
       difference: -50,
-      nextFund: 800,
+      nextFund: 1000,
       notes: "Faltante detectado de -$50.00 MXN en entrega de turno. Físico contado $3,870.00 contra $3,920.00 esperados. Reportado para aclaración.",
       expensesList: [
         {
@@ -537,8 +538,14 @@ export function findShiftCutForNotification(notif: FBNotification): ShiftCutReco
       : "06:30 a 14:00 hrs";
 
     // Con cuánto dinero se quedó la caja (Fondo para siguiente turno)
+    const targetBId = notif.branchId || notif.operatingBranchId || "branch-matriz";
+    const isBenito = targetBId === "branch-benito" || notif.senderName.includes("San Benito") || notif.title.includes("San Benito");
+    const isFlores = targetBId === "branch-flores" || notif.senderName.includes("Las Flores") || notif.title.includes("Las Flores");
+    const branchStandardFund = isBenito ? 800 : isFlores ? 1200 : 1000;
+
     const nextFundMatch = fullText.match(/(?:fondo(?: dejado| para nuevo turno)?|se qued[óo] en caja)[:\s]*\$?([0-9,]+(?:\.[0-9]+)?)/i);
-    const nextFund = nextFundMatch ? parseFloat(nextFundMatch[1].replace(/,/g, "")) : 800;
+    const parsedNext = nextFundMatch ? parseFloat(nextFundMatch[1].replace(/,/g, "")) : branchStandardFund;
+    const nextFund = (!isBenito && parsedNext === 800) ? branchStandardFund : parsedNext;
 
     // Efectivo esperado y contado
     const expectedMatch = fullText.match(/(?:efectivo esperado|esperado)[:\s]*\$?([0-9,]+(?:\.[0-9]+)?)/i);
@@ -580,10 +587,10 @@ export function findShiftCutForNotification(notif: FBNotification): ShiftCutReco
     const relevoMatch = notif.highlightText.match(/^(?:Cambio de Turno:\s*)?([^\➔\-]+)\s*[➔\-]\s*([^\.]+)/i);
     const outgoing = relevoMatch
       ? relevoMatch[1].trim()
-      : notif.senderName.replace(/^🏁\s*Cierre de Turno\s*\(|\)$/g, "").trim() || "Lupita Brito";
+      : notif.senderName.replace(/^🏁\s*Cierre de Turno\s*\(|\)$/g, "").trim() || "silvia puga";
     const incoming = relevoMatch ? relevoMatch[2].trim() : "Don Toño Brito";
 
-    const initialFund = 800;
+    const initialFund = branchStandardFund;
     const cashSales = Math.max(0, expectedCash - initialFund);
     const totalSales = cashSales + 1200;
 
@@ -595,7 +602,8 @@ export function findShiftCutForNotification(notif: FBNotification): ShiftCutReco
       outgoingCashier: outgoing,
       incomingCashier: incoming,
       responsible: outgoing,
-      branchName: "Sucursal Matriz (Centro)",
+      branchName: notif.branchName || "Sucursal Matriz (Centro)",
+      branchId: targetBId,
       previousShift: "Turno Saliente",
       nextShift: "Turno Entrante",
       initialFund,

@@ -317,6 +317,21 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
                 modified = true;
               }
             }
+            list = list.map((b: Branch) => {
+              if (b.id === "branch-matriz") {
+                if (b.currentShift?.initialFund === 800) {
+                  modified = true;
+                  return {
+                    ...b,
+                    currentShift: {
+                      ...b.currentShift,
+                      initialFund: 1000,
+                    },
+                  };
+                }
+              }
+              return b;
+            });
             if (modified) {
               try {
                 localStorage.setItem("brito_branches_data", JSON.stringify(list));
@@ -517,11 +532,21 @@ function resolveBranchParam(param: string | null): string | null {
           // Sincronizar historial de cortes y límites de turno en localStorage para todas las pantallas del navegador
           if (typeof window !== "undefined") {
             try {
-              localStorage.setItem("brito_shift_cuts_history", JSON.stringify(allCutsList));
+              const prevCutsRaw = localStorage.getItem("brito_shift_cuts_history");
+              const newCutsRaw = JSON.stringify(allCutsList);
+              const cutsChanged = prevCutsRaw !== newCutsRaw;
+              if (cutsChanged) {
+                localStorage.setItem("brito_shift_cuts_history", newCutsRaw);
+              }
 
               latestCutByBranch.forEach((cut, bId) => {
                 const cutTs = cut.timestamp || parseDateTimeSafe(cut.date);
-                const cutFund = Number(cut.nextFund ?? cut.initialFund ?? 0);
+                let cutFund = Number(cut.nextFund ?? cut.initialFund ?? 0);
+                if (bId === "branch-matriz" && (cutFund === 800 || cutFund <= 0)) {
+                  cutFund = 1000;
+                } else if (cutFund <= 0) {
+                  cutFund = bId === "branch-benito" ? 800 : bId === "branch-flores" ? 1200 : 1000;
+                }
                 if (cutTs > 0) {
                   localStorage.setItem(`brito_shift_start_${bId}`, cutTs.toString());
                   localStorage.setItem(`brito_pos_initial_fund_${bId}`, cutFund.toString());
@@ -577,7 +602,9 @@ function resolveBranchParam(param: string | null): string | null {
                 }
               }
 
-              window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+              if (cutsChanged) {
+                window.dispatchEvent(new Event("brito_shift_cuts_updated"));
+              }
               window.dispatchEvent(new Event("brito_sales_updated"));
               window.dispatchEvent(new Event("brito_caja_updated"));
             } catch (e) {
@@ -874,11 +901,14 @@ function resolveBranchParam(param: string | null): string | null {
               const totalTickets = agg.deskTickets + agg.orderCount;
 
               // Fondo inicial: Si hay un corte registrado para esta sucursal, el fondo del nuevo turno SIEMPRE es el nextFund del corte.
-              let initialFund = 1000;
-              if (latestCut && latestCut.nextFund !== undefined && latestCut.nextFund !== null) {
-                initialFund = Number(latestCut.nextFund);
-              } else if (b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null) {
-                initialFund = Number(b.currentShift.initialFund);
+              const standardFund = b.id === "branch-benito" ? 800 : b.id === "branch-flores" ? 1200 : 1000;
+              let initialFund = standardFund;
+              if (latestCut && latestCut.nextFund !== undefined && latestCut.nextFund !== null && Number(latestCut.nextFund) > 0) {
+                const parsed = Number(latestCut.nextFund);
+                initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
+              } else if (b.currentShift?.initialFund !== undefined && b.currentShift?.initialFund !== null && Number(b.currentShift.initialFund) > 0) {
+                const parsed = Number(b.currentShift.initialFund);
+                initialFund = (b.id === "branch-matriz" && parsed === 800) ? 1000 : parsed;
               }
 
               // Flujo de salidas: evitar doble deducción entre cash_movements y cash_expenses
@@ -1649,45 +1679,53 @@ function resolveBranchParam(param: string | null): string | null {
             return next;
           });
 
-          const newFund = (cut.nextFund !== undefined && cut.nextFund !== null) ? Number(cut.nextFund) : 0;
+          const standardFund = bId === "branch-benito" ? 800 : bId === "branch-flores" ? 1200 : 1000;
+          let newFund = (cut.nextFund !== undefined && cut.nextFund !== null && Number(cut.nextFund) > 0) ? Number(cut.nextFund) : standardFund;
+          if (bId === "branch-matriz" && (newFund === 800 || newFund <= 0)) {
+            newFund = 1000;
+          }
           const nextCashier = cut.incomingCashier || "Cajero";
+          const cutTs = cut.timestamp || parseDateTimeSafe(cut.date) || Date.now();
+          const isFreshCut = Math.abs(Date.now() - cutTs) < 120000;
 
-          // Reiniciar sucursal inmediatamente en 0 absoluto para el nuevo turno
-          setBranches((prev) => {
-            const updated = prev.map((b) => {
-              if (b.id !== bId) return b;
-              return {
-                ...b,
-                todaySales: 0,
-                todayTickets: 0,
-                todayDeskSales: 0,
-                todayDeskTickets: 0,
-                todayOrdersDeposit: 0,
-                todayOrdersTotal: 0,
-                todayOrdersCount: 0,
-                cashInDrawer: newFund,
-                lastCut: cut,
-                manager: nextCashier,
-                currentShift: {
-                  id: b.currentShift?.id || `shift-${b.id}`,
-                  name: cut.nextShift || b.currentShift?.name || "Turno General",
-                  cashier: nextCashier,
-                  openedAt: cut.date || b.currentShift?.openedAt || "06:00 AM",
-                  initialFund: newFund,
-                  totalSales: 0,
-                  ticketCount: 0,
-                  cashSales: 0,
-                  cardSales: 0,
-                  transferSales: 0,
-                  status: "abierto" as const,
-                },
-              };
+          // Solo reiniciar sucursal en 0 si es un corte genuinamente reciente (últimos 2 minutos)
+          if (isFreshCut) {
+            setBranches((prev) => {
+              const updated = prev.map((b) => {
+                if (b.id !== bId) return b;
+                return {
+                  ...b,
+                  todaySales: 0,
+                  todayTickets: 0,
+                  todayDeskSales: 0,
+                  todayDeskTickets: 0,
+                  todayOrdersDeposit: 0,
+                  todayOrdersTotal: 0,
+                  todayOrdersCount: 0,
+                  cashInDrawer: newFund,
+                  lastCut: cut,
+                  manager: nextCashier,
+                  currentShift: {
+                    id: b.currentShift?.id || `shift-${b.id}`,
+                    name: cut.nextShift || b.currentShift?.name || "Turno General",
+                    cashier: nextCashier,
+                    openedAt: cut.date || b.currentShift?.openedAt || "06:00 AM",
+                    initialFund: newFund,
+                    totalSales: 0,
+                    ticketCount: 0,
+                    cashSales: 0,
+                    cardSales: 0,
+                    transferSales: 0,
+                    status: "abierto" as const,
+                  },
+                };
+              });
+              try {
+                localStorage.setItem("brito_branches_data", JSON.stringify(updated));
+              } catch {}
+              return updated;
             });
-            try {
-              localStorage.setItem("brito_branches_data", JSON.stringify(updated));
-            } catch {}
-            return updated;
-          });
+          }
 
           try {
             const raw = localStorage.getItem("brito_shift_cuts_history");
@@ -1695,12 +1733,13 @@ function resolveBranchParam(param: string | null): string | null {
             const nextHistory = [cut, ...existingHistory.filter((c) => c && c.id !== cut.id)];
             localStorage.setItem("brito_shift_cuts_history", JSON.stringify(nextHistory));
 
-            const cutTs = cut.timestamp || parseDateTimeSafe(cut.date) || Date.now();
-            localStorage.setItem(`brito_shift_start_${bId}`, cutTs.toString());
-            localStorage.setItem(`brito_pos_initial_fund_${bId}`, newFund.toString());
-            if (bId === "branch-matriz") {
-              localStorage.setItem("brito_current_shift_start_timestamp", cutTs.toString());
-              localStorage.setItem("brito_pos_initial_fund", newFund.toString());
+            if (cutTs > 0) {
+              localStorage.setItem(`brito_shift_start_${bId}`, cutTs.toString());
+              localStorage.setItem(`brito_pos_initial_fund_${bId}`, newFund.toString());
+              if (bId === "branch-matriz") {
+                localStorage.setItem("brito_current_shift_start_timestamp", cutTs.toString());
+                localStorage.setItem("brito_pos_initial_fund", newFund.toString());
+              }
             }
 
             // Filtrar ventas y gastos locales de esta sucursal que ya quedaron cortados
@@ -1770,80 +1809,6 @@ function resolveBranchParam(param: string | null): string | null {
         })
       : undefined;
 
-    // Escuchar evento de corte local en esta misma ventana
-    const handleLocalCut = () => {
-      try {
-        const rawCuts = localStorage.getItem("brito_shift_cuts_history");
-        if (rawCuts) {
-          const cuts: ShiftCutRecord[] = JSON.parse(rawCuts);
-          if (Array.isArray(cuts) && cuts.length > 0) {
-            const latest = cuts[0];
-            const bId = latest.branchId || "branch-matriz";
-            const bName = latest.branchName || "Sucursal";
-            const cutMov: BranchCashMovement = {
-              id: `cut-${latest.id}`,
-              branchId: bId,
-              branchName: bName,
-              type: "salida",
-              category: "corte_caja",
-              categoryLabel: "Corte de Turno",
-              amount: Number(latest.countedCash || latest.totalSales || 0),
-              reason: `Corte de turno (${latest.shiftRange || "Turno"}). Saliente: ${latest.outgoingCashier} → Entrante: ${latest.incomingCashier}. Fondo nuevo: ${latest.nextFund ?? 0}`,
-              authorizedBy: latest.outgoingCashier || "Cajero",
-              timestamp: latest.date || new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
-              createdAt: new Date(latest.timestamp || Date.now()).toISOString(),
-              rawTimestamp: latest.timestamp || Date.now(),
-              movementType: "corte",
-              cashier: latest.outgoingCashier || "Cajero",
-              paymentMethod: "efectivo",
-            };
-            setCashMovements((prev) => [cutMov, ...prev.filter((m) => m.id !== cutMov.id)].slice(0, 300));
-
-            const newFund = (latest.nextFund !== undefined && latest.nextFund !== null) ? Number(latest.nextFund) : 0;
-            const nextCashier = latest.incomingCashier || "Cajero";
-
-            // Reiniciar sucursal inmediatamente en 0 absoluto para el nuevo turno
-            setBranches((prev) => {
-              const updated = prev.map((b) => {
-                if (b.id !== bId) return b;
-                return {
-                  ...b,
-                  todaySales: 0,
-                  todayTickets: 0,
-                  todayDeskSales: 0,
-                  todayDeskTickets: 0,
-                  todayOrdersDeposit: 0,
-                  todayOrdersTotal: 0,
-                  todayOrdersCount: 0,
-                  cashInDrawer: newFund,
-                  lastCut: latest,
-                  manager: nextCashier,
-                  currentShift: {
-                    id: b.currentShift?.id || `shift-${b.id}`,
-                    name: latest.nextShift || b.currentShift?.name || "Turno General",
-                    cashier: nextCashier,
-                    openedAt: latest.date || b.currentShift?.openedAt || "06:00 AM",
-                    initialFund: newFund,
-                    totalSales: 0,
-                    ticketCount: 0,
-                    cashSales: 0,
-                    cardSales: 0,
-                    transferSales: 0,
-                    status: "abierto" as const,
-                  },
-                };
-              });
-              try {
-                localStorage.setItem("brito_branches_data", JSON.stringify(updated));
-              } catch {}
-              return updated;
-            });
-          }
-        }
-      } catch {}
-    };
-    window.addEventListener("brito_shift_cuts_updated", handleLocalCut);
-
     return () => {
       unsubSale();
       unsubSaleCancelled();
@@ -1851,7 +1816,6 @@ function resolveBranchParam(param: string | null): string | null {
       unsubCashMovement();
       unsubShiftCut();
       if (unsubBranch) unsubBranch();
-      window.removeEventListener("brito_shift_cuts_updated", handleLocalCut);
     };
   }, []);
 

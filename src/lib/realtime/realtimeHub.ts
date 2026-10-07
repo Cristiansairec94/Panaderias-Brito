@@ -173,7 +173,7 @@ class RealtimeHub {
 
   public dispatchLocalEvent(type: string, payload: any) {
     if (!payload) return;
-    const rawId = payload.id || (payload.order && payload.order.id) || null;
+    const rawId = payload.id || (payload.cut && payload.cut.id) || (payload.order && payload.order.id) || (payload.branch && payload.branch.id) || null;
     if (rawId && typeof rawId === "string" && (rawId.includes("ING-ING") || rawId.includes("mov-mov-"))) {
       return;
     }
