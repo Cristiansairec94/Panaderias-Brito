@@ -1319,6 +1319,8 @@ function resolveBranchParam(param: string | null): string | null {
                 ...b,
                 todaySales: (Number(b.todaySales) || 0) + sale.total,
                 todayTickets: (Number(b.todayTickets) || 0) + 1,
+                todayDeskSales: (Number(b.todayDeskSales ?? b.todaySales) || 0) + sale.total,
+                todayDeskTickets: (Number(b.todayDeskTickets ?? b.todayTickets) || 0) + 1,
                 cashInDrawer: (Number(b.cashInDrawer) || 0) + (isCash ? sale.total : 0),
                 currentShift: updatedShift,
                 topProduct: updatedTopProduct,
@@ -1450,6 +1452,8 @@ function resolveBranchParam(param: string | null): string | null {
                 ...b,
                 todaySales: Math.max(0, (Number(b.todaySales) || 0) - payload.amount),
                 todayTickets: Math.max(0, (Number(b.todayTickets) || 0) - 1),
+                todayDeskSales: Math.max(0, (Number(b.todayDeskSales ?? b.todaySales) || 0) - payload.amount),
+                todayDeskTickets: Math.max(0, (Number(b.todayDeskTickets ?? b.todayTickets) || 0) - 1),
                 cashInDrawer: Math.max(0, (Number(b.cashInDrawer) || 0) - (isCash ? payload.amount : 0)),
                 currentShift: updatedShift || b.currentShift,
               };
