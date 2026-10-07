@@ -719,7 +719,7 @@ function resolveBranchParam(param: string | null): string | null {
           // 3. Movimientos de caja (aportes / retiros fuera de ventas y de cortes)
           dbMovs.forEach((m: any) => {
             if (m.category === "venta_mostrador" || m.category === "corte_caja") return;
-            if (m.id && (m.id.includes("ING-ING") || m.id.includes("mov-mov-"))) return;
+            if (m.id && (m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.id.includes("012599"))) return;
             const bId = m.branch_id || "branch-matriz";
             let cur = branchAgg.get(bId);
             if (!cur) {
@@ -749,7 +749,7 @@ function resolveBranchParam(param: string | null): string | null {
                 const localIncs = JSON.parse(rawLocalInc);
                 if (Array.isArray(localIncs)) {
                   localIncs.forEach((inc: any) => {
-                    if (!inc || !inc.id) return;
+                    if (!inc || !inc.id || inc.id.includes("012599")) return;
                     if (dbMovs.some((m: any) => m.id === inc.id)) return;
                     const bId = inc.branchId || inc.branch_id || "branch-matriz";
                     let cur = branchAgg.get(bId);

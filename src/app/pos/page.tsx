@@ -1996,7 +1996,7 @@ export default function POSPage() {
       if (cashMovements && cashMovements.length > 0) {
         cashMovements.forEach((m) => {
           if (m.type === "entrada" && m.category !== "venta_mostrador" && m.category !== "corte" && m.category !== "corte_caja") {
-            if (m.id && (m.id.includes("331037") || m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.amount > 500000)) return;
+            if (m.id && (m.id.includes("331037") || m.id.includes("012599") || m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.amount > 500000)) return;
             const bMatch = !activeBranch || activeBranch.id === "all" || m.branchId === activeBranch.id;
             if (bMatch && !incPool.some((i) => i.id === m.id)) {
               incPool.push({
@@ -2020,7 +2020,7 @@ export default function POSPage() {
       const targetCashier = activeBranch?.currentShift?.cashier || cashierName;
       const filtered = incPool.filter((inc) => {
         if (!inc) return false;
-        if (inc.id && (inc.id.includes("331037") || inc.amount > 500000)) return false;
+        if (inc.id && (inc.id.includes("331037") || inc.id.includes("012599") || inc.amount > 500000)) return false;
         if (activeBranch && activeBranch.id !== "all") {
           const incBranch = (inc as any).branchId || (inc as any).branch_id;
           if (incBranch) {

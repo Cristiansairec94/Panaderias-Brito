@@ -552,7 +552,7 @@ export default function ExpensesModal({
           if (!item) return false;
           const id = String(item.id || "");
           const amt = Number(item.amount || 0);
-          if (id.includes("354644") || id.includes("299599") || id.includes("331037") || id.includes("334972") || id.includes("ING-ING") || id.includes("mov-mov-")) return false;
+          if (id.includes("354644") || id.includes("299599") || id.includes("331037") || id.includes("334972") || id.includes("012599") || id.includes("ING-ING") || id.includes("mov-mov-")) return false;
           if (amt >= 500000) return false;
           return true;
         });
@@ -887,7 +887,7 @@ export default function ExpensesModal({
     if (cashMovements && cashMovements.length > 0) {
       cashMovements.forEach((m) => {
         if (m.type === "entrada" && m.category !== "venta_mostrador" && m.category !== "corte" && m.category !== "corte_caja") {
-          if (m.id && (m.id.includes("331037") || m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.amount > 500000)) return;
+          if (m.id && (m.id.includes("331037") || m.id.includes("012599") || m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.amount > 500000)) return;
           const bMatch = !activeBranch || activeBranch.id === "all" || m.branchId === activeBranch.id;
           if (bMatch && !pool.some((i) => i.id === m.id)) {
             pool.push({
@@ -910,7 +910,7 @@ export default function ExpensesModal({
 
     const rawFiltered = pool.filter((inc) => {
       if (!inc) return false;
-      if (inc.id && (inc.id.includes("331037") || inc.amount > 500000)) return false;
+      if (inc.id && (inc.id.includes("331037") || inc.id.includes("012599") || inc.amount > 500000)) return false;
       if (activeBranch && activeBranch.id !== "all") {
         const incBranch = (inc as any).branchId || (inc as any).branch_id;
         if (incBranch) {
