@@ -1868,10 +1868,11 @@ export default function POSPage() {
   const total = cart.reduce((sum, item) => sum + (item.product.price || 0) * (item.quantity || 0), 0);
   const totalPieces = cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const parsedCashGiven = Number(cashGiven) || 0;
-  const effectiveCashGiven = paymentMethod === "efectivo" ? (parsedCashGiven > 0 ? parsedCashGiven : total) : undefined;
+  const hasCashGiven = cashGiven.trim() !== "";
+  const effectiveCashGiven = paymentMethod === "efectivo" ? (hasCashGiven ? parsedCashGiven : undefined) : undefined;
   const change = paymentMethod === "efectivo" && parsedCashGiven >= total ? parsedCashGiven - total : 0;
-  // Si no se teclea cantidad en efectivo, se asume cobro exacto para agilidad máxima sin esperas
-  const isPaymentValid = paymentMethod !== "efectivo" || cashGiven.trim() === "" || parsedCashGiven >= total;
+  // En efectivo, el usuario DEBE seleccionar una opción (Exacto, billete o ingresar monto) que cubra el total para poder cobrar
+  const isPaymentValid = paymentMethod !== "efectivo" || (hasCashGiven && parsedCashGiven >= total);
 
   // Financial calculations strictly for the current operating cashier's shift
   const shiftStartBoundary = useMemo(() => {
@@ -4375,23 +4376,34 @@ export default function POSPage() {
                   type="button"
                   onClick={handleExactCash}
                   disabled={cart.length === 0}
-                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-200 to-amber-300 hover:from-amber-300 hover:to-amber-400 text-stone-950 text-xs font-black shrink-0 transition-all active:scale-90 hover:scale-105 shadow-2xs"
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-black shrink-0 transition-all active:scale-90 hover:scale-105 shadow-2xs ${
+                    hasCashGiven && parsedCashGiven === total && cashGiven === total.toString()
+                      ? "bg-gradient-to-r from-amber-400 to-amber-500 text-stone-950 ring-2 ring-amber-600 shadow-md font-black"
+                      : "bg-gradient-to-r from-amber-200 to-amber-300 hover:from-amber-300 hover:to-amber-400 text-stone-950"
+                  }`}
                   title="Cobro Exacto"
                 >
                   ⚡ Exacto
                 </button>
                 <div className="grid grid-cols-5 gap-1 flex-1">
-                  {QUICK_DENOMINATIONS.map((bill) => (
-                    <button
-                      key={bill}
-                      type="button"
-                      onClick={() => handleQuickCash(bill)}
-                      disabled={cart.length === 0}
-                      className="py-1 sm:py-1.5 bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 font-black text-xs sm:text-sm rounded-lg border border-amber-200 shadow-2xs transition-all duration-200 active:scale-90 hover:scale-105 text-center"
-                    >
-                      ${bill}
-                    </button>
-                  ))}
+                  {QUICK_DENOMINATIONS.map((bill) => {
+                    const isSelectedBill = hasCashGiven && cashGiven === bill.toString();
+                    return (
+                      <button
+                        key={bill}
+                        type="button"
+                        onClick={() => handleQuickCash(bill)}
+                        disabled={cart.length === 0}
+                        className={`py-1 sm:py-1.5 font-black text-xs sm:text-sm rounded-lg border shadow-2xs transition-all duration-200 active:scale-90 hover:scale-105 text-center ${
+                          isSelectedBill
+                            ? "bg-gradient-to-tr from-amber-500 to-orange-500 text-white border-amber-600 ring-2 ring-amber-400 shadow-sm"
+                            : "bg-white hover:bg-gradient-to-tr hover:from-amber-500 hover:to-orange-500 hover:text-white text-stone-900 border-amber-200"
+                        }`}
+                      >
+                        ${bill}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -4418,7 +4430,7 @@ export default function POSPage() {
                   />
                 </div>
 
-                {parsedCashGiven > 0 && (
+                {hasCashGiven && parsedCashGiven > 0 ? (
                   <div className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 shrink-0 shadow-sm animate-in zoom-in-95 duration-150 ${
                     parsedCashGiven >= total
                       ? "bg-emerald-600 text-white"
@@ -4429,6 +4441,13 @@ export default function POSPage() {
                       {parsedCashGiven >= total ? formatCurrency(change) : formatCurrency(total - parsedCashGiven)}
                     </span>
                   </div>
+                ) : (
+                  cart.length > 0 && (
+                    <div className="px-2 py-1 rounded-lg bg-amber-100/90 border border-amber-300/80 text-[10px] font-bold text-amber-900 flex items-center gap-1 shrink-0 shadow-2xs">
+                      <span>👆</span>
+                      <span>Elige opción</span>
+                    </div>
+                  )
                 )}
               </div>
             </div>
@@ -4623,6 +4642,14 @@ export default function POSPage() {
 
 
 
+          {/* Aviso visual cuando aún no se ha seleccionado con cuánto pagan en efectivo */}
+          {cart.length > 0 && paymentMethod === "efectivo" && !hasCashGiven && (
+            <div className="bg-amber-100/90 border border-amber-300 text-amber-950 rounded-xl px-2.5 py-1.5 text-center text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs animate-in fade-in duration-150">
+              <span className="text-amber-700">💡</span>
+              <span>Elige <strong>⚡ Exacto</strong>, un billete o ingresa con cuánto pagan para cobrar</span>
+            </div>
+          )}
+
           {/* Botones de Acción */}
           <div className="grid grid-cols-2 gap-2 pt-0.5">
             <button
@@ -4652,6 +4679,15 @@ export default function POSPage() {
                   ? "bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.01] active:scale-95 border border-amber-300/70 ring-2 ring-amber-400/40 cursor-pointer"
                   : "bg-stone-200 text-stone-400 border border-stone-300/60 opacity-60 cursor-not-allowed shadow-none"
               }`}
+              title={
+                cart.length === 0
+                  ? "Agrega productos a la charola"
+                  : !isPaymentValid
+                  ? paymentMethod === "efectivo" && !hasCashGiven
+                    ? "Elige 'Exacto', un billete o ingresa con cuánto pagan para cobrar"
+                    : "El monto ingresado es menor al total a cobrar"
+                  : "Cobrar y generar ticket"
+              }
             >
               <CheckCircle className={`w-4 h-4 shrink-0 ${cart.length > 0 && isPaymentValid ? "animate-bounce" : ""}`} />
               <span className="truncate">{isSubmitting ? "Registrando Venta..." : "Cobrar & Ticket"}</span>
