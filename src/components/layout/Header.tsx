@@ -343,7 +343,7 @@ export default function Header() {
                       <p className={`text-[10px] truncate ${
                         isAllBranches ? "text-stone-600 font-semibold" : "text-amber-200/80 font-medium"
                       }`}>
-                        Consolidado general
+                        Total en Cajas
                       </p>
                     </div>
                   </div>
@@ -351,12 +351,12 @@ export default function Header() {
                     <p className={`text-xs font-black font-mono tracking-tight ${
                       isAllBranches ? "text-emerald-800" : "text-emerald-400"
                     }`}>
-                      {formatCurrency(consolidatedMetrics.totalSales)}
+                      {formatCurrency(consolidatedMetrics.totalCashInDrawer)}
                     </p>
                     <p className={`text-[10px] font-semibold ${
                       isAllBranches ? "text-stone-600" : "text-stone-300"
                     }`}>
-                      {consolidatedMetrics.totalTickets} tickets
+                      En cajas • {consolidatedMetrics.totalTickets} tkts
                     </p>
                   </div>
                 </button>
@@ -402,16 +402,16 @@ export default function Header() {
                       </div>
                       <div className="text-right shrink-0 pl-2">
                         <p className={`text-xs font-black font-mono tracking-tight ${
-                          isSelected ? "text-amber-950" : "text-amber-300 drop-shadow-2xs"
+                          isSelected ? "text-emerald-950 font-black" : "text-emerald-400 font-black drop-shadow-2xs"
                         }`}>
-                          {formatCurrency(b.todaySales)}
+                          {formatCurrency(b.cashInDrawer)}
                         </p>
                         <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-md mt-0.5 ${
                           isSelected
                             ? "text-emerald-900 bg-emerald-100 border border-emerald-300"
                             : "text-emerald-300 bg-emerald-950/80 border border-emerald-500/50"
                         }`}>
-                          {b.todayTickets} tkts
+                          En caja
                         </span>
                       </div>
                     </button>
