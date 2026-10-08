@@ -174,21 +174,26 @@ export function cleanDuplicateIncomes(incomes: CashIncome[]): CashIncome[] {
 export function getStoredIncomes(): CashIncome[] {
   if (typeof window === "undefined") return INITIAL_INCOMES;
   try {
+    const isInit = localStorage.getItem("brito_incomes_initialized") === "true";
     const raw = localStorage.getItem(STORAGE_INCOMES_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Validador universal: número válido > 0 (sin tope superior)
-        const valid = parsed.filter(
-          (i: any) => typeof i.amount === "number" && !isNaN(i.amount) && i.amount > 0
-        );
-        const deduplicated = cleanDuplicateIncomes(valid);
-        if (deduplicated.length !== parsed.length) {
-          localStorage.setItem(STORAGE_INCOMES_KEY, JSON.stringify(deduplicated));
+      if (Array.isArray(parsed)) {
+        if (parsed.length === 0 && isInit) return [];
+        if (parsed.length > 0) {
+          // Validador universal: número válido > 0 (sin tope superior)
+          const valid = parsed.filter(
+            (i: any) => typeof i.amount === "number" && !isNaN(i.amount) && i.amount > 0
+          );
+          const deduplicated = cleanDuplicateIncomes(valid);
+          if (deduplicated.length !== parsed.length) {
+            localStorage.setItem(STORAGE_INCOMES_KEY, JSON.stringify(deduplicated));
+          }
+          return deduplicated;
         }
-        return deduplicated;
       }
     }
+    if (isInit) return [];
   } catch (err) {
     console.error("[Incomes] Error leyendo brito_cash_incomes:", err);
   }

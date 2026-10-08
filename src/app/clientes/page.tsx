@@ -40,6 +40,8 @@ import {
   normalizeCustomerName
 } from "@/lib/customers";
 import CustomerReportsView from "@/components/clientes/CustomerReportsView";
+import { useAuth } from "@/context/AuthContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
 // Ícono SVG oficial y ordenado de WhatsApp
 function WhatsAppIcon({ className = "w-4 h-4" }: { className?: string }) {
@@ -97,6 +99,9 @@ function getPageNumbers(current: number, total: number): (number | "...")[] {
 }
 
 export default function ClientesPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [activeTab, setActiveTab] = useState<"directorio" | "reportes">("directorio");
   const [search, setSearch] = useState("");
@@ -163,7 +168,19 @@ export default function ClientesPage() {
       setCustomers(syncCleaned);
     };
     window.addEventListener("brito_customers_updated", handleSync);
-    return () => window.removeEventListener("brito_customers_updated", handleSync);
+
+    // 3. Suscripción en tiempo real a mutaciones de clientes entre dispositivos
+    const unsubscribeRealtime = realtimeHub.onCustomer((payload) => {
+      console.log("[Clientes] Realtime customer payload received:", payload.action, payload.customer?.name);
+      const syncLoaded = getStoredCustomers();
+      const syncCleaned = syncLoaded.filter((c) => c.id !== "cli-0" && c.type !== "general");
+      setCustomers(syncCleaned);
+    });
+
+    return () => {
+      window.removeEventListener("brito_customers_updated", handleSync);
+      unsubscribeRealtime();
+    };
   }, []);
 
   // Al cambiar la búsqueda o el criterio de ordenamiento, regresar a la primera página
@@ -261,6 +278,10 @@ export default function ClientesPage() {
 
   // Apertura modal nuevo cliente
   const handleOpenCreate = () => {
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo el Administrador puede registrar nuevos clientes.");
+      return;
+    }
     setName("");
     setPhone("");
     setNotes("");
@@ -270,6 +291,10 @@ export default function ClientesPage() {
   // Guardar nuevo cliente (se agrega al inicio y se sincroniza en el servidor)
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo el Administrador puede registrar nuevos clientes.");
+      return;
+    }
     if (!name.trim()) return;
 
     const cleanName = name.trim();
@@ -302,6 +327,10 @@ export default function ClientesPage() {
 
   // Apertura modal editar
   const handleOpenEdit = (c: Customer) => {
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo el Administrador puede modificar datos de clientes.");
+      return;
+    }
     setEditingCustomer(c);
     setEditName(c.name);
     setEditPhone(c.phone === "N/A" ? "" : c.phone?.replace(/\D/g, "") || "");
@@ -311,6 +340,10 @@ export default function ClientesPage() {
   // Guardar edición
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo el Administrador puede modificar datos de clientes.");
+      return;
+    }
     if (!editingCustomer || !editName.trim()) return;
 
     const cleanEditName = editName.trim();
@@ -342,6 +375,10 @@ export default function ClientesPage() {
   }, [customers]);
 
   const handlePurgeAllDuplicates = () => {
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo el Administrador puede depurar contactos.");
+      return;
+    }
     const result = purgeAllDuplicateCustomers();
     const updated = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
     setCustomers(updated);
@@ -349,6 +386,10 @@ export default function ClientesPage() {
   };
 
   const handleUnifyDuplicates = () => {
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo el Administrador puede unificar contactos.");
+      return;
+    }
     const result = deduplicateKeepOneCustomers();
     const updated = getStoredCustomers().filter((c) => c.id !== "cli-0" && c.type !== "general");
     setCustomers(updated);
@@ -357,6 +398,10 @@ export default function ClientesPage() {
 
   // Confirmar eliminación
   const handleConfirmDelete = async () => {
+    if (!isAdmin) {
+      alert("Acceso denegado: Solo el Administrador puede eliminar clientes.");
+      return;
+    }
     if (!deleteConfirm) return;
 
     const deletedId = deleteConfirm.id;
@@ -413,14 +458,20 @@ export default function ClientesPage() {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-6 py-3.5 rounded-2xl shadow-lg shadow-amber-600/25 text-base sm:text-lg transition-all active:scale-95 cursor-pointer"
-          >
-            <Plus className="w-6 h-6" />
-            <span>Registrar Nuevo Cliente</span>
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-black px-6 py-3.5 rounded-2xl shadow-lg shadow-amber-600/25 text-base sm:text-lg transition-all active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-6 h-6" />
+              <span>Registrar Nuevo Cliente</span>
+            </button>
+          ) : (
+            <div className="hidden sm:flex items-center text-xs text-stone-400 font-bold italic px-3.5 py-2 bg-stone-100 rounded-xl border border-stone-200">
+              Solo lectura (requiere Administrador)
+            </div>
+          )}
         </div>
       </div>
 
@@ -503,26 +554,28 @@ export default function ClientesPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto shrink-0 flex-wrap sm:flex-nowrap">
-            <button
-              type="button"
-              onClick={handlePurgeAllDuplicates}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs sm:text-sm font-black rounded-2xl shadow-md shadow-rose-600/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              title="Elimina por completo del directorio a todos los clientes que tienen nombres repetidos"
-            >
-              <Trash2 className="w-4 h-4 shrink-0" />
-              <span>Eliminar contactos repetidos por completo</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleUnifyDuplicates}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-stone-950 text-xs sm:text-sm font-black rounded-2xl shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              title="Conserva 1 sola ficha limpia por cliente y borra las copias sobrantes"
-            >
-              <Sparkles className="w-4 h-4 shrink-0" />
-              <span>Dejar solo 1 de cada uno</span>
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2 w-full md:w-auto shrink-0 flex-wrap sm:flex-nowrap">
+              <button
+                type="button"
+                onClick={handlePurgeAllDuplicates}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs sm:text-sm font-black rounded-2xl shadow-md shadow-rose-600/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                title="Elimina por completo del directorio a todos los clientes que tienen nombres repetidos"
+              >
+                <Trash2 className="w-4 h-4 shrink-0" />
+                <span>Eliminar contactos repetidos por completo</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleUnifyDuplicates}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-stone-950 text-xs sm:text-sm font-black rounded-2xl shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                title="Conserva 1 sola ficha limpia por cliente y borra las copias sobrantes"
+              >
+                <Sparkles className="w-4 h-4 shrink-0" />
+                <span>Dejar solo 1 de cada uno</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -755,25 +808,29 @@ export default function ClientesPage() {
 
                       {/* 5. Acciones (Editar y Eliminar) */}
                       <td className="py-3.5 px-4 sm:px-5 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(c)}
-                            className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
-                            title="Editar cliente"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
+                        {isAdmin ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(c)}
+                              className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
+                              title="Editar cliente"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirm({ id: c.id, name: c.name })}
-                            className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-rose-100 text-stone-400 hover:text-rose-700 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
-                            title="Eliminar cliente"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirm({ id: c.id, name: c.name })}
+                              className="p-2 sm:p-2.5 rounded-xl bg-stone-100 hover:bg-rose-100 text-stone-400 hover:text-rose-700 border border-stone-300 font-bold transition-all active:scale-90 cursor-pointer shadow-2xs"
+                              title="Eliminar cliente"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-stone-400 text-xs italic">Solo lectura</span>
+                        )}
                       </td>
                     </tr>
                   );

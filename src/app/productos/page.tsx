@@ -27,7 +27,8 @@ import {
   CheckCircle2,
   Scale,
   Barcode,
-  Printer
+  Printer,
+  Lock
 } from "lucide-react";
 import { Product } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers } from "@/lib/utils";
@@ -47,8 +48,13 @@ import {
   ProductCategory
 } from "@/lib/products";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
 export default function ProductosPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -118,6 +124,22 @@ export default function ProductosPage() {
     window.addEventListener("brito_products_updated", handleUpdate);
     window.addEventListener("brito_categories_updated", handleUpdate);
 
+    // Suscripción a realtimeHub broadcast para cambios instantáneos entre dispositivos
+    const unsubRealtime = realtimeHub?.onProduct ? realtimeHub.onProduct((payload) => {
+      if (!payload?.product) return;
+      const { action, product } = payload;
+      if (action === "delete") {
+        setProducts((prev) => prev.filter((p) => p.id !== product.id));
+      } else if (action === "update") {
+        setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, ...product } : p));
+      } else if (action === "create") {
+        setProducts((prev) => {
+          if (prev.some((p) => p.id === product.id)) return prev;
+          return [...prev, product];
+        });
+      }
+    }) : undefined;
+
     // Suscripción en tiempo real de Supabase para cambios de productos y precios
     let channel: any = null;
     try {
@@ -143,6 +165,7 @@ export default function ProductosPage() {
     return () => {
       window.removeEventListener("brito_products_updated", handleUpdate);
       window.removeEventListener("brito_categories_updated", handleUpdate);
+      if (unsubRealtime) unsubRealtime();
       if (channel) {
         try {
           const supabase = createClient();
@@ -165,11 +188,19 @@ export default function ProductosPage() {
   };
 
   const handleOpenQuickPrice = (product: Product) => {
+    if (!isAdmin) {
+      alert("Acceso restringido: Solo el Administrador puede modificar precios.");
+      return;
+    }
     setQuickPriceProduct(product);
     setIsQuickPriceOpen(true);
   };
 
   const handleSaveQuickPrice = (productId: string, newPrice: number) => {
+    if (!isAdmin) {
+      alert("Acceso restringido: Solo el Administrador puede modificar precios.");
+      return;
+    }
     const prod = products.find((p) => p.id === productId);
     if (!prod) return;
 
@@ -198,6 +229,10 @@ export default function ProductosPage() {
 
   // Open Create Modal
   const handleOpenCreate = () => {
+    if (!isAdmin) {
+      alert("Acceso restringido: Solo el Administrador puede dar de alta nuevos productos.");
+      return;
+    }
     setModalMode("create");
     setEditingId(null);
     const initialCat = (selectedCategory !== "all" 
@@ -229,6 +264,10 @@ export default function ProductosPage() {
 
   // Open Edit Modal
   const handleOpenEdit = (product: Product) => {
+    if (!isAdmin) {
+      alert("Acceso restringido: Solo el Administrador puede editar productos.");
+      return;
+    }
     setModalMode("edit");
     setEditingId(product.id);
     const initialBarcode = product.barcode || product.code || generateProductBarcode();
@@ -273,6 +312,11 @@ export default function ProductosPage() {
   // Submit Create or Edit
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isAdmin) {
+      alert("Acceso restringido: Solo el Administrador puede registrar o guardar cambios de productos.");
+      return;
+    }
 
     if (!formData.name.trim()) {
       alert("Por favor ingresa el nombre del producto.");
@@ -337,12 +381,20 @@ export default function ProductosPage() {
 
   // Delete product handlers
   const handleOpenDelete = (product: Product) => {
+    if (!isAdmin) {
+      alert("Acceso restringido: Solo el Administrador puede eliminar productos.");
+      return;
+    }
     setDeletingProduct(product);
     setDeleteConfirmText("");
   };
 
   const handleConfirmDelete = () => {
     if (!deletingProduct) return;
+    if (!isAdmin) {
+      alert("Acceso restringido: Solo el Administrador puede eliminar productos.");
+      return;
+    }
     const clean = deleteConfirmText.trim().toLowerCase();
     if (clean === "no") {
       setDeletingProduct(null);
@@ -424,13 +476,20 @@ export default function ProductosPage() {
             <Printer className="w-4 h-4 text-amber-400" />
             <span>Imprimir Códigos</span>
           </button>
-          <button
-            onClick={handleOpenCreate}
-            className="w-full sm:w-auto justify-center px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-xl shadow-orange-500/25 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Nuevo Producto</span>
-          </button>
+          {isAdmin ? (
+            <button
+              onClick={handleOpenCreate}
+              className="w-full sm:w-auto justify-center px-6 py-3.5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-stone-950 font-black text-xs rounded-2xl shadow-xl shadow-orange-500/25 flex items-center gap-2 transition-all active:scale-95 uppercase tracking-wider cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>Nuevo Producto</span>
+            </button>
+          ) : (
+            <div className="w-full sm:w-auto px-4 py-3 bg-stone-800/90 border border-stone-700/80 rounded-2xl text-[11px] font-bold text-stone-300 flex items-center justify-center gap-2">
+              <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>Solo Administrador puede registrar productos</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -629,15 +688,17 @@ export default function ProductosPage() {
               })}
 
               {/* Botón rápido "+ Añadir Categoría" */}
-              <button
-                type="button"
-                onClick={() => setIsManageCategoriesOpen(true)}
-                className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-2 border-dashed border-amber-300 hover:border-amber-500 bg-amber-50/50 hover:bg-amber-100/70 text-amber-900 active:scale-98 select-none"
-                title="Añadir una nueva categoría al catálogo"
-              >
-                <Plus className="w-3.5 h-3.5 text-amber-700 stroke-[3]" />
-                <span>+ Nueva Categoría</span>
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsManageCategoriesOpen(true)}
+                  className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-2 border-dashed border-amber-300 hover:border-amber-500 bg-amber-50/50 hover:bg-amber-100/70 text-amber-900 active:scale-98 select-none"
+                  title="Añadir una nueva categoría al catálogo"
+                >
+                  <Plus className="w-3.5 h-3.5 text-amber-700 stroke-[3]" />
+                  <span>+ Nueva Categoría</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -778,26 +839,34 @@ export default function ProductosPage() {
 
                   {/* Card Actions */}
                   <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-1.5">
-                    <button
-                      onClick={() => handleOpenQuickPrice(product)}
-                      className="py-2 px-3 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-200/80 text-xs font-black rounded-xl flex items-center justify-center gap-1 transition-all"
-                      title="Modificar precio rápido"
-                    >
-                      <TagIcon className="w-3.5 h-3.5 text-amber-600" /> Precio
-                    </button>
-                    <button
-                      onClick={() => handleOpenEdit(product)}
-                      className="flex-1 py-2 px-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" /> Editar
-                    </button>
-                    <button
-                      onClick={() => handleOpenDelete(product)}
-                      className="p-2 bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-500 rounded-xl transition-colors"
-                      title="Eliminar producto"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isAdmin ? (
+                      <>
+                        <button
+                          onClick={() => handleOpenQuickPrice(product)}
+                          className="py-2 px-3 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 border border-amber-200/80 text-xs font-black rounded-xl flex items-center justify-center gap-1 transition-all"
+                          title="Modificar precio rápido"
+                        >
+                          <TagIcon className="w-3.5 h-3.5 text-amber-600" /> Precio
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(product)}
+                          className="flex-1 py-2 px-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" /> Editar
+                        </button>
+                        <button
+                          onClick={() => handleOpenDelete(product)}
+                          className="p-2 bg-stone-100 hover:bg-rose-100 hover:text-rose-600 text-stone-500 rounded-xl transition-colors"
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="w-full py-1 text-center text-[11px] text-stone-400 italic">
+                        Solo lectura (administrador requerido)
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -861,13 +930,13 @@ export default function ProductosPage() {
                         </span>
                       </td>
                       <td 
-                        onClick={() => handleOpenQuickPrice(product)}
-                        className="py-3 px-4 text-right font-black text-amber-600 text-sm whitespace-nowrap cursor-pointer hover:bg-amber-50/70 transition-colors group/cell select-none"
-                        title="Toca para modificar precio rápidamente"
+                        onClick={() => isAdmin && handleOpenQuickPrice(product)}
+                        className={`py-3 px-4 text-right font-black text-amber-600 text-sm whitespace-nowrap select-none ${isAdmin ? "cursor-pointer hover:bg-amber-50/70 group/cell" : ""}`}
+                        title={isAdmin ? "Toca para modificar precio rápidamente" : undefined}
                       >
                         <div className="flex items-center justify-end gap-1">
-                          <span className="group-hover/cell:underline">{formatCurrency(product.price)}</span>
-                          <span className="text-[10px] text-amber-600 bg-amber-100 px-1 py-0.2 rounded font-black">⚡</span>
+                          <span className={isAdmin ? "group-hover/cell:underline" : ""}>{formatCurrency(product.price)}</span>
+                          {isAdmin && <span className="text-[10px] text-amber-600 bg-amber-100 px-1 py-0.2 rounded font-black">⚡</span>}
                           {product.unit && (
                             <span className="text-[10px] font-bold text-stone-400 ml-0.5">
                               /{product.unit === "kg" ? "kg" : product.unit === "g" ? "g" : "pz"}
@@ -896,29 +965,33 @@ export default function ProductosPage() {
                         {product.tag || "—"}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleOpenQuickPrice(product)}
-                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg transition-colors"
-                            title="Modificar precio rápido"
-                          >
-                            <TagIcon className="w-3.5 h-3.5 text-amber-600" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenEdit(product)}
-                            className="p-1.5 bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 rounded-lg transition-colors"
-                            title="Editar completo"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleOpenDelete(product)}
-                            className="p-1.5 bg-stone-100 hover:bg-rose-100 text-stone-500 hover:text-rose-600 rounded-lg transition-colors"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {isAdmin ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenQuickPrice(product)}
+                              className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg transition-colors"
+                              title="Modificar precio rápido"
+                            >
+                              <TagIcon className="w-3.5 h-3.5 text-amber-600" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenEdit(product)}
+                              className="p-1.5 bg-stone-100 hover:bg-amber-100 text-stone-700 hover:text-amber-900 rounded-lg transition-colors"
+                              title="Editar completo"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleOpenDelete(product)}
+                              className="p-1.5 bg-stone-100 hover:bg-rose-100 text-stone-500 hover:text-rose-600 rounded-lg transition-colors"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-stone-400 text-[11px] italic">Solo lectura</span>
+                        )}
                       </td>
                     </tr>
                   );

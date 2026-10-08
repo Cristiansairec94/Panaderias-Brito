@@ -86,6 +86,20 @@ export interface RealtimeSessionRevokedPayload {
   senderDeviceId: string;
 }
 
+export interface RealtimeProductPayload {
+  action: "create" | "update" | "delete";
+  product: any;
+  senderDeviceId: string;
+  timestamp: string;
+}
+
+export interface RealtimeCustomerPayload {
+  action: "create" | "update" | "delete";
+  customer: any;
+  senderDeviceId: string;
+  timestamp: string;
+}
+
 export type RealtimeStatus = "connected" | "connecting" | "disconnected";
 
 type NotificationListener = (notif: FBNotification) => void;
@@ -97,6 +111,8 @@ type BreadDeliveryListener = (delivery: RealtimeBreadDeliveryPayload) => void;
 type BranchListener = (payload: RealtimeBranchPayload) => void;
 type ShiftCutListener = (cut: ShiftCutRecord) => void;
 type SessionRevokedListener = (payload: RealtimeSessionRevokedPayload) => void;
+type ProductListener = (payload: RealtimeProductPayload) => void;
+type CustomerListener = (payload: RealtimeCustomerPayload) => void;
 type StatusListener = (status: RealtimeStatus) => void;
 
 const CHANNEL_NAME = "panaderia_brito_realtime";
@@ -121,6 +137,8 @@ class RealtimeHub {
   private branchListeners = new Set<BranchListener>();
   private shiftCutListeners = new Set<ShiftCutListener>();
   private sessionRevokedListeners = new Set<SessionRevokedListener>();
+  private productListeners = new Set<ProductListener>();
+  private customerListeners = new Set<CustomerListener>();
   private statusListeners = new Set<StatusListener>();
 
   constructor() {
@@ -219,6 +237,10 @@ class RealtimeHub {
       this.shiftCutListeners.forEach((fn) => { try { fn(cutData); } catch (err) { console.error(err); } });
     } else if (type === "user_session_revoked") {
       this.sessionRevokedListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "product") {
+      this.productListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
+    } else if (type === "customer") {
+      this.customerListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     }
   }
 
@@ -272,6 +294,14 @@ class RealtimeHub {
         .on("broadcast", { event: "user_session_revoked" }, ({ payload }: { payload: any }) => {
           if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
           this.dispatchLocalEvent("user_session_revoked", payload);
+        })
+        .on("broadcast", { event: "product" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("product", payload);
+        })
+        .on("broadcast", { event: "customer" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("customer", payload);
         })
         .subscribe((channelStatus: string) => {
           if (channelStatus === "SUBSCRIBED") {
@@ -610,6 +640,40 @@ class RealtimeHub {
     this.sessionRevokedListeners.add(listener);
     return () => {
       this.sessionRevokedListeners.delete(listener);
+    };
+  }
+
+  public async broadcastProduct(action: "create" | "update" | "delete", product: any) {
+    const payload: RealtimeProductPayload = {
+      action,
+      product,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+    this.sendBroadcast("product", payload);
+  }
+
+  public onProduct(listener: ProductListener) {
+    this.productListeners.add(listener);
+    return () => {
+      this.productListeners.delete(listener);
+    };
+  }
+
+  public async broadcastCustomer(action: "create" | "update" | "delete", customer: any) {
+    const payload: RealtimeCustomerPayload = {
+      action,
+      customer,
+      senderDeviceId: this.getDeviceId(),
+      timestamp: new Date().toISOString(),
+    };
+    this.sendBroadcast("customer", payload);
+  }
+
+  public onCustomer(listener: CustomerListener) {
+    this.customerListeners.add(listener);
+    return () => {
+      this.customerListeners.delete(listener);
     };
   }
 

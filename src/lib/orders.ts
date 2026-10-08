@@ -362,13 +362,16 @@ export function getStoredOrders(): CustomOrder[] {
   }
 
   try {
+    const isOrdersInit = localStorage.getItem("brito_orders_initialized") === "true";
     const raw = localStorage.getItem(STORAGE_ORDERS_KEY);
     if (!raw) {
+      if (isOrdersInit) return [];
       localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(INITIAL_ORDERS));
       return INITIAL_ORDERS;
     }
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) {
+      if (isOrdersInit) return [];
       localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(INITIAL_ORDERS));
       return INITIAL_ORDERS;
     }

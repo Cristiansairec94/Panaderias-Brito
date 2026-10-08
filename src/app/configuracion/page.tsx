@@ -40,6 +40,7 @@ import { UserRole, Branch } from "@/types";
 import RoleManagement from "@/components/configuracion/RoleManagement";
 import EmployeeManagement from "@/components/configuracion/EmployeeManagement";
 import OfflineManagement from "@/components/configuracion/OfflineManagement";
+import AdminDataMaintenance from "@/components/configuracion/AdminDataMaintenance";
 
 function ConfiguracionContent() {
   const router = useRouter();
@@ -1113,43 +1114,48 @@ function ConfiguracionContent() {
 
       {/* Tab 5: Database & Cloud */}
       {activeTab === "database" && (
-        <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm max-w-3xl space-y-6 animate-in fade-in">
-          <div className="border-b border-stone-100 pb-3">
-            <h3 className="font-black text-base text-stone-900">Estado de Conexión a Supabase (Nube)</h3>
-            <p className="text-[11px] text-stone-500">Monitoreo de sincronización con PostgreSQL y Vercel.</p>
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-            <div>
-              <h4 className="font-black text-xs text-emerald-900">Conexión en Tiempo Real Activa</h4>
-              <p className="text-[11px] text-emerald-700 mt-0.5">
-                La base de datos en la nube está sincronizada. Todos los cambios de ventas, clientes e inventario se reflejan inmediatamente en todos los dispositivos.
-              </p>
+        <div className="max-w-4xl space-y-6 animate-in fade-in">
+          <div className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-sm space-y-6">
+            <div className="border-b border-stone-100 pb-3">
+              <h3 className="font-black text-base text-stone-900">Estado de Conexión a Supabase (Nube)</h3>
+              <p className="text-[11px] text-stone-500">Monitoreo de sincronización con PostgreSQL y Vercel.</p>
             </div>
-          </div>
 
-          <div className="space-y-3 text-xs">
-            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex justify-between items-center">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <span className="text-stone-400 block text-[10px] font-bold uppercase">Project Reference:</span>
-                <span className="font-mono font-bold text-stone-900">yaxqevvvoluaqanspqqf</span>
+                <h4 className="font-black text-xs text-emerald-900">Conexión en Tiempo Real Activa</h4>
+                <p className="text-[11px] text-emerald-700 mt-0.5">
+                  La base de datos en la nube está sincronizada. Todos los cambios de ventas, clientes e inventario se reflejan inmediatamente en todos los dispositivos.
+                </p>
               </div>
-              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-md">
-                Conectado
-              </span>
             </div>
 
-            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex justify-between items-center">
-              <div>
-                <span className="text-stone-400 block text-[10px] font-bold uppercase">Servidor de Despliegue:</span>
-                <span className="font-mono font-bold text-stone-900">Vercel Production Edge</span>
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex justify-between items-center">
+                <div>
+                  <span className="text-stone-400 block text-[10px] font-bold uppercase">Project Reference:</span>
+                  <span className="font-mono font-bold text-stone-900">yaxqevvvoluaqanspqqf</span>
+                </div>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-md">
+                  Conectado
+                </span>
               </div>
-              <span className="bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded-md">
-                panaderias-brito.vercel.app
-              </span>
+
+              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex justify-between items-center">
+                <div>
+                  <span className="text-stone-400 block text-[10px] font-bold uppercase">Servidor de Despliegue:</span>
+                  <span className="font-mono font-bold text-stone-900">Vercel Production Edge</span>
+                </div>
+                <span className="bg-blue-100 text-blue-800 text-[10px] font-black px-2 py-0.5 rounded-md">
+                  panaderias-brito.vercel.app
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* Mantenimiento y Reinicio de Datos (Solo Admin) */}
+          <AdminDataMaintenance />
         </div>
       )}
     </div>

@@ -54,7 +54,7 @@ import {
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb } from "@/lib/products";
+import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb, getDeletedProductIds } from "@/lib/products";
 import { 
   DEFAULT_GENERAL_CUSTOMER, 
   getStoredCustomers, 
@@ -1364,9 +1364,35 @@ export default function POSPage() {
 
     window.addEventListener("brito_products_updated", loadCatalog);
     window.addEventListener("storage", loadCatalog);
+
+    // Escuchar eventos en tiempo real de realtimeHub cuando el administrador añade, edita o elimina productos
+    const unsubProduct = realtimeHub?.onProduct ? realtimeHub.onProduct((payload) => {
+      if (!payload || !payload.product) return;
+      const { action, product } = payload;
+      if (action === "delete") {
+        setProducts((prev) => prev.filter((p) => p.id !== product.id));
+        const current = getStoredProducts();
+        saveStoredProducts(current.filter((p) => p.id !== product.id));
+      } else if (action === "update") {
+        setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, ...product } : p));
+        const current = getStoredProducts();
+        saveStoredProducts(current.map((p) => p.id === product.id ? { ...p, ...product } : p));
+      } else if (action === "create") {
+        setProducts((prev) => {
+          if (prev.some((p) => p.id === product.id)) return prev;
+          return [...prev, product];
+        });
+        const current = getStoredProducts();
+        if (!current.some((p) => p.id === product.id)) {
+          saveStoredProducts([...current, product]);
+        }
+      }
+    }) : undefined;
+
     return () => {
       window.removeEventListener("brito_products_updated", loadCatalog);
       window.removeEventListener("storage", loadCatalog);
+      if (unsubProduct) unsubProduct();
     };
   }, []);
 
@@ -1383,37 +1409,39 @@ export default function POSPage() {
           .eq("is_active", true)
           .order("name");
 
-        if (prodData && prodData.length > 0 && !prodErr) {
-          const stored = getStoredProducts();
-          const mapped: Product[] = prodData.map((p: any) => {
-            const storedMatch = stored.find((s) => s.id === p.id || s.name.toLowerCase() === p.name.toLowerCase());
-            const fallbackMatch = DEFAULT_PRODUCTS.find((fb) => fb.id === p.id || fb.name.toLowerCase() === p.name.toLowerCase());
-            return {
-              id: p.id,
-              code: p.code || storedMatch?.code || fallbackMatch?.code || `PRD-${p.id}`,
-              barcode: p.barcode || storedMatch?.barcode || fallbackMatch?.barcode,
-              name: p.name,
-              price: Number(p.price),
-              category: p.category_id || storedMatch?.category || "dulce_10",
-              icon: p.icon || storedMatch?.icon || "🥐",
-              stock: typeof p.stock === "number" ? p.stock : (storedMatch?.stock || 0),
-              image: p.image || storedMatch?.image || fallbackMatch?.image,
-              description: p.description || storedMatch?.description || fallbackMatch?.description,
-              tag: p.tag || storedMatch?.tag || fallbackMatch?.tag,
-              unit: p.unit || storedMatch?.unit || "pieza",
-            };
-          });
+        if (!prodErr && Array.isArray(prodData)) {
+          const isInitialized = typeof window !== "undefined" && localStorage.getItem("brito_catalog_initialized") === "true";
+          if (prodData.length === 0 && isInitialized) {
+            setProducts([]);
+            saveStoredProducts([]);
+            setIsDbConnected(true);
+          } else if (prodData.length > 0) {
+            const deletedIds = getDeletedProductIds();
+            const activeRows = prodData.filter((p: any) => !deletedIds.has(p.id));
+            const stored = getStoredProducts();
+            const mapped: Product[] = activeRows.map((p: any) => {
+              const storedMatch = stored.find((s) => s.id === p.id || s.name.toLowerCase() === p.name.toLowerCase());
+              const fallbackMatch = DEFAULT_PRODUCTS.find((fb) => fb.id === p.id || fb.name.toLowerCase() === p.name.toLowerCase());
+              return {
+                id: p.id,
+                code: p.code || storedMatch?.code || fallbackMatch?.code || `PRD-${p.id}`,
+                barcode: p.barcode || storedMatch?.barcode || fallbackMatch?.barcode,
+                name: p.name,
+                price: Number(p.price),
+                category: p.category_id || storedMatch?.category || "dulce_10",
+                icon: p.icon || storedMatch?.icon || "🥐",
+                stock: typeof p.stock === "number" ? p.stock : (storedMatch?.stock || 0),
+                image: p.image || storedMatch?.image || fallbackMatch?.image,
+                description: p.description || storedMatch?.description || fallbackMatch?.description,
+                tag: p.tag || storedMatch?.tag || fallbackMatch?.tag,
+                unit: p.unit || storedMatch?.unit || "pieza",
+              };
+            });
 
-          // Integrar productos locales creados en el apartado de productos
-          const mappedIds = new Set(mapped.map((m) => m.id));
-          for (const sp of stored) {
-            if (!mappedIds.has(sp.id)) {
-              mapped.push(sp);
-            }
+            setProducts(mapped);
+            saveStoredProducts(mapped);
+            setIsDbConnected(true);
           }
-
-          setProducts(mapped);
-          setIsDbConnected(true);
         }
 
         // 2. Load recent sales (historial completo de ventas)

@@ -747,8 +747,9 @@ export async function downloadAllDataToLocalPc(): Promise<{
 
   try {
     // 1. Asegurar catálogo de productos
+    const isCatalogInit = localStorage.getItem("brito_catalog_initialized") === "true";
     let prods = getStoredProducts();
-    if (!prods || prods.length === 0) {
+    if ((!prods || prods.length === 0) && !isCatalogInit) {
       prods = DEFAULT_PRODUCTS;
       saveStoredProducts(DEFAULT_PRODUCTS);
     }
@@ -774,6 +775,8 @@ export async function downloadAllDataToLocalPc(): Promise<{
           tag: `Pan $${p.price}`,
         }));
         saveStoredProducts(mapped);
+      } else if (remoteProds && remoteProds.length === 0 && isCatalogInit) {
+        saveStoredProducts([]);
       }
     } catch {
       // Usar catálogo local existente

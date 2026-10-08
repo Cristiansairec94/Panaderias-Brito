@@ -518,10 +518,17 @@ export default function GastosPage() {
           }
           setGastos(parsed);
           return;
+        } else if (Array.isArray(rawParsed) && rawParsed.length === 0 && localStorage.getItem("brito_gastos_initialized") === "true") {
+          setGastos([]);
+          return;
         }
       }
     } catch (e) {
       console.error("Error reading saved gastos:", e);
+    }
+    if (typeof window !== "undefined" && localStorage.getItem("brito_gastos_initialized") === "true") {
+      setGastos([]);
+      return;
     }
     setGastos(INITIAL_GASTOS);
     localStorage.setItem("brito_gastos_registro", JSON.stringify(INITIAL_GASTOS));

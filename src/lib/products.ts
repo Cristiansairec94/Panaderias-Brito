@@ -1,6 +1,7 @@
 import { Product, Sale } from "@/types";
 import { formatDateTimeSafe } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
 export function calculateEan13CheckDigit(digits12: string): number {
   const d = digits12.replace(/\D/g, "").slice(0, 12);
@@ -551,25 +552,58 @@ export function calculateProductTaxes(
   }
 }
 
+const DELETED_PRODUCTS_KEY = "brito_deleted_product_ids";
+
+export function getDeletedProductIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DELETED_PRODUCTS_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+export function markProductIdAsDeleted(id: string): void {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const ids = getDeletedProductIds();
+    ids.add(id);
+    localStorage.setItem(DELETED_PRODUCTS_KEY, JSON.stringify(Array.from(ids)));
+  } catch {}
+}
+
 export function getStoredProducts(): Product[] {
   if (typeof window === "undefined") {
     return DEFAULT_PRODUCTS;
   }
 
   try {
+    const isInitialized = localStorage.getItem("brito_catalog_initialized") === "true";
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
+      if (isInitialized) return [];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
       return DEFAULT_PRODUCTS;
     }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    if (!Array.isArray(parsed)) {
+      if (isInitialized) return [];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
+      return DEFAULT_PRODUCTS;
+    }
+    if (parsed.length === 0) {
+      // Si el catálogo fue vaciado para empezar desde cero, respetar arreglo vacío
+      if (isInitialized) return [];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PRODUCTS));
       return DEFAULT_PRODUCTS;
     }
 
+    const deletedIds = getDeletedProductIds();
+    const activeProducts = parsed.filter((p: Product) => p && p.id && !deletedIds.has(p.id));
+
     let needsResave = false;
-    const normalized = parsed.map((p: Product, idx: number) => {
+    const normalized = activeProducts.map((p: Product, idx: number) => {
       const defaultMatch = DEFAULT_PRODUCTS.find(dp => dp.id === p.id);
       let barcode = p.barcode || defaultMatch?.barcode;
 
@@ -663,6 +697,13 @@ export function addProduct(product: Omit<Product, "id">): Product {
     barcode: assignedBarcode,
     id: `prod-${Date.now()}`,
   };
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("brito_catalog_initialized", "true");
+    } catch {}
+  }
+
   saveStoredProducts([...current, newProduct]);
 
   if (typeof window !== "undefined") {
@@ -687,6 +728,12 @@ export function addProduct(product: Omit<Product, "id">): Product {
         tax_included: newProduct.taxIncluded !== undefined ? newProduct.taxIncluded : true,
         is_active: true,
       }, { onConflict: "id" }).then();
+    } catch {}
+
+    try {
+      if (realtimeHub?.broadcastProduct) {
+        realtimeHub.broadcastProduct("create", newProduct);
+      }
     } catch {}
   }
 
@@ -733,6 +780,12 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
         supabase.from("products").update(payload).eq("id", id).then();
       }
     } catch {}
+
+    try {
+      if (realtimeHub?.broadcastProduct) {
+        realtimeHub.broadcastProduct("update", updatedItem);
+      }
+    } catch {}
   }
 
   return updatedItem;
@@ -740,12 +793,20 @@ export function updateProduct(id: string, updates: Partial<Product>): Product | 
 
 export function deleteProduct(id: string): void {
   const current = getStoredProducts();
+  const deletedItem = current.find((p) => p.id === id);
+  markProductIdAsDeleted(id);
   saveStoredProducts(current.filter((p) => p.id !== id));
 
   if (typeof window !== "undefined") {
     try {
       const supabase = createClient();
       supabase.from("products").update({ is_active: false }).eq("id", id).then();
+    } catch {}
+
+    try {
+      if (realtimeHub?.broadcastProduct) {
+        realtimeHub.broadcastProduct("delete", deletedItem || { id });
+      }
     } catch {}
   }
 }
@@ -760,27 +821,37 @@ export async function fetchProductsFromDb(): Promise<Product[]> {
       .eq("is_active", true)
       .order("name");
 
-    if (data && data.length > 0 && !error) {
-      const mapped: Product[] = data.map((p: any) => ({
-        id: p.id,
-        code: p.code || `PRD-${p.id}`,
-        barcode: p.barcode,
-        name: p.name,
-        price: Number(p.price),
-        category: p.category,
-        icon: p.icon || "🥖",
-        stock: typeof p.stock === "number" ? p.stock : 0,
-        description: p.description,
-        image: p.image,
-        unit: p.unit || "pieza",
-        hasIva: !!p.has_iva,
-        ivaRate: Number(p.iva_rate) || 0,
-        hasIeps: !!p.has_ieps,
-        iepsRate: Number(p.ieps_rate) || 0,
-        taxIncluded: p.tax_included !== undefined ? p.tax_included : true,
-      }));
-      saveStoredProducts(mapped);
-      return mapped;
+    if (!error && Array.isArray(data)) {
+      const isInitialized = localStorage.getItem("brito_catalog_initialized") === "true";
+      if (data.length === 0 && isInitialized) {
+        saveStoredProducts([]);
+        return [];
+      }
+
+      if (data.length > 0) {
+        const deletedIds = getDeletedProductIds();
+        const activeRows = data.filter((p: any) => !deletedIds.has(p.id));
+        const mapped: Product[] = activeRows.map((p: any) => ({
+          id: p.id,
+          code: p.code || `PRD-${p.id}`,
+          barcode: p.barcode,
+          name: p.name,
+          price: Number(p.price),
+          category: p.category,
+          icon: p.icon || "🥖",
+          stock: typeof p.stock === "number" ? p.stock : 0,
+          description: p.description,
+          image: p.image,
+          unit: p.unit || "pieza",
+          hasIva: !!p.has_iva,
+          ivaRate: Number(p.iva_rate) || 0,
+          hasIeps: !!p.has_ieps,
+          iepsRate: Number(p.ieps_rate) || 0,
+          taxIncluded: p.tax_included !== undefined ? p.tax_included : true,
+        }));
+        saveStoredProducts(mapped);
+        return mapped;
+      }
     }
   } catch (e) {
     console.warn("fetchProductsFromDb fallback to local:", e);
