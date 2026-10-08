@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, Laptop, ArrowRight, Lock } from "lucide-react";
+import { ShieldAlert, Laptop, Smartphone, Tablet, Monitor, Copy, ArrowRight, Lock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function SessionRevokedModal() {
@@ -21,19 +21,46 @@ export default function SessionRevokedModal() {
   };
 
   const deviceName = revokedSessionInfo.deviceName || "Otro equipo o dispositivo";
+
   const formattedTime = revokedSessionInfo.timestamp
-    ? new Date(revokedSessionInfo.timestamp).toLocaleTimeString("es-MX", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-      })
-    : new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: true });
+    ? (() => {
+        try {
+          const d = new Date(revokedSessionInfo.timestamp);
+          const isToday = d.toDateString() === new Date().toDateString();
+          const time = d.toLocaleTimeString("es-MX", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+          });
+          return isToday ? `${time} (Hoy)` : `${time} (${d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })})`;
+        } catch {
+          return revokedSessionInfo.timestamp;
+        }
+      })()
+    : new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true });
 
   const isSameDeviceWindow =
     deviceName.toLowerCase().includes("pestaña") ||
     deviceName.toLowerCase().includes("ventana") ||
     deviceName.toLowerCase().includes("mismo equipo");
+
+  const getDeviceIcon = () => {
+    if (isSameDeviceWindow) {
+      return <Copy className="w-4 h-4 text-amber-600" />;
+    }
+    const lower = deviceName.toLowerCase();
+    if (lower.includes("teléfono") || lower.includes("celular") || lower.includes("iphone") || lower.includes("android")) {
+      return <Smartphone className="w-4 h-4 text-emerald-600" />;
+    }
+    if (lower.includes("tablet") || lower.includes("ipad")) {
+      return <Tablet className="w-4 h-4 text-purple-600" />;
+    }
+    if (lower.includes("pc") || lower.includes("mac") || lower.includes("laptop")) {
+      return <Laptop className="w-4 h-4 text-blue-600" />;
+    }
+    return <Monitor className="w-4 h-4 text-blue-600" />;
+  };
 
   return (
     <div className="fixed inset-0 z-[9999] bg-stone-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -73,7 +100,7 @@ export default function SessionRevokedModal() {
           <div className="bg-stone-50 rounded-2xl p-4 border border-stone-200 space-y-2.5 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-stone-500 flex items-center gap-1.5 font-medium">
-                <Laptop className="w-4 h-4 text-blue-600" /> {isSameDeviceWindow ? "Ubicación del acceso:" : "Nuevo equipo:"}
+                {getDeviceIcon()} {isSameDeviceWindow ? "Ubicación del acceso:" : "Nuevo equipo:"}
               </span>
               <span className="font-bold text-stone-900 bg-white px-2 py-0.5 rounded border border-stone-200 shadow-2xs">
                 {deviceName}

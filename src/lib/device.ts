@@ -26,20 +26,39 @@ export function getFriendlyDeviceName(): string {
 
   const ua = navigator.userAgent;
 
-  let os = "Equipo";
-  if (/Windows NT 10/i.test(ua)) os = "PC Windows";
-  else if (/Windows/i.test(ua)) os = "PC Windows";
-  else if (/iPhone/i.test(ua)) os = "iPhone";
-  else if (/iPad/i.test(ua)) os = "iPad";
-  else if (/Android/i.test(ua)) os = "Teléfono Android";
-  else if (/Macintosh|Mac OS/i.test(ua)) os = "Mac";
-  else if (/Linux/i.test(ua)) os = "Linux";
+  let os = "Dispositivo";
+  if (/Windows NT/i.test(ua) || /Windows/i.test(ua)) {
+    os = "PC Windows";
+  } else if (/iPhone/i.test(ua)) {
+    os = "iPhone";
+  } else if (/iPad/i.test(ua)) {
+    os = "iPad";
+  } else if (/Android/i.test(ua)) {
+    os = /Mobile/i.test(ua) ? "Teléfono Android" : "Tablet Android";
+  } else if (/Macintosh|Mac OS/i.test(ua)) {
+    os = "Mac";
+  } else if (/Linux/i.test(ua)) {
+    os = "Linux";
+  }
 
   let browser = "";
-  if (/Edg/i.test(ua)) browser = "Edge";
-  else if (/Chrome/i.test(ua)) browser = "Chrome";
-  else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = "Safari";
-  else if (/Firefox/i.test(ua)) browser = "Firefox";
+  if (/Edg\//i.test(ua)) {
+    browser = "Edge";
+  } else if (/SamsungBrowser/i.test(ua)) {
+    browser = "Samsung Browser";
+  } else if (/OPR\/|Opera/i.test(ua)) {
+    browser = "Opera";
+  } else if (/CriOS/i.test(ua)) {
+    browser = "Chrome";
+  } else if (/FxiOS/i.test(ua)) {
+    browser = "Firefox";
+  } else if (/Chrome\//i.test(ua) && !/Edg/i.test(ua)) {
+    browser = "Chrome";
+  } else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) {
+    browser = "Safari";
+  } else if (/Firefox\//i.test(ua)) {
+    browser = "Firefox";
+  }
 
   return browser ? `${os} (${browser})` : os;
 }
