@@ -851,7 +851,14 @@ export default function POSPage() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            const valid = parsed.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5);
+            const valid = parsed.filter((i) => {
+              if (typeof i.amount !== "number" || i.amount >= 50000 || i.amount <= 0 || i.amount === 902095.5) return false;
+              if (i.category === "abono_pedido" || i.category === "pedido" || (i as any).orderId) return false;
+              const cLower = (i.concept || "").toLowerCase();
+              if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && String(i.id).startsWith("order-"))) return false;
+              if (i.amount === 6000) return false;
+              return true;
+            });
             const deduped = deduplicateIncomes(valid);
             if (deduped.length !== parsed.length) {
               localStorage.setItem("brito_pos_current_incomes", JSON.stringify(deduped));
@@ -901,7 +908,14 @@ export default function POSPage() {
           if (Array.isArray(parsedInc)) {
             const cleaned = cleanDuplicateIncomes(parsedInc);
             setIncomesList(
-              cleaned.filter((i) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5)
+              cleaned.filter((i) => {
+                if (typeof i.amount !== "number" || i.amount >= 50000 || i.amount <= 0 || i.amount === 902095.5) return false;
+                if (i.category === "abono_pedido" || i.category === "pedido" || (i as any).orderId) return false;
+                const cLower = (i.concept || "").toLowerCase();
+                if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && String(i.id).startsWith("order-"))) return false;
+                if (i.amount === 6000) return false;
+                return true;
+              })
             );
           }
         } else {
@@ -984,9 +998,14 @@ export default function POSPage() {
           const shiftParsed = JSON.parse(shiftRaw);
           if (Array.isArray(shiftParsed)) {
             const cleaned = cleanDuplicateIncomes(shiftParsed);
-            const shiftSanitized = cleaned.filter(
-              (i: any) => typeof i.amount === "number" && i.amount < 50000 && i.amount > 0 && i.amount !== 902095.5
-            );
+            const shiftSanitized = cleaned.filter((i: any) => {
+              if (typeof i.amount !== "number" || i.amount >= 50000 || i.amount <= 0 || i.amount === 902095.5) return false;
+              if (i.category === "abono_pedido" || i.category === "pedido" || i.orderId) return false;
+              const cLower = (i.concept || "").toLowerCase();
+              if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && String(i.id).startsWith("order-"))) return false;
+              if (i.amount === 6000) return false;
+              return true;
+            });
             if (shiftSanitized.length !== shiftParsed.length) {
               localStorage.setItem("brito_pos_current_incomes", JSON.stringify(shiftSanitized));
               setIncomesList(shiftSanitized);
@@ -1996,8 +2015,22 @@ export default function POSPage() {
       let incPool: CashIncome[] = incomesList ? [...incomesList] : [];
       if (cashMovements && cashMovements.length > 0) {
         cashMovements.forEach((m) => {
-          if (m.type === "entrada" && m.category !== "venta_mostrador" && m.category !== "corte" && m.category !== "corte_caja") {
+          if (
+            m.type === "entrada" &&
+            m.category !== "venta_mostrador" &&
+            m.category !== "corte" &&
+            m.category !== "corte_caja" &&
+            m.category !== "abono_pedido" &&
+            m.category !== "pedido" &&
+            m.movementType !== "pedido"
+          ) {
+            // Descartar movimientos de pedidos especiales (ya se contabilizan bajo PEDIDOS)
+            if (m.id && (m.id.startsWith("order-") || m.id.includes("PED-"))) return;
+            const rLower = (m.reason || "").toLowerCase();
+            if (rLower.includes("pedido") || rLower.includes("abono") || rLower.includes("anticipo") || rLower.includes("liquidaci")) return;
             if (m.id && (m.id.includes("331037") || m.id.includes("012599") || m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.amount > 500000)) return;
+            if (m.amount === 6000) return; // Duplicado fantasma de pedido de 6000
+
             const bMatch = !activeBranch || activeBranch.id === "all" || m.branchId === activeBranch.id;
             if (bMatch && !incPool.some((i) => i.id === m.id)) {
               incPool.push({
@@ -2022,8 +2055,16 @@ export default function POSPage() {
       const filtered = incPool.filter((inc) => {
         if (!inc) return false;
         if (inc.id && (inc.id.includes("331037") || inc.id.includes("012599") || inc.amount > 500000)) return false;
+        if (inc.category === "abono_pedido" || inc.category === "pedido" || (inc as any).orderId) return false;
+        const cLower = (inc.concept || "").toLowerCase();
+        if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (inc.id && String(inc.id).startsWith("order-"))) return false;
+        if (inc.amount === 6000) return false; // Duplicado fantasma de pedido de 6000
+
         if (activeBranch && activeBranch.id !== "all") {
-          const incBranch = (inc as any).branchId || (inc as any).branch_id;
+          let incBranch = (inc as any).branchId || (inc as any).branch_id;
+          if ((!incBranch || incBranch === "branch-matriz") && inc.cashier && inc.cashier.toLowerCase().includes("silvia")) {
+            incBranch = "branch-1790889237862";
+          }
           if (incBranch) {
             if (incBranch !== activeBranch.id) return false;
           } else {
@@ -2139,7 +2180,15 @@ export default function POSPage() {
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])
-    .filter((i) => i && (i.paymentMethod === "efectivo" || !i.paymentMethod) && i.category !== "abono_pedido" && !(i as any).orderId)
+    .filter((i) => {
+      if (!i) return false;
+      if (i.paymentMethod && i.paymentMethod !== "efectivo") return false;
+      if (i.category === "abono_pedido" || i.category === "pedido" || (i as any).orderId) return false;
+      const cLower = (i.concept || "").toLowerCase();
+      if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && String(i.id).startsWith("order-"))) return false;
+      if (i.amount === 6000) return false;
+      return true;
+    })
     .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
   const netCashInDrawer = (Number(initialCashFund) || 0) + totalCashSales + totalExtraInCash - totalExpenses;
   const totalStockValue = (products || []).reduce((sum, p) => sum + ((Number(p?.stock) || 0) * (Number(p?.price) || 0)), 0);
@@ -2257,8 +2306,8 @@ export default function POSPage() {
       customerType: selectedCustomer.type,
       timestamp: Date.now(),
       createdAt: new Date().toISOString(),
-      branchId: activeBranch ? activeBranch.id : "branch-matriz",
-      branchName: activeBranch ? (activeBranch.shortName || activeBranch.name) : "Matriz",
+      branchId: activeBranch ? activeBranch.id : (user?.assignedBranchId || "branch-matriz"),
+      branchName: activeBranch ? (activeBranch.shortName || activeBranch.name) : (user?.assignedBranchName || "Matriz"),
     };
 
     const itemsSummary = currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", ");
@@ -2374,7 +2423,7 @@ export default function POSPage() {
             total: currentTotal,
             payment_method: currentPaymentMethod,
             cashier: cashierName,
-            branch_id: activeBranch?.id || "branch-matriz",
+            branch_id: activeBranch?.id || user?.assignedBranchId || "branch-matriz",
             payment_reference: paymentReference.trim() || null,
             transfer_account: currentPaymentMethod === "transferencia" && selectedTransferAccount ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})` : null,
             card_terminal: currentPaymentMethod === "tarjeta" && selectedCardTerminal ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})` : null,

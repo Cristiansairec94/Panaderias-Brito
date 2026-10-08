@@ -206,8 +206,8 @@ export const DEMO_USERS: User[] = [
     phone: "55 3344 5566",
     status: "activo",
     hasSystemAccess: true,
-    assignedBranchId: "branch-sanjuan",
-    assignedBranchName: "San Juan",
+    assignedBranchId: "branch-benito",
+    assignedBranchName: "Sucursal San Benito (Mercado)",
     createdAt: "10 feb 2024",
   },
   {
@@ -223,8 +223,8 @@ export const DEMO_USERS: User[] = [
     phone: "2213456778",
     status: "activo",
     hasSystemAccess: true,
-    assignedBranchId: "branch-matriz",
-    assignedBranchName: "Sucursal Matriz (Centro)",
+    assignedBranchId: "branch-1790889237862",
+    assignedBranchName: "Sucursal San Ildefonso",
     createdAt: "2 oct 2026",
   },
   {
@@ -241,7 +241,7 @@ export const DEMO_USERS: User[] = [
     status: "activo",
     hasSystemAccess: true,
     assignedBranchId: "branch-sanjuan",
-    assignedBranchName: "San Juan",
+    assignedBranchName: "Sucursal San Juan",
     createdAt: "2 oct 2026",
   },
   {
@@ -258,7 +258,7 @@ export const DEMO_USERS: User[] = [
     status: "activo",
     hasSystemAccess: true,
     assignedBranchId: "branch-matriz",
-    assignedBranchName: "Matriz",
+    assignedBranchName: "Sucursal Matriz (Centro)",
     createdAt: "2 oct 2026",
   },
   {
@@ -274,8 +274,8 @@ export const DEMO_USERS: User[] = [
     phone: "7731107898",
     status: "activo",
     hasSystemAccess: true,
-    assignedBranchId: "branch-sanjuan",
-    assignedBranchName: "San Juan",
+    assignedBranchId: "branch-angeles",
+    assignedBranchName: "Sucursal Los Ángeles",
     createdAt: "1 oct 2026",
   },
   {
@@ -292,7 +292,24 @@ export const DEMO_USERS: User[] = [
     status: "activo",
     hasSystemAccess: true,
     assignedBranchId: "branch-sanjuan",
-    assignedBranchName: "San Juan",
+    assignedBranchName: "Sucursal San Juan",
+    createdAt: "05 oct 2026",
+  },
+  {
+    id: "usr-angeles",
+    name: "Cajero Los Ángeles",
+    username: "angeles",
+    email: "angeles@panaderiabrito.com",
+    password: "1234",
+    role: "cajero",
+    roleLabel: "Cajero(a) de Mostrador",
+    jobTitle: "Cajero(a) de Mostrador",
+    avatar: "👨‍🍳",
+    phone: "55 4321 8765",
+    status: "activo",
+    hasSystemAccess: true,
+    assignedBranchId: "branch-angeles",
+    assignedBranchName: "Sucursal Los Ángeles",
     createdAt: "05 oct 2026",
   },
   {
@@ -370,8 +387,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let modified = false;
           parsed = parsed.map((u: any) => {
             if (u.id === "usr-silvia" || u.username === "silvia") {
-              modified = true;
-              return { ...u, assignedBranchId: "branch-matriz", assignedBranchName: "Sucursal Matriz (Centro)" };
+              if (u.assignedBranchId !== "branch-1790889237862") {
+                modified = true;
+                return { ...u, assignedBranchId: "branch-1790889237862", assignedBranchName: "Sucursal San Ildefonso" };
+              }
+            }
+            if (u.id === "usr-andres" || u.username === "andres") {
+              if (u.assignedBranchId !== "branch-angeles") {
+                modified = true;
+                return { ...u, assignedBranchId: "branch-angeles", assignedBranchName: "Sucursal Los Ángeles" };
+              }
+            }
+            if (u.id === "usr-5" || u.username === "carlos") {
+              if (u.assignedBranchId !== "branch-benito") {
+                modified = true;
+                return { ...u, assignedBranchId: "branch-benito", assignedBranchName: "Sucursal San Benito (Mercado)" };
+              }
             }
             return u;
           });
@@ -379,6 +410,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const sj = DEMO_USERS.find((u) => u.id === "usr-sanjuan");
             if (sj) {
               parsed.push(sj);
+              modified = true;
+            }
+          }
+          if (!parsed.some((u: any) => u.id === "usr-angeles" || u.username === "angeles")) {
+            const ang = DEMO_USERS.find((u) => u.id === "usr-angeles");
+            if (ang) {
+              parsed.push(ang);
               modified = true;
             }
           }
@@ -459,9 +497,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsedUser = JSON.parse(saved);
           if (parsedUser && (parsedUser.id === "usr-silvia" || parsedUser.username === "silvia")) {
-            parsedUser.assignedBranchId = "branch-matriz";
-            parsedUser.assignedBranchName = "Sucursal Matriz (Centro)";
-            sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
+            if (parsedUser.assignedBranchId !== "branch-1790889237862") {
+              parsedUser.assignedBranchId = "branch-1790889237862";
+              parsedUser.assignedBranchName = "Sucursal San Ildefonso";
+              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
+            }
+          }
+          if (parsedUser && (parsedUser.id === "usr-andres" || parsedUser.username === "andres")) {
+            if (parsedUser.assignedBranchId !== "branch-angeles") {
+              parsedUser.assignedBranchId = "branch-angeles";
+              parsedUser.assignedBranchName = "Sucursal Los Ángeles";
+              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
+            }
+          }
+          if (parsedUser && (parsedUser.id === "usr-5" || parsedUser.username === "carlos")) {
+            if (parsedUser.assignedBranchId !== "branch-benito") {
+              parsedUser.assignedBranchId = "branch-benito";
+              parsedUser.assignedBranchName = "Sucursal San Benito (Mercado)";
+              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
+            }
           }
           setUser(parsedUser);
         } catch (e) {

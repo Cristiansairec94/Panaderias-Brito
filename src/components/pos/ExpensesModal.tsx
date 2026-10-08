@@ -428,7 +428,7 @@ export default function ExpensesModal({
   const effectiveCashier =
     (activeBranch?.currentShift?.cashier && !activeBranch.currentShift.cashier.includes("Cajera 2"))
       ? activeBranch.currentShift.cashier
-      : (activeBranch?.id === "branch-matriz" ? "silvia puga" : (cashierName || activeBranch?.manager || "Cajero"));
+      : (activeBranch?.manager || cashierName || "Cajero");
   const effectiveShiftName =
     activeBranch?.currentShift?.name || shiftName || "Turno General";
   const effectiveBranchName = activeBranch?.name || branchName || "Sucursal Matriz (Centro)";
@@ -554,6 +554,9 @@ export default function ExpensesModal({
           const amt = Number(item.amount || 0);
           if (id.includes("354644") || id.includes("299599") || id.includes("331037") || id.includes("334972") || id.includes("012599") || id.includes("ING-ING") || id.includes("mov-mov-")) return false;
           if (amt >= 500000) return false;
+          // Eliminar entradas duplicadas de pedidos que se hayan colado en incomes
+          if (key === "brito_pos_current_incomes" && (item.category === "abono_pedido" || item.category === "pedido" || item.orderId || (item.concept && (/pedido|abono|anticipo|liquidaci|ped-/i).test(item.concept)))) return false;
+          if (key === "brito_pos_current_incomes" && amt === 6000) return false;
           return true;
         });
         if (cleaned.length !== parsed.length) {
@@ -848,7 +851,10 @@ export default function ExpensesModal({
       if (!e) return false;
       if (e.id && (e.id.includes("354644") || e.id.includes("299599") || e.id.includes("334972") || e.amount > 500000)) return false;
       if (activeBranch && activeBranch.id !== "all") {
-        const eBranch = (e as any).branchId || (e as any).branch_id;
+        let eBranch = (e as any).branchId || (e as any).branch_id;
+        if ((!eBranch || eBranch === "branch-matriz") && e.cashier && e.cashier.toLowerCase().includes("silvia")) {
+          eBranch = "branch-1790889237862";
+        }
         if (eBranch) {
           if (eBranch !== activeBranch.id) return false;
         } else {
@@ -886,8 +892,21 @@ export default function ExpensesModal({
     }
     if (cashMovements && cashMovements.length > 0) {
       cashMovements.forEach((m) => {
-        if (m.type === "entrada" && m.category !== "venta_mostrador" && m.category !== "corte" && m.category !== "corte_caja") {
+        if (
+          m.type === "entrada" &&
+          m.category !== "venta_mostrador" &&
+          m.category !== "corte" &&
+          m.category !== "corte_caja" &&
+          m.category !== "abono_pedido" &&
+          m.category !== "pedido"
+        ) {
+          // Descartar movimientos de pedidos especiales (ya se contabilizan bajo PEDIDOS)
+          if (m.id && (m.id.startsWith("order-") || m.id.includes("PED-"))) return;
+          const rLower = (m.reason || "").toLowerCase();
+          if (rLower.includes("pedido") || rLower.includes("abono") || rLower.includes("anticipo") || rLower.includes("liquidaci")) return;
           if (m.id && (m.id.includes("331037") || m.id.includes("012599") || m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.amount > 500000)) return;
+          if (m.amount === 6000) return; // Duplicado fantasma de pedido de 6000
+
           const bMatch = !activeBranch || activeBranch.id === "all" || m.branchId === activeBranch.id;
           if (bMatch && !pool.some((i) => i.id === m.id)) {
             pool.push({
@@ -911,8 +930,16 @@ export default function ExpensesModal({
     const rawFiltered = pool.filter((inc) => {
       if (!inc) return false;
       if (inc.id && (inc.id.includes("331037") || inc.id.includes("012599") || inc.amount > 500000)) return false;
+      if (inc.category === "abono_pedido" || inc.category === "pedido" || (inc as any).orderId) return false;
+      const cLower = (inc.concept || "").toLowerCase();
+      if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (inc.id && inc.id.startsWith("order-"))) return false;
+      if (inc.amount === 6000) return false; // Duplicado fantasma de pedido de 6000
+
       if (activeBranch && activeBranch.id !== "all") {
-        const incBranch = (inc as any).branchId || (inc as any).branch_id;
+        let incBranch = (inc as any).branchId || (inc as any).branch_id;
+        if ((!incBranch || incBranch === "branch-matriz") && inc.cashier && inc.cashier.toLowerCase().includes("silvia")) {
+          incBranch = "branch-1790889237862";
+        }
         if (incBranch) {
           if (incBranch !== activeBranch.id) return false;
         } else {
@@ -964,7 +991,10 @@ export default function ExpensesModal({
       if (!s) return false;
       if (s.id && (s.id.includes("354644") || s.id.includes("299599") || s.id.includes("331037") || s.total > 500000)) return false;
       if (activeBranch && activeBranch.id !== "all") {
-        const sBranch = (s as any).branchId || (s as any).branch_id;
+        let sBranch = (s as any).branchId || (s as any).branch_id;
+        if ((!sBranch || sBranch === "branch-matriz") && s.cashier && s.cashier.toLowerCase().includes("silvia")) {
+          sBranch = "branch-1790889237862";
+        }
         if (sBranch) {
           if (sBranch !== activeBranch.id) return false;
         } else {
@@ -1261,7 +1291,7 @@ export default function ExpensesModal({
           remainingBalance: 0,
           paymentStatus: "liquidado",
           paymentMethod: "efectivo",
-          cashier: "silvia puga",
+          cashier: "carlos bueno",
           createdAt: new Date().toISOString(),
           timestamp: Date.now(),
         });
@@ -1803,7 +1833,15 @@ export default function ExpensesModal({
 
   const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalIncomesInCash = shiftIncomes
-    .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && i.category !== "abono_pedido" && !(i as any).orderId)
+    .filter((i) => {
+      if (!i) return false;
+      if (i.paymentMethod && i.paymentMethod !== "efectivo") return false;
+      if (i.category === "abono_pedido" || i.category === "pedido" || (i as any).orderId) return false;
+      const cLower = (i.concept || "").toLowerCase();
+      if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && i.id.startsWith("order-"))) return false;
+      if (i.amount === 6000) return false;
+      return true;
+    })
     .reduce((sum, i) => sum + i.amount, 0);
 
   const calculatedCashInDrawer = Math.max(0, effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);

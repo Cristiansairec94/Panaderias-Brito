@@ -113,6 +113,34 @@ export default function CashDrawerShiftModal({
     return standardBranchFund;
   });
 
+  // Limpieza defensiva en localStorage para asegurar que ningún abono de pedido o 6000 fantasma contamine las entradas
+  useEffect(() => {
+    try {
+      const keys = ["brito_pos_current_expenses", "brito_pos_current_incomes", "brito_branch_cash_movements"];
+      keys.forEach((key) => {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        const cleaned = parsed.filter((item: any) => {
+          if (!item) return false;
+          const id = String(item.id || "");
+          const amt = Number(item.amount || 0);
+          if (id.includes("354644") || id.includes("299599") || id.includes("331037") || id.includes("334972") || id.includes("012599") || id.includes("ING-ING") || id.includes("mov-mov-")) return false;
+          if (amt >= 500000) return false;
+          if (key === "brito_pos_current_incomes" && (item.category === "abono_pedido" || item.category === "pedido" || item.orderId || (item.concept && (/pedido|abono|anticipo|liquidaci|ped-/i).test(item.concept)))) return false;
+          if (key === "brito_pos_current_incomes" && amt === 6000) return false;
+          if (key === "brito_branch_cash_movements" && item.type === "entrada" && (item.category === "abono_pedido" || item.category === "pedido" || (item.reason && (/pedido|abono|anticipo|liquidaci/i).test(item.reason)) || id.startsWith("order-"))) return false;
+          if (key === "brito_branch_cash_movements" && item.type === "entrada" && amt === 6000) return false;
+          return true;
+        });
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(key, JSON.stringify(cleaned));
+        }
+      });
+    } catch {}
+  }, [isOpen]);
+
   useEffect(() => {
     if (currentBranch?.lastCut?.nextFund !== undefined && currentBranch?.lastCut?.nextFund !== null) {
       const f = Number(currentBranch.lastCut.nextFund);
@@ -252,15 +280,19 @@ export default function CashDrawerShiftModal({
   }, [initialTab, isOpen]);
 
   useEffect(() => {
-    setOutgoingCashier(cashierName);
-    if (cashierName.includes("Cajera 1")) {
-      setIncomingCashier("Cajera 2 - Turno Vespertino");
+    const effectiveName = cashierName || currentBranch?.currentShift?.cashier || "Cajero";
+    setOutgoingCashier(effectiveName);
+    if (effectiveName.toLowerCase().includes("matutino") || effectiveName.includes("1")) {
+      setIncomingCashier("Cajero(a) Turno Vespertino");
       setNextShiftName("Turno Vespertino (14:00 - 22:00)");
-    } else {
-      setIncomingCashier("Cajera 1 - Turno Matutino");
+    } else if (effectiveName.toLowerCase().includes("vespertino") || effectiveName.includes("2")) {
+      setIncomingCashier("Cajero(a) Turno Matutino");
       setNextShiftName("Turno Matutino (06:00 - 14:00)");
+    } else {
+      setIncomingCashier(effectiveName);
+      setNextShiftName(currentBranch?.currentShift?.name || "Turno General");
     }
-  }, [cashierName]);
+  }, [cashierName, currentBranch?.currentShift?.cashier, currentBranch?.currentShift?.name]);
 
   useEffect(() => {
     if (isOpen) {
@@ -300,7 +332,10 @@ export default function CashDrawerShiftModal({
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
     if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-      const sBranch = (s as any).branchId || (s as any).branch_id;
+      let sBranch = (s as any).branchId || (s as any).branch_id;
+      if ((!sBranch || sBranch === "branch-matriz") && s.cashier && s.cashier.toLowerCase().includes("silvia")) {
+        sBranch = "branch-1790889237862";
+      }
       if (sBranch) {
         if (sBranch !== currentBranch.id) return false;
       } else {
@@ -323,7 +358,10 @@ export default function CashDrawerShiftModal({
   const shiftOrders = (orders || []).filter((o) => {
     if (!o) return false;
     if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-      const oBranch = (o as any).branchId || (o as any).branch_id;
+      let oBranch = (o as any).branchId || (o as any).branch_id;
+      if ((!oBranch || oBranch === "branch-matriz") && o.cashier && o.cashier.toLowerCase().includes("silvia")) {
+        oBranch = "branch-1790889237862";
+      }
       if (oBranch) {
         if (oBranch !== currentBranch.id) return false;
       } else {
@@ -372,7 +410,10 @@ export default function CashDrawerShiftModal({
     if (!e) return false;
     if (e.id && (e.id.includes("354644") || e.id.includes("299599") || e.id.includes("334972") || e.amount > 500000)) return false;
     if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-      const eBranch = (e as any).branchId || (e as any).branch_id;
+      let eBranch = (e as any).branchId || (e as any).branch_id;
+      if ((!eBranch || eBranch === "branch-matriz") && e.cashier && e.cashier.toLowerCase().includes("silvia")) {
+        eBranch = "branch-1790889237862";
+      }
       if (eBranch) {
         if (eBranch !== currentBranch.id) return false;
       } else {
@@ -390,8 +431,16 @@ export default function CashDrawerShiftModal({
   const shiftIncomes = (incomes || []).filter((inc) => {
     if (!inc) return false;
     if (inc.id && (inc.id.includes("012599") || inc.id.includes("331037") || inc.amount > 500000)) return false;
+    if (inc.category === "abono_pedido" || inc.category === "pedido" || (inc as any).orderId) return false;
+    const cLower = (inc.concept || "").toLowerCase();
+    if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (inc.id && String(inc.id).startsWith("order-"))) return false;
+    if (Number(inc.amount) === 6000) return false; // Duplicado fantasma de pedido de 6000
+
     if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-      const incBranch = (inc as any).branchId || (inc as any).branch_id;
+      let incBranch = (inc as any).branchId || (inc as any).branch_id;
+      if ((!incBranch || incBranch === "branch-matriz") && inc.cashier && inc.cashier.toLowerCase().includes("silvia")) {
+        incBranch = "branch-1790889237862";
+      }
       if (incBranch) {
         if (incBranch !== currentBranch.id) return false;
       } else {
@@ -405,12 +454,20 @@ export default function CashDrawerShiftModal({
     return true;
   });
   const totalIncomesInCash = shiftIncomes
-    .filter((i) => (i.paymentMethod === "efectivo" || !i.paymentMethod) && i.category !== "abono_pedido" && !(i as any).orderId && typeof i.amount === "number" && i.amount > 0 && i.amount !== 902095.5)
+    .filter((i) => {
+      if (!i) return false;
+      if (i.paymentMethod && i.paymentMethod !== "efectivo") return false;
+      if (i.category === "abono_pedido" || i.category === "pedido" || (i as any).orderId) return false;
+      const cLower = (i.concept || "").toLowerCase();
+      if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && String(i.id).startsWith("order-"))) return false;
+      if (Number(i.amount) === 6000) return false;
+      return typeof i.amount === "number" && i.amount > 0 && i.amount !== 902095.5;
+    })
     .reduce((sum, i) => sum + i.amount, 0);
 
   // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
   const calculatedExpectedCash = Math.max(0, effectiveInitialFund + posCash + totalIncomesInCash - totalExpenses);
-  const expectedCashInDrawer = branchCashInDrawer > 0 ? branchCashInDrawer : calculatedExpectedCash;
+  const expectedCashInDrawer = calculatedExpectedCash;
 
   // 4. Conteo y Diferencia (Arqueo)
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;

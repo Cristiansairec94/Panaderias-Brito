@@ -46,7 +46,7 @@ const DEFAULT_BRANCHES: Branch[] = [
     currentShift: {
       id: "shift-mat-101",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "silvia puga",
+      cashier: "carlos bueno",
       openedAt: "06:00 AM",
       initialFund: 1000,
       cashSales: 0,
@@ -176,10 +176,10 @@ const DEFAULT_BRANCHES: Branch[] = [
     code: "ILF-04",
     address: "Av. San Benito #123, Col. Centro Histórico",
     phone: "55 8361 7480",
-    manager: "Cajero San Ildefonso",
-    assignedUserId: "usr-ildefonso",
-    assignedUserName: "Cajero San Ildefonso",
-    assignedUserEmail: "ildefonso@panaderiabrito.com",
+    manager: "silvia puga",
+    assignedUserId: "usr-silvia",
+    assignedUserName: "silvia puga",
+    assignedUserEmail: "silvia@panaderiabrito.com",
     status: "abierta",
     dailyGoal: 6000,
     todaySales: 0,
@@ -195,7 +195,44 @@ const DEFAULT_BRANCHES: Branch[] = [
     currentShift: {
       id: "shift-ilf-401",
       name: "Turno Matutino (06:00 - 14:00)",
-      cashier: "Cajero San Ildefonso",
+      cashier: "silvia puga",
+      openedAt: "06:00 AM",
+      initialFund: 1000,
+      cashSales: 0,
+      cardSales: 0,
+      transferSales: 0,
+      totalSales: 0,
+      ticketCount: 0,
+      status: "abierto",
+    },
+  },
+  {
+    id: "branch-angeles",
+    name: "Sucursal Los Ángeles",
+    shortName: "Los Ángeles",
+    code: "SUC-LES",
+    address: "Calz. Guadalupe #890, Los Ángeles",
+    phone: "55 4321 8765",
+    manager: "andres sanchez",
+    assignedUserId: "usr-andres",
+    assignedUserName: "andres sanchez",
+    assignedUserEmail: "andres@panaderiabrito.com",
+    status: "abierta",
+    dailyGoal: 7000,
+    todaySales: 0,
+    todayTickets: 0,
+    cashInDrawer: 1000,
+    color: "blue",
+    topProduct: {
+      name: "Bolillo Tradicional",
+      piecesSold: 0,
+      category: "Pan Salado",
+      icon: "🥖",
+    },
+    currentShift: {
+      id: "shift-ang-301",
+      name: "Turno General",
+      cashier: "andres sanchez",
       openedAt: "06:00 AM",
       initialFund: 1000,
       cashSales: 0,
@@ -521,7 +558,15 @@ function resolveBranchParam(param: string | null): string | null {
           const cutTimestampByBranch = new Map<string, number>();
 
           allCutsList.forEach((cut) => {
-            const bId = cut.branchId || "branch-matriz";
+            let bId = cut.branchId || "branch-matriz";
+            if (bId === "branch-matriz") {
+              const resp = (cut.responsible || cut.outgoingCashier || "").toLowerCase();
+              if (resp.includes("silvia")) {
+                bId = "branch-1790889237862";
+              } else if (resp.includes("andres")) {
+                bId = "branch-angeles";
+              }
+            }
             if (!latestCutByBranch.has(bId)) {
               latestCutByBranch.set(bId, cut);
               const ts = cut.timestamp || parseDateTimeSafe(cut.date);
@@ -660,9 +705,23 @@ function resolveBranchParam(param: string | null): string | null {
             branchAgg.set(b.id, initBranchAgg());
           });
 
+          const resolveBranchForRecord = (rawBranchId: string | null | undefined, cashierName?: string): string => {
+            let bId = rawBranchId || "branch-matriz";
+            if (cashierName) {
+              const cLower = cashierName.toLowerCase();
+              if (cLower.includes("silvia")) {
+                return "branch-1790889237862";
+              }
+              if (cLower.includes("andres")) {
+                return "branch-angeles";
+              }
+            }
+            return bId;
+          };
+
           // 1. Agregar ventas de mostrador (filtrando turno activo vs acumulado)
           dbSales.forEach((s: any) => {
-            const bId = s.branch_id || "branch-matriz";
+            const bId = resolveBranchForRecord(s.branch_id, s.cashier);
             let cur = branchAgg.get(bId);
             if (!cur) {
               cur = initBranchAgg();
@@ -688,7 +747,7 @@ function resolveBranchParam(param: string | null): string | null {
 
           // 2. Agregar pedidos especiales (anticipos y liquidaciones)
           dbOrders.forEach((o: any) => {
-            const bId = o.branch_id || "branch-matriz";
+            const bId = resolveBranchForRecord(o.branch_id, o.cashier);
             let cur = branchAgg.get(bId);
             if (!cur) {
               cur = initBranchAgg();
@@ -718,9 +777,20 @@ function resolveBranchParam(param: string | null): string | null {
 
           // 3. Movimientos de caja (aportes / retiros fuera de ventas y de cortes)
           dbMovs.forEach((m: any) => {
-            if (m.category === "venta_mostrador" || m.category === "corte_caja") return;
-            if (m.id && (m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.id.includes("012599"))) return;
-            const bId = m.branch_id || "branch-matriz";
+            if (
+              m.category === "venta_mostrador" ||
+              m.category === "corte_caja" ||
+              m.category === "abono_pedido" ||
+              m.category === "pedido" ||
+              m.movement_type === "pedido" ||
+              m.movementType === "pedido"
+            ) return;
+            if (m.id && (String(m.id).startsWith("order-") || String(m.id).includes("PED-"))) return;
+            const rLower = (m.reason || "").toLowerCase();
+            if (rLower.includes("pedido") || rLower.includes("abono") || rLower.includes("anticipo") || rLower.includes("liquidaci")) return;
+            if (m.type === "entrada" && Number(m.amount) === 6000) return; // Duplicado fantasma de pedido de 6000
+            if (m.id && (m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.id.includes("012599") || m.id.includes("331037") || m.amount > 500000)) return;
+            const bId = resolveBranchForRecord(m.branch_id, m.authorized_by);
             let cur = branchAgg.get(bId);
             if (!cur) {
               cur = initBranchAgg();
@@ -749,9 +819,13 @@ function resolveBranchParam(param: string | null): string | null {
                 const localIncs = JSON.parse(rawLocalInc);
                 if (Array.isArray(localIncs)) {
                   localIncs.forEach((inc: any) => {
-                    if (!inc || !inc.id || inc.id.includes("012599")) return;
+                    if (!inc || !inc.id || inc.id.includes("012599") || inc.category === "abono_pedido" || inc.category === "pedido" || inc.orderId) return;
+                    if (inc.id && (String(inc.id).startsWith("order-") || String(inc.id).includes("PED-"))) return;
+                    const cLower = (inc.concept || "").toLowerCase();
+                    if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci")) return;
+                    if (Number(inc.amount) === 6000) return; // Duplicado fantasma de pedido de 6000
                     if (dbMovs.some((m: any) => m.id === inc.id)) return;
-                    const bId = inc.branchId || inc.branch_id || "branch-matriz";
+                    const bId = resolveBranchForRecord(inc.branchId || inc.branch_id, inc.cashier);
                     let cur = branchAgg.get(bId);
                     if (!cur) {
                       cur = initBranchAgg();
@@ -772,7 +846,7 @@ function resolveBranchParam(param: string | null): string | null {
 
           // 4. Gastos en efectivo
           dbExps.forEach((e: any) => {
-            const bId = e.branch_id || "branch-matriz";
+            const bId = resolveBranchForRecord(e.branch_id, e.cashier);
             let cur = branchAgg.get(bId);
             if (!cur) {
               cur = initBranchAgg();
@@ -849,28 +923,29 @@ function resolveBranchParam(param: string | null): string | null {
               const isBenito = dbB.id === "branch-benito";
               const isSj = dbB.id === "branch-sanjuan";
               const isIldefonso = dbB.id === "branch-1790889237862" || (dbB.name && dbB.name.toLowerCase().includes("ildefonso"));
+              const isAngeles = dbB.id === "branch-angeles" || (dbB.name && dbB.name.toLowerCase().includes("angeles"));
               if (!branchMap.has(dbB.id)) {
                 branchMap.set(dbB.id, {
                   id: dbB.id,
-                  name: dbB.name || (isIldefonso ? "Sucursal San Ildefonso" : isBenito ? "Sucursal San Benito (Mercado)" : isSj ? "Sucursal San Juan" : "Sucursal"),
-                  shortName: dbB.short_name || (isIldefonso ? "San Ildefonso" : isBenito ? "San Benito" : isSj ? "San Juan" : (dbB.name || "Sucursal")),
-                  code: isIldefonso ? "ILF-04" : isBenito ? "BEN-02" : isSj ? "SJU-02" : ("SUC-" + dbB.id.slice(-3).toUpperCase()),
-                  address: dbB.address || (isIldefonso ? "Av. San Benito #123, Col. Centro Histórico" : isBenito ? "Calle Hidalgo #120, Col. San Benito" : isSj ? "Calle Morelos #45, Col. San Juan" : "Dirección sucursal"),
-                  phone: dbB.phone || (isIldefonso ? "55 8361 7480" : "55 8765 4321"),
-                  manager: isIldefonso ? "Cajero San Ildefonso" : isBenito ? "Carlos Mendoza" : isSj ? "Cajero San Juan" : "Encargado de Sucursal",
-                  assignedUserId: isIldefonso ? "usr-ildefonso" : isBenito ? "usr-5" : isSj ? "usr-sanjuan" : undefined,
-                  assignedUserName: isIldefonso ? "Cajero San Ildefonso" : isBenito ? "Carlos Mendoza" : isSj ? "Cajero San Juan" : undefined,
-                  assignedUserEmail: isIldefonso ? "ildefonso@panaderiabrito.com" : isBenito ? "supervisor@panaderiabrito.com" : isSj ? "sanjuan@panaderiabrito.com" : undefined,
+                  name: dbB.name || (isIldefonso ? "Sucursal San Ildefonso" : isBenito ? "Sucursal San Benito (Mercado)" : isSj ? "Sucursal San Juan" : isAngeles ? "Sucursal Los Ángeles" : "Sucursal"),
+                  shortName: dbB.short_name || (isIldefonso ? "San Ildefonso" : isBenito ? "San Benito" : isSj ? "San Juan" : isAngeles ? "Los Ángeles" : (dbB.name || "Sucursal")),
+                  code: isIldefonso ? "ILF-04" : isBenito ? "BEN-02" : isSj ? "SJU-02" : isAngeles ? "SUC-LES" : ("SUC-" + dbB.id.slice(-3).toUpperCase()),
+                  address: dbB.address || (isIldefonso ? "Av. San Benito #123, Col. Centro Histórico" : isBenito ? "Calle Hidalgo #120, Col. San Benito" : isSj ? "Calle Morelos #45, Col. San Juan" : isAngeles ? "Calz. Guadalupe #890, Los Ángeles" : "Dirección sucursal"),
+                  phone: dbB.phone || (isIldefonso ? "55 8361 7480" : isAngeles ? "55 4321 8765" : "55 8765 4321"),
+                  manager: isIldefonso ? "silvia puga" : isBenito ? "Carlos Mendoza" : isSj ? "noe velasquez" : isAngeles ? "andres sanchez" : "Encargado de Sucursal",
+                  assignedUserId: isIldefonso ? "usr-silvia" : isBenito ? "usr-5" : isSj ? "usr-noe" : isAngeles ? "usr-andres" : undefined,
+                  assignedUserName: isIldefonso ? "silvia puga" : isBenito ? "Carlos Mendoza" : isSj ? "noe velasquez" : isAngeles ? "andres sanchez" : undefined,
+                  assignedUserEmail: isIldefonso ? "silvia@panaderiabrito.com" : isBenito ? "supervisor@panaderiabrito.com" : isSj ? "noe@panaderiabrito.com" : isAngeles ? "andres@panaderiabrito.com" : undefined,
                   status: dbB.is_active === false ? "cerrada" : "abierta",
-                  dailyGoal: isIldefonso ? 6000 : isBenito ? 8000 : isSj ? 8500 : 5000,
+                  dailyGoal: isIldefonso ? 6000 : isBenito ? 8000 : isSj ? 8500 : isAngeles ? 7000 : 5000,
                   todaySales: 0,
                   todayTickets: 0,
                   cashInDrawer: 1000,
-                  color: isIldefonso ? "emerald" : isSj ? "rose" : "emerald",
+                  color: isIldefonso ? "emerald" : isSj ? "rose" : isAngeles ? "blue" : "emerald",
                   currentShift: {
-                    id: isIldefonso ? "shift-ilf-401" : isSj ? "shift-sju-201" : `shift-${dbB.id}`,
-                    name: isSj ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)",
-                    cashier: isIldefonso ? "Cajero San Ildefonso" : isBenito ? "Carlos Mendoza" : isSj ? "Cajero San Juan" : "Cajero",
+                    id: isIldefonso ? "shift-ilf-401" : isSj ? "shift-sju-201" : isAngeles ? "shift-ang-301" : `shift-${dbB.id}`,
+                    name: isSj ? "Turno Vespertino (14:00 - 22:00)" : isIldefonso ? "Turno Matutino (06:00 - 14:00)" : "Turno General",
+                    cashier: isIldefonso ? "silvia puga" : isBenito ? "Carlos Mendoza" : isSj ? "noe velasquez" : isAngeles ? "andres sanchez" : "Cajero",
                     openedAt: isSj ? "14:00 hrs" : "06:00 AM",
                     initialFund: 1000,
                     status: "abierto",
@@ -881,6 +956,21 @@ function resolveBranchParam(param: string | null): string | null {
                     transferSales: 0,
                   },
                 });
+              } else {
+                const existing = branchMap.get(dbB.id)!;
+                if (isIldefonso && (!existing.assignedUserId || existing.assignedUserId === "usr-ildefonso")) {
+                  existing.manager = "silvia puga";
+                  existing.assignedUserId = "usr-silvia";
+                  existing.assignedUserName = "silvia puga";
+                  existing.assignedUserEmail = "silvia@panaderiabrito.com";
+                  if (existing.currentShift) existing.currentShift.cashier = "silvia puga";
+                } else if (isAngeles && (!existing.assignedUserId || existing.assignedUserId === "usr-angeles")) {
+                  existing.manager = "andres sanchez";
+                  existing.assignedUserId = "usr-andres";
+                  existing.assignedUserName = "andres sanchez";
+                  existing.assignedUserEmail = "andres@panaderiabrito.com";
+                  if (existing.currentShift) existing.currentShift.cashier = "andres sanchez";
+                }
               }
             });
 
@@ -953,7 +1043,15 @@ function resolveBranchParam(param: string | null): string | null {
               } else if (latestCut?.incomingCashier && !latestCut.incomingCashier.includes("Cajera 2")) {
                 activeCashier = latestCut.incomingCashier;
               } else if (b.id === "branch-matriz") {
+                activeCashier = "carlos bueno";
+              } else if (b.id === "branch-1790889237862") {
                 activeCashier = "silvia puga";
+              } else if (b.id === "branch-angeles") {
+                activeCashier = "andres sanchez";
+              } else if (b.id === "branch-sanjuan") {
+                activeCashier = "noe velasquez";
+              } else if (b.id === "branch-benito") {
+                activeCashier = "Carlos Mendoza";
               } else if (b.currentShift?.cashier && !b.currentShift.cashier.includes("Cajera 2")) {
                 activeCashier = b.currentShift.cashier;
               } else {
@@ -976,7 +1074,7 @@ function resolveBranchParam(param: string | null): string | null {
                 manager: activeCashier,
                 currentShift: {
                   id: b.currentShift?.id || `shift-${b.id}`,
-                  name: latestCut?.nextShift || b.currentShift?.name || "Turno General",
+                  name: latestCut?.nextShift || b.currentShift?.name || (b.id === "branch-1790889237862" ? "Turno Matutino" : "Turno General"),
                   cashier: activeCashier,
                   openedAt: latestCut?.date || b.currentShift?.openedAt || "06:00 AM",
                   initialFund: initialFund,
@@ -1103,6 +1201,16 @@ function resolveBranchParam(param: string | null): string | null {
           // D) Movimientos manuales de caja (aportes de cambio, retiros)
           dbMovs.forEach((m: any) => {
             if (m.category === "venta_mostrador") return;
+            if (
+              m.category === "abono_pedido" ||
+              m.category === "pedido" ||
+              m.movement_type === "pedido" ||
+              m.movementType === "pedido"
+            ) return;
+            if (m.id && (String(m.id).startsWith("order-") || String(m.id).includes("PED-"))) return;
+            const rLower = (m.reason || "").toLowerCase();
+            if (rLower.includes("pedido") || rLower.includes("abono") || rLower.includes("anticipo") || rLower.includes("liquidaci")) return;
+            if (m.type === "entrada" && Number(m.amount) === 6000) return; // Duplicado fantasma de pedido de 6000
             // Evitar duplicar si ya fue registrado como gasto
             if (
               m.type === "salida" &&
@@ -1287,7 +1395,20 @@ function resolveBranchParam(param: string | null): string | null {
       }
       const savedMovements = localStorage.getItem("brito_branch_cash_movements");
       if (savedMovements) {
-        setCashMovements(JSON.parse(savedMovements));
+        const parsed = JSON.parse(savedMovements);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter((m: any) => {
+            if (!m) return false;
+            if (m.id && (m.id.includes("ING-ING") || m.id.includes("mov-mov-") || m.id.includes("012599") || m.id.includes("331037") || m.amount > 500000)) return false;
+            if (m.type === "entrada" && (m.category === "abono_pedido" || m.category === "pedido" || (m.reason && /pedido|abono|anticipo|liquidaci/i.test(m.reason)) || (m.id && String(m.id).startsWith("order-")))) return false;
+            if (m.type === "entrada" && Number(m.amount) === 6000) return false;
+            return true;
+          });
+          setCashMovements(cleaned);
+          if (cleaned.length !== parsed.length) {
+            localStorage.setItem("brito_branch_cash_movements", JSON.stringify(cleaned));
+          }
+        }
       }
     } catch {
       // Ignore localStorage error
@@ -1624,6 +1745,18 @@ function resolveBranchParam(param: string | null): string | null {
     // 3. Escuchar MOVIMIENTOS DE CAJA (gastos, entradas, retiros)
     const unsubCashMovement = realtimeHub.onCashMovement
       ? realtimeHub.onCashMovement((movement) => {
+          if (movement.type === "entrada") {
+            const isOrderMovement =
+              movement.category === "abono_pedido" ||
+              movement.category === "pedido" ||
+              movement.category === "anticipo_pedido" ||
+              (movement.id && (String(movement.id).startsWith("order-") || String(movement.id).includes("PED-"))) ||
+              (movement.reason && (/pedido|abono|anticipo|liquidaci/i).test(movement.reason)) ||
+              Number(movement.amount) === 6000;
+            if (isOrderMovement) {
+              return;
+            }
+          }
           const movType: "entrada" | "gasto" = movement.type === "entrada" ? "entrada" : "gasto";
           const newMov: BranchCashMovement = {
             id: movement.id,

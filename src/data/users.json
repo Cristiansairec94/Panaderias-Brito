@@ -80,8 +80,8 @@
     "phone": "55 3344 5566",
     "status": "activo",
     "hasSystemAccess": true,
-    "assignedBranchId": "branch-sanjuan",
-    "assignedBranchName": "San Juan",
+    "assignedBranchId": "branch-benito",
+    "assignedBranchName": "Sucursal San Benito (Mercado)",
     "createdAt": "10 feb 2024"
   },
   {
@@ -97,8 +97,8 @@
     "phone": "2213456778",
     "status": "activo",
     "hasSystemAccess": true,
-    "assignedBranchId": "branch-matriz",
-    "assignedBranchName": "Sucursal Matriz (Centro)",
+    "assignedBranchId": "branch-1790889237862",
+    "assignedBranchName": "Sucursal San Ildefonso",
     "createdAt": "2 oct 2026"
   },
   {
@@ -115,7 +115,7 @@
     "status": "activo",
     "hasSystemAccess": true,
     "assignedBranchId": "branch-sanjuan",
-    "assignedBranchName": "San Juan",
+    "assignedBranchName": "Sucursal San Juan",
     "createdAt": "2 oct 2026"
   },
   {
@@ -132,7 +132,7 @@
     "status": "activo",
     "hasSystemAccess": true,
     "assignedBranchId": "branch-matriz",
-    "assignedBranchName": "Matriz",
+    "assignedBranchName": "Sucursal Matriz (Centro)",
     "createdAt": "2 oct 2026"
   },
   {
@@ -148,8 +148,8 @@
     "phone": "7731107898",
     "status": "activo",
     "hasSystemAccess": true,
-    "assignedBranchId": "branch-sanjuan",
-    "assignedBranchName": "San Juan",
+    "assignedBranchId": "branch-angeles",
+    "assignedBranchName": "Sucursal Los Ángeles",
     "createdAt": "1 oct 2026"
   },
   {
@@ -166,7 +166,24 @@
     "status": "activo",
     "hasSystemAccess": true,
     "assignedBranchId": "branch-sanjuan",
-    "assignedBranchName": "San Juan",
+    "assignedBranchName": "Sucursal San Juan",
+    "createdAt": "05 oct 2026"
+  },
+  {
+    "id": "usr-angeles",
+    "name": "Cajero Los Ángeles",
+    "username": "angeles",
+    "email": "angeles@panaderiabrito.com",
+    "password": "1234",
+    "role": "cajero",
+    "roleLabel": "Cajero(a) de Mostrador",
+    "jobTitle": "Cajero(a) de Mostrador",
+    "avatar": "👨‍🍳",
+    "phone": "55 4321 8765",
+    "status": "activo",
+    "hasSystemAccess": true,
+    "assignedBranchId": "branch-angeles",
+    "assignedBranchName": "Sucursal Los Ángeles",
     "createdAt": "05 oct 2026"
   }
 ]

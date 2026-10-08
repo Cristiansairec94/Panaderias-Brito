@@ -184,5 +184,42 @@
       "ticketCount": 0,
       "status": "abierto"
     }
+  },
+  {
+    "id": "branch-angeles",
+    "name": "Sucursal Los Ángeles",
+    "shortName": "Los Ángeles",
+    "code": "SUC-LES",
+    "address": "Calz. Guadalupe #890, Los Ángeles",
+    "phone": "55 4321 8765",
+    "manager": "andres sanchez",
+    "assignedUserId": "usr-andres",
+    "assignedUserName": "andres sanchez",
+    "assignedUserEmail": "andres@panaderiabrito.com",
+    "status": "abierta",
+    "dailyGoal": 7000,
+    "todaySales": 0,
+    "todayTickets": 0,
+    "cashInDrawer": 1000,
+    "color": "blue",
+    "topProduct": {
+      "name": "Bolillo Tradicional",
+      "piecesSold": 0,
+      "category": "Pan Salado",
+      "icon": "🥖"
+    },
+    "currentShift": {
+      "id": "shift-ang-301",
+      "name": "Turno General",
+      "cashier": "andres sanchez",
+      "openedAt": "06:00 AM",
+      "initialFund": 1000,
+      "cashSales": 0,
+      "cardSales": 0,
+      "transferSales": 0,
+      "totalSales": 0,
+      "ticketCount": 0,
+      "status": "abierto"
+    }
   }
 ]
