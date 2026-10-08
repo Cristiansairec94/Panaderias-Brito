@@ -2482,6 +2482,25 @@ export default function POSPage() {
                   .eq("id", item.product.id);
               }
             }
+
+            const effBranchId = activeBranch?.id || user?.assignedBranchId || (cashierName.toLowerCase().includes("silvia") ? "branch-1790889237862" : "branch-matriz");
+            const effBranchName = activeBranch?.name || (effBranchId === "branch-1790889237862" ? "Sucursal San Ildefonso" : "Sucursal");
+            if (realtimeHub?.broadcastSale) {
+              realtimeHub.broadcastSale({
+                id: createdSaleId,
+                branchId: effBranchId,
+                branchName: effBranchName,
+                total: currentTotal,
+                paymentMethod: currentPaymentMethod,
+                cashier: cashierName,
+                itemsSummary: currentItems.map((ci) => `${ci.quantity}x ${ci.product.name}`).join(", "),
+                timestamp: new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+                items: currentItems,
+                customerName: selectedCustomer.name,
+                date: newSaleRecord.date,
+                createdAt: newSaleRecord.createdAt,
+              });
+            }
           } else if (saleErr) {
             console.error("[POS] Error al insertar venta en Supabase:", saleErr);
           }

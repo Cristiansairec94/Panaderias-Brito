@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Branch, BranchShift, BranchCashMovement, ShiftCutRecord } from "@/types";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { recordCashOutflowAsExpense } from "@/lib/expenses";
@@ -446,11 +446,13 @@ function resolveBranchParam(param: string | null): string | null {
   const [isLiveSimulating, setIsLiveSimulating] = useState(false);
   const [recentSimulatedSales, setRecentSimulatedSales] = useState<SimulatedSale[]>([]);
   const [cashMovements, setCashMovements] = useState<BranchCashMovement[]>(DEFAULT_CASH_MOVEMENTS);
+  const syncBranchesRef = useRef<() => void>(() => {});
 
   // Load state from localStorage & Server API
   useEffect(() => {
     // 1. Sincronización en tiempo real con el servidor y Supabase para reflejar todas las sucursales de otros perfiles
     const syncBranchesWithServer = async () => {
+      syncBranchesRef.current = syncBranchesWithServer;
       try {
         // A) Sincronizar desde /api/branches (persistencia central del servidor)
         let serverBranches: Branch[] = [];
@@ -1428,10 +1430,10 @@ function resolveBranchParam(param: string | null): string | null {
         .subscribe();
     } catch {}
 
-    // Intervalo de respaldo suave cada 30 segundos (los cambios se sincronizan en vivo al instante vía Supabase Realtime)
+    // Intervalo de respaldo rápido cada 3 segundos (sincronización reactiva sin perder un segundo)
     const pollInterval = setInterval(() => {
       syncBranchesWithServer();
-    }, 30000);
+    }, 3000);
 
     const handleFocus = () => {
       syncBranchesWithServer();
@@ -1459,6 +1461,13 @@ function resolveBranchParam(param: string | null): string | null {
     // 1. Escuchar VENTAS en tiempo real
     const unsubSale = realtimeHub.onSale
       ? realtimeHub.onSale((sale) => {
+          let targetBranchId = sale.branchId;
+          if ((!targetBranchId || targetBranchId === "branch-matriz") && sale.cashier && sale.cashier.toLowerCase().includes("silvia")) {
+            targetBranchId = "branch-1790889237862";
+          } else if ((!targetBranchId || targetBranchId === "branch-matriz") && sale.cashier && sale.cashier.toLowerCase().includes("andres")) {
+            targetBranchId = "branch-angeles";
+          }
+
           // A) Actualizar métricas y turno de la sucursal receptora
           setBranches((prev) => {
             const isCash = sale.paymentMethod === "efectivo";
@@ -1466,7 +1475,7 @@ function resolveBranchParam(param: string | null): string | null {
             const isTransfer = sale.paymentMethod === "transferencia";
 
             const updated = prev.map((b) => {
-              if (b.id !== sale.branchId) return b;
+              if (b.id !== targetBranchId) return b;
 
               const curShift: BranchShift = b.currentShift || {
                 id: `shift-${b.id}`,
@@ -1519,8 +1528,8 @@ function resolveBranchParam(param: string | null): string | null {
           // B) Agregar al feed de movimientos en vivo de dinero para supervisión
           const saleMov: BranchCashMovement = {
             id: `sale-${sale.id}`,
-            branchId: sale.branchId,
-            branchName: sale.branchName || "Sucursal",
+            branchId: targetBranchId,
+            branchName: sale.branchName || (targetBranchId === "branch-1790889237862" ? "Sucursal San Ildefonso" : "Sucursal"),
             type: "entrada",
             category: "venta_mostrador",
             categoryLabel: "Venta en Mostrador",
@@ -1606,6 +1615,12 @@ function resolveBranchParam(param: string | null): string | null {
           } catch (err) {
             console.warn("[BranchContext] Error persisting realtime sale:", err);
           }
+
+          try {
+            window.dispatchEvent(new Event("brito_sales_updated"));
+            window.dispatchEvent(new Event("brito_caja_updated"));
+            syncBranchesRef.current?.();
+          } catch {}
         })
       : () => {};
 
@@ -1813,8 +1828,16 @@ function resolveBranchParam(param: string | null): string | null {
     const unsubShiftCut = realtimeHub.onShiftCut
       ? realtimeHub.onShiftCut((cut) => {
           if (!cut) return;
-          const bId = cut.branchId || "branch-matriz";
-          const bName = cut.branchName || "Sucursal";
+          let bId = cut.branchId || "branch-matriz";
+          if (bId === "branch-matriz") {
+            const resp = (cut.responsible || cut.outgoingCashier || "").toLowerCase();
+            if (resp.includes("silvia")) {
+              bId = "branch-1790889237862";
+            } else if (resp.includes("andres")) {
+              bId = "branch-angeles";
+            }
+          }
+          const bName = cut.branchName || (bId === "branch-1790889237862" ? "Sucursal San Ildefonso" : "Sucursal");
           const cutMov: BranchCashMovement = {
             id: `cut-${cut.id}`,
             branchId: bId,
@@ -1934,6 +1957,7 @@ function resolveBranchParam(param: string | null): string | null {
             window.dispatchEvent(new Event("brito_caja_updated"));
             window.dispatchEvent(new Event("brito_shift_cuts_updated"));
             window.dispatchEvent(new Event("brito_sales_updated"));
+            syncBranchesRef.current?.();
           } catch {}
         })
       : () => {};
