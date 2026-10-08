@@ -150,9 +150,9 @@ export const DEMO_USERS: User[] = [
     username: "paulina",
     email: "paulina@panaderiabrito.com",
     password: "1234",
-    role: "auxiliar_admin",
+    role: "admin",
     roleLabel: "Administrador General",
-    jobTitle: "Auxiliar Administrativo",
+    jobTitle: "Administradora General",
     avatar: "👩‍💼",
     phone: "55 8765 4321",
     status: "activo",
@@ -615,6 +615,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return { ...u, assignedBranchId: "branch-angeles", assignedBranchName: "Sucursal Los Ángeles" };
               }
             }
+            if (u.id === "usr-2" || u.username === "paulina") {
+              if (u.role !== "admin") {
+                modified = true;
+                return { ...u, role: "admin", roleLabel: "Administrador General", jobTitle: "Administradora General" };
+              }
+            }
             if (u.id === "usr-5" || u.username === "carlos") {
               if (u.assignedBranchId !== "branch-benito") {
                 modified = true;
@@ -830,6 +836,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (parsedUser.assignedBranchId !== "branch-benito") {
               parsedUser.assignedBranchId = "branch-benito";
               parsedUser.assignedBranchName = "Sucursal San Benito (Mercado)";
+              sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
+            }
+          }
+          if (parsedUser && (parsedUser.id === "usr-2" || parsedUser.username === "paulina")) {
+            if (parsedUser.role !== "admin") {
+              parsedUser.role = "admin";
+              parsedUser.roleLabel = "Administrador General";
+              parsedUser.jobTitle = "Administradora General";
               sessionStorage.setItem("brito_user", JSON.stringify(parsedUser));
             }
           }
