@@ -14,7 +14,16 @@ export default function SessionRevokedModal() {
   const handleAcknowledge = () => {
     clearRevokedSession();
     if (typeof window !== "undefined") {
-      window.location.href = "/";
+      sessionStorage.removeItem("brito_session_revoked");
+      localStorage.removeItem("brito_session_revoked");
+      sessionStorage.removeItem("brito_user");
+      sessionStorage.removeItem("brito_session_active");
+      sessionStorage.removeItem("brito_session_token");
+      sessionStorage.removeItem("brito_tab_id");
+      localStorage.removeItem("brito_session_token");
+      if (window.location.pathname !== "/") {
+        router.push("/");
+      }
     } else {
       router.push("/");
     }

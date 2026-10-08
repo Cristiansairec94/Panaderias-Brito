@@ -142,12 +142,24 @@ export async function PUT(req: NextRequest) {
     const sessions = { ...readStoredSessions() };
     const current = sessions[userId];
 
-    // Si no hay sesión registrada o el sessionToken no coincide
+    // Si no hay sesión previa registrada en el servidor, registrar esta como la sesión activa
     if (!current) {
+      const nowIso = new Date().toISOString();
+      const newSession: UserActiveSession = {
+        userId,
+        sessionToken,
+        deviceId: deviceId || "unknown_device",
+        deviceName: "Este equipo",
+        loginAt: nowIso,
+        lastSeenAt: nowIso,
+      };
+      sessions[userId] = newSession;
+      writeStoredSessions(sessions);
+
       return NextResponse.json({
         success: true,
-        valid: false,
-        reason: "no_active_session",
+        valid: true,
+        activeSession: newSession,
       });
     }
 

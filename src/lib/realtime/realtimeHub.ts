@@ -513,6 +513,7 @@ class RealtimeHub {
       if (!Array.isArray(data.events) || data.events.length === 0) return;
 
       for (const item of data.events) {
+        if (item.type === "user_session_revoked") continue;
         if (item.senderTabId && item.senderTabId === this.tabId) continue;
         if (item.payload?.senderTabId && item.payload.senderTabId === this.tabId) continue;
 
@@ -603,7 +604,6 @@ class RealtimeHub {
     };
 
     this.sendBroadcast("user_session_revoked", payload);
-    this.postToSyncEndpoint("user_session_revoked", payload);
   }
 
   public onUserSessionRevoked(listener: SessionRevokedListener) {

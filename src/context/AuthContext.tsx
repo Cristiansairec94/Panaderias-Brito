@@ -423,8 +423,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.removeItem("brito_tab_id");
       localStorage.removeItem("brito_session_token");
       try {
+        // Guardar SOLO en sessionStorage de esta pestaña para no bloquear otras ventanas nuevas
         sessionStorage.setItem("brito_session_revoked", JSON.stringify(info));
-        localStorage.setItem("brito_session_revoked", JSON.stringify(info));
+        localStorage.removeItem("brito_session_revoked");
       } catch (e) {}
     }
   }, []);
@@ -483,7 +484,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = realtimeHub.onUserSessionRevoked((payload) => {
       const currentUser = userRef.current;
-      if (!currentUser || payload.userId !== currentUser.id) {
+      const currentToken = sessionTokenRef.current;
+      // Solo nos interesa si este usuario está efectivamente en sesión en esta pestaña
+      if (!currentUser || !currentToken || payload.userId !== currentUser.id) {
+        return;
+      }
+
+      // Si el evento fue emitido por esta misma pestaña, ignorar
+      if (payload.activeTabId && payload.activeTabId === tabIdRef.current) {
+        return;
+      }
+      if (payload.activeSessionToken && payload.activeSessionToken === currentToken) {
         return;
       }
 
@@ -491,8 +502,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const isOtherDevice = Boolean(payload.activeDeviceId && payload.activeDeviceId !== myDeviceId);
       const isOtherTab = Boolean(payload.activeTabId && payload.activeTabId !== tabIdRef.current);
       const isOtherToken = Boolean(
-        (payload.activeSessionToken && payload.activeSessionToken !== sessionTokenRef.current) ||
-        (payload.sessionToken && payload.sessionToken !== sessionTokenRef.current)
+        (payload.activeSessionToken && payload.activeSessionToken !== currentToken) ||
+        (payload.sessionToken && payload.sessionToken !== currentToken)
       );
 
       // Si fue abierto en otro equipo O en otra pestaña/ventana de este mismo equipo
@@ -551,12 +562,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (res.ok) {
           const data = await res.json();
           if (data && data.valid === false) {
-            const active = data.activeSession;
-            const isSameDevice = data.reason === "session_overridden_same_device" || (active && active.deviceId === myDeviceId);
-            const sourceName = isSameDevice
-              ? "Otra pestaña / ventana en este mismo equipo"
-              : (active?.deviceName || "Otro equipo o dispositivo");
-            handleForceLogout(sourceName, active?.loginAt || active?.lastSeenAt);
+            // Solo revocar si REALMENTE fue revocada por otra ventana o equipo
+            if (data.reason === "session_overridden_same_device" || data.reason === "session_overridden_other_device") {
+              const active = data.activeSession;
+              const isSameDevice = data.reason === "session_overridden_same_device" || (active && active.deviceId === myDeviceId);
+              const sourceName = isSameDevice
+                ? "Otra pestaña / ventana en este mismo equipo"
+                : (active?.deviceName || "Otro equipo o dispositivo");
+              handleForceLogout(sourceName, active?.loginAt || active?.lastSeenAt);
+            }
           }
         }
       } catch (e) {
@@ -695,9 +709,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (typeof window !== "undefined") {
-      // Restaurar notificación de sesión revocada si ocurrió recientemente
+      // Restaurar notificación de sesión revocada si ocurrió recientemente en ESTA ventana específica
       try {
-        const savedRevoked = sessionStorage.getItem("brito_session_revoked") || localStorage.getItem("brito_session_revoked");
+        localStorage.removeItem("brito_session_revoked");
+        const savedRevoked = sessionStorage.getItem("brito_session_revoked");
         if (savedRevoked) {
           setRevokedSessionInfo(JSON.parse(savedRevoked));
         }
@@ -731,34 +746,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(parsedUser);
 
           // Restaurar o generar token de sesión
-          const savedToken = sessionStorage.getItem("brito_session_token") || localStorage.getItem("brito_session_token");
+          const savedToken = sessionStorage.getItem("brito_session_token");
           if (savedToken) {
             setSessionToken(savedToken);
             const myDeviceId = getDeviceId();
             const currentTabId = tabIdRef.current;
-            const activeTabInStorage = localStorage.getItem(`brito_active_tab_${parsedUser.id}`);
 
-            // Si ya hay otra pestaña activa registrada en este mismo equipo para este usuario
-            if (activeTabInStorage && activeTabInStorage !== currentTabId) {
-              handleForceLogout("Otra pestaña / ventana en este mismo equipo");
-            } else {
-              localStorage.setItem(`brito_active_tab_${parsedUser.id}`, currentTabId);
-              sessionStorage.setItem("brito_tab_id", currentTabId);
+            // Reclamar esta pestaña como activa en este navegador
+            localStorage.setItem(`brito_active_tab_${parsedUser.id}`, currentTabId);
+            sessionStorage.setItem("brito_tab_id", currentTabId);
 
-              // Verificar si el servidor aún considera este equipo como el titular autorizado
-              fetch(`/api/auth/session?userId=${encodeURIComponent(parsedUser.id)}`)
-                .then((res) => res.json())
-                .then((data) => {
-                  if (data?.activeSession) {
-                    if (data.activeSession.deviceId && data.activeSession.deviceId !== myDeviceId) {
-                      handleForceLogout(data.activeSession.deviceName, data.activeSession.lastSeenAt || data.activeSession.loginAt);
-                    } else if (data.activeSession.sessionToken && data.activeSession.sessionToken !== savedToken) {
-                      handleForceLogout("Otra pestaña / ventana en este mismo equipo", data.activeSession.lastSeenAt || data.activeSession.loginAt);
-                    }
+            // Verificar si el servidor aún considera este equipo como el titular autorizado
+            fetch(`/api/auth/session?userId=${encodeURIComponent(parsedUser.id)}`)
+              .then((res) => res.json())
+              .then((data) => {
+                if (data?.activeSession) {
+                  if (data.activeSession.deviceId && data.activeSession.deviceId !== myDeviceId) {
+                    handleForceLogout(data.activeSession.deviceName || "Otro equipo o dispositivo", data.activeSession.lastSeenAt || data.activeSession.loginAt);
+                  } else if (data.activeSession.sessionToken && data.activeSession.sessionToken !== savedToken) {
+                    handleForceLogout("Otra pestaña / ventana en este mismo equipo", data.activeSession.lastSeenAt || data.activeSession.loginAt);
                   }
-                })
-                .catch(() => {});
-            }
+                }
+              })
+              .catch(() => {});
           } else {
             registerActiveSession(parsedUser);
           }
