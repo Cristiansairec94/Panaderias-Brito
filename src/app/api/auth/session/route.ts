@@ -151,23 +151,13 @@ export async function PUT(req: NextRequest) {
       });
     }
 
-    // Si el sessionToken es diferente
+    // Si el sessionToken es diferente (otra ventana en este equipo o inicio de sesión en otro equipo)
     if (current.sessionToken !== sessionToken) {
-      // Si el deviceId es de OTRO equipo, la sesión fue tomada en otro dispositivo
-      if (deviceId && current.deviceId && current.deviceId !== deviceId) {
-        return NextResponse.json({
-          success: true,
-          valid: false,
-          reason: "session_overridden_other_device",
-          activeSession: current,
-        });
-      }
-
-      // Si es el MISMO equipo (otra pestaña/ventana del mismo navegador), no revocar
+      const isOtherDevice = Boolean(deviceId && current.deviceId && current.deviceId !== deviceId);
       return NextResponse.json({
         success: true,
-        valid: true,
-        sameDevice: true,
+        valid: false,
+        reason: isOtherDevice ? "session_overridden_other_device" : "session_overridden_same_device",
         activeSession: current,
       });
     }

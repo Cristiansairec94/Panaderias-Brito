@@ -393,6 +393,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionTokenRef.current = sessionToken;
   }, [sessionToken]);
 
+  // Identificador único e intransferible para cada pestaña o ventana individual
+  const tabIdRef = React.useRef<string>(
+    typeof window !== "undefined" && typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `tab_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  );
+
   const clearRevokedSession = useCallback(() => {
     setRevokedSessionInfo(null);
     if (typeof window !== "undefined") {
@@ -403,7 +410,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleForceLogout = useCallback((deviceName?: string, timestamp?: string) => {
     const info = {
-      deviceName: deviceName || "Otro dispositivo o equipo",
+      deviceName: deviceName || "Otro dispositivo o ventana",
       timestamp: timestamp || new Date().toISOString(),
     };
     setUser(null);
@@ -413,6 +420,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.removeItem("brito_user");
       sessionStorage.removeItem("brito_session_active");
       sessionStorage.removeItem("brito_session_token");
+      sessionStorage.removeItem("brito_tab_id");
       localStorage.removeItem("brito_session_token");
       try {
         sessionStorage.setItem("brito_session_revoked", JSON.stringify(info));
@@ -429,12 +437,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const deviceId = getDeviceId();
     const deviceName = getFriendlyDeviceName();
+    const currentTabId = tabIdRef.current;
 
     setSessionToken(newToken);
     setRevokedSessionInfo(null);
     try {
       sessionStorage.setItem("brito_session_token", newToken);
+      sessionStorage.setItem("brito_tab_id", currentTabId);
       localStorage.setItem("brito_session_token", newToken);
+      // Registrar esta pestaña como la única pestaña activa del usuario en este navegador
+      localStorage.setItem(`brito_active_tab_${targetUser.id}`, currentTabId);
       sessionStorage.removeItem("brito_session_revoked");
       localStorage.removeItem("brito_session_revoked");
     } catch (e) {}
@@ -453,11 +465,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }),
     }).catch((err) => console.warn("[AuthContext] Error registrando sesión activa:", err));
 
-    // Emitir revocación por broadcast a cualquier OTRO equipo que tenga este usuario abierto
+    // Emitir revocación por broadcast a cualquier OTRO equipo o ventana que tenga este usuario abierto
     realtimeHub.broadcastUserSessionRevoked({
       userId: targetUser.id,
       sessionToken: newToken,
+      activeSessionToken: newToken,
       activeDeviceId: deviceId,
+      activeTabId: currentTabId,
       deviceName,
       timestamp: new Date().toISOString(),
     });
@@ -465,7 +479,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return newToken;
   }, []);
 
-  // Escuchar eventos en tiempo real cuando la sesión se inicia en otro dispositivo
+  // Escuchar eventos en tiempo real cuando la sesión se inicia en otro dispositivo o en otra ventana
   useEffect(() => {
     const unsubscribe = realtimeHub.onUserSessionRevoked((payload) => {
       const currentUser = userRef.current;
@@ -474,25 +488,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const myDeviceId = getDeviceId();
-      // Si la sesión fue abierta en OTRO equipo físico (diferente deviceId)
-      if (payload.activeDeviceId && payload.activeDeviceId !== myDeviceId) {
-        handleForceLogout(payload.deviceName, payload.timestamp);
-      } else if (payload.activeDeviceId === myDeviceId) {
-        // Mismo equipo físico (otra pestaña o ventana del mismo navegador)
-        const token = payload.activeSessionToken || payload.sessionToken;
-        if (token) {
-          setSessionToken(token);
-          try {
-            sessionStorage.setItem("brito_session_token", token);
-            localStorage.setItem("brito_session_token", token);
-          } catch (e) {}
-        }
+      const isOtherDevice = Boolean(payload.activeDeviceId && payload.activeDeviceId !== myDeviceId);
+      const isOtherTab = Boolean(payload.activeTabId && payload.activeTabId !== tabIdRef.current);
+      const isOtherToken = Boolean(
+        (payload.activeSessionToken && payload.activeSessionToken !== sessionTokenRef.current) ||
+        (payload.sessionToken && payload.sessionToken !== sessionTokenRef.current)
+      );
+
+      // Si fue abierto en otro equipo O en otra pestaña/ventana de este mismo equipo
+      if (isOtherDevice || isOtherTab || isOtherToken) {
+        const sourceName = isOtherDevice
+          ? (payload.deviceName || "Otro equipo o dispositivo")
+          : "Otra pestaña / ventana en este mismo equipo";
+        handleForceLogout(sourceName, payload.timestamp);
       }
     });
 
     return () => {
       unsubscribe();
     };
+  }, [handleForceLogout]);
+
+  // Sincronización instantánea entre pestañas abiertas en el mismo equipo (almacenamiento local)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      const currentUser = userRef.current;
+      if (!currentUser) return;
+
+      // Si otra ventana reclamó ser la pestaña activa para este mismo usuario
+      if (e.key === `brito_active_tab_${currentUser.id}` && e.newValue) {
+        if (e.newValue !== tabIdRef.current) {
+          handleForceLogout("Otra pestaña / ventana en este mismo equipo");
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, [handleForceLogout]);
 
   // Heartbeat y verificación de estado de sesión en el servidor
@@ -518,13 +550,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (res.ok) {
           const data = await res.json();
-          if (data && data.valid === false && data.reason === "session_overridden_other_device") {
+          if (data && data.valid === false) {
             const active = data.activeSession;
-            handleForceLogout(active?.deviceName, active?.loginAt || active?.lastSeenAt);
+            const isSameDevice = data.reason === "session_overridden_same_device" || (active && active.deviceId === myDeviceId);
+            const sourceName = isSameDevice
+              ? "Otra pestaña / ventana en este mismo equipo"
+              : (active?.deviceName || "Otro equipo o dispositivo");
+            handleForceLogout(sourceName, active?.loginAt || active?.lastSeenAt);
           }
         }
       } catch (e) {
-        // Red inestable o desconexión
+        // Red inestable o desconexión momentánea
       }
     };
 
@@ -698,18 +734,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const savedToken = sessionStorage.getItem("brito_session_token") || localStorage.getItem("brito_session_token");
           if (savedToken) {
             setSessionToken(savedToken);
-            // Verificar si el servidor aún considera este equipo como el titular autorizado
             const myDeviceId = getDeviceId();
-            fetch(`/api/auth/session?userId=${encodeURIComponent(parsedUser.id)}`)
-              .then((res) => res.json())
-              .then((data) => {
-                if (data?.activeSession) {
-                  if (data.activeSession.deviceId && data.activeSession.deviceId !== myDeviceId) {
-                    handleForceLogout(data.activeSession.deviceName, data.activeSession.lastSeenAt || data.activeSession.loginAt);
+            const currentTabId = tabIdRef.current;
+            const activeTabInStorage = localStorage.getItem(`brito_active_tab_${parsedUser.id}`);
+
+            // Si ya hay otra pestaña activa registrada en este mismo equipo para este usuario
+            if (activeTabInStorage && activeTabInStorage !== currentTabId) {
+              handleForceLogout("Otra pestaña / ventana en este mismo equipo");
+            } else {
+              localStorage.setItem(`brito_active_tab_${parsedUser.id}`, currentTabId);
+              sessionStorage.setItem("brito_tab_id", currentTabId);
+
+              // Verificar si el servidor aún considera este equipo como el titular autorizado
+              fetch(`/api/auth/session?userId=${encodeURIComponent(parsedUser.id)}`)
+                .then((res) => res.json())
+                .then((data) => {
+                  if (data?.activeSession) {
+                    if (data.activeSession.deviceId && data.activeSession.deviceId !== myDeviceId) {
+                      handleForceLogout(data.activeSession.deviceName, data.activeSession.lastSeenAt || data.activeSession.loginAt);
+                    } else if (data.activeSession.sessionToken && data.activeSession.sessionToken !== savedToken) {
+                      handleForceLogout("Otra pestaña / ventana en este mismo equipo", data.activeSession.lastSeenAt || data.activeSession.loginAt);
+                    }
                   }
-                }
-              })
-              .catch(() => {});
+                })
+                .catch(() => {});
+            }
           } else {
             registerActiveSession(parsedUser);
           }
@@ -977,8 +1026,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.removeItem("brito_user");
       sessionStorage.removeItem("brito_session_active");
       sessionStorage.removeItem("brito_session_token");
+      sessionStorage.removeItem("brito_tab_id");
       sessionStorage.removeItem("brito_redirect_url");
       localStorage.removeItem("brito_session_token");
+      if (currentUserId) {
+        try {
+          localStorage.removeItem(`brito_active_tab_${currentUserId}`);
+        } catch (e) {}
+      }
       try {
         localStorage.removeItem("brito_user");
       } catch (e) {}

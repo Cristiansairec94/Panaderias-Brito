@@ -80,6 +80,7 @@ export interface RealtimeSessionRevokedPayload {
   activeDeviceId: string;
   activeSessionToken: string;
   sessionToken?: string;
+  activeTabId?: string;
   deviceName?: string;
   timestamp: string;
   senderDeviceId: string;
@@ -585,6 +586,7 @@ class RealtimeHub {
     activeDeviceId: string;
     activeSessionToken?: string;
     sessionToken?: string;
+    activeTabId?: string;
     deviceName?: string;
     timestamp?: string;
   }) {
@@ -594,6 +596,7 @@ class RealtimeHub {
       activeDeviceId: params.activeDeviceId,
       activeSessionToken: token,
       sessionToken: token,
+      activeTabId: params.activeTabId,
       deviceName: params.deviceName,
       timestamp: params.timestamp || new Date().toISOString(),
       senderDeviceId: this.getDeviceId(),
