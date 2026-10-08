@@ -2240,8 +2240,14 @@ export default function POSPage() {
     const ordersCashCalc = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
     const branchOrdersDeposit = Number(activeBranch?.todayOrdersDeposit ?? 0);
     const ordersCash = branchOrdersDeposit > 0 && ordersCashCalc === 0 ? branchOrdersDeposit : ordersCashCalc;
-    return posCash + ordersCash;
-  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit, activeBranch?.currentShift?.cashSales]);
+    const baseCash = posCash + ordersCash;
+    const targetBranchCash = Number(activeBranch?.cashInDrawer ?? 0);
+    const targetFund = Number(initialCashFund || 0);
+    if (targetBranchCash > 0 && baseCash === 0 && targetBranchCash > targetFund) {
+      return targetBranchCash - targetFund;
+    }
+    return baseCash;
+  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit, activeBranch?.currentShift?.cashSales, activeBranch?.cashInDrawer, initialCashFund]);
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])
@@ -2255,7 +2261,10 @@ export default function POSPage() {
       return true;
     })
     .reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-  const netCashInDrawer = (Number(initialCashFund) || 0) + totalCashSales + totalExtraInCash - totalExpenses;
+  const calculatedNetCashInDrawer = (Number(initialCashFund) || 0) + totalCashSales + totalExtraInCash - totalExpenses;
+  const netCashInDrawer = activeBranch?.cashInDrawer !== undefined && Number(activeBranch.cashInDrawer) > 0
+    ? Number(activeBranch.cashInDrawer)
+    : calculatedNetCashInDrawer;
   const totalStockValue = (products || []).reduce((sum, p) => sum + ((Number(p?.stock) || 0) * (Number(p?.price) || 0)), 0);
 
   const handleQuickCash = (amount: number) => {
@@ -3552,49 +3561,29 @@ export default function POSPage() {
                                     )}
                                   </div>
 
-                                  {/* Fila Principal de Métricas: Dinero en Caja (Gran Protagonista) + Actividad */}
-                                  <div className="flex items-baseline justify-between gap-3 px-0.5">
+                                  {/* Fila Principal de Métricas: Dinero en Caja (Gran Protagonista en Verde) */}
+                                  <div className="flex items-center justify-between gap-3 px-0.5">
                                     <div>
-                                      <p className="text-[10px] uppercase font-bold tracking-wider text-amber-200/60">
-                                        Dinero en Caja
+                                      <p className="text-[10px] uppercase font-bold tracking-wider text-emerald-400/90 flex items-center gap-1">
+                                        <span>💵</span> Dinero en Caja
                                       </p>
                                       <p className="font-mono font-black text-2xl sm:text-3xl text-emerald-400 tracking-tight leading-none mt-1 drop-shadow-xs">
                                         {formatCurrency(b.cashInDrawer)}
                                       </p>
                                     </div>
 
-                                    <div className="text-right">
-                                      <p className="text-[10px] uppercase font-bold tracking-wider text-amber-200/60">
-                                        Actividad
-                                      </p>
-                                      <p className="font-mono font-black text-sm sm:text-base text-amber-300 leading-none mt-1">
-                                        {b.todayTickets} <span className="text-xs font-semibold text-stone-400 font-sans">{b.todayTickets === 1 ? "venta" : "ventas"}</span>
-                                      </p>
+                                    <div className="text-right shrink-0">
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-500/50 shadow-xs">
+                                        {b.todayTickets} {b.todayTickets === 1 ? "op" : "ops"}
+                                      </span>
                                     </div>
                                   </div>
 
-                                  {/* Fila de Contexto: Desglose y Cajero */}
-                                  <div className="pt-2 border-t border-amber-900/30 flex items-center justify-between text-xs text-stone-300 flex-wrap gap-2">
-                                    <div className="flex items-center gap-2.5">
-                                      <span className="flex items-center gap-1 text-stone-300">
-                                        <span className="text-stone-400 text-[11px]">🥖 Mostrador:</span>
-                                        <strong className="font-mono font-bold text-white text-xs">
-                                          {formatCurrency(b.todayDeskSales ?? b.todaySales)}
-                                        </strong>
-                                      </span>
-                                      {(b.todayOrdersDeposit ?? 0) > 0 && (
-                                        <span className="flex items-center gap-1 text-pink-300">
-                                          <span className="text-pink-400/80 text-[11px]">🎂 Pedidos:</span>
-                                          <strong className="font-mono font-bold text-pink-200 text-xs">
-                                            {formatCurrency(b.todayOrdersDeposit ?? 0)}
-                                          </strong>
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    <span className="text-stone-400 flex items-center gap-1 text-[11px] truncate max-w-[180px]">
+                                  {/* Fila de Contexto: Cajero */}
+                                  <div className="pt-2 border-t border-amber-900/30 flex items-center justify-between text-xs text-stone-300">
+                                    <span className="text-stone-300 flex items-center gap-1.5 text-xs truncate">
                                       <span>👤</span>
-                                      <span className="text-stone-300 font-medium truncate">{b.currentShift?.cashier || b.manager || "Cajero en turno"}</span>
+                                      <span className="font-medium text-stone-200 truncate">{b.currentShift?.cashier || b.manager || "Cajero en turno"}</span>
                                     </span>
                                   </div>
 
@@ -3605,12 +3594,12 @@ export default function POSPage() {
                                         <span className="text-amber-400 font-mono font-semibold">
                                           🧾 {b.lastCut.id}
                                         </span>
-                                        <span className={`px-2 py-0.2 rounded-full text-[10px] font-bold ${
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                           b.lastCut.difference === 0 
                                             ? "bg-emerald-950/80 text-emerald-300 border border-emerald-500/40" 
                                             : "bg-rose-950/80 text-rose-300 border border-rose-500/40"
                                         }`}>
-                                          {b.lastCut.difference === 0 ? "✓ Cuadrada" : `Dif: ${formatCurrency(b.lastCut.difference)}`}
+                                          {b.lastCut.difference === 0 ? "✓ Cuadrada Exacta ($0.00)" : `Dif: ${formatCurrency(b.lastCut.difference)}`}
                                         </span>
                                       </div>
                                       <button
@@ -3627,36 +3616,25 @@ export default function POSPage() {
                             })}
                           </div>
 
-                          {/* Consolidado Red Brito: Resumen Ejecutivo de Alto Nivel */}
-                          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-black/95 via-[#231209] to-black/95 border border-amber-500/50 shadow-xl space-y-2.5">
+                          {/* Consolidado Red Brito: Resumen Ejecutivo enfocado exclusivamente en Dinero en Cajas */}
+                          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-black/95 via-[#160f08] to-black/95 border border-emerald-500/50 shadow-xl space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                Consolidado Total Red Brito
+                                Consolidado en Cajas Red Brito
                               </span>
-                              <span className="font-mono font-bold text-xs text-amber-200 bg-amber-950/80 border border-amber-600/40 px-2.5 py-0.5 rounded-full">
-                                {branches.reduce((sum, b) => sum + (b.todayTickets || 0), 0)} ventas totales
+                              <span className="font-mono font-bold text-xs text-emerald-300 bg-emerald-950/90 border border-emerald-600/40 px-2.5 py-0.5 rounded-full shadow-xs">
+                                {branches.reduce((sum, b) => sum + (b.todayTickets || 0), 0)} operaciones totales
                               </span>
                             </div>
 
-                            <div className="flex items-baseline justify-between gap-4 pt-1">
-                              <div>
-                                <p className="text-[10px] uppercase font-bold tracking-wider text-stone-400">
-                                  Total Efectivo en Cajas
-                                </p>
-                                <p className="font-mono font-black text-2xl sm:text-3xl text-emerald-400 tracking-tight leading-none mt-1 drop-shadow-xs">
-                                  {formatCurrency(branches.reduce((sum, b) => sum + (b.cashInDrawer || 0), 0))}
-                                </p>
-                              </div>
-
-                              <div className="text-right">
-                                <p className="text-[10px] uppercase font-bold tracking-wider text-amber-200/60">
-                                  Venta Mostrador Red
-                                </p>
-                                <p className="font-mono font-black text-lg sm:text-xl text-amber-300 leading-none mt-1">
-                                  {formatCurrency(branches.reduce((sum, b) => sum + (b.todayDeskSales ?? b.todaySales ?? 0), 0))}
-                                </p>
-                              </div>
+                            <div className="pt-1">
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-stone-400 flex items-center gap-1">
+                                <span>💵</span> Total Efectivo en Cajas
+                              </p>
+                              <p className="font-mono font-black text-3xl sm:text-4xl text-emerald-400 tracking-tight leading-none mt-1.5 drop-shadow-xs">
+                                {formatCurrency(branches.reduce((sum, b) => sum + (b.cashInDrawer || 0), 0))}
+                              </p>
                             </div>
                           </div>
                         </div>
