@@ -320,8 +320,9 @@ interface BranchContextType {
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
   const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+  const canSwitchBranches = isAdmin || user?.role === "supervisor" || Boolean(permissions?.canAccessSucursales);
   const userAssignedBranchId = (user?.assignedBranchId || "").trim();
 
   const [branches, setBranches] = useState<Branch[]>(() => {
@@ -435,13 +436,13 @@ function resolveBranchParam(param: string | null): string | null {
 
   // Los perfiles operativos (cajeros, etc.) quedan anclados a su sucursal asignada (a menos que no tengan asignada)
   useEffect(() => {
-    if (!isAdmin && userAssignedBranchId) {
+    if (!canSwitchBranches && userAssignedBranchId) {
       setCurrentBranchId(userAssignedBranchId);
       try {
         localStorage.setItem("brito_current_branch_id", userAssignedBranchId);
       } catch {}
     }
-  }, [isAdmin, userAssignedBranchId]);
+  }, [canSwitchBranches, userAssignedBranchId]);
 
   const [isLiveSimulating, setIsLiveSimulating] = useState(false);
   const [recentSimulatedSales, setRecentSimulatedSales] = useState<SimulatedSale[]>([]);

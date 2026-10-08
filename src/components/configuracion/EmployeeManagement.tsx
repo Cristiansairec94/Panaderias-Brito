@@ -102,6 +102,17 @@ const SYSTEM_ROLES: SystemRoleOption[] = [
     activeBg: "bg-purple-50",
   },
   {
+    id: "panadero",
+    label: "Maestro Panadero / Hornero",
+    shortLabel: "Panadero",
+    badge: "Producción & Horno",
+    icon: "🥖",
+    description: "Control de horneado, producción de pan y pastelería, insumos y pedidos.",
+    badgeBg: "bg-orange-100 text-orange-900 border-orange-300",
+    activeBorder: "border-orange-500 ring-2 ring-orange-400/40",
+    activeBg: "bg-orange-50",
+  },
+  {
     id: "admin",
     label: "Administrador General",
     shortLabel: "Administrador",
@@ -134,10 +145,10 @@ function generateRandomPin(): string {
 
 function suggestRoleFromJobTitle(jobTitle: string): UserRole {
   const lower = jobTitle.toLowerCase();
+  if (lower.includes("panader") || lower.includes("horn") || lower.includes("pastel") || lower.includes("amasad")) return "panadero";
   if (lower.includes("caj") || lower.includes("mostrador") || lower.includes("tienda")) return "cajero";
   if (lower.includes("admin") || lower.includes("auxiliar")) return "auxiliar_admin";
   if (lower.includes("superv") || lower.includes("encargad") || lower.includes("gerent")) return "supervisor";
-  if (lower.includes("panader") || lower.includes("horn") || lower.includes("pastel")) return "cajero";
   return "cajero";
 }
 

@@ -104,22 +104,23 @@ export default function PedidosPage() {
   const { addNotification } = useNotifications();
 
   // Control de roles y asignación de sucursal:
-  // Administradores: control y visualización total multi-sucursal ("all" y cualquier tienda)
-  // Perfiles operativos (cajeros como Andrés): estrictamente su sucursal asignada
+  // Administradores y supervisores: control y visualización total multi-sucursal ("all" y cualquier tienda)
+  // Perfiles operativos (cajeros): estrictamente su sucursal asignada
   const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+  const canFilterBranches = isAdmin || user?.role === "supervisor" || Boolean(user?.permissions?.canAccessSucursales);
   const userBranchId = (user?.assignedBranchId || currentBranch?.id || branches[0]?.id || "branch-matriz").trim();
   const userBranch = branches.find((b) => b.id === userBranchId) || currentBranch || branches[0];
 
   // State: Default view is "productos" en formato "lista" compacta y ordenada
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedBranchFilter, setSelectedBranchFilter] = useState(() => (isAdmin ? "all" : userBranchId));
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState(() => (canFilterBranches ? "all" : userBranchId));
 
   // Filtro efectivo de sucursal (para cajeros siempre está forzado a su sucursal asignada)
   const effectiveBranchFilter = useMemo(() => {
-    if (isAdmin) return selectedBranchFilter;
+    if (canFilterBranches) return selectedBranchFilter;
     return userBranchId;
-  }, [isAdmin, selectedBranchFilter, userBranchId]);
+  }, [canFilterBranches, selectedBranchFilter, userBranchId]);
 
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
   const [historialSubFilter, setHistorialSubFilter] = useState<"todos" | "entregados" | "cancelados">("todos");
@@ -258,16 +259,16 @@ export default function PedidosPage() {
   }, []);
 
   // Sincronización de sucursal: los cajeros quedan fijados a su tienda asignada;
-  // los administradores se sincronizan con la sucursal activa en la cabecera ("all" o tienda individual).
+  // los administradores y supervisores se sincronizan con la sucursal activa en la cabecera ("all" o tienda individual).
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canFilterBranches) {
       setSelectedBranchFilter(userBranchId);
     } else if (isAllBranches) {
       setSelectedBranchFilter("all");
     } else if (currentBranch && currentBranch.id) {
       setSelectedBranchFilter(currentBranch.id);
     }
-  }, [isAdmin, userBranchId, isAllBranches, currentBranch?.id]);
+  }, [canFilterBranches, userBranchId, isAllBranches, currentBranch?.id]);
 
   // Local minute clock (for checking if delivery time has passed today)
   const [currentMinutes, setCurrentMinutes] = useState<number>(() => {

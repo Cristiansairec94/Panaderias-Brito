@@ -698,6 +698,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Sincronización continua de roles, permisos y usuarios desde el servidor para garantizar que todas las máquinas tengan la misma verdad
+  useEffect(() => {
+    let isMounted = true;
+
+    const syncServerData = async () => {
+      // 1. Sincronizar roles y permisos del servidor
+      try {
+        const rolesRes = await fetch("/api/roles");
+        if (rolesRes.ok) {
+          const rolesData = await rolesRes.json();
+          if (rolesData && rolesData.permissions && isMounted) {
+            const serverPerms = rolesData.permissions;
+            const merged: Record<string, RolePermissions> = { ...ROLE_PERMISSIONS };
+            Object.keys(serverPerms).forEach((key) => {
+              const defaultRolePerms = (ROLE_PERMISSIONS as any)[key] || ROLE_PERMISSIONS.cajero;
+              merged[key] = {
+                ...defaultRolePerms,
+                ...serverPerms[key],
+              };
+              if (key === "admin") {
+                merged[key].canAccessDashboard = true;
+              }
+            });
+            setRolePermissionsMap(merged);
+            try {
+              localStorage.setItem("brito_role_permissions", JSON.stringify(merged));
+            } catch (e) {}
+          }
+        }
+      } catch (err) {
+        console.warn("[AuthContext] Error consultando /api/roles:", err);
+      }
+
+      // 2. Sincronizar lista completa de empleados desde el servidor
+      try {
+        const usersRes = await fetch("/api/users");
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          if (usersData && Array.isArray(usersData.users) && usersData.users.length > 0 && isMounted) {
+            const serverUsers: User[] = usersData.users;
+            setUsersList(serverUsers);
+            try {
+              localStorage.setItem("brito_custom_users", JSON.stringify(serverUsers));
+            } catch (e) {}
+
+            // Actualizar usuario en sesión activa si sus datos cambiaron en otra máquina
+            setUser((currentUser) => {
+              if (!currentUser) return null;
+              const match = serverUsers.find((u) => u.id === currentUser.id);
+              if (match) {
+                const updated: User = {
+                  ...currentUser,
+                  name: match.name,
+                  role: match.role,
+                  roleLabel: match.roleLabel,
+                  jobTitle: match.jobTitle,
+                  assignedBranchId: match.assignedBranchId,
+                  assignedBranchName: match.assignedBranchName,
+                  permissions: match.permissions,
+                  status: match.status,
+                  hasSystemAccess: match.hasSystemAccess,
+                };
+                try {
+                  sessionStorage.setItem("brito_user", JSON.stringify(updated));
+                } catch (e) {}
+                return updated;
+              }
+              return currentUser;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[AuthContext] Error consultando /api/users:", err);
+      }
+    };
+
+    syncServerData();
+
+    // Sincronizar al enfocar la ventana para captar cambios hechos en otras máquinas
+    const handleWindowFocus = () => {
+      syncServerData();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, []);
+
   // Check saved session on mount (Aislamiento estricto de sesión por ventana con sessionStorage)
   useEffect(() => {
     // Seguridad: limpiar sesiones residuales previas en localStorage para evitar que
@@ -1247,6 +1337,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return curr;
     });
+
+    // Persistir rol y permisos en el servidor para que todas las demás máquinas lo reciban
+    fetch("/api/roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role,
+        permissions: newPermissions,
+        roleTitle: roleLabel,
+      }),
+    }).catch((err) => console.warn("[AuthContext] Error persistiendo rol en servidor:", err));
   }, []);
 
   // Remove permissions for a deleted role
@@ -1261,6 +1362,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return copy;
     });
+
+    fetch("/api/roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        role,
+        permissions: {},
+      }),
+    }).catch(() => {});
   }, []);
 
   return (

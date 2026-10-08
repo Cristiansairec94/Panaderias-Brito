@@ -59,8 +59,9 @@ const ALL_TOP_BAKERY_PRODUCTS: TopProductItem[] = [
 ];
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "auxiliar_admin";
+  const canSwitchBranches = isAdmin || Boolean(user?.role === "supervisor" || permissions?.canAccessSucursales);
   const { unreadCount } = useNotifications();
   const { 
     branches, 
@@ -164,11 +165,11 @@ export default function Home() {
     return [...branches].sort((a, b) => b.todaySales - a.todaySales);
   }, [branches]);
 
-  // Si es cajero/operativo, solo visualiza la sucursal asignada
+  // Si es cajero/operativo, solo visualiza la sucursal asignada; supervisores y admins ven todas
   const displayedBranches = useMemo(() => {
-    if (isAdmin) return sortedBranches;
+    if (canSwitchBranches) return sortedBranches;
     return sortedBranches.filter((b) => b.id === currentBranch?.id);
-  }, [isAdmin, sortedBranches, currentBranch]);
+  }, [canSwitchBranches, sortedBranches, currentBranch]);
 
   // Filtrado de productos estrella por categoría
   const displayedTopProducts = useMemo(() => {
@@ -226,7 +227,7 @@ export default function Home() {
             {/* Branch Selector Pills */}
             <div className="pt-1 flex flex-wrap items-center gap-1.5">
               <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider mr-1">Sucursal:</span>
-              {isAdmin ? (
+              {canSwitchBranches ? (
                 <>
                   <button
                     onClick={() => switchBranch("all")}

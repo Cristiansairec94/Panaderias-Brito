@@ -59,16 +59,15 @@ function sanitizeUser(u: AppUser): Omit<AppUser, "password"> {
   return safe;
 }
 
-// GET: Obtener todos los usuarios y empleados (PROTEGIDO: sin contraseñas)
+// GET: Obtener todos los usuarios y empleados sincronizados para las terminales del sistema
 export async function GET() {
   try {
     const users = readStoredUsers();
-    const sanitizedUsers = users.map(sanitizeUser);
 
     return NextResponse.json({
       success: true,
-      users: sanitizedUsers,
-      count: sanitizedUsers.length,
+      users,
+      count: users.length,
       timestamp: Date.now(),
     });
   } catch (err: any) {

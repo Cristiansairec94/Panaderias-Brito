@@ -241,6 +241,18 @@ const DEFAULT_SYSTEM_ROLES: RoleConfig[] = [
     colorClass: COLOR_THEMES.blue.colors,
   },
   {
+    id: "supervisor",
+    name: "Supervisor de Turno",
+    defaultTitle: "Supervisor de Sucursal",
+    subtitle: "Supervisión Operativa & Turnos",
+    badge: "Auditoría & Tiendas",
+    icon: "🛡️",
+    isSystemRole: true,
+    description: "Supervisión de operaciones de tienda, auditoría de turnos y cortes de caja, seguimiento de pedidos e inventarios.",
+    colorTheme: "purple",
+    colorClass: COLOR_THEMES.purple.colors,
+  },
+  {
     id: "cajero",
     name: "Cajeros o Auxiliares de Tienda",
     defaultTitle: "Cajero / Auxiliar de Tienda",
@@ -251,6 +263,18 @@ const DEFAULT_SYSTEM_ROLES: RoleConfig[] = [
     description: "Cobro rápido de pan en POS, emisión de tickets térmicos, apertura y corte de turnos de efectivo, arqueos y consulta de catálogo.",
     colorTheme: "emerald",
     colorClass: COLOR_THEMES.emerald.colors,
+  },
+  {
+    id: "panadero",
+    name: "Maestro Panadero",
+    defaultTitle: "Jefe de Horno & Producción",
+    subtitle: "Producción, Hornos & Recetas",
+    badge: "Producción & Horno",
+    icon: "🥖",
+    isSystemRole: true,
+    description: "Control de insumos de amasado y horneado, seguimiento de pedidos de panadería y pastelería, y reporte de producción diaria.",
+    colorTheme: "orange",
+    colorClass: COLOR_THEMES.orange.colors,
   },
 ];
 
@@ -517,14 +541,16 @@ export default function RoleManagement() {
     setTimeout(() => setToastMessage(null), 3800);
   };
 
-  // Load custom roles from localStorage on mount
+  // Load custom roles from localStorage and server on mount
   useEffect(() => {
+    let isMounted = true;
+
+    // 1. Cargar desde localStorage para despliegue instantáneo
     try {
       const saved = localStorage.getItem("brito_custom_system_roles");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge ensuring default roles always exist while allowing icon/title customizations
           const merged = DEFAULT_SYSTEM_ROLES.map((def) => {
             const override = parsed.find((p: RoleConfig) => p.id === def.id);
             if (override) {
@@ -547,9 +573,49 @@ export default function RoleManagement() {
     } catch (e) {
       console.error("Error loading custom system roles:", e);
     }
+
+    // 2. Sincronizar con el servidor /api/roles
+    const fetchServerRoles = async () => {
+      try {
+        const res = await fetch("/api/roles");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.roles) && data.roles.length > 0 && isMounted) {
+            const serverRoles: RoleConfig[] = data.roles;
+            const merged = DEFAULT_SYSTEM_ROLES.map((def) => {
+              const override = serverRoles.find((p: RoleConfig) => p.id === def.id);
+              if (override) {
+                return {
+                  ...def,
+                  icon: def.id === "admin" ? def.icon : override.icon || def.icon,
+                  defaultTitle: def.id === "admin" ? def.defaultTitle : override.defaultTitle || def.defaultTitle,
+                };
+              }
+              return def;
+            });
+            serverRoles.forEach((customRole: RoleConfig) => {
+              if (!merged.some((r) => r.id === customRole.id)) {
+                merged.push(customRole);
+              }
+            });
+            setRolesList(merged);
+            try {
+              localStorage.setItem("brito_custom_system_roles", JSON.stringify(merged));
+            } catch (e) {}
+          }
+        }
+      } catch (err) {
+        console.warn("[RoleManagement] Error consultando /api/roles:", err);
+      }
+    };
+
+    fetchServerRoles();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Save custom roles and icon customizations to localStorage
+  // Save custom roles and icon customizations to localStorage and server
   const persistRolesList = (newList: RoleConfig[]) => {
     setRolesList(newList);
     try {
@@ -557,6 +623,13 @@ export default function RoleManagement() {
     } catch (e) {
       console.error("Error persisting custom roles:", e);
     }
+
+    // Persistir lista de roles en el servidor
+    fetch("/api/roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roles: newList }),
+    }).catch((err) => console.warn("[RoleManagement] Error guardando roles en servidor:", err));
   };
 
   // Active role configuration object
