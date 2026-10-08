@@ -345,6 +345,16 @@ export interface AppUser {
   createdAt?: string;
 }
 
+export interface UserActiveSession {
+  userId: string;
+  sessionToken: string;
+  deviceId: string;
+  deviceName?: string;
+  ip?: string;
+  loginAt: string;
+  lastSeenAt?: string;
+}
+
 export interface BranchShift {
   id: string;
   name: string; // e.g. "Turno Matutino (06:00 - 14:00)"

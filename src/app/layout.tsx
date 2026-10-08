@@ -43,6 +43,7 @@ export const metadata: Metadata = {
 
 import { SyncProvider } from "@/context/SyncContext";
 import { BranchProvider } from "@/context/BranchContext";
+import SessionRevokedModal from "@/components/auth/SessionRevokedModal";
 
 export default function RootLayout({
   children,
@@ -61,6 +62,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased font-sans">
         <AuthProvider>
+          <SessionRevokedModal />
           <SyncProvider>
             <BranchProvider>
               <NotificationProvider>

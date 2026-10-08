@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { UserRole, RolePermissions, AppUser } from "@/types";
+import { getDeviceId, getFriendlyDeviceName } from "@/lib/device";
+import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
 export type User = AppUser;
 
@@ -366,6 +368,8 @@ interface AuthContextType {
   rolePermissionsMap: Record<UserRole, RolePermissions>;
   updateRolePermissions: (role: UserRole, newPermissions: RolePermissions, roleLabel?: string) => void;
   removeRolePermissions: (role: UserRole) => void;
+  revokedSessionInfo: { deviceName?: string; timestamp?: string } | null;
+  clearRevokedSession: () => void;
   isLoading: boolean;
 }
 
@@ -373,9 +377,172 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [revokedSessionInfo, setRevokedSessionInfo] = useState<{ deviceName?: string; timestamp?: string } | null>(null);
   const [usersList, setUsersList] = useState<User[]>(DEMO_USERS);
   const [rolePermissionsMap, setRolePermissionsMap] = useState<Record<UserRole, RolePermissions>>(ROLE_PERMISSIONS);
   const [isLoading, setIsLoading] = useState(true);
+
+  const userRef = React.useRef<User | null>(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  const sessionTokenRef = React.useRef<string | null>(sessionToken);
+  useEffect(() => {
+    sessionTokenRef.current = sessionToken;
+  }, [sessionToken]);
+
+  const clearRevokedSession = useCallback(() => {
+    setRevokedSessionInfo(null);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brito_session_revoked");
+      localStorage.removeItem("brito_session_revoked");
+    }
+  }, []);
+
+  const handleForceLogout = useCallback((deviceName?: string, timestamp?: string) => {
+    const info = {
+      deviceName: deviceName || "Otro dispositivo o equipo",
+      timestamp: timestamp || new Date().toISOString(),
+    };
+    setUser(null);
+    setSessionToken(null);
+    setRevokedSessionInfo(info);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("brito_user");
+      sessionStorage.removeItem("brito_session_active");
+      sessionStorage.removeItem("brito_session_token");
+      localStorage.removeItem("brito_session_token");
+      try {
+        sessionStorage.setItem("brito_session_revoked", JSON.stringify(info));
+        localStorage.setItem("brito_session_revoked", JSON.stringify(info));
+      } catch (e) {}
+    }
+  }, []);
+
+  const registerActiveSession = useCallback((targetUser: User) => {
+    if (typeof window === "undefined") return null;
+    const newToken =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const deviceId = getDeviceId();
+    const deviceName = getFriendlyDeviceName();
+
+    setSessionToken(newToken);
+    setRevokedSessionInfo(null);
+    try {
+      sessionStorage.setItem("brito_session_token", newToken);
+      localStorage.setItem("brito_session_token", newToken);
+      sessionStorage.removeItem("brito_session_revoked");
+      localStorage.removeItem("brito_session_revoked");
+    } catch (e) {}
+
+    // Notificar al servidor
+    fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: targetUser.id,
+        userName: targetUser.name,
+        userRole: targetUser.role,
+        sessionToken: newToken,
+        deviceId,
+        deviceName,
+      }),
+    }).catch((err) => console.warn("[AuthContext] Error registrando sesión activa:", err));
+
+    // Emitir revocación por broadcast a cualquier OTRO equipo que tenga este usuario abierto
+    realtimeHub.broadcastUserSessionRevoked({
+      userId: targetUser.id,
+      sessionToken: newToken,
+      activeDeviceId: deviceId,
+      deviceName,
+      timestamp: new Date().toISOString(),
+    });
+
+    return newToken;
+  }, []);
+
+  // Escuchar eventos en tiempo real cuando la sesión se inicia en otro dispositivo
+  useEffect(() => {
+    const unsubscribe = realtimeHub.onUserSessionRevoked((payload) => {
+      const currentUser = userRef.current;
+      if (!currentUser || payload.userId !== currentUser.id) {
+        return;
+      }
+
+      const myDeviceId = getDeviceId();
+      // Si la sesión fue abierta en OTRO equipo físico (diferente deviceId)
+      if (payload.activeDeviceId && payload.activeDeviceId !== myDeviceId) {
+        handleForceLogout(payload.deviceName, payload.timestamp);
+      } else if (payload.activeDeviceId === myDeviceId) {
+        // Mismo equipo físico (otra pestaña o ventana del mismo navegador)
+        const token = payload.activeSessionToken || payload.sessionToken;
+        if (token) {
+          setSessionToken(token);
+          try {
+            sessionStorage.setItem("brito_session_token", token);
+            localStorage.setItem("brito_session_token", token);
+          } catch (e) {}
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [handleForceLogout]);
+
+  // Heartbeat y verificación de estado de sesión en el servidor
+  useEffect(() => {
+    if (!user || !sessionToken) return;
+
+    const verifyServerSession = async () => {
+      const currentUser = userRef.current;
+      const currentToken = sessionTokenRef.current;
+      if (!currentUser || !currentToken) return;
+
+      try {
+        const myDeviceId = getDeviceId();
+        const res = await fetch("/api/auth/session", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            sessionToken: currentToken,
+            deviceId: myDeviceId,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.valid === false && data.reason === "session_overridden_other_device") {
+            const active = data.activeSession;
+            handleForceLogout(active?.deviceName, active?.loginAt || active?.lastSeenAt);
+          }
+        }
+      } catch (e) {
+        // Red inestable o desconexión
+      }
+    };
+
+    const intervalId = setInterval(verifyServerSession, 5000);
+
+    const handleFocus = () => {
+      verifyServerSession();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [user?.id, sessionToken, handleForceLogout]);
 
   // Load custom users from localStorage on mount (Almacenamiento permanente y autoritativo)
   useEffect(() => {
@@ -492,6 +659,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (typeof window !== "undefined") {
+      // Restaurar notificación de sesión revocada si ocurrió recientemente
+      try {
+        const savedRevoked = sessionStorage.getItem("brito_session_revoked") || localStorage.getItem("brito_session_revoked");
+        if (savedRevoked) {
+          setRevokedSessionInfo(JSON.parse(savedRevoked));
+        }
+      } catch (e) {}
+
       const saved = sessionStorage.getItem("brito_user");
       if (saved) {
         try {
@@ -518,6 +693,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
           setUser(parsedUser);
+
+          // Restaurar o generar token de sesión
+          const savedToken = sessionStorage.getItem("brito_session_token") || localStorage.getItem("brito_session_token");
+          if (savedToken) {
+            setSessionToken(savedToken);
+            // Verificar si el servidor aún considera este equipo como el titular autorizado
+            const myDeviceId = getDeviceId();
+            fetch(`/api/auth/session?userId=${encodeURIComponent(parsedUser.id)}`)
+              .then((res) => res.json())
+              .then((data) => {
+                if (data?.activeSession) {
+                  if (data.activeSession.deviceId && data.activeSession.deviceId !== myDeviceId) {
+                    handleForceLogout(data.activeSession.deviceName, data.activeSession.lastSeenAt || data.activeSession.loginAt);
+                  }
+                }
+              })
+              .catch(() => {});
+          } else {
+            registerActiveSession(parsedUser);
+          }
         } catch (e) {
           console.error("Error parsing saved session:", e);
           setUser(null);
@@ -530,7 +725,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
     }
     setIsLoading(false);
-  }, []);
+  }, [handleForceLogout, registerActiveSession]);
 
   // Compute active permissions combining role defaults (dynamically configured) and user overrides
   const permissions: RolePermissions = user
@@ -645,6 +840,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (clean === "admin" && cleanPass === "admin") {
       const adminUser = usersList.find((u) => u.role === "admin") || DEMO_USERS[0];
       setUser(adminUser);
+      registerActiveSession(adminUser);
       if (typeof window !== "undefined") {
         sessionStorage.setItem("brito_user", JSON.stringify(adminUser));
         sessionStorage.setItem("brito_session_active", "true");
@@ -693,6 +889,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setUser(found);
+    registerActiveSession(found);
     if (typeof window !== "undefined") {
       sessionStorage.setItem("brito_user", JSON.stringify(found));
       sessionStorage.setItem("brito_session_active", "true");
@@ -760,6 +957,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginAs = (demoUser: User) => {
     setUser(demoUser);
+    registerActiveSession(demoUser);
     if (typeof window !== "undefined") {
       sessionStorage.setItem("brito_user", JSON.stringify(demoUser));
       sessionStorage.setItem("brito_session_active", "true");
@@ -770,14 +968,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    const currentUserId = user?.id;
+    const currentToken = sessionToken || (typeof window !== "undefined" ? sessionStorage.getItem("brito_session_token") : null);
+
     setUser(null);
+    setSessionToken(null);
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("brito_user");
       sessionStorage.removeItem("brito_session_active");
+      sessionStorage.removeItem("brito_session_token");
       sessionStorage.removeItem("brito_redirect_url");
+      localStorage.removeItem("brito_session_token");
       try {
         localStorage.removeItem("brito_user");
       } catch (e) {}
+    }
+
+    if (currentUserId) {
+      const q = currentToken
+        ? `?userId=${encodeURIComponent(currentUserId)}&sessionToken=${encodeURIComponent(currentToken)}`
+        : `?userId=${encodeURIComponent(currentUserId)}`;
+      fetch(`/api/auth/session${q}`, {
+        method: "DELETE",
+      }).catch(() => {});
     }
   };
 
@@ -1005,6 +1218,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         rolePermissionsMap,
         updateRolePermissions,
         removeRolePermissions,
+        revokedSessionInfo,
+        clearRevokedSession,
         isLoading,
       }}
     >

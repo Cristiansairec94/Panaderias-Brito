@@ -75,6 +75,16 @@ export interface RealtimeBreadDeliveryPayload {
   senderDeviceId: string;
 }
 
+export interface RealtimeSessionRevokedPayload {
+  userId: string;
+  activeDeviceId: string;
+  activeSessionToken: string;
+  sessionToken?: string;
+  deviceName?: string;
+  timestamp: string;
+  senderDeviceId: string;
+}
+
 export type RealtimeStatus = "connected" | "connecting" | "disconnected";
 
 type NotificationListener = (notif: FBNotification) => void;
@@ -85,6 +95,7 @@ type OrderListener = (payload: RealtimeOrderPayload) => void;
 type BreadDeliveryListener = (delivery: RealtimeBreadDeliveryPayload) => void;
 type BranchListener = (payload: RealtimeBranchPayload) => void;
 type ShiftCutListener = (cut: ShiftCutRecord) => void;
+type SessionRevokedListener = (payload: RealtimeSessionRevokedPayload) => void;
 type StatusListener = (status: RealtimeStatus) => void;
 
 const CHANNEL_NAME = "panaderia_brito_realtime";
@@ -108,6 +119,7 @@ class RealtimeHub {
   private breadDeliveryListeners = new Set<BreadDeliveryListener>();
   private branchListeners = new Set<BranchListener>();
   private shiftCutListeners = new Set<ShiftCutListener>();
+  private sessionRevokedListeners = new Set<SessionRevokedListener>();
   private statusListeners = new Set<StatusListener>();
 
   constructor() {
@@ -204,6 +216,8 @@ class RealtimeHub {
     } else if (type === "shift_cut") {
       const cutData = payload?.cut || payload;
       this.shiftCutListeners.forEach((fn) => { try { fn(cutData); } catch (err) { console.error(err); } });
+    } else if (type === "user_session_revoked") {
+      this.sessionRevokedListeners.forEach((fn) => { try { fn(payload); } catch (err) { console.error(err); } });
     }
   }
 
@@ -253,6 +267,10 @@ class RealtimeHub {
         .on("broadcast", { event: "shift_cut" }, ({ payload }: { payload: any }) => {
           if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
           this.dispatchLocalEvent("shift_cut", payload);
+        })
+        .on("broadcast", { event: "user_session_revoked" }, ({ payload }: { payload: any }) => {
+          if (payload?.senderTabId && payload.senderTabId === this.tabId) return;
+          this.dispatchLocalEvent("user_session_revoked", payload);
         })
         .subscribe((channelStatus: string) => {
           if (channelStatus === "SUBSCRIBED") {
@@ -559,6 +577,36 @@ class RealtimeHub {
     this.shiftCutListeners.add(listener);
     return () => {
       this.shiftCutListeners.delete(listener);
+    };
+  }
+
+  public async broadcastUserSessionRevoked(params: {
+    userId: string;
+    activeDeviceId: string;
+    activeSessionToken?: string;
+    sessionToken?: string;
+    deviceName?: string;
+    timestamp?: string;
+  }) {
+    const token = params.activeSessionToken || params.sessionToken || "";
+    const payload: RealtimeSessionRevokedPayload = {
+      userId: params.userId,
+      activeDeviceId: params.activeDeviceId,
+      activeSessionToken: token,
+      sessionToken: token,
+      deviceName: params.deviceName,
+      timestamp: params.timestamp || new Date().toISOString(),
+      senderDeviceId: this.getDeviceId(),
+    };
+
+    this.sendBroadcast("user_session_revoked", payload);
+    this.postToSyncEndpoint("user_session_revoked", payload);
+  }
+
+  public onUserSessionRevoked(listener: SessionRevokedListener) {
+    this.sessionRevokedListeners.add(listener);
+    return () => {
+      this.sessionRevokedListeners.delete(listener);
     };
   }
 
