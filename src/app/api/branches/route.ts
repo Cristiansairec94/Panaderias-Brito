@@ -7,6 +7,7 @@ const DATA_DIR = path.join(process.cwd(), "src", "data");
 const BRANCHES_FILE = path.join(DATA_DIR, "branches.json");
 
 let inMemoryBranchesCache: Branch[] | null = null;
+const deletedBranchIdsSet = new Set<string>();
 
 function ensureDataDirectory() {
   try {
@@ -19,32 +20,33 @@ function ensureDataDirectory() {
 }
 
 function readStoredBranches(): Branch[] {
+  let branches: Branch[] = [];
   if (inMemoryBranchesCache && inMemoryBranchesCache.length > 0) {
-    return inMemoryBranchesCache;
-  }
-
-  try {
-    ensureDataDirectory();
-    if (fs.existsSync(BRANCHES_FILE)) {
-      const content = fs.readFileSync(BRANCHES_FILE, "utf-8");
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        inMemoryBranchesCache = parsed;
-        return parsed;
+    branches = inMemoryBranchesCache;
+  } else {
+    try {
+      ensureDataDirectory();
+      if (fs.existsSync(BRANCHES_FILE)) {
+        const content = fs.readFileSync(BRANCHES_FILE, "utf-8");
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryBranchesCache = parsed;
+          branches = parsed;
+        }
       }
+    } catch (err) {
+      console.warn("[API Branches] Error al leer branches.json, usando memoria:", err);
     }
-  } catch (err) {
-    console.warn("[API Branches] Error al leer branches.json, usando memoria:", err);
   }
 
-  return inMemoryBranchesCache || [];
+  return (branches || []).filter((b) => !deletedBranchIdsSet.has(b.id));
 }
 
 function writeStoredBranches(branches: Branch[]): boolean {
-  inMemoryBranchesCache = branches;
+  inMemoryBranchesCache = branches.filter((b) => !deletedBranchIdsSet.has(b.id));
   try {
     ensureDataDirectory();
-    fs.writeFileSync(BRANCHES_FILE, JSON.stringify(branches, null, 2), "utf-8");
+    fs.writeFileSync(BRANCHES_FILE, JSON.stringify(inMemoryBranchesCache, null, 2), "utf-8");
     return true;
   } catch (err) {
     console.warn("[API Branches] No se pudo escribir en branches.json:", err);
@@ -59,6 +61,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       branches,
+      deletedIds: Array.from(deletedBranchIdsSet),
       count: branches.length,
       timestamp: Date.now(),
     });
@@ -83,12 +86,16 @@ export async function POST(req: NextRequest) {
       if (body.length > 0) {
         let updated: Branch[];
         if (isReplace) {
-          updated = body;
+          updated = body.filter((b: Branch) => !deletedBranchIdsSet.has(b.id));
         } else {
           // Merge preservation
           const mergedMap = new Map<string, Branch>();
           currentBranches.forEach((b) => mergedMap.set(b.id, b));
-          body.forEach((b) => mergedMap.set(b.id, { ...mergedMap.get(b.id), ...b }));
+          body.forEach((b) => {
+            if (!deletedBranchIdsSet.has(b.id)) {
+              mergedMap.set(b.id, { ...mergedMap.get(b.id), ...b });
+            }
+          });
           updated = Array.from(mergedMap.values());
         }
         writeStoredBranches(updated);
@@ -105,6 +112,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Permitir recreación si fue previamente eliminada
+    deletedBranchIdsSet.delete(newBranch.id);
 
     // Comprobar si ya existe por ID o Código
     const existingIndex = currentBranches.findIndex(
@@ -186,8 +196,11 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
+    deletedBranchIdsSet.add(id);
+
     const currentBranches = readStoredBranches();
     if (currentBranches.length <= 1) {
+      deletedBranchIdsSet.delete(id);
       return NextResponse.json(
         { success: false, error: "No se puede eliminar la única sucursal activa" },
         { status: 400 }

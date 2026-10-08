@@ -19,6 +19,41 @@ export interface SimulatedSale {
   timestamp: string;
 }
 
+export const DELETED_BRANCHES_STORAGE_KEY = "brito_deleted_branch_ids";
+
+export function getDeletedBranchIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DELETED_BRANCHES_STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        return new Set(arr.filter((id) => typeof id === "string" && id.trim().length > 0));
+      }
+    }
+  } catch {}
+  return new Set();
+}
+
+export function recordDeletedBranchId(id: string): void {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const set = getDeletedBranchIds();
+    set.add(id);
+    localStorage.setItem(DELETED_BRANCHES_STORAGE_KEY, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+export function removeDeletedBranchId(id: string): void {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const set = getDeletedBranchIds();
+    if (set.delete(id)) {
+      localStorage.setItem(DELETED_BRANCHES_STORAGE_KEY, JSON.stringify(Array.from(set)));
+    }
+  } catch {}
+}
+
 const DEFAULT_BRANCHES: Branch[] = [
   {
     id: "branch-matriz",
@@ -328,59 +363,23 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   const [branches, setBranches] = useState<Branch[]>(() => {
     if (typeof window !== "undefined") {
       try {
+        const deletedIds = getDeletedBranchIds();
         const savedBranches = localStorage.getItem("brito_branches_data");
         if (savedBranches) {
           const parsed = JSON.parse(savedBranches);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            let modified = false;
-            let list = parsed;
-            if (!list.some((b: Branch) => b.id === "branch-benito")) {
-              const benito = DEFAULT_BRANCHES.find((b) => b.id === "branch-benito");
-              if (benito) {
-                list = [...list, benito];
-                modified = true;
-              }
+            // Filtrar estrictamente cualquier sucursal eliminada por un administrador
+            const filtered = parsed.filter((b: Branch) => b && b.id && !deletedIds.has(b.id));
+            if (filtered.length > 0) {
+              return filtered;
             }
-            if (!list.some((b: Branch) => b.id === "branch-sanjuan")) {
-              const sj = DEFAULT_BRANCHES.find((b) => b.id === "branch-sanjuan");
-              if (sj) {
-                list = [...list, sj];
-                modified = true;
-              }
-            }
-            if (!list.some((b: Branch) => b.id === "branch-1790889237862")) {
-              const ilf = DEFAULT_BRANCHES.find((b) => b.id === "branch-1790889237862");
-              if (ilf) {
-                list = [...list, ilf];
-                modified = true;
-              }
-            }
-            list = list.map((b: Branch) => {
-              if (b.id === "branch-matriz") {
-                if (b.currentShift?.initialFund === 800) {
-                  modified = true;
-                  return {
-                    ...b,
-                    currentShift: {
-                      ...b.currentShift,
-                      initialFund: 1000,
-                    },
-                  };
-                }
-              }
-              return b;
-            });
-            if (modified) {
-              try {
-                localStorage.setItem("brito_branches_data", JSON.stringify(list));
-              } catch {}
-            }
-            return list;
           }
         }
       } catch {}
     }
-    return DEFAULT_BRANCHES;
+    const deletedIds = typeof window !== "undefined" ? getDeletedBranchIds() : new Set<string>();
+    const initialDefault = DEFAULT_BRANCHES.filter((b) => !deletedIds.has(b.id));
+    return initialDefault.length > 0 ? initialDefault : [DEFAULT_BRANCHES[0]];
   });
 
 function resolveBranchParam(param: string | null): string | null {
@@ -704,8 +703,11 @@ function resolveBranchParam(param: string | null): string | null {
             dayAccumulatedOrdersDeposit: 0,
           });
 
-          DEFAULT_BRANCHES.forEach((b) => {
-            branchAgg.set(b.id, initBranchAgg());
+          const currentDeletedIds = getDeletedBranchIds();
+          branches.forEach((b) => {
+            if (!currentDeletedIds.has(b.id)) {
+              branchAgg.set(b.id, initBranchAgg());
+            }
           });
 
           const resolveBranchForRecord = (rawBranchId: string | null | undefined, cashierName?: string): string => {
@@ -889,19 +891,32 @@ function resolveBranchParam(param: string | null): string | null {
 
           // Actualizar métricas vivas de cada sucursal e incorporar sucursales dinámicas
           setBranches((prev) => {
+            const currentDeletedIds = getDeletedBranchIds();
             const branchMap = new Map<string, Branch>();
-            DEFAULT_BRANCHES.forEach((d) => branchMap.set(d.id, d));
+
+            // 1. Sembrar EXCLUSIVAMENTE con el estado previo actual, filtrando sucursales eliminadas
             prev.forEach((b) => {
-              branchMap.set(b.id, { ...(branchMap.get(b.id) || b), ...b });
+              if (b && b.id && !currentDeletedIds.has(b.id)) {
+                branchMap.set(b.id, b);
+              }
             });
 
-            // Incorporar datos de configuración de /api/branches sin sobreescribir ventas/cajas vivas con 0
+            // Si el estado previo quedó vacío por alguna razón, sembrar con DEFAULT_BRANCHES no eliminadas
+            if (branchMap.size === 0) {
+              const availableDefault = DEFAULT_BRANCHES.filter((d) => !currentDeletedIds.has(d.id));
+              if (availableDefault.length > 0) {
+                availableDefault.forEach((d) => branchMap.set(d.id, d));
+              } else if (DEFAULT_BRANCHES[0]) {
+                branchMap.set(DEFAULT_BRANCHES[0].id, DEFAULT_BRANCHES[0]);
+              }
+            }
+
+            // 2. Incorporar datos de configuración de /api/branches (SOLO para sucursales no eliminadas que ya existan)
             if (serverBranches.length > 0) {
               serverBranches.forEach((serverB: Branch) => {
+                if (!serverB || !serverB.id || currentDeletedIds.has(serverB.id)) return;
                 const existing = branchMap.get(serverB.id);
-                if (!existing) {
-                  branchMap.set(serverB.id, serverB);
-                } else {
+                if (existing) {
                   branchMap.set(serverB.id, {
                     ...existing,
                     name: serverB.name || existing.name,
@@ -921,93 +936,17 @@ function resolveBranchParam(param: string | null): string | null {
               });
             }
 
-            // Incorporar sucursales de la tabla branches de Supabase si existen
+            // 3. Sincronizar datos de Supabase si existen (SOLO para sucursales no eliminadas que ya existan)
             dbBranches.forEach((dbB: any) => {
-              const isBenito = dbB.id === "branch-benito";
-              const isSj = dbB.id === "branch-sanjuan";
-              const isIldefonso = dbB.id === "branch-1790889237862" || (dbB.name && dbB.name.toLowerCase().includes("ildefonso"));
-              const isAngeles = dbB.id === "branch-angeles" || (dbB.name && dbB.name.toLowerCase().includes("angeles"));
-              if (!branchMap.has(dbB.id)) {
+              if (!dbB || !dbB.id || currentDeletedIds.has(dbB.id) || dbB.is_active === false) return;
+              const existing = branchMap.get(dbB.id);
+              if (existing) {
                 branchMap.set(dbB.id, {
-                  id: dbB.id,
-                  name: dbB.name || (isIldefonso ? "Sucursal San Ildefonso" : isBenito ? "Sucursal San Benito (Mercado)" : isSj ? "Sucursal San Juan" : isAngeles ? "Sucursal Los Ángeles" : "Sucursal"),
-                  shortName: dbB.short_name || (isIldefonso ? "San Ildefonso" : isBenito ? "San Benito" : isSj ? "San Juan" : isAngeles ? "Los Ángeles" : (dbB.name || "Sucursal")),
-                  code: isIldefonso ? "ILF-04" : isBenito ? "BEN-02" : isSj ? "SJU-02" : isAngeles ? "SUC-LES" : ("SUC-" + dbB.id.slice(-3).toUpperCase()),
-                  address: dbB.address || (isIldefonso ? "Av. San Benito #123, Col. Centro Histórico" : isBenito ? "Calle Hidalgo #120, Col. San Benito" : isSj ? "Calle Morelos #45, Col. San Juan" : isAngeles ? "Calz. Guadalupe #890, Los Ángeles" : "Dirección sucursal"),
-                  phone: dbB.phone || (isIldefonso ? "55 8361 7480" : isAngeles ? "55 4321 8765" : "55 8765 4321"),
-                  manager: isIldefonso ? "silvia puga" : isBenito ? "Carlos Mendoza" : isSj ? "noe velasquez" : isAngeles ? "andres sanchez" : "Encargado de Sucursal",
-                  assignedUserId: isIldefonso ? "usr-silvia" : isBenito ? "usr-5" : isSj ? "usr-noe" : isAngeles ? "usr-andres" : undefined,
-                  assignedUserName: isIldefonso ? "silvia puga" : isBenito ? "Carlos Mendoza" : isSj ? "noe velasquez" : isAngeles ? "andres sanchez" : undefined,
-                  assignedUserEmail: isIldefonso ? "silvia@panaderiabrito.com" : isBenito ? "supervisor@panaderiabrito.com" : isSj ? "noe@panaderiabrito.com" : isAngeles ? "andres@panaderiabrito.com" : undefined,
-                  status: dbB.is_active === false ? "cerrada" : "abierta",
-                  dailyGoal: isIldefonso ? 6000 : isBenito ? 8000 : isSj ? 8500 : isAngeles ? 7000 : 5000,
-                  todaySales: 0,
-                  todayTickets: 0,
-                  cashInDrawer: 1000,
-                  color: isIldefonso ? "emerald" : isSj ? "rose" : isAngeles ? "blue" : "emerald",
-                  currentShift: {
-                    id: isIldefonso ? "shift-ilf-401" : isSj ? "shift-sju-201" : isAngeles ? "shift-ang-301" : `shift-${dbB.id}`,
-                    name: isSj ? "Turno Vespertino (14:00 - 22:00)" : isIldefonso ? "Turno Matutino (06:00 - 14:00)" : "Turno General",
-                    cashier: isIldefonso ? "silvia puga" : isBenito ? "Carlos Mendoza" : isSj ? "noe velasquez" : isAngeles ? "andres sanchez" : "Cajero",
-                    openedAt: isSj ? "14:00 hrs" : "06:00 AM",
-                    initialFund: 1000,
-                    status: "abierto",
-                    totalSales: 0,
-                    ticketCount: 0,
-                    cashSales: 0,
-                    cardSales: 0,
-                    transferSales: 0,
-                  },
-                });
-              } else {
-                const existing = branchMap.get(dbB.id)!;
-                if (isIldefonso && (!existing.assignedUserId || existing.assignedUserId === "usr-ildefonso")) {
-                  existing.manager = "silvia puga";
-                  existing.assignedUserId = "usr-silvia";
-                  existing.assignedUserName = "silvia puga";
-                  existing.assignedUserEmail = "silvia@panaderiabrito.com";
-                  if (existing.currentShift) existing.currentShift.cashier = "silvia puga";
-                } else if (isAngeles && (!existing.assignedUserId || existing.assignedUserId === "usr-angeles")) {
-                  existing.manager = "andres sanchez";
-                  existing.assignedUserId = "usr-andres";
-                  existing.assignedUserName = "andres sanchez";
-                  existing.assignedUserEmail = "andres@panaderiabrito.com";
-                  if (existing.currentShift) existing.currentShift.cashier = "andres sanchez";
-                }
-              }
-            });
-
-            // Incorporar sucursales dinámicas detectadas en ventas o pedidos (ej. san ildefonso hgo)
-            branchAgg.forEach((agg, bId) => {
-              if (!branchMap.has(bId)) {
-                const bName = agg.branchName || `Sucursal ${bId}`;
-                branchMap.set(bId, {
-                  id: bId,
-                  name: bName,
-                  shortName: bName.split(" ")[0] || "Sucursal",
-                  code: "SUC-" + bId.slice(-3).toUpperCase(),
-                  address: "Ubicación Brito",
-                  phone: "55 0000 0000",
-                  manager: agg.lastCashier || "Cajero en turno",
-                  status: "abierta",
-                  dailyGoal: 5000,
-                  todaySales: 0,
-                  todayTickets: 0,
-                  cashInDrawer: 1000,
-                  color: "emerald",
-                  currentShift: {
-                    id: `shift-${bId}`,
-                    name: "Turno General",
-                    cashier: agg.lastCashier || "Cajero",
-                    openedAt: "06:00 AM",
-                    initialFund: 1000,
-                    status: "abierto",
-                    totalSales: 0,
-                    ticketCount: 0,
-                    cashSales: 0,
-                    cardSales: 0,
-                    transferSales: 0,
-                  },
+                  ...existing,
+                  name: dbB.name || existing.name,
+                  shortName: dbB.short_name || existing.shortName,
+                  address: dbB.address || existing.address,
+                  phone: dbB.phone || existing.phone,
                 });
               }
             });
@@ -1958,8 +1897,10 @@ function resolveBranchParam(param: string | null): string | null {
           if (!branch || !branch.id) return;
 
           setBranches((prev) => {
+            const currentDeletedIds = getDeletedBranchIds();
             let updated: Branch[];
             if (action === "create") {
+              if (currentDeletedIds.has(branch.id)) return prev;
               if (prev.some((b) => b.id === branch.id || (branch.code && b.code === branch.code))) {
                 updated = prev.map((b) =>
                   b.id === branch.id || (branch.code && b.code === branch.code) ? { ...b, ...branch } : b
@@ -1968,8 +1909,10 @@ function resolveBranchParam(param: string | null): string | null {
                 updated = [...prev, branch];
               }
             } else if (action === "update") {
+              if (currentDeletedIds.has(branch.id)) return prev;
               updated = prev.map((b) => (b.id === branch.id ? { ...b, ...branch } : b));
             } else if (action === "delete") {
+              recordDeletedBranchId(branch.id);
               if (prev.length <= 1) return prev;
               updated = prev.filter((b) => b.id !== branch.id);
             } else {
@@ -2036,12 +1979,19 @@ function resolveBranchParam(param: string | null): string | null {
   };
 
   const addBranch = useCallback((newBranch: Branch) => {
+    if (!isAdmin) {
+      console.warn("[BranchContext] Acceso denegado: solo administradores pueden agregar sucursales");
+      return;
+    }
+
+    removeDeletedBranchId(newBranch.id);
+
     setBranches((prev) => {
       if (prev.some((b) => b.id === newBranch.id || (newBranch.code && b.code === newBranch.code))) {
         return prev;
       }
       const updated = [...prev, newBranch];
-      persistBranches(updated);
+      persistBranches(updated, true);
       return updated;
     });
 
@@ -2063,9 +2013,14 @@ function resolveBranchParam(param: string | null): string | null {
         }).then(() => {}, () => {});
       } catch {}
     }
-  }, []);
+  }, [isAdmin]);
 
   const updateBranch = useCallback((branchId: string, updates: Partial<Branch>) => {
+    if (!isAdmin) {
+      console.warn("[BranchContext] Acceso denegado: solo administradores pueden editar sucursales");
+      return;
+    }
+
     let updatedBranch: Branch | null = null;
     setBranches((prev) => {
       const updated = prev.map((b) => {
@@ -2103,16 +2058,26 @@ function resolveBranchParam(param: string | null): string | null {
         }
       } catch {}
     }
-  }, []);
+  }, [isAdmin]);
 
   const deleteBranch = useCallback((branchId: string) => {
+    if (!isAdmin) {
+      console.warn("[BranchContext] Acceso denegado: solo administradores pueden eliminar sucursales");
+      return;
+    }
+
+    // 1. Guardar permanentemente en lista negra (tombstone)
+    recordDeletedBranchId(branchId);
+
     let deletedBranch: Branch | null = null;
+    let remainingBranches: Branch[] = [];
+
     setBranches((prev) => {
       if (prev.length <= 1) return prev;
       deletedBranch = prev.find((b) => b.id === branchId) || null;
-      const updated = prev.filter((b) => b.id !== branchId);
-      persistBranches(updated, true);
-      return updated;
+      remainingBranches = prev.filter((b) => b.id !== branchId);
+      persistBranches(remainingBranches, true);
+      return remainingBranches;
     });
 
     if (deletedBranch && realtimeHub.broadcastBranch) {
@@ -2132,8 +2097,7 @@ function resolveBranchParam(param: string | null): string | null {
 
     setCurrentBranchId((current) => {
       if (current === branchId) {
-        const remaining = branches.filter((b) => b.id !== branchId);
-        const nextId = remaining[0]?.id || "all";
+        const nextId = remainingBranches[0]?.id || "branch-matriz";
         try {
           localStorage.setItem("brito_current_branch_id", nextId);
         } catch {}
@@ -2141,7 +2105,7 @@ function resolveBranchParam(param: string | null): string | null {
       }
       return current;
     });
-  }, [branches]);
+  }, [isAdmin]);
 
   const registerRealSale = useCallback((
     branchId: string,

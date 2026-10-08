@@ -42,6 +42,7 @@ import {
   Trash2
 } from "lucide-react";
 import { useBranch, SimulatedSale } from "@/context/BranchContext";
+import { useAuth } from "@/context/AuthContext";
 import { Branch, BranchShift } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import GoogleBranchChart, { PeriodType } from "@/components/sucursales/GoogleBranchChart";
@@ -52,6 +53,9 @@ import DeleteBranchModal from "@/components/sucursales/DeleteBranchModal";
 import EditShiftModal from "@/components/sucursales/EditShiftModal";
 
 export default function SucursalesPage() {
+  const { user } = useAuth();
+  const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
+
   const { 
     branches, 
     currentBranch, 
@@ -74,24 +78,68 @@ export default function SucursalesPage() {
   const [editingShiftBranch, setEditingShiftBranch] = useState<Branch | null>(null);
   const [branchSuccessBanner, setBranchSuccessBanner] = useState<string | null>(null);
 
+  const handleOpenCreateBranch = () => {
+    if (!isAdmin) {
+      setBranchSuccessBanner("⚠️ Acceso Restringido: Solo los usuarios con rol de Administrador pueden registrar nuevas sucursales.");
+      setTimeout(() => setBranchSuccessBanner(null), 5000);
+      return;
+    }
+    setIsCreateBranchOpen(true);
+  };
+
+  const handleOpenEditBranch = (target?: Branch | null) => {
+    if (!isAdmin) {
+      setBranchSuccessBanner("⚠️ Acceso Restringido: Solo los usuarios con rol de Administrador pueden modificar sucursales.");
+      setTimeout(() => setBranchSuccessBanner(null), 5000);
+      return;
+    }
+    setEditingBranchTarget(target || (currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null));
+    setIsEditBranchOpen(true);
+  };
+
+  const handleOpenDeleteBranch = (target?: Branch | null) => {
+    if (!isAdmin) {
+      setBranchSuccessBanner("⚠️ Acceso Restringido: Solo los usuarios con rol de Administrador pueden retirar sucursales de la red.");
+      setTimeout(() => setBranchSuccessBanner(null), 5000);
+      return;
+    }
+    setDeletingBranchTarget(target || (currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null));
+    setIsDeleteBranchOpen(true);
+  };
+
   const handleAddBranch = (newBranch: Branch) => {
+    if (!isAdmin) {
+      setBranchSuccessBanner("⚠️ Permiso denegado: Solo el Administrador puede registrar sucursales.");
+      setTimeout(() => setBranchSuccessBanner(null), 5000);
+      return;
+    }
     addBranch(newBranch);
-    setBranchSuccessBanner(`¡Sucursal "${newBranch.name}" (${newBranch.code}) guardada con éxito en la red!`);
+    setBranchSuccessBanner(`¡Sucursal "${newBranch.name}" (${newBranch.code}) guardada de forma permanente en la red!`);
     setTimeout(() => setBranchSuccessBanner(null), 5000);
   };
 
   const handleUpdateBranch = (branchId: string, updates: Partial<Branch>) => {
+    if (!isAdmin) {
+      setBranchSuccessBanner("⚠️ Permiso denegado: Solo el Administrador puede editar sucursales.");
+      setTimeout(() => setBranchSuccessBanner(null), 5000);
+      return;
+    }
     updateBranch(branchId, updates);
     const updatedName = updates.name || "Sucursal";
-    setBranchSuccessBanner(`¡Sucursal "${updatedName}" actualizada con éxito en la red!`);
+    setBranchSuccessBanner(`¡Sucursal "${updatedName}" actualizada de forma permanente en la red!`);
     setTimeout(() => setBranchSuccessBanner(null), 5000);
   };
 
   const handleDeleteBranch = (branchId: string) => {
+    if (!isAdmin) {
+      setBranchSuccessBanner("⚠️ Permiso denegado: Solo el Administrador puede eliminar sucursales.");
+      setTimeout(() => setBranchSuccessBanner(null), 5000);
+      return;
+    }
     const target = branches.find((b) => b.id === branchId);
     const targetName = target ? target.name : "Sucursal";
     deleteBranch(branchId);
-    setBranchSuccessBanner(`Sucursal "${targetName}" eliminada de la red.`);
+    setBranchSuccessBanner(`Sucursal "${targetName}" eliminada de forma permanente de la red.`);
     setTimeout(() => setBranchSuccessBanner(null), 5000);
   };
 
@@ -322,33 +370,27 @@ export default function SucursalesPage() {
           {/* Action Buttons: Nueva Sucursal | Editar Sucursal | Eliminar Sucursal */}
           <div className="flex flex-wrap items-center gap-2.5">
             <button
-              onClick={() => setIsCreateBranchOpen(true)}
+              onClick={handleOpenCreateBranch}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-105 text-white font-black text-xs shadow-lg shadow-emerald-600/30 transition-colors active:opacity-85"
-              title="Registrar una nueva sucursal en la red"
+              title="Registrar una nueva sucursal en la red (Solo Administrador)"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>Nueva Sucursal</span>
             </button>
 
             <button
-              onClick={() => {
-                setEditingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
-                setIsEditBranchOpen(true);
-              }}
+              onClick={() => handleOpenEditBranch()}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 hover:text-white font-black text-xs border border-amber-400/30 backdrop-blur-md shadow-lg transition-colors active:opacity-85"
-              title="Modificar datos, encargado y turnos de una sucursal"
+              title="Modificar datos, encargado y turnos de una sucursal (Solo Administrador)"
             >
               <Edit3 className="w-4 h-4 text-amber-300 stroke-[2.5]" />
               <span>Editar Sucursal</span>
             </button>
 
             <button
-              onClick={() => {
-                setDeletingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
-                setIsDeleteBranchOpen(true);
-              }}
+              onClick={() => handleOpenDeleteBranch()}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 hover:text-white font-black text-xs border border-rose-400/30 backdrop-blur-md shadow-lg transition-colors active:opacity-85"
-              title="Retirar o eliminar una sucursal de la red"
+              title="Retirar o eliminar una sucursal de la red (Solo Administrador)"
             >
               <Trash2 className="w-4 h-4 text-rose-400 stroke-[2.5]" />
               <span>Eliminar Sucursal</span>
@@ -570,9 +612,9 @@ export default function SucursalesPage() {
 
                 <button
                   type="button"
-                  onClick={() => setIsCreateBranchOpen(true)}
+                  onClick={handleOpenCreateBranch}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-105 text-white font-black text-xs shadow-sm active:opacity-85 transition-colors"
-                  title="Registrar nueva sucursal"
+                  title="Registrar nueva sucursal (Solo Administrador)"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[3]" />
                   <span>Nueva Sucursal</span>
@@ -580,12 +622,9 @@ export default function SucursalesPage() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setEditingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
-                    setIsEditBranchOpen(true);
-                  }}
+                  onClick={() => handleOpenEditBranch()}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-200 shadow-xs transition-colors active:opacity-85"
-                  title="Editar datos de la sucursal"
+                  title="Editar datos de la sucursal (Solo Administrador)"
                 >
                   <Edit3 className="w-3.5 h-3.5 text-amber-600" />
                   <span>Editar</span>
@@ -593,12 +632,9 @@ export default function SucursalesPage() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setDeletingBranchTarget(currentBranch && currentBranch.id !== "all" ? currentBranch : branches[0] || null);
-                    setIsDeleteBranchOpen(true);
-                  }}
+                  onClick={() => handleOpenDeleteBranch()}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 shadow-xs transition-colors active:opacity-85"
-                  title="Eliminar sucursal de la red"
+                  title="Eliminar sucursal de la red (Solo Administrador)"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                   <span>Eliminar</span>
@@ -774,12 +810,9 @@ export default function SucursalesPage() {
                         <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap justify-end">
                           <button
                             type="button"
-                            onClick={() => {
-                              setEditingBranchTarget(b);
-                              setIsEditBranchOpen(true);
-                            }}
+                            onClick={() => handleOpenEditBranch(b)}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-amber-50 text-amber-800 font-bold text-[11px] border border-stone-200 shadow-xs transition-colors"
-                            title={`Editar datos de ${b.name}`}
+                            title={`Editar datos de ${b.name} (Solo Administrador)`}
                           >
                             <Edit3 className="w-3 h-3 text-amber-500" />
                             <span>Editar</span>
@@ -787,12 +820,9 @@ export default function SucursalesPage() {
 
                           <button
                             type="button"
-                            onClick={() => {
-                              setDeletingBranchTarget(b);
-                              setIsDeleteBranchOpen(true);
-                            }}
+                            onClick={() => handleOpenDeleteBranch(b)}
                             className="inline-flex items-center p-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-stone-200 shadow-xs transition-colors"
-                            title={`Eliminar ${b.name}`}
+                            title={`Eliminar ${b.name} (Solo Administrador)`}
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -1212,24 +1242,18 @@ export default function SucursalesPage() {
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setEditingBranchTarget(b);
-                                  setIsEditBranchOpen(true);
-                                }}
+                                onClick={() => handleOpenEditBranch(b)}
                                 className="p-2 rounded-xl bg-white hover:bg-amber-50 text-stone-600 hover:text-amber-800 border border-stone-200 shadow-xs transition-colors"
-                                title={`Editar datos de ${b.name}`}
+                                title={`Editar datos de ${b.name} (Solo Administrador)`}
                               >
                                 <Edit3 className="w-3.5 h-3.5 text-amber-600" />
                               </button>
 
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setDeletingBranchTarget(b);
-                                  setIsDeleteBranchOpen(true);
-                                }}
+                                onClick={() => handleOpenDeleteBranch(b)}
                                 className="p-2 rounded-xl bg-white hover:bg-rose-50 text-stone-600 hover:text-rose-600 border border-stone-200 shadow-xs transition-colors"
-                                title={`Eliminar ${b.name}`}
+                                title={`Eliminar ${b.name} (Solo Administrador)`}
                               >
                                 <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                               </button>

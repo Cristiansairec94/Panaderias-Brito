@@ -111,14 +111,24 @@ export async function POST(req: NextRequest) {
       timestamp: Date.now(),
     };
 
-    currentEvents.push(eventRecord);
-
-    // Mantener tamaño máximo de MAX_EVENTS eventos
-    if (currentEvents.length > MAX_EVENTS) {
-      currentEvents.splice(0, currentEvents.length - MAX_EVENTS);
+    let eventsToSave = currentEvents;
+    if (type === "branch" && payload?.action === "delete") {
+      const delId = payload?.branch?.id || payload?.id;
+      if (delId) {
+        eventsToSave = eventsToSave.filter(
+          (e) => !(e.type === "branch" && (e.payload?.branch?.id === delId || e.payload?.id === delId))
+        );
+      }
     }
 
-    saveStoredEvents(currentEvents);
+    eventsToSave.push(eventRecord);
+
+    // Mantener tamaño máximo de MAX_EVENTS eventos
+    if (eventsToSave.length > MAX_EVENTS) {
+      eventsToSave.splice(0, eventsToSave.length - MAX_EVENTS);
+    }
+
+    saveStoredEvents(eventsToSave);
 
     return NextResponse.json({
       success: true,
