@@ -583,8 +583,34 @@ export default function GastosPage() {
   };
 
   // ─── Helpers de Categoría ──────────────────────────────────────────────────
-  const getCategoryInfo = (catIdOrLabel?: string | null): GastoCategoriaDef => {
-    if (!catIdOrLabel) {
+  const getCategoryInfo = (catIdOrLabel?: string | null, description?: string): GastoCategoriaDef => {
+    let target = catIdOrLabel;
+
+    // Si la categoría no fue asignada o es genérica "otros"/"salida"/"caja", intentar inferirla inteligentemente de la descripción
+    if ((!target || target === "otros" || target === "gasto" || target === "salida" || target === "caja") && description) {
+      const descLower = description.toLowerCase();
+      if (descLower.includes("cierre de turno") || descLower.includes("don toño") || descLower.includes("retiro") || descLower.includes("socio")) {
+        target = "retiro_dueno";
+      } else if (descLower.includes("gas") || descLower.includes("horno")) {
+        target = "gas_lp";
+      } else if (descLower.includes("harina") || descLower.includes("levadura") || descLower.includes("manteca") || descLower.includes("azucar") || descLower.includes("insumo")) {
+        target = "insumos";
+      } else if (descLower.includes("bolsa") || descLower.includes("empaque") || descLower.includes("papel")) {
+        target = "empaques";
+      } else if (descLower.includes("cfe") || descLower.includes("luz") || descLower.includes("agua") || descLower.includes("internet")) {
+        target = "servicios";
+      } else if (descLower.includes("gasolina") || descLower.includes("pemex") || descLower.includes("reparto") || descLower.includes("camioneta")) {
+        target = "gasolina";
+      } else if (descLower.includes("proveedor") || descLower.includes("factura") || descLower.includes("pago a")) {
+        target = "proveedores";
+      } else if (descLower.includes("nomina") || descLower.includes("sueldo") || descLower.includes("semana")) {
+        target = "nomina";
+      } else if (descLower.includes("mantenimiento") || descLower.includes("refaccion") || descLower.includes("tecnico") || descLower.includes("reparac")) {
+        target = "mantenimiento";
+      }
+    }
+
+    if (!target) {
       return {
         id: "otros",
         label: "Gastos Menores / Varios",
@@ -595,21 +621,49 @@ export default function GastosPage() {
         border: "border-stone-200",
       };
     }
-    const catLower = String(catIdOrLabel).toLowerCase();
+    const catLower = String(target).toLowerCase();
     const found = GASTO_CATEGORIAS.find(
-      (c) => c.id === catIdOrLabel || c.label.toLowerCase() === catLower || (c.shortLabel && c.shortLabel.toLowerCase() === catLower)
+      (c) => c.id === target || c.label.toLowerCase() === catLower || (c.shortLabel && c.shortLabel.toLowerCase() === catLower)
     );
     return (
       found || {
         id: "otros",
-        label: String(catIdOrLabel) || "Otros Gastos",
-        shortLabel: String(catIdOrLabel) || "Gasto",
+        label: String(target) || "Otros Gastos",
+        shortLabel: String(target) || "Gasto",
         icon: "🧾",
         bg: "bg-stone-50",
         text: "text-stone-700",
         border: "border-stone-200",
       }
     );
+  };
+
+  const getDisplayCashier = (g: ExpenseRecord): string => {
+    const c = (g.cashier || "").trim();
+    if (c && c.toLowerCase() !== "cajero" && c.toLowerCase() !== "cajero de turno") {
+      return c;
+    }
+    if (g.description) {
+      const match = g.description.match(/\(([^->\)]+)(?:\s*->|\s*➔|\))/i);
+      if (match && match[1]) {
+        const name = match[1].trim();
+        return name.charAt(0).toUpperCase() + name.slice(1);
+      }
+    }
+    if (g.notes) {
+      const matchNotes = g.notes.match(/(?:cajero|responsable|entrega):\s*([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+)/i);
+      if (matchNotes && matchNotes[1]) {
+        return matchNotes[1].trim();
+      }
+    }
+    return c || "Cajero";
+  };
+
+  const cleanFolio = (id?: string | null): string => {
+    if (!id) return "#-";
+    let s = String(id).trim();
+    if (s.startsWith("#")) s = s.substring(1);
+    return `#${s}`;
   };
 
   // ─── Rangos de Fecha para Filtros y KPIs ───────────────────────────────────
@@ -786,7 +840,7 @@ export default function GastosPage() {
     let totalOps = 0;
 
     gastosPeriodo.forEach((g) => {
-      const catInfo = getCategoryInfo(g.category);
+      const catInfo = getCategoryInfo(g.category, g.description);
       if (!map[catInfo.id]) {
         map[catInfo.id] = { total: 0, count: 0, label: catInfo.label, icon: catInfo.icon };
       }
@@ -999,6 +1053,16 @@ export default function GastosPage() {
       actionLabel: "Ver Gastos",
       actionLink: "/gastos",
     });
+  };
+
+  const handleEliminarGastoPermanente = (g: ExpenseRecord) => {
+    if (typeof window !== "undefined") {
+      const confirmDelete = window.confirm(`¿Deseas eliminar permanentemente el registro #${g.id} ("${g.description}")?`);
+      if (!confirmDelete) return;
+    }
+    const updatedList = gastos.filter((item) => item.id !== g.id);
+    persistGastos(updatedList);
+    setActiveDropdown(null);
   };
 
   const handleExportCSV = () => {
@@ -1609,18 +1673,18 @@ export default function GastosPage() {
         {/* ── MODO 1: TABLA FLUIDA QUE ENCAJA 100% AL ZOOM ESTÁNDAR ── */}
         {viewMode === "tabla" ? (
           <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-stone-300 scrollbar-track-stone-100/60 pb-1">
-            <table className="w-full text-left border-collapse table-fixed min-w-[740px]">
+            <table className="w-full text-left border-collapse min-w-[980px]">
               <thead className="bg-stone-100/95 text-stone-700 font-black border-b border-stone-200 uppercase tracking-wider text-[11px] select-none sticky top-0 z-10 backdrop-blur-xs">
                 <tr>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[68px]">Folio</th>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[74px]">Fecha</th>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[74px]">Sucursal</th>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[88px]">Categoría</th>
-                  <th className="py-2.5 px-2.5 align-middle">Concepto</th>
-                  <th className="py-2.5 px-2 align-middle text-right whitespace-nowrap w-[78px]">Monto</th>
-                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[92px]">Pago / Origen</th>
-                  <th className="py-2.5 px-2 align-middle whitespace-nowrap w-[115px]">Cajero</th>
-                  <th className="py-2.5 px-2 align-middle text-center whitespace-nowrap w-[82px]">Acciones</th>
+                  <th className="py-3 px-3 align-middle whitespace-nowrap w-[100px]">Folio</th>
+                  <th className="py-3 px-3 align-middle whitespace-nowrap w-[95px]">Fecha</th>
+                  <th className="py-3 px-3 align-middle whitespace-nowrap w-[130px]">Sucursal</th>
+                  <th className="py-3 px-3 align-middle whitespace-nowrap w-[145px]">Categoría</th>
+                  <th className="py-3 px-3.5 align-middle min-w-[180px]">Concepto / Motivo</th>
+                  <th className="py-3 px-3 align-middle text-right whitespace-nowrap w-[120px]">Monto</th>
+                  <th className="py-3 px-3 align-middle text-center whitespace-nowrap w-[125px]">Pago / Origen</th>
+                  <th className="py-3 px-3 align-middle whitespace-nowrap w-[120px]">Cajero</th>
+                  <th className="py-3 px-3 align-middle text-center whitespace-nowrap w-[90px]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
@@ -1635,9 +1699,10 @@ export default function GastosPage() {
                 ) : (
                   filteredGastos.map((g, idx) => {
                     const isAnulado = g.status === "anulado";
-                    const catInfo = getCategoryInfo(g.category);
+                    const catInfo = getCategoryInfo(g.category, g.description);
                     const { isHoy, formattedDate, timeStr, cleanDate } = getExpenseDateTimeInfo(g);
                     const isNearBottom = idx >= filteredGastos.length - 2;
+                    const displayCashier = getDisplayCashier(g);
 
                     return (
                       <tr
@@ -1651,14 +1716,14 @@ export default function GastosPage() {
                         }`}
                       >
                         {/* 1. Folio */}
-                        <td className="py-2 px-2 align-middle font-mono tabular-nums font-black text-xs text-stone-900 whitespace-nowrap w-[68px]">
-                          <span className="bg-stone-100 border border-stone-200/90 px-1.5 py-0.5 rounded text-[11px] block text-center truncate">
-                            #{g.id}
+                        <td className="py-2.5 px-3 align-middle whitespace-nowrap w-[100px]">
+                          <span className="font-mono tabular-nums font-bold text-[11px] text-stone-800 bg-stone-100 border border-stone-200/90 px-2 py-0.5 rounded-md inline-block">
+                            {cleanFolio(g.id)}
                           </span>
                         </td>
 
                         {/* 2. Fecha */}
-                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[74px]">
+                        <td className="py-2.5 px-3 align-middle whitespace-nowrap w-[95px]">
                           {isHoy ? (
                             <div className="flex flex-col leading-tight">
                               <span className={`font-mono font-black text-xs ${isAnulado ? "line-through text-stone-400" : "text-stone-900"}`}>{timeStr || "Hoy"}</span>
@@ -1683,57 +1748,57 @@ export default function GastosPage() {
                         </td>
 
                         {/* 3. Sucursal */}
-                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[74px]">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded-md border border-stone-200/80 truncate max-w-full">
-                            <Store className="w-3 h-3 text-brito-orange-600 shrink-0" />
-                            <span className="truncate">{(g.branchName || "Matriz").replace("Sucursal ", "").replace(" (Centro)", "")}</span>
+                        <td className="py-2.5 px-3 align-middle whitespace-nowrap w-[130px]">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200/80">
+                            <Store className="w-3.5 h-3.5 text-brito-orange-600 shrink-0" />
+                            <span>{(g.branchName || "Matriz").replace("Sucursal ", "").replace(" (Centro)", "")}</span>
                           </span>
                         </td>
 
                         {/* 4. Categoría */}
-                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[88px]">
+                        <td className="py-2.5 px-3 align-middle whitespace-nowrap w-[145px]">
                           <span
-                            className={`px-1.5 py-0.5 rounded-md font-bold text-[11px] inline-flex items-center gap-1 border truncate max-w-full ${
+                            className={`px-2.5 py-1 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 border shadow-2xs ${
                               isAnulado
                                 ? "bg-stone-200 text-stone-600 border-stone-300 line-through"
                                 : `${catInfo.bg} ${catInfo.text} ${catInfo.border}`
                             }`}
                             title={g.categoryLabel || catInfo.label}
                           >
-                            <span className="text-[10px] shrink-0">{catInfo.icon}</span>
-                            <span className="truncate">{catInfo.shortLabel || catInfo.label || "Gasto"}</span>
+                            <span className="text-xs shrink-0">{catInfo.icon}</span>
+                            <span>{catInfo.shortLabel || catInfo.label || "Gasto"}</span>
                           </span>
                         </td>
 
                         {/* 5. Concepto / Motivo */}
-                        <td className="py-2 px-2.5 align-middle">
-                          <div className={`truncate font-bold text-xs text-stone-900 ${isAnulado ? "line-through text-stone-500" : ""}`} title={g.description}>
+                        <td className="py-2.5 px-3.5 align-middle min-w-[180px]">
+                          <div className={`font-bold text-xs sm:text-sm text-stone-900 leading-snug ${isAnulado ? "line-through text-stone-500" : ""}`} title={g.description}>
                             {g.description}
                           </div>
                           {g.supplier && (
-                            <div className="text-[10px] text-stone-500 truncate mt-0.5" title={g.supplier}>
+                            <div className="text-[10.5px] text-stone-500 mt-0.5" title={g.supplier}>
                               Prov: <strong className="text-stone-700 font-semibold">{g.supplier}</strong>
                             </div>
                           )}
                           {isAnulado && g.cancelReason && (
-                            <span className="inline-block mt-0.5 px-1 py-0.2 bg-red-100 text-red-800 font-bold text-[9px] rounded border border-red-200">
+                            <span className="inline-block mt-0.5 px-1.5 py-0.5 bg-red-100 text-red-800 font-bold text-[9.5px] rounded border border-red-200">
                               {g.cancelReason}
                             </span>
                           )}
                         </td>
 
                         {/* 6. Monto */}
-                        <td className="py-2 px-2 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[78px]">
-                          <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700"}>
+                        <td className="py-2.5 px-3 align-middle text-right font-mono tabular-nums font-black text-xs sm:text-sm whitespace-nowrap w-[120px]">
+                          <span className={isAnulado ? "line-through text-stone-400" : "text-rose-700 text-sm font-black"}>
                             -{formatCurrency(g.amount)}
                           </span>
                         </td>
 
                         {/* 7. Forma de Pago y Origen */}
-                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[92px]">
-                          <div className="inline-flex flex-col items-center leading-tight min-w-0">
+                        <td className="py-2.5 px-3 align-middle text-center whitespace-nowrap w-[125px]">
+                          <div className="inline-flex flex-col items-center leading-tight">
                             <span
-                              className={`px-1.5 py-0.5 rounded-md font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
+                              className={`px-2 py-0.5 rounded-md font-black text-[10px] uppercase inline-flex items-center gap-1 border ${
                                 g.paymentMethod === "efectivo"
                                   ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                                   : g.paymentMethod === "tarjeta"
@@ -1746,32 +1811,28 @@ export default function GastosPage() {
                               {g.paymentMethod === "transferencia" && <Building className="w-3 h-3 shrink-0" />}
                               <span>{g.paymentMethod === "transferencia" ? "SPEI" : g.paymentMethod}</span>
                             </span>
-                            <span className="text-[10px] text-stone-500 font-medium mt-0.5 truncate max-w-[88px]" title={g.accountOrigin}>
-                              {g.accountOrigin.replace(/\s*\(.*\)/, "")}
+                            <span className="text-[10px] text-stone-500 font-medium mt-0.5 max-w-[120px] truncate" title={g.accountOrigin}>
+                              {g.accountOrigin ? g.accountOrigin.replace(/\s*\(.*\)/, "") : "Caja Mostrador"}
                             </span>
                           </div>
                         </td>
 
-                        {/* 8. Cajero (COMPLETO y adaptativo a turno) */}
-                        <td className="py-2 px-2 align-middle whitespace-nowrap w-[115px]" title={g.cashier}>
-                          {g.cashier && g.cashier.includes(" - ") ? (
-                            <div className="flex flex-col leading-tight min-w-0">
-                              <span className="font-bold text-xs text-stone-900 truncate">
-                                {g.cashier.split(" - ")[0]}
-                              </span>
-                              <span className="text-[10px] text-stone-500 font-medium truncate">
-                                {g.cashier.split(" - ").slice(1).join(" - ")}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="font-bold text-xs text-stone-900 truncate block">
-                              {g.cashier || "Cajero"}
+                        {/* 8. Cajero */}
+                        <td className="py-2.5 px-3 align-middle whitespace-nowrap w-[120px]" title={displayCashier}>
+                          <div className="flex flex-col leading-tight">
+                            <span className="font-bold text-xs text-stone-900 truncate max-w-[115px]">
+                              {displayCashier.split(" - ")[0]}
                             </span>
-                          )}
+                            {displayCashier.includes(" - ") && (
+                              <span className="text-[10px] text-stone-500 font-medium truncate max-w-[115px]">
+                                {displayCashier.split(" - ").slice(1).join(" - ")}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
-                        {/* 9. Acciones (100% visible sin cortes) */}
-                        <td className="py-2 px-2 align-middle text-center whitespace-nowrap w-[82px]">
+                        {/* 9. Acciones */}
+                        <td className="py-2.5 px-3 align-middle text-center whitespace-nowrap w-[90px]">
                           <div className="relative inline-block text-left">
                             <button
                               type="button"
@@ -1848,6 +1909,17 @@ export default function GastosPage() {
                                     </button>
                                   </>
                                 )}
+
+                                {/* Eliminar Permanente */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleEliminarGastoPermanente(g)}
+                                  className="w-full px-3 py-2 text-stone-600 hover:text-red-700 hover:bg-rose-50/50 flex items-center gap-2 border-t border-stone-100 cursor-pointer"
+                                  title="Eliminar registro definitivamente"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-stone-400 group-hover:text-red-600" />
+                                  <span>Eliminar Registro</span>
+                                </button>
                               </div>
                             )}
                           </div>
@@ -1872,8 +1944,9 @@ export default function GastosPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                 {filteredGastos.map((g) => {
                   const isAnulado = g.status === "anulado";
-                  const catInfo = getCategoryInfo(g.category);
+                  const catInfo = getCategoryInfo(g.category, g.description);
                   const { isHoy, formattedDate, timeStr, cleanDate } = getExpenseDateTimeInfo(g);
+                  const displayCashier = getDisplayCashier(g);
 
                   return (
                     <div
@@ -1891,7 +1964,7 @@ export default function GastosPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-mono tabular-nums font-black text-xs text-stone-900 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-lg shadow-2xs">
-                              #{g.id}
+                              {cleanFolio(g.id)}
                             </span>
                             <span className="text-[10px] font-bold text-stone-600 bg-stone-50 border border-stone-200 px-1.5 py-0.5 rounded-md">
                               🏬 {(g.branchName || "Matriz").replace("Sucursal ", "")}
@@ -1952,7 +2025,7 @@ export default function GastosPage() {
                           🏦 {g.accountOrigin}
                         </p>
                         <p className="text-[11px] text-stone-500 font-medium">
-                          👤 Cajero: <strong className="text-stone-800 font-bold">{g.cashier}</strong>
+                          👤 Cajero: <strong className="text-stone-800 font-bold">{displayCashier}</strong>
                         </p>
                       </div>
 
@@ -2005,6 +2078,15 @@ export default function GastosPage() {
                             </button>
                           </>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarGastoPermanente(g)}
+                          className="py-1.5 px-2.5 bg-stone-100 hover:bg-rose-100 active:scale-95 text-stone-500 hover:text-rose-700 border border-stone-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                          title="Eliminar Registro"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                        </button>
                       </div>
                     </div>
                   );

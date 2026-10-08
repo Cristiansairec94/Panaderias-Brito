@@ -508,6 +508,141 @@ export function syncMissingSalesToIncomes(): void {
   }
 }
 
+export const CANONICAL_BRANCH_NAMES: Record<string, string> = {
+  "branch-matriz": "Sucursal Matriz (Centro)",
+  "branch-benito": "Sucursal San Benito (Mercado)",
+  "branch-sanjuan": "Sucursal San Juan",
+  "branch-angeles": "Sucursal Los Ángeles",
+  "branch-1790889237862": "Sucursal San Ildefonso",
+};
+
+/**
+ * Consulta en Supabase la tabla 'cash_movements' (entradas de dinero)
+ * y las ventas recientes, integrándolas al historial de ingresos local
+ * con deduplicación y mapeo preciso de sucursales.
+ */
+export async function fetchAndSyncIncomesFromSupabase(): Promise<{
+  success: boolean;
+  count: number;
+  incomes: CashIncome[];
+}> {
+  if (typeof window === "undefined") {
+    return { success: false, count: 0, incomes: [] };
+  }
+
+  try {
+    const supabase = createClient();
+    const { data: movements, error } = await supabase
+      .from("cash_movements")
+      .select("id, branch_id, type, category, category_label, amount, reason, authorized_by, created_at")
+      .eq("type", "entrada")
+      .order("created_at", { ascending: false })
+      .limit(300);
+
+    if (error || !Array.isArray(movements)) {
+      console.warn("[IncomesSupabase] Error consultando movimientos:", error);
+      return { success: false, count: 0, incomes: getStoredIncomes() };
+    }
+
+    const current = getStoredIncomes();
+    const syncedIncomes: CashIncome[] = [];
+
+    for (const mov of movements) {
+      if (!mov || !mov.id || Number(mov.amount) <= 0) continue;
+
+      let bId = mov.branch_id || "branch-matriz";
+      const auth = (mov.authorized_by || "").toLowerCase();
+      if (auth.includes("silvia")) {
+        bId = "branch-1790889237862";
+      } else if (auth.includes("noe") || auth.includes("noé")) {
+        bId = "branch-sanjuan";
+      } else if (auth.includes("carlos")) {
+        bId = "branch-benito";
+      } else if (auth.includes("andres") || auth.includes("andrés")) {
+        bId = "branch-angeles";
+      }
+
+      const bName = CANONICAL_BRANCH_NAMES[bId] || "Sucursal Matriz (Centro)";
+
+      // Extraer datos si están en el concepto
+      const pedMatch = (mov.reason || "").match(/pedido\s+(PED-\d+)\s*-\s*([^[\(]+)/i);
+      const orderNumber = pedMatch ? pedMatch[1].toUpperCase() : undefined;
+      const customerName = pedMatch ? pedMatch[2].trim() : undefined;
+
+      let paymentMethod: "efectivo" | "tarjeta" | "transferencia" = "efectivo";
+      const reasonLower = (mov.reason || "").toLowerCase();
+      if (reasonLower.includes("[tarjeta]") || reasonLower.includes("tarjeta")) {
+        paymentMethod = "tarjeta";
+      } else if (
+        reasonLower.includes("[transferencia]") ||
+        reasonLower.includes("transferencia") ||
+        reasonLower.includes("spei")
+      ) {
+        paymentMethod = "transferencia";
+      }
+
+      let category = (mov.category as CashIncomeCategory) || "ingreso_extraordinario";
+      if (!category || category === ("otro" as any)) {
+        if (
+          orderNumber ||
+          reasonLower.includes("anticipo") ||
+          reasonLower.includes("liquidaci") ||
+          reasonLower.includes("pedido")
+        ) {
+          category = "abono_pedido";
+        } else if (reasonLower.includes("cambio") || reasonLower.includes("feria") || reasonLower.includes("fondo")) {
+          category = "fondo_cambio";
+        } else if (reasonLower.includes("mostrador") || reasonLower.includes("venta")) {
+          category = "venta_mostrador";
+        }
+      }
+
+      let categoryLabel = mov.category_label;
+      if (!categoryLabel) {
+        if (category === "abono_pedido") categoryLabel = "Abono a Pedido Especial";
+        else if (category === "venta_mostrador") categoryLabel = "Venta Mostrador (Panadería / POS)";
+        else if (category === "fondo_cambio") categoryLabel = "Aportación de Cambio a Caja";
+        else if (category === "venta_costales") categoryLabel = "Venta de Costales / Reciclaje";
+        else if (category === "abono_cliente") categoryLabel = "Cobro a Mayorista / Tiendita";
+        else categoryLabel = "Entrada de Dinero";
+      }
+
+      const createdAtDate = mov.created_at ? new Date(mov.created_at) : new Date();
+      const timeStr = createdAtDate.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+
+      syncedIncomes.push({
+        id: mov.id,
+        amount: Number(mov.amount),
+        category,
+        categoryLabel,
+        paymentMethod,
+        concept: mov.reason || categoryLabel,
+        cashier: mov.authorized_by || "Cajero",
+        branchId: bId,
+        branchName: bName,
+        orderNumber,
+        customerName,
+        date: `Hoy, ${timeStr}`,
+        timestamp: mov.created_at || new Date().toISOString(),
+      });
+    }
+
+    const merged = cleanDuplicateIncomes([...syncedIncomes, ...current]);
+    saveStoredIncomes(merged);
+    markRecordIdsAsSynced(syncedIncomes.map((i) => i.id));
+    window.dispatchEvent(new Event("brito_incomes_updated"));
+
+    return {
+      success: true,
+      count: syncedIncomes.length,
+      incomes: merged,
+    };
+  } catch (err) {
+    console.error("[IncomesSupabase] Error en fetchAndSyncIncomesFromSupabase:", err);
+    return { success: false, count: 0, incomes: getStoredIncomes() };
+  }
+}
+
 // ─── SINCRONIZACIÓN EN TIEMPO REAL MULTI-SUCURSAL (WebSocket) ───────────
 if (typeof window !== "undefined") {
   // 1. Escuchar ventas remotas en tiempo real de otras sucursales
@@ -556,6 +691,20 @@ if (typeof window !== "undefined") {
       }
       const finalConcept = cleanReason ? `${categoryLabel}: ${cleanReason}` : categoryLabel;
 
+      let bId = mov.branchId || "branch-matriz";
+      const auth = (mov.authorizedBy || mov.cashier || "").toLowerCase();
+      if (auth.includes("silvia")) {
+        bId = "branch-1790889237862";
+      } else if (auth.includes("noe") || auth.includes("noé")) {
+        bId = "branch-sanjuan";
+      } else if (auth.includes("carlos")) {
+        bId = "branch-benito";
+      } else if (auth.includes("andres") || auth.includes("andrés")) {
+        bId = "branch-angeles";
+      }
+
+      const bName = CANONICAL_BRANCH_NAMES[bId] || mov.branchName || "Sucursal Matriz (Centro)";
+
       const remoteIncome: CashIncome = {
         id: cleanIncomeId,
         amount: Number(mov.amount),
@@ -564,8 +713,8 @@ if (typeof window !== "undefined") {
         paymentMethod: "efectivo",
         concept: finalConcept,
         cashier: mov.authorizedBy || mov.cashier || "Encargado de Caja",
-        branchId: mov.branchId || "branch-matriz",
-        branchName: mov.branchName || "Sucursal Matriz Centro",
+        branchId: bId,
+        branchName: bName,
         date: `Hoy, ${mov.timestamp}`,
         timestamp: new Date().toISOString(),
       };

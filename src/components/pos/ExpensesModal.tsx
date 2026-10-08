@@ -1114,8 +1114,8 @@ export default function ExpensesModal({
     const calculated = effectiveSales
       .filter((s) => !s.isCustomOrder)
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const branchDeskTotal = activeBranch?.todayDeskSales ?? activeBranch?.todaySales ?? 0;
-    return Math.max(calculated, branchDeskTotal);
+    const branchDeskTotal = Number(activeBranch?.todayDeskSales ?? activeBranch?.todaySales ?? 0);
+    return branchDeskTotal > 0 && calculated === 0 ? branchDeskTotal : calculated > 0 ? calculated : branchDeskTotal;
   }, [effectiveSales, activeBranch?.todayDeskSales, activeBranch?.todaySales]);
 
   // Ventas de mostrador puras en efectivo (excluyendo pedidos) - Para el balance contable del cajón
@@ -1123,8 +1123,8 @@ export default function ExpensesModal({
     const calculated = effectiveSales
       .filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder)
       .reduce((acc, s) => acc + (Number(s.total) || 0), 0);
-    const branchDeskCash = activeBranch?.todayDeskSales ?? activeBranch?.currentShift?.cashSales ?? activeBranch?.todaySales ?? 0;
-    return Math.max(calculated, branchDeskCash);
+    const branchDeskCash = Number(activeBranch?.todayDeskSales ?? activeBranch?.currentShift?.cashSales ?? activeBranch?.todaySales ?? 0);
+    return branchDeskCash > 0 && calculated === 0 ? branchDeskCash : calculated > 0 ? calculated : branchDeskCash;
   }, [effectiveSales, activeBranch?.currentShift?.cashSales, activeBranch?.todayDeskSales, activeBranch?.todaySales]);
 
   // Pedidos especiales del turno (todas las formas de pago: efectivo, tarjeta, transferencia)
@@ -1136,8 +1136,8 @@ export default function ExpensesModal({
       .filter((o) => !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
       .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
     const calculated = fromSales + fromOrders;
-    const branchOrdersTotal = activeBranch?.todayOrdersTotal ?? activeBranch?.todayOrdersDeposit ?? 0;
-    return Math.max(calculated, branchOrdersTotal);
+    const branchOrdersTotal = Number(activeBranch?.todayOrdersTotal ?? activeBranch?.todayOrdersDeposit ?? 0);
+    return branchOrdersTotal > 0 && calculated === 0 ? branchOrdersTotal : calculated > 0 ? calculated : branchOrdersTotal;
   }, [effectiveSales, effectiveOrders, activeBranch?.todayOrdersTotal, activeBranch?.todayOrdersDeposit]);
 
   // Pedidos especiales cobrados en efectivo (anticipos y liquidaciones) - Para el balance contable del cajón
@@ -1149,8 +1149,8 @@ export default function ExpensesModal({
       .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
       .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
     const calculated = fromSales + fromOrders;
-    const branchOrdersCash = activeBranch?.todayOrdersDeposit ?? 0;
-    return Math.max(calculated, branchOrdersCash);
+    const branchOrdersCash = Number(activeBranch?.todayOrdersDeposit ?? 0);
+    return branchOrdersCash > 0 && calculated === 0 ? branchOrdersCash : calculated > 0 ? calculated : branchOrdersCash;
   }, [effectiveSales, effectiveOrders, activeBranch?.todayOrdersDeposit]);
 
   // Ventas totales en efectivo (mostrador + anticipos/liquidaciones de pedidos)

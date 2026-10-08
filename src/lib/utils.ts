@@ -323,58 +323,100 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
       localStorage.getItem("brito_active_branch_id") ||
       undefined;
 
-    // 1. Clave específica de la sucursal activa
+    let maxCutTs = 0;
+
+    // 1. Buscar en clave específica de la sucursal activa
     if (effectiveBranchId && effectiveBranchId !== "all") {
       const branchStored = localStorage.getItem("brito_shift_start_" + effectiveBranchId);
       if (branchStored && !isNaN(Number(branchStored)) && Number(branchStored) > 0) {
         const num = Number(branchStored);
-        return num > now ? now : num;
-      }
-    }
-
-    // 2. Buscar en historial de cortes de esta sucursal
-    let startTs = 0;
-    const rawCuts = localStorage.getItem("brito_shift_cuts_history");
-    if (rawCuts) {
-      const parsed = JSON.parse(rawCuts);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        for (const cut of parsed) {
-          if (effectiveBranchId && effectiveBranchId !== "all" && cut.branchId && cut.branchId !== effectiveBranchId) {
-            continue;
-          }
-          const cutTs =
-            typeof cut.timestamp === "number"
-              ? cut.timestamp
-              : parseDateTimeSafe(cut.timestamp || cut.date || cut.createdAt);
-          if (cutTs > 0 && cutTs <= now && cutTs > startTs) {
-            startTs = cutTs;
-          }
+        if (num <= now && num > maxCutTs) {
+          maxCutTs = num;
         }
       }
     }
 
-    // 3. Clave global del turno actual sólo si no hay sucursal específica o no encontró corte
-    if (startTs === 0 && (!effectiveBranchId || effectiveBranchId === "all")) {
+    // 2. Buscar en historial de cortes de esta sucursal (brito_shift_cuts_history)
+    const rawCuts = localStorage.getItem("brito_shift_cuts_history");
+    if (rawCuts) {
+      try {
+        const parsed = JSON.parse(rawCuts);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          for (const cut of parsed) {
+            let cutBranch = cut.branchId || "branch-matriz";
+            if (cutBranch === "branch-matriz") {
+              const resp = (cut.responsible || cut.outgoingCashier || "").toLowerCase();
+              if (resp.includes("silvia")) {
+                cutBranch = "branch-1790889237862";
+              } else if (resp.includes("andres")) {
+                cutBranch = "branch-angeles";
+              }
+            }
+            if (effectiveBranchId && effectiveBranchId !== "all" && cutBranch !== effectiveBranchId) {
+              continue;
+            }
+            const cutTs =
+              typeof cut.timestamp === "number"
+                ? cut.timestamp
+                : parseDateTimeSafe(cut.timestamp || cut.date || cut.createdAt);
+            if (cutTs > 0 && cutTs <= now && cutTs > maxCutTs) {
+              maxCutTs = cutTs;
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // 3. Buscar en el estado persistido de sucursales (brito_branches_data)
+    try {
+      const rawBranches = localStorage.getItem("brito_branches_data");
+      if (rawBranches) {
+        const branches = JSON.parse(rawBranches);
+        if (Array.isArray(branches)) {
+          const matchB = branches.find((b: any) => b && (b.id === effectiveBranchId || (effectiveBranchId === "branch-1790889237862" && b.manager && b.manager.toLowerCase().includes("silvia"))));
+          if (matchB) {
+            if (matchB.lastCut) {
+              const bCutTs = typeof matchB.lastCut.timestamp === "number"
+                ? matchB.lastCut.timestamp
+                : parseDateTimeSafe(matchB.lastCut.timestamp || matchB.lastCut.date || matchB.lastCut.createdAt);
+              if (bCutTs > 0 && bCutTs <= now && bCutTs > maxCutTs) {
+                maxCutTs = bCutTs;
+              }
+            }
+            if (matchB.currentShift?.openedAt) {
+              const openTs = parseDateTimeSafe(matchB.currentShift.openedAt);
+              if (openTs > 0 && openTs <= now && openTs > maxCutTs) {
+                maxCutTs = openTs;
+              }
+            }
+          }
+        }
+      }
+    } catch {}
+
+    // 4. Si encontramos un corte válido, asegurar que la clave específica quede guardada
+    if (maxCutTs > 0) {
+      try {
+        if (effectiveBranchId && effectiveBranchId !== "all") {
+          localStorage.setItem("brito_shift_start_" + effectiveBranchId, maxCutTs.toString());
+        }
+      } catch {}
+      return maxCutTs;
+    }
+
+    // 5. Clave global del turno actual sólo si no hay sucursal específica o no encontró corte
+    if (!effectiveBranchId || effectiveBranchId === "all") {
       const stored = localStorage.getItem("brito_current_shift_start_timestamp");
       if (stored && !isNaN(Number(stored)) && Number(stored) > 0) {
         const num = Number(stored);
-        if (num <= now) startTs = num;
+        if (num <= now) return num;
       }
     }
 
-    if (startTs === 0) {
-      // Iniciar al comienzo del día de hoy (00:00:00) para no descartar ventas matutinas
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      startTs = todayStart.getTime();
-    }
-    try {
-      if (effectiveBranchId && effectiveBranchId !== "all") {
-        localStorage.setItem("brito_shift_start_" + effectiveBranchId, startTs.toString());
-      }
-      localStorage.setItem("brito_current_shift_start_timestamp", startTs.toString());
-    } catch (e) {}
-    return startTs;
+    // 6. Si no hay cortes hoy, iniciar al comienzo del día de hoy (00:00:00)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return todayStart.getTime();
   } catch (e) {}
   return Date.now();
 }

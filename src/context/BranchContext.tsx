@@ -1110,13 +1110,14 @@ function resolveBranchParam(param: string | null): string | null {
                 );
               });
 
+            try {
+              localStorage.setItem("brito_branches_data", JSON.stringify(updated));
+            } catch {}
+
             if (isIdentical) {
               return prev; // Mismo objeto en memoria, cero re-renderizado
             }
 
-            try {
-              localStorage.setItem("brito_branches_data", JSON.stringify(updated));
-            } catch {}
             return updated;
           });
 
@@ -1368,21 +1369,8 @@ function resolveBranchParam(param: string | null): string | null {
 
     syncBranchesWithServer();
 
-    // 2. Cargar estado de almacenamiento local
+    // 2. Cargar estado de almacenamiento local para otros parámetros
     try {
-      const savedBranches = localStorage.getItem("brito_branches_data");
-      if (savedBranches) {
-        const parsed = JSON.parse(savedBranches);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setBranches((prev) => {
-            const map = new Map<string, Branch>();
-            DEFAULT_BRANCHES.forEach((d) => map.set(d.id, d));
-            parsed.forEach((b: Branch) => map.set(b.id, { ...map.get(b.id), ...b }));
-            prev.forEach((b: Branch) => map.set(b.id, { ...map.get(b.id), ...b }));
-            return Array.from(map.values());
-          });
-        }
-      }
       const savedCurrent = localStorage.getItem("brito_current_branch_id");
       if (savedCurrent) {
         if (!isAdmin && userAssignedBranchId) {

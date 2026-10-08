@@ -49,6 +49,8 @@ import {
   syncMissingSalesToIncomes, 
   recordCashIncome, 
   cleanDuplicateIncomes,
+  fetchAndSyncIncomesFromSupabase,
+  CANONICAL_BRANCH_NAMES,
   INITIAL_INCOMES 
 } from "@/lib/incomes";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
@@ -484,6 +486,11 @@ export default function IngresosPage() {
   const [selectedIncomeForView, setSelectedIncomeForView] = useState<CashIncome | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
+  // ── Sincronización con Supabase ──
+  const [isSyncingWithSupabase, setIsSyncingWithSupabase] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [supabaseSyncSuccess, setSupabaseSyncSuccess] = useState<boolean | null>(null);
+
   // ── Formulario de Nuevo Ingreso ──
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<CashIncomeCategory>("abono_pedido");
@@ -508,8 +515,25 @@ export default function IngresosPage() {
     }
   }, []);
 
+  const syncWithSupabase = useCallback(async () => {
+    setIsSyncingWithSupabase(true);
+    try {
+      const res = await fetchAndSyncIncomesFromSupabase();
+      setSupabaseSyncSuccess(res.success);
+      setLastSyncTime(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      reloadIncomesFromStorage();
+    } catch (err) {
+      console.error("[Ingresos] Error al sincronizar con Supabase:", err);
+      setSupabaseSyncSuccess(false);
+    } finally {
+      setIsSyncingWithSupabase(false);
+    }
+  }, [reloadIncomesFromStorage]);
+
   useEffect(() => {
     reloadIncomesFromStorage();
+    // Traer inmediatamente ingresos en la nube desde Supabase
+    syncWithSupabase();
 
     const handleLocalUpdate = () => {
       reloadIncomesFromStorage();
@@ -538,14 +562,38 @@ export default function IngresosPage() {
       }, 100);
     });
 
+    // Suscripción reactiva directa a Supabase Postgres Changes para la tabla cash_movements
+    let supabaseChannel: any = null;
+    try {
+      const supabase = createClient();
+      supabaseChannel = supabase
+        .channel("ingresos-supabase-sync-hub")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "cash_movements" },
+          () => {
+            fetchAndSyncIncomesFromSupabase().then(() => reloadIncomesFromStorage());
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn("[Ingresos] Supabase realtime channel no inicializado:", e);
+    }
+
     return () => {
       window.removeEventListener("brito_incomes_updated", handleLocalUpdate);
       window.removeEventListener("storage", handleLocalUpdate);
       unsubSale();
       unsubCash();
       unsubOrder();
+      if (supabaseChannel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(supabaseChannel);
+        } catch {}
+      }
     };
-  }, [reloadIncomesFromStorage]);
+  }, [reloadIncomesFromStorage, syncWithSupabase]);
 
   // Actualizar sucursal por defecto si cambia en el contexto global
   useEffect(() => {
@@ -646,13 +694,20 @@ export default function IngresosPage() {
       if (selectedBranch !== "all") {
         const incBranch = (inc.branchName || "").toLowerCase();
         const target = selectedBranch.toLowerCase();
+        const targetBranchObj = branches.find((b) => b.name === selectedBranch || b.id === selectedBranch);
+        const targetBranchId = targetBranchObj ? targetBranchObj.id : null;
+
         const match =
           inc.branchName === selectedBranch ||
           inc.branchId === selectedBranch ||
-          (target.includes("matriz") && incBranch.includes("matriz")) ||
-          (target.includes("benito") && incBranch.includes("benito")) ||
-          (target.includes("mercado") && incBranch.includes("mercado")) ||
-          (target.includes("flores") && incBranch.includes("flores")) ||
+          (targetBranchId && inc.branchId === targetBranchId) ||
+          (target.includes("matriz") && (incBranch.includes("matriz") || inc.branchId === "branch-matriz")) ||
+          (target.includes("benito") && (incBranch.includes("benito") || inc.branchId === "branch-benito")) ||
+          (target.includes("mercado") && (incBranch.includes("mercado") || inc.branchId === "branch-benito")) ||
+          (target.includes("ildefonso") && (incBranch.includes("ildefonso") || inc.branchId === "branch-1790889237862")) ||
+          (target.includes("juan") && (incBranch.includes("juan") || inc.branchId === "branch-sanjuan")) ||
+          (target.includes("angeles") && (incBranch.includes("angeles") || inc.branchId === "branch-angeles")) ||
+          (target.includes("flores") && (incBranch.includes("flores") || inc.branchId === "branch-flores")) ||
           (target.includes("norte") && incBranch.includes("norte"));
         if (!match) return;
       }
@@ -671,7 +726,7 @@ export default function IngresosPage() {
     });
 
     return { dia, semana, mes, anio, todos };
-  }, [incomes, selectedBranch, selectedMethod, selectedCategory, todayStart, todayEnd, lunesSemana, domingoSemana, primerDiaMes, ultimoDiaMes, primerDiaAnio, ultimoDiaAnio]);
+  }, [incomes, selectedBranch, selectedMethod, selectedCategory, todayStart, todayEnd, lunesSemana, domingoSemana, primerDiaMes, ultimoDiaMes, primerDiaAnio, ultimoDiaAnio, branches]);
 
   // ─── Filtrado Principal y Ordenamiento Cronológico (Más reciente primero) ──
   const filteredIncomes = useMemo(() => {
@@ -693,13 +748,20 @@ export default function IngresosPage() {
         if (selectedBranch !== "all") {
           const incBranch = (inc.branchName || "").toLowerCase();
           const target = selectedBranch.toLowerCase();
+          const targetBranchObj = branches.find((b) => b.name === selectedBranch || b.id === selectedBranch);
+          const targetBranchId = targetBranchObj ? targetBranchObj.id : null;
+
           const match =
             inc.branchName === selectedBranch ||
             inc.branchId === selectedBranch ||
-            (target.includes("matriz") && incBranch.includes("matriz")) ||
-            (target.includes("benito") && incBranch.includes("benito")) ||
-            (target.includes("mercado") && incBranch.includes("mercado")) ||
-            (target.includes("flores") && incBranch.includes("flores")) ||
+            (targetBranchId && inc.branchId === targetBranchId) ||
+            (target.includes("matriz") && (incBranch.includes("matriz") || inc.branchId === "branch-matriz")) ||
+            (target.includes("benito") && (incBranch.includes("benito") || inc.branchId === "branch-benito")) ||
+            (target.includes("mercado") && (incBranch.includes("mercado") || inc.branchId === "branch-benito")) ||
+            (target.includes("ildefonso") && (incBranch.includes("ildefonso") || inc.branchId === "branch-1790889237862")) ||
+            (target.includes("juan") && (incBranch.includes("juan") || inc.branchId === "branch-sanjuan")) ||
+            (target.includes("angeles") && (incBranch.includes("angeles") || inc.branchId === "branch-angeles")) ||
+            (target.includes("flores") && (incBranch.includes("flores") || inc.branchId === "branch-flores")) ||
             (target.includes("norte") && incBranch.includes("norte"));
           if (!match) return false;
         }
@@ -878,14 +940,16 @@ export default function IngresosPage() {
 
     try {
       const supabase = createClient();
+      const targetBranchId = branches.find((b) => b.name === newIncome.branchName)?.id || newIncome.branchId || "branch-matriz";
       await supabase.from("cash_movements").insert({
         id: newIncome.id,
         type: "entrada",
         category: newIncome.category,
+        category_label: newIncome.categoryLabel,
         amount: newIncome.amount,
         reason: `${newIncome.categoryLabel}: ${newIncome.concept} (${newIncome.customerName || "General"}) [${newIncome.paymentMethod}]`,
         authorized_by: newIncome.cashier,
-        branch_id: branches.find((b) => b.name === newIncome.branchName)?.id || "branch-matriz",
+        branch_id: targetBranchId,
       });
     } catch (err) {
       console.log("Offline mode, saved locally", err);
@@ -980,8 +1044,12 @@ export default function IngresosPage() {
               <div className="flex items-center gap-2">
                 <h2 className="text-2xl font-black text-stone-900 tracking-tight">Registro de Ingresos</h2>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Tiempo Real Multi-Sucursal
+                  <span className={`w-2 h-2 rounded-full ${isSyncingWithSupabase ? "bg-amber-500 animate-ping" : supabaseSyncSuccess === false ? "bg-rose-500" : "bg-emerald-500 animate-pulse"}`} />
+                  {isSyncingWithSupabase
+                    ? "Sincronizando con Supabase..."
+                    : supabaseSyncSuccess === false
+                    ? "Modo Local (Offline)"
+                    : "Supabase Conectado en Vivo"}
                 </span>
               </div>
               <p className="text-xs text-stone-500 mt-0.5">
@@ -993,6 +1061,15 @@ export default function IngresosPage() {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => syncWithSupabase()}
+            disabled={isSyncingWithSupabase}
+            className="flex items-center gap-1.5 bg-white hover:bg-stone-50 text-stone-700 font-bold px-3.5 py-2.5 rounded-xl border border-stone-200 shadow-sm text-xs transition-all active:scale-95 disabled:opacity-60"
+            title={lastSyncTime ? `Última sincronización con Supabase: ${lastSyncTime}` : "Sincronizar ahora con Supabase"}
+          >
+            <RefreshCw className={`w-4 h-4 text-emerald-600 ${isSyncingWithSupabase ? "animate-spin" : ""}`} />
+            <span>{isSyncingWithSupabase ? "Sincronizando..." : "Sincronizar"}</span>
+          </button>
           <button
             onClick={() => setMostrarStats(!mostrarStats)}
             className={`flex items-center gap-1.5 font-bold px-3.5 py-2.5 rounded-xl border text-xs transition-all ${

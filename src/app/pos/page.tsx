@@ -611,9 +611,12 @@ export default function POSPage() {
             }
           } catch {}
         }
-        const shiftStart = getStoredShiftStartBoundary(activeBranch?.id);
+        const bId = activeBranch?.id || "branch-matriz";
+        const shiftStart = getStoredShiftStartBoundary(bId);
         const realSales = list.filter((s: any) => {
           if (!s) return false;
+          const sBranch = s.branchId || s.branch_id || "branch-matriz";
+          if (bId !== "all" && sBranch !== bId) return false;
           const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
           if (shiftStart > 0 && (!t || t < shiftStart)) return false;
           return true;
@@ -626,8 +629,9 @@ export default function POSPage() {
         } else {
           const parsedExp = JSON.parse(rawExpenses);
           if (Array.isArray(parsedExp)) {
-            const shiftStart = getStoredShiftStartBoundary();
             const filtered = parsedExp.filter((e: any) => {
+              const eBranch = e.branchId || e.branch_id || "branch-matriz";
+              if (bId !== "all" && eBranch !== bId) return false;
               const t = parseDateTimeSafe(e?.timestamp || e?.createdAt || e?.date);
               return shiftStart <= 0 || (t && t >= shiftStart);
             });
@@ -649,8 +653,9 @@ export default function POSPage() {
         } else {
           const parsedInc = JSON.parse(rawIncomes);
           if (Array.isArray(parsedInc)) {
-            const shiftStart = getStoredShiftStartBoundary();
             const filtered = parsedInc.filter((i: any) => {
+              const iBranch = i.branchId || i.branch_id || "branch-matriz";
+              if (bId !== "all" && iBranch !== bId) return false;
               const t = parseDateTimeSafe(i?.timestamp || i?.date || i?.createdAt);
               return shiftStart <= 0 || (t && t >= shiftStart);
             });
@@ -788,10 +793,13 @@ export default function POSPage() {
         if (saved && saved !== "[]") {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const shiftStart = getStoredShiftStartBoundary();
+            const currentBranchId = localStorage.getItem("brito_current_branch_id") || "branch-matriz";
+            const shiftStart = getStoredShiftStartBoundary(currentBranchId);
             const realSales = parsed.filter(
               (s: any) => {
                 if (!s) return false;
+                const sBranch = s.branchId || s.branch_id || "branch-matriz";
+                if (currentBranchId !== "all" && sBranch !== currentBranchId) return false;
                 const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
                 if (shiftStart > 0 && (!t || t < shiftStart)) return false;
                 return true;
@@ -940,12 +948,19 @@ export default function POSPage() {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) list = [...parsed];
         }
+        const bId = activeBranch?.id || "branch-matriz";
+        const shiftStart = getStoredShiftStartBoundary(bId);
+
         const masterSaved = localStorage.getItem("brito_pos_master_sales");
         if (masterSaved) {
           try {
             const masterParsed = JSON.parse(masterSaved);
             if (Array.isArray(masterParsed)) {
               for (const ms of masterParsed) {
+                const msBranch = ms?.branchId || ms?.branch_id || "branch-matriz";
+                const msTime = parseDateTimeSafe(ms?.timestamp || ms?.createdAt || ms?.date);
+                if (bId !== "all" && msBranch !== bId) continue;
+                if (shiftStart > 0 && msTime < shiftStart) continue;
                 if (ms && !list.some((s) => s.id === ms.id)) {
                   list.push(ms);
                 }
@@ -953,9 +968,10 @@ export default function POSPage() {
             }
           } catch {}
         }
-        const shiftStart = getStoredShiftStartBoundary(activeBranch?.id);
         const realSales = list.filter((s: any) => {
           if (!s) return false;
+          const sBranch = s.branchId || s.branch_id || "branch-matriz";
+          if (bId !== "all" && sBranch !== bId) return false;
           const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
           if (shiftStart > 0 && (!t || t < shiftStart)) return false;
           return true;
@@ -1208,13 +1224,8 @@ export default function POSPage() {
       todayStart.setHours(0, 0, 0, 0);
       const todayStartTs = todayStart.getTime();
 
-      // Obtener el inicio de turno más reciente y válido (del corte o inicio de turno guardado)
-      const lastCutTs = lastCutInfo
-        ? parseDateTimeSafe(lastCutInfo.timestamp || lastCutInfo.date || (lastCutInfo as any).createdAt || (lastCutInfo as any).cutTime)
-        : 0;
-      // Si hubo corte hoy, el turno inició en ese corte; de lo contrario inicia al inicio del día de hoy
-      const effectiveShiftStart = lastCutTs >= todayStartTs ? lastCutTs : todayStartTs;
-      localStorage.setItem("brito_current_shift_start_timestamp", effectiveShiftStart.toString());
+      const bId = activeBranch?.id || "branch-matriz";
+      const branchShiftStart = getStoredShiftStartBoundary(bId);
 
       // Sincronizar ventas del turno actual con ventana de tolerancia de 10 segundos
       const rawCurrent = localStorage.getItem("brito_pos_current_sales");
@@ -1224,8 +1235,10 @@ export default function POSPage() {
           const cleaned = parsed.filter(
             (s: any) => {
               if (!s) return false;
+              const sBranch = s.branchId || s.branch_id || "branch-matriz";
+              if (bId !== "all" && sBranch !== bId) return false;
               const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
-              if (effectiveShiftStart > 0 && (!t || t < effectiveShiftStart)) return false;
+              if (branchShiftStart > 0 && (!t || t < branchShiftStart)) return false;
               return true;
             }
           );
@@ -1504,21 +1517,42 @@ export default function POSPage() {
             localStorage.setItem("brito_pos_master_sales", JSON.stringify(masterList));
           }
 
-          // Sincronizar también con las ventas del turno actual (brito_pos_current_sales)
+          // Sincronizar también con las ventas del turno actual (brito_pos_current_sales) respetando la sucursal y el límite del corte
+          const currentBranchId = activeBranch?.id || user?.assignedBranchId || "branch-matriz";
+          const currentShiftStart = getStoredShiftStartBoundary(currentBranchId);
+
           const rawCurrent = localStorage.getItem("brito_pos_current_sales");
           const currentList: Sale[] = rawCurrent ? JSON.parse(rawCurrent) : [];
           const currentMap = new Map<string, Sale>(currentList.map((s) => [s.id, s]));
           let currentChanged = false;
 
-          for (const s of masterList) {
-            if (!currentMap.has(s.id)) {
-              currentMap.set(s.id, s);
+          // Eliminar ventas que no pertenezcan a esta sucursal o que sean anteriores al corte del turno
+          for (const [id, s] of currentMap.entries()) {
+            const sBranch = s.branchId || (s as any).branch_id || "branch-matriz";
+            const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+            if (currentBranchId !== "all" && sBranch !== currentBranchId) {
+              currentMap.delete(id);
+              currentChanged = true;
+            } else if (currentShiftStart > 0 && sTime < currentShiftStart) {
+              currentMap.delete(id);
               currentChanged = true;
             }
           }
 
-          if (currentChanged) {
-            const updatedCurrent = Array.from(currentMap.values()).sort((a, b) => compareMovementsDesc(a, b));
+          // Incorporar únicamente ventas correspondientes a esta sucursal y posteriores al inicio del turno
+          for (const s of masterList) {
+            const sBranch = s.branchId || (s as any).branch_id || "branch-matriz";
+            const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+            if ((currentBranchId === "all" || sBranch === currentBranchId) && (currentShiftStart <= 0 || sTime >= currentShiftStart)) {
+              if (!currentMap.has(s.id)) {
+                currentMap.set(s.id, s);
+                currentChanged = true;
+              }
+            }
+          }
+
+          const updatedCurrent = Array.from(currentMap.values()).sort((a, b) => compareMovementsDesc(a, b));
+          if (currentChanged || updatedCurrent.length !== currentList.length) {
             localStorage.setItem("brito_pos_current_sales", JSON.stringify(updatedCurrent));
             setRecentSalesList(updatedCurrent);
           }
@@ -2135,8 +2169,9 @@ export default function POSPage() {
     let posCash = (currentShiftSales || [])
       .filter((s) => s && s.paymentMethod === "efectivo")
       .reduce((sum, s) => sum + (Number(s.total) || 0), 0);
-    if (posCash === 0 && activeBranch && (activeBranch.todayDeskSales ?? activeBranch.todaySales ?? 0) > 0) {
-      posCash = activeBranch.todayDeskSales ?? activeBranch.todaySales ?? 0;
+    const branchDeskCash = Number(activeBranch?.todayDeskSales ?? activeBranch?.currentShift?.cashSales ?? 0);
+    if (branchDeskCash > 0 && posCash === 0) {
+      posCash = branchDeskCash;
     }
     // Para el conteo de efectivo en cajón, sumar anticipos cobrados en efectivo en este turno y sucursal
     const allShiftOrdersForCash = getStoredOrders().filter((o) => {
@@ -2174,9 +2209,11 @@ export default function POSPage() {
       if (shiftStartBoundary > 0 && (!t || t < shiftStartBoundary)) return false;
       return (o.paymentMethod === "efectivo" || !o.paymentMethod) && !(currentShiftSales || []).some((s) => s.id === o.orderNumber || s.id === o.id);
     });
-    const ordersCash = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+    const ordersCashCalc = allShiftOrdersForCash.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
+    const branchOrdersDeposit = Number(activeBranch?.todayOrdersDeposit ?? 0);
+    const ordersCash = branchOrdersDeposit > 0 && ordersCashCalc === 0 ? branchOrdersDeposit : ordersCashCalc;
     return posCash + ordersCash;
-  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id, activeBranch?.todayDeskSales, activeBranch?.todaySales]);
+  }, [currentShiftSales, shiftStartBoundary, shiftVersion, activeBranch?.id, activeBranch?.todayDeskSales, activeBranch?.todaySales, activeBranch?.todayOrdersDeposit, activeBranch?.currentShift?.cashSales]);
 
   const totalExpenses = (currentShiftExpenses || []).reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
   const totalExtraInCash = (currentShiftIncomes || [])

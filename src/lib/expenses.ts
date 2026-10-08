@@ -9,6 +9,9 @@ export const STORAGE_EXPENSES_KEY = "brito_gastos_registro";
 
 export const GASTO_CATEGORIAS_MAP: Record<string, { id: string; label: string }> = {
   retiro_dueno: { id: "retiro_dueno", label: "Retiro Don Toño / Socios" },
+  retiro: { id: "retiro_dueno", label: "Retiro Don Toño / Socios" },
+  corte: { id: "retiro_dueno", label: "Retiro Don Toño / Socios" },
+  corte_caja: { id: "retiro_dueno", label: "Retiro Don Toño / Socios" },
   gasto_gas: { id: "gas_lp", label: "Gas LP para Hornos" },
   gas_lp: { id: "gas_lp", label: "Gas LP para Hornos" },
   compra_insumos: { id: "insumos", label: "Materia Prima & Harinas" },
@@ -98,7 +101,30 @@ export function recordCashOutflowAsExpense(options: {
     DEFAULT_BRANCHES_NAMES[branchId] ||
     (branchId.includes("matriz") ? "Matriz (Centro)" : (branchId.includes("sanjuan") || branchId.includes("benito")) ? "San Juan" : "Las Flores (Plaza)");
 
-  const categoryKey = options.category ? options.category.toLowerCase().trim() : "otros";
+  let categoryKey = options.category ? options.category.toLowerCase().trim() : "otros";
+  if (!options.category || categoryKey === "otros" || categoryKey === "gasto" || categoryKey === "salida" || categoryKey === "caja") {
+    const descLower = finalDescription.toLowerCase();
+    if (descLower.includes("cierre de turno") || descLower.includes("don toño") || descLower.includes("retiro") || descLower.includes("socio")) {
+      categoryKey = "retiro_dueno";
+    } else if (descLower.includes("gas") || descLower.includes("horno")) {
+      categoryKey = "gas_lp";
+    } else if (descLower.includes("harina") || descLower.includes("levadura") || descLower.includes("manteca") || descLower.includes("azucar") || descLower.includes("insumo")) {
+      categoryKey = "insumos";
+    } else if (descLower.includes("bolsa") || descLower.includes("empaque") || descLower.includes("papel")) {
+      categoryKey = "empaques";
+    } else if (descLower.includes("cfe") || descLower.includes("luz") || descLower.includes("agua") || descLower.includes("internet")) {
+      categoryKey = "servicios";
+    } else if (descLower.includes("gasolina") || descLower.includes("pemex") || descLower.includes("reparto")) {
+      categoryKey = "gasolina";
+    } else if (descLower.includes("proveedor") || descLower.includes("factura")) {
+      categoryKey = "proveedores";
+    } else if (descLower.includes("nomina") || descLower.includes("sueldo") || descLower.includes("semana")) {
+      categoryKey = "nomina";
+    } else if (descLower.includes("mantenimiento") || descLower.includes("refaccion") || descLower.includes("tecnico")) {
+      categoryKey = "mantenimiento";
+    }
+  }
+
   const catDef = GASTO_CATEGORIAS_MAP[categoryKey] || {
     id: "otros",
     label: "Gastos Menores / Varios",
@@ -120,6 +146,16 @@ export function recordCashOutflowAsExpense(options: {
     }
   }
 
+  // Detectar cajero inteligente si es genérico
+  let finalCashier = (options.cashier || "Cajero de Turno").trim();
+  if (finalCashier.toLowerCase() === "cajero" || finalCashier.toLowerCase() === "cajero de turno") {
+    const match = finalDescription.match(/\(([^->\)]+)(?:\s*->|\s*➔|\))/i);
+    if (match && match[1]) {
+      const extracted = match[1].trim();
+      finalCashier = extracted.charAt(0).toUpperCase() + extracted.slice(1);
+    }
+  }
+
   const newExpense: ExpenseRecord = {
     id: folio,
     date: dateStr,
@@ -134,7 +170,7 @@ export function recordCashOutflowAsExpense(options: {
     accountOrigin: options.accountOrigin || "Caja Mostrador (Efectivo Turno)",
     supplier: options.supplier ? options.supplier.trim() : undefined,
     notes: options.notes ? options.notes.trim() : undefined,
-    cashier: options.cashier || "Cajero de Turno",
+    cashier: finalCashier,
     status: "activo",
     timestamp: now.toISOString(),
   };

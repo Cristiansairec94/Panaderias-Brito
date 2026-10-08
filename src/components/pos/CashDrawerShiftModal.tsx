@@ -389,11 +389,11 @@ export default function CashDrawerShiftModal({
   const branchCashInDrawer = Number(currentBranch?.cashInDrawer ?? 0);
 
   const calculatedPurePosCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
-  const purePosCash = branchDeskSales > 0 ? Math.max(calculatedPurePosCash, branchDeskSales) : calculatedPurePosCash;
+  const purePosCash = branchDeskSales > 0 && calculatedPurePosCash === 0 ? branchDeskSales : calculatedPurePosCash > 0 ? calculatedPurePosCash : branchDeskSales;
 
   const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
   const calculatedOrdersCash = ordersCash + ordersInSalesCash;
-  const totalOrdersCash = branchOrdersDeposit > 0 ? Math.max(calculatedOrdersCash, branchOrdersDeposit) : calculatedOrdersCash;
+  const totalOrdersCash = branchOrdersDeposit > 0 && calculatedOrdersCash === 0 ? branchOrdersDeposit : calculatedOrdersCash > 0 ? calculatedOrdersCash : branchOrdersDeposit;
 
   const posCash = purePosCash + totalOrdersCash;
 
