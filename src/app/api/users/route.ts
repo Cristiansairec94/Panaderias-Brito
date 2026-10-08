@@ -6,8 +6,10 @@ import { hashPasswordSync, verifyPasswordSync } from "@/lib/security";
 
 const DATA_DIR = path.join(process.cwd(), "src", "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
+const TMP_USERS_FILE = path.join("/tmp", "brito_users.json");
 
 let inMemoryUsersCache: AppUser[] | null = null;
+let lastFileMtime = 0;
 
 function ensureDataDirectory() {
   try {
@@ -20,18 +22,33 @@ function ensureDataDirectory() {
 }
 
 function readStoredUsers(): AppUser[] {
-  if (inMemoryUsersCache && inMemoryUsersCache.length > 0) {
-    return inMemoryUsersCache;
-  }
-
+  // 1. Revisar /tmp primero si estamos en entorno serverless (Vercel)
   try {
-    ensureDataDirectory();
-    if (fs.existsSync(USERS_FILE)) {
-      const content = fs.readFileSync(USERS_FILE, "utf-8");
+    if (fs.existsSync(TMP_USERS_FILE)) {
+      const content = fs.readFileSync(TMP_USERS_FILE, "utf-8");
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed) && parsed.length > 0) {
         inMemoryUsersCache = parsed;
         return parsed;
+      }
+    }
+  } catch {}
+
+  // 2. Leer desde src/data/users.json verificando cambios en disco
+  try {
+    ensureDataDirectory();
+    if (fs.existsSync(USERS_FILE)) {
+      const stats = fs.statSync(USERS_FILE);
+      if (stats.mtimeMs !== lastFileMtime || !inMemoryUsersCache) {
+        const content = fs.readFileSync(USERS_FILE, "utf-8");
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          inMemoryUsersCache = parsed;
+          lastFileMtime = stats.mtimeMs;
+          return parsed;
+        }
+      } else if (inMemoryUsersCache) {
+        return inMemoryUsersCache;
       }
     }
   } catch (err) {
@@ -43,14 +60,27 @@ function readStoredUsers(): AppUser[] {
 
 function writeStoredUsers(users: AppUser[]): boolean {
   inMemoryUsersCache = users;
+  let written = false;
+
+  // Intentar escribir en src/data/users.json
   try {
     ensureDataDirectory();
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
-    return true;
+    try {
+      lastFileMtime = fs.statSync(USERS_FILE).mtimeMs;
+    } catch {}
+    written = true;
   } catch (err) {
-    console.warn("[API Users] No se pudo escribir en users.json:", err);
-    return false;
+    console.warn("[API Users] No se pudo escribir en users.json (entorno serverless):", err);
   }
+
+  // Guardar copia en /tmp para persistencia en contenedores serverless
+  try {
+    fs.writeFileSync(TMP_USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+    written = true;
+  } catch {}
+
+  return written;
 }
 
 // Sanitizar usuario eliminando la contraseña antes de responder al cliente
@@ -152,20 +182,38 @@ export async function POST(req: NextRequest) {
 
     // Caso 1: Sincronización de lista completa
     if (Array.isArray(body)) {
+      const isReplace = req.nextUrl.searchParams.get("replace") === "true";
       if (body.length > 0) {
-        const mergedMap = new Map<string, AppUser>();
-        currentUsers.forEach((u) => mergedMap.set(u.id, u));
-        body.forEach((u) => {
-          if (u && u.id) {
-            const existing = mergedMap.get(u.id);
-            // Hashear contraseña si viene en texto claro nuevo
+        let updated: AppUser[];
+        if (isReplace) {
+          // Reemplazo autoritativo: respeta eliminaciones de empleados
+          updated = body.map((u) => {
+            const existing = currentUsers.find((curr) => curr.id === u.id);
             const finalPass = u.password
               ? (u.password.length === 64 ? u.password : hashPasswordSync(u.password))
-              : existing?.password;
-            mergedMap.set(u.id, { ...existing, ...u, ...(finalPass ? { password: finalPass } : {}) });
-          }
-        });
-        const updated = Array.from(mergedMap.values());
+              : existing?.password || "1234";
+            return {
+              ...existing,
+              ...u,
+              password: finalPass,
+            };
+          });
+        } else {
+          const mergedMap = new Map<string, AppUser>();
+          currentUsers.forEach((u) => mergedMap.set(u.id, u));
+          body.forEach((u) => {
+            if (u && u.id) {
+              const existing = mergedMap.get(u.id);
+              // Hashear contraseña si viene en texto claro nuevo
+              const finalPass = u.password
+                ? (u.password.length === 64 ? u.password : hashPasswordSync(u.password))
+                : existing?.password;
+              mergedMap.set(u.id, { ...existing, ...u, ...(finalPass ? { password: finalPass } : {}) });
+            }
+          });
+          updated = Array.from(mergedMap.values());
+        }
+
         writeStoredUsers(updated);
         return NextResponse.json({ success: true, users: updated.map(sanitizeUser), count: updated.length });
       }
@@ -277,7 +325,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const currentUsers = readStoredUsers();
-    const updatedList = currentUsers.filter((u) => u.id !== id);
+    const updatedList = currentUsers.filter((u) => u.id !== id && u.username !== id);
     writeStoredUsers(updatedList);
 
     return NextResponse.json({

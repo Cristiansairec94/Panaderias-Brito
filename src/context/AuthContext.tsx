@@ -373,6 +373,39 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
+// Helpers para persistencia de lista negra de empleados eliminados (Tombstones)
+// Evita que perfiles eliminados resuciten al refrescar la página o reconectar con el servidor
+export const getDeletedUserIds = (): Set<string> => {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem("brito_deleted_user_ids");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return new Set(parsed);
+    }
+  } catch {}
+  return new Set();
+};
+
+export const addDeletedUserId = (id: string) => {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const current = getDeletedUserIds();
+    current.add(id);
+    localStorage.setItem("brito_deleted_user_ids", JSON.stringify(Array.from(current)));
+  } catch {}
+};
+
+export const removeDeletedUserId = (id: string) => {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const current = getDeletedUserIds();
+    if (current.delete(id)) {
+      localStorage.setItem("brito_deleted_user_ids", JSON.stringify(Array.from(current)));
+    }
+  } catch {}
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -597,82 +630,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Load custom users from localStorage on mount (Almacenamiento permanente y autoritativo)
   useEffect(() => {
     try {
+      const deletedIds = getDeletedUserIds();
       const savedCustom = localStorage.getItem("brito_custom_users");
+      let baseUsers: User[] = DEMO_USERS;
+
       if (savedCustom) {
-        let parsed = JSON.parse(savedCustom);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          let modified = false;
-          parsed = parsed.map((u: any) => {
-            if (u.id === "usr-silvia" || u.username === "silvia") {
-              if (u.assignedBranchId !== "branch-1790889237862") {
-                modified = true;
-                return { ...u, assignedBranchId: "branch-1790889237862", assignedBranchName: "Sucursal San Ildefonso" };
-              }
-            }
-            if (u.id === "usr-andres" || u.username === "andres") {
-              if (u.assignedBranchId !== "branch-angeles") {
-                modified = true;
-                return { ...u, assignedBranchId: "branch-angeles", assignedBranchName: "Sucursal Los Ángeles" };
-              }
-            }
-            if (u.id === "usr-2" || u.username === "paulina") {
-              if (u.role !== "admin") {
-                modified = true;
-                return { ...u, role: "admin", roleLabel: "Administrador General", jobTitle: "Administradora General" };
-              }
-            }
-            if (u.id === "usr-5" || u.username === "carlos") {
-              if (u.assignedBranchId !== "branch-benito") {
-                modified = true;
-                return { ...u, assignedBranchId: "branch-benito", assignedBranchName: "Sucursal San Benito (Mercado)" };
-              }
-            }
-            return u;
-          });
-          if (!parsed.some((u: any) => u.id === "usr-sanjuan" || u.username === "sanjuan")) {
-            const sj = DEMO_USERS.find((u) => u.id === "usr-sanjuan");
-            if (sj) {
-              parsed.push(sj);
-              modified = true;
-            }
+        try {
+          const parsed = JSON.parse(savedCustom);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            baseUsers = parsed;
           }
-          if (!parsed.some((u: any) => u.id === "usr-angeles" || u.username === "angeles")) {
-            const ang = DEMO_USERS.find((u) => u.id === "usr-angeles");
-            if (ang) {
-              parsed.push(ang);
-              modified = true;
-            }
-          }
-          if (modified) {
-            localStorage.setItem("brito_custom_users", JSON.stringify(parsed));
-          }
-          setUsersList(parsed);
-          return;
+        } catch (e) {
+          console.error("Error parsing brito_custom_users:", e);
         }
       }
-      // Inicializar por primera vez con los empleados de la plantilla
-      localStorage.setItem("brito_custom_users", JSON.stringify(DEMO_USERS));
-      setUsersList(DEMO_USERS);
+
+      // Filtrar empleados eliminados para que NUNCA vuelvan a aparecer
+      let filtered = baseUsers.filter((u) => !deletedIds.has(u.id) && !deletedIds.has(u.username || ""));
+
+      // Asegurar rol admin permanente para Paulina Brito
+      filtered = filtered.map((u) => {
+        if (u.id === "usr-2" || u.username === "paulina") {
+          if (u.role !== "admin") {
+            return { ...u, role: "admin", roleLabel: "Administrador General", jobTitle: "Administradora General" };
+          }
+        }
+        return u;
+      });
+
+      localStorage.setItem("brito_custom_users", JSON.stringify(filtered));
+      setUsersList(filtered);
     } catch (e) {
       console.error("Error loading custom users from localStorage:", e);
       setUsersList(DEMO_USERS);
     }
   }, []);
 
-  // Sincronización en tiempo real entre pestañas abiertas del navegador
+  // Sincronización en tiempo real entre pestañas abiertas del navegador y componentes locales
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "brito_custom_users" && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setUsersList(parsed);
+            const deletedIds = getDeletedUserIds();
+            const filtered = parsed.filter((u) => !deletedIds.has(u.id) && !deletedIds.has(u.username || ""));
+            setUsersList(filtered);
           }
         } catch {}
       }
     };
+
+    const handleLocalUpdate = () => {
+      try {
+        const raw = localStorage.getItem("brito_custom_users");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const deletedIds = getDeletedUserIds();
+            const filtered = parsed.filter((u) => !deletedIds.has(u.id) && !deletedIds.has(u.username || ""));
+            setUsersList(filtered);
+          }
+        }
+      } catch {}
+    };
+
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    window.addEventListener("brito_users_updated", handleLocalUpdate);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("brito_users_updated", handleLocalUpdate);
+    };
   }, []);
 
   // Load saved role permissions from localStorage on mount
@@ -744,15 +772,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const usersData = await usersRes.json();
           if (usersData && Array.isArray(usersData.users) && usersData.users.length > 0 && isMounted) {
             const serverUsers: User[] = usersData.users;
-            setUsersList(serverUsers);
+            const deletedIds = getDeletedUserIds();
+
+            let localUsers: User[] = [];
             try {
-              localStorage.setItem("brito_custom_users", JSON.stringify(serverUsers));
+              const rawLocal = localStorage.getItem("brito_custom_users");
+              if (rawLocal) {
+                const parsed = JSON.parse(rawLocal);
+                if (Array.isArray(parsed)) localUsers = parsed;
+              }
+            } catch {}
+
+            // Filtrar usuarios borrados del servidor para no revivirlos
+            const validServerUsers = serverUsers.filter(
+              (u) => !deletedIds.has(u.id) && !deletedIds.has(u.username || "")
+            );
+
+            // Reconciliar inteligentemente: conservar empleados creados localmente que el servidor no tiene
+            const mergedMap = new Map<string, User>();
+            validServerUsers.forEach((u) => mergedMap.set(u.id, u));
+
+            localUsers.forEach((u) => {
+              if (!deletedIds.has(u.id) && !deletedIds.has(u.username || "")) {
+                if (!mergedMap.has(u.id)) {
+                  // Empleado creado localmente no presente en servidor: conservarlo y sincronizar
+                  mergedMap.set(u.id, u);
+                  fetch("/api/users", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(u),
+                  }).catch(() => {});
+                }
+              }
+            });
+
+            // Si el servidor todavía tiene usuarios eliminados, ordenar purga
+            const serverHadDeleted = serverUsers.some(
+              (u) => deletedIds.has(u.id) || deletedIds.has(u.username || "")
+            );
+            if (serverHadDeleted) {
+              deletedIds.forEach((delId) => {
+                fetch(`/api/users?id=${encodeURIComponent(delId)}`, { method: "DELETE" }).catch(() => {});
+              });
+            }
+
+            const reconciled = Array.from(mergedMap.values());
+            setUsersList(reconciled);
+            try {
+              localStorage.setItem("brito_custom_users", JSON.stringify(reconciled));
             } catch (e) {}
 
             // Actualizar usuario en sesión activa si sus datos cambiaron en otra máquina
             setUser((currentUser) => {
               if (!currentUser) return null;
-              const match = serverUsers.find((u) => u.id === currentUser.id);
+              const match = reconciled.find((u) => u.id === currentUser.id);
               if (match) {
                 const updated: User = {
                   ...currentUser,
@@ -1164,9 +1237,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addUser = useCallback((newUser: User) => {
+    // 1. Remover de lista negra de eliminados en caso de re-creación
+    removeDeletedUserId(newUser.id);
+    if (newUser.username) {
+      removeDeletedUserId(newUser.username);
+    }
+
+    let updated: User[] = [];
     setUsersList((prevUsers) => {
       const exists = prevUsers.some((u) => u.id === newUser.id);
-      const updated = exists
+      updated = exists
         ? prevUsers.map((u) => (u.id === newUser.id ? { ...u, ...newUser } : u))
         : [...prevUsers, newUser];
       try {
@@ -1176,6 +1256,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return updated;
     });
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_users_updated"));
+    }
 
     // Persistir de forma duradera en el servidor
     fetch("/api/users", {
@@ -1188,8 +1272,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateUser = useCallback((userId: string, updatedData: Partial<User>) => {
+    let updated: User[] = [];
     setUsersList((prevUsers) => {
-      const updated = prevUsers.map((u) => {
+      updated = prevUsers.map((u) => {
         if (u.id === userId) {
           return { ...u, ...updatedData };
         }
@@ -1202,6 +1287,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return updated;
     });
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_users_updated"));
+    }
 
     setUser((currUser) => {
       if (currUser && currUser.id === userId) {
@@ -1234,22 +1323,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: "No se permite eliminar la cuenta principal del Administrador Don Toño." };
     }
 
+    // 1. Agregar a lista negra de eliminados (tombstone)
+    addDeletedUserId(userId);
+
+    // 2. Actualizar estado y almacenamiento local
+    let updatedList: User[] = [];
     setUsersList((prevUsers) => {
-      const updated = prevUsers.filter((u) => u.id !== userId);
+      const targetUser = prevUsers.find((u) => u.id === userId);
+      if (targetUser?.username) {
+        addDeletedUserId(targetUser.username);
+      }
+      updatedList = prevUsers.filter((u) => u.id !== userId);
       try {
-        localStorage.setItem("brito_custom_users", JSON.stringify(updated));
+        localStorage.setItem("brito_custom_users", JSON.stringify(updatedList));
       } catch (e) {
         console.warn("Storage quota warning deleting user:", e);
       }
-      return updated;
+      return updatedList;
     });
 
-    // Eliminar en el servidor
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_users_updated"));
+    }
+
+    // 3. Eliminar en el servidor vía DELETE
     fetch(`/api/users?id=${encodeURIComponent(userId)}`, {
       method: "DELETE",
     }).catch((err) => {
       console.warn("[AuthContext] Error eliminando usuario en servidor:", err);
     });
+
+    // 4. Sincronizar lista completa autoritativa en el servidor con replace=true
+    fetch("/api/users?replace=true", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedList),
+    }).catch(() => {});
 
     return { success: true };
   }, [user]);
@@ -1279,6 +1388,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return updated;
     });
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("brito_users_updated"));
+    }
 
     // Persistir en servidor
     fetch("/api/users", {
