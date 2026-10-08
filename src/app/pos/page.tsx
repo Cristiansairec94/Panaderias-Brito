@@ -679,10 +679,10 @@ export default function POSPage() {
   // Auto-sync user and branch (solo para cajeros/operativos, el administrador puede ver y alternar cualquier sucursal libremente)
   useEffect(() => {
     if (user) {
-      if (user.role !== "admin") {
-        const userBranch = branches.find((b) => b.assignedUserId === user.id || b.id === user.assignedBranchId);
-        if (userBranch && currentBranch?.id !== userBranch.id) {
-          switchBranch(userBranch.id);
+      if (user.role !== "admin" && user.role !== "auxiliar_admin") {
+        const targetBranchId = user.assignedBranchId || branches.find((b) => b.assignedUserId === user.id)?.id;
+        if (targetBranchId && currentBranch?.id !== targetBranchId) {
+          switchBranch(targetBranchId);
         }
       }
       if (user.name && user.role === "cajero") {

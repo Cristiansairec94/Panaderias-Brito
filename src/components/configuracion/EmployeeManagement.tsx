@@ -147,7 +147,7 @@ interface EmployeeManagementProps {
 
 export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagementProps) {
   const { usersList, updateUser, addUser, deleteUser, toggleUserStatus } = useAuth();
-  const { branches } = useBranch();
+  const { branches, updateBranch } = useBranch();
 
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -385,7 +385,20 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
   // Delete employee
   const handleDelete = (emp: User) => {
     if (confirm(`¿Estás seguro de dar de baja a ${emp.name} de la plantilla de empleados?`)) {
-      deleteUser(emp.id);
+      const res = deleteUser(emp.id);
+      if (res && res.success === false) {
+        alert(res.message || "No se pudo eliminar el empleado.");
+        return;
+      }
+      branches.forEach((b) => {
+        if (b.assignedUserId === emp.id) {
+          updateBranch(b.id, {
+            assignedUserId: undefined,
+            assignedUserName: undefined,
+            assignedUserEmail: undefined,
+          });
+        }
+      });
       showToast(`Empleado "${emp.name}" eliminado.`);
     }
   };
@@ -559,7 +572,9 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
         {filteredEmployees.map((emp) => {
           const hasPhoto = Boolean(emp.photoUrl || (emp.avatar && (emp.avatar.startsWith("data:image") || emp.avatar.startsWith("http"))));
           const isInactive = emp.status === "inactivo";
-          const assignedBranch = branches.find((b) => b.id === emp.assignedBranchId || b.assignedUserId === emp.id);
+          const assignedBranch = branches.find((b) => b.id === emp.assignedBranchId);
+          const branchDisplayName = assignedBranch?.shortName || emp.assignedBranchName || "Todas las sucursales";
+          const managedBranches = branches.filter((b) => b.assignedUserId === emp.id);
           const puesto = emp.jobTitle || emp.roleLabel || "Personal de Panadería";
           const hasSoftwareAccount = Boolean(emp.username);
 
@@ -623,9 +638,20 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
                       <Building2 className="w-3.5 h-3.5 text-amber-500" /> Sucursal:
                     </span>
                     <span className="font-bold text-stone-800">
-                      {assignedBranch ? assignedBranch.shortName : "Todas las sucursales"}
+                      {branchDisplayName}
                     </span>
                   </div>
+
+                  {managedBranches.length > 0 && (
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="flex items-center gap-1.5 text-purple-600 font-semibold">
+                        <ShieldCheck className="w-3.5 h-3.5 text-purple-500" /> Encargado(a):
+                      </span>
+                      <span className="font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 text-[10px]">
+                        {managedBranches.map((mb) => mb.shortName).join(", ")}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="flex items-center gap-1.5 text-stone-500">

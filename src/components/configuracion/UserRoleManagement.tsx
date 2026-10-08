@@ -227,7 +227,7 @@ const AVATAR_OPTIONS = [
 
 export default function UserRoleManagement() {
   const { user: currentUser, usersList, addUser, updateUser, deleteUser, toggleUserStatus } = useAuth();
-  const { branches } = useBranch();
+  const { branches, updateBranch } = useBranch();
 
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -521,6 +521,15 @@ export default function UserRoleManagement() {
       if (res && !res.success) {
         alert(res.message || "No se pudo eliminar el usuario.");
       } else {
+        branches.forEach((b) => {
+          if (b.assignedUserId === target.id) {
+            updateBranch(b.id, {
+              assignedUserId: undefined,
+              assignedUserName: undefined,
+              assignedUserEmail: undefined,
+            });
+          }
+        });
         showToast(`Usuario "${target.name}" eliminado del sistema.`);
       }
     }
@@ -724,7 +733,9 @@ export default function UserRoleManagement() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredUsers.map((usr) => {
           const isCurrentUser = currentUser?.id === usr.id;
-          const assignedBranch = branches.find((b) => b.id === usr.assignedBranchId || b.assignedUserId === usr.id);
+          const assignedBranch = branches.find((b) => b.id === usr.assignedBranchId);
+          const branchDisplayName = assignedBranch ? `Sucursal ${assignedBranch.shortName}` : (usr.assignedBranchName ? `Sucursal ${usr.assignedBranchName}` : "Todas las sucursales");
+          const managedBranches = branches.filter((b) => b.assignedUserId === usr.id);
           const isInactive = usr.status === "inactivo";
           const hasPhoto = Boolean(usr.photoUrl || (usr.avatar && (usr.avatar.startsWith("data:image") || usr.avatar.startsWith("http"))));
           const isPasswordVisible = Boolean(visiblePasswords[usr.id]);
@@ -796,9 +807,20 @@ export default function UserRoleManagement() {
                   <div className="flex items-center gap-2 text-[11px]">
                     <Building2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                     <span className="font-bold text-stone-800">
-                      {assignedBranch ? `Sucursal ${assignedBranch.shortName}` : "Todas las sucursales"}
+                      {branchDisplayName}
                     </span>
                   </div>
+
+                  {managedBranches.length > 0 && (
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="flex items-center gap-1.5 text-purple-600 font-semibold">
+                        <ShieldCheck className="w-3.5 h-3.5 text-purple-500 shrink-0" /> Encargado(a):
+                      </span>
+                      <span className="font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 text-[10px]">
+                        {managedBranches.map((mb) => mb.shortName).join(", ")}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between text-[11px]">
                     <div className="flex items-center gap-1.5">
