@@ -57,6 +57,9 @@ interface CashDrawerShiftModalProps {
   lastCutTimestamp?: number;
   orders?: CustomOrder[];
   cashSalesTotal?: number;
+  branchId?: string;
+  branchName?: string;
+  branchCashInDrawer?: number;
 }
 
 const DEFAULT_SAMPLE_CUTS: ShiftCutRecord[] = [];
@@ -79,9 +82,12 @@ export default function CashDrawerShiftModal({
   lastCutTimestamp,
   orders,
   cashSalesTotal,
+  branchId,
+  branchName,
+  branchCashInDrawer,
 }: CashDrawerShiftModalProps) {
   const { addNotification } = useNotifications();
-  const { currentBranch, updateBranch } = useBranch();
+  const { currentBranch, branches, updateBranch } = useBranch();
 
   // Fondo Inicial Sincronizado en tiempo real
   const targetBranchId = currentBranch?.id || "branch-matriz";
@@ -383,41 +389,45 @@ export default function CashDrawerShiftModal({
     .filter((o) => (o.paymentMethod === "efectivo" || !o.paymentMethod) && !effectiveSales.some((s) => s.id === o.orderNumber || s.id === o.id))
     .reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
 
-  // Ventas de mostrador y pedidos basadas prioritariamente en la sucursal activa (notificación café)
-  const branchDeskSales = Number(currentBranch?.todayDeskSales ?? (currentBranch?.todaySales && (currentBranch?.todayOrdersDeposit ?? 0) === 0 ? currentBranch.todaySales : 0));
-  const branchOrdersDeposit = Number(currentBranch?.todayOrdersDeposit ?? 0);
-  const branchCashInDrawer = Number(currentBranch?.cashInDrawer ?? 0);
+  // Ventas de mostrador y pedidos basadas prioritariamente en la sucursal activa (barra café)
+  const targetBranch = (branchId ? branches.find((b) => b.id === branchId) : null) || currentBranch || branches[0];
+  const targetBranchCash = branchCashInDrawer !== undefined && branchCashInDrawer !== null
+    ? Number(branchCashInDrawer)
+    : Number(targetBranch?.cashInDrawer ?? 0);
+
+  const branchDeskSales = Number(targetBranch?.todayDeskSales ?? (targetBranch?.todaySales && (targetBranch?.todayOrdersDeposit ?? 0) === 0 ? targetBranch.todaySales : 0));
+  const branchOrdersDeposit = Number(targetBranch?.todayOrdersDeposit ?? 0);
+  const branchCashInDrawerVal = targetBranchCash;
 
   const calculatedPurePosCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && !s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
-  const purePosCash = branchDeskSales > 0 && calculatedPurePosCash === 0 ? branchDeskSales : calculatedPurePosCash > 0 ? calculatedPurePosCash : branchDeskSales;
+  const rawPurePosCash = branchDeskSales > 0 && calculatedPurePosCash === 0 ? branchDeskSales : calculatedPurePosCash > 0 ? calculatedPurePosCash : branchDeskSales;
 
   const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
   const calculatedOrdersCash = ordersCash + ordersInSalesCash;
   const totalOrdersCash = branchOrdersDeposit > 0 && calculatedOrdersCash === 0 ? branchOrdersDeposit : calculatedOrdersCash > 0 ? calculatedOrdersCash : branchOrdersDeposit;
 
-  const posCash = purePosCash + totalOrdersCash;
+  const rawPosCash = rawPurePosCash + totalOrdersCash;
 
-  const cashSales = posCash;
-  const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
-  const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
-  const rawTotalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0);
-  const totalSalesAll = rawTotalSalesAll + ordersCash;
-
-  const effectiveInitialFund = currentBranch?.currentShift?.initialFund !== undefined ? currentBranch.currentShift.initialFund : syncedFund;
+  const standardFund = targetBranch?.id === "branch-benito" ? 800 : targetBranch?.id === "branch-flores" ? 1200 : 1000;
+  const effectiveInitialFund = targetBranch?.currentShift?.initialFund !== undefined && targetBranch?.currentShift?.initialFund !== null
+    ? Number(targetBranch.currentShift.initialFund)
+    : (targetBranch?.lastCut?.nextFund !== undefined && targetBranch?.lastCut?.nextFund !== null
+        ? Number(targetBranch.lastCut.nextFund)
+        : (syncedFund || standardFund));
 
   // 2. Cálculos de Gastos y Entradas del Turno (incluyendo retiros de dueño tomados del cajón)
   const shiftExpenses = (expenses || []).filter((e) => {
     if (!e) return false;
     if (e.id && (e.id.includes("354644") || e.id.includes("299599") || e.id.includes("334972") || e.amount > 500000)) return false;
-    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+    if (targetBranch && targetBranch.id && targetBranch.id !== "all") {
       let eBranch = (e as any).branchId || (e as any).branch_id;
       if ((!eBranch || eBranch === "branch-matriz") && e.cashier && e.cashier.toLowerCase().includes("silvia")) {
         eBranch = "branch-1790889237862";
       }
       if (eBranch) {
-        if (eBranch !== currentBranch.id) return false;
+        if (eBranch !== targetBranch.id) return false;
       } else {
-        if (currentBranch.id !== "branch-matriz") return false;
+        if (targetBranch.id !== "branch-matriz") return false;
       }
     }
     const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
@@ -436,15 +446,15 @@ export default function CashDrawerShiftModal({
     if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (inc.id && String(inc.id).startsWith("order-"))) return false;
     if (Number(inc.amount) === 6000) return false; // Duplicado fantasma de pedido de 6000
 
-    if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
+    if (targetBranch && targetBranch.id && targetBranch.id !== "all") {
       let incBranch = (inc as any).branchId || (inc as any).branch_id;
       if ((!incBranch || incBranch === "branch-matriz") && inc.cashier && inc.cashier.toLowerCase().includes("silvia")) {
         incBranch = "branch-1790889237862";
       }
       if (incBranch) {
-        if (incBranch !== currentBranch.id) return false;
+        if (incBranch !== targetBranch.id) return false;
       } else {
-        if (currentBranch.id !== "branch-matriz") return false;
+        if (targetBranch.id !== "branch-matriz") return false;
       }
     }
     const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
@@ -466,8 +476,25 @@ export default function CashDrawerShiftModal({
     .reduce((sum, i) => sum + i.amount, 0);
 
   // 3. Dinero esperado en caja (Cajón: Fondo Inicial + Ventas Efectivo + Entradas Efectivo - Gastos Efectivo)
-  const calculatedExpectedCash = Math.max(0, effectiveInitialFund + posCash + totalIncomesInCash - totalExpenses);
-  const expectedCashInDrawer = calculatedExpectedCash;
+  const rawCalculatedExpectedCash = Math.max(0, effectiveInitialFund + rawPosCash + totalIncomesInCash - totalExpenses);
+  const expectedCashInDrawer = targetBranchCash > 0 ? targetBranchCash : rawCalculatedExpectedCash;
+
+  const netNonFundCash = Math.max(0, expectedCashInDrawer - effectiveInitialFund - totalIncomesInCash + totalExpenses);
+  const posCash = (rawPosCash > 0 && Math.abs(effectiveInitialFund + rawPosCash + totalIncomesInCash - totalExpenses - expectedCashInDrawer) < 0.01)
+    ? rawPosCash
+    : (cashSalesTotal !== undefined && cashSalesTotal > 0 && Math.abs(effectiveInitialFund + cashSalesTotal + totalIncomesInCash - totalExpenses - expectedCashInDrawer) < 0.01
+        ? cashSalesTotal
+        : netNonFundCash);
+
+  const purePosCash = (rawPurePosCash > 0 && Math.abs(rawPurePosCash + totalOrdersCash - posCash) < 0.01)
+    ? rawPurePosCash
+    : Math.max(0, posCash - totalOrdersCash);
+
+  const cashSales = posCash;
+  const cardSales = effectiveSales.filter((s) => s.paymentMethod === "tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const transferSales = effectiveSales.filter((s) => s.paymentMethod === "transferencia").reduce((sum, s) => sum + s.total, 0);
+  const rawTotalSalesAll = effectiveSales.reduce((sum, s) => sum + s.total, 0);
+  const totalSalesAll = rawTotalSalesAll + ordersCash;
 
   // 4. Conteo y Diferencia (Arqueo)
   const parsedCountedCash = countedCash === "" ? expectedCashInDrawer : Number(countedCash) || 0;

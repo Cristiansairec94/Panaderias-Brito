@@ -3532,10 +3532,17 @@ export default function POSPage() {
                               return (
                                 <div
                                   key={b.id}
-                                  className={`w-full p-3 sm:p-3.5 rounded-2xl border transition-all flex flex-col gap-2.5 shadow-md ${
+                                  onClick={() => {
+                                    switchBranch(b.id);
+                                    setShowBranchDropdown(false);
+                                  }}
+                                  role="button"
+                                  tabIndex={0}
+                                  title={`Seleccionar y visualizar ${b.name}`}
+                                  className={`w-full p-3 sm:p-3.5 rounded-2xl border transition-all flex flex-col gap-2.5 shadow-md cursor-pointer select-none ${
                                     isSelected
                                       ? "bg-[#25130a] border-amber-500/80 ring-1 ring-amber-500/30 shadow-amber-950/40"
-                                      : "bg-[#1a0d06] border-amber-900/40 hover:border-amber-700/50"
+                                      : "bg-[#1a0d06] border-amber-900/40 hover:border-amber-500/60 hover:bg-[#201007]"
                                   }`}
                                 >
                                   {/* Encabezado: Código, Nombre y Estado de Conexión */}
@@ -3941,6 +3948,15 @@ export default function POSPage() {
 
                 <span className="text-amber-400/60">•</span>
                 <span className="text-stone-100 font-semibold">{cashierName}</span>
+                <span className="text-amber-400/60">•</span>
+                {/* Insignia Dinámica en Tiempo Real de Dinero en Caja en la Barra Café */}
+                <span
+                  className="inline-flex items-center gap-1 bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded-lg text-[10px] font-mono font-black shadow-xs select-none"
+                  title={`Dinero actual en cajón para ${activeBranch?.name || "Sucursal Matriz"}`}
+                >
+                  <span>💵 Caja:</span>
+                  <strong className="text-emerald-400 font-black">{formatCurrency(activeBranch?.cashInDrawer ?? 0)}</strong>
+                </span>
                 <span className="text-amber-400/60">•</span>
                 <span className="text-amber-300/80 font-medium">Mostrador</span>
               </div>
@@ -5000,6 +5016,7 @@ export default function POSPage() {
           branchName={activeBranch?.name}
           branchAddress={activeBranch?.address}
           branchPhone={activeBranch?.phone}
+          branchCashInDrawer={activeBranch?.cashInDrawer}
           onOpenCreateOrder={() => {
             setShowExpensesModal(false);
             handleOpenCreateOrder();
@@ -5041,6 +5058,9 @@ export default function POSPage() {
         <CashDrawerShiftModal
           isOpen={showCashDrawerModal}
           onClose={() => setShowCashDrawerModal(false)}
+          branchId={activeBranch?.id}
+          branchName={activeBranch?.name}
+          branchCashInDrawer={activeBranch?.cashInDrawer}
           cashierName={cashierName}
           onChangeCashier={handleCashierChange}
           shiftName={shiftName}

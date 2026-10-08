@@ -149,6 +149,7 @@ interface ExpensesModalProps {
   branchName?: string;
   branchAddress?: string;
   branchPhone?: string;
+  branchCashInDrawer?: number;
   onOpenCreateOrder?: () => void;
 }
 
@@ -418,6 +419,7 @@ export default function ExpensesModal({
   branchName,
   branchAddress,
   branchPhone,
+  branchCashInDrawer,
   onOpenCreateOrder,
 }: ExpensesModalProps) {
   const { addNotification, openOrderDetail, openOrderPayment } = useNotifications();
@@ -1158,6 +1160,39 @@ export default function ExpensesModal({
     return shiftPurePosCash + shiftOrdersCash;
   }, [shiftPurePosCash, shiftOrdersCash]);
 
+  const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalIncomesInCash = shiftIncomes
+    .filter((i) => {
+      if (!i) return false;
+      if (i.paymentMethod && i.paymentMethod !== "efectivo") return false;
+      if (i.category === "abono_pedido" || i.category === "pedido" || (i as any).orderId) return false;
+      const cLower = (i.concept || "").toLowerCase();
+      if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && i.id.startsWith("order-"))) return false;
+      if (i.amount === 6000) return false;
+      return true;
+    })
+    .reduce((sum, i) => sum + i.amount, 0);
+
+  const targetBranchCash = branchCashInDrawer !== undefined && branchCashInDrawer !== null
+    ? Number(branchCashInDrawer)
+    : Number(activeBranch?.cashInDrawer ?? 0);
+
+  const calculatedCashInDrawer = Math.max(0, effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);
+  const netCashInDrawer = targetBranchCash > 0 ? targetBranchCash : calculatedCashInDrawer;
+
+  // Reconciliación contable exacta: Si netCashInDrawer viene de la sucursal activa (p.ej. $3,467 de San Benito)
+  // garantizamos que Fondo + Ventas + Pedidos + Entradas - Salidas sea matemáticamente idéntico y gemelo a Corte de Caja
+  const netNonFundCash = Math.max(0, netCashInDrawer - effectiveFund - totalIncomesInCash + totalExpenses);
+  const reconciledCashSales = (totalShiftCashSales > 0 && Math.abs(effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses - netCashInDrawer) < 0.01)
+    ? totalShiftCashSales
+    : (cashSalesTotal !== undefined && cashSalesTotal > 0 && Math.abs(effectiveFund + cashSalesTotal + totalIncomesInCash - totalExpenses - netCashInDrawer) < 0.01
+        ? cashSalesTotal
+        : netNonFundCash);
+
+  const reconciledPurePosCash = (shiftPurePosCash > 0 && Math.abs(shiftPurePosCash + shiftOrdersCash - reconciledCashSales) < 0.01)
+    ? shiftPurePosCash
+    : Math.max(0, reconciledCashSales - shiftOrdersCash);
+
   const totalOrdersDeposits = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.deposit) || 0), 0);
   const totalOrdersValue = activeOrdersForKpi.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
   
@@ -1621,7 +1656,7 @@ export default function ExpensesModal({
     const rawSum = visibleCashMovements.reduce((sum, m) => sum + m.amount, 0);
     if (cashDetailFilter === "ventas") {
       const targetDesk = cashMethodFilter === "efectivo" 
-        ? shiftPurePosCash 
+        ? reconciledPurePosCash 
         : cashMethodFilter === "all" 
         ? shiftPurePosTotal 
         : rawSum;
@@ -1636,7 +1671,7 @@ export default function ExpensesModal({
       return Math.max(rawSum, targetOrders);
     }
     return rawSum;
-  }, [visibleCashMovements, cashDetailFilter, cashMethodFilter, shiftPurePosCash, shiftPurePosTotal, shiftOrdersCash, shiftOrdersTotal]);
+  }, [visibleCashMovements, cashDetailFilter, cashMethodFilter, reconciledPurePosCash, shiftPurePosTotal, shiftOrdersCash, shiftOrdersTotal]);
 
   const currentFilteredPieces = useMemo(() => {
     return visibleCashMovements.reduce((sum, m) => sum + m.pieces, 0);
@@ -1830,22 +1865,6 @@ export default function ExpensesModal({
     if (selectedDayKey === "all") return dayGroups;
     return dayGroups.filter((g) => g.dayKey === selectedDayKey);
   }, [dayGroups, selectedDayKey]);
-
-  const totalExpenses = shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalIncomesInCash = shiftIncomes
-    .filter((i) => {
-      if (!i) return false;
-      if (i.paymentMethod && i.paymentMethod !== "efectivo") return false;
-      if (i.category === "abono_pedido" || i.category === "pedido" || (i as any).orderId) return false;
-      const cLower = (i.concept || "").toLowerCase();
-      if (cLower.includes("pedido") || cLower.includes("abono") || cLower.includes("anticipo") || cLower.includes("liquidaci") || (i.id && i.id.startsWith("order-"))) return false;
-      if (i.amount === 6000) return false;
-      return true;
-    })
-    .reduce((sum, i) => sum + i.amount, 0);
-
-  const calculatedCashInDrawer = Math.max(0, effectiveFund + totalShiftCashSales + totalIncomesInCash - totalExpenses);
-  const netCashInDrawer = calculatedCashInDrawer;
 
   // Cambiar de Salida a Entrada o viceversa
   const handleToggleMovementType = (type: "salida" | "entrada") => {
@@ -2660,7 +2679,7 @@ export default function ExpensesModal({
               Ventas
             </span>
             <span className="text-lg sm:text-xl md:text-2xl font-black text-emerald-700 block my-1 tracking-tight truncate">
-              +{formatCurrency(shiftPurePosCash)}
+              +{formatCurrency(reconciledPurePosCash)}
             </span>
             {shiftPurePosTotal > shiftPurePosCash && (
               <span className="text-[10px] text-emerald-700 font-bold block truncate">
@@ -4804,7 +4823,7 @@ export default function ExpensesModal({
                           <span className="text-emerald-950 flex items-center gap-1.5">
                             <span>🥖</span> (+) Ventas y Pedidos en Efectivo
                           </span>
-                          <span className="font-black text-emerald-700">+{formatCurrency(totalShiftCashSales)}</span>
+                          <span className="font-black text-emerald-700">+{formatCurrency(reconciledCashSales)}</span>
                         </div>
 
                         <div className="flex items-center justify-between p-2.5 bg-teal-50/70 border border-teal-200 rounded-xl">
