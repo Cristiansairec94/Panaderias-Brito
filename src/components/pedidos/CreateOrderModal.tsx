@@ -956,6 +956,7 @@ export default function CreateOrderModal({
 
         addNotification({
           id: `notif-order-${newOrder.id}`,
+          timestamp: newOrder.timestamp || Date.now(),
           senderName: branchSender,
           senderAvatar: "🎂",
           badgeIcon: "pastel",

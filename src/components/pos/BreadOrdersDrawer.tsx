@@ -29,6 +29,7 @@ import { formatCurrency, onlyNumbersKeyDown } from "@/lib/utils";
 import { getStoredProducts } from "@/lib/products";
 import { getStoredOrders, addCustomOrder, addOrderPayment, updateOrderStatus } from "@/lib/orders";
 import { useNotifications } from "@/context/NotificationContext";
+import { useBranch } from "@/context/BranchContext";
 
 interface BreadOrdersDrawerProps {
   isOpen: boolean;
@@ -49,10 +50,18 @@ export default function BreadOrdersDrawer({
   shiftName,
   onSelectOrderForReceipt,
 }: BreadOrdersDrawerProps) {
+  const { branches } = useBranch();
   const { addNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState<"new" | "list">("new");
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<CustomOrder[]>([]);
+  const [selectedPickupBranchId, setSelectedPickupBranchId] = useState(branchId || "branch-matriz");
+
+  useEffect(() => {
+    if (branchId) {
+      setSelectedPickupBranchId(branchId);
+    }
+  }, [branchId]);
 
   // Form states
   const [customerName, setCustomerName] = useState("");
@@ -200,11 +209,16 @@ export default function BreadOrdersDrawer({
       ? orderItems.map((i) => `${i.quantity}x ${i.name}`).join(", ")
       : customDescription.trim() || "Pedido especial de panadería";
 
+    const targetPickupBranch = branches.find((b) => b.id === selectedPickupBranchId) || {
+      id: branchId,
+      name: branchName,
+    };
+
     const newOrder = addCustomOrder({
       customerName: customerName.trim(),
       phone: customerPhone.trim(),
-      branchId,
-      branchName,
+      branchId: targetPickupBranch.id,
+      branchName: targetPickupBranch.name,
       operatingBranchId: branchId,
       operatingBranchName: branchName,
       description,
@@ -505,6 +519,25 @@ export default function BreadOrdersDrawer({
                     </select>
                   </div>
                 </div>
+
+                {deliveryType === "sucursal" && (
+                  <div>
+                    <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                      Sucursal de Recolección / Entrega *
+                    </label>
+                    <select
+                      value={selectedPickupBranchId}
+                      onChange={(e) => setSelectedPickupBranchId(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-amber-300 bg-amber-50/20 text-xs font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} {b.id === branchId ? "★ (Esta Sucursal)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {deliveryType === "domicilio" && (
                   <div>

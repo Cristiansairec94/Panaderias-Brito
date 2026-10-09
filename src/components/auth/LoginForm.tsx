@@ -8,7 +8,7 @@ import { useAuth, getFriendlyName, User } from "@/context/AuthContext";
 
 export default function LoginForm() {
   const router = useRouter();
-  const { login, verifyCredentials, getDefaultRouteForUser } = useAuth();
+  const { login, verifyCredentials, getDefaultRouteForUser, canAccessRoute } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -112,9 +112,12 @@ export default function LoginForm() {
           let target = destination;
           if (typeof window !== "undefined") {
             const pending = sessionStorage.getItem("brito_redirect_url");
+            sessionStorage.removeItem("brito_redirect_url");
             if (pending && pending !== "/") {
-              target = pending;
-              sessionStorage.removeItem("brito_redirect_url");
+              // Solo redirigir si el rol del usuario efectivamente tiene permiso de entrar
+              if (!canAccessRoute || canAccessRoute(pending)) {
+                target = pending;
+              }
             }
           }
           router.push(target);
@@ -342,6 +345,43 @@ export default function LoginForm() {
                     </>
                   )}
                 </button>
+
+                {/* Accesos Rápidos por Perfil de Empleado */}
+                <div className="pt-3.5 border-t border-stone-800/80 text-left space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-stone-400">Acceso rápido por perfil:</span>
+                    <span className="text-[10px] text-amber-400/90 font-medium">Clic para seleccionar</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { name: "Silvia Puga", user: "silvia", pass: "1234", branch: "San Ildefonso", avatar: "👩‍💼" },
+                      { name: "Don Toño", user: "admin", pass: "admin", branch: "Dueño / Admin", avatar: "👨‍🍳" },
+                      { name: "Paulina Brito", user: "paulina", pass: "1234", branch: "Admin General", avatar: "👩‍💼" },
+                      { name: "Noé Velásquez", user: "noe", pass: "1234", branch: "San Juan", avatar: "👨‍🍳" },
+                      { name: "Cajero Ángeles", user: "angeles", pass: "1234", branch: "Los Ángeles", avatar: "👨‍🍳" },
+                      { name: "Andrés Sánchez", user: "andres", pass: "1234", branch: "Los Ángeles", avatar: "👨‍💼" },
+                    ].map((demo) => (
+                      <button
+                        key={demo.user}
+                        type="button"
+                        onClick={() => {
+                          setIdentifier(demo.user);
+                          setPassword(demo.pass);
+                          setError("");
+                        }}
+                        className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          identifier.toLowerCase() === demo.user
+                            ? "bg-amber-500/25 border-amber-400 text-amber-200 shadow-xs ring-1 ring-amber-400/40"
+                            : "bg-stone-900/90 border-stone-800 text-stone-300 hover:border-stone-700 hover:text-white"
+                        }`}
+                        title={`${demo.name} (${demo.branch}) - Usuario: ${demo.user}, PIN: ${demo.pass}`}
+                      >
+                        <span>{demo.avatar}</span>
+                        <span>{demo.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </form>
             </div>
           </>

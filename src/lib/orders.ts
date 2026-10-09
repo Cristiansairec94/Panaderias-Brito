@@ -1,20 +1,43 @@
 import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types";
-import { formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
 
 export const STORAGE_ORDERS_KEY = "brito_custom_orders";
 
+function formatNotificationHour(timestamp?: number): string {
+  const ts = typeof timestamp === "number" && !isNaN(timestamp) && timestamp > 0 ? timestamp : Date.now();
+  const d = new Date(ts);
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes} hrs`;
+}
+
 export function orderToSupabasePayload(order: CustomOrder): any {
-  const effBranchId = resolveBranchId(order.operatingBranchId || order.branchId, order.cashier);
+  // Destination/Pickup branch: where the customer picks up or receives the order
+  const effPickupBranchId = resolveBranchId(order.branchId, undefined) || "branch-matriz";
+  const effPickupBranchName = order.branchName || "Sucursal Matriz (Centro)";
+
+  // Origin/Operating branch: where the cashier raised/created the order
+  const effOperatingBranchId = resolveBranchId(order.operatingBranchId || order.branchId, order.cashier);
+  const effOperatingBranchName = order.operatingBranchName || order.branchName || "Sucursal Matriz (Centro)";
+
+  // Embed origin branch in notes metadata so it is NEVER lost when storing in Supabase
+  let finalNotes = (order.notes || "").trim();
+  if (effOperatingBranchId) {
+    if (!finalNotes.includes("[Origen:")) {
+      finalNotes = `[Origen: ${effOperatingBranchId}|${effOperatingBranchName}] ${finalNotes}`.trim();
+    }
+  }
+
   return {
     id: order.id || order.orderNumber,
     order_number: order.orderNumber || order.id,
     customer_id: order.customerId || null,
     customer_name: order.customerName || "Cliente Mostrador",
     phone: order.phone || "N/A",
-    branch_id: effBranchId,
-    branch_name: order.operatingBranchName || order.branchName || "Sucursal Matriz (Centro)",
+    branch_id: effPickupBranchId,
+    branch_name: effPickupBranchName,
     description: order.description || "Pedido de pastelería",
     items: Array.isArray(order.items) ? order.items : [],
     delivery_date: order.deliveryDate ? order.deliveryDate.split("T")[0].split(" ")[0] : new Date().toISOString().split("T")[0],
@@ -29,7 +52,7 @@ export function orderToSupabasePayload(order: CustomOrder): any {
     payment_method: order.paymentMethod || "efectivo",
     payments: Array.isArray(order.payments) ? order.payments : [],
     dedication: order.dedication || null,
-    notes: order.notes || null,
+    notes: finalNotes || null,
     cashier: order.cashier || "Don Toño Brito",
     shift_name: order.shiftName || null,
   };
@@ -294,66 +317,110 @@ export const INITIAL_ORDERS: CustomOrder[] = [
 ];
 
 /**
- * Normaliza pedidos existentes para asegurar que contengan todos los campos nuevos
+ * Normaliza pedidos existentes para asegurar que contengan todos los campos compatibles
+ * tanto en camelCase como snake_case provenientes de Supabase o LocalStorage
  */
-function normalizeOrder(order: any): CustomOrder {
+export function normalizeOrder(order: any): CustomOrder {
+  if (!order) return null as any;
+
   const total = Number(order.total) || 0;
   const deposit = Number(order.deposit) || 0;
-  const remaining = Math.max(0, total - deposit);
+  const rawRemaining = order.remaining_balance !== undefined ? Number(order.remaining_balance) : (order.remainingBalance !== undefined ? Number(order.remainingBalance) : undefined);
+  const remaining = rawRemaining !== undefined && !isNaN(rawRemaining) ? Math.max(0, rawRemaining) : Math.max(0, total - deposit);
   const status = order.status || "pendiente";
-  const orderNumber = order.orderNumber || order.id || `PED-${Date.now().toString().slice(-3)}`;
+
+  const orderNumber = order.orderNumber || order.order_number || order.id || `PED-${Date.now().toString().slice(-3)}`;
+  const id = order.id || order.order_id || orderNumber;
+
+  const customerId = order.customerId || order.customer_id || undefined;
+  const customerName = order.customerName || order.customer_name || "Cliente Mostrador";
+  const phone = order.phone || "N/A";
+
+  const rawNotes = order.notes || "";
+  const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
+  const originBranchId = originMatch ? originMatch[1].trim() : undefined;
+  const originBranchName = originMatch && originMatch[2] ? originMatch[2].trim() : undefined;
+
+  // Pickup Branch (branch_id en Supabase)
+  const branchId = order.branchId || order.branch_id || "branch-matriz";
+  const branchName = order.branchName || order.branch_name || "Sucursal Matriz (Centro)";
+
+  // Operating Branch (Origen donde se levantó/cobró el pedido)
+  const operatingBranchId = order.operatingBranchId || order.operating_branch_id || originBranchId || branchId;
+  const operatingBranchName = order.operatingBranchName || order.operating_branch_name || originBranchName || branchName;
+
+  const rawDate = order.deliveryDate || order.delivery_date;
+  const deliveryDate = rawDate ? String(rawDate).split("T")[0].split(" ")[0] : new Date().toISOString().split("T")[0];
+
+  const deliveryTime = order.deliveryTime || order.delivery_time || (rawDate && String(rawDate).includes(" ") ? String(rawDate).split(" ")[1] : "16:00");
+  const deliveryType = order.deliveryType || order.delivery_type || "sucursal";
+  const deliveryAddress = order.deliveryAddress || order.delivery_address || undefined;
+
+  const paymentStatus = order.paymentStatus || order.payment_status || (remaining === 0 ? "liquidado" : deposit > 0 ? "anticipo" : "sin_anticipo");
+  const paymentMethod = order.paymentMethod || order.payment_method || "efectivo";
+
+  const rawCreated = order.createdAt || order.created_at || new Date().toISOString();
+  const createdAt = typeof rawCreated === "string" ? rawCreated : new Date(rawCreated).toISOString();
+  const timestamp = order.timestamp ? Number(order.timestamp) : parseDateTimeSafe(createdAt) || Date.now();
+
+  const cashier = order.cashier || "Don Toño Brito";
+  const shiftName = order.shiftName || order.shift_name || undefined;
+
+  let items = Array.isArray(order.items) && order.items.length > 0 ? order.items : [];
+  if (items.length === 0) {
+    items = [
+      {
+        name: order.description || "Pedido Especial",
+        quantity: 1,
+        unitPrice: total,
+        subtotal: total,
+      },
+    ];
+  }
+
+  let payments = Array.isArray(order.payments) ? order.payments : [];
+  if (payments.length === 0 && deposit > 0) {
+    payments = [
+      {
+        id: `PAY-${orderNumber}-0`,
+        date: new Date(timestamp).toLocaleDateString("es-MX", { dateStyle: "short" }),
+        amount: deposit,
+        paymentMethod: paymentMethod,
+        cashier: cashier,
+        notes: "Anticipo inicial registrado",
+      },
+    ];
+  }
 
   return {
-    id: order.id || orderNumber,
-    orderNumber: orderNumber,
-    customerId: order.customerId,
-    customerName: order.customerName || "Cliente Mostrador",
-    phone: order.phone || "N/A",
-    branchId: order.branchId || order.branch_id || order.operatingBranchId || order.operating_branch_id || "branch-matriz",
-    branchName: order.branchName || order.branch_name || order.operatingBranchName || order.operating_branch_name || "Sucursal Matriz (Centro)",
-    description: order.description || "Pedido de panadería",
-    items: Array.isArray(order.items) && order.items.length > 0
-      ? order.items
-      : [
-          {
-            name: order.description || "Pedido Especial",
-            quantity: 1,
-            unitPrice: total,
-            subtotal: total,
-          },
-        ],
-    deliveryDate: order.deliveryDate ? order.deliveryDate.split(" ")[0] : new Date().toISOString().split("T")[0],
-    deliveryTime: order.deliveryTime || (order.deliveryDate?.includes(" ") ? order.deliveryDate.split(" ")[1] : "12:00"),
-    deliveryType: order.deliveryType || "sucursal",
-    deliveryAddress: order.deliveryAddress,
-    status: status,
-    total: total,
-    deposit: deposit,
+    id,
+    orderNumber,
+    customerId,
+    customerName,
+    phone,
+    branchId,
+    branchName,
+    operatingBranchId,
+    operatingBranchName,
+    description: order.description || (items.length > 0 ? items.map((it: any) => `${it.quantity}x ${it.name}`).join(", ") : "Pedido de panadería"),
+    items,
+    deliveryDate,
+    deliveryTime,
+    deliveryType,
+    deliveryAddress,
+    status,
+    total,
+    deposit,
     remainingBalance: remaining,
-    paymentStatus: remaining === 0 ? "liquidado" : deposit > 0 ? "anticipo" : "sin_anticipo",
-    paymentMethod: order.paymentMethod || "efectivo",
+    paymentStatus,
+    paymentMethod,
     dedication: order.dedication || "",
-    notes: order.notes || "",
-    createdAt: order.createdAt || new Date().toISOString(),
-    timestamp: order.timestamp ? Number(order.timestamp) : parseDateTimeSafe(order.createdAt) || Date.now(),
-    operatingBranchId: order.operatingBranchId || order.operating_branch_id || order.branchId || order.branch_id || "branch-matriz",
-    operatingBranchName: order.operatingBranchName || order.operating_branch_name || order.branchName || order.branch_name || "Sucursal Matriz (Centro)",
-    shiftName: order.shiftName,
-    cashier: order.cashier || "Don Toño Brito",
-    payments: Array.isArray(order.payments) && order.payments.length > 0
-      ? order.payments
-      : deposit > 0
-      ? [
-          {
-            id: `PAY-${orderNumber}-0`,
-            date: new Date().toLocaleDateString("es-MX", { dateStyle: "short" }),
-            amount: deposit,
-            paymentMethod: order.paymentMethod || "efectivo",
-            cashier: order.cashier || "Cajero",
-            notes: "Anticipo inicial registrado",
-          },
-        ]
-      : [],
+    notes: rawNotes,
+    createdAt,
+    timestamp,
+    shiftName,
+    cashier,
+    payments,
   };
 }
 
@@ -439,38 +506,49 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
 
     // Primero los de servidor
     for (const ord of serverOrders) {
-      const key = ord.orderNumber || ord.id;
-      if (key) ordersMap.set(key, normalizeOrder(ord));
+      const norm = normalizeOrder(ord);
+      if (norm.id) ordersMap.set(norm.id, norm);
+      if (norm.orderNumber) ordersMap.set(norm.orderNumber, norm);
     }
 
     // Reconciliar con locales
     let hasLocalChangesToPush = false;
     const pendingPushList: CustomOrder[] = [];
 
-    for (const ord of localOrders) {
-      const key = ord.orderNumber || ord.id;
-      if (!key) continue;
+    for (const rawOrd of localOrders) {
+      const ord = normalizeOrder(rawOrd);
+      const existing = (ord.id && ordersMap.get(ord.id)) || (ord.orderNumber && ordersMap.get(ord.orderNumber));
 
-      if (!ordersMap.has(key)) {
+      if (!existing) {
         // Pedido creado localmente que no está en el servidor aún
-        ordersMap.set(key, ord);
+        if (ord.id) ordersMap.set(ord.id, ord);
+        if (ord.orderNumber) ordersMap.set(ord.orderNumber, ord);
         hasLocalChangesToPush = true;
         pendingPushList.push(ord);
       } else {
-        const serverOrd = ordersMap.get(key)!;
         const localTs = ord.timestamp || (ord.createdAt ? new Date(ord.createdAt).getTime() : 0);
-        const serverTs = serverOrd.timestamp || (serverOrd.createdAt ? new Date(serverOrd.createdAt).getTime() : 0);
+        const serverTs = existing.timestamp || (existing.createdAt ? new Date(existing.createdAt).getTime() : 0);
 
         if (localTs > serverTs) {
           // El local es más reciente (por ejemplo se cobró o editó en el dispositivo)
-          ordersMap.set(key, ord);
+          if (ord.id) ordersMap.set(ord.id, ord);
+          if (ord.orderNumber) ordersMap.set(ord.orderNumber, ord);
           hasLocalChangesToPush = true;
           pendingPushList.push(ord);
         }
       }
     }
 
-    const mergedList = Array.from(ordersMap.values()).sort((a, b) => {
+    // Deduplicar por id único
+    const uniqueOrders = new Map<string, CustomOrder>();
+    for (const ord of ordersMap.values()) {
+      const uniqueKey = ord.id || ord.orderNumber;
+      if (uniqueKey && !uniqueOrders.has(uniqueKey)) {
+        uniqueOrders.set(uniqueKey, ord);
+      }
+    }
+
+    const mergedList = Array.from(uniqueOrders.values()).sort((a, b) => {
       const timeA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
       const timeB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
       return timeB - timeA;
@@ -734,7 +812,7 @@ export function addCustomOrder(data: {
   const orderNumber = generateNextOrderNumber();
   const orderId = `ord-${Date.now().toString().slice(-8)}-${Math.floor(1000 + Math.random() * 9000)}`;
   const effOperatingBranchId = resolveBranchId(data.operatingBranchId || data.branchId, data.cashier);
-  const effPickupBranchId = resolveBranchId(data.branchId, data.cashier);
+  const effPickupBranchId = resolveBranchId(data.branchId, undefined);
   const deposit = Math.max(0, Math.min(data.total, Number(data.deposit) || 0));
   const remaining = Math.max(0, data.total - deposit);
   const paymentStatus: CustomOrder["paymentStatus"] =
@@ -862,9 +940,48 @@ export function addCustomOrder(data: {
     }).catch(() => {});
   }
 
-  // Transmitir pedido en tiempo real a los celulares y computadoras
-  if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
-    realtimeHub.broadcastOrder("create", newOrder);
+  // Transmitir pedido y notificación en tiempo real a los celulares y computadoras
+  if (typeof window !== "undefined") {
+    if (realtimeHub?.broadcastOrder) {
+      realtimeHub.broadcastOrder("create", newOrder);
+    }
+    if (realtimeHub?.broadcastNotification) {
+      const remaining = newOrder.remainingBalance || 0;
+      const isCross = Boolean(
+        newOrder.operatingBranchName &&
+        newOrder.branchName &&
+        newOrder.operatingBranchName.toLowerCase().trim() !== newOrder.branchName.toLowerCase().trim()
+      );
+      const branchSender = isCross
+        ? `🎂 ${newOrder.operatingBranchName} ➔ ${newOrder.branchName}`
+        : `🎂 Pedido Registrado (${newOrder.branchName || "Sucursal"})`;
+
+      const notifPayload = {
+        id: `notif-order-${newOrder.id}`,
+        senderName: branchSender,
+        senderAvatar: "🎂",
+        badgeIcon: "pastel" as const,
+        title: `Nuevo Pedido ${newOrder.orderNumber}: Total ${formatCurrency(newOrder.total)}`,
+        highlightText: `${newOrder.customerName} • Anticipo: ${formatCurrency(newOrder.deposit)}${remaining > 0 ? ` (Resta: ${formatCurrency(remaining)})` : " (Liquidado)"}`,
+        description: `${newOrder.description ? `${newOrder.description}. ` : ""}${isCross ? `[Levantado en: ${newOrder.operatingBranchName} • Entrega en: ${newOrder.branchName}] ` : `Recoge en: ${newOrder.branchName}. `}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(remaining)}.`,
+        timeAgo: formatNotificationHour(newOrder.timestamp),
+        timestamp: newOrder.timestamp || Date.now(),
+        group: "recientes" as const,
+        read: false,
+        category: "pedidos" as const,
+        orderId: newOrder.id,
+        branchId: newOrder.branchId,
+        branchName: newOrder.branchName,
+        operatingBranchId: newOrder.operatingBranchId,
+        operatingBranchName: newOrder.operatingBranchName,
+        actionLabel: remaining > 0 ? `Cobrar ${formatCurrency(remaining)}` : "Ver Detalle",
+        actionLink: "/pedidos",
+        secondaryActionLabel: remaining > 0 ? "Ver Detalle" : undefined,
+        secondaryActionLink: remaining > 0 ? "/pedidos" : undefined,
+      };
+
+      realtimeHub.broadcastNotification(notifPayload);
+    }
   }
 
   return newOrder;
@@ -911,6 +1028,7 @@ export function addOrderPayment(
   order.remainingBalance = newRemaining;
   order.paymentStatus = isFullLiquidation ? "liquidado" : "anticipo";
   order.payments = [...(order.payments || []), newPayment];
+  order.timestamp = Date.now();
 
   // Solo marcar como entregado si se solicitó explícitamente la entrega inmediata
   if (params.markAsDelivered) {
@@ -993,6 +1111,8 @@ export function addOrderPayment(
           remainingBalance: order.remainingBalance,
           paymentStatus: order.paymentStatus,
           payments: order.payments,
+          status: order.status,
+          timestamp: order.timestamp,
         },
       }),
     }).catch(() => {});
@@ -1001,6 +1121,42 @@ export function addOrderPayment(
   // Transmitir abono / liquidación en tiempo real
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
     realtimeHub.broadcastOrder("payment", order);
+    if (params.markAsDelivered) {
+      realtimeHub.broadcastOrder("status", order);
+    }
+  }
+
+  if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
+    const isPaid = order.remainingBalance === 0 || order.paymentStatus === "liquidado";
+    const originName = order.operatingBranchName || "Sucursal";
+    const destName = order.branchName || "Sucursal";
+    const isCross = originName.toLowerCase().trim() !== destName.toLowerCase().trim();
+
+    realtimeHub.broadcastNotification({
+      id: `notif-order-pay-${order.id}-${paymentAmount}`,
+      senderName: isPaid ? `🎂 Pedido Liquidado (${destName})` : `💰 Abono Recibido (${destName})`,
+      senderAvatar: isPaid ? "🎂" : "💰",
+      badgeIcon: "pastel",
+      title: isPaid
+        ? `Pedido Liquidado ${order.orderNumber}: $${paymentAmount.toFixed(2)}`
+        : `Abono de Pedido ${order.orderNumber}: $${paymentAmount.toFixed(2)}`,
+      highlightText: `${order.customerName} - ${isPaid ? "100% Pagado" : `Resta: $${(order.remainingBalance || 0).toFixed(2)}`}`,
+      description: isCross
+        ? `Se registró pago de $${paymentAmount.toFixed(2)} en ${destName}. Pedido originado en ${originName}. ${isPaid ? "Listo para entrega final." : `Saldo restante: $${(order.remainingBalance || 0).toFixed(2)}.`}`
+        : `Se registró pago de $${paymentAmount.toFixed(2)}. Pedido: ${order.description}. ${isPaid ? "Listo para entrega final." : `Saldo restante: $${(order.remainingBalance || 0).toFixed(2)}.`}`,
+      timeAgo: formatNotificationHour(Date.now()),
+      timestamp: Date.now(),
+      group: "recientes",
+      read: false,
+      category: "pedidos",
+      orderId: order.id,
+      branchId: order.branchId,
+      branchName: order.branchName,
+      operatingBranchId: order.operatingBranchId,
+      operatingBranchName: order.operatingBranchName,
+      actionLabel: (order.remainingBalance || 0) > 0 ? `Cobrar $${(order.remainingBalance || 0).toFixed(2)}` : "Ver Detalle",
+      actionLink: "/pedidos",
+    });
   }
 
   return order;
@@ -1017,6 +1173,7 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
   current[idx] = {
     ...current[idx],
     status,
+    timestamp: Date.now(),
   };
 
   saveStoredOrders(current);
@@ -1029,7 +1186,7 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
     fetch("/api/orders", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId, updates: { status } }),
+      body: JSON.stringify({ orderId, updates: { status, timestamp: current[idx].timestamp } }),
     }).catch(() => {});
   }
 
@@ -1046,23 +1203,30 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       entregado: "Entregado al Cliente ✅",
       cancelado: "Cancelado ❌",
     };
+    const isDelivered = status === "entregado";
+    const ord = current[idx];
+    const isCross = ord.operatingBranchName && ord.branchName && ord.operatingBranchName !== ord.branchName;
+
     realtimeHub.broadcastNotification({
-      id: `notif-order-status-${current[idx].id}-${status}`,
-      senderName: `👨‍🍳 ${current[idx].branchName}`,
-      senderAvatar: "👨‍🍳",
-      badgeIcon: "horno",
-      title: "Estado de Pedido Actualizado",
-      highlightText: `${current[idx].orderNumber}: Ahora está "${statusMap[status] || status}"`,
-      description: `Cliente: ${current[idx].customerName} • Entrega: ${current[idx].deliveryDate} ${current[idx].deliveryTime}`,
-      timeAgo: "Hace un momento",
+      id: `notif-order-status-${ord.id}-${status}`,
+      senderName: isDelivered ? `📦 ${ord.branchName}` : `👨‍🍳 ${ord.branchName}`,
+      senderAvatar: isDelivered ? "📦" : "👨‍🍳",
+      badgeIcon: "pastel",
+      title: isDelivered ? `Pedido Entregado con Éxito: ${ord.orderNumber}` : "Estado de Pedido Actualizado",
+      highlightText: isDelivered ? `${ord.customerName} • Entregado al Cliente` : `${ord.orderNumber}: Ahora está "${statusMap[status] || status}"`,
+      description: isDelivered
+        ? `El pedido ${ord.orderNumber} de "${ord.customerName}" fue entregado satisfactoriamente en ${ord.branchName}.${isCross ? ` (Originado en: ${ord.operatingBranchName}).` : ""}`
+        : `Cliente: ${ord.customerName} • Entrega: ${ord.deliveryDate} ${ord.deliveryTime}${isCross ? ` • Origen: ${ord.operatingBranchName}` : ""}`,
+      timeAgo: formatNotificationHour(Date.now()),
+      timestamp: Date.now(),
       group: "recientes",
       read: false,
       category: "pedidos",
-      orderId: current[idx].id,
-      branchId: current[idx].branchId,
-      branchName: current[idx].branchName,
-      operatingBranchId: current[idx].operatingBranchId,
-      operatingBranchName: current[idx].operatingBranchName,
+      orderId: ord.id,
+      branchId: ord.branchId,
+      branchName: ord.branchName,
+      operatingBranchId: ord.operatingBranchId,
+      operatingBranchName: ord.operatingBranchName,
       actionLabel: "Ver Detalle",
       actionLink: "/pedidos",
     });

@@ -1,204 +1,4955 @@
 [
   {
-    "id": "PED-101",
-    "orderNumber": "PED-101",
-    "customerId": "cli-3",
-    "customerName": "Sra. María González",
-    "phone": "55 1234 5678",
-    "branchId": "branch-matriz",
-    "branchName": "Sucursal Matriz (Centro)",
-    "description": "Pastel 3 Leches relleno de durazno, 50 personas, temático de XV años (flores lilas)",
+    "id": "ord-89179782-7222",
+    "order_number": "PED-201",
+    "customer_id": "cli-1789321767180",
+    "customer_name": "señora laura",
+    "phone": "123123123123",
+    "branch_id": "branch-angeles",
+    "branch_name": "Sucursal Los Ángeles",
+    "description": "3x Chocolate Caliente con Leche, 3x Concha de Chocolate, 4x Concha de Vainilla",
     "items": [
       {
-        "productId": "prod-8",
-        "name": "Pastel 3 Leches Artesanal Grande (50 personas)",
-        "quantity": 1,
-        "unitPrice": 850,
-        "subtotal": 850,
-        "notes": "Relleno de duraznos en almíbar y cubierta en crema chantilly lila"
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 3,
+        "subtotal": 90,
+        "productId": "prod-11",
+        "unitPrice": 30
       },
       {
-        "productId": "prod-9",
-        "name": "Pay de Queso con Zarzamora",
-        "quantity": 1,
-        "unitPrice": 100,
-        "subtotal": 100,
-        "notes": "Para mesa de postres"
+        "name": "Concha de Chocolate",
+        "quantity": 3,
+        "subtotal": 36,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 4,
+        "subtotal": 48,
+        "productId": "prod-1",
+        "unitPrice": 12
       }
     ],
-    "deliveryDate": "2026-09-27",
-    "deliveryTime": "16:00",
-    "deliveryType": "sucursal",
+    "delivery_date": "2026-10-10",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
     "status": "pendiente",
-    "total": 950,
-    "deposit": 500,
-    "remainingBalance": 450,
-    "paymentStatus": "anticipo",
-    "paymentMethod": "efectivo",
-    "dedication": "¡Mis XV Años Mariana!",
-    "notes": "Entregar en caja alta con base rígida y velas de chispa incluidas.",
-    "createdAt": "2026-09-24T14:58:58.462Z",
-    "cashier": "Lupita Brito",
+    "total": 174,
+    "deposit": 87,
+    "remaining_balance": 87,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
     "payments": [
       {
-        "id": "PAY-101-1",
-        "date": "24/09/26",
-        "amount": 500,
-        "paymentMethod": "efectivo",
-        "cashier": "Lupita Brito",
-        "notes": "Anticipo 50% al levantar pedido"
+        "id": "PAY-PED-201-1",
+        "date": "09/10/2026, 05:39 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 87,
+        "cashier": "andres sanchez",
+        "paymentMethod": "efectivo"
       }
-    ]
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "andres sanchez",
+    "shift_name": "Turno General",
+    "created_at": "2026-10-09T23:39:40.985818+00:00"
   },
   {
-    "id": "PED-102",
-    "orderNumber": "PED-102",
-    "customerId": "cli-2",
-    "customerName": "Ing. Carlos Mendoza",
-    "phone": "55 8765 4321",
-    "branchId": "branch-sanjuan",
-    "branchName": "Sucursal San Juan",
-    "description": "100 piezas de mini cuernitos rellenos de jamón y queso para evento escolar matutino",
+    "id": "ord-88985592-3846",
+    "order_number": "PED-200",
+    "customer_id": "cli-1790896482410",
+    "customer_name": "filemon sanchez",
+    "phone": "223344556",
+    "branch_id": "branch-sanjuan",
+    "branch_name": "Sucursal San Juan",
+    "description": "3x Oreja Hojaldrada, 3x Chocolate Caliente con Leche, 2x Concha de Chocolate, 2x Concha de Vainilla, 1x Harina de Trigo San Antonio 1kg",
     "items": [
       {
-        "productId": "prod-3",
-        "name": "Mini Cuernitos Hojaldrados Jamón y Queso",
-        "quantity": 100,
-        "unitPrice": 12,
-        "subtotal": 1200,
-        "notes": "Horneados a primera hora para entregar tibios"
+        "name": "Oreja Hojaldrada",
+        "quantity": 3,
+        "subtotal": 42,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 3,
+        "subtotal": 90,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 1,
+        "subtotal": 22,
+        "productId": "prod-14",
+        "unitPrice": 22
       }
     ],
-    "deliveryDate": "2026-09-26",
-    "deliveryTime": "08:30",
-    "deliveryType": "sucursal",
-    "status": "listo",
-    "total": 1200,
-    "deposit": 1200,
-    "remainingBalance": 0,
-    "paymentStatus": "liquidado",
-    "paymentMethod": "transferencia",
-    "dedication": "Evento Colegio San Juan",
-    "notes": "Cliente pasa en camioneta blanca a recoger en rampa.",
-    "createdAt": "2026-09-23T14:58:58.480Z",
-    "cashier": "Don Toño Brito",
+    "delivery_date": "2026-10-10",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 202,
+    "deposit": 101,
+    "remaining_balance": 101,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
     "payments": [
       {
-        "id": "PAY-102-1",
-        "date": "23/09/26",
-        "amount": 1200,
-        "paymentMethod": "transferencia",
-        "cashier": "Don Toño Brito",
-        "notes": "Liquidación total vía transferencia SPEI"
+        "id": "PAY-PED-200-1",
+        "date": "09/10/2026, 05:36 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 101,
+        "cashier": "noe velasquez",
+        "paymentMethod": "efectivo"
       }
-    ]
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "noe velasquez",
+    "shift_name": "Turno General",
+    "created_at": "2026-10-09T23:36:26.373355+00:00"
+  },
+  {
+    "id": "ord-86863717-5788",
+    "order_number": "PED-199",
+    "customer_id": "cli-1789321767180",
+    "customer_name": "señora laura",
+    "phone": "123123123123",
+    "branch_id": "branch-angeles",
+    "branch_name": "Sucursal Los Ángeles",
+    "description": "2x Chocolate Caliente con Leche, 2x Concha de Chocolate, 3x Concha de Vainilla, 6x Harina de Trigo San Antonio 1kg, 5x Rebanada Pastel 3 Leches, 5x Oreja Hojaldrada, 6x Leche Entera 1L",
+    "items": [
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 2,
+        "subtotal": 60,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 3,
+        "subtotal": 36,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 6,
+        "subtotal": 132,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 5,
+        "subtotal": 225,
+        "productId": "prod-8",
+        "unitPrice": 45
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 5,
+        "subtotal": 70,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Leche Entera 1L",
+        "quantity": 6,
+        "subtotal": 168,
+        "productId": "prod-13",
+        "unitPrice": 28
+      }
+    ],
+    "delivery_date": "2026-10-10",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 715,
+    "deposit": 400,
+    "remaining_balance": 315,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-199-1",
+        "date": "09/10/2026, 05:01 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 400,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": "[Origen: branch-1790889237862|Sucursal San Ildefonso]",
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-09T23:01:04.068478+00:00"
+  },
+  {
+    "id": "ord-75794975-9323",
+    "order_number": "PED-198",
+    "customer_id": "cli-1789407609164",
+    "customer_name": "gybyy",
+    "phone": "788787",
+    "branch_id": "branch-angeles",
+    "branch_name": "Sucursal Los Ángeles",
+    "description": "5x Chocolate Caliente con Leche, 3x Concha de Chocolate, 576x Concha de Vainilla, 23x Harina de Trigo San Antonio 1kg",
+    "items": [
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 5,
+        "subtotal": 150,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 3,
+        "subtotal": 36,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 576,
+        "subtotal": 6912,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 23,
+        "subtotal": 506,
+        "productId": "prod-14",
+        "unitPrice": 22
+      }
+    ],
+    "delivery_date": "2026-10-10",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 7604,
+    "deposit": 3802,
+    "remaining_balance": 3802,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-198-1",
+        "date": "09/10/2026, 01:56 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 3802,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": "[Origen: branch-1790889237862|Sucursal San Ildefonso]",
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-09T19:56:35.19907+00:00"
+  },
+  {
+    "id": "ord-75624248-2240",
+    "order_number": "PED-197",
+    "customer_id": "cli-1790961773760",
+    "customer_name": "joaquin sanabria",
+    "phone": "12134567909",
+    "branch_id": "branch-angeles",
+    "branch_name": "Sucursal Los Ángeles",
+    "description": "12x Harina de Trigo San Antonio 1kg, 89x Cuerno de Mantequilla, 23x Pay de Queso con Zarzamora, 56x Café de Olla Caliente",
+    "items": [
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 12,
+        "subtotal": 264,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 89,
+        "subtotal": 1335,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 23,
+        "subtotal": 920,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Café de Olla Caliente",
+        "quantity": 56,
+        "subtotal": 1400,
+        "productId": "prod-10",
+        "unitPrice": 25
+      }
+    ],
+    "delivery_date": "2026-10-10",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 3919,
+    "deposit": 1959.5,
+    "remaining_balance": 1959.5,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-197-1",
+        "date": "09/10/2026, 01:53 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 1959.5,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": "[Origen: branch-1790889237862|Sucursal San Ildefonso]",
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-09T19:53:44.536916+00:00"
+  },
+  {
+    "id": "ord-62521537-8069",
+    "order_number": "ord-62521537-8069",
+    "customer_id": "cli-1790803898308",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "56x j, 34x Chocolate Caliente con Leche, 123x Concha de Chocolate, 78x Concha de Vainilla, 345x Harina de Trigo San Antonio 1kg",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 16622,
+    "deposit": 8311,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-196-1",
+        "date": "09/10/2026, 10:15 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 8311,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-09T16:15:21.710317+00:00"
+  },
+  {
+    "id": "PED-195",
+    "order_number": "PED-195",
+    "customer_id": "cli-1790889047773",
+    "customer_name": "marcos sanchez",
+    "phone": "7731234567",
+    "branch_id": "branch-1790889237862",
+    "branch_name": "Sucursal San Ildefonso",
+    "description": "1x Oreja Hojaldrada, 2x Chocolate Caliente con Leche, 2x Concha de Chocolate, 2x Concha de Vainilla",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 1,
+        "subtotal": 14,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 2,
+        "subtotal": 60,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-1",
+        "unitPrice": 12
+      }
+    ],
+    "delivery_date": "2026-10-10",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 122,
+    "deposit": 61,
+    "remaining_balance": 61,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-195-1",
+        "date": "09/10/2026, 10:13 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 61,
+        "cashier": "Cajero Los Ángeles",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Cajero Los Ángeles",
+    "shift_name": "Turno General",
+    "created_at": "2026-10-09T16:13:09.697561+00:00"
+  },
+  {
+    "id": "ord-62344104-6957",
+    "order_number": "ord-62344104-6957",
+    "customer_id": "cli-1790896482410",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "5x Chocolate Caliente con Leche, 2x Concha de Chocolate, 3x Harina de Trigo San Antonio 1kg, 1x Leche Entera 1L, 3x Concha de Vainilla",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 304,
+    "deposit": 152,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-194-1",
+        "date": "09/10/2026, 10:12 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 152,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-09T16:12:24.529255+00:00"
+  },
+  {
+    "id": "ord-62295447-3077",
+    "order_number": "PED-193",
+    "customer_id": "cli-1791049308802",
+    "customer_name": "olga sarabia",
+    "phone": "3322558899",
+    "branch_id": "branch-angeles",
+    "branch_name": "Sucursal Los Ángeles",
+    "description": "3x Chocolate Caliente con Leche, 4x Concha de Chocolate, 2x Concha de Vainilla, 3x Harina de Trigo San Antonio 1kg",
+    "items": [
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 3,
+        "subtotal": 90,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 4,
+        "subtotal": 48,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 3,
+        "subtotal": 66,
+        "productId": "prod-14",
+        "unitPrice": 22
+      }
+    ],
+    "delivery_date": "2026-10-10",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 228,
+    "deposit": 120,
+    "remaining_balance": 108,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-193-1",
+        "date": "09/10/2026, 10:11 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 120,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": "[Origen: branch-1790889237862|Sucursal San Ildefonso]",
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-09T16:11:35.977546+00:00"
+  },
+  {
+    "id": "PED-192",
+    "order_number": "PED-192",
+    "customer_id": "cli-1790896482410",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "675x Oreja Hojaldrada",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 9450,
+    "deposit": 9450,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-192-1",
+        "date": "09/10/2026, 09:57 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 5509,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      },
+      {
+        "id": "PAY-PED-192-2",
+        "date": "09/10/2026, 09:58 a. m.",
+        "notes": "Liquidación de saldo pendiente",
+        "amount": 3941,
+        "cashier": "Cajero Los Ángeles",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-09T15:57:50.976398+00:00"
+  },
+  {
+    "id": "PED-191",
+    "order_number": "PED-191",
+    "customer_id": "cli-1790963198944",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "5x Chocolate Caliente con Leche, 1x Concha de Chocolate, 2x Concha de Vainilla, 2x Harina de Trigo San Antonio 1kg",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 230,
+    "deposit": 140,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-191-1",
+        "date": "09/10/2026, 09:56 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 140,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-09T15:56:32.487723+00:00"
+  },
+  {
+    "id": "PED-190",
+    "order_number": "PED-190",
+    "customer_id": "cli-1790896482410",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "7x Oreja Hojaldrada",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 98,
+    "deposit": 49,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-190-1",
+        "date": "09/10/2026, 09:43 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 49,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-09T15:43:19.40723+00:00"
+  },
+  {
+    "id": "PED-189",
+    "order_number": "PED-189",
+    "customer_id": "cli-1790889047773",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "12x Chocolate Caliente con Leche, 34x Concha de Chocolate, 56x Concha de Vainilla",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 1440,
+    "deposit": 720,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-189-1",
+        "date": "09/10/2026, 09:19 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 720,
+        "cashier": "Cajero Los Ángeles",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Cajero Los Ángeles",
+    "shift_name": "Turno General",
+    "created_at": "2026-10-09T15:19:23.944059+00:00"
+  },
+  {
+    "id": "PED-188",
+    "order_number": "PED-188",
+    "customer_id": "cli-1790308402174",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "9x Bolillo Tradicional, 345x Café de Olla Caliente, 32x Concha de Chocolate, 10x Concha de Vainilla, 33x Harina de Trigo San Antonio 1kg, 122x Empanada de Calabaza, 12x Dona Glaseada, 32x Cuerno de Mantequilla, 12x Chocolate Caliente con Leche, 33x Oreja Hojaldrada",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 13554,
+    "deposit": 7653,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-188-1",
+        "date": "09/10/2026, 08:43 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 7653,
+        "cashier": "Cajero Los Ángeles",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Cajero Los Ángeles",
+    "shift_name": "Turno General",
+    "created_at": "2026-10-09T14:43:31.915055+00:00"
+  },
+  {
+    "id": "PED-187",
+    "order_number": "PED-187",
+    "customer_id": "cli-1791049308802",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "89x Dona Glaseada, 123x Harina de Trigo San Antonio 1kg, 12x Bolillo Tradicional, 23x Café de Olla Caliente",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 4498,
+    "deposit": 2500,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "tarjeta",
+    "payments": [
+      {
+        "id": "PAY-PED-187-1",
+        "date": "09/10/2026, 08:40 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 2500,
+        "cashier": "Cajero Los Ángeles",
+        "cardTerminal": "Terminal Mostrador Principal (Mercado Pago) (Mercado Pago / STP)",
+        "paymentMethod": "tarjeta"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Cajero Los Ángeles",
+    "shift_name": "Turno General",
+    "created_at": "2026-10-09T14:40:42.202612+00:00"
+  },
+  {
+    "id": "PED-186",
+    "order_number": "PED-186",
+    "customer_id": "cli-1788548118413",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "123x Chocolate Caliente con Leche, 122x Concha de Chocolate, 45x Concha de Vainilla, 34x Harina de Trigo San Antonio 1kg, 89x Rebanada Pastel 3 Leches, 23x Oreja Hojaldrada, 43x Leche Entera 1L",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 11973,
+    "deposit": 8600,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-186-1",
+        "date": "09/10/2026, 08:37 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 8600,
+        "cashier": "Cajero Los Ángeles",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Cajero Los Ángeles",
+    "shift_name": "Turno General",
+    "created_at": "2026-10-09T14:37:32.516799+00:00"
+  },
+  {
+    "id": "PED-185",
+    "order_number": "PED-185",
+    "customer_id": "cli-1790889047773",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "23x Chocolate Caliente con Leche, 122x Concha de Chocolate, 31x Concha de Vainilla, 312x Harina de Trigo San Antonio 1kg, 31x Rebanada Pastel 3 Leches, 32x Oreja Hojaldrada, 412x Leche Entera 1L",
+    "items": [],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 22769,
+    "deposit": 12000,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "tarjeta",
+    "payments": [
+      {
+        "id": "PAY-PED-185-1",
+        "date": "09/10/2026, 08:34 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 12000,
+        "cashier": "Cajero Los Ángeles",
+        "cardTerminal": "Terminal Mostrador Principal (Mercado Pago) (Mercado Pago / STP)",
+        "paymentMethod": "tarjeta"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Cajero Los Ángeles",
+    "shift_name": "Turno General",
+    "created_at": "2026-10-09T14:34:19.406284+00:00"
+  },
+  {
+    "id": "PED-184",
+    "order_number": "PED-184",
+    "customer_id": "cli-2",
+    "customer_name": "Taquería 'El Pastorcito Dorado'",
+    "phone": "55 9988 1122",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "14x Dona Glaseada, 11x Harina de Trigo San Antonio 1kg",
+    "items": [
+      {
+        "name": "Dona Glaseada",
+        "quantity": 14,
+        "subtotal": 182,
+        "productId": "prod-7",
+        "unitPrice": 13
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 11,
+        "subtotal": 242,
+        "productId": "prod-14",
+        "unitPrice": 22
+      }
+    ],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 424,
+    "deposit": 300,
+    "remaining_balance": 124,
+    "payment_status": "anticipo",
+    "payment_method": "tarjeta",
+    "payments": [
+      {
+        "id": "PAY-PED-184-1",
+        "date": "08/10/2026, 05:54 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 300,
+        "cashier": "Carlos Mendoza",
+        "cardTerminal": "Terminal Mostrador Principal (Mercado Pago) (Mercado Pago / STP)",
+        "paymentMethod": "tarjeta"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Carlos Mendoza",
+    "shift_name": "Turno Matutino (06:30 - 14:30)",
+    "created_at": "2026-10-08T23:54:44.437866+00:00"
+  },
+  {
+    "id": "PED-183",
+    "order_number": "PED-183",
+    "customer_id": "cli-1790228123743",
+    "customer_name": "juliana",
+    "phone": "2476178887",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "78x Cuerno de Mantequilla, 545x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 78,
+        "subtotal": 1170,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 545,
+        "subtotal": 21800,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 22970,
+    "deposit": 15000,
+    "remaining_balance": 7970,
+    "payment_status": "anticipo",
+    "payment_method": "tarjeta",
+    "payments": [
+      {
+        "id": "PAY-PED-183-1",
+        "date": "08/10/2026, 05:53 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 15000,
+        "cashier": "Carlos Mendoza",
+        "cardTerminal": "Terminal Mostrador Principal (Mercado Pago) (Mercado Pago / STP)",
+        "paymentMethod": "tarjeta"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Carlos Mendoza",
+    "shift_name": "Turno Matutino (06:30 - 14:30)",
+    "created_at": "2026-10-08T23:53:59.356722+00:00"
+  },
+  {
+    "id": "PED-182",
+    "order_number": "PED-182",
+    "customer_id": "cli-1791049308802",
+    "customer_name": "olga sarabia",
+    "phone": "3322558899",
+    "branch_id": "branch-sanjuan",
+    "branch_name": "Sucursal San Juan",
+    "description": "1x Harina de Trigo San Antonio 1kg, 1x Dona Glaseada",
+    "items": [
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 1,
+        "subtotal": 22,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Dona Glaseada",
+        "quantity": 1,
+        "subtotal": 13,
+        "productId": "prod-7",
+        "unitPrice": 13
+      }
+    ],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 35,
+    "deposit": 35,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-182-1",
+        "date": "08/10/2026, 04:40 p. m.",
+        "notes": "Pago total inmediato",
+        "amount": 35,
+        "cashier": "Carlos Mendoza",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Carlos Mendoza",
+    "shift_name": "Turno Matutino (06:30 - 14:30)",
+    "created_at": "2026-10-08T22:40:51.351464+00:00"
+  },
+  {
+    "id": "PED-181",
+    "order_number": "PED-181",
+    "customer_id": "cli-1791049308802",
+    "customer_name": "olga sarabia",
+    "phone": "3322558899",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "43x Cuerno de Mantequilla, 76x Concha de Vainilla, 5x Concha de Chocolate, 3x Café de Olla Caliente, 20x Bolillo Tradicional, 5x Harina de Trigo San Antonio 1kg, 8x Empanada de Calabaza, 55x Dona Glaseada",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 43,
+        "subtotal": 645,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 76,
+        "subtotal": 912,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 5,
+        "subtotal": 60,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Café de Olla Caliente",
+        "quantity": 3,
+        "subtotal": 75,
+        "productId": "prod-10",
+        "unitPrice": 25
+      },
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 20,
+        "subtotal": 100,
+        "productId": "prod-4",
+        "unitPrice": 5
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 5,
+        "subtotal": 110,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Empanada de Calabaza",
+        "quantity": 8,
+        "subtotal": 144,
+        "productId": "prod-12",
+        "unitPrice": 18
+      },
+      {
+        "name": "Dona Glaseada",
+        "quantity": 55,
+        "subtotal": 715,
+        "productId": "prod-7",
+        "unitPrice": 13
+      }
+    ],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 2761,
+    "deposit": 1550,
+    "remaining_balance": 1211,
+    "payment_status": "anticipo",
+    "payment_method": "tarjeta",
+    "payments": [
+      {
+        "id": "PAY-PED-181-1",
+        "date": "08/10/2026, 04:38 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 1550,
+        "cashier": "Carlos Mendoza",
+        "cardTerminal": "Terminal Mostrador Principal (Mercado Pago) (Mercado Pago / STP)",
+        "paymentMethod": "tarjeta"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Carlos Mendoza",
+    "shift_name": "Turno Matutino (06:30 - 14:30)",
+    "created_at": "2026-10-08T22:38:38.08104+00:00"
+  },
+  {
+    "id": "PED-180",
+    "order_number": "PED-180",
+    "customer_id": "cli-1789407609164",
+    "customer_name": "gybyy",
+    "phone": "788787",
+    "branch_id": "branch-1790889237862",
+    "branch_name": "Sucursal San Ildefonso",
+    "description": "78x Pay de Queso con Zarzamora, 23x Dona Glaseada, 16x Harina de Trigo San Antonio 1kg, 9x Rebanada Pastel 3 Leches",
+    "items": [
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 78,
+        "subtotal": 3120,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Dona Glaseada",
+        "quantity": 23,
+        "subtotal": 299,
+        "productId": "prod-7",
+        "unitPrice": 13
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 16,
+        "subtotal": 352,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 9,
+        "subtotal": 405,
+        "productId": "prod-8",
+        "unitPrice": 45
+      }
+    ],
+    "delivery_date": "2026-10-10",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 4176,
+    "deposit": 2200,
+    "remaining_balance": 1976,
+    "payment_status": "anticipo",
+    "payment_method": "tarjeta",
+    "payments": [
+      {
+        "id": "PAY-PED-180-1",
+        "date": "08/10/2026, 04:35 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 2200,
+        "cashier": "Carlos Mendoza",
+        "cardTerminal": "Terminal Mostrador Principal (Mercado Pago) (Mercado Pago / STP)",
+        "paymentMethod": "tarjeta"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Carlos Mendoza",
+    "shift_name": "Turno Matutino (06:30 - 14:30)",
+    "created_at": "2026-10-08T22:36:00.704169+00:00"
+  },
+  {
+    "id": "PED-179",
+    "order_number": "PED-179",
+    "customer_id": "cli-1790228123743",
+    "customer_name": "juliana",
+    "phone": "2476178887",
+    "branch_id": "branch-sanjuan",
+    "branch_name": "Sucursal San Juan",
+    "description": "10x Cuerno de Mantequilla, 9x Pay de Queso con Zarzamora, 43x Chocolate Caliente con Leche, 14x Concha de Chocolate, 11x Concha de Vainilla, 23x Harina de Trigo San Antonio 1kg",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 10,
+        "subtotal": 150,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 9,
+        "subtotal": 360,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 43,
+        "subtotal": 1290,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 14,
+        "subtotal": 168,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 11,
+        "subtotal": 132,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 23,
+        "subtotal": 506,
+        "productId": "prod-14",
+        "unitPrice": 22
+      }
+    ],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 2606,
+    "deposit": 1800,
+    "remaining_balance": 806,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-179-1",
+        "date": "08/10/2026, 04:34 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 1800,
+        "cashier": "Carlos Mendoza",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Carlos Mendoza",
+    "shift_name": "Turno Matutino (06:30 - 14:30)",
+    "created_at": "2026-10-08T22:34:40.462896+00:00"
+  },
+  {
+    "id": "PED-178",
+    "order_number": "PED-178",
+    "customer_id": "cli-1790228123743",
+    "customer_name": "juliana",
+    "phone": "2476178887",
+    "branch_id": "branch-sanjuan",
+    "branch_name": "Sucursal San Juan",
+    "description": "23x Café de Olla Caliente, 24x Bolillo Tradicional, 452x Chocolate Caliente con Leche, 2x Concha de Vainilla, 43x Harina de Trigo San Antonio 1kg, 2x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Café de Olla Caliente",
+        "quantity": 23,
+        "subtotal": 575,
+        "productId": "prod-10",
+        "unitPrice": 25
+      },
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 24,
+        "subtotal": 120,
+        "productId": "prod-4",
+        "unitPrice": 5
+      },
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 452,
+        "subtotal": 13560,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 43,
+        "subtotal": 946,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 2,
+        "subtotal": 30,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 15255,
+    "deposit": 9500,
+    "remaining_balance": 5755,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-178-1",
+        "date": "08/10/2026, 03:49 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 9500,
+        "cashier": "andres sanchez",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "andres sanchez",
+    "shift_name": "Turno General",
+    "created_at": "2026-10-08T21:49:34.868462+00:00"
+  },
+  {
+    "id": "PED-177",
+    "order_number": "PED-177",
+    "customer_id": "cli-1790228945232",
+    "customer_name": "miguel Hidalgo",
+    "phone": "92139233",
+    "branch_id": "branch-sanjuan",
+    "branch_name": "Sucursal San Juan",
+    "description": "6x Pay de Queso con Zarzamora, 22x Bolillo Tradicional, 4x Café de Olla Caliente, 1x Chocolate Caliente con Leche, 11x Concha de Chocolate, 32x Cuerno de Mantequilla, 1x Concha de Vainilla, 1x Dona Glaseada",
+    "items": [
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 6,
+        "subtotal": 240,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 22,
+        "subtotal": 110,
+        "productId": "prod-4",
+        "unitPrice": 5
+      },
+      {
+        "name": "Café de Olla Caliente",
+        "quantity": 4,
+        "subtotal": 100,
+        "productId": "prod-10",
+        "unitPrice": 25
+      },
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 1,
+        "subtotal": 30,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 11,
+        "subtotal": 132,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 32,
+        "subtotal": 480,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 1,
+        "subtotal": 12,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Dona Glaseada",
+        "quantity": 1,
+        "subtotal": 13,
+        "productId": "prod-7",
+        "unitPrice": 13
+      }
+    ],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 1117,
+    "deposit": 780,
+    "remaining_balance": 337,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-177-1",
+        "date": "08/10/2026, 09:28 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 780,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-08T15:28:18.036734+00:00"
+  },
+  {
+    "id": "PED-176",
+    "order_number": "PED-176",
+    "customer_id": "cli-1790896482410",
+    "customer_name": "filemon sanchez",
+    "phone": "223344556",
+    "branch_id": "branch-sanjuan",
+    "branch_name": "Sucursal San Juan",
+    "description": "6x Oreja Hojaldrada, 78x Dona Glaseada, 899x Harina de Trigo San Antonio 1kg",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 6,
+        "subtotal": 84,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Dona Glaseada",
+        "quantity": 78,
+        "subtotal": 1014,
+        "productId": "prod-7",
+        "unitPrice": 13
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 899,
+        "subtotal": 19778,
+        "productId": "prod-14",
+        "unitPrice": 22
+      }
+    ],
+    "delivery_date": "2026-10-09",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 20876,
+    "deposit": 15676,
+    "remaining_balance": 5200,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-176-1",
+        "date": "08/10/2026, 08:46 a. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 15676,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-08T14:47:00.475345+00:00"
+  },
+  {
+    "id": "PED-175",
+    "order_number": "PED-175",
+    "customer_id": "cli-1790896482410",
+    "customer_name": "filemon sanchez",
+    "phone": "223344556",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "62x Pay de Queso con Zarzamora, 22x Chocolate Caliente con Leche, 232x Concha de Chocolate, 23x Concha de Vainilla, 45x Café de Olla Caliente",
+    "items": [
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 62,
+        "subtotal": 2480,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 22,
+        "subtotal": 660,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 232,
+        "subtotal": 2784,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 23,
+        "subtotal": 276,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Café de Olla Caliente",
+        "quantity": 45,
+        "subtotal": 1125,
+        "productId": "prod-10",
+        "unitPrice": 25
+      }
+    ],
+    "delivery_date": "2026-10-16",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 7325,
+    "deposit": 6000,
+    "remaining_balance": 1325,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-175-1",
+        "date": "07/10/2026, 04:05 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 6000,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-07T22:05:11.950375+00:00"
+  },
+  {
+    "id": "PED-174",
+    "order_number": "PED-174",
+    "customer_id": "cli-1790961773760",
+    "customer_name": "joaquin sanabria",
+    "phone": "12134567909",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "dulce con chocolate",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 9,
+        "subtotal": 126,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 9,
+        "subtotal": 360,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-15",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 486,
+    "deposit": 300,
+    "remaining_balance": 186,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-174-1",
+        "date": "07/10/2026, 03:59 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 300,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-07T21:59:24.551558+00:00"
+  },
+  {
+    "id": "PED-173",
+    "order_number": "PED-173",
+    "customer_id": "cli-1788546310390",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "77x Cuerno de Mantequilla, 66x Pay de Queso con Zarzamora",
+    "items": [],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 3795,
+    "deposit": 1897.5,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-173-1",
+        "date": "07/10/2026, 12:56 p. m.",
+        "notes": "Anticipo al levantar pedido",
+        "amount": 1897.5,
+        "cashier": "noe velasquez",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "noe velasquez",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-07T18:56:47.436133+00:00"
+  },
+  {
+    "id": "PED-172",
+    "order_number": "PED-172",
+    "customer_id": "cli-1790894744773",
+    "customer_name": "Cliente",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "3x Harina de Trigo San Antonio 1kg, 44x Bolillo Tradicional, 345x Café de Olla Caliente",
+    "items": [],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 8911,
+    "deposit": 8911,
+    "remaining_balance": 0,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-172-1",
+        "date": "07/10/2026, 12:16 p. m.",
+        "notes": "Pago total inmediato",
+        "amount": 8911,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-07T18:16:52.275728+00:00"
+  },
+  {
+    "id": "PED-105",
+    "order_number": "PED-105",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "N/A",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz",
+    "description": "2x Concha de Chocolate, 2x Cuerno de Mantequilla, 2x Oreja Hojaldrada, 2x Telera para Torta",
+    "items": [
+      {
+        "name": "2x Concha de Chocolate, 2x Cuerno de Mantequilla, 2x Oreja Hojaldrada, 2x Telera para Torta",
+        "quantity": 1,
+        "subtotal": 94,
+        "unitPrice": 94
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 94,
+    "deposit": 47,
+    "remaining_balance": 47,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-04T18:56:59.329689+00:00"
+  },
+  {
+    "id": "PED-171",
+    "order_number": "PED-171",
+    "customer_id": "cli-1790961773760",
+    "customer_name": "Cliente Mostrador",
+    "phone": "12134567909",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "8x Oreja Hojaldrada, 14x Chocolate Caliente con Leche, 13x Café de Olla Caliente",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 8,
+        "subtotal": 112,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 14,
+        "subtotal": 420,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Café de Olla Caliente",
+        "quantity": 13,
+        "subtotal": 325,
+        "productId": "prod-10",
+        "unitPrice": 25
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 857,
+    "deposit": 857,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [
+      {
+        "id": "PAY-PED-171-1",
+        "date": "03/10/2026, 02:08 p. m.",
+        "notes": "Pago total inmediato",
+        "amount": 857,
+        "cashier": "silvia puga",
+        "paymentMethod": "efectivo"
+      }
+    ],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": "Turno Matutino (06:00 - 14:00)",
+    "created_at": "2026-10-03T20:08:43.227244+00:00"
+  },
+  {
+    "id": "PED-170",
+    "order_number": "PED-170",
+    "customer_id": null,
+    "customer_name": "olga sarabia",
+    "phone": "3322558899",
+    "branch_id": "branch-1790889237862",
+    "branch_name": "san ildefonso hgo",
+    "description": "6x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 6,
+        "subtotal": 240,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-04",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 240,
+    "deposit": 120,
+    "remaining_balance": 120,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "silvia puga",
+    "shift_name": null,
+    "created_at": "2026-10-03T17:42:38.706123+00:00"
+  },
+  {
+    "id": "PED-106",
+    "order_number": "PED-106",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "2313123",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "1052x Concha de Chocolate, 1x Telera para Torta, 1x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 1052,
+        "subtotal": 12624,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 1,
+        "subtotal": 6,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 1,
+        "subtotal": 14,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 12644,
+    "deposit": 6322,
+    "remaining_balance": 6322,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:32.428745+00:00"
+  },
+  {
+    "id": "PED-107",
+    "order_number": "PED-107",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "2313123",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "522x Cuerno de Mantequilla, 222x Concha de Chocolate, 222x Telera para Torta",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 522,
+        "subtotal": 7830,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 222,
+        "subtotal": 2664,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 222,
+        "subtotal": 1332,
+        "productId": "prod-5",
+        "unitPrice": 6
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 11826,
+    "deposit": 11826,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:32.314093+00:00"
+  },
+  {
+    "id": "PED-108",
+    "order_number": "PED-108",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "2313123",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "2x Cuerno de Mantequilla, 4x Concha de Chocolate, 2x Telera para Torta",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 2,
+        "subtotal": 30,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 4,
+        "subtotal": 48,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 2,
+        "subtotal": 12,
+        "productId": "prod-5",
+        "unitPrice": 6
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 90,
+    "deposit": 90,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:32.192969+00:00"
+  },
+  {
+    "id": "PED-109",
+    "order_number": "PED-109",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "4234131",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "2x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 2,
+        "subtotal": 30,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 30,
+    "deposit": 30,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:32.072055+00:00"
+  },
+  {
+    "id": "PED-110",
+    "order_number": "PED-110",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "2476178887",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "4x Oreja Hojaldrada, 1x Telera para Torta",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 4,
+        "subtotal": 56,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 1,
+        "subtotal": 6,
+        "productId": "prod-5",
+        "unitPrice": 6
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 62,
+    "deposit": 62,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:31.956396+00:00"
+  },
+  {
+    "id": "PED-111",
+    "order_number": "PED-111",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "92139233",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "2121314x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 2121314,
+        "subtotal": 31819710,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 31819710,
+    "deposit": 31819710,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:31.84033+00:00"
+  },
+  {
+    "id": "PED-112",
+    "order_number": "PED-112",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "8546774654",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "212x Cuerno de Mantequilla, 32232x Telera para Torta",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 212,
+        "subtotal": 3180,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 32232,
+        "subtotal": 193392,
+        "productId": "prod-5",
+        "unitPrice": 6
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 196572,
+    "deposit": 98286,
+    "remaining_balance": 98286,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:31.717991+00:00"
+  },
+  {
+    "id": "PED-113",
+    "order_number": "PED-113",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "232432323",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "333x Cuerno de Mantequilla, 2112x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 333,
+        "subtotal": 4995,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 2112,
+        "subtotal": 29568,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 34563,
+    "deposit": 34563,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:31.598566+00:00"
+  },
+  {
+    "id": "PED-114",
+    "order_number": "PED-114",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "232432323",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "2x Concha de Chocolate, 5x Pay de Queso con Zarzamora, 8x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 5,
+        "subtotal": 200,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 8,
+        "subtotal": 112,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 336,
+    "deposit": 336,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:31.467293+00:00"
+  },
+  {
+    "id": "PED-115",
+    "order_number": "PED-115",
+    "customer_id": null,
+    "customer_name": "doña maria",
+    "phone": "2323232323",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "2x Bolillo Tradicional, 3443x Telera para Torta, 545x Concha de Chocolate, 2x Cuerno de Mantequilla, 2x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 2,
+        "subtotal": 10,
+        "productId": "prod-4",
+        "unitPrice": 5
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 3443,
+        "subtotal": 20658,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 545,
+        "subtotal": 6540,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 2,
+        "subtotal": 30,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 2,
+        "subtotal": 28,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-09-26",
+    "delivery_time": "16:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 27266,
+    "deposit": 13633,
+    "remaining_balance": 13633,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:31.349988+00:00"
+  },
+  {
+    "id": "PED-116",
+    "order_number": "PED-116",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "2183821912321",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "3x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 3,
+        "subtotal": 45,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 45,
+    "deposit": 22.5,
+    "remaining_balance": 22.5,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:31.2229+00:00"
+  },
+  {
+    "id": "PED-117",
+    "order_number": "PED-117",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "23422389234",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "2x Oreja Hojaldrada, 4x Cuerno de Mantequilla, 12x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 2,
+        "subtotal": 28,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 4,
+        "subtotal": 60,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 12,
+        "subtotal": 480,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 568,
+    "deposit": 568,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:31.102422+00:00"
+  },
+  {
+    "id": "PED-119",
+    "order_number": "PED-119",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "181283128",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "sera para un cumpleaños 25",
+    "items": [
+      {
+        "name": "Telera para Torta",
+        "quantity": 900,
+        "subtotal": 5400,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 23,
+        "subtotal": 920,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 232,
+        "subtotal": 3248,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 12,
+        "subtotal": 180,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 231,
+        "subtotal": 2772,
+        "productId": "prod-2",
+        "unitPrice": 12
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 12520,
+    "deposit": 12520,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:30.983283+00:00"
+  },
+  {
+    "id": "PED-120",
+    "order_number": "PED-120",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "83729843",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "1x Cuerno de Mantequilla, 1x Pay de Queso con Zarzamora, 5x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 1,
+        "subtotal": 15,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 1,
+        "subtotal": 40,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 5,
+        "subtotal": 70,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "cancelado",
+    "total": 125,
+    "deposit": 125,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:30.872446+00:00"
+  },
+  {
+    "id": "PED-121",
+    "order_number": "PED-121",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "65765765",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "1x Cuerno de Mantequilla, 2x Oreja Hojaldrada, 1x Concha de Chocolate, 1x Concha de Vainilla, 1x Bolillo Tradicional, 1x Empanada de Calabaza, 1x Telera para Torta, 1x Rebanada Pastel 3 Leches",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 1,
+        "subtotal": 15,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 2,
+        "subtotal": 28,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 1,
+        "subtotal": 12,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 1,
+        "subtotal": 12,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 1,
+        "subtotal": 5,
+        "productId": "prod-4",
+        "unitPrice": 5
+      },
+      {
+        "name": "Empanada de Calabaza",
+        "quantity": 1,
+        "subtotal": 18,
+        "productId": "prod-12",
+        "unitPrice": 18
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 1,
+        "subtotal": 6,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 1,
+        "subtotal": 45,
+        "productId": "prod-8",
+        "unitPrice": 45
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 141,
+    "deposit": 70.5,
+    "remaining_balance": 70.5,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:30.749656+00:00"
+  },
+  {
+    "id": "PED-123",
+    "order_number": "PED-123",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "32343223",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "199x Oreja Hojaldrada, 88x Pay de Queso con Zarzamora, 12x Rebanada Pastel 3 Leches, 22x Telera para Torta",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 199,
+        "subtotal": 2786,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 88,
+        "subtotal": 3520,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 12,
+        "subtotal": 540,
+        "productId": "prod-8",
+        "unitPrice": 45
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 22,
+        "subtotal": 132,
+        "productId": "prod-5",
+        "unitPrice": 6
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 6978,
+    "deposit": 6978,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:30.633758+00:00"
+  },
+  {
+    "id": "PED-124",
+    "order_number": "PED-124",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "1281281221",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "2x Cuerno de Mantequilla, 1x Oreja Hojaldrada, 5x Concha de Chocolate",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 2,
+        "subtotal": 30,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 1,
+        "subtotal": 14,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 5,
+        "subtotal": 60,
+        "productId": "prod-2",
+        "unitPrice": 12
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 104,
+    "deposit": 52,
+    "remaining_balance": 52,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:30.512338+00:00"
+  },
+  {
+    "id": "PED-125",
+    "order_number": "PED-125",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "12988901221",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "111x Oreja Hojaldrada, 222x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 111,
+        "subtotal": 1554,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 222,
+        "subtotal": 3330,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 4884,
+    "deposit": 4884,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:30.396772+00:00"
+  },
+  {
+    "id": "PED-126",
+    "order_number": "PED-126",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "12988901221",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "88x Telera para Torta, 11x Rebanada Pastel 3 Leches",
+    "items": [
+      {
+        "name": "Telera para Torta",
+        "quantity": 88,
+        "subtotal": 528,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 11,
+        "subtotal": 495,
+        "productId": "prod-8",
+        "unitPrice": 45
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 1023,
+    "deposit": 1023,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:30.275018+00:00"
+  },
+  {
+    "id": "PED-127",
+    "order_number": "PED-127",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "32343223",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "3x Oreja Hojaldrada, 2x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 3,
+        "subtotal": 42,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 2,
+        "subtotal": 30,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 72,
+    "deposit": 72,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:30.148385+00:00"
+  },
+  {
+    "id": "PED-128",
+    "order_number": "PED-128",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "212231312",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "2x Telera para Torta, 22x Concha de Chocolate, 11x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Telera para Torta",
+        "quantity": 2,
+        "subtotal": 12,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 22,
+        "subtotal": 264,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 11,
+        "subtotal": 165,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 441,
+    "deposit": 441,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:30.025442+00:00"
+  },
+  {
+    "id": "PED-129",
+    "order_number": "PED-129",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "12313123",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "88x Rebanada Pastel 3 Leches, 999x Telera para Torta, 888x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 88,
+        "subtotal": 3960,
+        "productId": "prod-8",
+        "unitPrice": 45
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 999,
+        "subtotal": 5994,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 888,
+        "subtotal": 13320,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 23274,
+    "deposit": 23274,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:29.913143+00:00"
+  },
+  {
+    "id": "PED-130",
+    "order_number": "PED-130",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "12313123",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "2x Telera para Torta, 1x Rebanada Pastel 3 Leches, 1x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Telera para Torta",
+        "quantity": 2,
+        "subtotal": 12,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 1,
+        "subtotal": 45,
+        "productId": "prod-8",
+        "unitPrice": 45
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 1,
+        "subtotal": 40,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 97,
+    "deposit": 97,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:29.784491+00:00"
+  },
+  {
+    "id": "PED-131",
+    "order_number": "PED-131",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "121123113",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "322x Telera para Torta, 1211x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Telera para Torta",
+        "quantity": 322,
+        "subtotal": 1932,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 1211,
+        "subtotal": 16954,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 18886,
+    "deposit": 18886,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:29.673849+00:00"
+  },
+  {
+    "id": "PED-132",
+    "order_number": "PED-132",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "83729843",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "234x Oreja Hojaldrada, 32x Telera para Torta, 234x Concha de Chocolate, 454x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 234,
+        "subtotal": 3276,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 32,
+        "subtotal": 192,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 234,
+        "subtotal": 2808,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 454,
+        "subtotal": 6810,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 13086,
+    "deposit": 13086,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:29.421225+00:00"
+  },
+  {
+    "id": "PED-133",
+    "order_number": "PED-133",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "27818281923",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "22x Cuerno de Mantequilla, 233x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 22,
+        "subtotal": 330,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 233,
+        "subtotal": 3262,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 3592,
+    "deposit": 3592,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:29.278583+00:00"
+  },
+  {
+    "id": "PED-134",
+    "order_number": "PED-134",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "212231312",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "12121x Cuerno de Mantequilla, 3231x Telera para Torta, 212x Concha de Chocolate",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 12121,
+        "subtotal": 181815,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 3231,
+        "subtotal": 19386,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 212,
+        "subtotal": 2544,
+        "productId": "prod-2",
+        "unitPrice": 12
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 203745,
+    "deposit": 203745,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:29.15592+00:00"
+  },
+  {
+    "id": "PED-135",
+    "order_number": "PED-135",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "212231312",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "1221x Oreja Hojaldrada, 11221x Telera para Torta",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 1221,
+        "subtotal": 17094,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 11221,
+        "subtotal": 67326,
+        "productId": "prod-5",
+        "unitPrice": 6
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 84420,
+    "deposit": 84420,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Cajera 1 - Turno Matutino",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:29.027331+00:00"
+  },
+  {
+    "id": "PED-136",
+    "order_number": "PED-136",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "23422389234",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "1x Oreja Hojaldrada, 2x Telera para Torta, 3x Concha de Chocolate",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 1,
+        "subtotal": 14,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 2,
+        "subtotal": 12,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 3,
+        "subtotal": 36,
+        "productId": "prod-2",
+        "unitPrice": 12
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 62,
+    "deposit": 40,
+    "remaining_balance": 22,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:28.906163+00:00"
+  },
+  {
+    "id": "PED-137",
+    "order_number": "PED-137",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "32343223",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "1x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 1,
+        "subtotal": 15,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 15,
+    "deposit": 7.5,
+    "remaining_balance": 7.5,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:28.78169+00:00"
+  },
+  {
+    "id": "PED-138",
+    "order_number": "PED-138",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "23422389234",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "132x Telera para Torta, 323x Concha de Chocolate, 212x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Telera para Torta",
+        "quantity": 132,
+        "subtotal": 792,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 323,
+        "subtotal": 3876,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 212,
+        "subtotal": 8480,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 13148,
+    "deposit": 13148,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:28.655721+00:00"
+  },
+  {
+    "id": "PED-139",
+    "order_number": "PED-139",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "12313123",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "8x Oreja Hojaldrada, 8x Telera para Torta, 2x Concha de Chocolate, 1x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 8,
+        "subtotal": 112,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 8,
+        "subtotal": 48,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 1,
+        "subtotal": 15,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 199,
+    "deposit": 199,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:28.540289+00:00"
+  },
+  {
+    "id": "PED-140",
+    "order_number": "PED-140",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "32343223",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "323x Oreja Hojaldrada, 12x Pay de Queso con Zarzamora, 1212x Rebanada Pastel 3 Leches",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 323,
+        "subtotal": 4522,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 12,
+        "subtotal": 480,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 1212,
+        "subtotal": 54540,
+        "productId": "prod-8",
+        "unitPrice": 45
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 59542,
+    "deposit": 29771,
+    "remaining_balance": 29771,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:28.424486+00:00"
+  },
+  {
+    "id": "PED-141",
+    "order_number": "PED-141",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "55 0000 0000",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "2x Cuerno de Mantequilla, 3x Telera para Torta, 88x Oreja Hojaldrada, 66x Concha de Chocolate, 88x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 2,
+        "subtotal": 30,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 3,
+        "subtotal": 18,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 88,
+        "subtotal": 1232,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 66,
+        "subtotal": 792,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 88,
+        "subtotal": 3520,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 5592,
+    "deposit": 5592,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:28.302088+00:00"
   },
   {
     "id": "PED-103",
-    "orderNumber": "PED-103",
-    "customerId": "cli-1",
-    "customerName": "Familia Brito (Don Toño)",
+    "order_number": "PED-103",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
     "phone": "55 9988 7766",
-    "branchId": "branch-flores",
-    "branchName": "Sucursal Las Flores (Plaza)",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
     "description": "Pastel Mil Hojas de Chocolate y Café con nuez garapiñada para cumpleaños familiar",
     "items": [
       {
-        "productId": "prod-8",
         "name": "Pastel Mil Hojas Gourmet Mediano (25 personas)",
+        "notes": "Crujiente hojaldre de mantequilla y crema pastelera de café de olla",
         "quantity": 1,
-        "unitPrice": 650,
         "subtotal": 650,
-        "notes": "Crujiente hojaldre de mantequilla y crema pastelera de café de olla"
+        "productId": "prod-8",
+        "unitPrice": 650
       }
     ],
-    "deliveryDate": "2026-09-28",
-    "deliveryTime": "18:00",
-    "deliveryType": "sucursal",
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
     "status": "pendiente",
     "total": 650,
     "deposit": 300,
-    "remainingBalance": 350,
-    "paymentStatus": "anticipo",
-    "paymentMethod": "efectivo",
-    "dedication": "¡Feliz Cumpleaños Don Toño!",
-    "notes": "Elaborar con hojaldre recién horneado ese mismo mediodía.",
-    "createdAt": "2026-09-26T02:58:58.481Z",
+    "remaining_balance": 350,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
     "cashier": "Elena Brito",
-    "payments": [
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:28.168094+00:00"
+  },
+  {
+    "id": "PED-102",
+    "order_number": "PED-102",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "55 8765 4321",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "100 piezas de mini cuernitos rellenos de jamón y queso para evento escolar matutino",
+    "items": [
       {
-        "id": "PAY-103-1",
-        "date": "26/09/26",
-        "amount": 300,
-        "paymentMethod": "efectivo",
-        "cashier": "Elena Brito",
-        "notes": "Anticipo recibido en caja"
+        "name": "Mini Cuernitos Hojaldrados Jamón y Queso",
+        "notes": "Horneados a primera hora para entregar tibios",
+        "quantity": 100,
+        "subtotal": 1200,
+        "productId": "prod-3",
+        "unitPrice": 12
       }
-    ]
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "listo",
+    "total": 1200,
+    "deposit": 1200,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:28.04854+00:00"
   },
   {
     "id": "PED-104",
-    "orderNumber": "PED-104",
-    "customerId": "cli-4",
-    "customerName": "Sra. Carmen Salazar",
+    "order_number": "PED-104",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
     "phone": "55 4567 8901",
-    "branchId": "branch-matriz",
-    "branchName": "Sucursal Matriz (Centro)",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
     "description": "Charola de 50 piezas de pan dulce surtido para desayuno corporativo",
     "items": [
       {
-        "productId": "prod-1",
         "name": "Conchas de Vainilla",
         "quantity": 20,
-        "unitPrice": 12,
-        "subtotal": 240
+        "subtotal": 240,
+        "productId": "prod-1",
+        "unitPrice": 12
       },
       {
-        "productId": "prod-7",
         "name": "Donas Glaseadas",
         "quantity": 15,
-        "unitPrice": 13,
-        "subtotal": 195
+        "subtotal": 195,
+        "productId": "prod-7",
+        "unitPrice": 13
       },
       {
-        "productId": "prod-6",
         "name": "Orejas de Mantequilla",
         "quantity": 15,
-        "unitPrice": 14,
-        "subtotal": 210
+        "subtotal": 210,
+        "productId": "prod-6",
+        "unitPrice": 14
       }
     ],
-    "deliveryDate": "2026-09-26",
-    "deliveryTime": "07:30",
-    "deliveryType": "domicilio",
-    "deliveryAddress": "Av. Reforma #500, Piso 4, Corporativo Reforma",
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
     "status": "entregado",
     "total": 645,
     "deposit": 645,
-    "remainingBalance": 0,
-    "paymentStatus": "liquidado",
-    "paymentMethod": "tarjeta",
-    "dedication": "Reunión Directiva Semanal",
-    "notes": "Llevar terminal para cobro o comprobante.",
-    "createdAt": "2026-09-25T02:58:58.481Z",
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
     "cashier": "Lupita Brito",
-    "payments": [
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:27.925238+00:00"
+  },
+  {
+    "id": "PED-146",
+    "order_number": "PED-146",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "19291212812",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "9x Concha de Vainilla, 99x Concha de Chocolate",
+    "items": [
       {
-        "id": "PAY-104-1",
-        "date": "24/09/26",
-        "amount": 300,
-        "paymentMethod": "tarjeta",
-        "cashier": "Lupita Brito",
-        "notes": "Anticipo inicial"
+        "name": "Concha de Vainilla",
+        "quantity": 9,
+        "subtotal": 108,
+        "productId": "prod-1",
+        "unitPrice": 12
       },
       {
-        "id": "PAY-104-2",
-        "date": "26/09/26",
-        "amount": 345,
-        "paymentMethod": "tarjeta",
-        "cashier": "Lupita Brito",
-        "notes": "Liquidación en entrega"
+        "name": "Concha de Chocolate",
+        "quantity": 99,
+        "subtotal": 1188,
+        "productId": "prod-2",
+        "unitPrice": 12
       }
-    ]
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 1296,
+    "deposit": 1296,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:27.805751+00:00"
+  },
+  {
+    "id": "PED-147",
+    "order_number": "PED-147",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "55 9988 1122",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "90x Dona Glaseada",
+    "items": [
+      {
+        "name": "Dona Glaseada",
+        "quantity": 90,
+        "subtotal": 1170,
+        "productId": "prod-7",
+        "unitPrice": 13
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 1170,
+    "deposit": 1170,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:27.678914+00:00"
+  },
+  {
+    "id": "PED-101",
+    "order_number": "PED-101",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "55 1234 5678",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "Pastel 3 Leches relleno de durazno, 50 personas, temático de XV años (flores lilas)",
+    "items": [
+      {
+        "name": "Pastel 3 Leches Artesanal Grande (50 personas)",
+        "notes": "Relleno de duraznos en almíbar y cubierta en crema chantilly lila",
+        "quantity": 1,
+        "subtotal": 850,
+        "productId": "prod-8",
+        "unitPrice": 850
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "notes": "Para mesa de postres",
+        "quantity": 1,
+        "subtotal": 100,
+        "productId": "prod-9",
+        "unitPrice": 100
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 950,
+    "deposit": 500,
+    "remaining_balance": 450,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Lupita Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:27.543658+00:00"
+  },
+  {
+    "id": "PED-145",
+    "order_number": "PED-145",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "696785865",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "98x Empanada de Calabaza, 1x Pay de Queso con Zarzamora, 78x Oreja Hojaldrada, 1x Telera para Torta, 2x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Empanada de Calabaza",
+        "quantity": 98,
+        "subtotal": 1764,
+        "productId": "prod-12",
+        "unitPrice": 18
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 1,
+        "subtotal": 40,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 78,
+        "subtotal": 1092,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 1,
+        "subtotal": 6,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 2,
+        "subtotal": 30,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 2932,
+    "deposit": 2932,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:27.42689+00:00"
+  },
+  {
+    "id": "PED-148",
+    "order_number": "PED-148",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "234234234",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "999x Dona Glaseada, 122x Cuerno de Mantequilla",
+    "items": [
+      {
+        "name": "Dona Glaseada",
+        "quantity": 999,
+        "subtotal": 12987,
+        "productId": "prod-7",
+        "unitPrice": 13
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 122,
+        "subtotal": 1830,
+        "productId": "prod-3",
+        "unitPrice": 15
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 14817,
+    "deposit": 7408.5,
+    "remaining_balance": 7408.5,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:27.306444+00:00"
+  },
+  {
+    "id": "PED-149",
+    "order_number": "PED-149",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "55 9988 1122",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "90x Concha de Chocolate, 22x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 90,
+        "subtotal": 1080,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 22,
+        "subtotal": 880,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 1960,
+    "deposit": 980,
+    "remaining_balance": 980,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:27.177692+00:00"
+  },
+  {
+    "id": "PED-150",
+    "order_number": "PED-150",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "65765765",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "9x Harina de Trigo San Antonio 1kg, 33x Concha de Vainilla, 11x Concha de Chocolate, 44x Cuerno de Mantequilla, 1x Pay de Queso con Zarzamora, 3x Rebanada Pastel 3 Leches, 22x Dona Glaseada, 44x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 9,
+        "subtotal": 198,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 33,
+        "subtotal": 396,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 11,
+        "subtotal": 132,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 44,
+        "subtotal": 660,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 1,
+        "subtotal": 40,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 3,
+        "subtotal": 135,
+        "productId": "prod-8",
+        "unitPrice": 45
+      },
+      {
+        "name": "Dona Glaseada",
+        "quantity": 22,
+        "subtotal": 286,
+        "productId": "prod-7",
+        "unitPrice": 13
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 44,
+        "subtotal": 616,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 2463,
+    "deposit": 2463,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:27.067107+00:00"
+  },
+  {
+    "id": "PED-151",
+    "order_number": "PED-151",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "65765765",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "1099x Rebanada Pastel 3 Leches, 888x Dona Glaseada, 5x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 1099,
+        "subtotal": 49455,
+        "productId": "prod-8",
+        "unitPrice": 45
+      },
+      {
+        "name": "Dona Glaseada",
+        "quantity": 888,
+        "subtotal": 11544,
+        "productId": "prod-7",
+        "unitPrice": 13
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 5,
+        "subtotal": 200,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 61199,
+    "deposit": 60000,
+    "remaining_balance": 1199,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:26.958896+00:00"
+  },
+  {
+    "id": "PED-152",
+    "order_number": "PED-152",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "11221212121",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "88x Cuerno de Mantequilla, 22x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 88,
+        "subtotal": 1320,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 22,
+        "subtotal": 880,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 2200,
+    "deposit": 2200,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:26.849177+00:00"
+  },
+  {
+    "id": "PED-154",
+    "order_number": "PED-154",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "23422389234",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "700x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 700,
+        "subtotal": 9800,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 9800,
+    "deposit": 9800,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:26.733212+00:00"
+  },
+  {
+    "id": "PED-155",
+    "order_number": "PED-155",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "237y278323",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "788x Concha de Vainilla, 34x Concha de Chocolate, 199x Oreja Hojaldrada",
+    "items": [
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 788,
+        "subtotal": 9456,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 34,
+        "subtotal": 408,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 199,
+        "subtotal": 2786,
+        "productId": "prod-6",
+        "unitPrice": 14
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 12650,
+    "deposit": 12650,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Cajera 1 - Turno Matutino",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:26.592579+00:00"
+  },
+  {
+    "id": "PED-156",
+    "order_number": "PED-156",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "55 9988 1122",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "10000x Harina de Trigo San Antonio 1kg",
+    "items": [
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 10000,
+        "subtotal": 220000,
+        "productId": "prod-14",
+        "unitPrice": 22
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "listo",
+    "total": 220000,
+    "deposit": 220000,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:26.476861+00:00"
+  },
+  {
+    "id": "PED-157",
+    "order_number": "PED-157",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "1231231",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "22x Concha de Chocolate, 333x Concha de Vainilla, 89x Cuerno de Mantequilla, 900x Bolillo Tradicional",
+    "items": [
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 22,
+        "subtotal": 264,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 333,
+        "subtotal": 3996,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 89,
+        "subtotal": 1335,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 900,
+        "subtotal": 4500,
+        "productId": "prod-4",
+        "unitPrice": 5
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "entregado",
+    "total": 10095,
+    "deposit": 10095,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Cajera 1 - Turno Matutino",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:26.362891+00:00"
+  },
+  {
+    "id": "PED-142",
+    "order_number": "PED-142",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "7731234567",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "pastel de 3 leches con zanahoria",
+    "items": [
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 3,
+        "subtotal": 135,
+        "productId": "prod-8",
+        "unitPrice": 45
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 135,
+    "deposit": 67.5,
+    "remaining_balance": 67.5,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:26.22868+00:00"
+  },
+  {
+    "id": "PED-143",
+    "order_number": "PED-143",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "1234567890",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "1x Concha de Vainilla, 1x Concha de Chocolate, 1x Cuerno de Mantequilla, 1x Telera para Torta",
+    "items": [
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 1,
+        "subtotal": 12,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 1,
+        "subtotal": 12,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 1,
+        "subtotal": 15,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 1,
+        "subtotal": 6,
+        "productId": "prod-5",
+        "unitPrice": 6
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 45,
+    "deposit": 22.5,
+    "remaining_balance": 22.5,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:26.101085+00:00"
+  },
+  {
+    "id": "PED-144",
+    "order_number": "PED-144",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "55 1234 5678",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "1x Dona Glaseada, 1x Rebanada Pastel 3 Leches, 1x Pay de Queso con Zarzamora",
+    "items": [
+      {
+        "name": "Dona Glaseada",
+        "quantity": 1,
+        "subtotal": 13,
+        "productId": "prod-7",
+        "unitPrice": 13
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 1,
+        "subtotal": 45,
+        "productId": "prod-8",
+        "unitPrice": 45
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 1,
+        "subtotal": 40,
+        "productId": "prod-9",
+        "unitPrice": 40
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 98,
+    "deposit": 49,
+    "remaining_balance": 49,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:25.980121+00:00"
+  },
+  {
+    "id": "PED-153",
+    "order_number": "PED-153",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "2234567876",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "2x Chocolate Caliente con Leche, 2x Pay de Queso con Zarzamora, 2x Rebanada Pastel 3 Leches, 1x Bolillo Tradicional, 1x Café de Olla Caliente",
+    "items": [
+      {
+        "name": "Chocolate Caliente con Leche",
+        "quantity": 2,
+        "subtotal": 60,
+        "productId": "prod-11",
+        "unitPrice": 30
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 2,
+        "subtotal": 80,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 2,
+        "subtotal": 90,
+        "productId": "prod-8",
+        "unitPrice": 45
+      },
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 1,
+        "subtotal": 5,
+        "productId": "prod-4",
+        "unitPrice": 5
+      },
+      {
+        "name": "Café de Olla Caliente",
+        "quantity": 1,
+        "subtotal": 25,
+        "productId": "prod-10",
+        "unitPrice": 25
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 260,
+    "deposit": 130,
+    "remaining_balance": 130,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "andres contreras sanchez",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:25.855993+00:00"
+  },
+  {
+    "id": "PED-159",
+    "order_number": "PED-159",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "239874y298y98234",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "213x Cuerno de Mantequilla, 123x Pay de Queso con Zarzamora, 92x Harina de Trigo San Antonio 1kg, 333x Empanada de Calabaza",
+    "items": [
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 213,
+        "subtotal": 3195,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Pay de Queso con Zarzamora",
+        "quantity": 123,
+        "subtotal": 4920,
+        "productId": "prod-9",
+        "unitPrice": 40
+      },
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 92,
+        "subtotal": 2024,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Empanada de Calabaza",
+        "quantity": 333,
+        "subtotal": 5994,
+        "productId": "prod-12",
+        "unitPrice": 18
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 16133,
+    "deposit": 10000,
+    "remaining_balance": 6133,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:25.742296+00:00"
+  },
+  {
+    "id": "PED-160",
+    "order_number": "PED-160",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "12211221",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "788x Harina de Trigo San Antonio 1kg, 34x Concha de Vainilla, 79x Concha de Chocolate",
+    "items": [
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 788,
+        "subtotal": 17336,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 34,
+        "subtotal": 408,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 79,
+        "subtotal": 948,
+        "productId": "prod-2",
+        "unitPrice": 12
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 18692,
+    "deposit": 10000,
+    "remaining_balance": 8692,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:25.628396+00:00"
+  },
+  {
+    "id": "PED-161",
+    "order_number": "PED-161",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "21 7128 1233",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "89x Concha de Chocolate, 10999x Cuerno de Mantequilla, 13x Bolillo Tradicional, 2x Concha de Vainilla",
+    "items": [
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 89,
+        "subtotal": 1068,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 10999,
+        "subtotal": 164985,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 13,
+        "subtotal": 65,
+        "productId": "prod-4",
+        "unitPrice": 5
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 2,
+        "subtotal": 24,
+        "productId": "prod-1",
+        "unitPrice": 12
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 166142,
+    "deposit": 83071,
+    "remaining_balance": 83071,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:25.507747+00:00"
+  },
+  {
+    "id": "PED-162",
+    "order_number": "PED-162",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "71271281",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "899x Concha de Vainilla, 43x Concha de Chocolate, 66x Cuerno de Mantequilla, 33x Bolillo Tradicional",
+    "items": [
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 899,
+        "subtotal": 10788,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 43,
+        "subtotal": 516,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 66,
+        "subtotal": 990,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 33,
+        "subtotal": 165,
+        "productId": "prod-4",
+        "unitPrice": 5
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "listo",
+    "total": 12459,
+    "deposit": 12459,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:25.392671+00:00"
+  },
+  {
+    "id": "PED-158",
+    "order_number": "PED-158",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "21 7128 1233",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "222x Concha de Vainilla, 31x Cuerno de Mantequilla, 28x Bolillo Tradicional",
+    "items": [
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 222,
+        "subtotal": 2664,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 31,
+        "subtotal": 465,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Bolillo Tradicional",
+        "quantity": 28,
+        "subtotal": 140,
+        "productId": "prod-4",
+        "unitPrice": 5
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "listo",
+    "total": 3269,
+    "deposit": 1634.5,
+    "remaining_balance": 1634.5,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:25.256081+00:00"
+  },
+  {
+    "id": "PED-163",
+    "order_number": "PED-163",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "2211445566",
+    "branch_id": "branch-benito",
+    "branch_name": "Sucursal San Benito (Mercado)",
+    "description": "1x Concha de Vainilla, 1x Concha de Chocolate, 1x Cuerno de Mantequilla, 1x Telera para Torta, 1x Dona Glaseada, 1x Rebanada Pastel 3 Leches",
+    "items": [
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 1,
+        "subtotal": 12,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 1,
+        "subtotal": 12,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Cuerno de Mantequilla",
+        "quantity": 1,
+        "subtotal": 15,
+        "productId": "prod-3",
+        "unitPrice": 15
+      },
+      {
+        "name": "Telera para Torta",
+        "quantity": 1,
+        "subtotal": 6,
+        "productId": "prod-5",
+        "unitPrice": 6
+      },
+      {
+        "name": "Dona Glaseada",
+        "quantity": 1,
+        "subtotal": 13,
+        "productId": "prod-7",
+        "unitPrice": 13
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 1,
+        "subtotal": 45,
+        "productId": "prod-8",
+        "unitPrice": 45
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 103,
+    "deposit": 51.5,
+    "remaining_balance": 51.5,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "andres sanchez",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:25.132743+00:00"
+  },
+  {
+    "id": "PED-164",
+    "order_number": "PED-164",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "7731109988",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "6x croasaen",
+    "items": [
+      {
+        "name": "croasaen",
+        "quantity": 6,
+        "subtotal": 120,
+        "productId": "prod-1790889708970",
+        "unitPrice": 20
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 120,
+    "deposit": 60,
+    "remaining_balance": 60,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "andres sanchez",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:25.013426+00:00"
+  },
+  {
+    "id": "PED-165",
+    "order_number": "PED-165",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "123456789",
+    "branch_id": "branch-1790889237862",
+    "branch_name": "san ildefonso hgo",
+    "description": "8x croasaen",
+    "items": [
+      {
+        "name": "croasaen",
+        "quantity": 8,
+        "subtotal": 160,
+        "productId": "prod-1790889708970",
+        "unitPrice": 20
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 160,
+    "deposit": 80,
+    "remaining_balance": 80,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "andres sanchez",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:24.898307+00:00"
+  },
+  {
+    "id": "PED-166",
+    "order_number": "PED-166",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "223344556",
+    "branch_id": "branch-1790889237862",
+    "branch_name": "san ildefonso hgo",
+    "description": "10x Concha de Vainilla",
+    "items": [
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 10,
+        "subtotal": 120,
+        "productId": "prod-1",
+        "unitPrice": 12
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 120,
+    "deposit": 60,
+    "remaining_balance": 60,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "andres sanchez",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:24.781576+00:00"
+  },
+  {
+    "id": "PED-167",
+    "order_number": "PED-167",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "12838213812",
+    "branch_id": "branch-matriz",
+    "branch_name": "Sucursal Matriz (Centro)",
+    "description": "821x Harina de Trigo San Antonio 1kg, 123x Concha de Vainilla, 425x Concha de Chocolate, 453x Oreja Hojaldrada, 934x Rebanada Pastel 3 Leches",
+    "items": [
+      {
+        "name": "Harina de Trigo San Antonio 1kg",
+        "quantity": 821,
+        "subtotal": 18062,
+        "productId": "prod-14",
+        "unitPrice": 22
+      },
+      {
+        "name": "Concha de Vainilla",
+        "quantity": 123,
+        "subtotal": 1476,
+        "productId": "prod-1",
+        "unitPrice": 12
+      },
+      {
+        "name": "Concha de Chocolate",
+        "quantity": 425,
+        "subtotal": 5100,
+        "productId": "prod-2",
+        "unitPrice": 12
+      },
+      {
+        "name": "Oreja Hojaldrada",
+        "quantity": 453,
+        "subtotal": 6342,
+        "productId": "prod-6",
+        "unitPrice": 14
+      },
+      {
+        "name": "Rebanada Pastel 3 Leches",
+        "quantity": 934,
+        "subtotal": 42030,
+        "productId": "prod-8",
+        "unitPrice": 45
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 73010,
+    "deposit": 73010,
+    "remaining_balance": 0,
+    "payment_status": "liquidado",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:24.659543+00:00"
+  },
+  {
+    "id": "PED-168",
+    "order_number": "PED-168",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "12134567909",
+    "branch_id": "branch-1790889237862",
+    "branch_name": "san ildefonso hgo",
+    "description": "6x Telera para Torta",
+    "items": [
+      {
+        "name": "Telera para Torta",
+        "quantity": 6,
+        "subtotal": 36,
+        "productId": "prod-5",
+        "unitPrice": 6
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 36,
+    "deposit": 18,
+    "remaining_balance": 18,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "Don Toño Brito",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:24.539633+00:00"
+  },
+  {
+    "id": "PED-169",
+    "order_number": "PED-169",
+    "customer_id": null,
+    "customer_name": "Cliente Mostrador",
+    "phone": "2233445566",
+    "branch_id": "branch-flores",
+    "branch_name": "Sucursal Las Flores (Plaza)",
+    "description": "6x Dona Glaseada",
+    "items": [
+      {
+        "name": "Dona Glaseada",
+        "quantity": 6,
+        "subtotal": 78,
+        "productId": "prod-7",
+        "unitPrice": 13
+      }
+    ],
+    "delivery_date": "2026-10-07",
+    "delivery_time": "12:00",
+    "delivery_type": "sucursal",
+    "delivery_address": null,
+    "status": "pendiente",
+    "total": 78,
+    "deposit": 39,
+    "remaining_balance": 39,
+    "payment_status": "anticipo",
+    "payment_method": "efectivo",
+    "payments": [],
+    "dedication": null,
+    "notes": null,
+    "cashier": "andres sanchez",
+    "shift_name": null,
+    "created_at": "2026-10-02T18:21:24.413067+00:00"
   }
 ]

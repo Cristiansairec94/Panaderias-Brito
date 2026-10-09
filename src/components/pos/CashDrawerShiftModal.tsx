@@ -727,7 +727,8 @@ export default function CashDrawerShiftModal({
       cutId: cutRecord.id,
       branchId: cutRecord.branchId || resolveBranchId(currentBranch?.id || branchId, outgoingCashier),
       branchName: cutRecord.branchName || "Sucursal",
-      timeAgo: "Hace un momento",
+      timeAgo: `${currentTime} hrs`,
+      timestamp: cutRecord.timestamp || Date.now(),
       group: "recientes",
       read: false,
     };

@@ -48,6 +48,17 @@ export default function MobileBottomNav() {
 
   const isAdmin = !user || user.role === "admin" || user.role === "auxiliar_admin";
 
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!showNotifications) return;
+    setNow(Date.now());
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showNotifications]);
+
   useEffect(() => {
     if (!isAdmin && activeTab === "cortes") {
       setActiveTab("all");
@@ -274,6 +285,7 @@ export default function MobileBottomNav() {
                         <NotificationItem
                           key={notif.id}
                           notif={notif}
+                          now={now}
                           getBadgeIcon={getBadgeIcon}
                           markAsRead={markAsRead}
                           markAsUnread={markAsUnread}
@@ -297,6 +309,7 @@ export default function MobileBottomNav() {
                         <NotificationItem
                           key={notif.id}
                           notif={notif}
+                          now={now}
                           getBadgeIcon={getBadgeIcon}
                           markAsRead={markAsRead}
                           markAsUnread={markAsUnread}

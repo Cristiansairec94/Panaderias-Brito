@@ -67,23 +67,33 @@ export default function OrderPaymentModal({
 
     setIsSubmitting(true);
     try {
-      const operatingBranchId = currentBranch?.id || order.branchId || "branch-matriz";
-      const operatingBranchName = currentBranch?.name || order.branchName || "Sucursal Matriz (Centro)";
+      const paymentBranchId = currentBranch?.id || order.branchId || "branch-matriz";
+      const paymentBranchName = currentBranch?.name || order.branchName || "Sucursal Matriz (Centro)";
+
+      const originBranchId = order.operatingBranchId || order.branchId || "branch-matriz";
+      const originBranchName = order.operatingBranchName || order.branchName || "Sucursal Matriz (Centro)";
+
+      const pickupBranchId = order.branchId || paymentBranchId;
+      const pickupBranchName = order.branchName || paymentBranchName;
+
+      const isDeliveredNow = Boolean(markAsDelivered && numericAmount === order.remainingBalance);
+      const isFullyPaid = numericAmount >= order.remainingBalance;
+      const newRemaining = Math.max(0, order.remainingBalance - numericAmount);
 
       addOrderPayment(order.id, {
         amount: numericAmount,
         paymentMethod,
         cashier: user?.name || "Cajero en Turno",
-        operatingBranchId,
-        operatingBranchName,
+        operatingBranchId: paymentBranchId,
+        operatingBranchName: paymentBranchName,
         notes: notes.trim() || undefined,
-        markAsDelivered: markAsDelivered && numericAmount === order.remainingBalance,
+        markAsDelivered: isDeliveredNow,
       });
 
       if (numericAmount > 0) {
         try {
           registerRealSale(
-            operatingBranchId,
+            paymentBranchId,
             numericAmount,
             paymentMethod,
             user?.name || "Cajero en Turno",
@@ -94,28 +104,49 @@ export default function OrderPaymentModal({
         }
 
         try {
-          const isFullyPaid = numericAmount >= order.remainingBalance;
-          const newRemaining = Math.max(0, order.remainingBalance - numericAmount);
+          const isCross = originBranchName.toLowerCase().trim() !== paymentBranchName.toLowerCase().trim();
+
+          const notifTitle = isDeliveredNow
+            ? `Pedido Liquidado y Entregado ${order.orderNumber}: ${formatCurrency(numericAmount)}`
+            : isFullyPaid
+            ? `Pedido Liquidado ${order.orderNumber}: ${formatCurrency(numericAmount)}`
+            : `Abono de Pedido ${order.orderNumber}: ${formatCurrency(numericAmount)}`;
+
+          const notifHighlight = `${order.customerName} - ${isFullyPaid ? "100% Pagado" : `Resta: ${formatCurrency(newRemaining)}`}${isDeliveredNow ? " • Entregado" : ""}`;
+
+          const notifDescription = isCross
+            ? `Se cobró ${formatCurrency(numericAmount)} (${paymentMethod}) en ${paymentBranchName}. Pedido originado en ${originBranchName}. ${isDeliveredNow ? "Entregado con éxito al cliente en mostrador." : isFullyPaid ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`
+            : `Se cobró ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isDeliveredNow ? "Entregado con éxito al cliente en mostrador." : isFullyPaid ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`;
+
+          const notifSender = isDeliveredNow
+            ? `📦✅ Pedido Liquidado y Entregado (${paymentBranchName})`
+            : isFullyPaid
+            ? `🎂 Pedido Liquidado (${paymentBranchName})`
+            : `💰 Abono Recibido (${paymentBranchName})`;
+
           addNotification({
             id: `notif-order-pay-${order.id}-${numericAmount}`,
-            senderName: `🎂 ${isFullyPaid ? "Pedido Liquidado" : "Abono Recibido"} (${operatingBranchName})`,
-            senderAvatar: "🎂",
+            timestamp: Date.now(),
+            senderName: notifSender,
+            senderAvatar: isDeliveredNow ? "📦" : "🎂",
             badgeIcon: "pastel",
-            title: `${isFullyPaid ? "Pedido Liquidado" : "Abono de Pedido"} ${order.orderNumber}: ${formatCurrency(numericAmount)}`,
-            highlightText: `${order.customerName} - ${isFullyPaid ? "100% Pagado" : `Resta: ${formatCurrency(newRemaining)}`}`,
-            description: `Se cobró ${formatCurrency(numericAmount)} (${paymentMethod}). Pedido: ${order.description}. ${isFullyPaid ? "Listo para entrega final." : `Saldo restante: ${formatCurrency(newRemaining)}.`}`,
+            title: notifTitle,
+            highlightText: notifHighlight,
+            description: notifDescription,
             category: "pedidos",
             orderId: order.id,
-            branchId: order.branchId,
-            branchName: order.branchName,
-            operatingBranchId: operatingBranchId || order.operatingBranchId,
-            operatingBranchName: operatingBranchName || order.operatingBranchName,
+            branchId: pickupBranchId,
+            branchName: pickupBranchName,
+            operatingBranchId: originBranchId,
+            operatingBranchName: originBranchName,
             actionLabel: newRemaining > 0 ? `Cobrar ${formatCurrency(newRemaining)}` : "Ver Detalle",
             actionLink: "/pedidos",
             secondaryActionLabel: newRemaining > 0 ? "Ver Detalle" : undefined,
             secondaryActionLink: newRemaining > 0 ? "/pedidos" : undefined,
           });
-        } catch (notifErr) {}
+        } catch (notifErr) {
+          console.warn("Could not create payment notification:", notifErr);
+        }
       }
 
       if (typeof window !== "undefined") {

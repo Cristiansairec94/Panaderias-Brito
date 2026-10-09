@@ -24,7 +24,14 @@ import {
   Receipt,
   ShieldCheck
 } from "lucide-react";
-import { useNotifications, FBNotification, findShiftCutForNotification } from "@/context/NotificationContext";
+import { 
+  useNotifications, 
+  FBNotification, 
+  findShiftCutForNotification, 
+  findOrderForNotification,
+  formatLiveNotificationTime,
+  resolveNotificationTimestamp 
+} from "@/context/NotificationContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatCurrency } from "@/lib/utils";
 
@@ -142,6 +149,18 @@ export default function NotificationsDropdown() {
       setActiveTab("all");
     }
   }, [isAdmin, activeTab]);
+
+  // Temporizador en vivo que se actualiza segundo a segundo mientras el panel está abierto
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setNow(Date.now());
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
   const cortesCount = notifications.filter((n) => n.category === "caja").length;
   const pedidosCount = notifications.filter((n) => n.category === "pedidos").length;
@@ -378,6 +397,7 @@ export default function NotificationsDropdown() {
                       <NotificationCardItem
                         key={notif.id}
                         notif={notif}
+                        now={now}
                         getBadgeIcon={getBadgeIcon}
                         markAsRead={markAsRead}
                         markAsUnread={markAsUnread}
@@ -403,6 +423,7 @@ export default function NotificationsDropdown() {
                       <NotificationCardItem
                         key={notif.id}
                         notif={notif}
+                        now={now}
                         getBadgeIcon={getBadgeIcon}
                         markAsRead={markAsRead}
                         markAsUnread={markAsUnread}
@@ -431,32 +452,44 @@ export default function NotificationsDropdown() {
 // Helper to extract structured order data and format clean previews
 function parseOrderNotification(notif: FBNotification) {
   const combined = `${notif.title} ${notif.highlightText} ${notif.description}`;
+  const storedOrder = findOrderForNotification(notif);
 
   // 1. Folio
   const folioMatch = combined.match(/PED-\d+/i);
-  const folio = folioMatch ? folioMatch[0] : (notif.orderId || null);
+  const folio = storedOrder?.orderNumber || (folioMatch ? folioMatch[0] : (notif.orderId || null));
 
   // 2. Customer Name
-  let customer = notif.highlightText || "";
-  if (customer.includes(":")) {
+  let customer = storedOrder?.customerName || notif.highlightText || "";
+  if (!storedOrder?.customerName && customer.includes(":")) {
     const parts = customer.split(":");
     customer = parts.slice(1).join(":").trim();
   }
-  customer = customer
-    .replace(/\s*-\s*Anticipo.*$/i, "")
-    .replace(/\s*-\s*Total.*$/i, "")
-    .replace(/^PED-\d+\s*/i, "")
-    .trim();
+  if (!storedOrder?.customerName) {
+    customer = customer
+      .replace(/\s*-\s*Anticipo.*$/i, "")
+      .replace(/\s*-\s*Total.*$/i, "")
+      .replace(/\s*-\s*Resta.*$/i, "")
+      .replace(/\s*-\s*100%.*$/i, "")
+      .replace(/^PED-\d+\s*/i, "")
+      .trim();
+
+    if (customer.startsWith("$")) {
+      const descNameMatch = notif.description.match(/(?:de|cliente)\s+["']?([A-Za-zÁÉÍÓÚáéíóúñÑ\s]+)["']?/i);
+      if (descNameMatch && descNameMatch[1]) {
+        customer = descNameMatch[1].trim();
+      }
+    }
+  }
 
   // 3. Amounts
   const totalMatch = combined.match(/Total:?\s*\$?([0-9,.]+)/i);
-  const total = totalMatch ? `$${totalMatch[1].replace(/^\$/, "")}` : null;
+  const total = totalMatch ? `$${totalMatch[1].replace(/^\$/, "")}` : (storedOrder?.total ? formatCurrency(storedOrder.total) : null);
 
   const depositMatch = combined.match(/Anticipo:?\s*\$?([0-9,.]+)/i);
-  const deposit = depositMatch ? `$${depositMatch[1].replace(/^\$/, "")}` : null;
+  const deposit = depositMatch ? `$${depositMatch[1].replace(/^\$/, "")}` : (storedOrder?.deposit ? formatCurrency(storedOrder.deposit) : null);
 
-  const remainingMatch = combined.match(/(?:Saldo restante|Cobrar):?\s*\$?([0-9,.]+)/i);
-  const remaining = remainingMatch ? `$${remainingMatch[1].replace(/^\$/, "")}` : null;
+  const remainingMatch = combined.match(/(?:Saldo restante|Cobrar|Resta):?\s*\$?([0-9,.]+)/i);
+  const remaining = remainingMatch ? `$${remainingMatch[1].replace(/^\$/, "")}` : (storedOrder?.remainingBalance !== undefined ? formatCurrency(storedOrder.remainingBalance) : null);
 
   // 4. Cross-Branch Route
   let originBranch = notif.operatingBranchName || "";
@@ -495,6 +528,24 @@ function parseOrderNotification(notif: FBNotification) {
     cleanDesc = notif.description;
   }
 
+  // 6. Flags de Pago y Entrega
+  const isPaid =
+    combined.toLowerCase().includes("liquidado") ||
+    combined.toLowerCase().includes("100% pagado") ||
+    (notif.title && notif.title.toLowerCase().includes("liquidado")) ||
+    (notif.title && notif.title.toLowerCase().includes("pagado")) ||
+    (remainingMatch && (remainingMatch[1] === "0" || remainingMatch[1] === "0.00"));
+
+  const isDelivered =
+    combined.toLowerCase().includes("entregad") ||
+    (notif.title && notif.title.toLowerCase().includes("entregado"));
+
+  const isPaymentEvent =
+    (notif.id && notif.id.includes("order-pay")) ||
+    notif.title.toLowerCase().includes("liquidado") ||
+    notif.title.toLowerCase().includes("abono") ||
+    notif.highlightText.toLowerCase().includes("pagado");
+
   return {
     folio,
     customer,
@@ -505,12 +556,16 @@ function parseOrderNotification(notif: FBNotification) {
     destBranch,
     isCross,
     cleanDesc,
+    isPaid,
+    isDelivered,
+    isPaymentEvent,
   };
 }
 
 // Subcomponent for individual card item styled with elegant bakery aesthetics
 function NotificationCardItem({
   notif,
+  now,
   getBadgeIcon,
   markAsRead,
   markAsUnread,
@@ -520,6 +575,7 @@ function NotificationCardItem({
   onCloseDropdown,
 }: {
   notif: FBNotification;
+  now?: number;
   getBadgeIcon: (icon: FBNotification["badgeIcon"]) => React.ReactNode;
   markAsRead: (id: string) => void;
   markAsUnread: (id: string) => void;
@@ -531,6 +587,10 @@ function NotificationCardItem({
   const [isExpanded, setIsExpanded] = useState(false);
   const { openOrderDetail, openOrderPayment, openShiftCutDetail } = useNotifications();
   const isMenuOpen = activeItemMenu === notif.id;
+
+  const currentNow = now || Date.now();
+  const resolvedTs = resolveNotificationTimestamp(notif);
+  const timeInfo = formatLiveNotificationTime(resolvedTs, currentNow);
 
   const isShiftCut =
     notif.category === "caja" ||
@@ -603,9 +663,29 @@ function NotificationCardItem({
           )}
 
           {isOrder && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-pink-100 via-rose-100 to-amber-100 text-pink-900 border border-pink-300/80 shadow-2xs">
-              🎂 PEDIDO DE CLIENTE
-            </span>
+            <>
+              {parsedOrder?.isPaid && parsedOrder?.isDelivered ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-950 border border-emerald-300 shadow-2xs">
+                  ✅📦 PAGADO Y ENTREGADO
+                </span>
+              ) : parsedOrder?.isPaid ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs">
+                  ✅ PEDIDO LIQUIDADO
+                </span>
+              ) : parsedOrder?.isDelivered ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-300 shadow-2xs">
+                  📦 PEDIDO ENTREGADO
+                </span>
+              ) : parsedOrder?.isPaymentEvent ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                  💰 ABONO RECIBIDO
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-pink-100 via-rose-100 to-amber-100 text-pink-900 border border-pink-300/80 shadow-2xs">
+                  🎂 PEDIDO DE CLIENTE
+                </span>
+              )}
+            </>
           )}
 
           {parsedOrder?.isCross && (
@@ -617,9 +697,21 @@ function NotificationCardItem({
           )}
         </div>
 
-        <span className="text-[11px] font-semibold text-stone-400 shrink-0 ml-auto">
-          {notif.timeAgo}
-        </span>
+        <div
+          className="flex items-center gap-1.5 ml-auto shrink-0 bg-stone-100/90 hover:bg-amber-100/70 px-2.5 py-0.5 rounded-full border border-stone-200/80 text-[11px] font-semibold transition-colors cursor-help shadow-2xs"
+          title={timeInfo.fullTooltip}
+        >
+          <Clock className={`w-3.5 h-3.5 shrink-0 ${timeInfo.secondsAgo < 60 ? "text-amber-600 animate-pulse" : "text-stone-400"}`} />
+          <span className="font-bold text-stone-900 font-mono tracking-tight">{timeInfo.exactTime}</span>
+          {timeInfo.secondsAgo >= 60 && (
+            <>
+              <span className="text-stone-300 font-bold">•</span>
+              <span className="font-medium text-stone-500 font-mono">
+                {timeInfo.liveTimeAgo}
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Main Row: Avatar + Structured Info */}
@@ -646,16 +738,21 @@ function NotificationCardItem({
         <div className="flex-1 min-w-0 pr-0.5 space-y-1">
           {isOrder && parsedOrder ? (
             <>
-              {/* Header Title with Folio and Customer */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {parsedOrder.folio && (
-                  <span className="text-[10px] font-mono font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-1.5 py-0.2 rounded-md">
-                    {parsedOrder.folio}
-                  </span>
-                )}
-                <h5 className="text-xs sm:text-[13px] font-bold text-stone-900 leading-snug truncate">
+              {/* Header Title with Folio, Action Title, and Customer */}
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {parsedOrder.folio && (
+                    <span className="text-[10px] font-mono font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-1.5 py-0.2 rounded-md">
+                      {parsedOrder.folio}
+                    </span>
+                  )}
+                  <h5 className="text-xs sm:text-[13px] font-bold text-stone-900 leading-snug">
+                    {notif.title || `Pedido ${parsedOrder.folio || ""}`}
+                  </h5>
+                </div>
+                <p className="text-[11px] font-semibold text-stone-600 truncate">
                   👤 {parsedOrder.customer || notif.highlightText}
-                </h5>
+                </p>
               </div>
 
               {/* Colorful Financial Pills Row */}
@@ -665,14 +762,27 @@ function NotificationCardItem({
                     Total: <strong className="font-mono font-black text-stone-900">{parsedOrder.total}</strong>
                   </span>
                 )}
-                {parsedOrder.deposit && (
-                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                    Anticipo: <strong className="font-mono font-black text-emerald-700">{parsedOrder.deposit}</strong>
+                {parsedOrder.isPaid ? (
+                  <span className="text-[11px] font-black text-emerald-900 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 font-mono">
+                    ✓ 100% Pagado
                   </span>
+                ) : (
+                  <>
+                    {parsedOrder.deposit && (
+                      <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                        Anticipo: <strong className="font-mono font-black text-emerald-700">{parsedOrder.deposit}</strong>
+                      </span>
+                    )}
+                    {parsedOrder.remaining && (
+                      <span className="text-[11px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-300">
+                        Por Cobrar: <strong className="font-mono font-black text-amber-800">{parsedOrder.remaining}</strong>
+                      </span>
+                    )}
+                  </>
                 )}
-                {parsedOrder.remaining && (
-                  <span className="text-[11px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-300">
-                    Por Cobrar: <strong className="font-mono font-black text-amber-800">{parsedOrder.remaining}</strong>
+                {parsedOrder.isDelivered && (
+                  <span className="text-[11px] font-black text-blue-900 bg-blue-100/90 px-2.5 py-0.5 rounded-lg border border-blue-300 font-mono">
+                    ✓ Entregado
                   </span>
                 )}
               </div>
@@ -965,7 +1075,7 @@ function NotificationCardItem({
                   markAsRead(notif.id);
                   onCloseDropdown();
                   const label = (notif.actionLabel || "").toLowerCase();
-                  if (label.includes("cobrar") || label.includes("pagar")) {
+                  if ((label.includes("cobrar") || label.includes("pagar")) && !parsedOrder?.isPaid) {
                     openOrderPayment(notif);
                   } else {
                     openOrderDetail(notif);
@@ -973,7 +1083,9 @@ function NotificationCardItem({
                 }}
                 className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-all truncate cursor-pointer active:scale-95"
               >
-                {notif.actionLabel || "Ver Detalle"}
+                {(notif.actionLabel || "").toLowerCase().includes("cobrar") && parsedOrder?.isPaid
+                  ? "Ver Detalle"
+                  : notif.actionLabel || "Ver Detalle"}
               </button>
               <button
                 type="button"
@@ -1027,7 +1139,7 @@ function NotificationCardItem({
               markAsRead(notif.id);
               onCloseDropdown();
               const label = (notif.actionLabel || "").toLowerCase();
-              if (label.includes("cobrar") || label.includes("pagar")) {
+              if ((label.includes("cobrar") || label.includes("pagar")) && !parsedOrder?.isPaid) {
                 openOrderPayment(notif);
               } else {
                 openOrderDetail(notif);
@@ -1036,7 +1148,9 @@ function NotificationCardItem({
             className="w-full bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer active:scale-98"
           >
             <span>
-              {notif.actionLabel === "Ver Pedidos" || notif.actionLabel === "Ver Pedido"
+              {(notif.actionLabel === "Ver Pedidos" || notif.actionLabel === "Ver Pedido")
+                ? "Ver Detalle del Pedido"
+                : (notif.actionLabel || "").toLowerCase().includes("cobrar") && parsedOrder?.isPaid
                 ? "Ver Detalle del Pedido"
                 : notif.actionLabel}
             </span>

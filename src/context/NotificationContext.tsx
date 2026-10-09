@@ -34,6 +34,7 @@ export interface FBNotification {
   branchName?: string;
   operatingBranchId?: string;
   operatingBranchName?: string;
+  timestamp?: number;
 }
 
 export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
@@ -41,20 +42,36 @@ export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
 
   const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
 
+  // Si es un pedido de pan/pastelería explícito, siempre se evalúa como pedido
+  const isPedido =
+    notif.category === "pedidos" ||
+    Boolean(notif.orderId) ||
+    text.includes("pedido") ||
+    text.includes("encargo") ||
+    text.includes("apartado") ||
+    text.includes("anticipo") ||
+    text.includes("liquidado") ||
+    text.includes("abono") ||
+    text.includes("entregad") ||
+    text.includes("ped-");
+
   // 1. Bloqueo estricto: Cero notificaciones de almacén, inventario, producción de hornos, insumos o escaneos
+  // (EXCEPTO si es un evento de pedido legítimo)
   if (
-    notif.category === "inventario" ||
-    notif.category === "produccion" ||
-    text.includes("almacén") ||
-    text.includes("almacen") ||
-    text.includes("stock") ||
-    text.includes("harina") ||
-    text.includes("insumo") ||
-    text.includes("horno") ||
-    text.includes("camioneta") ||
-    text.includes("código") ||
-    text.includes("codigo") ||
-    text.includes("código de barras")
+    !isPedido && (
+      notif.category === "inventario" ||
+      notif.category === "produccion" ||
+      text.includes("almacén") ||
+      text.includes("almacen") ||
+      text.includes("stock") ||
+      text.includes("harina") ||
+      text.includes("insumo") ||
+      text.includes("horno") ||
+      text.includes("camioneta") ||
+      text.includes("código") ||
+      text.includes("codigo") ||
+      text.includes("código de barras")
+    )
   ) {
     return false;
   }
@@ -72,15 +89,6 @@ export function isAllowedNotification(notif: Partial<FBNotification>): boolean {
     text.includes("cierre de turno") ||
     text.includes("corte de turno");
 
-  // 3. Permitir exclusivamente Pedidos / Encargos de pan y pasteles
-  const isPedido =
-    notif.category === "pedidos" ||
-    text.includes("pedido") ||
-    text.includes("encargo") ||
-    text.includes("apartado") ||
-    text.includes("anticipo") ||
-    text.includes("ped-");
-
   return Boolean(isCierreTurno || isPedido);
 }
 
@@ -95,27 +103,35 @@ export function checkBranchMatch(
   userBranchId?: string,
   userBranchName?: string
 ): boolean {
-  const uId = (userBranchId || "").toLowerCase().trim();
-  const uName = (userBranchName || "").toLowerCase().trim();
+  const stripAccents = (str?: string): string => {
+    return (str || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  };
+
+  const uId = stripAccents(userBranchId);
+  const uName = stripAccents(userBranchName);
 
   // Helper para identificar palabras clave de sucursal
   const getBranchKeywords = (str: string): string[] => {
-    const s = str.toLowerCase();
+    const s = stripAccents(str);
     const keywords: string[] = [];
-    if (s.includes("benito")) keywords.push("benito");
-    if (s.includes("flores")) keywords.push("flores");
-    if (s.includes("matriz") || s.includes("centro")) keywords.push("matriz");
-    if (s.includes("ildefonso")) keywords.push("ildefonso");
-    if (s.includes("angeles") || s.includes("ángeles")) keywords.push("angeles");
-    if (s.includes("sanjuan") || s.includes("san juan")) keywords.push("sanjuan");
+    if (s.includes("benito") || s.includes("ben-02")) keywords.push("benito");
+    if (s.includes("flores") || s.includes("flo-03")) keywords.push("flores");
+    if (s.includes("matriz") || s.includes("centro") || s.includes("mat-01")) keywords.push("matriz");
+    if (s.includes("ildefonso") || s.includes("1790889237862") || s.includes("ilf-04")) keywords.push("ildefonso");
+    if (s.includes("angeles") || s.includes("suc-les")) keywords.push("angeles");
+    if (s.includes("sanjuan") || s.includes("san juan") || s.includes("sju-02")) keywords.push("sanjuan");
     return keywords;
   };
 
   const userKeywords = [...getBranchKeywords(uId), ...getBranchKeywords(uName)];
 
   const checkMatch = (targetId?: string, targetName?: string): boolean => {
-    const tId = (targetId || "").toLowerCase().trim();
-    const tName = (targetName || "").toLowerCase().trim();
+    const tId = stripAccents(targetId);
+    const tName = stripAccents(targetName);
 
     if (uId && tId && (uId === tId || uId.includes(tId) || tId.includes(uId))) {
       return true;
@@ -142,8 +158,8 @@ export function checkBranchMatch(
 
   // 3. Coincidencia por texto libre si hay palabras clave reconocibles
   if (info.fullText && userKeywords.length > 0) {
-    const textLower = info.fullText.toLowerCase();
-    if (userKeywords.some((k) => textLower.includes(k))) {
+    const textNorm = stripAccents(info.fullText);
+    if (userKeywords.some((k) => textNorm.includes(k))) {
       return true;
     }
   }
@@ -176,7 +192,12 @@ export function isSameOrderEvent(a: Partial<FBNotification>, b: Partial<FBNotifi
 
   const isPayment = (n: Partial<FBNotification>) => {
     const t = `${n.id || ""} ${n.title || ""} ${n.highlightText || ""}`.toLowerCase();
-    return t.includes("abono") || t.includes("liquidado") || (n.id || "").includes("order-pay");
+    return t.includes("abono") || t.includes("liquidado") || t.includes("pagado") || (n.id || "").includes("order-pay");
+  };
+
+  const isDelivery = (n: Partial<FBNotification>) => {
+    const t = `${n.id || ""} ${n.title || ""} ${n.highlightText || ""}`.toLowerCase();
+    return t.includes("entregad") || (n.id || "").includes("order-delivered") || ((n.id || "").includes("order-status") && (n.id || "").includes("entregado"));
   };
 
   const isStatus = (n: Partial<FBNotification>) => {
@@ -186,8 +207,25 @@ export function isSameOrderEvent(a: Partial<FBNotification>, b: Partial<FBNotifi
 
   const isPayA = isPayment(a);
   const isPayB = isPayment(b);
+  const isDelivA = isDelivery(a);
+  const isDelivB = isDelivery(b);
   const isStatA = isStatus(a);
   const isStatB = isStatus(b);
+
+  // Un pago y una entrega son eventos DISTINTOS del mismo pedido y no se colapsan entre sí
+  if ((isPayA && isDelivB) || (isDelivA && isPayB)) {
+    return false;
+  }
+
+  // Una creación y un pago son eventos DISTINTOS del mismo pedido
+  if ((!isPayA && isPayB) || (isPayA && !isPayB)) {
+    return false;
+  }
+
+  // Una creación y una entrega son eventos DISTINTOS del mismo pedido
+  if ((!isDelivA && isDelivB) || (isDelivA && !isDelivB)) {
+    return false;
+  }
 
   // Si ambos son pagos del mismo pedido
   if (isPayA && isPayB) {
@@ -200,13 +238,26 @@ export function isSameOrderEvent(a: Partial<FBNotification>, b: Partial<FBNotifi
     return !amtA || !amtB || amtA === amtB;
   }
 
-  // Si ambos son cambios de estado del mismo pedido
-  if (isStatA && isStatB) {
+  // Si ambos son entregas del mismo pedido
+  if (isDelivA && isDelivB) {
     return true;
   }
 
-  // Si ninguno es abono ni cambio de estado, ambos son eventos de alta/creación del mismo pedido
-  if (!isPayA && !isPayB && !isStatA && !isStatB) {
+  // Si ambos son cambios de estado del mismo pedido
+  if (isStatA && isStatB) {
+    const getStatusType = (n: Partial<FBNotification>): string => {
+      const s = `${n.id || ""} ${n.title || ""} ${n.highlightText || ""}`.toLowerCase();
+      if (s.includes("entregad")) return "entregado";
+      if (s.includes("listo")) return "listo";
+      if (s.includes("cancelad") || s.includes("baja")) return "cancelado";
+      if (s.includes("pendiente") || s.includes("preparaci")) return "pendiente";
+      return "status";
+    };
+    return getStatusType(a) === getStatusType(b);
+  }
+
+  // Si ninguno es abono, ni entrega, ni cambio de estado: ambos son eventos de alta/creación del mismo pedido
+  if (!isPayA && !isPayB && !isDelivA && !isDelivB && !isStatA && !isStatB) {
     return true;
   }
 
@@ -214,49 +265,62 @@ export function isSameOrderEvent(a: Partial<FBNotification>, b: Partial<FBNotifi
 }
 
 export function mergeNotifications(existing: FBNotification, incoming: FBNotification): FBNotification {
-  const isCross = Boolean(
-    (incoming.operatingBranchName && incoming.branchName && incoming.operatingBranchName !== incoming.branchName) ||
-    (existing.operatingBranchName && existing.branchName && existing.operatingBranchName !== existing.branchName) ||
-    (incoming.senderName && incoming.senderName.includes("➔")) ||
-    (existing.senderName && existing.senderName.includes("➔")) ||
-    (incoming.title && incoming.title.includes("➔")) ||
-    (existing.title && existing.title.includes("➔"))
-  );
+  const isPayment = (n: Partial<FBNotification>) => {
+    const t = `${n.id || ""} ${n.title || ""} ${n.highlightText || ""}`.toLowerCase();
+    return t.includes("abono") || t.includes("liquidado") || t.includes("pagado") || (n.id || "").includes("order-pay");
+  };
 
-  const bestBranchName = incoming.branchName || existing.branchName || "Sucursal San Ildefonso";
-  const bestOperatingBranchName = incoming.operatingBranchName || existing.operatingBranchName || "Sucursal Los Ángeles";
+  const isDelivery = (n: Partial<FBNotification>) => {
+    const t = `${n.id || ""} ${n.title || ""} ${n.highlightText || ""}`.toLowerCase();
+    return t.includes("entregad") || (n.id || "").includes("order-delivered");
+  };
 
-  let bestSenderName = incoming.senderName || existing.senderName;
-  if (isCross && bestOperatingBranchName && bestBranchName && bestOperatingBranchName !== bestBranchName) {
-    bestSenderName = `🎂 ${bestOperatingBranchName} ➔ ${bestBranchName}`;
-  }
+  const incomingIsPay = isPayment(incoming);
+  const existingIsPay = isPayment(existing);
+  const incomingIsDeliv = isDelivery(incoming);
+  const existingIsDeliv = isDelivery(existing);
 
-  // Extraer el folio para asegurar que el título sea impecable: "Nuevo Pedido PED-189: Total $..."
-  const combined = `${existing.title} ${existing.highlightText} ${existing.description} ${incoming.title} ${incoming.highlightText} ${incoming.description}`;
-  const folioMatch = combined.match(/PED-\d+/i);
-  const totalMatch = combined.match(/Total:?\s*\$?([0-9,.]+)/i);
+  const bestBranchName = incoming.branchName || existing.branchName || "";
+  const bestOperatingBranchName = incoming.operatingBranchName || existing.operatingBranchName || "";
 
-  let bestTitle = existing.title;
-  if (folioMatch && totalMatch) {
-    bestTitle = `Nuevo Pedido ${folioMatch[0]}: Total $${totalMatch[1].replace(/^\$/, "")}`;
-  } else if (incoming.title.toLowerCase().includes("total") && incoming.title.includes("PED-")) {
-    bestTitle = incoming.title;
-  }
-
-  // Highlight con cliente y anticipo
+  let bestTitle = incoming.title || existing.title;
   let bestHighlight = incoming.highlightText || existing.highlightText;
-  const customerMatch = combined.match(/(?:marcos sanchez|silvia puga|[A-Z][a-z]+\s+[A-Z][a-z]+)/i);
-  const depositMatch = combined.match(/Anticipo:?\s*\$?([0-9,.]+)/i);
-  const remainingMatch = combined.match(/(?:Saldo restante|Cobrar):?\s*\$?([0-9,.]+)/i);
+  let bestSenderName = incoming.senderName || existing.senderName;
 
-  if (customerMatch && depositMatch) {
-    const cust = customerMatch[0].trim();
-    const dep = `$${depositMatch[1].replace(/^\$/, "")}`;
-    const rem = remainingMatch ? `$${remainingMatch[1].replace(/^\$/, "")}` : null;
-    bestHighlight = `${cust} • Anticipo: ${dep}${rem ? ` (Resta: ${rem})` : ""}`;
+  // Solo reconstruir título como "Nuevo Pedido" si es un evento de creación inicial
+  if (!incomingIsPay && !existingIsPay && !incomingIsDeliv && !existingIsDeliv) {
+    const combined = `${existing.title} ${existing.highlightText} ${existing.description} ${incoming.title} ${incoming.highlightText} ${incoming.description}`;
+    const folioMatch = combined.match(/PED-\d+/i);
+    const totalMatch = combined.match(/Total:?\s*\$?([0-9,.]+)/i);
+
+    if (folioMatch && totalMatch) {
+      bestTitle = `Nuevo Pedido ${folioMatch[0]}: Total $${totalMatch[1].replace(/^\$/, "")}`;
+    } else if (incoming.title.toLowerCase().includes("total") && incoming.title.includes("PED-")) {
+      bestTitle = incoming.title;
+    }
+
+    const customerMatch = combined.match(/(?:marcos sanchez|silvia puga|[A-Z][a-z]+\s+[A-Z][a-z]+)/i);
+    const depositMatch = combined.match(/Anticipo:?\s*\$?([0-9,.]+)/i);
+    const remainingMatch = combined.match(/(?:Saldo restante|Cobrar):?\s*\$?([0-9,.]+)/i);
+
+    if (customerMatch && depositMatch) {
+      const cust = customerMatch[0].trim();
+      const dep = `$${depositMatch[1].replace(/^\$/, "")}`;
+      const rem = remainingMatch ? `$${remainingMatch[1].replace(/^\$/, "")}` : null;
+      bestHighlight = `${cust} • Anticipo: ${dep}${rem ? ` (Resta: ${rem})` : ""}`;
+    }
+
+    const isCross = Boolean(
+      (bestOperatingBranchName && bestBranchName && bestOperatingBranchName !== bestBranchName) ||
+      (incoming.senderName && incoming.senderName.includes("➔")) ||
+      (existing.senderName && existing.senderName.includes("➔"))
+    );
+    if (isCross && bestOperatingBranchName && bestBranchName && bestOperatingBranchName !== bestBranchName) {
+      bestSenderName = `🎂 ${bestOperatingBranchName} ➔ ${bestBranchName}`;
+    }
   }
 
-  // Priorizar la descripción más rica y detallada (con los panes/artículos)
+  // Priorizar la descripción más rica y detallada
   let bestDescription = existing.description;
   if (incoming.description && incoming.description.length > (existing.description || "").length) {
     bestDescription = incoming.description;
@@ -300,9 +364,17 @@ export function isNotificationVisibleForUser(
   }
 
   // 2. Roles Operativos (Cajeros, Panaderos, etc.):
-  // REGLA 1: Cortes de caja, dinero que entra, movimientos de efectivo, arqueos y retiros
-  // son EXCLUSIVOS del perfil administrador. Se bloquean estrictamente para cajeros.
   const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
+
+  const isPedido =
+    notif.category === "pedidos" ||
+    Boolean(notif.orderId) ||
+    text.includes("ped-") ||
+    text.includes("pedido") ||
+    text.includes("liquidado") ||
+    text.includes("abono") ||
+    text.includes("pastel");
+
   const isCajaCategory =
     notif.category === "caja" ||
     notif.badgeIcon === "dinero" ||
@@ -319,49 +391,87 @@ export function isNotificationVisibleForUser(
     text.includes("fondo dejado") ||
     text.includes("ticket cancelado");
 
-  if (isCajaCategory) {
+  if (isCajaCategory && !isPedido) {
     return false;
   }
 
   // REGLA 2: Notificaciones de PEDIDOS:
-  // Solo le llegan al cajero si el pedido es de la sucursal donde se hizo el pedido (origen)
-  // o donde se entregará (destino/recogida).
-  const userBranchId = (user.assignedBranchId || activeBranch?.id || "").trim();
-  const userBranchName = (user.assignedBranchName || activeBranch?.name || activeBranch?.shortName || "").trim();
+  // Llegan al cajero si el pedido involucra su sucursal:
+  // - Sucursal donde se hizo/alzó el pedido (origen)
+  // - Sucursal donde se entregará/recogerá (destino)
+  // - Sucursal donde se cobró/liquidó el pedido
+  // - O si coincide con el cajero que lo levantó
+  const candidateBranches: Array<{ id: string; name: string }> = [];
+  if (user?.assignedBranchId || user?.assignedBranchName) {
+    candidateBranches.push({
+      id: (user.assignedBranchId || "").trim(),
+      name: (user.assignedBranchName || "").trim(),
+    });
+  }
+  if (activeBranch?.id || activeBranch?.name || activeBranch?.shortName) {
+    candidateBranches.push({
+      id: (activeBranch.id || "").trim(),
+      name: (activeBranch.name || activeBranch.shortName || "").trim(),
+    });
+  }
 
-  // Si por alguna razón el usuario no tiene ninguna sucursal asignada
-  if (!userBranchId && !userBranchName) {
+  // Si por alguna razón el usuario no tiene ninguna sucursal asignada ni activa
+  if (candidateBranches.length === 0) {
     return true;
   }
 
-  // Resolver sucursales del pedido
-  let pickupId = notif.branchId;
-  let pickupName = notif.branchName;
-  let operatingId = notif.operatingBranchId;
-  let operatingName = notif.operatingBranchName;
+  // Resolver sucursales directas de la notificación
+  const pickupId = notif.branchId;
+  const pickupName = notif.branchName;
+  const operatingId = notif.operatingBranchId;
+  const operatingName = notif.operatingBranchName;
 
-  // Si faltan campos en la notificación, resolverlos desde el pedido almacenado
-  if (!pickupId && !operatingId) {
-    const order = findOrderForNotification(notif as FBNotification);
-    if (order) {
-      pickupId = order.branchId;
-      pickupName = order.branchName;
-      operatingId = order.operatingBranchId;
-      operatingName = order.operatingBranchName;
+  // 1. Revisar coincidencia directa con los datos de la notificación
+  for (const cand of candidateBranches) {
+    const matchesNotification = checkBranchMatch(
+      {
+        pickupBranchId: pickupId,
+        pickupBranchName: pickupName,
+        operatingBranchId: operatingId,
+        operatingBranchName: operatingName,
+        fullText: text,
+      },
+      cand.id,
+      cand.name
+    );
+    if (matchesNotification) return true;
+  }
+
+  // 2. Buscar datos reales del pedido almacenado para contrastar origen y destino
+  const order = findOrderForNotification(notif as FBNotification);
+  if (order) {
+    for (const cand of candidateBranches) {
+      const matchesOrder = checkBranchMatch(
+        {
+          pickupBranchId: order.branchId,
+          pickupBranchName: order.branchName,
+          operatingBranchId: order.operatingBranchId,
+          operatingBranchName: order.operatingBranchName,
+          fullText: `${order.orderNumber} ${order.customerName} ${order.cashier || ""} ${order.description || ""}`,
+        },
+        cand.id,
+        cand.name
+      );
+      if (matchesOrder) return true;
+    }
+
+    // 3. Revisar si el cajero del pedido es este usuario (ej. Silvia Puga, Andrés Sánchez)
+    if (order.cashier && user?.name && order.cashier.toLowerCase().includes(user.name.toLowerCase().trim())) {
+      return true;
     }
   }
 
-  return checkBranchMatch(
-    {
-      pickupBranchId: pickupId,
-      pickupBranchName: pickupName,
-      operatingBranchId: operatingId,
-      operatingBranchName: operatingName,
-      fullText: text,
-    },
-    userBranchId,
-    userBranchName
-  );
+  // 4. Si el nombre del usuario aparece directamente en el texto de la notificación
+  if (user?.name && user.name.length >= 3 && text.includes(user.name.toLowerCase().trim())) {
+    return true;
+  }
+
+  return false;
 }
 
 const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
@@ -374,6 +484,7 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
     highlightText: "silvia puga entregó turno a Don Toño Brito",
     description: "Horario de turno: 06:00 a 14:00 hrs. Efectivo en caja: $47,569.00. Cuadró exacto sin faltante ($0.00 de diferencia). Fondo dejado para nuevo turno: $1,000.00. Efectivo retirado: $46,569.00.",
     timeAgo: "Hace 15 min",
+    timestamp: Date.now() - 15 * 60 * 1000,
     group: "recientes",
     read: false,
     actionLabel: "Ver Corte de Caja",
@@ -429,6 +540,7 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
     highlightText: "Carlos R. entregó turno a Don Toño Brito",
     description: "Horario de turno: 14:00 a 21:30 hrs. Efectivo esperado: $3,920.00 | Efectivo contado: $3,870.00. Faltante detectado: -$50.00 MXN en entrega de turno. Fondo dejado: $800.00.",
     timeAgo: "Hace 1 hora",
+    timestamp: Date.now() - 60 * 60 * 1000,
     group: "recientes",
     read: false,
     actionLabel: "Ver Corte de Caja",
@@ -483,6 +595,7 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
     highlightText: "Sra. María González - Anticipo: $500.00",
     description: "Pastel 3 Leches XV Años. Entrega: Mañana a las 16:00 hrs (Recoge en Sucursal Matriz Centro). Saldo restante: $450.00.",
     timeAgo: "Hace 28 min",
+    timestamp: Date.now() - 28 * 60 * 1000,
     group: "recientes",
     read: false,
     actionLabel: "Cobrar $450",
@@ -501,10 +614,11 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
     senderName: "🎂 Pedido Liquidado (San Juan)",
     senderAvatar: "🎂",
     badgeIcon: "pastel",
-    title: "Nuevo Pedido PED-102: Total $1,200.00",
+    title: "Pedido Liquidado PED-102: Total $1,200.00",
     highlightText: "Ing. Carlos Mendoza - 100% Pagado ($1,200.00)",
     description: "100 piezas de Mini Cuernitos Hojaldrados. Entrega: Hoy a las 08:30 hrs en Sucursal San Juan. Estado: Listo para entrega.",
     timeAgo: "Ayer a las 6:30 PM",
+    timestamp: Date.now() - 24 * 60 * 60 * 1000,
     group: "anteriores",
     read: true,
     actionLabel: "Ver Detalle",
@@ -525,6 +639,7 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
     highlightText: "Lic. Andrea Romero - Anticipo: $700.00",
     description: "Pastel Gourmet Fondant y 50 Cupcakes. Creado en Sucursal Las Flores. Recoge en Sucursal San Juan a las 15:00 hrs. Saldo restante: $750.00.",
     timeAgo: "Hace 10 min",
+    timestamp: Date.now() - 10 * 60 * 1000,
     group: "recientes",
     read: false,
     actionLabel: "Cobrar $750",
@@ -537,6 +652,27 @@ const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
     branchName: "Sucursal San Juan",
     operatingBranchId: "branch-flores",
     operatingBranchName: "Sucursal Las Flores (Plaza)",
+  },
+  {
+    id: "pedido-ped-189-liquidado",
+    senderName: "📦✅ Pedido Liquidado y Entregado (Sucursal Los Ángeles)",
+    senderAvatar: "📦",
+    badgeIcon: "pastel",
+    title: "Pedido Liquidado y Entregado PED-189: $500.00",
+    highlightText: "Marcos Sánchez - 100% Pagado • Entregado en Sucursal Los Ángeles",
+    description: "Se cobró liquidación final de $500.00 en Sucursal Los Ángeles. Pedido originado en Sucursal San Ildefonso. Entregado con éxito al cliente en mostrador.",
+    timeAgo: "Hace 5 min",
+    timestamp: Date.now() - 5 * 60 * 1000,
+    group: "recientes",
+    read: false,
+    actionLabel: "Ver Detalle",
+    actionLink: "/pedidos?order=PED-189",
+    category: "pedidos",
+    orderId: "PED-189",
+    branchId: "branch-angeles",
+    branchName: "Sucursal Los Ángeles",
+    operatingBranchId: "branch-1790889237862",
+    operatingBranchName: "Sucursal San Ildefonso",
   },
 ];
 
@@ -763,6 +899,159 @@ export function findShiftCutForNotification(notif: FBNotification): ShiftCutReco
   return null;
 }
 
+export interface FormattedNotificationTime {
+  exactTime: string;      // ej. "14:55 hrs", "Ayer 18:30 hrs", "08/10 14:20 hrs"
+  liveTimeAgo: string;    // ej. "Hace 15 seg", "Hace 1 min", "Hace 2 hrs", "Hace 1 día"
+  fullTooltip: string;    // ej. "Viernes, 9 de octubre de 2026 a las 14:55:23 hrs"
+  secondsAgo: number;
+}
+
+/**
+ * Temporizador y formateador dinámico de tiempo para notificaciones.
+ * Muestra segundos (0 a 59s), luego minutos (1 a 59m), luego horas (1 a 23h), luego días,
+ * junto con la hora exacta local a la que se registró el evento.
+ */
+export function formatLiveNotificationTime(timestamp?: number, now: number = Date.now()): FormattedNotificationTime {
+  const ts = typeof timestamp === "number" && !isNaN(timestamp) && timestamp > 0 ? timestamp : now;
+  const diffMs = Math.max(0, now - ts);
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHours = Math.floor(diffMin / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  // 1. Temporizador dinámico: segundos -> minutos -> horas -> días -> semanas
+  let liveTimeAgo = "";
+  if (diffSec < 60) {
+    liveTimeAgo = `Hace ${diffSec} seg`;
+  } else if (diffMin < 60) {
+    liveTimeAgo = diffMin === 1 ? "Hace 1 min" : `Hace ${diffMin} min`;
+  } else if (diffHours < 24) {
+    liveTimeAgo = diffHours === 1 ? "Hace 1 hr" : `Hace ${diffHours} hrs`;
+  } else if (diffDays < 7) {
+    liveTimeAgo = diffDays === 1 ? "Hace 1 día" : `Hace ${diffDays} días`;
+  } else {
+    const weeks = Math.floor(diffDays / 7);
+    liveTimeAgo = weeks === 1 ? "Hace 1 sem" : `Hace ${weeks} sem`;
+  }
+
+  // 2. Hora exacta legible
+  const notifDate = new Date(ts);
+  const nowDate = new Date(now);
+
+  const isToday = notifDate.toDateString() === nowDate.toDateString();
+  const yesterday = new Date(nowDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = notifDate.toDateString() === yesterday.toDateString();
+
+  const hours = String(notifDate.getHours()).padStart(2, "0");
+  const minutes = String(notifDate.getMinutes()).padStart(2, "0");
+  const timeOnly = `${hours}:${minutes} hrs`;
+
+  let exactTime = "";
+  if (isToday) {
+    exactTime = timeOnly;
+  } else if (isYesterday) {
+    exactTime = `Ayer ${timeOnly}`;
+  } else {
+    const day = String(notifDate.getDate()).padStart(2, "0");
+    const month = String(notifDate.getMonth() + 1).padStart(2, "0");
+    exactTime = `${day}/${month} ${timeOnly}`;
+  }
+
+  // 3. Tooltip completo con día de la semana, fecha, hora y segundos
+  let fullTooltip = "";
+  try {
+    const dayName = notifDate.toLocaleDateString("es-MX", { weekday: "long" });
+    const fullDate = notifDate.toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const secs = String(notifDate.getSeconds()).padStart(2, "0");
+    fullTooltip = `${dayName.charAt(0).toUpperCase() + dayName.slice(1)}, ${fullDate} a las ${hours}:${minutes}:${secs} hrs`;
+  } catch (e) {
+    fullTooltip = `${notifDate.toLocaleString("es-MX")} hrs`;
+  }
+
+  return {
+    exactTime,
+    liveTimeAgo,
+    fullTooltip,
+    secondsAgo: diffSec,
+  };
+}
+
+/**
+ * Formatea la hora exacta de la notificación (ej. "18:05 hrs")
+ */
+export function formatNotificationHour(timestamp?: number): string {
+  const ts = typeof timestamp === "number" && !isNaN(timestamp) && timestamp > 0 ? timestamp : Date.now();
+  const d = new Date(ts);
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes} hrs`;
+}
+
+/**
+ * Resuelve y garantiza un timestamp numérico fiable para cualquier notificación,
+ * buscando en sus datos de corte, pedido asociado, id o texto relativo previo.
+ */
+export function resolveNotificationTimestamp(notif: Partial<FBNotification>): number {
+  if (typeof notif.timestamp === "number" && !isNaN(notif.timestamp) && notif.timestamp > 1000000000000) {
+    return notif.timestamp;
+  }
+
+  if (notif.shiftCutData?.timestamp && typeof notif.shiftCutData.timestamp === "number" && notif.shiftCutData.timestamp > 1000000000000) {
+    return notif.shiftCutData.timestamp;
+  }
+
+  const order = findOrderForNotification(notif as FBNotification);
+  if (order) {
+    if (order.timestamp && typeof order.timestamp === "number" && order.timestamp > 1000000000000) {
+      return order.timestamp;
+    }
+    if (order.createdAt) {
+      const t = new Date(order.createdAt).getTime();
+      if (!isNaN(t) && t > 1000000000000) return t;
+    }
+  }
+
+  if (notif.id) {
+    const tsMatch = notif.id.match(/\b(17\d{11})\b/);
+    if (tsMatch && tsMatch[1]) {
+      const parsed = parseInt(tsMatch[1], 10);
+      if (!isNaN(parsed) && parsed > 1000000000000) return parsed;
+    }
+  }
+
+  if (notif.timeAgo) {
+    const s = notif.timeAgo.toLowerCase().trim();
+    const now = Date.now();
+    // 1. Detectar si viene una hora fija como "18:05 hrs", "06:05 pm", "18:05"
+    const timeMatch = s.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      const d = new Date();
+      let h = parseInt(timeMatch[1], 10);
+      const m = parseInt(timeMatch[2], 10);
+      if (s.includes("pm") && h < 12) h += 12;
+      if (s.includes("am") && h === 12) h = 0;
+      d.setHours(h, m, 0, 0);
+      if (s.includes("ayer")) d.setDate(d.getDate() - 1);
+      return d.getTime();
+    }
+    const minM = s.match(/hace\s*(\d+)\s*min/);
+    if (minM) return now - parseInt(minM[1], 10) * 60 * 1000;
+    const hourM = s.match(/hace\s*(\d+)\s*h/);
+    if (hourM) return now - parseInt(hourM[1], 10) * 3600 * 1000;
+    const secM = s.match(/hace\s*(\d+)\s*s/);
+    if (secM) return now - parseInt(secM[1], 10) * 1000;
+    if (s.includes("ayer")) return now - 24 * 3600 * 1000;
+    if (s.includes("hace un momento") || s.includes("ahora")) return now - 45 * 1000;
+  }
+
+  return Date.now();
+}
+
 interface NotificationContextType {
   notifications: FBNotification[];
   allNotifications?: FBNotification[];
@@ -817,6 +1106,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           if (Array.isArray(parsed) && parsed.length > 0) {
             // Purgar y excluir estrictamente cualquier notificación vieja de almacén / stock
             const allowed = parsed.filter(isAllowedNotification).map((item: FBNotification) => {
+              const enrichedTs = resolveNotificationTimestamp(item);
+              const timeAgoClean = (!item.timeAgo || item.timeAgo === "Hace un momento" || item.timeAgo.toLowerCase() === "ahora")
+                ? formatNotificationHour(enrichedTs)
+                : item.timeAgo;
               if (
                 (item.category === "caja" ||
                  item.title.toLowerCase().includes("corte") ||
@@ -825,7 +1118,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               ) {
                 const enriched = findShiftCutForNotification(item);
                 if (enriched) {
-                  return { ...item, shiftCutData: enriched, cutId: enriched.id };
+                  return { ...item, timestamp: enrichedTs, timeAgo: timeAgoClean, shiftCutData: enriched, cutId: enriched.id };
                 }
               }
               // Retro-compatibilidad: enriquecer pedidos antiguos con datos de sucursal
@@ -834,6 +1127,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 if (order) {
                   return {
                     ...item,
+                    timestamp: enrichedTs,
+                    timeAgo: timeAgoClean,
                     branchId: item.branchId || order.branchId,
                     branchName: item.branchName || order.branchName,
                     operatingBranchId: item.operatingBranchId || order.operatingBranchId,
@@ -841,7 +1136,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                   };
                 }
               }
-              return item;
+              return { ...item, timestamp: enrichedTs, timeAgo: timeAgoClean };
             });
 
             // Deduplicación estricta de pedidos repetidos en almacenamiento
@@ -986,13 +1281,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const playChime = () => {
     if (!soundEnabled || typeof window === "undefined") return;
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtxClass) return;
+      const audioCtx = new AudioCtxClass();
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume().catch(() => {});
+      }
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = "sine";
       osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
       osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5
-      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
@@ -1007,9 +1307,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (typeof window === "undefined" || !realtimeHub.onNotification) return;
 
-    const unsubNotification = realtimeHub.onNotification((remoteNotif) => {
+    const unsubNotification = realtimeHub.onNotification((incomingNotif) => {
       // Filtrar estrictamente: solo Cierres de Turno y Pedidos
-      if (!isAllowedNotification(remoteNotif)) return;
+      if (!isAllowedNotification(incomingNotif)) return;
+
+      const remoteNotif: FBNotification = {
+        ...incomingNotif,
+        timestamp: resolveNotificationTimestamp(incomingNotif),
+      };
 
       const isDuplicate = notificationsRef.current.some((n) => isSameOrderEvent(n, remoteNotif));
       if (isDuplicate) {
@@ -1044,10 +1349,252 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       setRealtimeStatus(status);
     });
 
+    const unsubOrder = realtimeHub.onOrder
+      ? realtimeHub.onOrder(({ action, order }) => {
+          if (!order) return;
+          if (action === "create") {
+            const notifId = `notif-order-${order.id}`;
+            if (
+              notificationsRef.current.some(
+                (n) => n.id === notifId || isSameOrderEvent(n, { id: notifId, orderId: order.id, highlightText: order.orderNumber })
+              )
+            ) {
+              return;
+            }
+
+            const totalNum = Number(order.total) || 0;
+            const depositNum = Number(order.deposit) || 0;
+            const remaining = Number(order.remainingBalance) !== undefined && !isNaN(Number(order.remainingBalance))
+              ? Number(order.remainingBalance)
+              : Math.max(0, totalNum - depositNum);
+            const originName = order.operatingBranchName || "Sucursal";
+            const currentOrDestName = order.branchName || "Sucursal";
+            const isCross = Boolean(
+              originName && currentOrDestName &&
+              originName.toLowerCase().trim() !== currentOrDestName.toLowerCase().trim()
+            );
+
+            const branchSender = isCross
+              ? `🎂 ${originName} ➔ ${currentOrDestName}`
+              : `🎂 Pedido Registrado (${currentOrDestName})`;
+
+            const notif: FBNotification = {
+              id: notifId,
+              senderName: branchSender,
+              senderAvatar: "🎂",
+              badgeIcon: "pastel",
+              title: `Nuevo Pedido ${order.orderNumber}: Total $${totalNum.toFixed(2)}`,
+              highlightText: `${order.customerName} • Anticipo: $${depositNum.toFixed(2)}${remaining > 0 ? ` (Resta: $${remaining.toFixed(2)})` : " (Liquidado)"}`,
+              description: `${order.description ? `${order.description}. ` : ""}${isCross ? `[Levantado en: ${originName} • Entrega en: ${currentOrDestName}] ` : (order.deliveryType === "domicilio" ? `A domicilio: ${order.deliveryAddress || "Dirección registrada"}. ` : `Recoge en: ${currentOrDestName}. `)}Entrega: ${order.deliveryDate} a las ${order.deliveryTime} hrs. Saldo restante: $${remaining.toFixed(2)}.`,
+              timeAgo: formatNotificationHour(order.timestamp || Date.now()),
+              timestamp: order.timestamp || Date.now(),
+              group: "recientes",
+              read: false,
+              category: "pedidos",
+              orderId: order.id,
+              branchId: order.branchId,
+              branchName: order.branchName,
+              operatingBranchId: order.operatingBranchId,
+              operatingBranchName: order.operatingBranchName,
+              actionLabel: remaining > 0 ? `Cobrar $${remaining.toFixed(2)}` : "Ver Detalle",
+              actionLink: "/pedidos",
+              secondaryActionLabel: remaining > 0 ? "Ver Detalle" : undefined,
+              secondaryActionLink: remaining > 0 ? "/pedidos" : undefined,
+            };
+
+            setNotifications((prev) => {
+              if (prev.some((n) => isSameOrderEvent(n, notif))) return prev;
+              const updated = [notif, ...prev];
+              persistNotifs(updated);
+              return updated;
+            });
+
+            const isVisible = isNotificationVisibleForUser(notif, userRef.current, currentBranchRef.current);
+            if (isVisible) {
+              playChime();
+              setActiveToast(notif);
+              triggerNativeNotification(notif);
+            }
+          } else if (action === "payment") {
+            const remNum = Number(order.remainingBalance) || 0;
+            const isPaid = remNum === 0 || order.paymentStatus === "liquidado";
+            const lastPayment = Array.isArray(order.payments) && order.payments.length > 0 ? order.payments[order.payments.length - 1] : null;
+            const paymentAmount = Number(lastPayment?.amount) || Number(order.deposit) || 0;
+            const notifId = `notif-order-pay-${order.id}-${paymentAmount}`;
+
+            if (notificationsRef.current.some((n) => n.id === notifId)) {
+              return;
+            }
+
+            const originName = order.operatingBranchName || "Sucursal";
+            const currentOrDestName = order.branchName || "Sucursal";
+            const isCross = originName.toLowerCase().trim() !== currentOrDestName.toLowerCase().trim();
+
+            const notif: FBNotification = {
+              id: notifId,
+              senderName: isPaid ? `🎂 Pedido Liquidado (${currentOrDestName})` : `💰 Abono Recibido (${currentOrDestName})`,
+              senderAvatar: "🎂",
+              badgeIcon: "pastel",
+              title: isPaid
+                ? `Pedido Liquidado ${order.orderNumber}: $${paymentAmount.toFixed(2)}`
+                : `Abono de Pedido ${order.orderNumber}: $${paymentAmount.toFixed(2)}`,
+              highlightText: `${order.customerName} - ${isPaid ? "100% Pagado" : `Resta: $${remNum.toFixed(2)}`}`,
+              description: isCross
+                ? `Se registró pago de $${paymentAmount.toFixed(2)} en ${currentOrDestName}. Pedido originado en ${originName}. ${isPaid ? "Listo para entrega final." : `Saldo restante: $${remNum.toFixed(2)}.`}`
+                : `Se registró pago de $${paymentAmount.toFixed(2)}. Pedido: ${order.description || order.orderNumber}. ${isPaid ? "Listo para entrega final." : `Saldo restante: $${remNum.toFixed(2)}.`}`,
+              timeAgo: formatNotificationHour(Date.now()),
+              timestamp: Date.now(),
+              group: "recientes",
+              read: false,
+              category: "pedidos",
+              orderId: order.id,
+              branchId: order.branchId,
+              branchName: order.branchName,
+              operatingBranchId: order.operatingBranchId,
+              operatingBranchName: order.operatingBranchName,
+              actionLabel: remNum > 0 ? `Cobrar $${remNum.toFixed(2)}` : "Ver Detalle",
+              actionLink: "/pedidos",
+            };
+
+            setNotifications((prev) => {
+              if (prev.some((n) => isSameOrderEvent(n, notif))) return prev;
+              const updated = [notif, ...prev];
+              persistNotifs(updated);
+              return updated;
+            });
+
+            const isVisible = isNotificationVisibleForUser(notif, userRef.current, currentBranchRef.current);
+            if (isVisible) {
+              playChime();
+              setActiveToast(notif);
+              triggerNativeNotification(notif);
+            }
+          } else if (action === "status") {
+            const notifId = `notif-order-status-${order.id}-${order.status}`;
+            if (
+              notificationsRef.current.some(
+                (n) => n.id === notifId || (order.status === "entregado" && n.id === `notif-order-delivered-${order.id}`)
+              )
+            ) {
+              return;
+            }
+
+            const originName = order.operatingBranchName || "Sucursal";
+            const delivBranchName = order.branchName || "Sucursal";
+            const isCross = originName.toLowerCase().trim() !== delivBranchName.toLowerCase().trim();
+
+            let title = `Estado de Pedido: ${order.status.toUpperCase()} (${order.orderNumber})`;
+            let description = `El pedido ${order.orderNumber} cambió a estado ${order.status}.`;
+            let senderName = `📦 Pedido ${order.orderNumber} (${delivBranchName})`;
+            let avatar = "📦";
+
+            if (order.status === "entregado") {
+              senderName = `📦 Pedido Entregado (${delivBranchName})`;
+              avatar = "📦";
+              title = `Pedido Entregado con Éxito: ${order.orderNumber}`;
+              description = `El pedido ${order.orderNumber} de "${order.customerName}" fue entregado satisfactoriamente en ${delivBranchName}.${isCross ? ` (Originado en: ${originName}).` : ""}`;
+            } else if (order.status === "listo") {
+              senderName = `🎂 Producto Listo en Sucursal (${delivBranchName})`;
+              avatar = "🎂";
+              title = `El producto ya está en sucursal: ${order.orderNumber}`;
+              description = `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal para entrega en ${delivBranchName}.`;
+            } else if (order.status === "cancelado") {
+              senderName = `🗑️ Pedido Cancelado (${delivBranchName})`;
+              avatar = "🗑️";
+              title = `Pedido Cancelado: ${order.orderNumber}`;
+              description = `El pedido ${order.orderNumber} de "${order.customerName}" ha sido dado de baja o cancelado.`;
+            }
+
+            const notif: FBNotification = {
+              id: notifId,
+              senderName,
+              senderAvatar: avatar,
+              badgeIcon: "pastel",
+              title,
+              highlightText: `${order.customerName} • ${order.status === "entregado" ? "Entregado al Cliente" : order.status === "listo" ? "Listo en Sucursal" : order.status}`,
+              description,
+              timeAgo: formatNotificationHour(Date.now()),
+              timestamp: Date.now(),
+              group: "recientes",
+              read: false,
+              category: "pedidos",
+              orderId: order.id,
+              branchId: order.branchId,
+              branchName: order.branchName,
+              operatingBranchId: order.operatingBranchId,
+              operatingBranchName: order.operatingBranchName,
+              actionLabel: "Ver Detalle",
+              actionLink: "/pedidos",
+            };
+
+            setNotifications((prev) => {
+              if (prev.some((n) => isSameOrderEvent(n, notif))) return prev;
+              const updated = [notif, ...prev];
+              persistNotifs(updated);
+              return updated;
+            });
+
+            const isVisible = isNotificationVisibleForUser(notif, userRef.current, currentBranchRef.current);
+            if (isVisible) {
+              playChime();
+              setActiveToast(notif);
+              triggerNativeNotification(notif);
+            }
+          }
+        })
+      : undefined;
+
     return () => {
       unsubNotification();
       unsubStatus();
+      if (unsubOrder) unsubOrder();
     };
+  }, []);
+
+  // Escuchar cambios de notificaciones generadas en otras pestañas locales
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_NOTIFS_KEY && e.newValue) {
+        try {
+          const rawRemoteList: FBNotification[] = JSON.parse(e.newValue);
+          if (!Array.isArray(rawRemoteList) || rawRemoteList.length === 0) return;
+          const remoteList = rawRemoteList.map((n) => ({
+            ...n,
+            timestamp: resolveNotificationTimestamp(n),
+          }));
+
+          setNotifications((prev) => {
+            const currentIds = new Set(prev.map((n) => n.id));
+            const newNotifs = remoteList.filter(
+              (n) => !currentIds.has(n.id) && !prev.some((p) => isSameOrderEvent(p, n))
+            );
+
+            if (newNotifs.length === 0) {
+              return remoteList;
+            }
+
+            // Comprobar si alguna de las notificaciones nuevas es visible para este usuario en esta pestaña
+            for (const n of newNotifs) {
+              if (isNotificationVisibleForUser(n, userRef.current, currentBranchRef.current)) {
+                playChime();
+                setActiveToast(n);
+                triggerNativeNotification(n);
+                break;
+              }
+            }
+
+            return remoteList;
+          });
+        } catch (err) {
+          console.warn("[NotificationContext] Error parsing storage notifs:", err);
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   const addNotification = (notif: Omit<FBNotification, "id" | "read" | "timeAgo" | "group"> & Partial<FBNotification>) => {
@@ -1057,12 +1604,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
 
     const newId = notif.id || `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const timestamp = notif.timestamp || Date.now();
     const fullNotif: FBNotification = {
       id: newId,
-      timeAgo: "Hace un momento",
+      timeAgo: notif.timeAgo && notif.timeAgo !== "Hace un momento" ? notif.timeAgo : formatNotificationHour(timestamp),
       group: "recientes",
       read: false,
       ...notif,
+      timestamp,
     };
 
     const isDuplicate = notificationsRef.current.some((n) => isSameOrderEvent(n, fullNotif));
@@ -1075,6 +1624,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         persistNotifs(updated);
         return updated;
       });
+
+      // Transmitir en vivo a los demás celulares/computadoras del negocio aunque ya exista localmente
+      if (realtimeHub.broadcastNotification) {
+        realtimeHub.broadcastNotification(fullNotif);
+      }
       return;
     }
 
@@ -1364,17 +1918,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded-md">
                 {activeToast.title}
               </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveToast(null);
-                }}
-                className="text-stone-400 hover:text-white text-xs p-1 cursor-pointer"
-                title="Cerrar notificación"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-1.5 ml-auto pr-1">
+                <span className="text-[10px] font-mono text-amber-300 font-bold bg-stone-800/90 px-1.5 py-0.5 rounded border border-amber-500/30">
+                  🕒 {formatLiveNotificationTime(resolveNotificationTimestamp(activeToast)).exactTime}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveToast(null);
+                  }}
+                  className="text-stone-400 hover:text-white text-xs p-1 cursor-pointer"
+                  title="Cerrar notificación"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <p className="text-xs font-black text-white mt-1 leading-snug">
               {activeToast.highlightText}

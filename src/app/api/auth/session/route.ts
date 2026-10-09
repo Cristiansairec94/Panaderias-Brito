@@ -67,6 +67,16 @@ export async function GET(req: NextRequest) {
 
     if (userId) {
       const session = sessions[userId] || null;
+      // Si la sesión tiene más de 45 segundos sin señal de vida (heartbeat), considerarla inactiva
+      if (session && session.lastSeenAt) {
+        const lastSeenMs = new Date(session.lastSeenAt).getTime();
+        if (Date.now() - lastSeenMs > 45 * 1000) {
+          return NextResponse.json({
+            success: true,
+            activeSession: null,
+          });
+        }
+      }
       return NextResponse.json({
         success: true,
         activeSession: session,
@@ -141,10 +151,10 @@ export async function PUT(req: NextRequest) {
 
     const sessions = { ...readStoredSessions() };
     const current = sessions[userId];
+    const nowIso = new Date().toISOString();
 
     // Si no hay sesión previa registrada en el servidor, registrar esta como la sesión activa
     if (!current) {
-      const nowIso = new Date().toISOString();
       const newSession: UserActiveSession = {
         userId,
         sessionToken,
@@ -163,24 +173,43 @@ export async function PUT(req: NextRequest) {
       });
     }
 
-    // Si el sessionToken es diferente (otra ventana en este equipo o inicio de sesión en otro equipo)
-    if (current.sessionToken !== sessionToken) {
-      const isOtherDevice = Boolean(deviceId && current.deviceId && current.deviceId !== deviceId);
+    // Si el sessionToken es el mismo: actualizar heartbeat normalmente
+    if (current.sessionToken === sessionToken) {
+      current.lastSeenAt = nowIso;
+      if (deviceId) current.deviceId = deviceId;
+      writeStoredSessions(sessions);
+
       return NextResponse.json({
         success: true,
-        valid: false,
-        reason: isOtherDevice ? "session_overridden_other_device" : "session_overridden_same_device",
+        valid: true,
         activeSession: current,
       });
     }
 
-    // Sesión válida: actualizar lastSeenAt
-    current.lastSeenAt = new Date().toISOString();
-    writeStoredSessions(sessions);
+    // Si el sessionToken es diferente (otra ventana o inicio de sesión reciente)
+    const lastSeenMs = current.lastSeenAt ? new Date(current.lastSeenAt).getTime() : 0;
+    const isStale = Date.now() - lastSeenMs > 30 * 1000;
+    const isSameDevice = !deviceId || !current.deviceId || current.deviceId === deviceId;
 
+    // Si es el mismo equipo O la sesión anterior ya caducó por inactividad, adoptar la sesión sin bloquear
+    if (isSameDevice || isStale) {
+      current.sessionToken = sessionToken;
+      if (deviceId) current.deviceId = deviceId;
+      current.lastSeenAt = nowIso;
+      writeStoredSessions(sessions);
+
+      return NextResponse.json({
+        success: true,
+        valid: true,
+        activeSession: current,
+      });
+    }
+
+    // Solo rechazar si REALMENTE proviene de otro equipo físico distinto y tiene menos de 30 segundos activa
     return NextResponse.json({
       success: true,
-      valid: true,
+      valid: false,
+      reason: "session_overridden_other_device",
       activeSession: current,
     });
   } catch (err: any) {

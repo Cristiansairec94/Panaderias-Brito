@@ -30,7 +30,7 @@ import NotificationsDropdown from "./NotificationsDropdown";
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout, getDefaultRouteForUser } = useAuth();
+  const { user, logout, loginAs, usersList, getDefaultRouteForUser } = useAuth();
   const { isCollapsed, toggleCollapse } = useSidebar();
   const { 
     branches, 
@@ -462,7 +462,7 @@ export default function Header() {
                 onClick={() => setShowUserMenu(false)}
               />
 
-              <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-24px)] bg-[#1c0e08] rounded-2xl shadow-2xl border border-amber-900/60 p-3 z-[150] animate-in fade-in zoom-in-95 text-stone-200">
+              <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-24px)] bg-[#1c0e08] rounded-2xl shadow-2xl border border-amber-900/60 p-3 z-[150] animate-in fade-in zoom-in-95 text-stone-200">
                 <div className="p-3 border-b border-amber-900/40 bg-[#24130b] rounded-xl mb-2 space-y-2">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-lg text-white font-bold overflow-hidden shadow-inner shrink-0">
@@ -493,7 +493,61 @@ export default function Header() {
                     </div>
                   )}
                 </div>
-                <div className="pt-1">
+
+                {/* Quick Switch Profiles / Cajeros */}
+                <div className="py-1.5 border-b border-amber-900/40 space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-400/90 px-2 py-0.5">
+                    Cambiar a otro perfil / cajero:
+                  </p>
+                  <div className="max-h-52 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                    {usersList
+                      .filter((u) => u.hasSystemAccess !== false && u.status !== "inactivo")
+                      .map((u) => {
+                        const isCurrent = user?.id === u.id;
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => {
+                              loginAs(u);
+                              setShowUserMenu(false);
+                              if (pathname === "/sucursales" || pathname === "/configuracion" || pathname === "/finanzas") {
+                                if (u.role === "cajero") {
+                                  router.push("/pos");
+                                }
+                              }
+                            }}
+                            className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                              isCurrent
+                                ? "bg-amber-500/20 border border-amber-400/50 text-amber-200 font-bold"
+                                : "hover:bg-[#28150c] text-stone-300 hover:text-white"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="text-lg select-none shrink-0">{u.avatar || "👤"}</span>
+                              <div className="min-w-0">
+                                <p className="font-bold truncate text-[11px] leading-tight text-white capitalize">{u.name}</p>
+                                <p className="text-[10px] text-stone-400 truncate leading-tight">
+                                  {u.assignedBranchName ? u.assignedBranchName.replace(/^Sucursal\s+/i, "") : u.roleLabel}
+                                </p>
+                              </div>
+                            </div>
+                            {isCurrent ? (
+                              <span className="text-[9px] bg-amber-400 text-stone-950 font-black px-1.5 py-0.5 rounded-full shrink-0">
+                                Actual
+                              </span>
+                            ) : (
+                              <span className="text-[9px] text-amber-400/70 group-hover:text-amber-300 font-bold shrink-0">
+                                Entrar ➔
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                <div className="pt-2">
                   <button
                     type="button"
                     onClick={handleLogout}

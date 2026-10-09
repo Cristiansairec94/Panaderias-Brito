@@ -114,13 +114,12 @@ export default function PedidosPage() {
   // State: Default view is "productos" en formato "lista" compacta y ordenada
   const [orders, setOrders] = useState<CustomOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedBranchFilter, setSelectedBranchFilter] = useState(() => (canFilterBranches ? "all" : userBranchId));
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>(() => (canFilterBranches ? "all" : userBranchId));
 
-  // Filtro efectivo de sucursal (para cajeros siempre está forzado a su sucursal asignada)
+  // Filtro efectivo de sucursal: por defecto inicia en la sucursal asignada del cajero o "all", pero permite seleccionar otra sucursal o "all"
   const effectiveBranchFilter = useMemo(() => {
-    if (canFilterBranches) return selectedBranchFilter;
-    return userBranchId;
-  }, [canFilterBranches, selectedBranchFilter, userBranchId]);
+    return selectedBranchFilter || userBranchId || "all";
+  }, [selectedBranchFilter, userBranchId]);
 
   const [classificationFilter, setClassificationFilter] = useState<OrderClassificationKey>("all");
   const [historialSubFilter, setHistorialSubFilter] = useState<"todos" | "entregados" | "cancelados">("todos");
@@ -258,15 +257,28 @@ export default function PedidosPage() {
     };
   }, []);
 
-  // Sincronización de sucursal: los cajeros quedan fijados a su tienda asignada;
-  // los administradores y supervisores se sincronizan con la sucursal activa en la cabecera ("all" o tienda individual).
+  // Sincronización de sucursal:
+  // Para administradores se sincroniza con la cabecera ("all" o tienda individual);
+  // para cajeros por defecto inicia en su tienda asignada, pero permitiéndoles seleccionar "all" u otra tienda si lo desean.
+  const hasInitializedBranchRef = useRef(false);
   useEffect(() => {
-    if (!canFilterBranches) {
-      setSelectedBranchFilter(userBranchId);
-    } else if (isAllBranches) {
-      setSelectedBranchFilter("all");
-    } else if (currentBranch && currentBranch.id) {
-      setSelectedBranchFilter(currentBranch.id);
+    if (!hasInitializedBranchRef.current) {
+      hasInitializedBranchRef.current = true;
+      if (!canFilterBranches) {
+        setSelectedBranchFilter(userBranchId);
+      } else if (isAllBranches) {
+        setSelectedBranchFilter("all");
+      } else if (currentBranch && currentBranch.id) {
+        setSelectedBranchFilter(currentBranch.id);
+      }
+      return;
+    }
+    if (canFilterBranches) {
+      if (isAllBranches) {
+        setSelectedBranchFilter("all");
+      } else if (currentBranch && currentBranch.id) {
+        setSelectedBranchFilter(currentBranch.id);
+      }
     }
   }, [canFilterBranches, userBranchId, isAllBranches, currentBranch?.id]);
 
@@ -399,32 +411,92 @@ export default function PedidosPage() {
     return order.status === "entregado";
   };
 
-    const checkOrderMatchesBranch = useCallback((order: CustomOrder, filter: string) => {
-    if (!filter || filter === "all") return true;
-    const f = filter.toLowerCase().trim();
-    const targetBranch = branches.find((b) => b.id.toLowerCase() === f || b.name.toLowerCase() === f);
-    const targetId = targetBranch ? targetBranch.id.toLowerCase() : f;
-    const targetName = targetBranch ? targetBranch.name.toLowerCase() : f;
+  const stripAccents = useCallback((str?: string): string => {
+    return (str || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }, []);
 
-    const pId = String(order.branchId || "").toLowerCase().trim();
-    const pName = String(order.branchName || "").toLowerCase().trim();
-    const opId = String((order as any).operatingBranchId || "").toLowerCase().trim();
-    const opName = String((order as any).operatingBranchName || "").toLowerCase().trim();
+  const getBranchKeywords = useCallback((str?: string): string[] => {
+    const s = (str || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+    const keywords: string[] = [];
+    if (s.includes("angeles") || s.includes("suc-les")) keywords.push("angeles");
+    if (s.includes("ildefonso") || s.includes("1790889237862") || s.includes("ilf-04")) keywords.push("ildefonso");
+    if (s.includes("benito") || s.includes("ben-02")) keywords.push("benito");
+    if (s.includes("flores") || s.includes("flo-03")) keywords.push("flores");
+    if (s.includes("sanjuan") || s.includes("san juan") || s.includes("sju-02")) keywords.push("sanjuan");
+    if (s.includes("matriz") || s.includes("centro") || s.includes("mat-01")) keywords.push("matriz");
+    return keywords;
+  }, []);
 
-    if (!pId && !opId) return true;
+  const checkOrderMatchesBranch = useCallback(
+    (order: CustomOrder, filter: string) => {
+      if (!filter || filter === "all") return true;
+      const f = stripAccents(filter);
 
-    const matchesPickup = (pId && (pId === targetId || pId.includes(targetId) || targetId.includes(pId))) ||
-                          (pName && (pName === targetName || pName.includes(targetName) || targetName.includes(pName)));
-    const matchesOperating = (opId && (opId === targetId || opId.includes(targetId) || targetId.includes(opId))) ||
-                             (opName && (opName === targetName || opName.includes(targetName) || targetName.includes(opName)));
+      // Filtro especial para ver todos los pedidos inter-sucursales
+      if (f === "inter_sucursal" || f === "foraneos") {
+        const pId = stripAccents(order.branchId);
+        const opId = stripAccents(order.operatingBranchId);
+        return Boolean(
+          (pId && opId && pId !== opId) ||
+          (order.operatingBranchName &&
+            order.branchName &&
+            stripAccents(order.operatingBranchName) !== stripAccents(order.branchName))
+        );
+      }
 
-    const cashierMatches = (targetId.includes("angeles") && order.cashier && (order.cashier.toLowerCase().includes("andres") || order.cashier.toLowerCase().includes("ángeles"))) ||
-                           (targetId.includes("1790889237862") && order.cashier && order.cashier.toLowerCase().includes("silvia")) ||
-                           (targetId.includes("benito") && order.cashier && order.cashier.toLowerCase().includes("carlos")) ||
-                           (targetId.includes("sanjuan") && order.cashier && order.cashier.toLowerCase().includes("noe"));
+      const targetBranch = branches.find(
+        (b) => stripAccents(b.id) === f || stripAccents(b.name) === f
+      );
+      const targetId = targetBranch ? stripAccents(targetBranch.id) : f;
+      const targetName = targetBranch ? stripAccents(targetBranch.name) : f;
+      const targetKeywords = [...getBranchKeywords(targetId), ...getBranchKeywords(targetName)];
 
-    return matchesPickup || matchesOperating || cashierMatches;
-  }, [branches]);
+      const pId = stripAccents(order.branchId);
+      const pName = stripAccents(order.branchName);
+      const opId = stripAccents((order as any).operatingBranchId);
+      const opName = stripAccents((order as any).operatingBranchName);
+
+      const pickupKeywords = [...getBranchKeywords(pId), ...getBranchKeywords(pName)];
+      const operatingKeywords = [...getBranchKeywords(opId), ...getBranchKeywords(opName)];
+
+      if (!pId && !opId) return true;
+
+      // 1. Coincidencia con sucursal de entrega/recogida
+      const matchesPickup =
+        (pId && (pId === targetId || pId.includes(targetId) || targetId.includes(pId))) ||
+        (pName && (pName === targetName || pName.includes(targetName) || targetName.includes(pName))) ||
+        (targetKeywords.length > 0 && pickupKeywords.some((k) => targetKeywords.includes(k)));
+
+      // 2. Coincidencia con sucursal de origen/donde se levantó
+      const matchesOperating =
+        (opId && (opId === targetId || opId.includes(targetId) || targetId.includes(opId))) ||
+        (opName && (opName === targetName || opName.includes(targetName) || targetName.includes(opName))) ||
+        (targetKeywords.length > 0 && operatingKeywords.some((k) => targetKeywords.includes(k)));
+
+      // 3. Coincidencia con el cajero que lo levantó
+      const cashierText = stripAccents(order.cashier);
+      const cashierMatches =
+        (targetKeywords.includes("angeles") && (cashierText.includes("andres") || cashierText.includes("angeles"))) ||
+        (targetKeywords.includes("ildefonso") && cashierText.includes("silvia")) ||
+        (targetKeywords.includes("benito") && cashierText.includes("carlos")) ||
+        (targetKeywords.includes("sanjuan") && cashierText.includes("noe"));
+
+      // 4. Coincidencia en notas o descripción con palabras clave de la sucursal
+      const orderNotesText = `${stripAccents(order.notes)} ${stripAccents(order.description)}`;
+      const textMatches = targetKeywords.some((k) => orderNotesText.includes(k));
+
+      return matchesPickup || matchesOperating || cashierMatches || textMatches;
+    },
+    [branches, getBranchKeywords, stripAccents]
+  );
 
 // Classification counts for the current branch view
   const classificationCounts = useMemo(() => {
@@ -534,9 +606,13 @@ export default function PedidosPage() {
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
+    const hasSearch = searchQuery.trim().length > 0;
+    const q = stripAccents(searchQuery);
+
     return orders.filter((order) => {
-      // Branch filter (revisar sucursal de entrega o sucursal donde se levantó/cobró)
-      if (!checkOrderMatchesBranch(order, effectiveBranchFilter)) {
+      // 1. Si el usuario escribe una búsqueda (folio PED-..., cliente, teléfono),
+      // buscar a nivel GLOBAL en TODOS los pedidos para que el cajero pueda encontrarlo al instante
+      if (!hasSearch && !checkOrderMatchesBranch(order, effectiveBranchFilter)) {
         return false;
       }
 
@@ -613,15 +689,16 @@ export default function PedidosPage() {
         }
       }
 
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchNumber = order.orderNumber.toLowerCase().includes(q);
-        const matchCustomer = order.customerName.toLowerCase().includes(q);
-        const matchPhone = order.phone.includes(q);
-        const matchDesc = order.description.toLowerCase().includes(q);
-        const matchDedication = order.dedication?.toLowerCase().includes(q);
-        if (!matchNumber && !matchCustomer && !matchPhone && !matchDesc && !matchDedication) {
+      // Search query (busca en folio, cliente, teléfono, descripción, notas, dedicatoria y sucursal)
+      if (hasSearch) {
+        const matchNumber = stripAccents(order.orderNumber).includes(q) || stripAccents(order.id).includes(q);
+        const matchCustomer = stripAccents(order.customerName).includes(q);
+        const matchPhone = (order.phone || "").replace(/\D/g, "").includes(q.replace(/\D/g, ""));
+        const matchDesc = stripAccents(order.description).includes(q);
+        const matchDedication = stripAccents(order.dedication).includes(q);
+        const matchNotes = stripAccents(order.notes).includes(q);
+        const matchBranch = stripAccents(order.branchName).includes(q) || stripAccents((order as any).operatingBranchName).includes(q);
+        if (!matchNumber && !matchCustomer && !matchPhone && !matchDesc && !matchDedication && !matchNotes && !matchBranch) {
           return false;
         }
       }
@@ -630,6 +707,8 @@ export default function PedidosPage() {
     });
   }, [
     orders,
+    searchQuery,
+    stripAccents,
     effectiveBranchFilter,
     classificationFilter,
     historialSubFilter,
@@ -643,7 +722,6 @@ export default function PedidosPage() {
     customSelectedYear,
     startOfWeekStr,
     endOfWeekStr,
-    searchQuery,
     todayStr,
     tomorrowStr,
     currentMinutes,
@@ -687,10 +765,8 @@ export default function PedidosPage() {
       return o.status !== "entregado" && o.status !== "cancelado";
     });
 
-    // Para perfiles no administradores (cajeros), limitar inmediatamente a su propia sucursal
-    const userScopedOrders = isAdmin 
-      ? baseOrders 
-      : baseOrders.filter((o) => checkOrderMatchesBranch(o, userBranchId));
+    // Permitir ver los totales por sucursal para coordinar pedidos inter-sucursales
+    const userScopedOrders = baseOrders;
 
     // Filtro por período de tiempo (Día, Semana, Mes, Año, Todos)
     const periodOrders = userScopedOrders.filter((order) => {
@@ -705,7 +781,7 @@ export default function PedidosPage() {
       return true;
     });
 
-    // Mapear cada sucursal visible según rol (Admin ve todas, Cajero solo la suya)
+    // Mapear cada sucursal
     const branchMap = new Map<string, {
       branchId: string;
       branchName: string;
@@ -720,9 +796,7 @@ export default function PedidosPage() {
       unpaidCount: number;
     }>();
 
-    const visibleBranches = isAdmin 
-      ? branches 
-      : branches.filter((b) => b.id === userBranchId);
+    const visibleBranches = branches;
 
     visibleBranches.forEach((b) => {
       branchMap.set(b.id, {
@@ -889,6 +963,7 @@ export default function PedidosPage() {
       playScanBeep(true);
     } catch (e) {}
     addNotification({
+      id: `notif-order-status-${order.id}-listo`,
       title: "El producto ya está en sucursal",
       description: `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal.`,
       senderName: "Control de Pedidos",
@@ -914,6 +989,7 @@ export default function PedidosPage() {
         updateOrderStatus(order.id, "pendiente");
         loadOrders();
         addNotification({
+          id: `notif-order-status-${order.id}-pendiente`,
           title: "Estado Actualizado",
           description: `El pedido ${order.orderNumber} regresó a "En Preparación".`,
           senderName: "Control de Pedidos",
@@ -950,6 +1026,7 @@ export default function PedidosPage() {
       loadOrders();
       setSelectedOrderForDetail(null);
       addNotification({
+        id: `notif-order-status-${order.id}-entregado`,
         title: "Pedido Entregado con Éxito",
         description: `El pedido ${order.orderNumber} de "${order.customerName}" fue entregado satisfactoriamente.`,
         senderName: "Control de Pedidos",
@@ -993,6 +1070,7 @@ export default function PedidosPage() {
           playScanBeep(true);
         } catch (e) {}
         addNotification({
+          id: `notif-order-status-${order.id}-listo`,
           title: "El producto ya está en sucursal",
           description: `El pedido ${order.orderNumber} de "${order.customerName}" ha sido marcado como LISTO en sucursal.`,
           senderName: "Control de Pedidos",
@@ -3608,6 +3686,7 @@ export default function PedidosPage() {
           loadOrders();
           setSelectedOrderForDetail(null);
           addNotification({
+            id: `notif-order-status-${o.id}-entregado`,
             title: "Pedido Entregado",
             description: `El pedido ${o.orderNumber} (${o.customerName}) ha sido marcado como entregado exitosamente.`,
             senderName: "Control de Pedidos",
@@ -3655,6 +3734,7 @@ export default function PedidosPage() {
             updateOrderStatus(order.id, "listo");
             loadOrders();
             addNotification({
+              id: `notif-order-status-${order.id}-listo`,
               title: "Pedido Reactivado",
               description: `El pedido ${order.orderNumber} ha regresado a la sección de pedidos activos.`,
               senderName: "Control de Pedidos",

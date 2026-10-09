@@ -127,6 +127,7 @@ class RealtimeHub {
   private channel: any = null;
   private status: RealtimeStatus = "disconnected";
   private initialized = false;
+  private lastSyncTimestamp: number = Date.now() - 1000 * 60 * 60;
 
   private notificationListeners = new Set<NotificationListener>();
   private saleListeners = new Set<SaleListener>();
@@ -527,7 +528,9 @@ class RealtimeHub {
   public async fetchCatchupEvents() {
     if (typeof window === "undefined") return;
     try {
-      const lastTs = localStorage.getItem(LAST_SYNC_TIMESTAMP_KEY) || (Date.now() - 1000 * 60 * 60).toString();
+      const lastTs = this.lastSyncTimestamp
+        ? Math.max(0, this.lastSyncTimestamp - 30000)
+        : (Date.now() - 1000 * 60 * 60);
       const res = await fetch(`/api/realtime/sync?since=${lastTs}`);
       if (!res.ok) return;
 
@@ -535,9 +538,9 @@ class RealtimeHub {
       if (!data) return;
 
       if (data.serverTime) {
-        localStorage.setItem(LAST_SYNC_TIMESTAMP_KEY, data.serverTime.toString());
+        this.lastSyncTimestamp = data.serverTime;
       } else {
-        localStorage.setItem(LAST_SYNC_TIMESTAMP_KEY, Date.now().toString());
+        this.lastSyncTimestamp = Date.now();
       }
 
       if (!Array.isArray(data.events) || data.events.length === 0) return;

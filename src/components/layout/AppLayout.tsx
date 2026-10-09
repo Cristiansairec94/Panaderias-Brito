@@ -40,6 +40,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (pathname === "/" && canAccessRoute && !canAccessRoute("/")) {
       router.replace(defaultRoute);
     }
+
+    // Si un cajero o perfil operativo intenta abrir una ruta administrativa restringida (ej. /sucursales),
+    // redirigir suavemente a su área habilitada (ej. /pos)
+    if (pathname && canAccessRoute && !canAccessRoute(pathname)) {
+      if (pathname === "/sucursales" || pathname === "/configuracion" || pathname === "/finanzas") {
+        router.replace(defaultRoute);
+      }
+    }
   }, [user, isLoading, pathname, router, canAccessRoute, getDefaultRouteForUser]);
 
   if (isLoading) {

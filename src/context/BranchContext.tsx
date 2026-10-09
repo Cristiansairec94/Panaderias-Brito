@@ -7,6 +7,7 @@ import { recordCashOutflowAsExpense } from "@/lib/expenses";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc } from "@/lib/utils";
+import { normalizeOrder } from "@/lib/orders";
 
 export interface SimulatedSale {
   id: string;
@@ -482,8 +483,9 @@ function resolveBranchParam(param: string | null): string | null {
               .gte("created_at", todayIso),
             supabase
               .from("custom_orders")
-              .select("id, order_number, customer_name, branch_id, branch_name, description, total, deposit, remaining_balance, payment_status, payment_method, cashier, created_at, payments")
-              .gte("created_at", todayIso),
+              .select("*")
+              .order("created_at", { ascending: false })
+              .limit(200),
             supabase
               .from("cash_movements")
               .select("id, branch_id, type, category, category_label, amount, reason, authorized_by, created_at")
@@ -870,20 +872,38 @@ function resolveBranchParam(param: string | null): string | null {
             try {
               const rawLocalOrd = localStorage.getItem("brito_custom_orders");
               const localOrdList = rawLocalOrd ? JSON.parse(rawLocalOrd) : [];
-              const ordMap = new Map<string, any>(localOrdList.map((o: any) => [o.orderNumber || o.id, o]));
+              const ordMap = new Map<string, any>();
+
+              // Cargar existentes previamente normalizados
+              localOrdList.forEach((o: any) => {
+                const norm = normalizeOrder(o);
+                if (norm.id) ordMap.set(norm.id, norm);
+                if (norm.orderNumber) ordMap.set(norm.orderNumber, norm);
+              });
+
               let anyOrdUpdated = false;
 
               dbOrders.forEach((dbo: any) => {
-                const key = dbo.order_number || dbo.id;
-                const existing = ordMap.get(key);
-                if (!existing || (!existing.deposit && dbo.deposit) || existing.deposit !== dbo.deposit || existing.status !== dbo.status) {
-                  ordMap.set(key, { ...existing, ...dbo });
+                const norm = normalizeOrder(dbo);
+                const existing = (norm.id && ordMap.get(norm.id)) || (norm.orderNumber && ordMap.get(norm.orderNumber));
+                const exTs = existing?.timestamp || 0;
+                const normTs = norm.timestamp || 0;
+                if (!existing || exTs < normTs || existing.deposit !== norm.deposit || existing.status !== norm.status) {
+                  if (norm.id) ordMap.set(norm.id, norm);
+                  if (norm.orderNumber) ordMap.set(norm.orderNumber, norm);
                   anyOrdUpdated = true;
                 }
               });
 
               if (anyOrdUpdated) {
-                localStorage.setItem("brito_custom_orders", JSON.stringify(Array.from(ordMap.values())));
+                const uniqueOrders = new Map<string, any>();
+                for (const ord of ordMap.values()) {
+                  const key = ord.id || ord.orderNumber;
+                  if (key && !uniqueOrders.has(key)) {
+                    uniqueOrders.set(key, ord);
+                  }
+                }
+                localStorage.setItem("brito_custom_orders", JSON.stringify(Array.from(uniqueOrders.values())));
                 window.dispatchEvent(new Event("brito_orders_updated"));
               }
             } catch {}
@@ -2253,7 +2273,8 @@ function resolveBranchParam(param: string | null): string | null {
           title: "Venta en Mostrador",
           highlightText: `+$${amount.toFixed(2)} MXN • ${saleLog.branchName}`,
           description: `${saleLog.cashier}: ${saleLog.itemsSummary} (${paymentMethod.toUpperCase()})`,
-          timeAgo: "Hace un momento",
+          timeAgo: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")} hrs`,
+          timestamp: Date.now(),
           group: "recientes",
           read: false,
           category: "caja",
@@ -2610,7 +2631,8 @@ function resolveBranchParam(param: string | null): string | null {
           title: isEntrada ? "Ingreso a Caja" : "Salida de Dinero / Gasto",
           highlightText: `${isEntrada ? "+" : "-"}$${movement.amount.toFixed(2)} MXN • ${branchName}`,
           description: `${movement.categoryLabel}: ${movement.reason} • Autorizó: ${movement.authorizedBy}`,
-          timeAgo: "Hace un momento",
+          timeAgo: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")} hrs`,
+          timestamp: Date.now(),
           group: "recientes",
           read: false,
           category: "caja",

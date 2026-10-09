@@ -1,68 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-
-export interface StoredRealtimeEvent {
-  id: string;
-  type: string;
-  payload: any;
-  senderDeviceId: string;
-  timestamp: number;
-}
-
-const DATA_DIR = path.join(process.cwd(), "src", "data");
-const EVENTS_FILE = path.join(DATA_DIR, "realtime_events.json");
-
-// Buffer en memoria y persistente para los últimos 500 eventos del servidor
-const MAX_EVENTS = 500;
-let eventBuffer: StoredRealtimeEvent[] = [];
-let isInitialized = false;
-
-function ensureDataDirectory() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  } catch (err) {
-    console.warn("[API Realtime] No se pudo crear directorio data:", err);
-  }
-}
-
-function loadStoredEvents(): StoredRealtimeEvent[] {
-  if (isInitialized && eventBuffer.length > 0) {
-    return eventBuffer;
-  }
-
-  try {
-    ensureDataDirectory();
-    if (fs.existsSync(EVENTS_FILE)) {
-      const content = fs.readFileSync(EVENTS_FILE, "utf-8");
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        eventBuffer = parsed;
-        isInitialized = true;
-        return eventBuffer;
-      }
-    }
-  } catch (err) {
-    console.warn("[API Realtime] Error al leer realtime_events.json, usando memoria:", err);
-  }
-
-  isInitialized = true;
-  return eventBuffer;
-}
-
-function saveStoredEvents(events: StoredRealtimeEvent[]): boolean {
-  eventBuffer = events;
-  try {
-    ensureDataDirectory();
-    fs.writeFileSync(EVENTS_FILE, JSON.stringify(events, null, 2), "utf-8");
-    return true;
-  } catch (err) {
-    console.warn("[API Realtime] No se pudo escribir en realtime_events.json:", err);
-    return false;
-  }
-}
+import { 
+  StoredRealtimeEvent, 
+  MAX_EVENTS, 
+  loadStoredEvents, 
+  saveStoredEvents 
+} from "@/lib/realtime/serverEvents";
 
 export async function GET(req: NextRequest) {
   try {

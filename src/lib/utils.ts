@@ -572,17 +572,17 @@ export function compressImageFile(
 
 /**
  * Resuelve de manera estricta y canónica el identificador de sucursal
- * considerando el ID provisto, nombres alternativos y el cajero asignado.
+ * considerando el ID provisto, nombres alternativos, códigos y el cajero asignado.
  */
 export function resolveBranchId(rawBranchId: string | null | undefined, cashierName?: string): string {
   if (rawBranchId) {
     const lower = rawBranchId.toLowerCase().trim();
-    if (lower.includes("angeles") || lower.includes("ángeles")) return "branch-angeles";
-    if (lower.includes("ildefonso") || lower.includes("1790889237862")) return "branch-1790889237862";
-    if (lower.includes("benito")) return "branch-benito";
-    if (lower.includes("sanjuan") || lower.includes("san-juan") || lower.includes("san juan")) return "branch-sanjuan";
-    if (lower.includes("flores")) return "branch-flores";
-    if (lower.includes("matriz") || lower.includes("centro")) return "branch-matriz";
+    if (lower.includes("angeles") || lower.includes("ángeles") || lower.includes("suc-les")) return "branch-angeles";
+    if (lower.includes("ildefonso") || lower.includes("1790889237862") || lower.includes("ilf-04")) return "branch-1790889237862";
+    if (lower.includes("benito") || lower.includes("ben-02")) return "branch-benito";
+    if (lower.includes("sanjuan") || lower.includes("san-juan") || lower.includes("san juan") || lower.includes("sju-02")) return "branch-sanjuan";
+    if (lower.includes("flores") || lower.includes("flo-03")) return "branch-flores";
+    if (lower.includes("matriz") || lower.includes("centro") || lower.includes("mat-01")) return "branch-matriz";
     if (lower !== "branch-matriz" && lower.startsWith("branch-")) return rawBranchId;
   }
   if (cashierName) {
