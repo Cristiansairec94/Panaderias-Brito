@@ -97,6 +97,7 @@ export default function OrderPaymentModal({
           const isFullyPaid = numericAmount >= order.remainingBalance;
           const newRemaining = Math.max(0, order.remainingBalance - numericAmount);
           addNotification({
+            id: `notif-order-pay-${order.id}-${numericAmount}`,
             senderName: `🎂 ${isFullyPaid ? "Pedido Liquidado" : "Abono Recibido"} (${operatingBranchName})`,
             senderAvatar: "🎂",
             badgeIcon: "pastel",

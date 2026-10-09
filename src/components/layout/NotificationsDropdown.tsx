@@ -207,12 +207,12 @@ export default function NotificationsDropdown() {
                 </h3>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   {isAdmin ? (
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
                       🛡️ Control Total (Todas las sucursales y cortes)
                     </span>
                   ) : (
-                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100/90 border border-amber-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                      📍 Sucursal {user?.assignedBranchName || "Asignada"}
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+                      📍 Sucursal {(user?.assignedBranchName || "San Ildefonso").replace(/^(sucursal\s*)+/i, "").trim()}
                     </span>
                   )}
                 </div>
@@ -428,7 +428,87 @@ export default function NotificationsDropdown() {
   );
 }
 
-// Subcomponent for individual card item styled exactly like user mockup
+// Helper to extract structured order data and format clean previews
+function parseOrderNotification(notif: FBNotification) {
+  const combined = `${notif.title} ${notif.highlightText} ${notif.description}`;
+
+  // 1. Folio
+  const folioMatch = combined.match(/PED-\d+/i);
+  const folio = folioMatch ? folioMatch[0] : (notif.orderId || null);
+
+  // 2. Customer Name
+  let customer = notif.highlightText || "";
+  if (customer.includes(":")) {
+    const parts = customer.split(":");
+    customer = parts.slice(1).join(":").trim();
+  }
+  customer = customer
+    .replace(/\s*-\s*Anticipo.*$/i, "")
+    .replace(/\s*-\s*Total.*$/i, "")
+    .replace(/^PED-\d+\s*/i, "")
+    .trim();
+
+  // 3. Amounts
+  const totalMatch = combined.match(/Total:?\s*\$?([0-9,.]+)/i);
+  const total = totalMatch ? `$${totalMatch[1].replace(/^\$/, "")}` : null;
+
+  const depositMatch = combined.match(/Anticipo:?\s*\$?([0-9,.]+)/i);
+  const deposit = depositMatch ? `$${depositMatch[1].replace(/^\$/, "")}` : null;
+
+  const remainingMatch = combined.match(/(?:Saldo restante|Cobrar):?\s*\$?([0-9,.]+)/i);
+  const remaining = remainingMatch ? `$${remainingMatch[1].replace(/^\$/, "")}` : null;
+
+  // 4. Cross-Branch Route
+  let originBranch = notif.operatingBranchName || "";
+  let destBranch = notif.branchName || "";
+
+  if (!originBranch || !destBranch) {
+    const routeMatch = notif.title.match(/Sucursal\s+([^➔•\)]+)\s*➔\s*Sucursal\s+([^•\)]+)/i);
+    if (routeMatch) {
+      originBranch = routeMatch[1].trim();
+      destBranch = routeMatch[2].trim();
+    } else {
+      const descRoute = notif.description.match(/Levantado en:\s*([^•\]]+)\s*•\s*Entrega en:\s*([^•\]]+)/i);
+      if (descRoute) {
+        originBranch = descRoute[1].trim();
+        destBranch = descRoute[2].trim();
+      }
+    }
+  }
+
+  // Clean branch names
+  originBranch = originBranch.replace(/^Sucursal\s+/i, "").replace(/\(.*\)/, "").trim();
+  destBranch = destBranch.replace(/^Sucursal\s+/i, "").replace(/\(.*\)/, "").trim();
+
+  const isCross = Boolean(originBranch && destBranch && originBranch.toLowerCase() !== destBranch.toLowerCase());
+
+  // 5. Clean Description (Strip out raw redundant strings already shown in badges)
+  let cleanDesc = notif.description
+    .replace(/\[Levantado en:.*?Entrega en:.*?\]\s*/i, "")
+    .replace(/Recoge en:\s*[^.]+\.\s*/i, "")
+    .replace(/Saldo restante:\s*[^.]+\.\s*/i, "")
+    .replace(/Anticipo:\s*[^.]+\.\s*/i, "")
+    .replace(/Total:\s*[^.]+\.\s*/i, "")
+    .trim();
+
+  if (!cleanDesc) {
+    cleanDesc = notif.description;
+  }
+
+  return {
+    folio,
+    customer,
+    total,
+    deposit,
+    remaining,
+    originBranch,
+    destBranch,
+    isCross,
+    cleanDesc,
+  };
+}
+
+// Subcomponent for individual card item styled with elegant bakery aesthetics
 function NotificationCardItem({
   notif,
   getBadgeIcon,
@@ -448,6 +528,7 @@ function NotificationCardItem({
   setActiveItemMenu: (id: string | null) => void;
   onCloseDropdown: () => void;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const { openOrderDetail, openOrderPayment, openShiftCutDetail } = useNotifications();
   const isMenuOpen = activeItemMenu === notif.id;
 
@@ -459,6 +540,7 @@ function NotificationCardItem({
     notif.category === "pedidos" ||
     notif.title.toLowerCase().includes("pedido");
 
+  const parsedOrder = isOrder ? parseOrderNotification(notif) : null;
   const cutData = isShiftCut ? findShiftCutForNotification(notif) : null;
 
   const fullText = `${notif.title} ${notif.highlightText} ${notif.description}`.toLowerCase();
@@ -491,29 +573,29 @@ function NotificationCardItem({
           openShiftCutDetail(notif);
         }
       }}
-      className={`bg-white rounded-2xl border border-[#eee6dd] p-4 shadow-xs space-y-2.5 relative group transition-all ${
-        isOrder || isShiftCut ? "cursor-pointer hover:border-amber-400 hover:shadow-md" : ""
+      className={`bg-white/95 rounded-2xl border border-[#e8ded2] hover:border-amber-400 p-3.5 sm:p-4 shadow-xs hover:shadow-md space-y-2.5 relative group transition-all ${
+        isOrder || isShiftCut ? "cursor-pointer" : ""
       }`}
     >
-      {/* Top Header Tag: Status Pill + Time */}
-      <div className="flex items-center justify-between gap-2 flex-wrap pb-1.5 border-b border-stone-100">
+      {/* Top Header Tag: Status Pill + Cross-Branch Route + Time */}
+      <div className="flex items-center justify-between gap-1.5 flex-wrap pb-2 border-b border-amber-900/10">
         <div className="flex items-center gap-1.5 flex-wrap">
           {isShiftCut && (
             <>
               {isSquare ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100/90 text-emerald-800 border border-emerald-300 shadow-2xs">
                   ✓ CAJA CUADRADA EXACTA
                 </span>
               ) : isShort ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
-                  🚨 NO CUADRÓ LA CAJA (FALTANTE)
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+                  🚨 NO CUADRÓ (FALTANTE)
                 </span>
               ) : isOver ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                  ⚠️ NO CUADRÓ LA CAJA (SOBRANTE)
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                  ⚠️ NO CUADRÓ (SOBRANTE)
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700 border border-stone-200">
                   🏁 CIERRE DE TURNO
                 </span>
               )}
@@ -521,8 +603,16 @@ function NotificationCardItem({
           )}
 
           {isOrder && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-200">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-pink-100 via-rose-100 to-amber-100 text-pink-900 border border-pink-300/80 shadow-2xs">
               🎂 PEDIDO DE CLIENTE
+            </span>
+          )}
+
+          {parsedOrder?.isCross && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-50 to-orange-100 text-amber-950 border border-amber-300 shadow-2xs">
+              <span className="text-amber-800">🏬 {parsedOrder.originBranch}</span>
+              <span className="text-orange-600 font-black">➔</span>
+              <span className="text-amber-900">📍 {parsedOrder.destBranch}</span>
             </span>
           )}
         </div>
@@ -532,41 +622,154 @@ function NotificationCardItem({
         </span>
       </div>
 
-      {/* Top row: Avatar & Description */}
-      <div className="flex items-start gap-3.5">
-        {/* Avatar Container with Graphic & Overlapping Badge */}
+      {/* Main Row: Avatar + Structured Info */}
+      <div className="flex items-start gap-3">
+        {/* Avatar Container with Warm Bakery Gradient & Overlapping Badge */}
         <div className="relative shrink-0">
-          <div className="w-13 h-13 rounded-2xl bg-[#faf6f0] border border-[#ede5dc] flex items-center justify-center p-1 shadow-2xs">
+          <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-br from-amber-100/90 via-orange-50 to-pink-50 border border-amber-200/80 flex items-center justify-center p-1 shadow-2xs">
             {notif.badgeIcon === "harina" ? (
-              <FlourSackGraphic className="w-10 h-10" />
+              <FlourSackGraphic className="w-9 h-9 sm:w-10 sm:h-10" />
             ) : notif.badgeIcon === "pastel" ? (
-              <CakeGraphic className="w-10 h-10" />
+              <CakeGraphic className="w-9 h-9 sm:w-10 sm:h-10" />
             ) : (
               <span className="text-2xl select-none">{notif.senderAvatar}</span>
             )}
           </div>
 
           {/* Overlapping Badge Icon in Terracotta Circle */}
-          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#b85422] border-2 border-white flex items-center justify-center text-white shadow-xs">
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-br from-[#c25425] to-[#a83d12] border-2 border-white flex items-center justify-center text-white shadow-xs">
             {getBadgeIcon(notif.badgeIcon)}
           </div>
         </div>
 
-        {/* Text Details */}
-        <div className="flex-1 min-w-0 pr-1">
-          <h5 className="text-xs font-bold text-stone-900 mb-0.5 leading-snug">
-            {notif.title}
-          </h5>
-          <p className="text-xs sm:text-[13px] text-stone-700 leading-snug">
-            <strong className="font-semibold text-stone-800">{notif.highlightText}: </strong>
-            <span className="text-stone-600">{notif.description}</span>
-          </p>
+        {/* Text Details Area */}
+        <div className="flex-1 min-w-0 pr-0.5 space-y-1">
+          {isOrder && parsedOrder ? (
+            <>
+              {/* Header Title with Folio and Customer */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {parsedOrder.folio && (
+                  <span className="text-[10px] font-mono font-black text-amber-900 bg-amber-100/90 border border-amber-300 px-1.5 py-0.2 rounded-md">
+                    {parsedOrder.folio}
+                  </span>
+                )}
+                <h5 className="text-xs sm:text-[13px] font-bold text-stone-900 leading-snug truncate">
+                  👤 {parsedOrder.customer || notif.highlightText}
+                </h5>
+              </div>
+
+              {/* Colorful Financial Pills Row */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                {parsedOrder.total && (
+                  <span className="text-[11px] font-bold text-stone-800 bg-stone-100 px-2 py-0.5 rounded-lg border border-stone-200">
+                    Total: <strong className="font-mono font-black text-stone-900">{parsedOrder.total}</strong>
+                  </span>
+                )}
+                {parsedOrder.deposit && (
+                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                    Anticipo: <strong className="font-mono font-black text-emerald-700">{parsedOrder.deposit}</strong>
+                  </span>
+                )}
+                {parsedOrder.remaining && (
+                  <span className="text-[11px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-300">
+                    Por Cobrar: <strong className="font-mono font-black text-amber-800">{parsedOrder.remaining}</strong>
+                  </span>
+                )}
+              </div>
+
+              {/* Description / Items with "Leer más" Toggle */}
+              {parsedOrder.cleanDesc && (
+                <div className="text-xs text-stone-700 pt-0.5 leading-relaxed">
+                  {parsedOrder.cleanDesc.length > 80 ? (
+                    isExpanded ? (
+                      <div className="space-y-1 animate-in fade-in duration-150">
+                        <p className="text-stone-700 bg-amber-50/50 p-2 rounded-xl border border-amber-200/60 leading-normal">
+                          {parsedOrder.cleanDesc}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsExpanded(false);
+                          }}
+                          className="text-amber-800 hover:text-amber-950 font-black text-[11px] underline underline-offset-2 cursor-pointer transition-colors inline-flex items-center gap-1"
+                        >
+                          Mostrar menos ▲
+                        </button>
+                      </div>
+                    ) : (
+                      <p>
+                        <span className="text-stone-600">
+                          {parsedOrder.cleanDesc.slice(0, 75).trim()}...
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsExpanded(true);
+                          }}
+                          className="text-amber-800 hover:text-amber-950 font-black text-[11px] underline underline-offset-2 ml-1 cursor-pointer transition-colors inline-flex items-center gap-1"
+                        >
+                          Leer más ▾
+                        </button>
+                      </p>
+                    )
+                  ) : (
+                    <p className="text-stone-600">{parsedOrder.cleanDesc}</p>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Default non-order layout with optional "Leer más" */}
+              <h5 className="text-xs font-bold text-stone-900 leading-snug">
+                {notif.title}
+              </h5>
+              <div className="text-xs sm:text-[13px] text-stone-700 leading-snug">
+                <strong className="font-semibold text-stone-800">{notif.highlightText}: </strong>
+                {notif.description.length > 95 ? (
+                  isExpanded ? (
+                    <span className="animate-in fade-in duration-150">
+                      <span className="text-stone-600">{notif.description}</span>{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsExpanded(false);
+                        }}
+                        className="text-amber-800 hover:text-amber-950 font-black text-[11px] underline underline-offset-2 cursor-pointer inline-flex items-center gap-0.5 ml-1"
+                      >
+                        Mostrar menos ▲
+                      </button>
+                    </span>
+                  ) : (
+                    <span>
+                      <span className="text-stone-600">{notif.description.slice(0, 85).trim()}...</span>{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsExpanded(true);
+                        }}
+                        className="text-amber-800 hover:text-amber-950 font-black text-[11px] underline underline-offset-2 cursor-pointer inline-flex items-center gap-0.5 ml-1"
+                      >
+                        Leer más ▼
+                      </button>
+                    </span>
+                  )
+                ) : (
+                  <span className="text-stone-600">{notif.description}</span>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Card Options Menu & Unread Indicator */}
         <div className="flex items-center gap-1 shrink-0 -mr-1">
           {!notif.read && (
-            <span className="w-2 h-2 rounded-full bg-[#c25425] shrink-0" title="No leída" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[#c25425] shrink-0 shadow-xs" title="No leída" />
           )}
 
           <div className="relative">
@@ -745,14 +948,14 @@ function NotificationCardItem({
             onCloseDropdown();
             openShiftCutDetail(notif);
           }}
-          className="w-full bg-[#c25425] hover:bg-[#a8441b] text-white font-black text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer active:scale-98"
+          className="w-full bg-gradient-to-r from-amber-700 via-orange-700 to-amber-800 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer active:scale-98"
         >
           <span>Ver Corte de Caja</span>
           <span className="text-sm font-bold leading-none">➔</span>
         </button>
       ) : notif.secondaryActionLabel ? (
-        /* Dual action buttons matching Card 2 in user mockup */
-        <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+        /* Dual action buttons matching Card in user mockup */
+        <div className="grid grid-cols-2 gap-2.5 pt-1">
           {isOrder ? (
             <>
               <button
@@ -768,7 +971,7 @@ function NotificationCardItem({
                     openOrderDetail(notif);
                   }
                 }}
-                className="bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate cursor-pointer active:scale-95"
+                className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-all truncate cursor-pointer active:scale-95"
               >
                 {notif.actionLabel || "Ver Detalle"}
               </button>
@@ -780,7 +983,7 @@ function NotificationCardItem({
                   onCloseDropdown();
                   openOrderDetail(notif);
                 }}
-                className="bg-[#fdfbf9] border border-[#c25425] text-[#c25425] hover:bg-[#faeee6] font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate cursor-pointer active:scale-95"
+                className="bg-white hover:bg-amber-50/80 border-2 border-amber-300 text-amber-900 font-bold text-xs sm:text-[13px] py-2 px-3 rounded-xl text-center shadow-2xs transition-all truncate cursor-pointer active:scale-95"
               >
                 {notif.secondaryActionLabel === "Ver Pedidos" || notif.secondaryActionLabel === "Ver Pedido"
                   ? "Ver Detalle"
@@ -796,7 +999,7 @@ function NotificationCardItem({
                   markAsRead(notif.id);
                   onCloseDropdown();
                 }}
-                className="bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate"
+                className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-all truncate active:scale-95"
               >
                 {notif.actionLabel}
               </Link>
@@ -807,7 +1010,7 @@ function NotificationCardItem({
                   markAsRead(notif.id);
                   onCloseDropdown();
                 }}
-                className="bg-[#fdfbf9] border border-[#c25425] text-[#c25425] hover:bg-[#faeee6] font-medium text-xs sm:text-[13px] py-2.5 px-3 rounded-xl text-center shadow-xs transition-colors truncate"
+                className="bg-white hover:bg-amber-50/80 border-2 border-amber-300 text-amber-900 font-bold text-xs sm:text-[13px] py-2 px-3 rounded-xl text-center shadow-2xs transition-all truncate active:scale-95"
               >
                 {notif.secondaryActionLabel}
               </Link>
@@ -830,7 +1033,7 @@ function NotificationCardItem({
                 openOrderDetail(notif);
               }
             }}
-            className="w-full bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer active:scale-98"
+            className="w-full bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer active:scale-98"
           >
             <span>
               {notif.actionLabel === "Ver Pedidos" || notif.actionLabel === "Ver Pedido"
@@ -847,7 +1050,7 @@ function NotificationCardItem({
               markAsRead(notif.id);
               onCloseDropdown();
             }}
-            className="w-full bg-[#c25425] hover:bg-[#a8441b] text-white font-medium text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors"
+            className="w-full bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-xs sm:text-[13px] py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all"
           >
             <span>{notif.actionLabel}</span>
             <span className="text-sm font-bold leading-none">➔</span>

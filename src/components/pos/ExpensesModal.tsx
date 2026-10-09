@@ -51,7 +51,8 @@ import {
   matchesCashier,
   getStoredShiftStartBoundary,
   deduplicateExpenses,
-  deduplicateIncomes
+  deduplicateIncomes,
+  resolveBranchId
 } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useNotifications } from "@/context/NotificationContext";
@@ -455,6 +456,9 @@ export default function ExpensesModal({
 
     if (matchPickup || matchOperating) return true;
 
+    const resolvedOrdBranch = resolveBranchId(opId || pId, o.cashier);
+    if (resolvedOrdBranch === bId) return true;
+
     // Si no tiene campos de sucursal explícitos, asociar solo si coincide el cajero o si es Matriz
     if (!pId && !pName && !opId && !opName) {
       if (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) {
@@ -853,15 +857,8 @@ export default function ExpensesModal({
       if (!e) return false;
       if (e.id && (e.id.includes("354644") || e.id.includes("299599") || e.id.includes("334972") || e.amount > 500000)) return false;
       if (activeBranch && activeBranch.id !== "all") {
-        let eBranch = (e as any).branchId || (e as any).branch_id;
-        if ((!eBranch || eBranch === "branch-matriz") && e.cashier && e.cashier.toLowerCase().includes("silvia")) {
-          eBranch = "branch-1790889237862";
-        }
-        if (eBranch) {
-          if (eBranch !== activeBranch.id) return false;
-        } else {
-          if (activeBranch.id !== "branch-matriz") return false;
-        }
+        const eBranch = resolveBranchId((e as any).branchId || (e as any).branch_id, e.cashier);
+        if (eBranch !== activeBranch.id) return false;
       }
       const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
       if (!isOwnerOrAdmin && (!e.cashier || (!matchesCashier(e.cashier, effectiveCashier) && !matchesCashier(e.cashier, cashierName)))) return false;
@@ -938,15 +935,8 @@ export default function ExpensesModal({
       if (inc.amount === 6000) return false; // Duplicado fantasma de pedido de 6000
 
       if (activeBranch && activeBranch.id !== "all") {
-        let incBranch = (inc as any).branchId || (inc as any).branch_id;
-        if ((!incBranch || incBranch === "branch-matriz") && inc.cashier && inc.cashier.toLowerCase().includes("silvia")) {
-          incBranch = "branch-1790889237862";
-        }
-        if (incBranch) {
-          if (incBranch !== activeBranch.id) return false;
-        } else {
-          if (activeBranch.id !== "branch-matriz") return false;
-        }
+        const incBranch = resolveBranchId((inc as any).branchId || (inc as any).branch_id, inc.cashier);
+        if (incBranch !== activeBranch.id) return false;
       }
       const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
       if (!isOwnerOrAdmin && (!inc.cashier || (!matchesCashier(inc.cashier, effectiveCashier) && !matchesCashier(inc.cashier, cashierName)))) return false;
@@ -993,15 +983,8 @@ export default function ExpensesModal({
       if (!s) return false;
       if (s.id && (s.id.includes("354644") || s.id.includes("299599") || s.id.includes("331037") || s.total > 500000)) return false;
       if (activeBranch && activeBranch.id !== "all") {
-        let sBranch = (s as any).branchId || (s as any).branch_id;
-        if ((!sBranch || sBranch === "branch-matriz") && s.cashier && s.cashier.toLowerCase().includes("silvia")) {
-          sBranch = "branch-1790889237862";
-        }
-        if (sBranch) {
-          if (sBranch !== activeBranch.id) return false;
-        } else {
-          if (activeBranch.id !== "branch-matriz") return false;
-        }
+        const sBranch = resolveBranchId((s as any).branchId || (s as any).branch_id, s.cashier);
+        if (sBranch !== activeBranch.id) return false;
       }
       if (effectiveCashier && s.cashier && !matchesCashier(s.cashier, effectiveCashier) && (!cashierName || !matchesCashier(s.cashier, cashierName))) {
         return false;

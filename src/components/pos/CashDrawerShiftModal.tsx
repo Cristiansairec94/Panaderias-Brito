@@ -32,7 +32,7 @@ import {
   FileText
 } from "lucide-react";
 import { Product, Sale, CashExpense, CashIncome, ShiftCutRecord, CustomOrder } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanDecimalNumbers, formatDateTimeSafe, parseDateTimeSafe, matchesCashier, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
 import { getStoredOrders } from "@/lib/orders";
 import { useNotifications, FBNotification } from "@/context/NotificationContext";
 import { useBranch } from "@/context/BranchContext";
@@ -90,7 +90,7 @@ export default function CashDrawerShiftModal({
   const { currentBranch, branches, updateBranch } = useBranch();
 
   // Fondo Inicial Sincronizado en tiempo real
-  const targetBranchId = currentBranch?.id || "branch-matriz";
+  const targetBranchId = resolveBranchId(branchId || currentBranch?.id, cashierName);
   const standardBranchFund = targetBranchId === "branch-benito" ? 800 : targetBranchId === "branch-flores" ? 1200 : 1000;
 
   const [syncedFund, setSyncedFund] = useState<number>(() => {
@@ -338,15 +338,8 @@ export default function CashDrawerShiftModal({
   const shiftSales = (sales || []).filter((s) => {
     if (!s) return false;
     if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-      let sBranch = (s as any).branchId || (s as any).branch_id;
-      if ((!sBranch || sBranch === "branch-matriz") && s.cashier && s.cashier.toLowerCase().includes("silvia")) {
-        sBranch = "branch-1790889237862";
-      }
-      if (sBranch) {
-        if (sBranch !== currentBranch.id) return false;
-      } else {
-        if (currentBranch.id !== "branch-matriz") return false;
-      }
+      const sBranch = resolveBranchId((s as any).branchId || (s as any).branch_id, s.cashier);
+      if (sBranch !== currentBranch.id) return false;
     }
     if (outgoingCashier && s.cashier && !matchesCashier(s.cashier, outgoingCashier)) {
       return false;
@@ -364,15 +357,11 @@ export default function CashDrawerShiftModal({
   const shiftOrders = (orders || []).filter((o) => {
     if (!o) return false;
     if (currentBranch && currentBranch.id && currentBranch.id !== "all") {
-      let oBranch = (o as any).branchId || (o as any).branch_id;
-      if ((!oBranch || oBranch === "branch-matriz") && o.cashier && o.cashier.toLowerCase().includes("silvia")) {
-        oBranch = "branch-1790889237862";
-      }
-      if (oBranch) {
-        if (oBranch !== currentBranch.id) return false;
-      } else {
-        if (currentBranch.id !== "branch-matriz") return false;
-      }
+      const oBranch = resolveBranchId(
+        (o as any).operatingBranchId || (o as any).pickupBranchId || (o as any).branchId || (o as any).branch_id,
+        o.cashier
+      );
+      if (oBranch !== currentBranch.id) return false;
     }
     if (outgoingCashier && o.cashier && !matchesCashier(o.cashier, outgoingCashier)) {
       return false;
@@ -420,15 +409,8 @@ export default function CashDrawerShiftModal({
     if (!e) return false;
     if (e.id && (e.id.includes("354644") || e.id.includes("299599") || e.id.includes("334972") || e.amount > 500000)) return false;
     if (targetBranch && targetBranch.id && targetBranch.id !== "all") {
-      let eBranch = (e as any).branchId || (e as any).branch_id;
-      if ((!eBranch || eBranch === "branch-matriz") && e.cashier && e.cashier.toLowerCase().includes("silvia")) {
-        eBranch = "branch-1790889237862";
-      }
-      if (eBranch) {
-        if (eBranch !== targetBranch.id) return false;
-      } else {
-        if (targetBranch.id !== "branch-matriz") return false;
-      }
+      const eBranch = resolveBranchId((e as any).branchId || (e as any).branch_id, e.cashier);
+      if (eBranch !== targetBranch.id) return false;
     }
     const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, outgoingCashier))) return false;
@@ -447,15 +429,8 @@ export default function CashDrawerShiftModal({
     if (Number(inc.amount) === 6000) return false; // Duplicado fantasma de pedido de 6000
 
     if (targetBranch && targetBranch.id && targetBranch.id !== "all") {
-      let incBranch = (inc as any).branchId || (inc as any).branch_id;
-      if ((!incBranch || incBranch === "branch-matriz") && inc.cashier && inc.cashier.toLowerCase().includes("silvia")) {
-        incBranch = "branch-1790889237862";
-      }
-      if (incBranch) {
-        if (incBranch !== targetBranch.id) return false;
-      } else {
-        if (targetBranch.id !== "branch-matriz") return false;
-      }
+      const incBranch = resolveBranchId((inc as any).branchId || (inc as any).branch_id, inc.cashier);
+      if (incBranch !== targetBranch.id) return false;
     }
     const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier))) return false;
@@ -556,7 +531,7 @@ export default function CashDrawerShiftModal({
       outgoingCashier,
       incomingCashier,
       responsible: outgoingCashier,
-      branchId: currentBranch?.id || "branch-matriz",
+      branchId: resolveBranchId(currentBranch?.id || branchId, outgoingCashier),
       branchName: currentBranch?.name || "Sucursal Matriz (Centro)",
       previousShift: shiftName,
       nextShift: nextShiftName,
@@ -592,7 +567,7 @@ export default function CashDrawerShiftModal({
 
       // Reiniciar inicio de turno y cajero entrante para que ventas/gastos inicien estrictamente en 0
       const cutTs = cutRecord.timestamp || Date.now();
-      const targetBranchId = currentBranch?.id || "branch-matriz";
+      const targetBranchId = resolveBranchId(currentBranch?.id || branchId, outgoingCashier);
       localStorage.setItem("brito_shift_start_" + targetBranchId, cutTs.toString());
       localStorage.setItem("brito_current_shift_start_timestamp", cutTs.toString());
       localStorage.setItem("brito_current_shift_cashier", incomingCashier);
@@ -608,8 +583,8 @@ export default function CashDrawerShiftModal({
         const curSales = JSON.parse(localStorage.getItem("brito_pos_current_sales") || "[]");
         const remainingSales = Array.isArray(curSales)
           ? curSales.filter((s: any) => {
-              const bId = s.branchId || s.branch_id;
-              return bId && bId !== targetBranchId;
+              const bId = resolveBranchId(s.branchId || s.branch_id, s.cashier);
+              return bId !== targetBranchId;
             })
           : [];
         localStorage.setItem("brito_pos_current_sales", JSON.stringify(remainingSales));
@@ -619,8 +594,8 @@ export default function CashDrawerShiftModal({
         const curExp = JSON.parse(localStorage.getItem("brito_pos_current_expenses") || "[]");
         const remainingExp = Array.isArray(curExp)
           ? curExp.filter((e: any) => {
-              const bId = e.branchId || e.branch_id;
-              return bId && bId !== targetBranchId;
+              const bId = resolveBranchId(e.branchId || e.branch_id, e.cashier);
+              return bId !== targetBranchId;
             })
           : [];
         localStorage.setItem("brito_pos_current_expenses", JSON.stringify(remainingExp));
@@ -630,8 +605,8 @@ export default function CashDrawerShiftModal({
         const curInc = JSON.parse(localStorage.getItem("brito_pos_current_incomes") || "[]");
         const remainingInc = Array.isArray(curInc)
           ? curInc.filter((i: any) => {
-              const bId = i.branchId || i.branch_id;
-              return bId && bId !== targetBranchId;
+              const bId = resolveBranchId(i.branchId || i.branch_id, i.cashier);
+              return bId !== targetBranchId;
             })
           : [];
         localStorage.setItem("brito_pos_current_incomes", JSON.stringify(remainingInc));
@@ -750,7 +725,7 @@ export default function CashDrawerShiftModal({
       actionLink: `/caja?tab=historial&corteId=${cutRecord.id}`,
       shiftCutData: cutRecord,
       cutId: cutRecord.id,
-      branchId: cutRecord.branchId || currentBranch?.id || "branch-matriz",
+      branchId: cutRecord.branchId || resolveBranchId(currentBranch?.id || branchId, outgoingCashier),
       branchName: cutRecord.branchName || "Sucursal",
       timeAgo: "Hace un momento",
       group: "recientes",

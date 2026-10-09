@@ -52,7 +52,7 @@ import {
   ArrowUpRight
 } from "lucide-react";
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem, ShiftCutRecord } from "@/types";
-import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes } from "@/lib/utils";
+import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb, getDeletedProductIds } from "@/lib/products";
 import { 
@@ -1994,12 +1994,8 @@ export default function POSPage() {
         if (!s) return false;
         if (s.id && (s.id.includes("354644") || s.id.includes("299599") || s.id.includes("331037") || s.total > 500000)) return false;
         if (activeBranch && activeBranch.id !== "all") {
-          const sBranch = (s as any).branchId || (s as any).branch_id;
-          if (sBranch) {
-            if (sBranch !== activeBranch.id) return false;
-          } else {
-            if (activeBranch.id !== "branch-matriz") return false;
-          }
+          const sBranch = resolveBranchId((s as any).branchId || (s as any).branch_id, s.cashier);
+          if (sBranch !== activeBranch.id) return false;
         }
         if (targetCashier && s.cashier && !matchesCashier(s.cashier, targetCashier) && (!cashierName || !matchesCashier(s.cashier, cashierName))) {
           return false;
@@ -2049,12 +2045,8 @@ export default function POSPage() {
         if (!e) return false;
         if (e.id && (e.id.includes("354644") || e.id.includes("299599") || e.id.includes("334972") || e.amount > 500000)) return false;
         if (activeBranch && activeBranch.id !== "all") {
-          const eBranch = (e as any).branchId || (e as any).branch_id;
-          if (eBranch) {
-            if (eBranch !== activeBranch.id) return false;
-          } else {
-            if (activeBranch.id !== "branch-matriz") return false;
-          }
+          const eBranch = resolveBranchId((e as any).branchId || (e as any).branch_id, e.cashier);
+          if (eBranch !== activeBranch.id) return false;
         }
         const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
         if (!isOwnerOrAdmin && (!e.cashier || (!matchesCashier(e.cashier, targetCashier) && !matchesCashier(e.cashier, cashierName)))) return false;
@@ -2123,15 +2115,8 @@ export default function POSPage() {
         if (inc.amount === 6000) return false; // Duplicado fantasma de pedido de 6000
 
         if (activeBranch && activeBranch.id !== "all") {
-          let incBranch = (inc as any).branchId || (inc as any).branch_id;
-          if ((!incBranch || incBranch === "branch-matriz") && inc.cashier && inc.cashier.toLowerCase().includes("silvia")) {
-            incBranch = "branch-1790889237862";
-          }
-          if (incBranch) {
-            if (incBranch !== activeBranch.id) return false;
-          } else {
-            if (activeBranch.id !== "branch-matriz") return false;
-          }
+          const incBranch = resolveBranchId((inc as any).branchId || (inc as any).branch_id, inc.cashier);
+          if (incBranch !== activeBranch.id) return false;
         }
         const isOwnerOrAdmin = inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin"));
         if (!isOwnerOrAdmin && (!inc.cashier || (!matchesCashier(inc.cashier, targetCashier) && !matchesCashier(inc.cashier, cashierName)))) return false;
@@ -2171,17 +2156,13 @@ export default function POSPage() {
                                    (oOperatingName && ((bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName))) ||
                                                        (bShort && (oOperatingName.includes(bShort) || bShort.includes(oOperatingName)))));
 
-          if (matchesPickup || matchesOperating) {
-            // Coincide con la sucursal activa
-          } else if (!oPickupId && !oPickupName && !oOperatingId && !oOperatingName) {
-            if (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) {
-              // Coincide cajero
-            } else if (bId === "branch-matriz") {
-              // Asignar por defecto a matriz
-            } else {
-              return false;
-            }
-          } else {
+          const cashierMatches = (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) ||
+                                 (bId.includes("angeles") && o.cashier && (o.cashier.toLowerCase().includes("andres") || o.cashier.toLowerCase().includes("ángeles"))) ||
+                                 (bId.includes("1790889237862") && o.cashier && o.cashier.toLowerCase().includes("silvia")) ||
+                                 (bId.includes("benito") && o.cashier && o.cashier.toLowerCase().includes("carlos")) ||
+                                 (bId.includes("sanjuan") && o.cashier && o.cashier.toLowerCase().includes("noe"));
+
+          if (!matchesPickup && !matchesOperating && !cashierMatches) {
             return false;
           }
         }
@@ -2219,18 +2200,13 @@ export default function POSPage() {
                       (oOperatingId && (oOperatingId === bId || bId.includes(oOperatingId) || oOperatingId.includes(bId))) ||
                       (oOperatingName && ((bName && (oOperatingName === bName || oOperatingName.includes(bName) || bName.includes(oOperatingName))) ||
                                           (bShort && (oOperatingName.includes(bShort) || bShort.includes(oOperatingName)))));
-        if (!match) {
-          if (!oPickupId && !oPickupName && !oOperatingId && !oOperatingName) {
-            if (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) {
-              // match
-            } else if (bId === "branch-matriz") {
-              // match
-            } else {
-              return false;
-            }
-          } else {
-            return false;
-          }
+        const cashierMatches = (activeBranch.currentShift?.cashier && o.cashier && matchesCashier(o.cashier, activeBranch.currentShift.cashier)) ||
+                               (bId.includes("angeles") && o.cashier && (o.cashier.toLowerCase().includes("andres") || o.cashier.toLowerCase().includes("ángeles"))) ||
+                               (bId.includes("1790889237862") && o.cashier && o.cashier.toLowerCase().includes("silvia")) ||
+                               (bId.includes("benito") && o.cashier && o.cashier.toLowerCase().includes("carlos")) ||
+                               (bId.includes("sanjuan") && o.cashier && o.cashier.toLowerCase().includes("noe"));
+        if (!match && !cashierMatches) {
+          return false;
         }
       }
       const t = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
@@ -2497,7 +2473,7 @@ export default function POSPage() {
             total: currentTotal,
             payment_method: currentPaymentMethod,
             cashier: cashierName,
-            branch_id: activeBranch?.id || user?.assignedBranchId || "branch-matriz",
+            branch_id: resolveBranchId(activeBranch?.id || user?.assignedBranchId, cashierName),
             payment_reference: paymentReference.trim() || null,
             transfer_account: currentPaymentMethod === "transferencia" && selectedTransferAccount ? `${selectedTransferAccount.name} (${selectedTransferAccount.bank})` : null,
             card_terminal: currentPaymentMethod === "tarjeta" && selectedCardTerminal ? `${selectedCardTerminal.name} (${selectedCardTerminal.bank})` : null,
@@ -2557,8 +2533,8 @@ export default function POSPage() {
               }
             }
 
-            const effBranchId = activeBranch?.id || user?.assignedBranchId || (cashierName.toLowerCase().includes("silvia") ? "branch-1790889237862" : "branch-matriz");
-            const effBranchName = activeBranch?.name || (effBranchId === "branch-1790889237862" ? "Sucursal San Ildefonso" : "Sucursal");
+            const effBranchId = resolveBranchId(activeBranch?.id || user?.assignedBranchId, cashierName);
+            const effBranchName = activeBranch?.name || (effBranchId === "branch-angeles" ? "Sucursal Los Ángeles" : effBranchId === "branch-1790889237862" ? "Sucursal San Ildefonso" : "Sucursal");
             if (realtimeHub?.broadcastSale) {
               realtimeHub.broadcastSale({
                 id: createdSaleId,

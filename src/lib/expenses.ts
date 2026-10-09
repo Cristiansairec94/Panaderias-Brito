@@ -1,7 +1,7 @@
 "use client";
 
 import { ExpenseRecord, BranchCashMovement } from "@/types";
-import { formatCurrency, formatDateTimeSafe } from "@/lib/utils";
+import { formatCurrency, formatDateTimeSafe, resolveBranchId } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 
@@ -35,6 +35,8 @@ export const DEFAULT_BRANCHES_NAMES: Record<string, string> = {
   "branch-benito": "San Benito (Mercado)",
   "branch-las-flores": "Las Flores (Plaza)",
   "branch-flores": "Las Flores (Plaza)",
+  "branch-angeles": "Sucursal Los Ángeles",
+  "branch-1790889237862": "San Ildefonso",
 };
 
 const getLocalDateISO = (d: Date = new Date()): string => {
@@ -95,11 +97,19 @@ export function recordCashOutflowAsExpense(options: {
   }
 
   const finalDescription = options.description ? options.description.trim() : "Salida de efectivo";
-  const branchId = options.branchId || "branch-matriz";
+  const branchId = resolveBranchId(options.branchId, options.cashier);
   const branchName =
     options.branchName ||
     DEFAULT_BRANCHES_NAMES[branchId] ||
-    (branchId.includes("matriz") ? "Matriz (Centro)" : (branchId.includes("sanjuan") || branchId.includes("benito")) ? "San Juan" : "Las Flores (Plaza)");
+    (branchId.includes("matriz")
+      ? "Matriz (Centro)"
+      : branchId.includes("angeles")
+      ? "Sucursal Los Ángeles"
+      : branchId.includes("1790889237862")
+      ? "San Ildefonso"
+      : (branchId.includes("sanjuan") || branchId.includes("benito"))
+      ? "San Juan"
+      : "Las Flores (Plaza)");
 
   let categoryKey = options.category ? options.category.toLowerCase().trim() : "otros";
   if (!options.category || categoryKey === "otros" || categoryKey === "gasto" || categoryKey === "salida" || categoryKey === "caja") {
@@ -264,8 +274,8 @@ if (typeof window !== "undefined" && realtimeHub?.onCashMovement) {
         displayDate: `Hoy, ${payload.timestamp || new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`,
         category: catDef.id,
         categoryLabel: catDef.label,
-        branchId: payload.branchId,
-        branchName: payload.branchName,
+        branchId: resolveBranchId(payload.branchId, payload.authorizedBy),
+        branchName: payload.branchName || DEFAULT_BRANCHES_NAMES[resolveBranchId(payload.branchId, payload.authorizedBy)] || "Sucursal",
         description: payload.reason || "Salida de efectivo remota",
         amount: Number(payload.amount),
         paymentMethod: "efectivo",

@@ -734,7 +734,10 @@ export default function UserRoleManagement() {
         {filteredUsers.map((usr) => {
           const isCurrentUser = currentUser?.id === usr.id;
           const assignedBranch = branches.find((b) => b.id === usr.assignedBranchId);
-          const branchDisplayName = assignedBranch ? `Sucursal ${assignedBranch.shortName}` : (usr.assignedBranchName ? `Sucursal ${usr.assignedBranchName}` : "Todas las sucursales");
+          const rawBranch = assignedBranch ? assignedBranch.shortName : usr.assignedBranchName;
+          const branchDisplayName = rawBranch
+            ? (rawBranch.toLowerCase().startsWith("sucursal") ? rawBranch : `Sucursal ${rawBranch}`)
+            : "Todas las sucursales";
           const managedBranches = branches.filter((b) => b.assignedUserId === usr.id);
           const isInactive = usr.status === "inactivo";
           const hasPhoto = Boolean(usr.photoUrl || (usr.avatar && (usr.avatar.startsWith("data:image") || usr.avatar.startsWith("http"))));

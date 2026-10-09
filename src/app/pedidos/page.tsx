@@ -418,7 +418,12 @@ export default function PedidosPage() {
     const matchesOperating = (opId && (opId === targetId || opId.includes(targetId) || targetId.includes(opId))) ||
                              (opName && (opName === targetName || opName.includes(targetName) || targetName.includes(opName)));
 
-    return matchesPickup || matchesOperating;
+    const cashierMatches = (targetId.includes("angeles") && order.cashier && (order.cashier.toLowerCase().includes("andres") || order.cashier.toLowerCase().includes("ángeles"))) ||
+                           (targetId.includes("1790889237862") && order.cashier && order.cashier.toLowerCase().includes("silvia")) ||
+                           (targetId.includes("benito") && order.cashier && order.cashier.toLowerCase().includes("carlos")) ||
+                           (targetId.includes("sanjuan") && order.cashier && order.cashier.toLowerCase().includes("noe"));
+
+    return matchesPickup || matchesOperating || cashierMatches;
   }, [branches]);
 
 // Classification counts for the current branch view
@@ -3521,6 +3526,8 @@ export default function PedidosPage() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         initialBranchId={effectiveBranchFilter !== "all" ? effectiveBranchFilter : currentBranch?.id}
+        cashierName={user?.name || (effectiveBranchFilter.includes("angeles") ? "andres sanchez" : userBranch?.manager || "Cajero")}
+        shiftName={userBranch?.currentShift?.name}
         onOrderCreated={(orderId) => {
           loadOrders();
           const created = getStoredOrders().find((o) => o.id === orderId);

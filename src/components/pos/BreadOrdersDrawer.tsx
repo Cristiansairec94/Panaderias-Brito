@@ -224,13 +224,23 @@ export default function BreadOrdersDrawer({
     // Notificación en vivo para todos los dispositivos y dueños
     try {
       const remaining = newOrder.remainingBalance || 0;
+      const isCross = Boolean(
+        newOrder.operatingBranchName &&
+        newOrder.branchName &&
+        newOrder.operatingBranchName !== newOrder.branchName
+      );
+      const branchSender = isCross
+        ? `🎂 ${newOrder.operatingBranchName} ➔ ${newOrder.branchName}`
+        : `🎂 Pedido Registrado (${branchName || newOrder.branchName || "Mostrador"})`;
+
       addNotification({
-        senderName: `🎂 Pedido Registrado (${branchName || "Mostrador"})`,
+        id: `notif-order-${newOrder.id}`,
+        senderName: branchSender,
         senderAvatar: "🎂",
         badgeIcon: "pastel",
         title: `Nuevo Pedido ${newOrder.orderNumber}: Total ${formatCurrency(newOrder.total)}`,
-        highlightText: `${newOrder.customerName} - Anticipo: ${formatCurrency(newOrder.deposit)}`,
-        description: `${newOrder.description}. Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs (${newOrder.deliveryType === "domicilio" ? `A domicilio: ${newOrder.deliveryAddress}` : `Recoge en ${newOrder.branchName || branchName || "Sucursal"}`}). Saldo restante: ${formatCurrency(remaining)}.`,
+        highlightText: `${newOrder.customerName} • Anticipo: ${formatCurrency(newOrder.deposit)}${remaining > 0 ? ` (Resta: ${formatCurrency(remaining)})` : " (Liquidado)"}`,
+        description: `${newOrder.description ? `${newOrder.description}. ` : ""}${isCross ? `[Levantado en: ${newOrder.operatingBranchName} • Entrega en: ${newOrder.branchName}] ` : (newOrder.deliveryType === "domicilio" ? `A domicilio: ${newOrder.deliveryAddress || "Dirección registrada"}. ` : `Recoge en ${newOrder.branchName || branchName || "Sucursal"}. `)}Entrega: ${newOrder.deliveryDate} a las ${newOrder.deliveryTime} hrs. Saldo restante: ${formatCurrency(remaining)}.`,
         category: "pedidos",
         orderId: newOrder.id,
         branchId: newOrder.branchId,
@@ -284,6 +294,7 @@ export default function BreadOrdersDrawer({
     if (updated) {
       try {
         addNotification({
+          id: `notif-order-pay-${order.id}-${order.remainingBalance}`,
           senderName: `🎂 Pedido Liquidado (${branchName || "Mostrador"})`,
           senderAvatar: "🎂",
           badgeIcon: "pastel",

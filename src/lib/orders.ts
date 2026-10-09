@@ -1,18 +1,19 @@
 import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types";
-import { formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary } from "@/lib/utils";
+import { formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
 
 export const STORAGE_ORDERS_KEY = "brito_custom_orders";
 
 export function orderToSupabasePayload(order: CustomOrder): any {
+  const effBranchId = resolveBranchId(order.operatingBranchId || order.branchId, order.cashier);
   return {
     id: order.id || order.orderNumber,
     order_number: order.orderNumber || order.id,
     customer_id: order.customerId || null,
     customer_name: order.customerName || "Cliente Mostrador",
     phone: order.phone || "N/A",
-    branch_id: order.operatingBranchId || order.branchId || "branch-matriz",
+    branch_id: effBranchId,
     branch_name: order.operatingBranchName || order.branchName || "Sucursal Matriz (Centro)",
     description: order.description || "Pedido de pastelería",
     items: Array.isArray(order.items) ? order.items : [],
@@ -71,7 +72,7 @@ export async function persistOrderPaymentMovementToSupabase(params: {
       amount: params.amount,
       reason: `${params.isLiquidation ? "Liquidación final" : "Anticipo"} pedido ${params.orderNumber} - ${params.customerName}`,
       authorized_by: params.cashier || "Cajero",
-      branch_id: params.branchId || "branch-matriz",
+      branch_id: resolveBranchId(params.branchId, params.cashier),
     });
     if (error) {
       console.warn("[OrdersSupabase] Error registrando movimiento de dinero en Supabase:", error);
@@ -731,7 +732,9 @@ export function addCustomOrder(data: {
 }): CustomOrder {
   const current = getStoredOrders();
   const orderNumber = generateNextOrderNumber();
-  const orderId = orderNumber;
+  const orderId = `ord-${Date.now().toString().slice(-8)}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const effOperatingBranchId = resolveBranchId(data.operatingBranchId || data.branchId, data.cashier);
+  const effPickupBranchId = resolveBranchId(data.branchId, data.cashier);
   const deposit = Math.max(0, Math.min(data.total, Number(data.deposit) || 0));
   const remaining = Math.max(0, data.total - deposit);
   const paymentStatus: CustomOrder["paymentStatus"] =
@@ -759,7 +762,7 @@ export function addCustomOrder(data: {
       customerName: data.customerName,
       customerId: data.customerId,
       cashier: data.cashier,
-      branchId: data.operatingBranchId || data.branchId,
+      branchId: effOperatingBranchId,
       branchName: data.operatingBranchName || data.branchName,
       paymentMethod: data.paymentMethod,
       isLiquidation: remaining === 0,
@@ -778,8 +781,8 @@ export function addCustomOrder(data: {
       description: data.description,
       items: data.items,
       isLiquidation: remaining === 0,
-      branchId: data.branchId,
-      operatingBranchId: data.operatingBranchId || data.branchId,
+      branchId: effPickupBranchId,
+      operatingBranchId: effOperatingBranchId,
     });
   }
 
@@ -789,9 +792,9 @@ export function addCustomOrder(data: {
     customerId: data.customerId,
     customerName: data.customerName.trim(),
     phone: data.phone.trim(),
-    branchId: data.branchId,
+    branchId: effPickupBranchId,
     branchName: data.branchName,
-    operatingBranchId: data.operatingBranchId || data.branchId,
+    operatingBranchId: effOperatingBranchId,
     operatingBranchName: data.operatingBranchName || data.branchName,
     description: data.description.trim() || (data.items.length > 0 ? data.items.map(i => `${i.quantity}x ${i.name}`).join(", ") : "Encargo"),
     items: data.items,
@@ -829,15 +832,15 @@ export function addCustomOrder(data: {
       orderId,
       customerName: data.customerName,
       cashier: data.cashier,
-      branchId: data.operatingBranchId || data.branchId,
+      branchId: effOperatingBranchId,
       isLiquidation: remaining === 0,
     });
 
     if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
       realtimeHub.broadcastCashMovement({
         id: `ING-ord-${orderNumber}`,
-        branchId: data.operatingBranchId || data.branchId,
-        branchName: data.operatingBranchName || data.branchName || "Sucursal Matriz",
+        branchId: effOperatingBranchId,
+        branchName: data.operatingBranchName || data.branchName || "Sucursal",
         type: "entrada",
         category: "abono_pedido" as any,
         categoryLabel: remaining === 0 ? "Liquidación de Pedido Especial" : "Anticipo de Pedido Especial",
@@ -862,33 +865,6 @@ export function addCustomOrder(data: {
   // Transmitir pedido en tiempo real a los celulares y computadoras
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
     realtimeHub.broadcastOrder("create", newOrder);
-  }
-
-  // Alerta sonora y visual inmediata en celular y turnos de ambas sucursales
-  if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
-    const isCross = newOrder.operatingBranchName && newOrder.branchName && newOrder.operatingBranchName !== newOrder.branchName;
-    const branchLabel = isCross
-      ? `${newOrder.operatingBranchName} ➔ Entrega: ${newOrder.branchName}`
-      : newOrder.branchName;
-
-    realtimeHub.broadcastNotification({
-      id: `order-create-${newOrder.id}-${Date.now()}`,
-      senderName: `🎂 ${branchLabel}`,
-      senderAvatar: "🎂",
-      badgeIcon: "pastel",
-      title: isCross ? `Nuevo Pedido (${newOrder.operatingBranchName} ➔ ${newOrder.branchName})` : "Nuevo Pedido Especial",
-      highlightText: `${newOrder.orderNumber}: ${newOrder.customerName}`,
-      description: `${isCross ? `[Levantado en: ${newOrder.operatingBranchName} • Entrega en: ${newOrder.branchName}] ` : ""}Entrega: ${newOrder.deliveryDate} ${newOrder.deliveryTime} • Anticipo: $${newOrder.deposit} MXN (Total: $${newOrder.total} MXN)`,
-      timeAgo: "Hace un momento",
-      group: "recientes",
-      read: false,
-      category: "pedidos",
-      orderId: newOrder.id,
-      actionLabel: newOrder.remainingBalance > 0 ? `Cobrar $${newOrder.remainingBalance}` : "Ver Detalle",
-      actionLink: "/pedidos",
-      secondaryActionLabel: newOrder.remainingBalance > 0 ? "Ver Detalle" : undefined,
-      secondaryActionLink: newOrder.remainingBalance > 0 ? "/pedidos" : undefined,
-    });
   }
 
   return newOrder;
@@ -941,6 +917,8 @@ export function addOrderPayment(
     order.status = "entregado";
   }
 
+  const effOperatingBranchId = resolveBranchId(params.operatingBranchId || order.operatingBranchId || order.branchId, params.cashier);
+
   // Registrar en ingresos de caja de quien opera el turno
   recordOrderCashIncome({
     amount: paymentAmount,
@@ -949,8 +927,8 @@ export function addOrderPayment(
     customerName: order.customerName,
     customerId: order.customerId,
     cashier: params.cashier,
-    branchId: params.operatingBranchId || order.branchId,
-    branchName: params.operatingBranchName || order.branchName,
+    branchId: effOperatingBranchId,
+    branchName: params.operatingBranchName || order.operatingBranchName || order.branchName,
     paymentMethod: params.paymentMethod,
     isLiquidation: isFullLiquidation,
   });
@@ -969,7 +947,7 @@ export function addOrderPayment(
     items: order.items,
     isLiquidation: isFullLiquidation,
     branchId: order.branchId,
-    operatingBranchId: params.operatingBranchId || order.branchId,
+    operatingBranchId: effOperatingBranchId,
   });
 
   current[idx] = order;
@@ -983,15 +961,15 @@ export function addOrderPayment(
     orderId: order.id,
     customerName: order.customerName,
     cashier: params.cashier,
-    branchId: params.operatingBranchId || order.branchId,
+    branchId: effOperatingBranchId,
     isLiquidation: isFullLiquidation,
   });
 
   if (typeof window !== "undefined" && realtimeHub?.broadcastCashMovement) {
     realtimeHub.broadcastCashMovement({
       id: `ING-pay-${order.orderNumber}-${order.payments?.length || 1}`,
-      branchId: params.operatingBranchId || order.branchId || "branch-matriz",
-      branchName: params.operatingBranchName || (order as any).branchName || "Sucursal Matriz",
+      branchId: effOperatingBranchId,
+      branchName: params.operatingBranchName || (order as any).operatingBranchName || (order as any).branchName || "Sucursal",
       type: "entrada",
       category: "abono_pedido" as any,
       categoryLabel: isFullLiquidation ? "Liquidación de Pedido Especial" : "Abono a Pedido Especial",
@@ -1023,35 +1001,6 @@ export function addOrderPayment(
   // Transmitir abono / liquidación en tiempo real
   if (typeof window !== "undefined" && realtimeHub?.broadcastOrder) {
     realtimeHub.broadcastOrder("payment", order);
-  }
-
-  // Notificación al celular
-  if (typeof window !== "undefined" && realtimeHub?.broadcastNotification) {
-    const isCross = (order as any).operatingBranchName && order.branchName && (order as any).operatingBranchName !== order.branchName;
-    const branchLabel = isCross
-      ? `${(order as any).operatingBranchName} ➔ ${order.branchName}`
-      : order.branchName;
-
-    realtimeHub.broadcastNotification({
-      id: `order-pay-${order.id}-${Date.now()}`,
-      senderName: `💰 ${branchLabel}`,
-      senderAvatar: isFullLiquidation ? "🎉" : "💵",
-      badgeIcon: "dinero",
-      title: isFullLiquidation
-        ? `Pedido Especial Liquidado ${isCross ? `(${branchLabel})` : ""}`
-        : `Abono a Pedido Especial ${isCross ? `(${branchLabel})` : ""}`,
-      highlightText: `${order.orderNumber}: Cobro de $${paymentAmount} MXN`,
-      description: `${isCross ? `[Levantado: ${(order as any).operatingBranchName} • Entrega: ${order.branchName}] ` : ""}Cliente: ${order.customerName} • Saldo restante: $${newRemaining} MXN`,
-      timeAgo: "Hace un momento",
-      group: "recientes",
-      read: false,
-      category: "pedidos",
-      orderId: order.id,
-      actionLabel: newRemaining > 0 ? `Cobrar $${newRemaining}` : "Ver Detalle",
-      actionLink: "/pedidos",
-      secondaryActionLabel: newRemaining > 0 ? "Ver Detalle" : undefined,
-      secondaryActionLink: newRemaining > 0 ? "/pedidos" : undefined,
-    });
   }
 
   return order;
@@ -1098,7 +1047,7 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       cancelado: "Cancelado ❌",
     };
     realtimeHub.broadcastNotification({
-      id: `order-status-${current[idx].id}-${Date.now()}`,
+      id: `notif-order-status-${current[idx].id}-${status}`,
       senderName: `👨‍🍳 ${current[idx].branchName}`,
       senderAvatar: "👨‍🍳",
       badgeIcon: "horno",
@@ -1110,6 +1059,10 @@ export function updateOrderStatus(orderId: string, status: CustomOrder["status"]
       read: false,
       category: "pedidos",
       orderId: current[idx].id,
+      branchId: current[idx].branchId,
+      branchName: current[idx].branchName,
+      operatingBranchId: current[idx].operatingBranchId,
+      operatingBranchName: current[idx].operatingBranchName,
       actionLabel: "Ver Detalle",
       actionLink: "/pedidos",
     });

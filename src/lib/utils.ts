@@ -373,7 +373,11 @@ export function getStoredShiftStartBoundary(branchId?: string): number {
       if (rawBranches) {
         const branches = JSON.parse(rawBranches);
         if (Array.isArray(branches)) {
-          const matchB = branches.find((b: any) => b && (b.id === effectiveBranchId || (effectiveBranchId === "branch-1790889237862" && b.manager && b.manager.toLowerCase().includes("silvia"))));
+          const matchB = branches.find((b: any) => b && (
+            b.id === effectiveBranchId || 
+            (effectiveBranchId === "branch-1790889237862" && b.manager && b.manager.toLowerCase().includes("silvia")) ||
+            (effectiveBranchId === "branch-angeles" && b.manager && (b.manager.toLowerCase().includes("andres") || b.manager.toLowerCase().includes("andrés")))
+          ));
           if (matchB) {
             if (matchB.lastCut) {
               const bCutTs = typeof matchB.lastCut.timestamp === "number"
@@ -566,3 +570,28 @@ export function compressImageFile(
   });
 }
 
+/**
+ * Resuelve de manera estricta y canónica el identificador de sucursal
+ * considerando el ID provisto, nombres alternativos y el cajero asignado.
+ */
+export function resolveBranchId(rawBranchId: string | null | undefined, cashierName?: string): string {
+  if (rawBranchId) {
+    const lower = rawBranchId.toLowerCase().trim();
+    if (lower.includes("angeles") || lower.includes("ángeles")) return "branch-angeles";
+    if (lower.includes("ildefonso") || lower.includes("1790889237862")) return "branch-1790889237862";
+    if (lower.includes("benito")) return "branch-benito";
+    if (lower.includes("sanjuan") || lower.includes("san-juan") || lower.includes("san juan")) return "branch-sanjuan";
+    if (lower.includes("flores")) return "branch-flores";
+    if (lower.includes("matriz") || lower.includes("centro")) return "branch-matriz";
+    if (lower !== "branch-matriz" && lower.startsWith("branch-")) return rawBranchId;
+  }
+  if (cashierName) {
+    const cLower = cashierName.toLowerCase().trim();
+    if (cLower.includes("silvia") || cLower.includes("puga")) return "branch-1790889237862";
+    if (cLower.includes("andres") || cLower.includes("andrés")) return "branch-angeles";
+    if (cLower.includes("noe") || cLower.includes("velasquez") || cLower.includes("velázquez")) return "branch-sanjuan";
+    if (cLower.includes("carlos") && !cLower.includes("bueno")) return "branch-benito";
+    if (cLower.includes("carlos bueno") || cLower.includes("toño") || cLower.includes("lupita")) return "branch-matriz";
+  }
+  return rawBranchId || "branch-matriz";
+}

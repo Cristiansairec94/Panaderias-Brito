@@ -105,6 +105,9 @@ export function checkBranchMatch(
     if (s.includes("benito")) keywords.push("benito");
     if (s.includes("flores")) keywords.push("flores");
     if (s.includes("matriz") || s.includes("centro")) keywords.push("matriz");
+    if (s.includes("ildefonso")) keywords.push("ildefonso");
+    if (s.includes("angeles") || s.includes("ángeles")) keywords.push("angeles");
+    if (s.includes("sanjuan") || s.includes("san juan")) keywords.push("sanjuan");
     return keywords;
   };
 
@@ -146,6 +149,138 @@ export function checkBranchMatch(
   }
 
   return false;
+}
+
+export function isSameOrderEvent(a: Partial<FBNotification>, b: Partial<FBNotification>): boolean {
+  if (a.id && b.id && a.id === b.id) return true;
+
+  // 1. Extraer folio único PED-XXX (prioridad absoluta porque es el folio único de negocio)
+  const getOrderFolio = (n: Partial<FBNotification>): string | null => {
+    const text = `${n.title || ""} ${n.highlightText || ""} ${n.description || ""} ${n.id || ""} ${n.orderId || ""}`;
+    const m = text.match(/PED-(\d+)/i);
+    return m ? `ped-${m[1]}` : null;
+  };
+
+  const folioA = getOrderFolio(a);
+  const folioB = getOrderFolio(b);
+
+  const getOrderId = (n: Partial<FBNotification>): string | null => {
+    return n.orderId ? n.orderId.toLowerCase().trim() : null;
+  };
+
+  const idA = getOrderId(a);
+  const idB = getOrderId(b);
+
+  const sameOrder = Boolean((folioA && folioB && folioA === folioB) || (idA && idB && idA === idB));
+  if (!sameOrder) return false;
+
+  const isPayment = (n: Partial<FBNotification>) => {
+    const t = `${n.id || ""} ${n.title || ""} ${n.highlightText || ""}`.toLowerCase();
+    return t.includes("abono") || t.includes("liquidado") || (n.id || "").includes("order-pay");
+  };
+
+  const isStatus = (n: Partial<FBNotification>) => {
+    const t = `${n.id || ""} ${n.title || ""}`.toLowerCase();
+    return t.includes("estado de pedido") || (n.id || "").includes("order-status");
+  };
+
+  const isPayA = isPayment(a);
+  const isPayB = isPayment(b);
+  const isStatA = isStatus(a);
+  const isStatB = isStatus(b);
+
+  // Si ambos son pagos del mismo pedido
+  if (isPayA && isPayB) {
+    const extractAmount = (n: Partial<FBNotification>): string | null => {
+      const m = `${n.title || ""} ${n.highlightText || ""} ${n.id || ""}`.match(/\$?([\d,]+(\.\d{2})?)/);
+      return m ? m[1].replace(/,/g, "") : null;
+    };
+    const amtA = extractAmount(a);
+    const amtB = extractAmount(b);
+    return !amtA || !amtB || amtA === amtB;
+  }
+
+  // Si ambos son cambios de estado del mismo pedido
+  if (isStatA && isStatB) {
+    return true;
+  }
+
+  // Si ninguno es abono ni cambio de estado, ambos son eventos de alta/creación del mismo pedido
+  if (!isPayA && !isPayB && !isStatA && !isStatB) {
+    return true;
+  }
+
+  return false;
+}
+
+export function mergeNotifications(existing: FBNotification, incoming: FBNotification): FBNotification {
+  const isCross = Boolean(
+    (incoming.operatingBranchName && incoming.branchName && incoming.operatingBranchName !== incoming.branchName) ||
+    (existing.operatingBranchName && existing.branchName && existing.operatingBranchName !== existing.branchName) ||
+    (incoming.senderName && incoming.senderName.includes("➔")) ||
+    (existing.senderName && existing.senderName.includes("➔")) ||
+    (incoming.title && incoming.title.includes("➔")) ||
+    (existing.title && existing.title.includes("➔"))
+  );
+
+  const bestBranchName = incoming.branchName || existing.branchName || "Sucursal San Ildefonso";
+  const bestOperatingBranchName = incoming.operatingBranchName || existing.operatingBranchName || "Sucursal Los Ángeles";
+
+  let bestSenderName = incoming.senderName || existing.senderName;
+  if (isCross && bestOperatingBranchName && bestBranchName && bestOperatingBranchName !== bestBranchName) {
+    bestSenderName = `🎂 ${bestOperatingBranchName} ➔ ${bestBranchName}`;
+  }
+
+  // Extraer el folio para asegurar que el título sea impecable: "Nuevo Pedido PED-189: Total $..."
+  const combined = `${existing.title} ${existing.highlightText} ${existing.description} ${incoming.title} ${incoming.highlightText} ${incoming.description}`;
+  const folioMatch = combined.match(/PED-\d+/i);
+  const totalMatch = combined.match(/Total:?\s*\$?([0-9,.]+)/i);
+
+  let bestTitle = existing.title;
+  if (folioMatch && totalMatch) {
+    bestTitle = `Nuevo Pedido ${folioMatch[0]}: Total $${totalMatch[1].replace(/^\$/, "")}`;
+  } else if (incoming.title.toLowerCase().includes("total") && incoming.title.includes("PED-")) {
+    bestTitle = incoming.title;
+  }
+
+  // Highlight con cliente y anticipo
+  let bestHighlight = incoming.highlightText || existing.highlightText;
+  const customerMatch = combined.match(/(?:marcos sanchez|silvia puga|[A-Z][a-z]+\s+[A-Z][a-z]+)/i);
+  const depositMatch = combined.match(/Anticipo:?\s*\$?([0-9,.]+)/i);
+  const remainingMatch = combined.match(/(?:Saldo restante|Cobrar):?\s*\$?([0-9,.]+)/i);
+
+  if (customerMatch && depositMatch) {
+    const cust = customerMatch[0].trim();
+    const dep = `$${depositMatch[1].replace(/^\$/, "")}`;
+    const rem = remainingMatch ? `$${remainingMatch[1].replace(/^\$/, "")}` : null;
+    bestHighlight = `${cust} • Anticipo: ${dep}${rem ? ` (Resta: ${rem})` : ""}`;
+  }
+
+  // Priorizar la descripción más rica y detallada (con los panes/artículos)
+  let bestDescription = existing.description;
+  if (incoming.description && incoming.description.length > (existing.description || "").length) {
+    bestDescription = incoming.description;
+  }
+
+  return {
+    ...existing,
+    ...incoming,
+    id: existing.id.startsWith("notif-order-") ? existing.id : (incoming.id.startsWith("notif-order-") ? incoming.id : existing.id),
+    title: bestTitle,
+    senderName: bestSenderName,
+    highlightText: bestHighlight,
+    description: bestDescription,
+    branchId: incoming.branchId || existing.branchId,
+    branchName: bestBranchName,
+    operatingBranchId: incoming.operatingBranchId || existing.operatingBranchId,
+    operatingBranchName: bestOperatingBranchName,
+    orderId: incoming.orderId || existing.orderId,
+    actionLabel: incoming.actionLabel || existing.actionLabel,
+    actionLink: incoming.actionLink || existing.actionLink,
+    secondaryActionLabel: incoming.secondaryActionLabel || existing.secondaryActionLabel,
+    secondaryActionLink: incoming.secondaryActionLink || existing.secondaryActionLink,
+    read: existing.read,
+  };
 }
 
 export function isNotificationVisibleForUser(
@@ -708,8 +843,23 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               }
               return item;
             });
-            if (allowed.length > 0) {
-              return allowed;
+
+            // Deduplicación estricta de pedidos repetidos en almacenamiento
+            const deduplicated: FBNotification[] = [];
+            for (const item of allowed) {
+              const existingIdx = deduplicated.findIndex((existing) => isSameOrderEvent(existing, item));
+              if (existingIdx === -1) {
+                deduplicated.push(item);
+              } else {
+                deduplicated[existingIdx] = mergeNotifications(deduplicated[existingIdx], item);
+              }
+            }
+
+            if (deduplicated.length > 0) {
+              try {
+                localStorage.setItem(STORAGE_NOTIFS_KEY, JSON.stringify(deduplicated));
+              } catch (e) {}
+              return deduplicated;
             }
           }
         }
@@ -717,6 +867,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
     return INITIAL_FB_NOTIFICATIONS;
   });
+
+  const notificationsRef = useRef(notifications);
+  notificationsRef.current = notifications;
 
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [nativePermission, setNativePermission] = useState<NotificationPermission>("default");
@@ -803,7 +956,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Notificaciones filtradas según el rol y sucursal del usuario
   const visibleNotifications = useMemo(() => {
-    return notifications.filter((notif) => isNotificationVisibleForUser(notif, user, currentBranch));
+    const filtered = notifications.filter((notif) => isNotificationVisibleForUser(notif, user, currentBranch));
+    // DEDUPLICACIÓN EN TIEMPO DE RENDER: Garantía del 100% de que NUNCA se mostrarán pedidos duplicados
+    const deduped: FBNotification[] = [];
+    for (const item of filtered) {
+      const idx = deduped.findIndex((d) => isSameOrderEvent(d, item));
+      if (idx === -1) {
+        deduped.push(item);
+      } else {
+        deduped[idx] = mergeNotifications(deduped[idx], item);
+      }
+    }
+    return deduped;
   }, [notifications, user, currentBranch]);
 
   // Conteo de no leídas calculado exclusivamente sobre las notificaciones visibles para el usuario
@@ -847,9 +1011,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // Filtrar estrictamente: solo Cierres de Turno y Pedidos
       if (!isAllowedNotification(remoteNotif)) return;
 
+      const isDuplicate = notificationsRef.current.some((n) => isSameOrderEvent(n, remoteNotif));
+      if (isDuplicate) {
+        setNotifications((prev) => {
+          const idx = prev.findIndex((n) => isSameOrderEvent(n, remoteNotif));
+          if (idx === -1) return prev;
+          const updated = [...prev];
+          updated[idx] = mergeNotifications(prev[idx], remoteNotif);
+          persistNotifs(updated);
+          return updated;
+        });
+        return; // Detener: NO sonar ni mostrar toast si es duplicado
+      }
+
       setNotifications((prev) => {
-        // Evitar duplicados si ya existe
-        if (prev.some((n) => n.id === remoteNotif.id)) return prev;
+        if (prev.some((n) => isSameOrderEvent(n, remoteNotif))) return prev;
         const updated = [remoteNotif, ...prev];
         persistNotifs(updated);
         return updated;
@@ -889,8 +1065,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       ...notif,
     };
 
+    const isDuplicate = notificationsRef.current.some((n) => isSameOrderEvent(n, fullNotif));
+    if (isDuplicate) {
+      setNotifications((prev) => {
+        const idx = prev.findIndex((n) => isSameOrderEvent(n, fullNotif));
+        if (idx === -1) return prev;
+        const updated = [...prev];
+        updated[idx] = mergeNotifications(prev[idx], fullNotif);
+        persistNotifs(updated);
+        return updated;
+      });
+      return;
+    }
+
     setNotifications((prev) => {
-      if (prev.some((n) => n.id === newId)) return prev;
+      if (prev.some((n) => isSameOrderEvent(n, fullNotif))) return prev;
       const updated = [fullNotif, ...prev];
       persistNotifs(updated);
       return updated;
