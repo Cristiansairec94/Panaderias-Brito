@@ -2561,13 +2561,13 @@ export default function PedidosPage() {
                             </div>
                           )}
 
-                          {/* Día y Hora exacta en que se realizó/levantó el pedido */}
+                          {/* Insignia destacada: Cuándo se levantó el pedido */}
                           <div
-                            className="flex items-center gap-1.5 mt-1.5 text-[11px] font-bold text-amber-900 bg-gradient-to-r from-amber-50 to-orange-50/80 border border-amber-200/90 px-2 py-0.5 rounded-lg w-fit shadow-2xs"
+                            className="flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-xl bg-amber-100/90 border border-amber-300 text-amber-950 font-bold text-xs shadow-2xs w-fit"
                             title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
                           >
                             <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                            <span className="text-stone-500 font-medium">Pedido:</span>
+                            <span className="text-amber-900 font-extrabold text-[10px] uppercase tracking-wide">Levantado:</span>
                             <span className="font-mono font-black text-amber-950">{creationInfo.fullBadgeStr}</span>
                           </div>
 
@@ -2707,18 +2707,21 @@ export default function PedidosPage() {
 
                       {/* COLUMNA 3: Entrega, Cliente y Saldo Cuadrado (xl:col-span-2) */}
                       <div className="md:col-span-1 xl:col-span-2 min-w-0 flex flex-col justify-between gap-1.5 h-full py-0.5">
-                        {/* Fecha y Hora de Pedido (Cuándo se hizo) */}
-                        <div className="pb-1 border-b border-stone-100">
-                          <span className="text-[9px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1 mb-0.5">
+                        {/* Fecha y Hora de Levantamiento (Cuándo se hizo el pedido) */}
+                        <div>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 flex items-center gap-1 mb-0.5">
                             <Clock className="w-3 h-3 text-amber-600 shrink-0" />
-                            <span>Pedido Realizado</span>
+                            <span>Levantado</span>
                           </span>
                           <div
-                            className="flex items-center justify-between gap-1 text-stone-700 font-bold text-xs bg-amber-50/70 border border-amber-200/80 px-2 py-0.5 rounded-md"
-                            title={`Registrado: ${creationInfo.fullDateStr}`}
+                            className="flex items-center gap-1.5 flex-wrap"
+                            title={`Pedido levantado el: ${creationInfo.fullDateStr}`}
                           >
-                            <span className="truncate">{creationInfo.shortDateStr}</span>
-                            <span className="font-mono tabular-nums font-black text-amber-950 bg-amber-100/90 border border-amber-300 px-1.5 rounded shrink-0">
+                            <div className="flex items-center gap-1 text-amber-950 font-bold text-xs bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded-md">
+                              <Calendar className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span>{creationInfo.shortDateStr}</span>
+                            </div>
+                            <span className="font-mono tabular-nums font-black text-amber-950 text-xs sm:text-sm bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md">
                               {creationInfo.exactTimeStr}
                             </span>
                           </div>
@@ -2726,7 +2729,7 @@ export default function PedidosPage() {
 
                         {/* Fecha y Hora de Entrega */}
                         <div>
-                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-400 block mb-0.5">Entrega Programada</span>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-stone-400 block mb-0.5">Entrega</span>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {normalizeDateStr(order.deliveryDate) === todayStr ? (
                               <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-md shadow-2xs animate-pulse">
