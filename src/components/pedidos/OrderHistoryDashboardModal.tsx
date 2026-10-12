@@ -31,7 +31,7 @@ import {
   Building2
 } from "lucide-react";
 import { CustomOrder, Branch } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatOrderCreation } from "@/lib/utils";
 
 interface OrderHistoryDashboardModalProps {
   isOpen: boolean;
@@ -395,6 +395,7 @@ export default function OrderHistoryDashboardModal({
               {filteredOrders.map((order) => {
                 const isDelivered = order.status === "entregado";
                 const isCancelled = order.status === "cancelado";
+                const creationInfo = formatOrderCreation(order);
 
                 return (
                   <div
@@ -412,8 +413,12 @@ export default function OrderHistoryDashboardModal({
                           <span className="font-mono text-xs font-black text-stone-900 bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200">
                             {order.orderNumber}
                           </span>
-                          <span className="block text-[10px] text-stone-400 font-semibold mt-1">
-                            Creado: {order.createdAt?.slice(0, 10)}
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded mt-1 font-bold shadow-2xs"
+                            title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
+                          >
+                            <Clock className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                            <span>Levantado: {creationInfo.fullBadgeStr}</span>
                           </span>
                         </div>
 
@@ -570,6 +575,7 @@ export default function OrderHistoryDashboardModal({
                   <tbody className="divide-y divide-stone-100 font-medium text-stone-800">
                     {filteredOrders.map((order) => {
                       const isDelivered = order.status === "entregado";
+                      const creationInfo = formatOrderCreation(order);
 
                       return (
                         <tr
@@ -577,7 +583,10 @@ export default function OrderHistoryDashboardModal({
                           className="hover:bg-stone-50/80 transition-colors"
                         >
                           <td className="py-2.5 px-3.5 font-mono font-black text-stone-900 whitespace-nowrap">
-                            {order.orderNumber}
+                            <div>{order.orderNumber}</div>
+                            <div className="text-[9px] text-stone-400 font-mono font-normal">
+                              {creationInfo.formattedDateOnly}
+                            </div>
                           </td>
                           <td className="py-2.5 px-3.5 whitespace-nowrap">
                             {isDelivered ? (
@@ -603,9 +612,16 @@ export default function OrderHistoryDashboardModal({
                             )}
                           </td>
                           <td className="py-2.5 px-3.5 whitespace-nowrap">
-                            <div>{order.deliveryDate}</div>
-                            <div className="text-[10px] text-stone-400">
-                              {order.deliveryTime || "16:00"} hrs
+                            <div className="font-bold">{order.deliveryDate}</div>
+                            <div className="text-[10px] text-stone-500">
+                              Entrega: {order.deliveryTime || "16:00"} hrs
+                            </div>
+                            <div
+                              className="text-[10px] text-amber-900 font-bold mt-0.5 flex items-center gap-1"
+                              title={`Pedido levantado el: ${creationInfo.fullDateStr}`}
+                            >
+                              <Clock className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                              <span>Lev: {creationInfo.fullBadgeStr}</span>
                             </div>
                           </td>
                           <td className="py-2.5 px-3.5 whitespace-nowrap text-stone-600">

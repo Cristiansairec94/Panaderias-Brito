@@ -21,7 +21,7 @@ import {
   Eye
 } from "lucide-react";
 import { CustomOrder } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatOrderCreation } from "@/lib/utils";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import { useNotifications } from "@/context/NotificationContext";
 
@@ -305,6 +305,7 @@ export default function PosOrdersDrawer({
               const isDelivered = order.status === "entregado";
               const isCancelled = order.status === "cancelado";
               const hasDebt = order.remainingBalance > 0;
+              const creationInfo = formatOrderCreation(order);
 
               return (
                 <div
@@ -356,17 +357,27 @@ export default function PosOrdersDrawer({
                     </div>
                   )}
 
-                  {/* Fila 2: Cliente y Fecha */}
+                  {/* Fila 2: Cliente, Fecha de Entrega y Fecha en que se levantó */}
                   <div>
                     <h4 className="font-black text-sm text-stone-900">{order.customerName}</h4>
-                    <div className="flex items-center gap-3 text-xs text-stone-600 mt-0.5 flex-wrap">
+                    <div className="flex items-center gap-2.5 text-xs text-stone-600 mt-1 flex-wrap">
                       <span className="flex items-center gap-1 font-bold">
                         <Phone className="w-3.5 h-3.5 text-stone-400" /> {order.phone}
                       </span>
-                      <span className="flex items-center gap-1 font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                        <Clock className="w-3.5 h-3.5 text-amber-600" />
-                        {order.deliveryDate} a las {order.deliveryTime || "16:00"} hrs
+                      <span className="flex items-center gap-1 font-bold text-stone-800 bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200">
+                        <Clock className="w-3.5 h-3.5 text-stone-500" />
+                        Entrega: {order.deliveryDate} ({order.deliveryTime || "16:00"} hrs)
                       </span>
+                    </div>
+
+                    {/* Fecha y hora exacta de registro / levantado */}
+                    <div
+                      className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900 bg-amber-50/80 border border-amber-200/80 px-2 py-0.5 rounded-lg mt-1 w-fit shadow-2xs"
+                      title={`Pedido registrado el: ${creationInfo.fullDateStr}`}
+                    >
+                      <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                      <span className="text-stone-500 font-medium">Levantado:</span>
+                      <span className="font-mono font-black text-amber-950">{creationInfo.fullBadgeStr}</span>
                     </div>
 
                     {order.operatingBranchName && order.branchName && order.operatingBranchName !== order.branchName && (

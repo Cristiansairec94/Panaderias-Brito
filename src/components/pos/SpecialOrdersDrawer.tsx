@@ -16,7 +16,7 @@ import {
   Eye
 } from "lucide-react";
 import { CustomOrder } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatOrderCreation } from "@/lib/utils";
 import { getStoredOrders, updateOrderStatus, deleteCustomOrder } from "@/lib/orders";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
@@ -281,6 +281,7 @@ export default function SpecialOrdersDrawer({
               const isToday = order.deliveryDate === todayStr;
               const hasRemaining = order.remainingBalance > 0 && order.status !== "cancelado";
               const isDelivered = order.status === "entregado";
+              const creationInfo = formatOrderCreation(order);
 
               return (
                 <div
@@ -344,24 +345,34 @@ export default function SpecialOrdersDrawer({
                   )}
 
                   {/* Fila 3: Fecha/Hora y Saldo Destacado */}
-                  <div className="flex items-center justify-between gap-2 text-xs pt-1">
-                    <div className="flex items-center gap-1.5 text-stone-400 text-[11px]">
-                      <Clock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                      <span className={isToday ? "text-amber-400 font-black" : "font-medium"}>
-                        {isToday ? "¡Hoy!" : order.deliveryDate} • {order.deliveryTime} hrs
-                      </span>
+                  <div className="space-y-1 pt-1">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-1.5 text-stone-300 text-[11px]">
+                        <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className={isToday ? "text-amber-400 font-black" : "font-medium"}>
+                          Entrega: {isToday ? "¡Hoy!" : order.deliveryDate} • {order.deliveryTime || "16:00"} hrs
+                        </span>
+                      </div>
+
+                      <div className="text-right">
+                        {hasRemaining ? (
+                          <span className="inline-block px-2.5 py-0.5 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-400 font-mono font-black text-xs">
+                            Resta pagar: {formatCurrency(order.remainingBalance)}
+                          </span>
+                        ) : (
+                          <span className="inline-block px-2.5 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-mono font-black text-[11px]">
+                            ✓ Totalmente Pagado
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="text-right">
-                      {hasRemaining ? (
-                        <span className="inline-block px-2.5 py-0.5 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-400 font-mono font-black text-xs">
-                          Resta pagar: {formatCurrency(order.remainingBalance)}
-                        </span>
-                      ) : (
-                        <span className="inline-block px-2.5 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-mono font-black text-[11px]">
-                          ✓ Totalmente Pagado
-                        </span>
-                      )}
+                    {/* Fecha en que se levantó */}
+                    <div className="flex items-center gap-1.5 text-[10px] text-stone-400">
+                      <span>Levantado:</span>
+                      <span className="font-mono font-bold text-amber-300 bg-black/40 border border-stone-800 px-1.5 py-0.2 rounded">
+                        {creationInfo.fullBadgeStr}
+                      </span>
                     </div>
                   </div>
 
