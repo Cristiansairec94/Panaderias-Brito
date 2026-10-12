@@ -40,14 +40,9 @@ import { onlyNumbersKeyDown, cleanOnlyNumbers, compressImageFile } from "@/lib/u
 import { UserRole } from "@/types";
 
 const PUESTOS_PANADERIA = [
-  "Maestro Panadero",
-  "Hornero / Producción",
-  "Pastelero / Repostero",
   "Cajero(a) de Mostrador",
   "Auxiliar Administrativo",
   "Encargado(a) de Sucursal",
-  "Ayudante General de Panadería",
-  "Repartidor / Logística",
   "Supervisor de Calidad"
 ];
 
@@ -171,12 +166,12 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
 
   // Modal Form Fields
   const [formName, setFormName] = useState("");
-  const [formJobTitle, setFormJobTitle] = useState("Maestro Panadero");
+  const [formJobTitle, setFormJobTitle] = useState("Cajero(a) de Mostrador");
   const [formCustomJobTitle, setFormCustomJobTitle] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formBranchId, setFormBranchId] = useState("");
   const [formStatus, setFormStatus] = useState<"activo" | "inactivo">("activo");
-  const [formAvatar, setFormAvatar] = useState("👨‍🍳");
+  const [formAvatar, setFormAvatar] = useState("👩‍💼");
   const [formPhotoUrl, setFormPhotoUrl] = useState<string>("");
   const [formCreatedAt, setFormCreatedAt] = useState("");
 
@@ -215,12 +210,12 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
   const handleOpenCreateModal = () => {
     setEditingEmployeeId(null);
     setFormName("");
-    setFormJobTitle("Maestro Panadero");
+    setFormJobTitle("Cajero(a) de Mostrador");
     setFormCustomJobTitle("");
     setFormPhone("");
     setFormBranchId(branches[0]?.id || "");
     setFormStatus("activo");
-    setFormAvatar("👨‍🍳");
+    setFormAvatar("👩‍💼");
     setFormPhotoUrl("");
     setFormCreatedAt(new Date().toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" }));
     
@@ -466,7 +461,7 @@ export default function EmployeeManagement({ onGoToUsersTab }: EmployeeManagemen
               Directorio de Empleados de Panadería
             </h3>
             <p className="text-xs text-stone-600 max-w-2xl leading-relaxed">
-              Registra y administra la plantilla de trabajadores de Panaderías Brito: asigna fotografías, puestos de trabajo (panaderos, horneros, cajeros, repartidores), teléfonos de contacto y sucursales.
+              Registra y administra la plantilla de trabajadores de Panaderías Brito: asigna fotografías, puestos de trabajo, teléfonos de contacto y sucursales.
             </p>
           </div>
 
