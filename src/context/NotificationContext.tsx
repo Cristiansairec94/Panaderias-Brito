@@ -340,34 +340,11 @@ export function isNotificationVisibleForUser(
     normalizeStr(user?.assignedBranchName).includes("angeles")
   );
 
-  const isBranchPersonnel = Boolean(
-    isAndres ||
-    !user ||
-    user.role === "cajero" ||
-    user.role === "panadero" ||
-    user.role === "supervisor" ||
-    user.roleLabel?.toLowerCase().includes("cajer") ||
-    user.roleLabel?.toLowerCase().includes("mostrador") ||
-    user.roleLabel?.toLowerCase().includes("supervisor") ||
-    user.jobTitle?.toLowerCase().includes("cajer") ||
-    user.jobTitle?.toLowerCase().includes("mostrador") ||
-    user.jobTitle?.toLowerCase().includes("ayudante") ||
-    normUser.includes("carlos") ||
-    normUser.includes("silvia") ||
-    normUser.includes("noe") ||
-    normUsername === "carlos" ||
-    normUsername === "carlos.bueno" ||
-    normUsername === "silvia" ||
-    normUsername === "noe" ||
-    normUsername === "sanjuan" ||
-    normUsername === "angeles" ||
-    (user.role !== "admin" && user.role !== "auxiliar_admin")
-  );
-
   // 1. Administrador real (Don Toño Brito, Paulina Brito, Lic. Roberto Morales):
   // "en los perfiles administrativos como el de paulina y toño, en esos debo tener todos los botones que son administrastivos y deben ver corte de cajas, pedidos etc, pero solo los perfiles administrativos"
-  const isAdmin = !isBranchPersonnel && Boolean(
+  const isAdmin = Boolean(
     user && 
+    !isAndres &&
     (user.role === "admin" || user.role === "auxiliar_admin") &&
     (
       user.id === "usr-1" ||
@@ -382,16 +359,15 @@ export function isNotificationVisibleForUser(
       normUser.includes("morales") ||
       normUser.includes("dueno") ||
       normUser.includes("dueño") ||
-      user.jobTitle?.toLowerCase().includes("administrad")
+      user.roleLabel?.toLowerCase().includes("administrad") ||
+      user.jobTitle?.toLowerCase().includes("administrad") ||
+      user.role === "admin"
     )
   );
 
-  // Administrador: acceso completo garantizado a cortes de caja y pedidos
+  // Administrador: acceso completo garantizado a todos los cortes de caja de empleados, pedidos y avisos globales del negocio
   if (isAdmin) {
-    if (!activeBranch || !activeBranch.id || activeBranch.id === "all") {
-      return true;
-    }
-    return checkBranchMatchesTargetCode(notif, getCanonicalBranchCode(activeBranch.id));
+    return true;
   }
 
   // 2. Perfiles Operativos de Sucursal (Andrés Sánchez, etc.) o filtro de Sucursal específica:

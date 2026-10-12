@@ -140,51 +140,11 @@ export default function NotificationsDropdown() {
     normalizeStr(user?.assignedBranchName).includes("angeles")
   );
 
-  // Perfiles de cajero / mostrador / sucursales:
-  // Andrés Sánchez, Carlos Mendoza, Carlos Bueno, Silvia, Noé, Sofía, Elena, Juan, etc.,
-  // o cualquier usuario operando en el mostrador / punto de venta (/pos).
-  // Para estos perfiles se OCULTA RIGUROSAMENTE:
-  // - El botón "Todas"
-  // - El botón "🏁 Cierres"
-  // - El botón "No leídas"
-  // Y se muestra EXCLUSIVAMENTE:
-  // - El cuadro/botón "🎂 Pedidos (XX)"
-  // - El enlace "Marcar leídas"
-  const isCashierProfile = Boolean(
-    isAndresSanchez ||
-    pathname?.startsWith("/pos") ||
-    !user ||
-    user.role === "cajero" ||
-    user.role === "panadero" ||
-    user.role === "supervisor" ||
-    usernameNorm === "carlos" ||
-    usernameNorm === "carlos.bueno" ||
-    usernameNorm === "silvia" ||
-    usernameNorm === "noe" ||
-    usernameNorm === "sanjuan" ||
-    usernameNorm === "angeles" ||
-    usernameNorm === "sofia" ||
-    usernameNorm === "elena" ||
-    userNorm.includes("carlos") ||
-    userNorm.includes("mendoza") ||
-    userNorm.includes("bueno") ||
-    userNorm.includes("silvia") ||
-    userNorm.includes("noe") ||
-    userNorm.includes("cajero") ||
-    user?.roleLabel?.toLowerCase().includes("cajer") ||
-    user?.roleLabel?.toLowerCase().includes("mostrador") ||
-    user?.roleLabel?.toLowerCase().includes("supervisor") ||
-    user?.jobTitle?.toLowerCase().includes("cajer") ||
-    user?.jobTitle?.toLowerCase().includes("mostrador") ||
-    user?.jobTitle?.toLowerCase().includes("ayudante") ||
-    Boolean(user?.assignedBranchId && user?.role !== "admin" && user?.role !== "auxiliar_admin") ||
-    (user?.role !== "admin" && user?.role !== "auxiliar_admin")
-  );
-
   // Perfiles administrativos reales (Don Toño Brito, Paulina Brito, Lic. Roberto Morales):
   // "en los perfiles administrativos como el de paulina y toño, en esos debo tener todos los botones que son administrastivos y deben ver corte de cajas, pedidos etc, pero solo los perfiles administrativos"
-  const isAdmin = !isAndresSanchez && !isCashierProfile && Boolean(
+  const isAdmin = Boolean(
     user && 
+    !isAndresSanchez &&
     (user.role === "admin" || user.role === "auxiliar_admin") &&
     (
       user.id === "usr-1" ||
@@ -199,7 +159,9 @@ export default function NotificationsDropdown() {
       userNorm.includes("morales") ||
       userNorm.includes("dueno") ||
       userNorm.includes("dueño") ||
-      user?.jobTitle?.toLowerCase().includes("administrad")
+      user?.roleLabel?.toLowerCase().includes("administrad") ||
+      user?.jobTitle?.toLowerCase().includes("administrad") ||
+      user.role === "admin"
     )
   );
 

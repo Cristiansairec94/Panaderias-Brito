@@ -235,8 +235,6 @@ export default function CashDrawerShiftModal({
     }
   }, [currentBranch?.id, currentBranch?.currentShift?.cashier, cashierName]);
   const [incomingCashier, setIncomingCashier] = useState("Siguiente Cajero(a)");
-  const [isCustomOutgoing, setIsCustomOutgoing] = useState(false);
-  const [isCustomIncoming, setIsCustomIncoming] = useState(false);
   const [nextShiftName, setNextShiftName] = useState("Turno Vespertino (14:00 - 22:00)");
   const [countedCash, setCountedCash] = useState<string>("");
   const [nextInitialFund, setNextInitialFund] = useState("");
@@ -304,66 +302,48 @@ export default function CashDrawerShiftModal({
   const outgoingProfile = useMemo(() => findProfile(outgoingCashier), [outgoingCashier, findProfile]);
   const incomingProfile = useMemo(() => findProfile(incomingCashier), [incomingCashier, findProfile]);
 
+  // Identificar la sucursal exacta a la que pertenece esta caja
+  const effectiveBranchId = useMemo(() => {
+    return resolveBranchId(branchId || currentBranch?.id, cashierName);
+  }, [branchId, currentBranch?.id, cashierName]);
+
+  // Filtrar única y estrictamente los cajeros de ESTA sucursal (máximo 2: Turno Mañana y Turno Tarde)
+  // "ambos tienen que ser de la misma sucursal, no puede haber mas de dos perfiles, cada perfil va hacia una sucursal y solo hay dos cajeros por sucursal, el del turno de la mañama y el turno de la tarde"
   const branchUsers = useMemo(() => {
-    const bId = currentBranch?.id;
-    return usersList.filter((u) => u.status !== "inactivo" && (bId ? u.assignedBranchId === bId : true));
-  }, [usersList, currentBranch?.id]);
-
-  const otherUsers = useMemo(() => {
-    const bId = currentBranch?.id;
-    return usersList.filter((u) => u.status !== "inactivo" && (bId ? u.assignedBranchId !== bId : false));
-  }, [usersList, currentBranch?.id]);
-
-  useEffect(() => {
-    const bId = currentBranch?.id;
-    // 1. Resolver el nombre de quien entrega ligado estrictamente a la plantilla de perfiles
-    let effectiveName = "";
-    if (cashierName && usersList.some((u) => matchesCashier(u.name, cashierName))) {
-      const match = usersList.find((u) => matchesCashier(u.name, cashierName));
-      effectiveName = match ? match.name : cashierName;
-    } else {
-      // Buscar usuario asignado a esta sucursal en usersList
-      const branchUser = usersList.find((u) => (bId ? u.assignedBranchId === bId : false) && u.status !== "inactivo");
-      if (branchUser) {
-        effectiveName = branchUser.name;
-      } else if (currentBranch?.assignedUserId) {
-        const u = usersList.find((usr) => usr.id === currentBranch.assignedUserId && usr.status !== "inactivo");
-        effectiveName = u ? u.name : (user?.name || "Don Toño Brito");
-      } else {
-        effectiveName = user?.name || "Don Toño Brito";
-      }
-    }
-
-    setOutgoingCashier(effectiveName);
-
-    // 2. Seleccionar a la persona que recibe (nunca duplicar la que entrega)
-    const sameBranchCandidates = usersList.filter(
+    const list = usersList.filter(
       (u) =>
         u.status !== "inactivo" &&
-        !matchesCashier(u.name, effectiveName) &&
-        !matchesCashier(u.username, effectiveName) &&
-        (bId ? u.assignedBranchId === bId : false)
+        u.role !== "admin" &&
+        u.role !== "auxiliar_admin" &&
+        u.role !== "panadero" &&
+        resolveBranchId(u.assignedBranchId, u.name) === effectiveBranchId
     );
+    // Garantizar que no exceda 2 perfiles
+    return list.slice(0, 2);
+  }, [usersList, effectiveBranchId]);
 
-    if (sameBranchCandidates.length > 0) {
-      setIncomingCashier(sameBranchCandidates[0].name);
-      setNextShiftName(effectiveName.toLowerCase().includes("matutino") ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
+  useEffect(() => {
+    if (branchUsers.length === 0) return;
+
+    // 1. Quien entrega: por defecto el cajero actual si coincide con los de esta sucursal, o el primero
+    let effectiveName = "";
+    const matched = branchUsers.find((u) => cashierName && matchesCashier(u.name, cashierName));
+    if (matched) {
+      effectiveName = matched.name;
     } else {
-      const otherCandidates = usersList.filter(
-        (u) =>
-          u.status !== "inactivo" &&
-          !matchesCashier(u.name, effectiveName) &&
-          !matchesCashier(u.username, effectiveName)
-      );
-      if (otherCandidates.length > 0) {
-        const preferred = otherCandidates.find((u) => u.role === "cajero") || otherCandidates[0];
-        setIncomingCashier(preferred.name);
-      } else {
-        setIncomingCashier("Don Toño Brito");
-      }
-      setNextShiftName(currentBranch?.currentShift?.name || "Turno Siguiente");
+      effectiveName = branchUsers[0].name;
     }
-  }, [cashierName, currentBranch?.id, currentBranch?.assignedUserId, currentBranch?.currentShift?.cashier, currentBranch?.currentShift?.name, usersList, user?.name]);
+    setOutgoingCashier(effectiveName);
+
+    // 2. Quien recibe: es obligatoriamente el OTRO cajero de la misma sucursal (Mañana <-> Tarde)
+    const partner = branchUsers.find((u) => !matchesCashier(u.name, effectiveName)) || branchUsers[1] || branchUsers[0];
+    if (partner) {
+      setIncomingCashier(partner.name);
+    }
+
+    const isMorning = effectiveName.toLowerCase().includes("mañana") || effectiveName.toLowerCase().includes("matutino") || (branchUsers[0] && matchesCashier(branchUsers[0].name, effectiveName));
+    setNextShiftName(isMorning ? "Turno Vespertino (14:00 - 22:00)" : "Turno Matutino (06:00 - 14:00)");
+  }, [branchUsers, cashierName]);
 
   useEffect(() => {
     if (isOpen) {
@@ -1260,9 +1240,9 @@ export default function CashDrawerShiftModal({
                         <span className="font-black text-rose-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
                           <span className="text-base">👤</span> ENTREGA:
                         </span>
-                        {outgoingProfile?.assignedBranchName && (
-                          <span className="text-[10px] text-stone-500 font-bold bg-stone-100 px-2 py-0.5 rounded-md truncate max-w-[150px]">
-                            📍 {outgoingProfile.assignedBranchName.replace("Sucursal ", "")}
+                        {(outgoingProfile?.assignedBranchName || currentBranch?.name) && (
+                          <span className="text-[10px] text-stone-600 font-bold bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-md truncate max-w-[150px]">
+                            📍 {(outgoingProfile?.assignedBranchName || currentBranch?.name || "").replace("Sucursal ", "")}
                           </span>
                         )}
                       </div>
@@ -1273,57 +1253,26 @@ export default function CashDrawerShiftModal({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          {!isCustomOutgoing ? (
-                            <div className="relative">
-                              <select
-                                value={outgoingCashier}
-                                onChange={(e) => {
-                                  if (e.target.value === "__custom__") {
-                                    setIsCustomOutgoing(true);
-                                  } else {
-                                    setOutgoingCashier(e.target.value);
-                                  }
-                                }}
-                                className="w-full font-black text-stone-900 text-xs sm:text-sm bg-transparent border-b-2 border-dashed border-stone-300 hover:border-rose-400 focus:outline-none focus:border-rose-500 cursor-pointer truncate py-0.5 transition-colors pr-4"
-                              >
-                                {branchUsers.length > 0 && (
-                                  <optgroup label={`Personal de ${currentBranch?.shortName || currentBranch?.name || "esta Sucursal"}`}>
-                                    {branchUsers.map((u) => (
-                                      <option key={u.id} value={u.name}>
-                                        {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
-                                      </option>
-                                    ))}
-                                  </optgroup>
-                                )}
-                                <optgroup label="Todos los Perfiles & Administración">
-                                  {otherUsers.map((u) => (
-                                    <option key={u.id} value={u.name}>
-                                      {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              </select>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <input
-                                type="text"
-                                value={outgoingCashier}
-                                onChange={(e) => setOutgoingCashier(e.target.value)}
-                                placeholder="Nombre de quien entrega"
-                                className="w-full text-xs font-black px-2 py-1 border-2 border-rose-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400"
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setIsCustomOutgoing(false)}
-                                className="text-[10px] text-stone-600 hover:text-stone-900 px-2 py-1 bg-stone-100 hover:bg-stone-200 rounded-lg font-bold shrink-0 transition-colors cursor-pointer"
-                                title="Volver a lista de perfiles"
-                              >
-                                Perfiles
-                              </button>
-                            </div>
-                          )}
+                          <div className="relative">
+                            <select
+                              value={outgoingCashier}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setOutgoingCashier(val);
+                                const partner = branchUsers.find((u) => !matchesCashier(u.name, val)) || branchUsers.find((u) => u.name !== val);
+                                if (partner) {
+                                  setIncomingCashier(partner.name);
+                                }
+                              }}
+                              className="w-full font-black text-stone-900 text-xs sm:text-sm bg-transparent border-b-2 border-dashed border-stone-300 hover:border-rose-400 focus:outline-none focus:border-rose-500 cursor-pointer truncate py-0.5 transition-colors pr-4"
+                            >
+                              {branchUsers.map((u) => (
+                                <option key={u.id} value={u.name}>
+                                  {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                           <span className="text-[10.5px] text-stone-500 font-bold block truncate mt-0.5">
                             {outgoingProfile?.jobTitle || outgoingProfile?.roleLabel || "Cajero(a) en turno saliente"}
                           </span>
@@ -1337,9 +1286,9 @@ export default function CashDrawerShiftModal({
                         <span className="font-black text-emerald-700 uppercase shrink-0 text-xs sm:text-sm flex items-center gap-1.5">
                           <span className="text-base">👤</span> RECIBE:
                         </span>
-                        {incomingProfile?.assignedBranchName && (
+                        {(incomingProfile?.assignedBranchName || currentBranch?.name) && (
                           <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100/80 border border-emerald-200 px-2 py-0.5 rounded-md truncate max-w-[150px]">
-                            📍 {incomingProfile.assignedBranchName.replace("Sucursal ", "")}
+                            📍 {(incomingProfile?.assignedBranchName || currentBranch?.name || "").replace("Sucursal ", "")}
                           </span>
                         )}
                       </div>
@@ -1350,57 +1299,26 @@ export default function CashDrawerShiftModal({
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          {!isCustomIncoming ? (
-                            <div className="relative">
-                              <select
-                                value={incomingCashier}
-                                onChange={(e) => {
-                                  if (e.target.value === "__custom__") {
-                                    setIsCustomIncoming(true);
-                                  } else {
-                                    setIncomingCashier(e.target.value);
-                                  }
-                                }}
-                                className="w-full font-black text-emerald-950 text-xs sm:text-sm bg-transparent border-b-2 border-dashed border-emerald-300 hover:border-emerald-500 focus:outline-none focus:border-emerald-600 cursor-pointer truncate py-0.5 transition-colors pr-4"
-                              >
-                                {branchUsers.length > 0 && (
-                                  <optgroup label={`Personal de ${currentBranch?.shortName || currentBranch?.name || "esta Sucursal"}`}>
-                                    {branchUsers.map((u) => (
-                                      <option key={u.id} value={u.name}>
-                                        {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
-                                      </option>
-                                    ))}
-                                  </optgroup>
-                                )}
-                                <optgroup label="Todos los Perfiles & Administración">
-                                  {otherUsers.map((u) => (
-                                    <option key={u.id} value={u.name}>
-                                      {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              </select>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <input
-                                type="text"
-                                value={incomingCashier}
-                                onChange={(e) => setIncomingCashier(e.target.value)}
-                                placeholder="Nombre de quien recibe"
-                                className="w-full text-xs font-black px-2 py-1 border-2 border-emerald-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setIsCustomIncoming(false)}
-                                className="text-[10px] text-stone-600 hover:text-stone-900 px-2 py-1 bg-stone-100 hover:bg-stone-200 rounded-lg font-bold shrink-0 transition-colors cursor-pointer"
-                                title="Volver a lista de perfiles"
-                              >
-                                Perfiles
-                              </button>
-                            </div>
-                          )}
+                          <div className="relative">
+                            <select
+                              value={incomingCashier}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setIncomingCashier(val);
+                                const partner = branchUsers.find((u) => !matchesCashier(u.name, val)) || branchUsers.find((u) => u.name !== val);
+                                if (partner) {
+                                  setOutgoingCashier(partner.name);
+                                }
+                              }}
+                              className="w-full font-black text-emerald-950 text-xs sm:text-sm bg-transparent border-b-2 border-dashed border-emerald-300 hover:border-emerald-500 focus:outline-none focus:border-emerald-600 cursor-pointer truncate py-0.5 transition-colors pr-4"
+                            >
+                              {branchUsers.map((u) => (
+                                <option key={u.id} value={u.name}>
+                                  {u.avatar || "👤"} {u.name} — {u.jobTitle || u.roleLabel || u.role}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                           <span className="text-[10.5px] text-emerald-800 font-bold block truncate mt-0.5">
                             {incomingProfile?.jobTitle || incomingProfile?.roleLabel || "Cajero(a) entrante / Relevo de caja"}
                           </span>

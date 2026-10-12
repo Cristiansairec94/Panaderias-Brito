@@ -747,12 +747,12 @@ export function resolveBranchId(rawBranchId: string | null | undefined, cashierN
     }
 
     // 3. Reconocimiento de palabras clave y nombres canónicos
-    if (cLower.includes("angeles") || cLower.includes("ángeles") || cLower.includes("lazaro") || cLower.includes("lázaro")) return "branch-angeles";
-    if (cLower.includes("benito")) return "branch-benito";
+    if (cLower.includes("angeles") || cLower.includes("ángeles") || cLower.includes("lazaro") || cLower.includes("lázaro") || cLower.includes("andres") || cLower.includes("andrés")) return "branch-angeles";
+    if (cLower.includes("benito") || cLower.includes("mendoza")) return "branch-benito";
     if (cLower.includes("ildefonso") || cLower.includes("silvia") || cLower.includes("puga")) return "branch-1790889237862";
-    if (cLower.includes("sanjuan") || cLower.includes("san juan") || cLower.includes("noe") || cLower.includes("velasquez")) return "branch-sanjuan";
-    if (cLower.includes("flores")) return "branch-flores";
-    if (cLower.includes("matriz") || cLower.includes("centro") || cLower.includes("toño") || cLower.includes("lupita")) return "branch-matriz";
+    if (cLower.includes("sanjuan") || cLower.includes("san juan") || cLower.includes("noe") || cLower.includes("noé") || cLower.includes("velasquez") || cLower.includes("velásquez")) return "branch-sanjuan";
+    if (cLower.includes("flores") || cLower.includes("sofia") || cLower.includes("sofía") || cLower.includes("elena")) return "branch-flores";
+    if (cLower.includes("matriz") || cLower.includes("centro") || cLower.includes("toño") || cLower.includes("tono") || cLower.includes("lupita") || cLower.includes("bueno")) return "branch-matriz";
   }
 
   return rawBranchId || "branch-matriz";

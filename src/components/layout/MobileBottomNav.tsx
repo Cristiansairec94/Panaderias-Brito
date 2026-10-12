@@ -53,44 +53,11 @@ export default function MobileBottomNav() {
     normalizeStr(user?.assignedBranchName).includes("angeles")
   );
 
-  // Perfiles de cajero / mostrador / sucursales:
-  // Andrés Sánchez, Carlos Mendoza, Carlos Bueno, Silvia, Noé, Sofía, Elena, Juan, etc.,
-  // o cualquier usuario operando en el mostrador / punto de venta (/pos).
-  const isCashierProfile = Boolean(
-    isAndresSanchez ||
-    pathname?.startsWith("/pos") ||
-    !user ||
-    user.role === "cajero" ||
-    user.role === "panadero" ||
-    user.role === "supervisor" ||
-    usernameNorm === "carlos" ||
-    usernameNorm === "carlos.bueno" ||
-    usernameNorm === "silvia" ||
-    usernameNorm === "noe" ||
-    usernameNorm === "sanjuan" ||
-    usernameNorm === "angeles" ||
-    usernameNorm === "sofia" ||
-    usernameNorm === "elena" ||
-    userNorm.includes("carlos") ||
-    userNorm.includes("mendoza") ||
-    userNorm.includes("bueno") ||
-    userNorm.includes("silvia") ||
-    userNorm.includes("noe") ||
-    userNorm.includes("cajero") ||
-    user?.roleLabel?.toLowerCase().includes("cajer") ||
-    user?.roleLabel?.toLowerCase().includes("mostrador") ||
-    user?.roleLabel?.toLowerCase().includes("supervisor") ||
-    user?.jobTitle?.toLowerCase().includes("cajer") ||
-    user?.jobTitle?.toLowerCase().includes("mostrador") ||
-    user?.jobTitle?.toLowerCase().includes("ayudante") ||
-    Boolean(user?.assignedBranchId && user?.role !== "admin" && user?.role !== "auxiliar_admin") ||
-    (user?.role !== "admin" && user?.role !== "auxiliar_admin")
-  );
-
   // Perfiles administrativos reales (Don Toño Brito, Paulina Brito, Lic. Roberto Morales):
   // "en los perfiles administrativos como el de paulina y toño, en esos debo tener todos los botones que son administrastivos y deben ver corte de cajas, pedidos etc, pero solo los perfiles administrativos"
-  const isAdmin = !isAndresSanchez && !isCashierProfile && Boolean(
+  const isAdmin = Boolean(
     user && 
+    !isAndresSanchez &&
     (user.role === "admin" || user.role === "auxiliar_admin") &&
     (
       user.id === "usr-1" ||
@@ -105,7 +72,9 @@ export default function MobileBottomNav() {
       userNorm.includes("morales") ||
       userNorm.includes("dueno") ||
       userNorm.includes("dueño") ||
-      user?.jobTitle?.toLowerCase().includes("administrad")
+      user?.roleLabel?.toLowerCase().includes("administrad") ||
+      user?.jobTitle?.toLowerCase().includes("administrad") ||
+      user.role === "admin"
     )
   );
 
@@ -264,9 +233,22 @@ export default function MobileBottomNav() {
             {/* Cabecera y Controles */}
             <div className="p-4 sm:p-5 pb-2 flex flex-col shrink-0">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl sm:text-[22px] font-bold text-stone-900 tracking-tight">
-                  Avisos & Notificaciones
-                </h3>
+                <div>
+                  <h3 className="text-xl sm:text-[22px] font-bold text-stone-900 tracking-tight">
+                    Avisos & Notificaciones
+                  </h3>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {isAdmin ? (
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+                        🛡️ Control Total (Todas las sucursales y cortes)
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+                        📍 Sucursal {(user?.assignedBranchName || (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "Los Ángeles" : user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "San Benito" : "Asignada")).replace(/^(sucursal\s*)+/i, "").trim()}
+                      </span>
+                    )}
+                  </div>
+                </div>
 
                 <div className="flex items-center gap-1">
                   {/* Menú de opciones rápidas */}
