@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { 
   Bell, 
   CheckCheck, 
@@ -36,6 +37,7 @@ import {
   getCanonicalBranchCode
 } from "@/context/NotificationContext";
 import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
 import { formatCurrency, formatOrderCreation } from "@/lib/utils";
 
 // Graphic illustration for Flour Sack matching user mockup
@@ -115,10 +117,21 @@ function CakeGraphic({ className = "w-10 h-10" }: { className?: string }) {
 export default function NotificationsDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useAuth();
+  const pathname = usePathname();
+  const { currentBranch, isAllBranches } = useBranch();
   
-  // Perfiles como Andrés Sánchez, Carlos (Mendoza / Bueno), Silvia, Noé, cajeros y personal de sucursal
-  // tienen su vista de notificaciones estrictamente limitada a pedidos de su sucursal.
-  const isBranchProfile = Boolean(
+  // Perfiles de cajero / mostrador / sucursales:
+  // Andrés Sánchez, Carlos Mendoza, Carlos Bueno, Silvia, Noé, Sofía, Elena, Juan, etc.,
+  // o cualquier usuario operando en el mostrador / punto de venta (/pos).
+  // Para estos perfiles se OCULTA RIGUROSAMENTE:
+  // - El botón "Todas"
+  // - El botón "🏁 Cierres"
+  // - El botón "No leídas"
+  // Y se muestra EXCLUSIVAMENTE:
+  // - El cuadro/botón "🎂 Pedidos (XX)"
+  // - El enlace "Marcar leídas"
+  const isCashierProfile = Boolean(
+    pathname?.startsWith("/pos") ||
     !user ||
     user.role === "cajero" ||
     user.role === "panadero" ||
@@ -126,11 +139,35 @@ export default function NotificationsDropdown() {
     user.username === "andres" ||
     user.username === "carlos" ||
     user.username === "carlos.bueno" ||
+    user.username === "silvia" ||
+    user.username === "noe" ||
+    user.username === "sanjuan" ||
+    user.username === "angeles" ||
+    user.username === "sofia" ||
+    user.username === "elena" ||
     user.name?.toLowerCase().includes("andres") ||
     user.name?.toLowerCase().includes("carlos") ||
-    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+    user.name?.toLowerCase().includes("mendoza") ||
+    user.name?.toLowerCase().includes("bueno") ||
+    user.name?.toLowerCase().includes("sanchez") ||
+    user.name?.toLowerCase().includes("silvia") ||
+    user.name?.toLowerCase().includes("noe") ||
+    user.name?.toLowerCase().includes("cajero") ||
+    user.roleLabel?.toLowerCase().includes("cajer") ||
+    user.roleLabel?.toLowerCase().includes("mostrador") ||
+    user.roleLabel?.toLowerCase().includes("supervisor") ||
+    user.jobTitle?.toLowerCase().includes("cajer") ||
+    user.jobTitle?.toLowerCase().includes("mostrador") ||
+    user.jobTitle?.toLowerCase().includes("ayudante") ||
+    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin") ||
+    (user.role !== "admin" && user.role !== "auxiliar_admin")
   );
-  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
+
+  const isAdmin = !isCashierProfile && Boolean(
+    user && 
+    (user.role === "admin" || user.role === "auxiliar_admin") &&
+    (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
+  );
 
   const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">(
     isAdmin ? "all" : "pedidos"
@@ -170,7 +207,7 @@ export default function NotificationsDropdown() {
     } else {
       setActiveTab("all");
     }
-  }, [isAdmin, user?.id]);
+  }, [isAdmin, user?.id, pathname]);
 
   // Temporizador en vivo que se actualiza segundo a segundo mientras el panel está abierto
   const [now, setNow] = useState(Date.now());
@@ -190,7 +227,8 @@ export default function NotificationsDropdown() {
     user?.assignedBranchName ||
     (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
     (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
-    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "")
+    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
+    (currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "")
   );
 
   // Para usuarios de sucursal (Andrés Sánchez, Carlos, cajeros):

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
 import { 
   useNotifications, 
   getCanonicalBranchCode, 
@@ -31,8 +32,13 @@ export default function MobileBottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { isMobileOpen, toggleMobile, setMobileOpen } = useSidebar();
+  const { currentBranch } = useBranch();
   
-  const isBranchProfile = Boolean(
+  // Perfiles de cajero / mostrador / sucursales:
+  // Andrés Sánchez, Carlos Mendoza, Carlos Bueno, Silvia, Noé, Sofía, Elena, Juan, etc.,
+  // o cualquier usuario operando en el mostrador / punto de venta (/pos).
+  const isCashierProfile = Boolean(
+    pathname?.startsWith("/pos") ||
     !user ||
     user.role === "cajero" ||
     user.role === "panadero" ||
@@ -40,11 +46,35 @@ export default function MobileBottomNav() {
     user.username === "andres" ||
     user.username === "carlos" ||
     user.username === "carlos.bueno" ||
+    user.username === "silvia" ||
+    user.username === "noe" ||
+    user.username === "sanjuan" ||
+    user.username === "angeles" ||
+    user.username === "sofia" ||
+    user.username === "elena" ||
     user.name?.toLowerCase().includes("andres") ||
     user.name?.toLowerCase().includes("carlos") ||
-    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+    user.name?.toLowerCase().includes("mendoza") ||
+    user.name?.toLowerCase().includes("bueno") ||
+    user.name?.toLowerCase().includes("sanchez") ||
+    user.name?.toLowerCase().includes("silvia") ||
+    user.name?.toLowerCase().includes("noe") ||
+    user.name?.toLowerCase().includes("cajero") ||
+    user.roleLabel?.toLowerCase().includes("cajer") ||
+    user.roleLabel?.toLowerCase().includes("mostrador") ||
+    user.roleLabel?.toLowerCase().includes("supervisor") ||
+    user.jobTitle?.toLowerCase().includes("cajer") ||
+    user.jobTitle?.toLowerCase().includes("mostrador") ||
+    user.jobTitle?.toLowerCase().includes("ayudante") ||
+    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin") ||
+    (user.role !== "admin" && user.role !== "auxiliar_admin")
   );
-  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
+
+  const isAdmin = !isCashierProfile && Boolean(
+    user && 
+    (user.role === "admin" || user.role === "auxiliar_admin") &&
+    (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
+  );
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "cortes" | "pedidos" | "unread">(
@@ -83,7 +113,7 @@ export default function MobileBottomNav() {
     } else {
       setActiveTab("all");
     }
-  }, [isAdmin, user?.id]);
+  }, [isAdmin, user?.id, pathname]);
 
   // Si no hay usuario logueado, no mostrar la barra
   if (!user) return null;
@@ -115,7 +145,8 @@ export default function MobileBottomNav() {
     user?.assignedBranchName ||
     (user?.username === "andres" || user?.name?.toLowerCase().includes("andres") ? "branch-angeles" : "") ||
     (user?.username === "carlos" || user?.name?.toLowerCase().includes("mendoza") ? "branch-benito" : "") ||
-    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "")
+    (user?.username === "carlos.bueno" || user?.name?.toLowerCase().includes("bueno") ? "branch-matriz" : "") ||
+    (currentBranch?.id && currentBranch.id !== "all" ? currentBranch.id : "")
   );
 
   // Para usuarios con rol cajero o perfiles de sucursal:

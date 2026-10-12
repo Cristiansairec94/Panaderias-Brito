@@ -331,12 +331,35 @@ export function isNotificationVisibleForUser(
     user.username === "andres" ||
     user.username === "carlos" ||
     user.username === "carlos.bueno" ||
+    user.username === "silvia" ||
+    user.username === "noe" ||
+    user.username === "sanjuan" ||
+    user.username === "angeles" ||
+    user.username === "sofia" ||
+    user.username === "elena" ||
     user.name?.toLowerCase().includes("andres") ||
     user.name?.toLowerCase().includes("carlos") ||
-    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin")
+    user.name?.toLowerCase().includes("mendoza") ||
+    user.name?.toLowerCase().includes("bueno") ||
+    user.name?.toLowerCase().includes("sanchez") ||
+    user.name?.toLowerCase().includes("silvia") ||
+    user.name?.toLowerCase().includes("noe") ||
+    user.name?.toLowerCase().includes("cajero") ||
+    user.roleLabel?.toLowerCase().includes("cajer") ||
+    user.roleLabel?.toLowerCase().includes("mostrador") ||
+    user.roleLabel?.toLowerCase().includes("supervisor") ||
+    user.jobTitle?.toLowerCase().includes("cajer") ||
+    user.jobTitle?.toLowerCase().includes("mostrador") ||
+    user.jobTitle?.toLowerCase().includes("ayudante") ||
+    Boolean(user.assignedBranchId && user.role !== "admin" && user.role !== "auxiliar_admin") ||
+    (user.role !== "admin" && user.role !== "auxiliar_admin")
   );
 
-  const isAdmin = !isBranchProfile && Boolean(user && (user.role === "admin" || user.role === "auxiliar_admin"));
+  const isAdmin = !isBranchProfile && Boolean(
+    user && 
+    (user.role === "admin" || user.role === "auxiliar_admin") &&
+    (user.username === "admin" || user.username === "paulina" || user.username === "roberto" || user.name?.toLowerCase().includes("toño") || user.name?.toLowerCase().includes("paulina") || user.name?.toLowerCase().includes("morales"))
+  );
   if (isAdmin) {
     return true;
   }
