@@ -39,7 +39,7 @@ import {
 } from "@/context/NotificationContext";
 import { useAuth } from "@/context/AuthContext";
 import { useBranch } from "@/context/BranchContext";
-import { formatCurrency, formatOrderCreation } from "@/lib/utils";
+import { formatCurrency, formatOrderCreation, resolveBranchId } from "@/lib/utils";
 
 const normalizeStr = (s?: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
@@ -252,14 +252,27 @@ export default function NotificationsDropdown() {
           if (oDest && oDest === activeBranchCode) return true;
           const oOrigin = getCanonicalBranchCode(order.operatingBranchId || order.operatingBranchName);
           if (oOrigin && oOrigin === activeBranchCode) return true;
+          if (order.cashier) {
+            const cashierBranch = getCanonicalBranchCode(resolveBranchId(undefined, order.cashier));
+            if (cashierBranch && cashierBranch === activeBranchCode) return true;
+          }
+          if (Array.isArray(order.payments) && order.payments.length > 0) {
+            for (const p of order.payments) {
+              if (p.cashier) {
+                const payBranch = getCanonicalBranchCode(resolveBranchId(undefined, p.cashier));
+                if (payBranch && payBranch === activeBranchCode) return true;
+              }
+            }
+          }
         }
 
         const text = `${n.title || ""} ${n.highlightText || ""} ${n.description || ""} ${n.senderName || ""}`.toLowerCase();
         if (activeBranchCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
         if (activeBranchCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
-        if (activeBranchCode === "branch-sanjuan" && text.includes("san juan")) return true;
-        if (activeBranchCode === "branch-benito" && text.includes("benito")) return true;
+        if (activeBranchCode === "branch-sanjuan" && (text.includes("san juan") || text.includes("sanjuan"))) return true;
+        if (activeBranchCode === "branch-benito" && (text.includes("benito") || text.includes("mercado"))) return true;
         if (activeBranchCode === "branch-1790889237862" && text.includes("ildefonso")) return true;
+        if (activeBranchCode === "branch-flores" && (text.includes("flores") || text.includes("plaza"))) return true;
 
         return false;
       })

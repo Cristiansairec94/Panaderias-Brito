@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_PRODUCTS, getStoredProducts, saveStoredProducts } from "@/lib/products";
 import { DEFAULT_GENERAL_CUSTOMER, getStoredCustomers, saveStoredCustomers } from "@/lib/customers";
 import { playSyncSuccessSound } from "@/lib/sound";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
+import { parseDateTimeSafe } from "@/lib/utils";
 
 export const STORAGE_SYNC_QUEUE_KEY = "brito_offline_sync_queue";
 export const STORAGE_LAST_SYNC_KEY = "brito_last_sync_time";
@@ -17,7 +19,11 @@ export function getSyncQueue(): SyncItem[] {
     const raw = localStorage.getItem(STORAGE_SYNC_QUEUE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => {
+      const ts = new Date(item.createdAt).getTime();
+      return ts >= CLEAN_SLATE_EPOCH;
+    });
   } catch (err) {
     console.error("[SyncService] Error al leer cola de sincronización:", err);
     return [];
@@ -477,7 +483,11 @@ export async function syncAllLocalDataToSupabase(): Promise<{
       if (Array.isArray(list)) list.forEach((s) => s.id && !salesMap.has(s.id) && salesMap.set(s.id, s));
     }
 
-    const unsyncedSales = Array.from(salesMap.values()).filter((s) => s.id && !syncedIds.has(s.id));
+    const unsyncedSales = Array.from(salesMap.values()).filter((s) => {
+      if (!s.id || syncedIds.has(s.id)) return false;
+      const sTs = s.timestamp ? Number(s.timestamp) : parseDateTimeSafe(s.createdAt || s.date);
+      return sTs >= CLEAN_SLATE_EPOCH;
+    });
 
     if (unsyncedSales.length > 0) {
       // Procesar en chunks de 40 para no exceder límites de Supabase
@@ -555,9 +565,11 @@ export async function syncAllLocalDataToSupabase(): Promise<{
       if (Array.isArray(list)) list.forEach((e) => e.id && !expensesMap.has(e.id) && expensesMap.set(e.id, e));
     }
 
-    const unsyncedExpenses = Array.from(expensesMap.values()).filter(
-      (e) => e.id && !e.id.includes("mov-mov-") && !syncedIds.has(e.id)
-    );
+    const unsyncedExpenses = Array.from(expensesMap.values()).filter((e) => {
+      if (!e.id || e.id.includes("mov-mov-") || syncedIds.has(e.id)) return false;
+      const eTs = e.timestamp ? Number(e.timestamp) : parseDateTimeSafe(e.createdAt || e.date);
+      return eTs >= CLEAN_SLATE_EPOCH;
+    });
     if (unsyncedExpenses.length > 0) {
       const expPayload = unsyncedExpenses.map((exp) => ({
         id: exp.id,
@@ -605,9 +617,11 @@ export async function syncAllLocalDataToSupabase(): Promise<{
       if (Array.isArray(list)) list.forEach((i) => i.id && !incomesMap.has(i.id) && incomesMap.set(i.id, i));
     }
 
-    const unsyncedIncomes = Array.from(incomesMap.values()).filter(
-      (i) => i.id && !i.id.includes("ING-ING") && !syncedIds.has(i.id)
-    );
+    const unsyncedIncomes = Array.from(incomesMap.values()).filter((i) => {
+      if (!i.id || i.id.includes("ING-ING") || syncedIds.has(i.id)) return false;
+      const iTs = i.timestamp || (i.createdAt ? parseDateTimeSafe(i.createdAt) : 0);
+      return iTs >= CLEAN_SLATE_EPOCH;
+    });
     if (unsyncedIncomes.length > 0) {
       const incPayload = unsyncedIncomes.map((inc) => ({
         id: inc.id,
@@ -640,7 +654,11 @@ export async function syncAllLocalDataToSupabase(): Promise<{
       if (Array.isArray(list)) list.forEach((o) => o.id && !ordersMap.has(o.id) && ordersMap.set(o.id, o));
     }
 
-    const unsyncedOrders = Array.from(ordersMap.values()).filter((o) => o.id && !syncedIds.has(o.id));
+    const unsyncedOrders = Array.from(ordersMap.values()).filter((o) => {
+      if (!o.id || syncedIds.has(o.id)) return false;
+      const oTs = o.timestamp || (o.createdAt ? parseDateTimeSafe(o.createdAt) : 0);
+      return oTs >= CLEAN_SLATE_EPOCH;
+    });
     if (unsyncedOrders.length > 0) {
       const ordPayload = unsyncedOrders.map((ord) => ({
         id: ord.id,

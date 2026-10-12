@@ -56,6 +56,7 @@ import {
   deleteCustomOrder,
   extractOrderOriginAndNotes
 } from "@/lib/orders";
+
 import CreateOrderModal from "@/components/pedidos/CreateOrderModal";
 import OrderPaymentModal from "@/components/pedidos/OrderPaymentModal";
 import OrderReceiptModal from "@/components/pedidos/OrderReceiptModal";
@@ -447,12 +448,26 @@ export default function PedidosPage() {
       .toLowerCase()
       .trim();
     const keywords: string[] = [];
-    if (s.includes("angeles") || s.includes("suc-les")) keywords.push("angeles");
-    if (s.includes("ildefonso") || s.includes("1790889237862") || s.includes("ilf-04")) keywords.push("ildefonso");
-    if (s.includes("benito") || s.includes("ben-02")) keywords.push("benito");
-    if (s.includes("flores") || s.includes("flo-03")) keywords.push("flores");
-    if (s.includes("sanjuan") || s.includes("san juan") || s.includes("sju-02")) keywords.push("sanjuan");
-    if (s.includes("matriz") || s.includes("centro") || s.includes("mat-01")) keywords.push("matriz");
+    if (s.includes("angeles") || s.includes("ángeles") || s.includes("suc-les")) {
+      keywords.push("angeles");
+    }
+    if (s.includes("ildefonso") || s.includes("1790889237862") || s.includes("ilf-04")) {
+      keywords.push("ildefonso");
+    }
+    if (s.includes("benito") || s.includes("ben-02") || s.includes("mercado")) {
+      keywords.push("benito");
+    }
+    if (s.includes("flores") || s.includes("flo-03") || s.includes("plaza")) {
+      keywords.push("flores");
+    }
+    if (s.includes("sanjuan") || s.includes("san juan") || s.includes("sju-02")) {
+      keywords.push("sanjuan");
+      keywords.push("san juan");
+    }
+    if (s.includes("matriz") || s.includes("centro") || s.includes("mat-01")) {
+      keywords.push("matriz");
+      keywords.push("centro");
+    }
     return keywords;
   }, []);
 
@@ -499,7 +514,9 @@ export default function PedidosPage() {
       const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
       const originMetaId = stripAccents(originMatch ? originMatch[1] : "");
       const originMetaKeywords = getBranchKeywords(originMetaId);
-      const matchesOriginMeta = targetKeywords.length > 0 && originMetaKeywords.some((k) => targetKeywords.includes(k));
+      const matchesOriginMeta =
+        (originMetaId && (originMetaId === targetId || originMetaId.includes(targetId) || targetId.includes(originMetaId))) ||
+        (targetKeywords.length > 0 && originMetaKeywords.some((k) => targetKeywords.includes(k)));
 
       const matchesOperating =
         (opId && (opId === targetId || opId.includes(targetId) || targetId.includes(opId))) ||
@@ -509,26 +526,38 @@ export default function PedidosPage() {
 
       if (matchesPickup || matchesOperating) return true;
 
-      // Si el pedido tiene cualquier sucursal asignada (destino u origen) y ninguna pertenece a esta tienda,
-      // NO pertenece a esta tienda (evitar que pedidos de otras sucursales se cuelen por nombre de cajero)
-      const hasBranchAssignment =
-        pickupKeywords.length > 0 ||
-        operatingKeywords.length > 0 ||
-        originMetaKeywords.length > 0 ||
-        Boolean(pId) ||
-        Boolean(opId);
-
-      if (hasBranchAssignment) {
-        return false;
-      }
-
-      // 3. Fallback estrictamente para pedidos huérfanos sin asignación de sucursal
+      // 3. Coincidencia por cajero asignado a la sucursal que registró el pedido
       if (order.cashier) {
-        const resolvedBranch = resolveBranchId(undefined, order.cashier);
-        const resolvedKeywords = getBranchKeywords(resolvedBranch);
-        if (targetKeywords.length > 0 && resolvedKeywords.some((k) => targetKeywords.includes(k))) {
+        const cashierBranch = stripAccents(resolveBranchId(undefined, order.cashier));
+        const cashierKeywords = getBranchKeywords(cashierBranch);
+        if (
+          cashierBranch === targetId ||
+          (targetKeywords.length > 0 && cashierKeywords.some((k) => targetKeywords.includes(k)))
+        ) {
           return true;
         }
+      }
+
+      // 4. Coincidencia por cobros o abonos recibidos por personal de esta sucursal
+      if (Array.isArray(order.payments) && order.payments.length > 0) {
+        for (const p of order.payments) {
+          if (p.cashier) {
+            const payBranch = stripAccents(resolveBranchId(undefined, p.cashier));
+            const payKeywords = getBranchKeywords(payBranch);
+            if (
+              payBranch === targetId ||
+              (targetKeywords.length > 0 && payKeywords.some((k) => targetKeywords.includes(k)))
+            ) {
+              return true;
+            }
+          }
+        }
+      }
+
+      // 5. Coincidencia con menciones de ruta o sucursal en notas o descripción (ej: "San Benito ➔ San Juan")
+      const textToSearch = `${rawNotes} ${order.description || ""}`.toLowerCase();
+      if (targetKeywords.length > 0 && targetKeywords.some((k) => textToSearch.includes(k))) {
+        return true;
       }
 
       return false;
@@ -651,6 +680,7 @@ export default function PedidosPage() {
     const q = stripAccents(searchQuery);
 
     return orders.filter((order) => {
+
       // 1. Si el usuario escribe una búsqueda (folio PED-..., cliente, teléfono),
       // buscar a nivel GLOBAL en TODOS los pedidos para que el cajero pueda encontrarlo al instante
       if (!hasSearch && !checkOrderMatchesBranch(order, effectiveBranchFilter)) {

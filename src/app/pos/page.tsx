@@ -54,6 +54,7 @@ import {
 import { Product, CartItem, Sale, CashExpense, Customer, BreadDeliveryRecord, TransferAccount, CardTerminalAccount, CashIncome, CustomOrder, OrderItem, ShiftCutRecord } from "@/types";
 import { formatCurrency, onlyNumbersKeyDown, cleanOnlyNumbers, cleanDecimalNumbers, playScanBeep, formatDateTimeSafe, parseDateTimeSafe, compareMovementsDesc, matchesCashier, getStoredShiftStartBoundary, deduplicateExpenses, deduplicateIncomes, resolveBranchId } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { getStoredProducts, saveStoredProducts, DEFAULT_PRODUCTS, PRODUCT_CATEGORIES, findProductByBarcodeOrCode, fetchProductsFromDb, getDeletedProductIds } from "@/lib/products";
 import { 
   DEFAULT_GENERAL_CUSTOMER, 
@@ -618,6 +619,7 @@ export default function POSPage() {
           const sBranch = s.branchId || s.branch_id || "branch-matriz";
           if (bId !== "all" && sBranch !== bId) return false;
           const t = parseDateTimeSafe(s?.timestamp || s?.createdAt || s?.date);
+          if (!t || t < CLEAN_SLATE_EPOCH) return false;
           if (shiftStart > 0 && (!t || t < shiftStart)) return false;
           return true;
         });
@@ -633,6 +635,7 @@ export default function POSPage() {
               const eBranch = e.branchId || e.branch_id || "branch-matriz";
               if (bId !== "all" && eBranch !== bId) return false;
               const t = parseDateTimeSafe(e?.timestamp || e?.createdAt || e?.date);
+              if (!t || t < CLEAN_SLATE_EPOCH) return false;
               return shiftStart <= 0 || (t && t >= shiftStart);
             });
             const deduped = deduplicateExpenses(filtered);

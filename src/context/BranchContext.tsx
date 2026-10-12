@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { parseDateTimeSafe, getStoredShiftStartBoundary, formatDateTimeSafe, compareMovementsDesc, resolveBranchId } from "@/lib/utils";
 import { normalizeOrder } from "@/lib/orders";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
 export interface SimulatedSale {
   id: string;
@@ -156,10 +157,10 @@ const DEFAULT_BRANCHES: Branch[] = [
     assignedUserEmail: "sanjuan@panaderiabrito.com",
     status: "abierta",
     dailyGoal: 8500,
-    todaySales: 181,
-    todayDeskSales: 181,
-    todayTickets: 3,
-    cashInDrawer: 6267,
+    todaySales: 0,
+    todayDeskSales: 0,
+    todayTickets: 0,
+    cashInDrawer: 1000,
     color: "rose",
     topProduct: {
       name: "Bolillo Tradicional",
@@ -173,11 +174,11 @@ const DEFAULT_BRANCHES: Branch[] = [
       cashier: "noe velasquez",
       openedAt: "06:00 hrs",
       initialFund: 1000,
-      cashSales: 181,
+      cashSales: 0,
       cardSales: 0,
       transferSales: 0,
-      totalSales: 181,
-      ticketCount: 3,
+      totalSales: 0,
+      ticketCount: 0,
       status: "abierto",
     },
   },
@@ -474,7 +475,29 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             parsed.forEach((b: Branch) => {
               if (b && b.id && !deletedIds.has(b.id)) {
                 const existing = branchMap.get(b.id);
-                branchMap.set(b.id, existing ? { ...existing, ...b } : b);
+                const cleanB = {
+                  ...b,
+                  todaySales: 0,
+                  todayTickets: 0,
+                  todayDeskSales: 0,
+                  todayDeskTickets: 0,
+                  todayOrdersDeposit: 0,
+                  todayOrdersTotal: 0,
+                  todayOrdersCount: 0,
+                  dayAccumulatedSales: 0,
+                  dayAccumulatedTickets: 0,
+                };
+                if (cleanB.currentShift) {
+                  cleanB.currentShift = {
+                    ...cleanB.currentShift,
+                    cashSales: 0,
+                    cardSales: 0,
+                    transferSales: 0,
+                    totalSales: 0,
+                    ticketCount: 0,
+                  };
+                }
+                branchMap.set(b.id, existing ? { ...existing, ...cleanB } : cleanB);
               }
             });
           }
@@ -663,11 +686,21 @@ function resolveBranchParam(param: string | null): string | null {
               .select("id, name, short_name, address, phone, is_active"),
           ]);
 
-          const dbSales = salesRes.status === "fulfilled" && !salesRes.value.error ? salesRes.value.data || [] : [];
-          const dbOrders = ordersRes.status === "fulfilled" && !ordersRes.value.error ? ordersRes.value.data || [] : [];
-          const dbMovs = movsRes.status === "fulfilled" && !movsRes.value.error ? movsRes.value.data || [] : [];
-          const dbExps = expsRes.status === "fulfilled" && !expsRes.value.error ? expsRes.value.data || [] : [];
-          const dbCuts = cutsRes.status === "fulfilled" && !cutsRes.value.error ? cutsRes.value.data || [] : [];
+          const dbSales = salesRes.status === "fulfilled" && !salesRes.value.error
+            ? (salesRes.value.data || []).filter((s: any) => parseDateTimeSafe(s.created_at || s.date) >= CLEAN_SLATE_EPOCH)
+            : [];
+          const dbOrders = ordersRes.status === "fulfilled" && !ordersRes.value.error
+            ? (ordersRes.value.data || []).filter((o: any) => parseDateTimeSafe(o.created_at) >= CLEAN_SLATE_EPOCH)
+            : [];
+          const dbMovs = movsRes.status === "fulfilled" && !movsRes.value.error
+            ? (movsRes.value.data || []).filter((m: any) => parseDateTimeSafe(m.created_at) >= CLEAN_SLATE_EPOCH)
+            : [];
+          const dbExps = expsRes.status === "fulfilled" && !expsRes.value.error
+            ? (expsRes.value.data || []).filter((e: any) => parseDateTimeSafe(e.created_at) >= CLEAN_SLATE_EPOCH)
+            : [];
+          const dbCuts = cutsRes.status === "fulfilled" && !cutsRes.value.error
+            ? (cutsRes.value.data || []).filter((c: any) => parseDateTimeSafe(c.opened_at) >= CLEAN_SLATE_EPOCH)
+            : [];
           const dbBranches = branchesRes.status === "fulfilled" && !branchesRes.value.error ? branchesRes.value.data || [] : [];
 
           // Recolectar todos los cortes de turno cerrados (Supabase + LocalStorage)
@@ -679,7 +712,8 @@ function resolveBranchParam(param: string | null): string | null {
                 const parsedCuts: ShiftCutRecord[] = JSON.parse(rawLocalCuts);
                 if (Array.isArray(parsedCuts)) {
                   parsedCuts.forEach((c) => {
-                    if (c && c.id) allCutsMap.set(c.id, c);
+                    const cTs = c.timestamp || parseDateTimeSafe(c.date);
+                    if (cTs >= CLEAN_SLATE_EPOCH && c && c.id) allCutsMap.set(c.id, c);
                   });
                 }
               }
@@ -770,7 +804,7 @@ function resolveBranchParam(param: string | null): string | null {
                     const sBranch = s.branchId || s.branch_id || "branch-matriz";
                     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
                     const bCutLimit = cutTimestampByBranch.get(sBranch) || 0;
-                    return sTime > bCutLimit;
+                    return sTime >= CLEAN_SLATE_EPOCH && sTime > bCutLimit;
                   });
                   localStorage.setItem("brito_pos_current_sales", JSON.stringify(filtered));
                 }
@@ -785,7 +819,7 @@ function resolveBranchParam(param: string | null): string | null {
                     const eBranch = e.branchId || e.branch_id || "branch-matriz";
                     const eTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
                     const bCutLimit = cutTimestampByBranch.get(eBranch) || 0;
-                    return eTime > bCutLimit;
+                    return eTime >= CLEAN_SLATE_EPOCH && eTime > bCutLimit;
                   });
                   localStorage.setItem("brito_pos_current_expenses", JSON.stringify(filtered));
                 }
@@ -800,7 +834,7 @@ function resolveBranchParam(param: string | null): string | null {
                     const iBranch = i.branchId || i.branch_id || "branch-matriz";
                     const iTime = parseDateTimeSafe(i.timestamp || i.date || i.createdAt);
                     const bCutLimit = cutTimestampByBranch.get(iBranch) || 0;
-                    return iTime > bCutLimit;
+                    return iTime >= CLEAN_SLATE_EPOCH && iTime > bCutLimit;
                   });
                   localStorage.setItem("brito_pos_current_incomes", JSON.stringify(filtered));
                 }
@@ -1016,7 +1050,10 @@ function resolveBranchParam(param: string | null): string | null {
           if (dbOrders.length > 0) {
             try {
               const rawLocalOrd = localStorage.getItem("brito_custom_orders");
-              const localOrdList = rawLocalOrd ? JSON.parse(rawLocalOrd) : [];
+              const localOrdList = (rawLocalOrd ? JSON.parse(rawLocalOrd) : []).filter((o: any) => {
+                const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.createdAt || o.created_at);
+                return ts >= CLEAN_SLATE_EPOCH;
+              });
               const ordMap = new Map<string, any>();
 
               // Cargar existentes previamente normalizados

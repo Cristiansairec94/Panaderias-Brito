@@ -4,6 +4,7 @@ import path from "path";
 import { CustomOrder } from "@/types";
 import { INITIAL_ORDERS, normalizeOrder } from "@/lib/orders";
 import { recordServerRealtimeEvent } from "@/lib/realtime/serverEvents";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
 // Ruta al archivo de almacenamiento persistente en el servidor
 const DATA_DIR = path.join(process.cwd(), "src", "data");
@@ -31,7 +32,7 @@ function ensureDataDirectory() {
 }
 
 function readStoredOrders(): CustomOrder[] {
-  if (inMemoryOrdersCache && inMemoryOrdersCache.length > 0) {
+  if (inMemoryOrdersCache !== null) {
     return inMemoryOrdersCache;
   }
 
@@ -40,8 +41,13 @@ function readStoredOrders(): CustomOrder[] {
     if (fs.existsSync(ORDERS_FILE)) {
       const content = fs.readFileSync(ORDERS_FILE, "utf-8");
       const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const normalized = parsed.map(normalizeOrder);
+      if (Array.isArray(parsed)) {
+        const normalized = parsed
+          .filter((o: any) => {
+            const ts = o.timestamp ? Number(o.timestamp) : new Date(o.createdAt || o.created_at).getTime();
+            return ts >= CLEAN_SLATE_EPOCH;
+          })
+          .map(normalizeOrder);
         inMemoryOrdersCache = normalized;
         return normalized;
       }
@@ -50,18 +56,15 @@ function readStoredOrders(): CustomOrder[] {
     console.warn("[API Orders] Error al leer orders.json, usando memoria:", err);
   }
 
-  // Si aún no hay archivo ni cache, inicializar con los pedidos base
-  if (!inMemoryOrdersCache || inMemoryOrdersCache.length === 0) {
-    inMemoryOrdersCache = [...INITIAL_ORDERS];
-    try {
-      ensureDataDirectory();
-      fs.writeFileSync(ORDERS_FILE, JSON.stringify(INITIAL_ORDERS, null, 2), "utf-8");
-    } catch (err) {
-      console.warn("[API Orders] No se pudo sembrar orders.json:", err);
-    }
+  inMemoryOrdersCache = [];
+  try {
+    ensureDataDirectory();
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify([], null, 2), "utf-8");
+  } catch (err) {
+    console.warn("[API Orders] No se pudo inicializar orders.json:", err);
   }
 
-  return inMemoryOrdersCache || [];
+  return inMemoryOrdersCache;
 }
 
 function writeStoredOrders(orders: CustomOrder[]): boolean {
@@ -82,7 +85,37 @@ function writeStoredOrders(orders: CustomOrder[]): boolean {
  */
 export async function GET(req: NextRequest) {
   try {
-    const orders = readStoredOrders();
+    let orders = readStoredOrders();
+
+    if (orders.length === 0) {
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://yaxqevvvoluaqanspqqf.supabase.co";
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_3XTqXPSLsMF6xJ-x2VBCZg_mM9FvVgw";
+        const res = await fetch(`${supabaseUrl}/rest/v1/custom_orders?select=*&order=created_at.desc`, {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+          },
+          cache: "no-store",
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            orders = data
+              .filter((o: any) => {
+                const ts = o.timestamp ? Number(o.timestamp) : new Date(o.created_at || o.createdAt).getTime();
+                return ts >= CLEAN_SLATE_EPOCH;
+              })
+              .map(normalizeOrder);
+            writeStoredOrders(orders);
+          }
+        }
+      } catch (dbErr) {
+        console.warn("[API Orders GET] Error al cargar desde Supabase:", dbErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       orders,
@@ -119,15 +152,18 @@ export async function POST(req: NextRequest) {
 
     if (Array.isArray(body.orders)) {
       // Merge masivo de pedidos recibidos desde PC o celular
-      for (const ord of body.orders) {
-        if (!ord) continue;
+      for (const rawOrd of body.orders) {
+        if (!rawOrd) continue;
+        const ord = normalizeOrder(rawOrd);
+        const incomingTs = ord.timestamp || (ord.createdAt ? new Date(ord.createdAt).getTime() : 0);
+        if (incomingTs < CLEAN_SLATE_EPOCH) continue;
+
         const key = ord.orderNumber || ord.id;
         if (!key) continue;
 
         if (ordersMap.has(key)) {
           // Si ya existe, nos quedamos con el que tenga mayor timestamp o actualizamos campos
           const existing = ordersMap.get(key)!;
-          const incomingTs = ord.timestamp || (ord.createdAt ? new Date(ord.createdAt).getTime() : 0);
           const existingTs = existing.timestamp || (existing.createdAt ? new Date(existing.createdAt).getTime() : 0);
 
           if (incomingTs >= existingTs) {
@@ -175,7 +211,11 @@ export async function POST(req: NextRequest) {
       }
     } else if (body.order) {
       // Pedido individual
-      const ord = body.order;
+      const ord = normalizeOrder(body.order);
+      const incomingTs = ord.timestamp || (ord.createdAt ? new Date(ord.createdAt).getTime() : 0);
+      if (incomingTs < CLEAN_SLATE_EPOCH) {
+        return NextResponse.json({ success: true, message: "Ignorado por fecha anterior al arranque limpio" });
+      }
       const key = ord.orderNumber || ord.id;
       if (key) {
         ordersMap.set(key, ord);

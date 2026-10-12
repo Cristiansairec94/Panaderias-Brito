@@ -1,5 +1,6 @@
 "use client";
 
+import "@/lib/wipeOperationalData";
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { UserRole, RolePermissions, AppUser } from "@/types";
 import { getDeviceId, getFriendlyDeviceName } from "@/lib/device";

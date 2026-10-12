@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { getStoredProducts, markProductIdAsDeleted } from "@/lib/products";
 import { getStoredCustomers, markCustomerIdAsDeleted } from "@/lib/customers";
+import { executeCompleteOperationalWipe } from "@/lib/wipeOperationalData";
 
 type ResetScope = "sales" | "products" | "customers" | "all";
 
@@ -64,68 +65,9 @@ export default function AdminDataMaintenance() {
       const supabase = createClient();
       const scope = activeModal;
 
-      // 1. Limpieza de Ventas, Movimientos y Cortes
+      // 1. Limpieza de Ventas, Pedidos, Movimientos, Gastos y Notificaciones
       if (scope === "sales" || scope === "all") {
-        // LocalStorage keys
-        const salesKeys = [
-          "brito_pos_master_sales",
-          "brito_simulated_sales",
-          "brito_pos_current_sales",
-          "brito_pos_current_expenses",
-          "brito_pos_current_incomes",
-          "brito_branch_cash_movements",
-          "brito_shift_cuts_history",
-          "brito_custom_orders",
-          "brito_gastos",
-          "brito_cash_incomes",
-          "brito_offline_sales",
-          "brito_sync_queue",
-        ];
-        salesKeys.forEach((key) => {
-          try {
-            localStorage.removeItem(key);
-          } catch {}
-        });
-
-        // Initialize empty states so no mock data is re-injected
-        localStorage.setItem("brito_orders_initialized", "true");
-        localStorage.setItem("brito_incomes_initialized", "true");
-        localStorage.setItem("brito_gastos_initialized", "true");
-        localStorage.setItem("brito_custom_orders", JSON.stringify([]));
-        localStorage.setItem("brito_cash_incomes", JSON.stringify([]));
-        localStorage.setItem("brito_gastos", JSON.stringify([]));
-        localStorage.setItem("brito_pos_master_sales", JSON.stringify([]));
-        localStorage.setItem("brito_simulated_sales", JSON.stringify([]));
-        localStorage.setItem("brito_branch_cash_movements", JSON.stringify([]));
-        localStorage.setItem("brito_shift_cuts_history", JSON.stringify([]));
-
-        // Supabase cleanup if connected
-        try {
-          await supabase.from("custom_orders").delete().neq("id", "none");
-        } catch (e) {
-          console.warn("[AdminMaintenance] custom_orders delete note:", e);
-        }
-        try {
-          await supabase.from("cash_movements").delete().neq("id", "none");
-        } catch (e) {
-          console.warn("[AdminMaintenance] cash_movements delete note:", e);
-        }
-        try {
-          await supabase.from("sales").delete().neq("id", "none");
-        } catch (e) {
-          console.warn("[AdminMaintenance] sales delete note:", e);
-        }
-        try {
-          await supabase.from("cash_cuts").delete().neq("id", "none");
-        } catch (e) {
-          console.warn("[AdminMaintenance] cash_cuts delete note:", e);
-        }
-
-        // Notify modules
-        window.dispatchEvent(new Event("brito_orders_updated"));
-        window.dispatchEvent(new Event("brito_incomes_updated"));
-        window.dispatchEvent(new Event("brito_gastos_updated"));
-        window.dispatchEvent(new Event("brito_sales_updated"));
+        await executeCompleteOperationalWipe({ wipeSupabase: true });
       }
 
       // 2. Limpieza de Catálogo de Productos

@@ -10,11 +10,16 @@ import Header from "./Header";
 import MobileBottomNav from "./MobileBottomNav";
 import LoginForm from "@/components/auth/LoginForm";
 import { ShieldAlert, ArrowLeft } from "lucide-react";
+import { autoRunOperationalWipeIfNeeded } from "@/lib/wipeOperationalData";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isLoading, canAccessRoute, getDefaultRouteForUser } = useAuth();
+
+  useEffect(() => {
+    autoRunOperationalWipeIfNeeded();
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;

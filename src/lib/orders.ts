@@ -1,3 +1,4 @@
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 import { CustomOrder, OrderItem, OrderPayment, CashIncome, Sale } from "@/types";
 import { formatCurrency, formatDateTimeSafe, parseDateTimeSafe, getStoredShiftStartBoundary, resolveBranchId } from "@/lib/utils";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
@@ -13,14 +14,44 @@ function formatNotificationHour(timestamp?: number): string {
   return `${hours}:${minutes} hrs`;
 }
 
+export const CANONICAL_BRANCH_NAMES: Record<string, string> = {
+  "branch-matriz": "Sucursal Matriz (Centro)",
+  "branch-sanjuan": "Sucursal San Juan",
+  "branch-benito": "Sucursal San Benito (Mercado)",
+  "branch-flores": "Sucursal Las Flores (Plaza)",
+  "branch-angeles": "Sucursal Los Ángeles",
+  "branch-1790889237862": "Sucursal San Ildefonso",
+};
+
 export function orderToSupabasePayload(order: CustomOrder): any {
   // Destination/Pickup branch: where the customer picks up or receives the order
   const effPickupBranchId = resolveBranchId(order.branchId, undefined) || "branch-matriz";
-  const effPickupBranchName = order.branchName || "Sucursal Matriz (Centro)";
+  const effPickupBranchName = order.branchName || CANONICAL_BRANCH_NAMES[effPickupBranchId] || "Sucursal Matriz (Centro)";
 
   // Origin/Operating branch: where the cashier raised/created the order
-  const effOperatingBranchId = resolveBranchId(order.operatingBranchId || order.branchId, order.cashier);
-  const effOperatingBranchName = order.operatingBranchName || order.branchName || "Sucursal Matriz (Centro)";
+  const rawNotes = order.notes || "";
+  const originMatch = rawNotes.match(/\[Origen:\s*([^\|\]]+)(?:\|([^\]]+))?\]/);
+  const originMetaId = originMatch ? originMatch[1].trim() : undefined;
+  const originMetaName = originMatch && originMatch[2] ? originMatch[2].trim() : undefined;
+
+  const cashierBranch = order.cashier ? resolveBranchId(undefined, order.cashier) : undefined;
+  let effOperatingBranchId = originMetaId ? resolveBranchId(originMetaId, undefined) : undefined;
+  if (!effOperatingBranchId && order.operatingBranchId && order.operatingBranchId !== order.branchId) {
+    effOperatingBranchId = resolveBranchId(order.operatingBranchId, undefined);
+  }
+  if (!effOperatingBranchId && cashierBranch) {
+    effOperatingBranchId = cashierBranch;
+  }
+  if (!effOperatingBranchId) {
+    effOperatingBranchId = resolveBranchId(order.operatingBranchId || order.branchId, order.cashier);
+  }
+
+  const effOperatingBranchName =
+    originMetaName ||
+    (effOperatingBranchId && CANONICAL_BRANCH_NAMES[effOperatingBranchId]) ||
+    order.operatingBranchName ||
+    order.branchName ||
+    "Sucursal Matriz (Centro)";
 
   // Embed origin branch in notes metadata so it is NEVER lost when storing in Supabase
   let finalNotes = (order.notes || "").trim();
@@ -95,7 +126,9 @@ export function extractOrderOriginAndNotes(order?: Partial<CustomOrder> | { note
 }
 
 export async function persistOrderToSupabase(order: CustomOrder): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !order) return;
+  const orderTs = order.timestamp ? Number(order.timestamp) : parseDateTimeSafe(order.createdAt);
+  if (orderTs < CLEAN_SLATE_EPOCH) return;
   try {
     const supabase = createClient();
     const payload = orderToSupabasePayload(order);
@@ -141,221 +174,8 @@ export async function persistOrderPaymentMovementToSupabase(params: {
   }
 }
 
-export const INITIAL_ORDERS: CustomOrder[] = [
-  {
-    id: "PED-101",
-    orderNumber: "PED-101",
-    customerId: "cli-3",
-    customerName: "Sra. María González",
-    phone: "55 1234 5678",
-    branchId: "branch-matriz",
-    branchName: "Sucursal Matriz (Centro)",
-    operatingBranchId: "branch-matriz",
-    operatingBranchName: "Sucursal Matriz (Centro)",
-    description: "Pastel 3 Leches relleno de durazno, 50 personas, temático de XV años (flores lilas)",
-    items: [
-      {
-        productId: "prod-8",
-        name: "Pastel 3 Leches Artesanal Grande (50 personas)",
-        quantity: 1,
-        unitPrice: 850,
-        subtotal: 850,
-        notes: "Relleno de duraznos en almíbar y cubierta en crema chantilly lila",
-      },
-      {
-        productId: "prod-9",
-        name: "Pay de Queso con Zarzamora",
-        quantity: 1,
-        unitPrice: 100,
-        subtotal: 100,
-        notes: "Para mesa de postres",
-      },
-    ],
-    deliveryDate: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString().split("T")[0], // Mañana
-    deliveryTime: "16:00",
-    deliveryType: "sucursal",
-    status: "pendiente",
-    total: 950,
-    deposit: 500,
-    remainingBalance: 450,
-    paymentStatus: "anticipo",
-    paymentMethod: "efectivo",
-    dedication: "¡Mis XV Años Mariana!",
-    notes: "Entregar en caja alta con base rígida y velas de chispa incluidas.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-    cashier: "Lupita Brito",
-    payments: [
-      {
-        id: "PAY-101-1",
-        date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toLocaleDateString("es-MX", { dateStyle: "short" }),
-        amount: 500,
-        paymentMethod: "efectivo",
-        cashier: "Lupita Brito",
-        notes: "Anticipo 50% al levantar pedido",
-      },
-    ],
-  },
-  {
-    id: "PED-102",
-    orderNumber: "PED-102",
-    customerId: "cli-2",
-    customerName: "Ing. Carlos Mendoza",
-    phone: "55 8765 4321",
-    branchId: "branch-sanjuan",
-    branchName: "Sucursal San Juan",
-    operatingBranchId: "branch-sanjuan",
-    operatingBranchName: "Sucursal San Juan",
-    description: "100 piezas de mini cuernitos rellenos de jamón y queso para evento escolar matutino",
-    items: [
-      {
-        productId: "prod-3",
-        name: "Mini Cuernitos Hojaldrados Jamón y Queso",
-        quantity: 100,
-        unitPrice: 12,
-        subtotal: 1200,
-        notes: "Horneados a primera hora para entregar tibios",
-      },
-    ],
-    deliveryDate: new Date().toISOString().split("T")[0], // Hoy
-    deliveryTime: "08:30",
-    deliveryType: "sucursal",
-    status: "listo",
-    total: 1200,
-    deposit: 1200,
-    remainingBalance: 0,
-    paymentStatus: "liquidado",
-    paymentMethod: "transferencia",
-    dedication: "Evento Colegio San Juan",
-    notes: "Cliente pasa en camioneta blanca a recoger en rampa.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    cashier: "Don Toño Brito",
-    payments: [
-      {
-        id: "PAY-102-1",
-        date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toLocaleDateString("es-MX", { dateStyle: "short" }),
-        amount: 1200,
-        paymentMethod: "transferencia",
-        cashier: "Don Toño Brito",
-        notes: "Liquidación total vía transferencia SPEI",
-      },
-    ],
-  },
-  {
-    id: "PED-103",
-    orderNumber: "PED-103",
-    customerId: "cli-1",
-    customerName: "Familia Brito (Don Toño)",
-    phone: "55 9988 7766",
-    branchId: "branch-sanjuan",
-    branchName: "Sucursal San Juan",
-    operatingBranchId: "branch-flores",
-    operatingBranchName: "Sucursal Las Flores (Plaza)",
-    description: "Pastel Mil Hojas de Chocolate y Café con nuez garapiñada. Creado en Las Flores, se recoge en San Juan.",
-    items: [
-      {
-        productId: "prod-8",
-        name: "Pastel Mil Hojas Gourmet Mediano (25 personas)",
-        quantity: 1,
-        unitPrice: 650,
-        subtotal: 650,
-        notes: "Crujiente hojaldre de mantequilla y crema pastelera de café de olla",
-      },
-    ],
-    deliveryDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2).toISOString().split("T")[0], // En 2 días
-    deliveryTime: "18:00",
-    deliveryType: "sucursal",
-    status: "pendiente",
-    total: 650,
-    deposit: 300,
-    remainingBalance: 350,
-    paymentStatus: "anticipo",
-    paymentMethod: "efectivo",
-    dedication: "¡Feliz Cumpleaños Don Toño!",
-    notes: "Elaborar con hojaldre recién horneado ese mismo mediodía. Recoger en San Juan.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-    cashier: "Elena Brito",
-    payments: [
-      {
-        id: "PAY-103-1",
-        date: new Date().toLocaleDateString("es-MX", { dateStyle: "short" }),
-        amount: 300,
-        paymentMethod: "efectivo",
-        cashier: "Elena Brito",
-        notes: "Anticipo recibido en caja",
-      },
-    ],
-  },
-  {
-    id: "PED-104",
-    orderNumber: "PED-104",
-    customerId: "cli-4",
-    customerName: "Sra. Carmen Salazar",
-    phone: "55 4567 8901",
-    branchId: "branch-matriz",
-    branchName: "Sucursal Matriz (Centro)",
-    description: "Charola de 50 piezas de pan dulce surtido para desayuno corporativo",
-    items: [
-      {
-        productId: "prod-1",
-        name: "Conchas de Vainilla",
-        quantity: 20,
-        unitPrice: 12,
-        subtotal: 240,
-      },
-      {
-        productId: "prod-7",
-        name: "Donas Glaseadas",
-        quantity: 15,
-        unitPrice: 13,
-        subtotal: 195,
-      },
-      {
-        productId: "prod-6",
-        name: "Orejas de Mantequilla",
-        quantity: 15,
-        unitPrice: 14,
-        subtotal: 210,
-      },
-    ],
-    deliveryDate: new Date().toISOString().split("T")[0], // Hoy
-    deliveryTime: "07:30",
-    deliveryType: "domicilio",
-    deliveryAddress: "Av. Reforma #500, Piso 4, Corporativo Reforma",
-    status: "entregado",
-    total: 645,
-    deposit: 645,
-    remainingBalance: 0,
-    paymentStatus: "liquidado",
-    paymentMethod: "tarjeta",
-    dedication: "Reunión Directiva Semanal",
-    notes: "Llevar terminal para cobro o comprobante.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
-    cashier: "Lupita Brito",
-    payments: [
-      {
-        id: "PAY-104-1",
-        date: new Date(Date.now() - 1000 * 60 * 60 * 36).toLocaleDateString("es-MX", { dateStyle: "short" }),
-        amount: 300,
-        paymentMethod: "tarjeta",
-        cashier: "Lupita Brito",
-        notes: "Anticipo inicial",
-      },
-      {
-        id: "PAY-104-2",
-        date: new Date().toLocaleDateString("es-MX", { dateStyle: "short" }),
-        amount: 345,
-        paymentMethod: "tarjeta",
-        cashier: "Lupita Brito",
-        notes: "Liquidación en entrega",
-      },
-    ],
-  },
-];
+export const INITIAL_ORDERS: CustomOrder[] = [];
 
-/**
- * Normaliza pedidos existentes para asegurar que contengan todos los campos compatibles
- * tanto en camelCase como snake_case provenientes de Supabase o LocalStorage
- */
 export function normalizeOrder(order: any): CustomOrder {
   if (!order) return null as any;
 
@@ -379,11 +199,30 @@ export function normalizeOrder(order: any): CustomOrder {
 
   // Pickup Branch (branch_id en Supabase)
   const branchId = order.branchId || order.branch_id || "branch-matriz";
-  const branchName = order.branchName || order.branch_name || "Sucursal Matriz (Centro)";
+  const branchName = order.branchName || order.branch_name || CANONICAL_BRANCH_NAMES[branchId] || "Sucursal Matriz (Centro)";
+
+  const cashier = order.cashier || "Don Toño Brito";
+  const cashierBranchId = cashier ? resolveBranchId(undefined, cashier) : undefined;
 
   // Operating Branch (Origen donde se levantó/cobró el pedido)
-  const operatingBranchId = order.operatingBranchId || order.operating_branch_id || originBranchId || branchId;
-  const operatingBranchName = order.operatingBranchName || order.operating_branch_name || originBranchName || branchName;
+  let operatingBranchId = originBranchId || order.operatingBranchId || order.operating_branch_id;
+  let operatingBranchName = originBranchName || order.operatingBranchName || order.operating_branch_name;
+
+  if (!operatingBranchId || (operatingBranchId === branchId && cashierBranchId && cashierBranchId !== branchId)) {
+    if (cashierBranchId) {
+      operatingBranchId = cashierBranchId;
+      operatingBranchName = CANONICAL_BRANCH_NAMES[cashierBranchId] || operatingBranchName || branchName;
+    } else {
+      operatingBranchId = branchId;
+      operatingBranchName = branchName;
+    }
+  }
+
+  // Ensure origin metadata is stamped in notes if operating branch differs from pickup
+  let notes = rawNotes;
+  if (operatingBranchId && operatingBranchId !== branchId && !notes.includes("[Origen:")) {
+    notes = `[Origen: ${operatingBranchId}|${operatingBranchName}] ${notes}`.trim();
+  }
 
   const rawDate = order.deliveryDate || order.delivery_date;
   const deliveryDate = rawDate ? String(rawDate).split("T")[0].split(" ")[0] : new Date().toISOString().split("T")[0];
@@ -399,7 +238,6 @@ export function normalizeOrder(order: any): CustomOrder {
   const createdAt = typeof rawCreated === "string" ? rawCreated : new Date(rawCreated).toISOString();
   const timestamp = order.timestamp ? Number(order.timestamp) : parseDateTimeSafe(createdAt) || Date.now();
 
-  const cashier = order.cashier || "Don Toño Brito";
   const shiftName = order.shiftName || order.shift_name || undefined;
 
   let items = Array.isArray(order.items) && order.items.length > 0 ? order.items : [];
@@ -451,7 +289,7 @@ export function normalizeOrder(order: any): CustomOrder {
     paymentStatus,
     paymentMethod,
     dedication: order.dedication || "",
-    notes: rawNotes,
+    notes,
     createdAt,
     timestamp,
     shiftName,
@@ -475,11 +313,16 @@ export function getStoredOrders(): CustomOrder[] {
     }
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      if (isOrdersInit) return [];
-      localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(INITIAL_ORDERS));
-      return INITIAL_ORDERS;
+      return [];
     }
-    return parsed.map(normalizeOrder);
+    const epochFiltered = parsed.filter((o: any) => {
+      const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.createdAt || o.created_at);
+      return ts >= CLEAN_SLATE_EPOCH;
+    });
+    if (epochFiltered.length !== parsed.length) {
+      localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(epochFiltered));
+    }
+    return epochFiltered.map(normalizeOrder);
   } catch (err) {
     console.error("Error loading stored orders:", err);
     return INITIAL_ORDERS;
@@ -516,7 +359,12 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
         .order("created_at", { ascending: false });
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        serverOrders = data.map(normalizeOrder);
+        serverOrders = data
+          .filter((o: any) => {
+            const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.created_at);
+            return ts >= CLEAN_SLATE_EPOCH;
+          })
+          .map(normalizeOrder);
       }
     } catch (dbErr) {
       console.warn("[OrdersSync] Supabase no disponible temporalmente:", dbErr);
@@ -529,7 +377,12 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json.orders)) {
-            serverOrders = json.orders.map(normalizeOrder);
+            serverOrders = json.orders
+              .filter((o: any) => {
+                const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.createdAt || o.created_at);
+                return ts >= CLEAN_SLATE_EPOCH;
+              })
+              .map(normalizeOrder);
           }
         }
       } catch (apiErr) {
@@ -553,6 +406,9 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
 
     for (const rawOrd of localOrders) {
       const ord = normalizeOrder(rawOrd);
+      const localTs = ord.timestamp || (ord.createdAt ? new Date(ord.createdAt).getTime() : 0);
+      if (localTs < CLEAN_SLATE_EPOCH) continue;
+
       const existing = (ord.id && ordersMap.get(ord.id)) || (ord.orderNumber && ordersMap.get(ord.orderNumber));
 
       if (!existing) {
@@ -562,7 +418,6 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
         hasLocalChangesToPush = true;
         pendingPushList.push(ord);
       } else {
-        const localTs = ord.timestamp || (ord.createdAt ? new Date(ord.createdAt).getTime() : 0);
         const serverTs = existing.timestamp || (existing.createdAt ? new Date(existing.createdAt).getTime() : 0);
 
         if (localTs > serverTs) {
@@ -596,17 +451,24 @@ export async function syncOrdersWithServer(): Promise<CustomOrder[]> {
 
     // Subir pedidos locales faltantes o actualizados a Supabase y al endpoint de respaldo
     if (hasLocalChangesToPush && pendingPushList.length > 0) {
-      try {
-        const supabase = createClient();
-        const payloads = pendingPushList.map(orderToSupabasePayload);
-        supabase.from("custom_orders").upsert(payloads, { onConflict: "id" }).then(() => {});
-      } catch {}
+      const validPending = pendingPushList.filter((o) => {
+        const ts = o.timestamp ? Number(o.timestamp) : parseDateTimeSafe(o.createdAt);
+        return ts >= CLEAN_SLATE_EPOCH;
+      });
 
-      fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orders: pendingPushList }),
-      }).catch((e) => console.warn("[OrdersSync] Error actualizando cambios al servidor:", e));
+      if (validPending.length > 0) {
+        try {
+          const supabase = createClient();
+          const payloads = validPending.map(orderToSupabasePayload);
+          supabase.from("custom_orders").upsert(payloads, { onConflict: "id" }).then(() => {});
+        } catch {}
+
+        fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orders: validPending }),
+        }).catch((e) => console.warn("[OrdersSync] Error actualizando cambios al servidor:", e));
+      }
     }
 
     return mergedList;
@@ -847,8 +709,13 @@ export function addCustomOrder(data: {
   const current = getStoredOrders();
   const orderNumber = generateNextOrderNumber();
   const orderId = `ord-${Date.now().toString().slice(-8)}-${Math.floor(1000 + Math.random() * 9000)}`;
-  const effOperatingBranchId = resolveBranchId(data.operatingBranchId || data.branchId, data.cashier);
+  const cashierBranch = data.cashier ? resolveBranchId(undefined, data.cashier) : undefined;
+  const effOperatingBranchId = data.operatingBranchId && data.operatingBranchId !== data.branchId
+    ? resolveBranchId(data.operatingBranchId, undefined)
+    : (cashierBranch || resolveBranchId(data.operatingBranchId || data.branchId, data.cashier));
+  const effOperatingBranchName = data.operatingBranchName || (effOperatingBranchId && CANONICAL_BRANCH_NAMES[effOperatingBranchId]) || data.branchName || "Sucursal Matriz (Centro)";
   const effPickupBranchId = resolveBranchId(data.branchId, undefined);
+  const effPickupBranchName = data.branchName || CANONICAL_BRANCH_NAMES[effPickupBranchId] || "Sucursal Matriz (Centro)";
   const deposit = Math.max(0, Math.min(data.total, Number(data.deposit) || 0));
   const remaining = Math.max(0, data.total - deposit);
   const paymentStatus: CustomOrder["paymentStatus"] =
@@ -877,7 +744,7 @@ export function addCustomOrder(data: {
       customerId: data.customerId,
       cashier: data.cashier,
       branchId: effOperatingBranchId,
-      branchName: data.operatingBranchName || data.branchName,
+      branchName: effOperatingBranchName,
       paymentMethod: data.paymentMethod,
       isLiquidation: remaining === 0,
     });
@@ -900,6 +767,11 @@ export function addCustomOrder(data: {
     });
   }
 
+  let finalNotes = (data.notes || "").trim();
+  if (effOperatingBranchId && effOperatingBranchId !== effPickupBranchId && !finalNotes.includes("[Origen:")) {
+    finalNotes = `[Origen: ${effOperatingBranchId}|${effOperatingBranchName}] ${finalNotes}`.trim();
+  }
+
   const newOrder: CustomOrder = {
     id: orderId,
     orderNumber: orderNumber,
@@ -907,9 +779,9 @@ export function addCustomOrder(data: {
     customerName: data.customerName.trim(),
     phone: data.phone.trim(),
     branchId: effPickupBranchId,
-    branchName: data.branchName,
+    branchName: effPickupBranchName,
     operatingBranchId: effOperatingBranchId,
-    operatingBranchName: data.operatingBranchName || data.branchName,
+    operatingBranchName: effOperatingBranchName,
     description: data.description.trim() || (data.items.length > 0 ? data.items.map(i => `${i.quantity}x ${i.name}`).join(", ") : "Encargo"),
     items: data.items,
     deliveryDate: data.deliveryDate,
@@ -926,7 +798,7 @@ export function addCustomOrder(data: {
     cardTerminal: data.cardTerminal,
     paymentReference: data.paymentReference,
     dedication: data.dedication?.trim(),
-    notes: data.notes?.trim(),
+    notes: finalNotes || undefined,
     createdAt: new Date().toISOString(),
     timestamp: Date.now(),
     cashier: data.cashier,
@@ -1071,7 +943,11 @@ export function addOrderPayment(
     order.status = "entregado";
   }
 
-  const effOperatingBranchId = resolveBranchId(params.operatingBranchId || order.operatingBranchId || order.branchId, params.cashier);
+  const paymentCashierBranch = params.cashier ? resolveBranchId(undefined, params.cashier) : undefined;
+  const effOperatingBranchId = params.operatingBranchId
+    ? resolveBranchId(params.operatingBranchId, undefined)
+    : (paymentCashierBranch || resolveBranchId(order.operatingBranchId || order.branchId, params.cashier));
+  const effOperatingBranchName = params.operatingBranchName || (effOperatingBranchId && CANONICAL_BRANCH_NAMES[effOperatingBranchId]) || order.operatingBranchName || order.branchName;
 
   // Registrar en ingresos de caja de quien opera el turno
   recordOrderCashIncome({
@@ -1082,7 +958,7 @@ export function addOrderPayment(
     customerId: order.customerId,
     cashier: params.cashier,
     branchId: effOperatingBranchId,
-    branchName: params.operatingBranchName || order.operatingBranchName || order.branchName,
+    branchName: effOperatingBranchName,
     paymentMethod: params.paymentMethod,
     isLiquidation: isFullLiquidation,
   });

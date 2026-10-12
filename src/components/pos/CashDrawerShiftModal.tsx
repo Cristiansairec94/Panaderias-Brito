@@ -39,6 +39,7 @@ import { useBranch } from "@/context/BranchContext";
 import { useAuth } from "@/context/AuthContext";
 import { realtimeHub } from "@/lib/realtime/realtimeHub";
 import { createClient } from "@/lib/supabase/client";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
 interface CashDrawerShiftModalProps {
   isOpen: boolean;
@@ -417,6 +418,7 @@ export default function CashDrawerShiftModal({
       return false;
     }
     const sTime = parseDateTimeSafe(s.timestamp || s.createdAt || s.date);
+    if (!sTime || sTime < CLEAN_SLATE_EPOCH) return false;
     if (shiftStartBoundary > 0) {
       if (!sTime || sTime < shiftStartBoundary) return false;
     }
@@ -439,6 +441,7 @@ export default function CashDrawerShiftModal({
       return false;
     }
     const oTime = parseDateTimeSafe(o.timestamp || o.createdAt || (o as any).date);
+    if (!oTime || oTime < CLEAN_SLATE_EPOCH) return false;
     if (shiftStartBoundary > 0) {
       if (!oTime || oTime < shiftStartBoundary) return false;
     }
@@ -465,7 +468,7 @@ export default function CashDrawerShiftModal({
 
   const ordersInSalesCash = effectiveSales.filter((s) => s.paymentMethod === "efectivo" && s.isCustomOrder).reduce((sum, s) => sum + s.total, 0);
   const calculatedOrdersCash = ordersCash + ordersInSalesCash;
-  const totalOrdersCash = branchOrdersDeposit > 0 && calculatedOrdersCash === 0 ? branchOrdersDeposit : calculatedOrdersCash > 0 ? calculatedOrdersCash : branchOrdersDeposit;
+  const totalOrdersCash = calculatedOrdersCash > 0 ? calculatedOrdersCash : 0;
 
   const rawPosCash = rawPurePosCash + totalOrdersCash;
 
@@ -487,6 +490,7 @@ export default function CashDrawerShiftModal({
     const isOwnerOrAdmin = e.isOwner || e.category === "retiro_dueno" || outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (e.cashier && (e.cashier.toLowerCase().includes("don toño") || e.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!e.cashier || !matchesCashier(e.cashier, outgoingCashier))) return false;
     const expTime = parseDateTimeSafe(e.timestamp || e.createdAt || e.date);
+    if (!expTime || expTime < CLEAN_SLATE_EPOCH) return false;
     if (shiftStartBoundary > 0 && expTime && expTime < shiftStartBoundary) return false;
     return true;
   });
@@ -507,6 +511,7 @@ export default function CashDrawerShiftModal({
     const isOwnerOrAdmin = outgoingCashier.toLowerCase().includes("don toño") || outgoingCashier.toLowerCase().includes("admin") || (inc.cashier && (inc.cashier.toLowerCase().includes("don toño") || inc.cashier.toLowerCase().includes("admin")));
     if (!isOwnerOrAdmin && (!inc.cashier || !matchesCashier(inc.cashier, outgoingCashier))) return false;
     const incTime = parseDateTimeSafe(inc.timestamp || inc.date || (inc as any).createdAt);
+    if (!incTime || incTime < CLEAN_SLATE_EPOCH) return false;
     if (shiftStartBoundary > 0 && incTime && incTime < shiftStartBoundary) return false;
     return true;
   });

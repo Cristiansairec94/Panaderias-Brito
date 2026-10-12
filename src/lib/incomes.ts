@@ -6,87 +6,10 @@ import { markRecordIdsAsSynced } from "@/lib/sync/syncService";
 
 export const STORAGE_INCOMES_KEY = "brito_cash_incomes";
 
-export const INITIAL_INCOMES: CashIncome[] = [
-  {
-    id: "ING-849102",
-    amount: 500,
-    category: "abono_pedido",
-    categoryLabel: "Abono a Pedido Especial",
-    paymentMethod: "efectivo",
-    concept: "Anticipo de pastel 3 leches XV años para Sra. María González (PED-101)",
-    customerId: "cli-3",
-    customerName: "Sra. María González",
-    orderId: "PED-101",
-    orderNumber: "PED-101",
-    cashier: "Lupita Brito",
-    branchName: "Sucursal Matriz Centro",
-    date: "Hoy, 08:45 AM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849103",
-    amount: 850,
-    category: "abono_cliente",
-    categoryLabel: "Cobro a Mayorista / Tiendita",
-    paymentMethod: "transferencia",
-    referenceNumber: "SPEI-774921",
-    concept: "Liquidación semanal de 150 bolillos y teleras",
-    customerId: "cli-1",
-    customerName: "Abarrotes La Guadalupana (Don Pepe)",
-    cashier: "Don Toño Brito",
-    branchName: "Sucursal Matriz Centro",
-    date: "Hoy, 10:15 AM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849104",
-    amount: 300,
-    category: "abono_pedido",
-    categoryLabel: "Abono a Pedido Especial",
-    paymentMethod: "efectivo",
-    concept: "Anticipo pastel mil hojas de chocolate y café para cumpleaños",
-    customerId: "cli-4",
-    customerName: "Familia Brito",
-    orderId: "PED-103",
-    orderNumber: "PED-103",
-    cashier: "Lupita Brito",
-    branchName: "Sucursal Norte",
-    date: "Hoy, 11:30 AM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849105",
-    amount: 250,
-    category: "venta_costales",
-    categoryLabel: "Venta de Costales / Reciclaje",
-    paymentMethod: "efectivo",
-    concept: "Venta de 50 costales de harina vacíos a forrajera local",
-    cashier: "Maestro Juan",
-    branchName: "Sucursal Matriz Centro",
-    date: "Hoy, 12:45 PM",
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "ING-849106",
-    amount: 1000,
-    category: "fondo_cambio",
-    categoryLabel: "Aportación de Cambio a Caja",
-    paymentMethod: "efectivo",
-    concept: "Inyección de morralla y billetes de $20 y $50 para cambio del turno vespertino",
-    cashier: "Don Toño Brito",
-    branchName: "Sucursal Mercado",
-    date: "Hoy, 01:20 PM",
-    timestamp: new Date().toISOString(),
-  },
-];
+export const INITIAL_INCOMES: CashIncome[] = [];
 
 /**
- * Limpia y deduplica de forma estricta los ingresos para evitar registros repetidos:
- * 1. Si existe un "abono_pedido" (Anticipo o Liquidación de Pedido Especial) y además una "venta_mostrador"
- *    que menciona el mismo número de pedido (ej. PED-110) y el mismo monto, se elimina la venta_mostrador repetida.
- * 2. Si existen dos registros con la misma referencia de venta (saleId) o mismo ID, se conserva solo 1.
- * 3. Si existen dos registros de "venta_mostrador" con el mismo monto, mismo cajero, mismo concepto / productos
- *    y generados con pocos segundos/minutos de diferencia, se conserva solo 1.
+ * Limpia y deduplica de forma estricta los ingresos
  */
 export function cleanDuplicateIncomes(incomes: CashIncome[]): CashIncome[] {
   if (!Array.isArray(incomes)) return [];

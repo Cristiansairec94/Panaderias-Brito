@@ -1,4 +1,5 @@
 "use client";
+import { CLEAN_SLATE_EPOCH } from "@/lib/wipeOperationalData";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from "react";
 import { realtimeHub, RealtimeStatus } from "@/lib/realtime/realtimeHub";
@@ -442,220 +443,39 @@ function checkBranchMatchesTargetCode(notif: Partial<FBNotification>, targetCode
     if (orderOriginCode && orderOriginCode === targetCode) {
       return true;
     }
+
+    if (order.cashier) {
+      const cashierBranchCode = getCanonicalBranchCode(resolveBranchId(undefined, order.cashier));
+      if (cashierBranchCode && cashierBranchCode === targetCode) {
+        return true;
+      }
+    }
+
+    if (Array.isArray(order.payments) && order.payments.length > 0) {
+      for (const p of order.payments) {
+        if (p.cashier) {
+          const payBranchCode = getCanonicalBranchCode(resolveBranchId(undefined, p.cashier));
+          if (payBranchCode && payBranchCode === targetCode) {
+            return true;
+          }
+        }
+      }
+    }
   }
 
   // 4. Búsqueda de palabra clave por sucursal en el texto
   const text = `${notif.title || ""} ${notif.highlightText || ""} ${notif.description || ""} ${notif.senderName || ""}`.toLowerCase();
   if (targetCode === "branch-matriz" && (text.includes("matriz") || text.includes("centro"))) return true;
   if (targetCode === "branch-angeles" && (text.includes("angeles") || text.includes("ángeles"))) return true;
-  if (targetCode === "branch-sanjuan" && text.includes("san juan")) return true;
-  if (targetCode === "branch-benito" && text.includes("benito")) return true;
+  if (targetCode === "branch-sanjuan" && (text.includes("san juan") || text.includes("sanjuan"))) return true;
+  if (targetCode === "branch-benito" && (text.includes("benito") || text.includes("mercado"))) return true;
   if (targetCode === "branch-1790889237862" && text.includes("ildefonso")) return true;
+  if (targetCode === "branch-flores" && (text.includes("flores") || text.includes("plaza"))) return true;
 
   return false;
 }
 
-const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [
-  {
-    id: "corte-turno-matutino-cuadro",
-    senderName: "🏁 Cierre de Turno (silvia puga)",
-    senderAvatar: "💰",
-    badgeIcon: "dinero",
-    title: "Cierre a las 14:00 hrs: ✓ CAJA CUADRADA EXACTA ($0.00)",
-    highlightText: "silvia puga entregó turno a Don Toño Brito",
-    description: "Horario de turno: 06:00 a 14:00 hrs. Efectivo en caja: $47,569.00. Cuadró exacto sin faltante ($0.00 de diferencia). Fondo dejado para nuevo turno: $1,000.00. Efectivo retirado: $46,569.00.",
-    timeAgo: "Hace 15 min",
-    timestamp: Date.now() - 15 * 60 * 1000,
-    group: "recientes",
-    read: false,
-    actionLabel: "Ver Corte de Caja",
-    actionLink: "/caja?tab=historial",
-    category: "caja",
-    cutId: "CORTE-MAT-001",
-    shiftCutData: {
-      id: "CORTE-MAT-001",
-      date: new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
-      timestamp: Date.now() - 15 * 60 * 1000,
-      shiftRange: "06:00 a 14:00 hrs",
-      outgoingCashier: "silvia puga",
-      incomingCashier: "Don Toño Brito",
-      responsible: "silvia puga",
-      branchName: "Sucursal Matriz (Centro)",
-      branchId: "branch-matriz",
-      previousShift: "Matutino",
-      nextShift: "Vespertino",
-      initialFund: 1000,
-      cashSales: 18979,
-      cardSales: 0,
-      transferSales: 0,
-      totalSales: 18979,
-      totalSalesAll: 18979,
-      totalExpenses: 6000,
-      totalIncomes: 33590,
-      expectedCash: 47569,
-      countedCash: 47569,
-      difference: 0,
-      nextFund: 1000,
-      notes: "Cierre de turno matutino completado conforme y sin faltantes. Don Toño recibió el efectivo físico en mostrador.",
-      expensesList: [
-        {
-          id: "EXP-M01",
-          amount: 500,
-          category: "compra_insumos",
-          description: "Compra urgente de levadura fresca y mantequilla",
-          cashier: "Lupita Brito",
-          date: new Date().toISOString().split("T")[0],
-          authorizedBy: "Don Toño Brito",
-        },
-      ],
-      stockPieces: 320,
-      stockValue: 3840,
-    },
-  },
-  {
-    id: "corte-turno-vespertino-alerta",
-    senderName: "🏁 Cierre de Turno (Vespertino)",
-    senderAvatar: "⚠️",
-    badgeIcon: "dinero",
-    title: "Cierre a las 21:30 hrs: 🚨 NO CUADRÓ LA CAJA (Faltante -$50.00)",
-    highlightText: "Turno Vespertino entregó turno a Don Toño Brito",
-    description: "Horario de turno: 14:00 a 21:30 hrs. Efectivo esperado: $3,920.00 | Efectivo contado: $3,870.00. Faltante detectado: -$50.00 MXN en entrega de turno. Fondo dejado: $800.00.",
-    timeAgo: "Hace 1 hora",
-    timestamp: Date.now() - 60 * 60 * 1000,
-    group: "recientes",
-    read: false,
-    actionLabel: "Ver Corte de Caja",
-    actionLink: "/caja?tab=historial",
-    category: "caja",
-    cutId: "CORTE-VESP-002",
-    shiftCutData: {
-      id: "CORTE-VESP-002",
-      date: new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
-      timestamp: Date.now() - 60 * 60 * 1000,
-      shiftRange: "14:00 a 21:30 hrs",
-      outgoingCashier: "Turno Vespertino",
-      incomingCashier: "Don Toño Brito",
-      responsible: "Turno Vespertino",
-      branchName: "Sucursal Matriz (Centro)",
-      previousShift: "Vespertino",
-      nextShift: "Nocturno / Cierre",
-      initialFund: 1000,
-      cashSales: 3320,
-      cardSales: 850,
-      transferSales: 400,
-      totalSales: 4570,
-      totalSalesAll: 4570,
-      totalExpenses: 200,
-      totalIncomes: 0,
-      expectedCash: 3920,
-      countedCash: 3870,
-      difference: -50,
-      nextFund: 1000,
-      notes: "Faltante detectado de -$50.00 MXN en entrega de turno. Físico contado $3,870.00 contra $3,920.00 esperados. Reportado para aclaración.",
-      expensesList: [
-        {
-          id: "EXP-V01",
-          amount: 200,
-          category: "limpieza",
-          description: "Bolsas y productos de limpieza para cierre",
-          cashier: "Turno Vespertino",
-          date: new Date().toISOString().split("T")[0],
-          authorizedBy: "Don Toño Brito",
-        },
-      ],
-      stockPieces: 85,
-      stockValue: 1020,
-    },
-  },
-  {
-    id: "pedido-ped-101",
-    senderName: "🎂 Pedido Registrado (Matriz Centro)",
-    senderAvatar: "🎂",
-    badgeIcon: "pastel",
-    title: "Nuevo Pedido PED-101: Total $950.00",
-    highlightText: "Sra. María González - Anticipo: $500.00",
-    description: "Pastel 3 Leches XV Años. Entrega: Mañana a las 16:00 hrs (Recoge en Sucursal Matriz Centro). Saldo restante: $450.00.",
-    timeAgo: "Hace 28 min",
-    timestamp: Date.now() - 28 * 60 * 1000,
-    group: "recientes",
-    read: false,
-    actionLabel: "Cobrar $450",
-    actionLink: "/caja",
-    secondaryActionLabel: "Ver Detalle",
-    secondaryActionLink: "/pedidos?order=PED-101",
-    category: "pedidos",
-    orderId: "PED-101",
-    branchId: "branch-matriz",
-    branchName: "Sucursal Matriz (Centro)",
-    operatingBranchId: "branch-matriz",
-    operatingBranchName: "Sucursal Matriz (Centro)",
-  },
-  {
-    id: "pedido-ped-102",
-    senderName: "🎂 Pedido Liquidado (San Juan)",
-    senderAvatar: "🎂",
-    badgeIcon: "pastel",
-    title: "Pedido Liquidado PED-102: Total $1,200.00",
-    highlightText: "Ing. Carlos Mendoza - 100% Pagado ($1,200.00)",
-    description: "100 piezas de Mini Cuernitos Hojaldrados. Entrega: Hoy a las 08:30 hrs en Sucursal San Juan. Estado: Listo para entrega.",
-    timeAgo: "Ayer a las 6:30 PM",
-    timestamp: Date.now() - 24 * 60 * 60 * 1000,
-    group: "anteriores",
-    read: true,
-    actionLabel: "Ver Detalle",
-    actionLink: "/pedidos?order=PED-102",
-    category: "pedidos",
-    orderId: "PED-102",
-    branchId: "branch-sanjuan",
-    branchName: "Sucursal San Juan",
-    operatingBranchId: "branch-sanjuan",
-    operatingBranchName: "Sucursal San Juan",
-  },
-  {
-    id: "pedido-ped-103",
-    senderName: "🎂 Pedido Inter-Sucursal (Las Flores ➔ San Juan)",
-    senderAvatar: "🎂",
-    badgeIcon: "pastel",
-    title: "Nuevo Pedido PED-103: Total $1,450.00",
-    highlightText: "Lic. Andrea Romero - Anticipo: $700.00",
-    description: "Pastel Gourmet Fondant y 50 Cupcakes. Creado en Sucursal Las Flores. Recoge en Sucursal San Juan a las 15:00 hrs. Saldo restante: $750.00.",
-    timeAgo: "Hace 10 min",
-    timestamp: Date.now() - 10 * 60 * 1000,
-    group: "recientes",
-    read: false,
-    actionLabel: "Cobrar $750",
-    actionLink: "/caja",
-    secondaryActionLabel: "Ver Detalle",
-    secondaryActionLink: "/pedidos?order=PED-103",
-    category: "pedidos",
-    orderId: "PED-103",
-    branchId: "branch-sanjuan",
-    branchName: "Sucursal San Juan",
-    operatingBranchId: "branch-flores",
-    operatingBranchName: "Sucursal Las Flores (Plaza)",
-  },
-  {
-    id: "pedido-ped-189-liquidado",
-    senderName: "📦✅ Pedido Liquidado y Entregado (Sucursal Los Ángeles)",
-    senderAvatar: "📦",
-    badgeIcon: "pastel",
-    title: "Pedido Liquidado y Entregado PED-189: $500.00",
-    highlightText: "Marcos Sánchez - 100% Pagado • Entregado en Sucursal Los Ángeles",
-    description: "Se cobró liquidación final de $500.00 en Sucursal Los Ángeles. Pedido originado en Sucursal San Ildefonso. Entregado con éxito al cliente en mostrador.",
-    timeAgo: "Hace 5 min",
-    timestamp: Date.now() - 5 * 60 * 1000,
-    group: "recientes",
-    read: false,
-    actionLabel: "Ver Detalle",
-    actionLink: "/pedidos?order=PED-189",
-    category: "pedidos",
-    orderId: "PED-189",
-    branchId: "branch-angeles",
-    branchName: "Sucursal Los Ángeles",
-    operatingBranchId: "branch-1790889237862",
-    operatingBranchName: "Sucursal San Ildefonso",
-  },
-];
+const INITIAL_FB_NOTIFICATIONS: FBNotification[] = [];
 
 export function findOrderForNotification(notif: FBNotification): CustomOrder | null {
   try {
@@ -1005,32 +825,12 @@ export function resolveNotificationTimestamp(notif: Partial<FBNotification>): nu
     }
   }
 
-  if (notif.timeAgo) {
-    const s = notif.timeAgo.toLowerCase().trim();
-    const now = Date.now();
-    // 1. Detectar si viene una hora fija como "18:05 hrs", "06:05 pm", "18:05"
-    const timeMatch = s.match(/(\d{1,2}):(\d{2})/);
-    if (timeMatch) {
-      const d = new Date();
-      let h = parseInt(timeMatch[1], 10);
-      const m = parseInt(timeMatch[2], 10);
-      if (s.includes("pm") && h < 12) h += 12;
-      if (s.includes("am") && h === 12) h = 0;
-      d.setHours(h, m, 0, 0);
-      if (s.includes("ayer")) d.setDate(d.getDate() - 1);
-      return d.getTime();
-    }
-    const minM = s.match(/hace\s*(\d+)\s*min/);
-    if (minM) return now - parseInt(minM[1], 10) * 60 * 1000;
-    const hourM = s.match(/hace\s*(\d+)\s*h/);
-    if (hourM) return now - parseInt(hourM[1], 10) * 3600 * 1000;
-    const secM = s.match(/hace\s*(\d+)\s*s/);
-    if (secM) return now - parseInt(secM[1], 10) * 1000;
-    if (s.includes("ayer")) return now - 24 * 3600 * 1000;
-    if (s.includes("hace un momento") || s.includes("ahora")) return now - 45 * 1000;
+  if (notif.createdAt) {
+    const t = new Date(notif.createdAt).getTime();
+    if (!isNaN(t) && t > 1000000000000) return t;
   }
 
-  return Date.now();
+  return 0;
 }
 
 interface NotificationContextType {
@@ -1085,63 +885,33 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Purgar y excluir estrictamente cualquier notificación vieja de almacén / stock
-            const allowed = parsed.filter(isAllowedNotification).map((item: FBNotification) => {
+            // Filtrar estrictamente solo notificaciones posteriores al arranque limpio
+            const epochFiltered = parsed.filter((item: FBNotification) => {
+              if (!isAllowedNotification(item)) return false;
+              const ts = resolveNotificationTimestamp(item);
+              return ts >= CLEAN_SLATE_EPOCH;
+            });
+
+            if (epochFiltered.length === 0) {
+              localStorage.setItem(STORAGE_NOTIFS_KEY, JSON.stringify([]));
+              return [];
+            }
+
+            const allowed = epochFiltered.map((item: FBNotification) => {
               const enrichedTs = resolveNotificationTimestamp(item);
               const timeAgoClean = (!item.timeAgo || item.timeAgo === "Hace un momento" || item.timeAgo.toLowerCase() === "ahora")
                 ? formatNotificationHour(enrichedTs)
                 : item.timeAgo;
-              if (
-                (item.category === "caja" ||
-                 item.title.toLowerCase().includes("corte") ||
-                 item.title.toLowerCase().includes("cierre")) &&
-                !item.shiftCutData
-              ) {
-                const enriched = findShiftCutForNotification(item);
-                if (enriched) {
-                  return { ...item, timestamp: enrichedTs, timeAgo: timeAgoClean, shiftCutData: enriched, cutId: enriched.id };
-                }
-              }
-              // Retro-compatibilidad: enriquecer pedidos antiguos con datos de sucursal
-              if (item.category === "pedidos" && (!item.branchId || !item.operatingBranchId)) {
-                const order = findOrderForNotification(item);
-                if (order) {
-                  return {
-                    ...item,
-                    timestamp: enrichedTs,
-                    timeAgo: timeAgoClean,
-                    branchId: item.branchId || order.branchId,
-                    branchName: item.branchName || order.branchName,
-                    operatingBranchId: item.operatingBranchId || order.operatingBranchId,
-                    operatingBranchName: item.operatingBranchName || order.operatingBranchName,
-                  };
-                }
-              }
               return { ...item, timestamp: enrichedTs, timeAgo: timeAgoClean };
             });
 
-            // Deduplicación estricta de pedidos repetidos en almacenamiento
-            const deduplicated: FBNotification[] = [];
-            for (const item of allowed) {
-              const existingIdx = deduplicated.findIndex((existing) => isSameOrderEvent(existing, item));
-              if (existingIdx === -1) {
-                deduplicated.push(item);
-              } else {
-                deduplicated[existingIdx] = mergeNotifications(deduplicated[existingIdx], item);
-              }
-            }
-
-            if (deduplicated.length > 0) {
-              try {
-                localStorage.setItem(STORAGE_NOTIFS_KEY, JSON.stringify(deduplicated));
-              } catch (e) {}
-              return deduplicated;
-            }
+            localStorage.setItem(STORAGE_NOTIFS_KEY, JSON.stringify(allowed));
+            return allowed;
           }
         }
       } catch (e) {}
     }
-    return INITIAL_FB_NOTIFICATIONS;
+    return [];
   });
 
   const notificationsRef = useRef(notifications);
@@ -1232,7 +1002,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Notificaciones filtradas según el rol y sucursal del usuario
   const visibleNotifications = useMemo(() => {
-    const filtered = notifications.filter((notif) => isNotificationVisibleForUser(notif, user, currentBranch));
+    const filtered = notifications.filter((notif) => {
+      const ts = resolveNotificationTimestamp(notif);
+      if (ts < CLEAN_SLATE_EPOCH) return false;
+      return isNotificationVisibleForUser(notif, user, currentBranch);
+    });
     // DEDUPLICACIÓN EN TIEMPO DE RENDER: Garantía del 100% de que NUNCA se mostrarán pedidos duplicados
     const deduped: FBNotification[] = [];
     for (const item of filtered) {
@@ -1290,11 +1064,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const unsubNotification = realtimeHub.onNotification((incomingNotif) => {
       // Filtrar estrictamente: solo Cierres de Turno y Pedidos
-      if (!isAllowedNotification(incomingNotif)) return;
+      const notifTs = resolveNotificationTimestamp(incomingNotif);
+      if (notifTs > 0 && notifTs < CLEAN_SLATE_EPOCH) return;
 
       const remoteNotif: FBNotification = {
         ...incomingNotif,
-        timestamp: resolveNotificationTimestamp(incomingNotif),
+        timestamp: notifTs > 0 ? notifTs : Date.now(),
       };
 
       const isDuplicate = notificationsRef.current.some((n) => isSameOrderEvent(n, remoteNotif));
@@ -1333,6 +1108,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const unsubOrder = realtimeHub.onOrder
       ? realtimeHub.onOrder(({ action, order }) => {
           if (!order) return;
+          const orderTs = order.timestamp || (order.createdAt ? new Date(order.createdAt).getTime() : 0);
+          if (orderTs > 0 && orderTs < CLEAN_SLATE_EPOCH) return;
           if (action === "create") {
             const notifId = `notif-order-${order.id}`;
             if (
@@ -1540,8 +1317,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (e.key === STORAGE_NOTIFS_KEY && e.newValue) {
         try {
           const rawRemoteList: FBNotification[] = JSON.parse(e.newValue);
-          if (!Array.isArray(rawRemoteList) || rawRemoteList.length === 0) return;
-          const remoteList = rawRemoteList.map((n) => ({
+          if (!Array.isArray(rawRemoteList)) return;
+          const epochFiltered = rawRemoteList.filter((n) => {
+            const ts = resolveNotificationTimestamp(n);
+            return ts >= CLEAN_SLATE_EPOCH;
+          });
+          if (epochFiltered.length === 0) {
+            setNotifications([]);
+            return;
+          }
+          const remoteList = epochFiltered.map((n) => ({
             ...n,
             timestamp: resolveNotificationTimestamp(n),
           }));
@@ -1574,8 +1359,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
     };
 
+    const handleClearEvent = () => {
+      setNotifications([]);
+    };
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    window.addEventListener("brito_notifications_cleared", handleClearEvent);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("brito_notifications_cleared", handleClearEvent);
+    };
   }, []);
 
   const addNotification = (notif: Omit<FBNotification, "id" | "read" | "timeAgo" | "group"> & Partial<FBNotification>) => {

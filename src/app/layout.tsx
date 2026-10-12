@@ -59,6 +59,60 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Panadería Brito" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var WIPE_KEY = 'brito_clean_slate_epoch_1791836100000';
+                  if (localStorage.getItem(WIPE_KEY) !== 'true') {
+                    var keys = [
+                      'brito_notifications',
+                      'brito_custom_orders',
+                      'brito_orders',
+                      'brito_pos_master_sales',
+                      'brito_pos_current_sales',
+                      'brito_recent_sales',
+                      'brito_simulated_sales',
+                      'brito_offline_sales',
+                      'brito_sync_queue',
+                      'brito_offline_archive',
+                      'brito_synced_cache',
+                      'brito_shift_cuts_history',
+                      'brito_expenses',
+                      'brito_gastos',
+                      'brito_gastos_registro',
+                      'brito_pos_current_expenses',
+                      'brito_incomes',
+                      'brito_incomes_v2',
+                      'brito_cash_incomes',
+                      'brito_pos_current_incomes',
+                      'brito_branch_cash_movements',
+                      'brito_bread_deliveries',
+                      'brito_current_shift_start_timestamp'
+                    ];
+                    for (var i = 0; i < keys.length; i++) {
+                      localStorage.setItem(keys[i], '[]');
+                    }
+                    localStorage.setItem('brito_orders_initialized', 'true');
+                    localStorage.setItem('brito_incomes_initialized', 'true');
+                    localStorage.setItem('brito_gastos_initialized', 'true');
+                    localStorage.removeItem('brito_branches_data');
+                    localStorage.removeItem('brito_branches');
+                    localStorage.removeItem('brito_current_shift_start_timestamp');
+                    for (var j = localStorage.length - 1; j >= 0; j--) {
+                      var k = localStorage.key(j);
+                      if (k && (k.indexOf('brito_shift_start_') === 0 || k.indexOf('brito_pos_initial_fund_') === 0)) {
+                        localStorage.removeItem(k);
+                      }
+                    }
+                    localStorage.setItem(WIPE_KEY, 'true');
+                  }
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
       </head>
       <body className="antialiased font-sans">
         <AuthProvider>
