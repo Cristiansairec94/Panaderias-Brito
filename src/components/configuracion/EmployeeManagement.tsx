@@ -42,7 +42,6 @@ import { UserRole } from "@/types";
 const PUESTOS_PANADERIA = [
   "Cajero(a) de Mostrador",
   "Auxiliar Administrativo",
-  "Encargado(a) de Sucursal",
   "Supervisor de Calidad"
 ];
 
@@ -119,7 +118,7 @@ function generateRandomPin(): string {
 function suggestRoleFromJobTitle(jobTitle: string): UserRole {
   const lower = jobTitle.toLowerCase();
   if (lower.includes("admin") || lower.includes("dueño") || lower.includes("general")) return "admin";
-  if (lower.includes("auxiliar") || lower.includes("contab") || lower.includes("superv") || lower.includes("encargad") || lower.includes("gerent")) return "auxiliar_admin";
+  if (lower.includes("auxiliar") || lower.includes("contab") || lower.includes("superv") || lower.includes("gerent")) return "auxiliar_admin";
   return "cajero";
 }
 
